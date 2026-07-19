@@ -4,9 +4,20 @@ How a maintainer cuts a release. Guardana is five packages that version **in
 lockstep** — one number, one tag, one PyPI publish for all of them — so a
 release is a single deliberate act, not five.
 
-If you only remember one thing: **`python scripts/bump_version.py <part>`, roll
-the changelog, commit, tag `vX.Y.Z`, push the tag.** The rest of this file is the
-why and the edge cases.
+If you only remember one thing: **`uv run python scripts/release.py <part>`** —
+it runs the gate, bumps the version + pins + lock, rolls the changelog, commits,
+tags `vX.Y.Z`, and pushes. Pushing the tag triggers the PyPI publish (which pauses
+on the `pypi` environment for one approval click). Preview with `--dry-run` first.
+
+```bash
+uv run python scripts/release.py patch --dry-run   # show the plan, change nothing
+uv run python scripts/release.py patch             # cut it: 0.1.0 -> 0.1.1
+uv run python scripts/release.py 0.1.0             # first release: tag the current version, no bump
+```
+
+Only a maintainer (repo admin) can push a `v*` tag — enforced by a tag-protection
+ruleset — so a release is always deliberate. The rest of this file is the why, the
+manual steps the script automates, and the edge cases.
 
 ## Versioning: SemVer, and what 0.x means
 
