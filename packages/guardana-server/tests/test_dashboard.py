@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from guardana.server import create_app
+from guardana.server.rule_catalog import rule_catalog
 from guardana.server.store import InMemoryStore
 
 _OK = 200
@@ -11,8 +12,23 @@ def test_dashboard_is_off_by_default() -> None:
     client = TestClient(create_app())
     assert client.get("/").status_code == _NOT_FOUND
     assert client.get("/stats").status_code == _NOT_FOUND
+    assert client.get("/catalog").status_code == _NOT_FOUND
     # The core endpoints are unaffected.
     assert client.get("/trend").status_code == _OK
+
+
+def test_catalog_endpoint_serves_human_rule_descriptions() -> None:
+    client = TestClient(create_app(dashboard=True))
+    catalog = client.get("/catalog").json()
+    entry = catalog["guardana.supply_chain.pickle_opcode"]
+    assert entry["name"]
+    assert entry["description"]
+
+
+def test_rule_catalog_loader_returns_entries_and_handles_unknown_language() -> None:
+    catalog = rule_catalog()
+    assert "guardana.prompt.system_prompt_leak.canary" in catalog
+    assert rule_catalog("zz") == {}
 
 
 def test_dashboard_page_and_stats_mount_when_enabled() -> None:

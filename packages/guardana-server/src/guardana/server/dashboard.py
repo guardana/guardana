@@ -2,8 +2,9 @@
 
 No template engine, no build step, no external assets: inline CSS/JS and inline
 SVG charts, so it works fully offline. The page is a thin client — it polls
-`/stats` (aggregated server-side) and `/findings`, and renders. Submitted data is
-untrusted (any agent can POST), so the client escapes every value it injects.
+`/stats` (aggregated server-side) and `/findings`, reads `/catalog` once for
+human-readable rule names/descriptions, and renders. Submitted data is untrusted
+(any agent can POST), so the client escapes every value it injects.
 """
 
 
@@ -80,6 +81,26 @@ _PAGE = """<!doctype html>
   footer { color: var(--muted); font-size: 11px; padding: 16px 24px;
     border-top: 1px solid var(--line); max-width: 1100px; margin: 0 auto; }
   .mt { margin-top: 20px; }
+  /* Bounded so the page height stays stable as findings accumulate — the footer
+     is always reachable, and the list scrolls within its own box. */
+  #findings { max-height: 460px; overflow-y: auto; margin-top: 8px; }
+  #sources { max-height: 300px; overflow-y: auto; }
+  details.f { border-bottom: 1px solid var(--line); }
+  details.f > summary { list-style: none; cursor: pointer; padding: 7px 4px; display: grid;
+    grid-template-columns: 76px 1fr 34%; gap: 10px; align-items: baseline; }
+  details.f > summary::-webkit-details-marker { display: none; }
+  details.f > summary:hover { background: var(--bg); }
+  .fname { font-weight: 500; }
+  .fname .rid { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: var(--muted); font-weight: 400; }
+  .fsrc { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+    color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .det { padding: 2px 10px 14px 86px; font-size: 12px; }
+  .det p { margin: 5px 0; } .det .lbl { color: var(--muted); }
+  .det code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+    background: var(--bg); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+  .tax { display: inline-block; border: 1px solid var(--line); border-radius: 4px;
+    padding: 0 5px; font-size: 10px; color: var(--muted); margin-right: 4px; }
 </style>
 </head>
 <body>
@@ -139,6 +160,8 @@ const SEV_VAR = s => getComputedStyle(document.documentElement)
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const el = id => document.getElementById(id);
+let CATALOG = {};  // rule_id -> {name, description}, from /catalog
+const friendlyName = f => (CATALOG[f.rule_id] || {}).name || f.title || f.rule_id;
 
 function barRow(key, value, max, color, mono) {
   const w = max > 0 ? Math.round((value / max) * 100) : 0;
@@ -178,8 +201,10 @@ function sevPill(s) { return s ? `<span class="pill sev-${esc(s)}">${esc(s)}</sp
 function renderRules(rows) {
   if (!rows.length) { el("rules").innerHTML = `<div class="empty">No findings yet.</div>`; return; }
   const max = Math.max(1, ...rows.map(r => r.count));
-  el("rules").innerHTML = rows.map(r =>
-    barRow(r.rule_id.replace(/^guardana\\./, ""), r.count, max, "var(--accent)", true)).join("");
+  el("rules").innerHTML = rows.map(r => {
+    const name = (CATALOG[r.rule_id] || {}).name || r.rule_id.replace(/^guardana\\./, "");
+    return barRow(name, r.count, max, "var(--accent)");
+  }).join("");
 }
 
 function renderSeries(series) {
@@ -204,12 +229,24 @@ function renderSeries(series) {
 
 function renderFindings(items) {
   if (!items.length) { el("findings").innerHTML = `<div class="empty">No findings.</div>`; return; }
-  el("findings").innerHTML = "<table><thead><tr><th>sev</th><th>rule</th><th>source</th>"
-    + "<th>summary</th></tr></thead><tbody>"
-    + items.map(f => `<tr><td>${sevPill(f.severity)}</td>`
-      + `<td class="mono">${esc(f.rule_id)}</td>`
-      + `<td class="mono" title="${esc(f.target_ref)}">${esc(f.target_ref)}</td>`
-      + `<td>${esc(f.evidence && f.evidence.summary)}</td></tr>`).join("") + "</tbody></table>";
+  el("findings").innerHTML = items.map(f => {
+    const c = CATALOG[f.rule_id] || {}, ev = f.evidence || {}, v = f.verdict;
+    const tax = (f.taxonomy || []).map(t => `<span class="tax">${esc(t.id)}</span>`).join("");
+    const det = `<div class="det">`
+      + (c.description ? `<p>${esc(c.description)}</p>` : "")
+      + (ev.summary ? `<p><span class="lbl">evidence:</span> ${esc(ev.summary)}</p>` : "")
+      + (ev.detail ? `<p><span class="lbl">detail:</span> <code>${esc(ev.detail)}</code></p>` : "")
+      + `<p><span class="lbl">target:</span> <code>${esc(f.target_ref)}</code></p>`
+      + (v ? `<p><span class="lbl">verdict:</span> ${esc(v.outcome)} (confidence `
+          + `${Number(v.confidence).toFixed(2)}, ${esc(v.evaluator_id)})`
+          + (v.rationale ? ` — ${esc(v.rationale)}` : "") + `</p>` : "")
+      + (tax ? `<p>${tax}</p>` : "") + `</div>`;
+    return `<details class="f"><summary><span>${sevPill(f.severity)}</span>`
+      + `<span class="fname">${esc(friendlyName(f))}`
+      + `<span class="rid">${esc(f.rule_id)}</span></span>`
+      + `<span class="fsrc" title="${esc(f.target_ref)}">${esc(f.target_ref)}</span>`
+      + `</summary>${det}</details>`;
+  }).join("");
 }
 
 function populateSourceFilter(rows) {
@@ -219,12 +256,18 @@ function populateSourceFilter(rows) {
   sel.value = cur;
 }
 
+async function loadCatalog() {
+  try { CATALOG = await (await fetch("catalog")).json(); } catch (e) { CATALOG = {}; }
+}
+
 async function loadFindings() {
   const src = el("source-filter").value;
   const url = "findings?limit=100" + (src ? "&source=" + encodeURIComponent(src) : "");
+  const box = el("findings"), innerScroll = box.scrollTop;
   const items = (await (await fetch(url)).json())
     .flatMap(sub => (sub.findings || []).concat(sub.unverified || []));
   renderFindings(items.slice(0, 100));
+  box.scrollTop = innerScroll;  // keep the reader's place across refresh
 }
 
 async function loadStats() {
@@ -236,12 +279,13 @@ async function loadStats() {
 }
 
 async function refresh() {
-  try { await loadStats(); await loadFindings(); }
+  const pageScroll = window.scrollY;
+  try { await loadStats(); await loadFindings(); window.scrollTo(0, pageScroll); }
   catch (e) { el("updated").textContent = "collector unreachable"; }
 }
 
 el("source-filter").addEventListener("change", loadFindings);
-refresh();
+loadCatalog().then(refresh);
 setInterval(refresh, __REFRESH_MS__);
 </script>
 </body>

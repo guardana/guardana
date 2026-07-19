@@ -134,8 +134,10 @@ import-linter contract and a test. It ships an **opt-in monitoring dashboard**
 (`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default): a
 single self-contained page — no build step, works offline — showing severity and
 per-source/per-rule breakdowns, an activity-over-time trend, a prominent
-**unverified** counter, and a filterable recent-findings table. Read-only; the
-`--no-auth` posture is unchanged (do not expose to an untrusted network).
+**unverified** counter, and a recent-findings list where each entry shows a
+**human-readable rule name** and expands to its description, evidence, and graded
+verdict (from a bundled `catalog/en.json`). Read-only; the no-auth posture is
+unchanged (do not expose to an untrusted network).
 
 ## What you can achieve
 

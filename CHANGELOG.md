@@ -194,9 +194,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   self-contained HTML page (no build step, works offline) served at `GET /`,
   backed by an aggregated `GET /stats` — severity, per-source and per-rule
   breakdowns, an activity-over-time trend, a prominent `unverified` counter, and
-  a source-filtered recent-findings table. Read-only and unauthenticated (same
-  posture as the collector); the store gained timestamped `records()` for the
-  time-series. `Store.list()` was renamed to `Store.submissions()`.
+  a recent-findings list. Each finding shows a **human-readable rule name** with
+  an expandable detail (what the rule catches, the evidence, the graded verdict,
+  and the standards tags), served from a bundled `catalog/en.json` (`GET
+  /catalog`) that a test pins to the rule registry so it can't drift; custom
+  rules fall back to the finding's own title. The findings list scrolls in its
+  own bounded box so the page height stays stable as findings accumulate.
+  Read-only and unauthenticated (same posture as the collector); the store gained
+  timestamped `records()` for the time-series, and `Store.list()` was renamed to
+  `Store.submissions()`.
 - **Tooling hardening**: curated ruff ruleset including bandit (`S`) and
   public-API docstrings (`D`); `mypy --strict` across the whole repo, tests
   included; pytest branch-coverage gate (`fail_under = 90`) in CI; an

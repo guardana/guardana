@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from guardana.server.dashboard import render_dashboard
 from guardana.server.envelope import SCHEMA_VERSION, Submission
+from guardana.server.rule_catalog import rule_catalog
 from guardana.server.stats import compute_stats
 from guardana.server.store import InMemoryStore, Store
 
@@ -71,3 +72,7 @@ def _mount_dashboard(app: FastAPI, store: Store, refresh_seconds: int) -> None:
     @app.get("/stats")
     def get_stats() -> dict[str, object]:
         return asdict(compute_stats(store.records()))
+
+    @app.get("/catalog")
+    def get_catalog() -> dict[str, dict[str, str]]:
+        return rule_catalog()
