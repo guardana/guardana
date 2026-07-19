@@ -1,0 +1,177 @@
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+guardana-core = { workspace = true }
+guardana-rules = { workspace = true }
+guardana-cli = { workspace = true }
+guardana-report = { workspace = true }
+guardana-server = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Deliberately-insecure demo inputs — not project source; never lint/format them.
+# force-exclude so pre-commit (which passes explicit file paths) also skips them.
+extend-exclude = ["examples/vulnerable-model"]
+force-exclude = true
+
+[tool.ruff.lint]
+# Curated, not `ALL`: every family here is one we have decided we want, so a ruff
+# upgrade never silently changes the gate. Rationale for the security-relevant ones:
+#   S    bandit — a security tool must lint itself for security
+#   D    docstrings on the public API (the extension points third parties implement)
+#   ANN  annotations, mirroring `mypy --strict`
+#   TC   import-time cost / typing-only imports
+#   PTH, RET, SIM, PERF, FURB, PIE, C4  — readability and correctness of everyday code
+select = [
+    "A",      # builtin shadowing
+    "ANN",    # missing annotations
+    "B",      # bugbear
+    "C4",     # comprehensions
+    "C90",    # mccabe complexity
+    "D",      # pydocstyle
+    "DTZ",    # naive datetimes
+    "E",      # pycodestyle errors
+    "ERA",    # commented-out code
+    "F",      # pyflakes
+    "FURB",   # modern-python refactors
+    "G",      # logging format
+    "I",      # import sorting
+    "LOG",    # logging misuse
+    "N",      # pep8 naming
+    "PERF",   # performance anti-patterns
+    "PIE",    # misc lints
+    "PL",     # pylint
+    "PT",     # pytest style
+    "PTH",    # pathlib over os.path
+    "Q",      # quotes
+    "RET",    # return simplifications
+    "RSE",    # raise style
+    "RUF",    # ruff-specific
+    "S",      # bandit (security)
+    "SIM",    # simplify
+    "SLF",    # private-member access
+    "T20",    # stray print()
+    "TC",     # typing-only imports
+    "TRY",    # exception anti-patterns
+    "UP",     # pyupgrade
+]
+ignore = [
+    # Our error messages carry the context that makes a finding actionable
+    # (which file, which key, which value). TRY003/EM would push that text into
+    # exception subclasses and make the messages worse, not better.
+    "TRY003",
+    # One concept per file, named after that concept: a module/package docstring
+    # restating the module name is exactly the noise CLAUDE.md forbids. Docstrings
+    # are required where they carry information: public classes, methods, functions.
+    "D100",
+    "D104",
+    "D105",
+    "D107",
+    # Formatter owns these.
+    "D203",
+    "D213",
+    # `ISC001`/`COM812` are omitted from `select` entirely: they fight the formatter.
+]
+# NOT selected, deliberately:
+#   INP  — would flag our PEP 420 namespace dirs, tempting a contributor to add
+#          `packages/*/src/guardana/__init__.py`, which breaks the namespace for
+#          the other four distributions (see CLAUDE.md). A lint whose "fix" is a
+#          catastrophe is worse than no lint.
+#   ARG  — Rule.run(target, ctx) and ChatTransport.send(...) are interface contracts;
+#          an implementation that ignores an argument is correct, not a smell.
+#   FBT  — typer derives CLI flags from parameter names, so boolean flags are forced.
+#   EM   — see TRY003.
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+# typer derives each CLI flag from its parameter name, so `--format` must be
+# `format` and `--dir` must be `dir`. Renaming them to appease A002 would rename
+# the published CLI surface.
+"packages/guardana-cli/src/guardana/cli/*.py" = ["A002"]
+"packages/*/tests/**" = [
+    "S101",     # pytest is built on assert
+    "D",        # test names are the documentation
+    "PLR2004",  # a literal in an assertion is the expected value, not a magic number
+    "SLF001",   # tests may reach into the private surface they are pinning down
+]
+"examples/custom_rule/tests/**" = ["S101", "D", "PLR2004"]
+# Maintainer scripts are CLIs — print() is their user interface, not stray debug output.
+"scripts/*.py" = ["T201"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = [
+    "packages/guardana-core/src",
+    "packages/guardana-report/src",
+    "packages/guardana-rules/src",
+    "packages/guardana-cli/src",
+    "packages/guardana-server/src",
+    "examples/custom_rule/src",
+]
+# Deliberately-insecure demo inputs: not project source, and not type-checked.
+exclude = ["examples/vulnerable-model"]
+
+[[tool.mypy.overrides]]
+module = "defusedxml.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "-q -ra --strict-markers --strict-config"
+# The example plugin is deliberately NOT collected here: installing it would put
+# its `acme.*` rules into every `Registry.discover()` call and make the dogfood
+# scan non-representative. CI runs its tests in a dedicated job instead, which is
+# also the only honest way to prove third-party entry-point discovery works.
+testpaths = ["packages"]
+xfail_strict = true
+filterwarnings = [
+    "error",
+    # fastapi's TestClient still imports httpx; the deprecation is starlette's to fix.
+    # Matched by message, not by class: importing the class here would drag
+    # starlette into pytest's config phase, where it fails on the very import it
+    # is warning about.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:Warning",
+]
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.1",
+    "mypy>=2.2.0",
+    "pre-commit>=4.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=6.0",
+    "ruff>=0.15.21",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["guardana"]
+
+[tool.coverage.report]
+# The gate is a ratchet, not a target: it exists to catch a PR that adds
+# untested code, not to chase 100%.
+fail_under = 90
+show_missing = true
+
+[tool.importlinter]
+root_packages = [
+    "guardana.core",
+    "guardana.rules",
+    "guardana.cli",
+    "guardana.report",
+    "guardana.server",
+]
+
+[[tool.importlinter.contracts]]
+# The commercialization carve-out, enforced by tooling and not just by review:
+# everything a user runs offline must work without the optional collector.
+name = "The engine never depends on the collector"
+type = "forbidden"
+source_modules = ["guardana.core", "guardana.rules", "guardana.cli", "guardana.report"]
+forbidden_modules = ["guardana.server"]

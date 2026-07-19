@@ -1,0 +1,33 @@
+# Categorizes GitHub's auto-generated release notes by PR label.
+# Used when you click "Generate release notes" while drafting a Release, so the
+# notes group cleanly instead of being one flat list. Requires PRs to be labeled
+# (see docs/maintainers/github-setup.md for the label set).
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - dependencies  # dependabot bumps are noise in user-facing notes
+    authors:
+      # Dependabot authors PRs as the login `dependabot[bot]`; a bare `dependabot`
+      # would never match, so bumps would still leak into the notes.
+      - dependabot[bot]
+  categories:
+    - title: ⚠️ Breaking changes
+      labels:
+        - breaking
+    - title: 🚀 Features & new rules
+      labels:
+        - feature
+        - rule
+    - title: 🐛 Bug fixes
+      labels:
+        - bug
+    - title: 🔒 Security
+      labels:
+        - security
+    - title: 📚 Documentation
+      labels:
+        - documentation
+    - title: 🧹 Everything else
+      labels:
+        - "*"

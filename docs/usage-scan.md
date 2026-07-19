@@ -1,0 +1,90 @@
+# `guardana scan` — static, offline, CI-friendly
+
+Scans a directory as an **artifact target**: model files, dependency
+manifests, and source. No network access, no live model required. This is
+the fast, deterministic front door — the one that's safe to run on every
+commit.
+
+```bash
+guardana scan <path> [OPTIONS]
+```
+
+## Flags
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `PATH` (positional, required) | — | Directory to scan |
+| `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file — see [`profiles.md`](profiles.md) |
+| `--preset [ci\|pre-training\|monitor]` | none | Named policy preset (mutually exclusive with `--profile`) — see [`profiles.md`](profiles.md#named-presets---preset) |
+| `--format [human\|json\|sarif\|junit]` | `human` | Output format |
+| `--no-plugins` | off | Disable entry-point rule/evaluator discovery (YAML-only safe mode) — see [`SECURITY.md`](../SECURITY.md) |
+| `--rules PATH` | none | Directory or file of custom YAML rules; repeatable. Combined with the profile's `rules.paths` — see [`writing-rules.md`](writing-rules.md). A malformed rule file is a warning, never an abort. |
+| `--reporter TEXT` | none | Forward findings to a collector, e.g. `server://https://collector.example.com/findings` |
+
+## What runs
+
+Only rules whose `target_kind` is `artifact` and whose declared
+`required_capabilities` are satisfied by an artifact target (i.e.
+`read_files`) execute. Endpoint-only rules (prompt injection, jailbreak,
+system-prompt leak, output-secrets) are silently skipped against `scan` —
+they need a live model, so use `guardana probe` for those.
+
+Guardana dogfoods itself in CI by scanning its own source, which must stay
+clean:
+
+```console
+$ guardana scan packages
+✓ No findings.
+
+0 finding(s); 17 rule(s) run, 0 skipped.
+```
+
+Note the path: in this repository, `guardana scan .` exits `1` by design —
+[`examples/vulnerable-model/`](../examples/vulnerable-model/) is deliberately
+malicious so the quickstart has something real to find. CI therefore scans
+`packages`, not `.`.
+
+## Example output with findings (`--format human`, the default)
+
+```console
+$ guardana scan ./some-model-repo
+✖ [CRITICAL] guardana.supply_chain.pickle_opcode — Dangerous pickle opcode (arbitrary code on load)
+    unpickling imports non-allowlisted callable: os.system  (./some-model-repo)
+▲ [MEDIUM] guardana.supply_chain.hallucinated_package — Import of unknown package (possible slopsquat lead)
+    unknown import 'torchutilz' (lead — verify it exists on PyPI)  (./some-model-repo)
+
+2 finding(s); 17 rule(s) run, 0 skipped.
+```
+
+`hallucinated_package` scans `import`/`from` statements in `.py` source
+files via `ast.parse`; it does not read `requirements.txt` or lockfiles.
+
+## Other formats
+
+```bash
+guardana scan . --format json    # machine-readable findings + summary
+guardana scan . --format sarif   # SARIF 2.1.0, for GitHub code-scanning upload
+guardana scan . --format junit   # JUnit XML, for CI test-result reporting
+```
+
+## Exit codes
+
+`scan` exits `1` (and CI treats the step as failed) when any finding's
+severity is at or above the active profile's `fail_on.severity` **and**
+either it has no verdict (a static check) or its verdict's `confidence` is
+at or above `fail_on.min_confidence`. Otherwise it exits `0`. This is the
+same `gate()` policy logic `probe` uses — see [`profiles.md`](profiles.md).
+
+```bash
+guardana scan . || echo "gate failed — see findings above"
+```
+
+## Forwarding to a collector
+
+```bash
+guardana scan . --reporter server://https://collector.example.com
+```
+
+Findings are POSTed to the collector after being printed locally — this
+never blocks the local exit-code gate. See
+[`architecture.md`](architecture.md#the-coreserver-boundary).

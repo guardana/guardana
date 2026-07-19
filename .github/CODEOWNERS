@@ -1,0 +1,4 @@
+# Default owners for everything in the repo, so every PR gets a review
+# request routed automatically. Add narrower paths below as the maintainer
+# team grows and specific packages get dedicated owners.
+* @guardana/maintainers

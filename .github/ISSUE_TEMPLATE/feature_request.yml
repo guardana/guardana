@@ -1,0 +1,67 @@
+name: Feature or rule request
+description: Propose a new check, capability, or improvement.
+labels: ["enhancement"]
+body:
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Checked for existing issues
+      options:
+        - label: I searched open and closed issues and didn't find this already proposed.
+          required: true
+
+  - type: textarea
+    id: threat
+    attributes:
+      label: What threat, check, or capability is this?
+      description: >
+        Describe what you want Guardana to detect or do, and why it matters
+        (what does a user miss today without it?).
+    validations:
+      required: true
+
+  - type: input
+    id: taxonomy
+    attributes:
+      label: OWASP / MITRE ATLAS / NIST mapping (if known)
+      description: >
+        Leave blank if you don't know it — maintainers can help place it. See
+        `packages/guardana-rules/src/guardana/rules/catalog/*.yaml` for
+        examples of the `taxonomy` field.
+      placeholder: e.g. LLM01 (Prompt Injection), AML.T0051
+    validations:
+      required: false
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of extension is this?
+      description: See `CLAUDE.md` → "Extending Guardana" if you're unsure which applies.
+      options:
+        - New Rule (YAML)
+        - New Rule (Python plugin — logic YAML can't express)
+        - New Evaluator
+        - New Target
+        - CLI / reporter change
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you be willing to contribute this?
+      options:
+        - "Yes, I plan to open a PR"
+        - "Yes, with some guidance"
+        - "No, just proposing it"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links, references, example payloads, or prior art (e.g. how garak/other tools handle this).
+    validations:
+      required: false

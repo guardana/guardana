@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Keep the CI/release workflows' pinned actions current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps):"
+
+  # Dependabot supports uv workspaces natively (resolves the root
+  # pyproject.toml + uv.lock across all packages/* members). If a Dependabot
+  # run ever reports uv as unsupported on your GitHub instance, fall back to
+  # "pip" here — but prefer "uv" since it matches how this repo actually
+  # resolves dependencies.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps):"

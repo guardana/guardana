@@ -1,0 +1,69 @@
+# Local gates that mirror CI. Fast checks run on every commit; the slow ones
+# (mypy, pytest, dogfood) run on `git push`, so a broken push never reaches CI.
+#
+# Setup, once:
+#   uv run pre-commit install --install-hooks --hook-type commit-msg --hook-type pre-push
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.21
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.11.28
+    hooks:
+      # uv.lock must stay in step with the pyprojects, or `uv sync --locked` fails in CI.
+      - id: uv-lock
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      # A security tool that leaked a key through its own history would be a bad joke.
+      - id: detect-private-key
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      # CLAUDE.md and CONTRIBUTING.md require conventional-commit messages; this
+      # enforces it instead of trusting everyone to remember.
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict
+        entry: uv run mypy --strict .
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: lint-imports
+        name: import-linter (the engine must never depend on the collector)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: pytest
+        name: pytest + coverage gate
+        entry: uv run pytest --cov
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: dogfood
+        name: guardana scans its own source
+        entry: uv run guardana scan packages
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

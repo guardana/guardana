@@ -1,0 +1,75 @@
+name: Bug report
+description: Something in Guardana doesn't work as documented.
+labels: ["bug"]
+body:
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Checked for existing issues
+      options:
+        - label: I searched open and closed issues and didn't find this already reported.
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Guardana version
+      description: >
+        Output of `guardana --version`. If you installed from source, add the
+        git commit you built from.
+      placeholder: e.g. guardana-cli 0.1.0, or commit abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: e.g. 3.12.4
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. macOS 14.5, Ubuntu 22.04, Windows 11
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command run
+      description: The full command line, including flags and profile/config paths.
+      placeholder: guardana scan . --profile ./guardana.yaml --format sarif
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected Guardana to do.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Full output / traceback
+      description: >
+        Paste the complete terminal output or traceback, not a snippet. Redact
+        secrets, tokens, or proprietary code first.
+      render: shell
+    validations:
+      required: true

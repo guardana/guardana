@@ -1,0 +1,20 @@
+# Sample profile combining Guardana's built-in rules with a third-party
+# rule package (examples/custom_rule/, namespaced acme.*). Run it with:
+#
+#   guardana scan . --profile examples/guardana.yaml
+#
+# after installing the example package (`uv pip install -e examples/custom_rule`
+# or equivalent) so its rules are present in the registry.
+
+name: pre-deploy
+
+rules:
+  include:
+    - "guardana.*"   # every built-in rule
+    - "acme.*"        # Acme's own private rules (examples/custom_rule/)
+  exclude:
+    - "guardana.output.secrets"   # example: this team already gates output separately
+
+fail_on:
+  severity: high
+  min_confidence: 0.7
