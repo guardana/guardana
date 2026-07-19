@@ -197,9 +197,11 @@ visibility, any run can forward its normalized findings to a collector with
 `--reporter server://…`:
 
 - **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
-  agent — dev machines, CI, live monitors — in one place. Today it exposes
-  ingest, list, and trend over a versioned JSON API; a richer dashboard, auth,
-  and persistent storage are on the [roadmap](ROADMAP.md).
+  agent — dev machines, CI, live monitors — in one place. Ingest/list/trend over
+  a versioned JSON API, plus an **opt-in monitoring dashboard**
+  (`GUARDANA_DASHBOARD=1`, off by default) — a single self-contained page with
+  severity, per-source/per-rule, and activity-over-time views. Auth and
+  persistent storage are on the [roadmap](ROADMAP.md).
 - **Managed cloud (planned):** the same collector, hosted for you, with
   dashboards, multi-team rollups, retention, and policy management — for teams
   that would rather not run it themselves.

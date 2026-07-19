@@ -83,6 +83,11 @@ that is input hardening — not access control.
 behind whatever authentication your infrastructure already provides. Durable,
 authenticated storage is the seam a hosted backend replaces.
 
+The optional dashboard (`GUARDANA_DASHBOARD=1`, off by default) is **read-only**
+— it adds no write endpoints — but it is equally unauthenticated and displays the
+collected findings, so the same rule applies: it belongs inside your perimeter,
+never on an untrusted network.
+
 ## How we hold ourselves to this
 
 A security tool that doesn't scan itself is a marketing exercise. On every push,

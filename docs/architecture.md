@@ -302,7 +302,12 @@ graded must never reach the collector as a false all-clear.
 It validates every submission with Pydantic models
 (`guardana.server.envelope.Submission`), so a malformed POST — or one with an
 unsupported `schema_version` — is rejected with `422` instead of poisoning
-`/findings` and `/trend`.
+`/findings` and `/trend`. An **opt-in dashboard**
+(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default) mounts a
+read-only page at `GET /` plus an aggregated `GET /stats` — a self-contained HTML
+page (no build step, offline; server-side aggregation in `guardana.server.stats`)
+that visualizes the store. It adds no write surface and no auth; the
+`Store` grows a `records()` seam (timestamped submissions) for the time-series.
 
 This boundary is intentional and load-bearing: all OSS value (every rule, every
 evaluator, every report format, every CLI mode) works fully offline with zero

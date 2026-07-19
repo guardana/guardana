@@ -248,9 +248,9 @@ fleet-wide visibility, any run forwards its normalized findings to a collector
 with `--reporter server://…`, over a versioned JSON envelope (now v2, which
 carries the `unverified` channel so the collector can never render a false
 all-clear). Run the collector yourself (`guardana-server`, OSS — ingest/list/
-trend today, with a dashboard, auth, and persistence on the roadmap), or use the
-planned managed cloud for a hosted version with richer dashboards and multi-team
-rollups.
+trend plus an opt-in monitoring dashboard, with auth and persistence on the
+roadmap), or use the planned managed cloud for a hosted version with richer
+dashboards and multi-team rollups.
 
 **`guardana-core` never imports `guardana-server`, directly or transitively** —
 enforced by an import-linter contract and a test, not by good intentions. That

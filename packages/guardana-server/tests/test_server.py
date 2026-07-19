@@ -167,7 +167,7 @@ def test_store_is_bounded_so_a_long_running_collector_cannot_grow_without_limit(
     for source in ("a", "b", "c"):
         client.post("/findings", json=_real_envelope(source=source))
 
-    assert [s.source for s in store.list()] == ["b", "c"]
+    assert [s.source for s in store.submissions()] == ["b", "c"]
 
 
 def test_omitted_schema_version_is_rejected_not_assumed() -> None:

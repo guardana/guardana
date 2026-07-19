@@ -187,9 +187,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every submission with Pydantic — a malformed POST or an unsupported
   `schema_version` gets `422` instead of poisoning `/findings` and `/trend`.
 - **Optional `guardana-server` collector**: ingests normalized `Finding`s from
-  many agents for a list/trend view, kept behind the core↔server
-  commercialization boundary (`guardana-core` never imports
-  `guardana-server`).
+  many agents for a list/trend view, kept behind the core↔server boundary
+  (`guardana-core` never imports `guardana-server`).
+- **Opt-in monitoring dashboard** (`guardana-server`): off by default; enabled
+  with `create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`. A single
+  self-contained HTML page (no build step, works offline) served at `GET /`,
+  backed by an aggregated `GET /stats` — severity, per-source and per-rule
+  breakdowns, an activity-over-time trend, a prominent `unverified` counter, and
+  a source-filtered recent-findings table. Read-only and unauthenticated (same
+  posture as the collector); the store gained timestamped `records()` for the
+  time-series. `Store.list()` was renamed to `Store.submissions()`.
 - **Tooling hardening**: curated ruff ruleset including bandit (`S`) and
   public-API docstrings (`D`); `mypy --strict` across the whole repo, tests
   included; pytest branch-coverage gate (`fail_under = 90`) in CI; an

@@ -120,13 +120,14 @@ here on purpose.
 
 ## Collector / cloud track (parallel)
 
-The self-hosted OSS collector (`guardana-server`) grows a real monitoring
-surface — auth, a persistent store, and a dashboard on top of today's
-ingest/list/trend — so a team can run its own central AI-security view. A
-managed **cloud** is the hosted version of the same, adding what only makes
-sense hosted: multi-team/org rollups, retention, and policy management — built
-on the same `Reporter` envelope (now v2, carrying the `unverified` channel). The
-engine-never-imports-server contract is permanent, self-hosted or managed.
+The self-hosted OSS collector (`guardana-server`) already ships an opt-in
+monitoring **dashboard** on top of ingest/list/trend; next it grows **auth** and
+a **persistent store** so a team can run its own central AI-security view for
+real. A managed **cloud** is the hosted version of the same, adding what only
+makes sense hosted: multi-team/org rollups, retention, and policy management —
+built on the same `Reporter` envelope (now v2, carrying the `unverified`
+channel). The engine-never-imports-server contract is permanent, self-hosted or
+managed.
 
 ## Researched and deliberately deferred
 

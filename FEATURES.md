@@ -125,12 +125,17 @@ honoured — a typo'd key, an out-of-range confidence, an empty include —
   skip the CLI entirely.
 - A complete runnable third-party package: [`examples/custom_rule/`](examples/custom_rule/).
 
-### Optional central collector
+### Optional central collector + dashboard
 
 Any run forwards normalized findings with `--reporter server://…` (versioned
 JSON envelope). The collector (`guardana-server`) is strictly additive and
 separately deployed — the engine never depends on it, enforced by an
-import-linter contract and a test.
+import-linter contract and a test. It ships an **opt-in monitoring dashboard**
+(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default): a
+single self-contained page — no build step, works offline — showing severity and
+per-source/per-rule breakdowns, an activity-over-time trend, a prominent
+**unverified** counter, and a filterable recent-findings table. Read-only; the
+`--no-auth` posture is unchanged (do not expose to an untrusted network).
 
 ## What you can achieve
 

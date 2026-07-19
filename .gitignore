@@ -34,3 +34,4 @@ Thumbs.db
 # AI-agent tooling and internal working docs (not part of the published project)
 .claude/
 docs/superpowers/
+.playwright-mcp/
