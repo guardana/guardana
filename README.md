@@ -93,8 +93,7 @@ One engine, three entry points, no separate tools to learn:
 | **Monitor** | `guardana monitor --url <endpoint> --model <name>` | Long-running sampling observer next to a served model; alerts on policy-gate failure or a rise in findings over baseline. |
 
 Any of the three can forward findings to an optional central collector with
-`--reporter server://<collector-url>` (see [the commercialization
-boundary](#the-commercialization-boundary)).
+`--reporter server://<collector-url>` (see [central monitoring](#central-monitoring--self-hosted-or-managed)).
 
 Full flag references and example output:
 [`docs/usage-scan.md`](docs/usage-scan.md) ·
@@ -190,15 +189,25 @@ and `guardana-core` is a plain library you can drive from your own code
 - The full model: [`docs/architecture.md`](docs/architecture.md) ·
   [`docs/extending.md`](docs/extending.md).
 
-## The commercialization boundary
+## Central monitoring — self-hosted or managed
 
-`guardana-core` never depends on `guardana-server`, even transitively. The
-optional `guardana-server` collector only *consumes* normalized findings over a
-`Reporter` interface (`--reporter server://…`). Every scan, probe, and monitor
-run works fully offline with zero required network calls beyond the target
-itself — the collector is a strictly additive, separately deployed layer for
-teams that want fleet-wide visibility, never a requirement to get value from the
-OSS engine. That boundary is enforced by a test, not just a promise.
+Every scan, probe, and monitor run works **fully offline** — no network calls
+beyond the target itself, no account, no lock-in. When you want fleet-wide
+visibility, any run can forward its normalized findings to a collector with
+`--reporter server://…`:
+
+- **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
+  agent — dev machines, CI, live monitors — in one place. Today it exposes
+  ingest, list, and trend over a versioned JSON API; a richer dashboard, auth,
+  and persistent storage are on the [roadmap](ROADMAP.md).
+- **Managed cloud (planned):** the same collector, hosted for you, with
+  dashboards, multi-team rollups, retention, and policy management — for teams
+  that would rather not run it themselves.
+
+Either way the engine stays fully independent: `guardana-core` never imports
+`guardana-server`, even transitively — a boundary enforced by a test, not just a
+promise. The collector is strictly additive; the engine delivers its full value
+with or without it.
 
 ## Why "Guardana"?
 
@@ -266,10 +275,10 @@ the people who'll shape where it goes:
   guardrail you know cold? The plugin model means your checks live in your
   package under your namespace — contribute them upstream or keep them private,
   same contract either way.
-- **☁️ Cloud early access.** The fleet-visibility collector is the commercial
-  layer the OSS engine already reports into. If centralized, multi-team AI
-  security posture is on your radar, reach out to help shape it — and use it
-  first.
+- **☁️ Cloud early access.** A managed, hosted version of the collector the OSS
+  engine already reports into — dashboards, multi-team rollups, and retention,
+  without running `guardana-server` yourself. If centralized AI-security posture
+  is on your radar, reach out to help shape it — and use it first.
 - **💬 Everyone else.** Stars, issues, ideas, and questions in
   [Discussions](https://github.com/guardana/guardana/discussions) genuinely move
   this forward.

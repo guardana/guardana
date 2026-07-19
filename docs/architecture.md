@@ -304,12 +304,12 @@ It validates every submission with Pydantic models
 unsupported `schema_version` — is rejected with `422` instead of poisoning
 `/findings` and `/trend`.
 
-This boundary is intentional and load-bearing for the project's
-commercialization model: all OSS value (every rule, every evaluator, every
-report format, every CLI mode) works fully offline with zero dependency on
-the collector. The collector is a strictly additive layer that can be
-extended commercially (dashboard, fleet management, retention) without ever
-forking or depending-back-into the engine.
+This boundary is intentional and load-bearing: all OSS value (every rule, every
+evaluator, every report format, every CLI mode) works fully offline with zero
+dependency on the collector. The collector is a strictly separable layer —
+self-hosted (`guardana-server`) or, later, a managed cloud — that can grow
+(dashboard, auth, persistence, fleet management, retention) without ever forking
+or depending-back-into the engine.
 
 ## Repository layout
 

@@ -240,21 +240,24 @@ to Guardana. That is the whole extensibility story in one folder.
 
 ---
 
-## 7. The commercialization boundary (why it's structured this way)
+## 7. Central monitoring, and why the collector is separate
 
 Everything above works **fully offline** — every rule, evaluator, report format,
-and run mode, with no required network beyond the target itself. The optional
-`guardana-server` collector only *consumes* normalized findings that a run
-forwards with `--reporter server://…`, over a versioned JSON envelope (now v2,
-which carries the `unverified` channel so the collector can never render a false
-all-clear).
+and run mode, with no required network beyond the target itself. When you want
+fleet-wide visibility, any run forwards its normalized findings to a collector
+with `--reporter server://…`, over a versioned JSON envelope (now v2, which
+carries the `unverified` channel so the collector can never render a false
+all-clear). Run the collector yourself (`guardana-server`, OSS — ingest/list/
+trend today, with a dashboard, auth, and persistence on the roadmap), or use the
+planned managed cloud for a hosted version with richer dashboards and multi-team
+rollups.
 
 **`guardana-core` never imports `guardana-server`, directly or transitively** —
 enforced by an import-linter contract and a test, not by good intentions. That
-boundary is deliberate: the entire open-source engine is self-sufficient, and the
-collector (dashboards, fleet trends, multi-model rollups) is a strictly additive
-layer that can be built out commercially without ever forking or depending back
-into the engine.
+boundary is deliberate and load-bearing: the entire open-source engine is
+self-sufficient, and the collector is a strictly *separable* layer — self-hosted
+or managed — that can grow without ever forking or depending back into the
+engine.
 
 ---
 

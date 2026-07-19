@@ -162,5 +162,5 @@ OpenAI-compatible model you trust; rules don't change when the grader does.
 expresses gradual escalation declaratively — no Python, graded per turn and
 across the whole conversation.
 
-**Aggregate a fleet.** Many agents, one collector, one `/trend` — the
-foundation the commercial cloud layer builds on without touching the engine.
+**Aggregate a fleet.** Many agents, one collector, one `/trend` — self-hosted
+today, and the foundation a managed cloud builds on without touching the engine.

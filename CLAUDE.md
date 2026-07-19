@@ -39,7 +39,8 @@ transitively.** The server only *consumes* normalized `Finding`s through the
 `Reporter` interface (`guardana.core.reporter`), reached via a
 `--reporter server://…` URL, over a versioned JSON envelope
 (`schema_version`). All OSS value works fully offline; the server/collector is
-a separable layer — this is the commercialization carve-out. If a change makes
+a strictly separable layer (self-hosted, or a future managed cloud) that must
+grow without the engine ever depending back into it. If a change makes
 `guardana-core` (or `guardana-rules`, `guardana-cli`, `guardana-report`) depend
 on `guardana-server`, that change is wrong regardless of how convenient it
 looks.
