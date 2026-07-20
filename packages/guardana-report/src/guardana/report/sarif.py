@@ -12,7 +12,9 @@ _LEVEL = {
 }
 
 
-def _sarif_result(f: Finding, *, level: str, kind: str | None = None) -> dict[str, object]:
+def _sarif_result(
+    f: Finding, *, level: str, kind: str | None = None, suppressed: bool = False
+) -> dict[str, object]:
     result: dict[str, object] = {
         "ruleId": f.rule_id,
         "level": level,
@@ -21,6 +23,10 @@ def _sarif_result(f: Finding, *, level: str, kind: str | None = None) -> dict[st
     }
     if kind is not None:
         result["kind"] = kind
+    if suppressed:
+        # SARIF's native representation of a baselined finding: still reported,
+        # but marked suppressed so a consumer (GitHub code scanning) doesn't alert.
+        result["suppressions"] = [{"kind": "external"}]
     return result
 
 
@@ -29,7 +35,11 @@ def _results(result: ScanResult) -> list[dict[str, object]]:
     # An unverified check is not a clean pass: surface it as a note flagged for
     # review, never omit it (that would read as "no problem" to a SARIF consumer).
     unverified = [_sarif_result(f, level="note", kind="review") for f in result.unverified]
-    return confirmed + unverified
+    waived = [
+        _sarif_result(f, level=_LEVEL.get(f.severity, "note"), suppressed=True)
+        for f in result.waived
+    ]
+    return confirmed + unverified + waived
 
 
 class SarifRenderer:

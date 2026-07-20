@@ -26,6 +26,38 @@ def test_scan_clean_tree_exits_zero(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
+def test_scan_baseline_waives_findings(tmp_path: Path) -> None:
+    target = tmp_path / "src"
+    target.mkdir()
+    (target / "m.pkl").write_bytes(pickle.dumps(_Evil()))
+    baseline = tmp_path / "baseline.yaml"  # kept outside the scanned tree
+    generated = runner.invoke(app, ["scan", str(target), "--write-baseline", str(baseline)])
+    assert generated.exit_code == 0
+    assert baseline.exists()
+    # A CRITICAL finding normally fails the gate (exit 1); with it baselined the
+    # same scan is green, and the finding is still reported as WAIVED.
+    scanned = runner.invoke(app, ["scan", str(target), "--baseline", str(baseline)])
+    assert scanned.exit_code == 0
+    assert "WAIVED" in scanned.stdout
+
+
+def test_scan_baseline_and_write_baseline_are_mutually_exclusive(tmp_path: Path) -> None:
+    (tmp_path / "ok.py").write_text("import os\n")
+    result = runner.invoke(
+        app, ["scan", str(tmp_path), "--baseline", "x.yaml", "--write-baseline", "y.yaml"]
+    )
+    assert result.exit_code != 0
+
+
+def test_scan_malformed_baseline_is_clean_error_not_traceback(tmp_path: Path) -> None:
+    (tmp_path / "ok.py").write_text("import os\n")
+    baseline = tmp_path / "bad.yaml"
+    baseline.write_text("waivers: not-a-list\n")
+    result = runner.invoke(app, ["scan", str(tmp_path), "--baseline", str(baseline)])
+    assert result.exit_code == 2
+    assert "Traceback" not in result.output
+
+
 def test_rules_lists_builtin_rules() -> None:
     result = runner.invoke(app, ["rules"])
     assert result.exit_code == 0

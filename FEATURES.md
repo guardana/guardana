@@ -16,6 +16,11 @@ two cannot silently drift.
 | **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. |
 | **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, a finding-count rise over its baseline, or a rise in *unverified* checks (a model whose safety checks go blind is itself the alert). Plants a fresh random canary every cycle. |
 
+Scan takes a **per-finding baseline** (`--write-baseline` to snapshot, `--baseline`
+to apply): accept today's findings with a reason so a blocking gate can go live on
+an existing repo, while a new finding still fails — waived findings stay reported
+(`WAIVED` / `waived` / SARIF `suppressions`), never silently dropped.
+
 Plus `guardana rules` (list everything installed, incl. your own, **grouped by
 security layer**, filterable with `--surface build|runtime`, and able to include
 a custom pack with `--rules <dir>` so you can confirm it parses), `guardana init`

@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -31,3 +32,16 @@ class Finding:
     target_ref: str
     evidence: Evidence
     verdict: "Verdict | None" = None
+
+    @property
+    def fingerprint(self) -> str:
+        """A stable short id for this finding: same rule + location → same value.
+
+        This is the key a baseline waiver matches on. It deliberately hashes only
+        the rule id and the location, not the evidence text (which can vary run to
+        run) — so a waiver keeps matching the same finding, while a *new*
+        occurrence in a different place gets a different fingerprint and still
+        fails the gate. Suppression is always narrow, never a blanket silence.
+        """
+        digest = hashlib.sha256(f"{self.rule_id}\x00{self.target_ref}".encode())
+        return digest.hexdigest()[:16]

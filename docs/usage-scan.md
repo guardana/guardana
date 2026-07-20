@@ -19,6 +19,8 @@ guardana scan <path> [OPTIONS]
 | `--format [human\|json\|sarif\|junit]` | `human` | Output format |
 | `--no-plugins` | off | Disable entry-point rule/evaluator discovery (YAML-only safe mode) — see [`SECURITY.md`](../SECURITY.md) |
 | `--rules PATH` | none | Directory or file of custom YAML rules; repeatable. Combined with the profile's `rules.paths` — see [`writing-rules.md`](writing-rules.md). A malformed rule file is a warning, never an abort. |
+| `--baseline PATH` | none | Baseline file: findings it lists are **waived** — still reported (as `WAIVED`), but they no longer fail the gate. A *new* finding elsewhere still does. See [Baselining](#baselining-existing-findings). |
+| `--write-baseline PATH` | none | Write a baseline waiving every current finding to `PATH`, then exit 0. Add a reason to each entry before committing it. |
 | `--reporter TEXT` | none | Forward findings to a collector, e.g. `server://https://collector.example.com/findings` |
 
 ## What runs
@@ -66,6 +68,32 @@ guardana scan . --format json    # machine-readable findings + summary
 guardana scan . --format sarif   # SARIF 2.1.0, for GitHub code-scanning upload
 guardana scan . --format junit   # JUnit XML, for CI test-result reporting
 ```
+
+## Baselining existing findings
+
+Turning on a blocking gate for an existing repository is usually all-or-nothing:
+either you fix the whole backlog first, or you exclude a rule entirely and go
+blind to new occurrences. A baseline is the middle path — accept *today's*
+findings with a reason, while a genuinely new one still fails the build.
+
+```bash
+# 1. Snapshot the current findings into a baseline file.
+guardana scan . --write-baseline guardana-baseline.yaml
+
+# 2. Edit guardana-baseline.yaml: replace each placeholder 'reason' with why the
+#    finding is acceptable, and commit the file.
+
+# 3. From now on, scan against it. Baselined findings are reported as WAIVED and
+#    do not fail the gate; a NEW finding (a different fingerprint) still does.
+guardana scan . --baseline guardana-baseline.yaml
+```
+
+A waiver is matched by a **fingerprint** — a stable hash of the rule id and the
+finding's location — so it keeps waiving the same finding but never a different
+one. Waived findings are never silently dropped: they appear in every format (a
+`WAIVED` line in human output, a `waived` array in JSON, `suppressions` in SARIF),
+so a reviewer can always see what was accepted and why. A malformed baseline file
+is a hard error (exit 2), never a silent "waive nothing" or "waive everything".
 
 ## Exit codes
 

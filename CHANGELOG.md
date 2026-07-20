@@ -231,6 +231,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   listing (the same repeatable flag `scan`/`probe` accept), so you can confirm a
   pack parses and is discovered without launching a probe; unloadable files are
   warned about, never silently dropped.
+- **Per-finding baseline** (`guardana scan --baseline <file>` /
+  `--write-baseline <file>`): accept today's findings on an existing repo with a
+  reason so a blocking gate can be turned on without fixing the whole backlog,
+  while a *new* finding (a different rule+location fingerprint) still fails.
+  Waived findings are never silently dropped — they are reported in a `waived`
+  channel in every format (a `WAIVED` line in human output, a `waived` array in
+  JSON, native `suppressions` in SARIF). A malformed baseline is a hard error,
+  never a silent waive-nothing or waive-everything.
 
 ### Security
 

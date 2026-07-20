@@ -31,10 +31,21 @@ class JUnitRenderer:
                 f"      <skipped message={message}>{reason}</skipped>\n"
                 f"    </testcase>"
             )
+        for f in result.waived:
+            name = quoteattr(f.rule_id)
+            classname = quoteattr(f.target_ref)
+            message = quoteattr(f.title)
+            reason = escape(f"waived: {f.evidence.summary}")
+            cases.append(
+                f"    <testcase name={name} classname={classname}>\n"
+                f"      <skipped message={message}>{reason}</skipped>\n"
+                f"    </testcase>"
+            )
         body = "\n".join(cases)
+        skipped = len(result.unverified) + len(result.waived)
         return (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<testsuite name="guardana" tests="{result.rules_run}" '
-            f'failures="{len(result.findings)}" skipped="{len(result.unverified)}">\n'
+            f'failures="{len(result.findings)}" skipped="{skipped}">\n'
             f"{body}\n</testsuite>"
         )

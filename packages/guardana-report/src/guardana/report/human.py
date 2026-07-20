@@ -24,6 +24,9 @@ class HumanRenderer:
             reason = f.verdict.rationale if f.verdict is not None else f.evidence.summary
             lines.append(f"? [UNVERIFIED] {f.rule_id} — {f.title}")
             lines.append(f"    {reason}  ({f.target_ref})")
+        for f in result.waived:
+            lines.append(f"~ [WAIVED] {f.rule_id} — {f.title}")
+            lines.append(f"    {f.evidence.summary}  ({f.target_ref})")
         lines.append("")
         summary = (
             f"{len(result.findings)} finding(s); "
@@ -31,5 +34,7 @@ class HumanRenderer:
         )
         if result.unverified:
             summary += f" {len(result.unverified)} unverified."
+        if result.waived:
+            summary += f" {len(result.waived)} waived."
         lines.append(summary)
         return "\n".join(lines)
