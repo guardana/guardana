@@ -14,10 +14,11 @@ two cannot silently drift.
 |---|---|---|
 | **Static scan** | `guardana scan <path>` | Offline, no-network, deterministic supply-chain checks over a repo or model directory. Exit code `1` on a gate failure — drops into CI like a linter. |
 | **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. |
-| **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure or a finding-count rise over its baseline. Plants a fresh random canary every cycle. |
+| **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, a finding-count rise over its baseline, or a rise in *unverified* checks (a model whose safety checks go blind is itself the alert). Plants a fresh random canary every cycle. |
 
 Plus `guardana rules` (list everything installed, incl. your own, **grouped by
-security layer** and filterable with `--surface build|runtime`), `guardana init`
+security layer**, filterable with `--surface build|runtime`, and able to include
+a custom pack with `--rules <dir>` so you can confirm it parses), `guardana init`
 (starter policy file), `guardana new-rule` (scaffold a custom rule), and
 `--format human|json|sarif|junit` everywhere a result is printed.
 
@@ -54,7 +55,7 @@ Every finding carries typed OWASP LLM Top 10 / MITRE ATLAS / NIST references.
 | `guardana.supply_chain.model_format` | HIGH | Model files in formats that can carry code; a well-formed safetensors file is never flagged. |
 | `guardana.supply_chain.hallucinated_package` | MEDIUM | Imports of unknown packages — slopsquat *leads*, at honest lead-level confidence. |
 | `guardana.supply_chain.provenance` | MEDIUM | Unpinned model downloads and missing licenses (leads). |
-| `guardana.supply_chain.hardcoded_secret` | HIGH | Current-era keys — `sk-proj-`/`sk-ant-api03-` (OpenAI/Anthropic), GitHub token forms, private-key headers. |
+| `guardana.supply_chain.hardcoded_secret` | HIGH | Current-era keys — `sk-proj-`/`sk-ant-api03-` (OpenAI/Anthropic), GitHub token forms, private-key headers — across Python, config, **and** web/systems source (`.ts`/`.js`/`.go`/`.java`/`.rs`/`.tf`/…). |
 | `guardana.output.secrets` | HIGH | A live model leaking secret-shaped strings in its replies to benign probes. |
 | `guardana.prompt.mcp_tool_poisoning` | HIGH/MED | Hidden instructions in an MCP tool manifest — invisible Unicode, instruction-override phrases, base64 payloads in tool descriptions (indirect prompt injection). |
 | `guardana.prompt.hidden_instructions` | HIGH | Invisible instruction-smuggling characters (bidi overrides, the Unicode Tags block, zero-width) in agent rule files (`.cursorrules`) and Markdown model cards — the "Rules File Backdoor". Concealment, not imperative prose, is the signal. |

@@ -32,6 +32,29 @@ def test_rules_lists_builtin_rules() -> None:
     assert "guardana.supply_chain.pickle_opcode" in result.stdout
 
 
+def test_rules_includes_custom_yaml_pack(tmp_path: Path) -> None:
+    (tmp_path / "my_rule.yaml").write_text(
+        "id: acme.prompt.demo\n"
+        "title: Demo custom rule\n"
+        "severity: high\n"
+        "target_kind: endpoint\n"
+        "requires: [chat]\n"
+        "evaluator: keyword\n"
+        "prompts:\n"
+        '  - "hello"\n'
+    )
+    result = runner.invoke(app, ["rules", "--rules", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "acme.prompt.demo" in result.stdout
+
+
+def test_rules_warns_on_unloadable_custom_pack(tmp_path: Path) -> None:
+    (tmp_path / "broken.yaml").write_text("id: acme.broken\ntitle: no prompts\nseverity: high\n")
+    result = runner.invoke(app, ["rules", "--rules", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "warning: could not load rule" in result.output
+
+
 def test_scan_rejects_invalid_format(tmp_path: Path) -> None:
     (tmp_path / "ok.py").write_text("import os\n")
     result = runner.invoke(app, ["scan", str(tmp_path), "--format", "bogus"])

@@ -15,6 +15,9 @@ _RULE_ID = "guardana.supply_chain.hardcoded_secret"
 
 # Text-like config/source suffixes worth scanning. Deliberately excludes
 # markdown/docs and binaries/model formats to keep noise and runtime down.
+# The web/systems-language suffixes matter because a served model is fronted by
+# a Node/Go/Java gateway as often as a Python one — a secret in `handler.ts` is
+# every bit as leaked as one in `handler.py`.
 _SCAN_SUFFIXES = frozenset(
     {
         ".py",
@@ -29,7 +32,26 @@ _SCAN_SUFFIXES = frozenset(
         ".conf",
         ".txt",
         ".sh",
+        ".bash",
+        ".zsh",
         ".properties",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
+        ".go",
+        ".rb",
+        ".java",
+        ".kt",
+        ".rs",
+        ".php",
+        ".cs",
+        ".tf",
+        ".tfvars",
+        ".gradle",
+        ".xml",
     }
 )
 

@@ -4,6 +4,10 @@ from pathlib import Path
 import pytest
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain._known_packages import (
+    KNOWN_DISTRIBUTIONS,
+    installed_import_names,
+)
 from guardana.rules.supply_chain.hallucinated_package import HallucinatedPackageRule
 
 
@@ -91,3 +95,27 @@ def test_a_padded_file_does_not_evade_the_scan(tmp_path: Path) -> None:
     (tmp_path / "big.py").write_text(big, encoding="utf-8")
     findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert any("totally_fake_zzz" in f.evidence.summary for f in findings)
+
+
+def test_import_name_differing_from_distribution_not_flagged(tmp_path: Path) -> None:
+    # bs4 (beautifulsoup4), jwt (PyJWT), cv2 (opencv-python): the import name
+    # differs from the PyPI distribution. Curating these by import name is what
+    # keeps a real ML repo from drowning in false positives.
+    (tmp_path / "a.py").write_text(
+        "import bs4\nimport jwt\nimport cv2\nimport psycopg2\n", encoding="utf-8"
+    )
+    findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert findings == []
+
+
+def test_installed_distribution_import_name_is_treated_as_known(tmp_path: Path) -> None:
+    # A distribution importable in the scanning env demonstrably exists, so it is
+    # not a hallucination even when its import name is not in the static allowlist.
+    installed = installed_import_names()
+    assert "pytest" in installed  # sanity: the resolver sees the running env
+    sample = next((n for n in installed if n.isidentifier() and n not in KNOWN_DISTRIBUTIONS), None)
+    if sample is None:  # pragma: no cover - only if every installed name is allowlisted
+        pytest.skip("no installed distribution outside the static allowlist")
+    (tmp_path / "a.py").write_text(f"import {sample}\n", encoding="utf-8")
+    findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert findings == []

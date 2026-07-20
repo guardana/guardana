@@ -8,7 +8,10 @@ from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM03
-from guardana.rules.supply_chain._known_packages import KNOWN_DISTRIBUTIONS
+from guardana.rules.supply_chain._known_packages import (
+    KNOWN_DISTRIBUTIONS,
+    installed_import_names,
+)
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
 
@@ -88,7 +91,7 @@ class HallucinatedPackageRule(Rule):
         if not isinstance(target, ArtifactTarget):
             return
         local = _local_modules(Path(target.ref))
-        known = _STDLIB | KNOWN_DISTRIBUTIONS | local
+        known = _STDLIB | KNOWN_DISTRIBUTIONS | installed_import_names() | local
         for path in target.iter_files((".py",)):
             yield from self._scan(path, known)
 

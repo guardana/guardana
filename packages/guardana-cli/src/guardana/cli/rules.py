@@ -1,5 +1,6 @@
 import json
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -34,9 +35,25 @@ def rules(
     surface: Annotated[
         SurfaceFilter, typer.Option(help="Filter by security layer: all|build|runtime")
     ] = SurfaceFilter.all,
+    rules: Annotated[
+        list[Path],
+        typer.Option(
+            "--rules", help="Directory or file of custom YAML rules to include; repeatable."
+        ),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
-    """List all discovered rules, grouped by the layer they secure (build vs runtime)."""
-    discovered = [r for r in Registry.discover().rules() if _keep(r, surface)]
+    """List all discovered rules, grouped by the layer they secure (build vs runtime).
+
+    Pass `--rules <dir>` to include custom YAML rules in the listing — the same
+    flag `scan`/`probe` take — so you can confirm a rule pack parses and is picked
+    up without launching a full probe. A file that fails to load is warned about,
+    never silently dropped.
+    """
+    registry = Registry.discover()
+    outcome = registry.load_yaml_rule_dirs(rules)
+    for error in outcome.errors:
+        typer.echo(f"warning: could not load rule — {error}", err=True)
+    discovered = [r for r in registry.rules() if _keep(r, surface)]
     if format == RulesFormat.json:
         typer.echo(json.dumps([_as_dict(r) for r in discovered], indent=2))
         return

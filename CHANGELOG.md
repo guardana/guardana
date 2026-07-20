@@ -212,6 +212,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dogfood-scan gates); dependency audit (`uv audit`) in CI. CI dogfoods
   Guardana against its own source (`guardana scan packages`) on every push.
 
+### Changed
+
+- **`hallucinated_package` no longer floods real ML repos with false positives.**
+  It now folds in the top-level import names of every distribution installed in
+  the scanning environment (`importlib.metadata.packages_distributions()`) and
+  ships a much larger curated allowlist that covers import names differing from
+  their PyPI distribution (`bs4`→beautifulsoup4, `jwt`→PyJWT, `cv2`→opencv-python,
+  `psycopg2`, `sentence_transformers`, `prometheus_client`, …). This only removes
+  noise: a package that is importable demonstrably exists, so a non-existent
+  (hallucinated) one can never appear in either set — the check is not weakened.
+- **`hardcoded_secret` now scans web/systems source files**, not just Python and
+  config. Added `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs`/`.go`/`.rb`/`.java`/`.kt`/
+  `.rs`/`.php`/`.cs`/`.tf`/`.tfvars`/`.gradle`/`.xml` (and `.bash`/`.zsh`): a
+  served model is fronted by a Node/Go/Java gateway as often as a Python one, and
+  a secret there leaks just the same.
+- **`guardana rules --rules <dir>`** now includes custom YAML rule packs in the
+  listing (the same repeatable flag `scan`/`probe` accept), so you can confirm a
+  pack parses and is discovered without launching a probe; unloadable files are
+  warned about, never silently dropped.
+
 ### Security
 
 Findings from the pre-release code audit. Guardana has not

@@ -51,6 +51,16 @@ def test_clean_file_no_findings(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_flags_secret_in_typescript_gateway(tmp_path: Path) -> None:
+    # A served model is often fronted by a Node/TS gateway; a secret there leaks
+    # just the same. Previously only Python/config suffixes were scanned.
+    key = _fake_aws_key()
+    (tmp_path / "handler.ts").write_text(f'const awsKey = "{key}";\n')
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert any(f.severity.name == "HIGH" for f in findings)
+    assert all(key not in f.evidence.summary for f in findings)
+
+
 def test_ignores_binary_and_model_files(tmp_path: Path) -> None:
     secret_shaped = _fake_aws_key().encode()
     (tmp_path / "weights.pt").write_bytes(b"\x80\x02}q\x00" + secret_shaped + b"\x00\x01\x02")
