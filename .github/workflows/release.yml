@@ -2,15 +2,17 @@
 # The maintainer runbook for cutting a release is RELEASING.md; the one-time repo
 # and PyPI setup is docs/maintainers/github-setup.md.
 #
-# Before the first release, a maintainer must create a PyPI *pending* Trusted
-# Publisher for EACH of the 5 packages (guardana-core/-rules/-report/-cli/-server),
-# pointed at this repo, this workflow file, and the "pypi" environment.
-# See https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/ —
-# "pending" is what lets the first OIDC upload create a project that doesn't exist
-# yet. Upload order is irrelevant (PyPI doesn't check a wheel's deps at upload).
+# Steady-state: this builds all five packages and uploads them via OIDC trusted
+# publishing behind the "pypi" environment's approval gate — no API token in CI.
+# Each of the 5 projects must have a trusted publisher pointed at this repo, this
+# workflow file, and the "pypi" environment.
 #
-# This builds all five and uploads them via OIDC trusted publishing — no API token
-# is stored or needed. Full runbook: RELEASING.md.
+# NOTE on first-time setup: you cannot pre-register five *pending* publishers with
+# this one shared (repo, workflow, environment) config — PyPI allows only one
+# pending publisher per config. Bootstrap the projects once with a token upload,
+# then add a normal trusted publisher to each. Full runbook + the one-time
+# new-project rate-limit caveat: RELEASING.md. `skip-existing` below keeps re-runs
+# idempotent.
 
 name: Release
 

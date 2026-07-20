@@ -155,25 +155,50 @@ pre-release and won't be installed by a plain `pip install guardana-cli` (only
 with `--pre` or an explicit `==1.0.0rc1`). Mark the GitHub Release as a
 **pre-release** too. When it's proven, release the final `1.0.0`.
 
-## First-time PyPI setup (once per package, before the first real release)
+## First-time PyPI setup (once, before the first release)
 
-The five packages aren't on PyPI yet (README says "PyPI coming soon"). Before the
-first `v*` tag can publish:
+Steady-state releases publish via OIDC trusted publishing — no API token in CI.
+Getting the five projects to *exist* the first time has one wrinkle worth knowing:
+PyPI allows **only one _pending_ trusted publisher per (owner, repo, workflow,
+environment) configuration.** All five packages share the same repo, `release.yml`,
+and `pypi` environment, so you *cannot* pre-register five pending publishers — the
+second is rejected with *"a pending trusted publisher matching this configuration
+has already been registered for a different project name."* (This is not a name
+squat; the names are free.)
 
-1. For **each** of the five packages, create a
-   [PyPI *pending* Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
-   pointed at this repo, the `release.yml` workflow, and the `pypi` environment.
-   "Pending" is the flavour for a project that doesn't exist yet: the first
-   OIDC upload creates the project. No API token is ever stored.
-2. Upload **order doesn't matter.** PyPI accepts a wheel regardless of whether
-   its declared dependencies are already on the index, so `release.yml` can
-   publish all five in one run. (Contrast: *installing* them needs core present,
-   but that's a consumer concern, not an upload-time one.)
-3. After the first successful publish, drop the "PyPI coming soon" note from the
-   README and add the install-from-PyPI path (`uv add guardana-cli` /
-   `uvx --from guardana-cli guardana`). The console script is `guardana` but the
-   distribution is `guardana-cli`, so `uvx` needs `--from` — unless you also
-   publish a thin `guardana` meta-package (see ROADMAP) that re-exports the CLI.
+So bootstrap the five projects once with a one-time token, then attach a normal
+(non-pending) trusted publisher to each — the same config on five *existing*
+projects is allowed:
+
+1. Build all five and sanity-check the metadata:
+   ```bash
+   for pkg in packages/*/; do uv build "$pkg" --out-dir dist/; done
+   uvx twine check dist/*
+   ```
+2. Create an **account-scoped** PyPI API token (Account settings → API tokens) —
+   account scope is required because the projects don't exist yet.
+3. `uvx twine upload --skip-existing dist/*` — creates, reserves, and publishes
+   all five names. **Expect a possible one-time HTTP 429:** registering five
+   brand-new projects in one burst can trip PyPI's *new-project* rate limit
+   partway through. That is a bootstrap artifact, not a workflow bug — wait for
+   the window to clear and re-run the same command; `--skip-existing` skips what
+   already landed. A normal release (a new *version* of an *existing* project) is
+   not subject to this limit, so it never recurs.
+4. On each of the five project pages (Manage → Publishing → Add a trusted
+   publisher): owner `guardana`, repo `guardana`, workflow `release.yml`,
+   environment `pypi`. Non-pending (the projects now exist), so the identical
+   config on all five is accepted. Delete any leftover *pending* publisher — a
+   token upload does not convert it.
+5. Revoke the account token. From here on every release is OIDC via `release.yml`,
+   tokenless, and `skip-existing` makes any re-run idempotent.
+6. Drop the "PyPI coming soon" note from the README and add the install path
+   (`uv add guardana-cli` / `uvx --from guardana-cli guardana` — the console
+   script is `guardana`, the distribution is `guardana-cli`, hence `--from`).
+
+**Going forward the auto-release is boring on purpose:** `release.py X.Y.Z` cuts
+the tag, `release.yml` builds all five and publishes via OIDC behind the `pypi`
+environment's one approval, and `skip-existing` means a re-tag or a partial retry
+never errors. No tokens, no new-project rate limit, no surprises.
 
 ## The GitHub Release
 
