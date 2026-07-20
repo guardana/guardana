@@ -5,7 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - Unreleased
+## [0.1.1] - Unreleased
+
+Production-hardening from the first real-world use of the packages.
+
+### Added
+
+- **Per-finding baseline** (`guardana scan --baseline <file>` /
+  `--write-baseline <file>`): accept today's findings on an existing repo with a
+  reason so a blocking gate can be turned on without fixing the whole backlog,
+  while a *new* finding (a different rule+location fingerprint) still fails.
+  Waived findings are never silently dropped — they are reported in a `waived`
+  channel in every format (a `WAIVED` line in human output, a `waived` array in
+  JSON, native `suppressions` in SARIF). A malformed baseline is a hard error,
+  never a silent waive-nothing or waive-everything.
+- **Custom endpoint adapter** (`guardana probe --adapter <file>`): probe a
+  *guarded product endpoint* with its own request/response schema, not just the
+  raw OpenAI/Ollama/TGI wire — so the probe exercises the guardrails in front of
+  the model, not only the bare model. The adapter file maps a body template (with
+  a `{{prompt}}` slot and optional `{{system}}`), static/`${ENV}`-expanded headers,
+  and a dotted `response_path` to the reply text. New public API
+  `guardana.core.target.HttpAdapterTransport` / `AdapterConfig`. Fail-closed: a
+  body with no `{{prompt}}` slot, or a response path that does not resolve to
+  text, is an error — never a blank exchange graded as a clean pass. A planted
+  system prompt with no `{{system}}` slot is folded into the prompt, never dropped.
+
+### Changed
+
+- **`hardcoded_secret` gains an opt-in entropy mode** (`rule_config` →
+  `guardana.supply_chain.hardcoded_secret.entropy: true`): in addition to the
+  high-precision prefix-anchored keys, it flags a high-entropy value assigned to a
+  secret-named variable (`db_password`, `jwt_secret`, …) — the provider-less
+  secrets that carry no recognizable prefix. Off by default because generic
+  entropy matching is false-positive-prone; placeholders and config-shaped names
+  are filtered out.
+
+## [0.1.0] - 2026-07-20
 
 ### Added
 
@@ -227,25 +262,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.rs`/`.php`/`.cs`/`.tf`/`.tfvars`/`.gradle`/`.xml` (and `.bash`/`.zsh`): a
   served model is fronted by a Node/Go/Java gateway as often as a Python one, and
   a secret there leaks just the same.
-- **`hardcoded_secret` gains an opt-in entropy mode** (`rule_config` →
-  `guardana.supply_chain.hardcoded_secret.entropy: true`): in addition to the
-  high-precision prefix-anchored keys, it flags a high-entropy value assigned to a
-  secret-named variable (`db_password`, `jwt_secret`, …) — the provider-less
-  secrets that carry no recognizable prefix. Off by default because generic
-  entropy matching is false-positive-prone; placeholders and config-shaped names
-  are filtered out.
 - **`guardana rules --rules <dir>`** now includes custom YAML rule packs in the
   listing (the same repeatable flag `scan`/`probe` accept), so you can confirm a
   pack parses and is discovered without launching a probe; unloadable files are
   warned about, never silently dropped.
-- **Per-finding baseline** (`guardana scan --baseline <file>` /
-  `--write-baseline <file>`): accept today's findings on an existing repo with a
-  reason so a blocking gate can be turned on without fixing the whole backlog,
-  while a *new* finding (a different rule+location fingerprint) still fails.
-  Waived findings are never silently dropped — they are reported in a `waived`
-  channel in every format (a `WAIVED` line in human output, a `waived` array in
-  JSON, native `suppressions` in SARIF). A malformed baseline is a hard error,
-  never a silent waive-nothing or waive-everything.
 
 ### Security
 

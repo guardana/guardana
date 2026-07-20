@@ -25,12 +25,46 @@ guardana probe --url <base-url> --model <name> [OPTIONS]
 | `--model TEXT` (required) | — | Model name to send in each request |
 | `--api-key-env TEXT` | none | Name of an environment variable holding the bearer API key |
 | `--provider [openai\|ollama\|tgi]` | `openai` | Endpoint wire protocol: OpenAI-compatible (default), Ollama's native `/api/chat`, or HF TGI's `/generate` |
+| `--adapter PATH` | none | Adapter file mapping a **guarded product endpoint**'s custom request/response schema — see [Probing a guarded endpoint](#probing-a-guarded-endpoint). Overrides `--provider`. |
 | `--system-prompt-file PATH` | none | File containing the system prompt already deployed in front of the model, so non-canary rules probe the real configuration |
 | `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file |
 | `--preset [ci\|pre-training\|monitor]` | none | Named policy preset (mutually exclusive with `--profile`) — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--format [human\|json\|sarif\|junit]` | `human` | Output format |
 | `--rules PATH` | none | Directory or file of custom YAML rules; repeatable. Combined with the profile's `rules.paths` — see [`writing-rules.md`](writing-rules.md). A malformed rule file is a warning, never an abort. |
 | `--reporter TEXT` | none | Forward findings to a collector, e.g. `server://https://collector.example.com` |
+
+## Probing a guarded endpoint
+
+`--provider` speaks the raw model wire (OpenAI/Ollama/TGI). But the thing you most
+want to test is often your **guarded product endpoint** — the model *plus* the API
+gateway, auth, and guardrails in front of it — and that has its own request and
+response schema. `--adapter <file>` maps it, so the probe drives the whole surface
+instead of bypassing it to the bare model.
+
+```yaml
+# wellness-adapter.yaml
+url: https://api.example.com/v1/wellness/chat   # optional; defaults to --url
+headers:
+  X-Api-Key: ${WELLNESS_API_KEY}                # ${ENV} is expanded; unset = error
+  Content-Type: application/json
+body:                                           # your endpoint's request shape;
+  message: "{{prompt}}"                         # {{prompt}} is where the probe goes
+  user_id_hash: "guardana-probe"
+  stream: false
+response_path: data.reply                       # dotted path to the reply text
+```
+
+```bash
+guardana probe --url https://api.example.com --model wellness --adapter wellness-adapter.yaml
+```
+
+The mapping is **fail-closed**: a `body` with no `{{prompt}}` slot is rejected at
+load (the probe would otherwise send the same static request for every check and
+pass everything), and a `response_path` that does not resolve to a string is an
+error, never a blank reply graded as clean. A planted system prompt with no
+`{{system}}` slot in the body is folded into the prompt rather than dropped, so a
+canary/leak check is never silently disarmed. Programmatically, the same mapping
+is `guardana.core.target.HttpAdapterTransport` / `AdapterConfig`.
 
 ## How canary rules work
 

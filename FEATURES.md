@@ -114,6 +114,12 @@ honoured — a typo'd key, an out-of-range confidence, an empty include —
 `--provider ollama` (native `/api/chat`), `--provider tgi` (HF TGI
 `/generate`). Unknown provider = loud error.
 
+Or map a **guarded product endpoint** with `--adapter <file>`: a body template
+(`{{prompt}}`/`{{system}}`), `${ENV}`-expanded headers, and a dotted
+`response_path` to the reply — so the probe exercises your gateway and guardrails,
+not just the bare model. Fail-closed (no `{{prompt}}` slot, or a response path that
+isn't text, is an error). Public API: `HttpAdapterTransport` / `AdapterConfig`.
+
 ### A framework, not just a CLI
 
 - **Declarative YAML rules** — single-turn `prompts:` or multi-turn `steps:`

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from guardana.cli._adapter import load_adapter_config
 from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._formats import OutputFormat
@@ -12,6 +13,7 @@ from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.core.registry import Registry
 from guardana.core.runner import gate
+from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport
 from guardana.report import get_renderer
 
 
@@ -24,6 +26,12 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     provider: Annotated[
         str, typer.Option(help="Endpoint wire protocol: openai|ollama|tgi")
     ] = "openai",
+    adapter: Annotated[
+        Path | None,
+        typer.Option(
+            help="Adapter file mapping a guarded endpoint's custom request/response schema."
+        ),
+    ] = None,
     system_prompt_file: Annotated[
         Path | None, typer.Option("--system-prompt-file", help="File containing a system prompt")
     ] = None,
@@ -48,6 +56,13 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     wire_config_evaluators(registry, prof)
     load_custom_rules(registry, prof, rules)
 
+    transport: ChatTransport | None = None
+    if adapter is not None:
+        try:
+            transport = HttpAdapterTransport(load_adapter_config(adapter, url))
+        except EndpointError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
     connection = Connection(
         url=url,
         model=model,
@@ -56,6 +71,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
             system_prompt_file.read_text(encoding="utf-8") if system_prompt_file else None
         ),
         provider=provider,
+        transport=transport,
     )
 
     result = run_against_endpoint(url, lambda: run_probe(registry, prof, connection))
