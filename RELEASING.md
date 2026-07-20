@@ -171,7 +171,9 @@ first `v*` tag can publish:
    but that's a consumer concern, not an upload-time one.)
 3. After the first successful publish, drop the "PyPI coming soon" note from the
    README and add the install-from-PyPI path (`uv add guardana-cli` /
-   `uvx guardana`).
+   `uvx --from guardana-cli guardana`). The console script is `guardana` but the
+   distribution is `guardana-cli`, so `uvx` needs `--from` — unless you also
+   publish a thin `guardana` meta-package (see ROADMAP) that re-exports the CLI.
 
 ## The GitHub Release
 

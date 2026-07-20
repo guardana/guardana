@@ -29,11 +29,19 @@ test/lint gates.
 
 ## PyPI package — coming soon
 
-`uvx guardana scan .` and `pip install guardana-cli` will work once the
-`guardana-cli` distribution (and its `guardana-core` / `guardana-rules` /
-`guardana-report` dependencies) are published to PyPI. That has not
-happened yet — until then, install from source as shown above rather than
-relying on a package name that isn't live.
+`uvx --from guardana-cli guardana scan .` and `pip install guardana-cli` will
+work once the `guardana-cli` distribution (and its `guardana-core` /
+`guardana-rules` / `guardana-report` dependencies) are published to PyPI. The
+console script is `guardana` but its distribution is `guardana-cli`, so `uvx`
+needs `--from guardana-cli` to find it. That has not happened yet — until then,
+install from source as shown above rather than relying on a package name that
+isn't live.
+
+To run the current code with zero install *today*, point `uvx` at the git repo:
+
+```bash
+uvx --from git+https://github.com/guardana/guardana#subdirectory=packages/guardana-cli guardana scan .
+```
 
 ## The optional collector
 

@@ -22,9 +22,26 @@ uv run pre-commit install --install-hooks --hook-type commit-msg --hook-type pre
 (`ruff`, `mypy`, `pytest`, `pre-commit`, `import-linter`) from the single root
 `pyproject.toml` workspace.
 
+## Your first contribution
+
+The fastest way in is a **new declarative rule**, and it needs no engine
+knowledge. A YAML rule is "send these prompts, grade with this evaluator" —
+`uv run guardana new-rule yourname.prompt.my_check` scaffolds a valid skeleton,
+and the whole thing (rule + its required positive and negative test fixtures) is
+typically a ~30-minute PR. See [`docs/writing-rules.md`](docs/writing-rules.md)
+and the worked example in [`examples/custom_rule/`](examples/custom_rule/).
+
+Looking for something concrete? Browse issues labelled
+[`good first issue`](https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+Every rule maps to a standard (OWASP LLM / MITRE ATLAS / NIST) and ships with a
+positive **and** a negative fixture — that fixture pair is non-negotiable,
+because it is what keeps the project honest about the false-positive /
+false-negative failure mode dynamic checks are prone to.
+
 ## Tooling gates
 
-CI runs exactly these, and so should you:
+CI runs these on every push (plus a `uv audit` dependency check), and so should
+you:
 
 ```bash
 uv run ruff check .            # lint (see "The lint ruleset" below)

@@ -92,9 +92,10 @@ never on an untrusted network.
 
 A security tool that doesn't scan itself is a marketing exercise. On every push,
 CI runs the bandit rule set over our own source (`ruff`'s `S` family), audits
-our dependencies (`uv audit`), refuses a commit that contains a private key
-(`detect-private-key`), and runs `guardana scan packages` — Guardana against
-Guardana, which must stay at zero findings.
+our dependencies (`uv audit`), and runs `guardana scan packages` — Guardana
+against Guardana, which must stay at zero findings. The pre-commit gate refuses
+a commit that contains a private key (`detect-private-key`) before it ever
+leaves a contributor's machine.
 
 ## Supported versions
 

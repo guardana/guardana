@@ -17,7 +17,7 @@ body:
       description: >
         Output of `guardana --version`. If you installed from source, add the
         git commit you built from.
-      placeholder: e.g. guardana-cli 0.1.0, or commit abc1234
+      placeholder: e.g. guardana 0.1.0 (from `guardana --version`), or commit abc1234
     validations:
       required: true
 

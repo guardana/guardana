@@ -13,7 +13,7 @@ that runs on your laptop, in CI, and next to a served model.**
 [![OWASP LLM Top 10](https://img.shields.io/badge/mapped-OWASP%20%C2%B7%20MITRE%20ATLAS%20%C2%B7%20NIST-informational.svg)](#standards-and-architecture)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Quickstart](#quickstart) · [Features](FEATURES.md) · [The 25 rules](#whats-in-the-box) · [Docs](https://guardana.dev) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
+[Quickstart](#quickstart) · [Features](FEATURES.md) · [The 25 rules](#whats-in-the-box) · [Docs](docs/index.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
 
 </div>
 
@@ -24,7 +24,8 @@ that runs on your laptop, in CI, and next to a served model.**
 Existing AI red-team scanners (garak, Giskard, PyRIT, CyberSecEval, and
 friends) are good at *sending* attacks. Their shared, documented weakness is
 telling you whether an attack **actually succeeded**: keyword-graded dynamic
-checks misjudge outcomes at rates reported as high as **37%** (Fujitsu, 2024).
+checks misjudge outcomes at rates reported as high as **37%**
+([Fujitsu Research, 2024](https://arxiv.org/abs/2410.16527)).
 A scanner that can't tell a refusal from a compliance isn't a security tool —
 it's a random number generator with a progress bar.
 
@@ -40,6 +41,25 @@ Static supply-chain checks (pickle opcodes, unsafe model formats, dependency
 risk) don't have this problem — they're deterministic. So Guardana ships them
 as the reliable, no-false-positive-theater **front door**, and builds
 evaluator-graded dynamic checks and a live monitor around that core.
+
+## How it compares
+
+Most tools do one of these things well. Guardana's bet is that the team running
+a self-hosted model wants one engine covering the model file, the live endpoint,
+*and* the running service — with a confidence on every dynamic verdict.
+
+| | Static model-artifact scan | Live endpoint probe | Long-running monitor | Graded confidence (not keyword) | OWASP-LLM / ATLAS mapping | SARIF / CI gate |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|
+| **Guardana** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| garak | — | ✅ | — | partial | partial | partial |
+| ModelScan | ✅ | — | — | n/a | — | — |
+| promptfoo | — | ✅ | — | ✅ | — | ✅ |
+| PyRIT | — | ✅ | — | partial | — | — |
+| Giskard | — | ✅ | — | ✅ | partial | — |
+
+<sub>Checkmarks reflect each tool's primary, documented focus as of July 2026 —
+these are excellent tools with different goals, not competitors to dismiss.
+Corrections welcome via PR.</sub>
 
 ## Quickstart
 
@@ -70,7 +90,7 @@ $ uv run guardana scan examples/vulnerable-model
 That exits `1` — the same signal a CI gate reads. Now point it at your own code:
 
 ```bash
-uv run guardana scan .                 # static scan of the current directory
+uv run guardana scan path/to/your/project   # static scan of a repo or model dir
 uv run guardana rules                  # list every discovered rule + its standards tags
 uv run guardana init                   # write a starter guardana.yaml policy file
 uv run guardana new-rule acme.prompt.demo  # scaffold a custom YAML rule (run via --rules)
@@ -78,9 +98,15 @@ uv run guardana scan . --format sarif  # SARIF 2.1.0 for GitHub code scanning
 uv run guardana --version              # print the installed version
 ```
 
+(Running `guardana scan .` at the repo root exits `1` on purpose — this repo
+bundles the deliberately-vulnerable `examples/vulnerable-model/` fixture. Point
+it at `packages/` for a clean run.)
+
 > **PyPI coming soon.** Once published you'll be able to run
-> `uvx guardana scan .` with zero install, or `uv add guardana-cli`. Until then,
-> the source checkout above is the supported path.
+> `uvx --from guardana-cli guardana scan .` with zero install, or
+> `uv add guardana-cli`. Until then, the source checkout above is the supported
+> path. (The console script is `guardana`; its distribution is `guardana-cli`,
+> hence `--from`.)
 
 ## Three ways to run it
 
@@ -90,7 +116,7 @@ One engine, three entry points, no separate tools to learn:
 |---|---|---|
 | **Dev / CI** | `guardana scan <path>` | Fast, static, no-network scan of a repo or model directory. Drops into a pipeline as a linter-like gate. |
 | **Live probe** | `guardana probe --url <endpoint> --model <name>` | One-shot dynamic run against a live endpoint: prompt injection, jailbreak (single-turn and multi-turn scenarios), system-prompt leakage, output-secret checks — each graded by an Evaluator with a confidence. OpenAI-compatible by default; `--provider ollama\|tgi` speaks Ollama's native `/api/chat` or HF TGI's `/generate`. |
-| **Monitor** | `guardana monitor --url <endpoint> --model <name>` | Long-running sampling observer next to a served model; alerts on policy-gate failure or a rise in findings over baseline. |
+| **Monitor** | `guardana monitor --url <endpoint> --model <name>` | Long-running sampling observer next to a served model; alerts on policy-gate failure, a rise in findings over baseline, or a rise in *unverified* checks — a model whose safety checks go blind is itself the alert. |
 
 Any of the three can forward findings to an optional central collector with
 `--reporter server://<collector-url>` (see [central monitoring](#central-monitoring--self-hosted-or-managed)).
@@ -99,6 +125,34 @@ Full flag references and example output:
 [`docs/usage-scan.md`](docs/usage-scan.md) ·
 [`docs/usage-probe.md`](docs/usage-probe.md) ·
 [`docs/usage-monitor.md`](docs/usage-monitor.md).
+
+### Drop it into GitHub Actions
+
+Works today, straight from the repo (no PyPI needed) — scans on every push and
+uploads results to GitHub code scanning:
+
+```yaml
+# .github/workflows/ai-security.yml
+name: AI security
+on: [push, pull_request]
+jobs:
+  guardana:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # to upload SARIF
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Scan for AI supply-chain risk
+        run: >
+          uvx --from
+          git+https://github.com/guardana/guardana#subdirectory=packages/guardana-cli
+          guardana scan . --format sarif > guardana.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()           # upload findings even when the gate fails the build
+        with:
+          sarif_file: guardana.sarif
+```
 
 ## What's in the box
 
