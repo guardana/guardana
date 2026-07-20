@@ -45,3 +45,6 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          # Idempotent re-runs: a version already on PyPI (e.g. bootstrapped by a
+          # one-time token upload, or a re-tagged release) is skipped, not failed.
+          skip-existing: true
