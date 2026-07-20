@@ -61,6 +61,44 @@ def test_flags_secret_in_typescript_gateway(tmp_path: Path) -> None:
     assert all(key not in f.evidence.summary for f in findings)
 
 
+def _high_entropy_value() -> str:
+    # Built at runtime (not a contiguous literal) so scanning this repo's own
+    # tests never trips a secret rule.
+    return "Xk9" + "qWz2Lp7Rt4Nv8Bm3Cy6"
+
+
+def test_entropy_mode_off_by_default_ignores_generic_secret(tmp_path: Path) -> None:
+    (tmp_path / "conf.py").write_text(f'db_password = "{_high_entropy_value()}"\n')
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert findings == []
+
+
+def test_entropy_mode_flags_generic_secret_when_enabled(tmp_path: Path) -> None:
+    value = _high_entropy_value()
+    (tmp_path / "conf.py").write_text(f'db_password = "{value}"\n')
+    ctx = RuleContext(config={"entropy": True})
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), ctx))
+    assert any(f.severity.name == "HIGH" for f in findings)
+    assert all(value not in f.evidence.summary for f in findings)  # redacted
+    assert all(value not in f.evidence.detail for f in findings)
+
+
+def test_entropy_mode_ignores_placeholder(tmp_path: Path) -> None:
+    (tmp_path / "conf.py").write_text('api_key = "your-api-key-here-xxxxxxxx"\n')
+    ctx = RuleContext(config={"entropy": True})
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), ctx))
+    assert findings == []
+
+
+def test_entropy_mode_ignores_config_named_and_low_entropy(tmp_path: Path) -> None:
+    (tmp_path / "conf.py").write_text(
+        'password_length = "1234567890123"\ntoken_type = "Beareraaaaaaaaa"\n'
+    )
+    ctx = RuleContext(config={"entropy": True})
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), ctx))
+    assert findings == []
+
+
 def test_ignores_binary_and_model_files(tmp_path: Path) -> None:
     secret_shaped = _fake_aws_key().encode()
     (tmp_path / "weights.pt").write_bytes(b"\x80\x02}q\x00" + secret_shaped + b"\x00\x01\x02")

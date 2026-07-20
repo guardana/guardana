@@ -227,6 +227,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.rs`/`.php`/`.cs`/`.tf`/`.tfvars`/`.gradle`/`.xml` (and `.bash`/`.zsh`): a
   served model is fronted by a Node/Go/Java gateway as often as a Python one, and
   a secret there leaks just the same.
+- **`hardcoded_secret` gains an opt-in entropy mode** (`rule_config` →
+  `guardana.supply_chain.hardcoded_secret.entropy: true`): in addition to the
+  high-precision prefix-anchored keys, it flags a high-entropy value assigned to a
+  secret-named variable (`db_password`, `jwt_secret`, …) — the provider-less
+  secrets that carry no recognizable prefix. Off by default because generic
+  entropy matching is false-positive-prone; placeholders and config-shaped names
+  are filtered out.
 - **`guardana rules --rules <dir>`** now includes custom YAML rule packs in the
   listing (the same repeatable flag `scan`/`probe` accept), so you can confirm a
   pack parses and is discovered without launching a probe; unloadable files are

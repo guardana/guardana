@@ -6,6 +6,7 @@ a missed secret (no theater).
 """
 
 import re
+from pathlib import Path
 
 # The `sk-…` family: OpenAI's current default (`sk-proj-`), service accounts
 # (`sk-svcacct-`), Anthropic (`sk-ant-api03-`), and the legacy bare form. The
@@ -66,3 +67,54 @@ REDACT_PREFIX_LEN = 6
 def redact(secret: str) -> str:
     """Keep only a short identifying prefix — evidence must never carry the secret."""
     return f"{secret[:REDACT_PREFIX_LEN]}…"
+
+
+# Text-like config/source suffixes both secret-scanning rules cover. Deliberately
+# excludes markdown/docs and binaries/model formats — a served model is fronted by
+# a Node/Go/Java gateway as often as a Python one, so web/systems source is in.
+
+TEXT_SUFFIXES: frozenset[str] = frozenset(
+    {
+        ".py",
+        ".pyi",
+        ".env",
+        ".yaml",
+        ".yml",
+        ".json",
+        ".toml",
+        ".ini",
+        ".cfg",
+        ".conf",
+        ".txt",
+        ".sh",
+        ".bash",
+        ".zsh",
+        ".properties",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
+        ".go",
+        ".rb",
+        ".java",
+        ".kt",
+        ".rs",
+        ".php",
+        ".cs",
+        ".tf",
+        ".tfvars",
+        ".gradle",
+        ".xml",
+    }
+)
+
+# `Path.suffix` never matches a file literally named ".env" or ".env.local"
+# (it treats the whole name as the stem for dotfiles), so those are matched by name.
+_ENV_DOTFILE = re.compile(r"^\.env(\..+)?$")
+
+
+def is_scannable_text(path: Path) -> bool:
+    """Whether a path is a text-like source/config file worth a secret scan."""
+    return path.suffix in TEXT_SUFFIXES or bool(_ENV_DOTFILE.match(path.name))

@@ -60,7 +60,7 @@ Every finding carries typed OWASP LLM Top 10 / MITRE ATLAS / NIST references.
 | `guardana.supply_chain.model_format` | HIGH | Model files in formats that can carry code; a well-formed safetensors file is never flagged. |
 | `guardana.supply_chain.hallucinated_package` | MEDIUM | Imports of unknown packages — slopsquat *leads*, at honest lead-level confidence. |
 | `guardana.supply_chain.provenance` | MEDIUM | Unpinned model downloads and missing licenses (leads). |
-| `guardana.supply_chain.hardcoded_secret` | HIGH | Current-era keys — `sk-proj-`/`sk-ant-api03-` (OpenAI/Anthropic), GitHub token forms, private-key headers — across Python, config, **and** web/systems source (`.ts`/`.js`/`.go`/`.java`/`.rs`/`.tf`/…). |
+| `guardana.supply_chain.hardcoded_secret` | HIGH | Current-era keys — `sk-proj-`/`sk-ant-api03-` (OpenAI/Anthropic), GitHub token forms, private-key headers — across Python, config, **and** web/systems source (`.ts`/`.js`/`.go`/`.java`/`.rs`/`.tf`/…). Opt-in `entropy: true` mode also catches provider-less secrets (a DB password, a shared JWT key). |
 | `guardana.output.secrets` | HIGH | A live model leaking secret-shaped strings in its replies to benign probes. |
 | `guardana.prompt.mcp_tool_poisoning` | HIGH/MED | Hidden instructions in an MCP tool manifest — invisible Unicode, instruction-override phrases, base64 payloads in tool descriptions (indirect prompt injection). |
 | `guardana.prompt.hidden_instructions` | HIGH | Invisible instruction-smuggling characters (bidi overrides, the Unicode Tags block, zero-width) in agent rule files (`.cursorrules`) and Markdown model cards — the "Rules File Backdoor". Concealment, not imperative prose, is the signal. |
