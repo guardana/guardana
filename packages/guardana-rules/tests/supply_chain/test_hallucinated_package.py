@@ -97,6 +97,36 @@ def test_a_padded_file_does_not_evade_the_scan(tmp_path: Path) -> None:
     assert any("totally_fake_zzz" in f.evidence.summary for f in findings)
 
 
+def test_declared_requirement_not_flagged_under_isolated_install(tmp_path: Path) -> None:
+    # The residual FP class: real, in-requirements packages that aren't importable
+    # in Guardana's own (isolated) env. Reading requirements.txt resolves them.
+    (tmp_path / "requirements.txt").write_text(
+        "jsonlines==1.2.3\nlangdetect\nPyPDF2>=3.0\npycountry\n", encoding="utf-8"
+    )
+    (tmp_path / "a.py").write_text(
+        "import jsonlines\nimport langdetect\nimport PyPDF2\nimport pycountry\n", encoding="utf-8"
+    )
+    findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert findings == []
+
+
+def test_declared_in_pyproject_not_flagged(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\ndependencies = ["pynvml", "pytrends>=1.0"]\n', encoding="utf-8"
+    )
+    (tmp_path / "a.py").write_text("import pynvml\nimport pytrends\n", encoding="utf-8")
+    findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert findings == []
+
+
+def test_undeclared_import_still_flagged(tmp_path: Path) -> None:
+    (tmp_path / "requirements.txt").write_text("jsonlines\n", encoding="utf-8")
+    (tmp_path / "a.py").write_text("import jsonlines\nimport totally_fake_zzz\n", encoding="utf-8")
+    findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert any("totally_fake_zzz" in f.evidence.summary for f in findings)
+    assert not any("jsonlines" in f.evidence.summary for f in findings)
+
+
 def test_import_name_differing_from_distribution_not_flagged(tmp_path: Path) -> None:
     # bs4 (beautifulsoup4), jwt (PyJWT), cv2 (opencv-python): the import name
     # differs from the PyPI distribution. Curating these by import name is what

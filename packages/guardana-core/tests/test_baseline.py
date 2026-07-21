@@ -24,9 +24,14 @@ def _finding(rule_id: str = "guardana.x", ref: str = "a.py:1") -> Finding:
     )
 
 
-def test_fingerprint_stable_and_location_sensitive() -> None:
-    assert _finding(ref="a.py:1").fingerprint == _finding(ref="a.py:1").fingerprint
-    assert _finding(ref="a.py:1").fingerprint != _finding(ref="a.py:2").fingerprint
+def test_fingerprint_is_line_independent_but_content_sensitive() -> None:
+    # F-E: a line shift must NOT change the fingerprint (else a baseline churns on
+    # unrelated edits) ...
+    assert _finding(ref="a.py:1").fingerprint == _finding(ref="a.py:2").fingerprint
+    # ... but a different file or rule still differs, so a genuinely new finding
+    # still fails the gate (fail-closed).
+    assert _finding(ref="a.py:1").fingerprint != _finding(ref="b.py:1").fingerprint
+    assert _finding(rule_id="other", ref="a.py:1").fingerprint != _finding(ref="a.py:1").fingerprint
     assert len(_finding().fingerprint) == 16
 
 

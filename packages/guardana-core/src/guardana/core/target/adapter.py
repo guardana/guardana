@@ -36,6 +36,10 @@ class AdapterConfig:
     headers: Mapping[str, str] = field(default_factory=dict)
     prompt_token: str = "{{prompt}}"  # noqa: S105 — a template placeholder, not a secret
     system_token: str = "{{system}}"  # noqa: S105 — a template placeholder, not a secret
+    messages_token: str = "{{messages}}"  # noqa: S105 — a template placeholder, not a secret
+
+
+_ROLE_LABEL = {"system": "System", "user": "User", "assistant": "Assistant"}
 
 
 def _fill(node: object, replacements: Mapping[str, str]) -> object:
@@ -50,6 +54,32 @@ def _fill(node: object, replacements: Mapping[str, str]) -> object:
     if isinstance(node, list):
         return [_fill(value, replacements) for value in node]
     return node
+
+
+def _put_messages(node: object, token: str, conversation: list[dict[str, str]]) -> object:
+    """Replace a string node equal to the messages token with the message list."""
+    if isinstance(node, str):
+        return conversation if node == token else node
+    if isinstance(node, dict):
+        return {key: _put_messages(value, token, conversation) for key, value in node.items()}
+    if isinstance(node, list):
+        return [_put_messages(value, token, conversation) for value in node]
+    return node
+
+
+def _fold_prompt(messages: Sequence[ChatMessage], *, drop_system: bool) -> str:
+    """Collapse a conversation into one prompt, never dropping a turn.
+
+    A multi-turn scenario replays a growing conversation; an endpoint with only a
+    `{{prompt}}` slot can't carry that, so the whole escalation is folded into a
+    labelled transcript rather than reduced to the last turn (which would silently
+    neuter the very check the scenario is about). A single turn stays its bare
+    content. `drop_system` excludes a system message that has its own `{{system}}`.
+    """
+    included = [m for m in messages if not (drop_system and m.role == "system")]
+    if len(included) <= 1:
+        return included[0].content if included else ""
+    return "\n".join(f"{_ROLE_LABEL.get(m.role, m.role)}: {m.content}" for m in included)
 
 
 def extract_path(payload: object, path: str, *, ref: str) -> str:
@@ -98,12 +128,14 @@ class HttpAdapterTransport:
             raise EndpointError(
                 f"unsupported URL scheme {scheme!r} in {config.url!r}: expected http or https"
             )
-        # A body with no prompt slot would send the same static request for every
-        # probe — every rule would test nothing and pass. Refuse it at build time.
-        if config.prompt_token not in json.dumps(config.body):
+        # A body with neither a prompt nor a messages slot would send the same
+        # static request for every probe — every rule would test nothing and pass.
+        # Refuse it at build time.
+        serialized = json.dumps(config.body)
+        if config.prompt_token not in serialized and config.messages_token not in serialized:
             raise EndpointError(
-                f"adapter body has no {config.prompt_token} slot; the probe prompt would "
-                f"never reach the endpoint"
+                f"adapter body has no {config.prompt_token} or {config.messages_token} slot; "
+                f"the probe would never reach the endpoint"
             )
         self._config = config
         self._fetch = fetch or _default_fetch
@@ -115,19 +147,24 @@ class HttpAdapterTransport:
         messages: Sequence[ChatMessage],
         api_key: str | None,
     ) -> str:
-        """Fill the configured body with the probe prompt, POST it, and read the reply.
+        """Fill the configured body with the conversation, POST it, and read the reply.
 
         `base_url`/`model`/`api_key` are the standard transport signature; this
         adapter uses its own configured URL and headers instead (auth belongs in a
-        header here). A planted system prompt with no `{{system}}` slot is folded
-        into the prompt rather than dropped, so a system-prompt-based check is never
-        silently disarmed.
+        header here). A `{{messages}}` slot receives the full transcript for an
+        endpoint that speaks multi-turn; otherwise every turn — a planted system
+        prompt and each step of a scenario alike — is folded into `{{prompt}}` as a
+        labelled transcript, so context is never silently dropped.
         """
         cfg = self._config
+        serialized = json.dumps(cfg.body)
+        has_system_slot = cfg.system_token in serialized
         system = next((m.content for m in messages if m.role == "system"), None)
-        user = next((m.content for m in reversed(messages) if m.role == "user"), "")
-        has_system_slot = cfg.system_token in json.dumps(cfg.body)
-        prompt = user if system is None or has_system_slot else f"{system}\n{user}"
-        body = _fill(cfg.body, {cfg.prompt_token: prompt, cfg.system_token: system or ""})
+        prompt = _fold_prompt(messages, drop_system=has_system_slot)
+        body: object = cfg.body
+        if cfg.messages_token in serialized:
+            conversation = [{"role": m.role, "content": m.content} for m in messages]
+            body = _put_messages(body, cfg.messages_token, conversation)
+        body = _fill(body, {cfg.prompt_token: prompt, cfg.system_token: system or ""})
         payload = self._fetch(cfg.url, json.dumps(body).encode("utf-8"), cfg.headers)
         return extract_path(payload, cfg.response_path, ref=cfg.url)

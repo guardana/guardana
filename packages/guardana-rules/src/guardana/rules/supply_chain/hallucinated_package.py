@@ -8,6 +8,7 @@ from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM03
+from guardana.rules.supply_chain._declared_deps import declared_import_names, normalize
 from guardana.rules.supply_chain._known_packages import (
     KNOWN_DISTRIBUTIONS,
     installed_import_names,
@@ -90,12 +91,19 @@ class HallucinatedPackageRule(Rule):
         """Scan every `.py` file, treating the target's own modules as known."""
         if not isinstance(target, ArtifactTarget):
             return
-        local = _local_modules(Path(target.ref))
+        root = Path(target.ref)
+        local = _local_modules(root)
         known = _STDLIB | KNOWN_DISTRIBUTIONS | installed_import_names() | local
+        # The repo's own declared dependencies (requirements/pyproject), normalized —
+        # so a real, in-requirements package is known even under an isolated install
+        # where it isn't importable in Guardana's env.
+        declared = declared_import_names(root)
         for path in target.iter_files((".py",)):
-            yield from self._scan(path, known)
+            yield from self._scan(path, known, declared)
 
-    def _scan(self, path: Path, known: frozenset[str]) -> Iterator[Finding]:
+    def _scan(
+        self, path: Path, known: frozenset[str], declared: frozenset[str]
+    ) -> Iterator[Finding]:
         source = read_text_bounded(path)
         if source is None:
             return
@@ -104,7 +112,7 @@ class HallucinatedPackageRule(Rule):
         except SyntaxError:
             return
         for lineno, name in _imports(tree):
-            if name not in known:
+            if name not in known and normalize(name) not in declared:
                 yield Finding(
                     rule_id=self.meta.id,
                     severity=self.meta.severity,

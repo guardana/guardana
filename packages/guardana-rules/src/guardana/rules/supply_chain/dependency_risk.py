@@ -7,6 +7,7 @@ from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
+from guardana.rules.supply_chain._ast_names import import_aliases, resolved_call_name
 from guardana.rules.supply_chain._reading import read_text_bounded
 
 _SAFE_YAML_LOADERS = frozenset({"SafeLoader", "CSafeLoader"})
@@ -16,30 +17,25 @@ _SAFE_YAML_LOADERS = frozenset({"SafeLoader", "CSafeLoader"})
 # false positive on already-safe code.
 _YAML_LOADER_ARG_COUNT = 2
 
+# A sentinel distinct from any real keyword value (including None/True/False), so
+# "argument absent" and "argument set to False" are told apart — they carry
+# different messages for torch.load.
+_MISSING = object()
+
 # Loaders that deserialize arbitrary Python — pickle and its ecosystem wrappers.
 # Any call to one of these on untrusted data is code execution on load, with no
-# safe-mode argument to check, so the call itself is the finding. Matched by
-# dotted name (`joblib.load`, not an aliased `jl.load`) — see the rule's
-# known alias limitation.
+# safe-mode argument to check, so the call itself is the finding. Resolved through
+# import aliases, so `import joblib as jl; jl.load(...)` is caught too.
 _PICKLE_FAMILY_LOADERS = frozenset(
     {"pickle.load", "pickle.loads", "joblib.load", "dill.load", "dill.loads", "pandas.read_pickle"}
 )
 
 
-def _dotted_call_name(node: ast.Call) -> str:
-    f = node.func
-    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):
-        return f"{f.value.id}.{f.attr}"
-    if isinstance(f, ast.Name):
-        return f.id
-    return ""
-
-
-def _has_kw(node: ast.Call, name: str, want: object) -> bool:
-    return any(
-        kw.arg == name and isinstance(kw.value, ast.Constant) and kw.value.value == want
-        for kw in node.keywords
-    )
+def _kw_constant(node: ast.Call, name: str) -> object:
+    for kw in node.keywords:
+        if kw.arg == name and isinstance(kw.value, ast.Constant):
+            return kw.value.value
+    return _MISSING
 
 
 def _yaml_loader_arg(node: ast.Call) -> ast.expr | None:
@@ -52,30 +48,64 @@ def _yaml_loader_arg(node: ast.Call) -> ast.expr | None:
     return None
 
 
-def _yaml_loader_is_safe(node: ast.Call) -> bool:
+def _yaml_loader_name(node: ast.Call) -> str | None:
     loader = _yaml_loader_arg(node)
     if isinstance(loader, ast.Attribute):
-        return loader.attr in _SAFE_YAML_LOADERS
+        return loader.attr
     if isinstance(loader, ast.Name):
-        return loader.id in _SAFE_YAML_LOADERS
-    return False
+        return loader.id
+    return None
 
 
-def _sinks(tree: ast.AST) -> Iterator[tuple[int, str]]:
+def _torch_load_finding(node: ast.Call) -> tuple[str, Severity] | None:
+    weights_only = _kw_constant(node, "weights_only")
+    if weights_only is True:
+        return None
+    if weights_only is False:
+        return "torch.load with weights_only=False (executes pickle on load)", Severity.HIGH
+    return "torch.load without weights_only=True", Severity.HIGH
+
+
+def _yaml_load_finding(node: ast.Call) -> tuple[str, Severity] | None:
+    name = _yaml_loader_name(node)
+    if name in _SAFE_YAML_LOADERS:
+        return None
+    if name == "FullLoader":
+        # FullLoader blocks arbitrary object construction (what yaml.full_load
+        # uses) — materially safer than Loader/UnsafeLoader, so a lower-severity
+        # note rather than the HIGH the unrestricted loaders earn.
+        return (
+            "yaml.load with Loader=FullLoader (safer than Loader, still avoid on untrusted input)",
+            Severity.MEDIUM,
+        )
+    shown = f"Loader={name}" if name else "no safe Loader"
+    return f"yaml.load with {shown}", Severity.HIGH
+
+
+def _sinks(tree: ast.AST) -> Iterator[tuple[int, str, Severity]]:
+    aliases = import_aliases(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        name = _dotted_call_name(node)
+        name = resolved_call_name(node, aliases)
         if name in _PICKLE_FAMILY_LOADERS:
-            yield node.lineno, f"{name} on possibly-untrusted data"
-        elif name == "torch.load" and not _has_kw(node, "weights_only", True):
-            yield node.lineno, "torch.load without weights_only=True"
-        elif name == "yaml.load" and not _yaml_loader_is_safe(node):
-            yield node.lineno, "yaml.load without SafeLoader"
-        elif name == "numpy.load" and _has_kw(node, "allow_pickle", True):
+            yield node.lineno, f"{name} on possibly-untrusted data", Severity.HIGH
+        elif name == "torch.load":
+            torch_finding = _torch_load_finding(node)
+            if torch_finding is not None:
+                yield node.lineno, torch_finding[0], torch_finding[1]
+        elif name == "yaml.load":
+            yaml_finding = _yaml_load_finding(node)
+            if yaml_finding is not None:
+                yield node.lineno, yaml_finding[0], yaml_finding[1]
+        elif name == "numpy.load" and _kw_constant(node, "allow_pickle") is True:
             # numpy.load defaults to allow_pickle=False; the True override is the
             # classic ML pickle-RCE vector (a crafted .npy runs code on load).
-            yield node.lineno, "numpy.load with allow_pickle=True on possibly-untrusted data"
+            yield (
+                node.lineno,
+                "numpy.load with allow_pickle=True on possibly-untrusted data",
+                Severity.HIGH,
+            )
 
 
 class DependencyRiskRule(Rule):
@@ -105,10 +135,10 @@ class DependencyRiskRule(Rule):
             tree = ast.parse(source)
         except SyntaxError:
             return
-        for lineno, message in _sinks(tree):
+        for lineno, message, severity in _sinks(tree):
             yield Finding(
                 rule_id=self.meta.id,
-                severity=self.meta.severity,
+                severity=severity,
                 title=self.meta.title,
                 taxonomy=self.meta.taxonomy,
                 target_ref=f"{path}:{lineno}",

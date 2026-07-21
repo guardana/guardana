@@ -8,20 +8,12 @@ re-implementing — and diverging on — the same list.
 import ast
 from collections.abc import Iterator
 
+from guardana.rules.supply_chain._ast_names import import_aliases, resolved_call_name
+
 # Builtins that run a string as code. Matched only as a *bare* call — `eval(x)`,
 # not `df.eval(x)` (pandas) or `engine.exec(x)` (SQLAlchemy), which are unrelated
 # methods that happen to share the name. Attribute calls are deliberately ignored.
 _CODE_BUILTINS = frozenset({"eval", "exec"})
-
-
-def _dotted_call_name(node: ast.Call) -> str:
-    """Return `receiver.attr` for `os.system(...)`, or the bare name for `eval(...)`."""
-    func = node.func
-    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
-        return f"{func.value.id}.{func.attr}"
-    if isinstance(func, ast.Name):
-        return func.id
-    return ""
 
 
 def _is_bare_builtin(node: ast.Call) -> bool:
@@ -36,14 +28,18 @@ def _uses_shell_true(node: ast.Call) -> bool:
 
 
 def code_sinks(tree: ast.AST) -> Iterator[tuple[int, str]]:
-    """Yield `(line, why)` for each dynamic-code / shell execution sink in the tree."""
+    """Yield `(line, why)` for each dynamic-code / shell execution sink in the tree.
+
+    Call names are resolved through import aliases, so `import os as o; o.system(...)`
+    is caught as well as the canonical `os.system(...)`.
+    """
+    aliases = import_aliases(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         if _is_bare_builtin(node):
-            name = _dotted_call_name(node)
-            yield node.lineno, f"{name}(...) runs a string as code"
-        elif _dotted_call_name(node) == "os.system":
+            yield node.lineno, f"{resolved_call_name(node, aliases)}(...) runs a string as code"
+        elif resolved_call_name(node, aliases) == "os.system":
             yield node.lineno, "os.system(...) runs a shell command"
         elif _uses_shell_true(node):
             yield node.lineno, "subprocess call with shell=True (command injection risk)"

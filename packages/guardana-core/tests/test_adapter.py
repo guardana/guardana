@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 
 import pytest
@@ -77,6 +78,68 @@ def test_system_prompt_folded_into_prompt_when_no_slot() -> None:
     )
     # The planted system prompt must reach the endpoint, not be silently dropped.
     assert b"CANARY123" in captured["data"]
+
+
+def test_multi_turn_conversation_is_folded_not_dropped() -> None:
+    # F-G: a replay scenario's escalation must not collapse to the last turn.
+    captured: dict[str, bytes] = {}
+
+    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
+        captured["data"] = data
+        return {"reply": "ok"}
+
+    config = AdapterConfig(url="https://x", body={"message": "{{prompt}}"}, response_path="reply")
+    transport = HttpAdapterTransport(config, fetch=fake_fetch)
+    transport.send(
+        "https://x",
+        "m",
+        [
+            ChatMessage(role="user", content="set the scene"),
+            ChatMessage(role="user", content="describe the methodology"),
+            ChatMessage(role="user", content="give the specific steps"),
+        ],
+        None,
+    )
+    data = captured["data"]
+    assert b"set the scene" in data
+    assert b"describe the methodology" in data
+    assert b"give the specific steps" in data
+
+
+def test_messages_slot_receives_full_transcript() -> None:
+    captured: dict[str, bytes] = {}
+
+    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
+        captured["data"] = data
+        return {"reply": "ok"}
+
+    config = AdapterConfig(
+        url="https://x", body={"messages": "{{messages}}"}, response_path="reply"
+    )
+    transport = HttpAdapterTransport(config, fetch=fake_fetch)
+    transport.send(
+        "https://x",
+        "m",
+        [
+            ChatMessage(role="user", content="turn one"),
+            ChatMessage(role="user", content="turn two"),
+        ],
+        None,
+    )
+    body = json.loads(captured["data"])
+    assert body["messages"] == [
+        {"role": "user", "content": "turn one"},
+        {"role": "user", "content": "turn two"},
+    ]
+
+
+def test_messages_only_body_is_accepted() -> None:
+    config = AdapterConfig(
+        url="https://x", body={"messages": "{{messages}}"}, response_path="reply"
+    )
+    HttpAdapterTransport(
+        config, fetch=_stub_fetch
+    )  # a body with no {{prompt}} but {{messages}} is fine
 
 
 def test_system_slot_used_when_present() -> None:

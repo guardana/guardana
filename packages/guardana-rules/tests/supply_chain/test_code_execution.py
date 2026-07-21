@@ -10,6 +10,11 @@ def _scan(tmp_path: Path) -> list[str]:
     return [f.evidence.summary for f in rule.run(ArtifactTarget(tmp_path), RuleContext())]
 
 
+def test_flags_aliased_os_system(tmp_path: Path) -> None:
+    (tmp_path / "al.py").write_text("import os as o\no.system('rm -rf /')\n", encoding="utf-8")
+    assert any("os.system" in s for s in _scan(tmp_path))
+
+
 def test_flags_os_system(tmp_path: Path) -> None:
     (tmp_path / "a.py").write_text("import os\nos.system('rm -rf /')\n", encoding="utf-8")
     assert any("os.system" in s for s in _scan(tmp_path))

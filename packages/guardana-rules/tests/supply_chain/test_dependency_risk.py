@@ -125,6 +125,52 @@ def test_a_safe_json_load_is_not_flagged(tmp_path: Path) -> None:
     assert list(DependencyRiskRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
 
 
+def test_aliased_imports_are_resolved(tmp_path: Path) -> None:
+    # The dominant idiom: `import pandas as pd`. A dotted-name-only match would
+    # miss `pd.read_pickle` / `np.load` / `t.load` — i.e. most real ML code.
+    (tmp_path / "a.py").write_text(
+        "import pandas as pd\n"
+        "import numpy as np\n"
+        "import torch as t\n"
+        "pd.read_pickle('x.pkl')\n"
+        "np.load('a.npy', allow_pickle=True)\n"
+        "t.load('m.pt')\n",
+        encoding="utf-8",
+    )
+    summaries = [
+        f.evidence.summary
+        for f in DependencyRiskRule().run(ArtifactTarget(tmp_path), RuleContext())
+    ]
+    assert "pandas.read_pickle on possibly-untrusted data" in summaries
+    assert any("numpy.load with allow_pickle=True" in s for s in summaries)
+    assert "torch.load without weights_only=True" in summaries
+
+
+def test_unrelated_alias_not_flagged(tmp_path: Path) -> None:
+    # `df.eval`-style: a method that shares a name with a sink but isn't one.
+    (tmp_path / "ok.py").write_text(
+        "import pandas as pd\ndf = pd.DataFrame()\ndf.to_pickle('x.pkl')\n", encoding="utf-8"
+    )
+    assert list(DependencyRiskRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+def test_full_loader_is_a_medium_not_high(tmp_path: Path) -> None:
+    (tmp_path / "f.py").write_text(
+        "import yaml\nyaml.load(open('x'), Loader=yaml.FullLoader)\n", encoding="utf-8"
+    )
+    findings = list(DependencyRiskRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.severity.name for f in findings] == ["MEDIUM"]
+    assert "FullLoader" in findings[0].evidence.summary
+
+
+def test_weights_only_false_message_is_precise(tmp_path: Path) -> None:
+    (tmp_path / "w.py").write_text(
+        "import torch\ntorch.load('m.pt', weights_only=False)\n", encoding="utf-8"
+    )
+    findings = list(DependencyRiskRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert any("weights_only=False" in f.evidence.summary for f in findings)
+
+
 def test_a_padded_file_does_not_evade_the_scan(tmp_path: Path) -> None:
     # A ~1 MiB docstring used to push the file past the old bound and hide the
     # sink. The bound is now generous enough that real files are scanned, so the

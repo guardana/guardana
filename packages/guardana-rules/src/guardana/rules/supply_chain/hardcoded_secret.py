@@ -1,3 +1,5 @@
+import base64
+import binascii
 import math
 import re
 from collections import Counter
@@ -41,6 +43,34 @@ _NON_SECRET_NAME = re.compile(
     r"(?i)(_id|_name|_length|_len|_type|_url|_uri|_path|_file|_field|"
     r"_header|_regex|_pattern|_prompt|_hint|_format|_expiry|_ttl|_rotation)$"
 )
+# Structured public values that read as high-entropy but aren't secrets: a UUID, a
+# hex digest (md5/sha1/sha256), a model id / slash-path, or base64 of printable
+# text. Skipped before the entropy test — this is where opt-in mode's false
+# positives concentrate.
+_UUID = re.compile(r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_HEX_DIGEST = re.compile(r"(?i)^([0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64})$")
+_MODEL_ID = re.compile(r"^[A-Za-z0-9][\w.-]*(/[\w.-]+)+$")
+_BASE64 = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
+
+
+def _is_printable_base64(value: str) -> bool:
+    if len(value) % 4 != 0 or not _BASE64.fullmatch(value):
+        return False
+    try:
+        decoded = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError):
+        return False
+    return decoded.isascii() and decoded.decode("ascii").isprintable()
+
+
+def _is_structured_nonsecret(value: str) -> bool:
+    """Report a UUID / hex digest / model id / printable-base64 — structured, not a secret."""
+    return bool(
+        _UUID.match(value)
+        or _HEX_DIGEST.match(value)
+        or _MODEL_ID.match(value)
+        or _is_printable_base64(value)
+    )
 
 
 def _shannon(value: str) -> float:
@@ -51,7 +81,7 @@ def _shannon(value: str) -> float:
 
 def _looks_like_secret(value: str) -> bool:
     """Report whether a value has real entropy and mixed classes and isn't a placeholder."""
-    if _PLACEHOLDER.search(value):
+    if _PLACEHOLDER.search(value) or _is_structured_nonsecret(value):
         return False
     classes = (
         int(any(c.islower() for c in value))

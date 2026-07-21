@@ -1,0 +1,67 @@
+name: "Guardana AI Security Scan"
+description: "Scan model files and code for AI/LLM supply-chain risk; upload SARIF to code scanning."
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  path:
+    description: "Path to scan (a directory or a single file)."
+    required: false
+    default: "."
+  args:
+    description: "Extra arguments passed to `guardana scan` (e.g. --preset ci --baseline guardana-baseline.yaml)."
+    required: false
+    default: ""
+  version:
+    description: "guardana-cli version to run (default: the latest release)."
+    required: false
+    default: ""
+  sarif-file:
+    description: "Where to write the SARIF report."
+    required: false
+    default: "guardana.sarif"
+  upload-sarif:
+    description: "Upload the SARIF report to GitHub code scanning."
+    required: false
+    default: "true"
+  fail-on-findings:
+    description: "Fail the job when the scan gate trips (findings at/above the policy severity)."
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - name: Run Guardana scan
+      id: scan
+      shell: bash
+      # Inputs are passed through the environment (never interpolated into the
+      # command) so a crafted input can't inject shell.
+      env:
+        GUARDANA_PATH: ${{ inputs.path }}
+        GUARDANA_ARGS: ${{ inputs.args }}
+        GUARDANA_SARIF: ${{ inputs.sarif-file }}
+        GUARDANA_VERSION: ${{ inputs.version }}
+      run: |
+        set +e
+        spec="guardana-cli"
+        if [ -n "$GUARDANA_VERSION" ]; then spec="guardana-cli==$GUARDANA_VERSION"; fi
+        uvx --from "$spec" guardana scan "$GUARDANA_PATH" --format sarif $GUARDANA_ARGS > "$GUARDANA_SARIF"
+        echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+    - name: Upload SARIF to code scanning
+      if: ${{ inputs.upload-sarif == 'true' && always() }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
+
+    - name: Enforce the gate
+      if: ${{ inputs.fail-on-findings == 'true' }}
+      shell: bash
+      env:
+        GUARDANA_EXIT: ${{ steps.scan.outputs.exit_code }}
+      run: exit "$GUARDANA_EXIT"

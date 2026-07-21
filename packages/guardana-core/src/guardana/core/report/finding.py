@@ -2,6 +2,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from guardana.core.report._ref import split_ref
 from guardana.core.severity import Severity
 from guardana.core.taxonomy import TaxonomyRef
 
@@ -35,13 +36,17 @@ class Finding:
 
     @property
     def fingerprint(self) -> str:
-        """A stable short id for this finding: same rule + location → same value.
+        """A stable short id a baseline waiver matches on: rule + file + description.
 
-        This is the key a baseline waiver matches on. It deliberately hashes only
-        the rule id and the location, not the evidence text (which can vary run to
-        run) — so a waiver keeps matching the same finding, while a *new*
-        occurrence in a different place gets a different fingerprint and still
-        fails the gate. Suppression is always narrow, never a blanket silence.
+        Hashes the rule id, the file path (with the line number dropped), and the
+        evidence summary. Dropping the line makes the waiver survive unrelated edits
+        above the finding — the churn that would otherwise re-break a gated repo on
+        every reshuffle. Including the summary keeps it fail-closed for *different*
+        findings: a new problem (a different rule or a different description) in the
+        same file gets a different fingerprint and still fails the gate. Only an
+        identical finding — same rule, same file, same description — collides, which
+        is the same issue already triaged, not a new one.
         """
-        digest = hashlib.sha256(f"{self.rule_id}\x00{self.target_ref}".encode())
-        return digest.hexdigest()[:16]
+        path, _line = split_ref(self.target_ref)
+        key = f"{self.rule_id}\x00{path}\x00{self.evidence.summary}"
+        return hashlib.sha256(key.encode()).hexdigest()[:16]

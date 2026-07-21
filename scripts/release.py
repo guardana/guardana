@@ -25,7 +25,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 _CORE_PYPROJECT = _ROOT / "packages" / "guardana-core" / "pyproject.toml"
 _CHANGELOG = _ROOT / "CHANGELOG.md"
 _VERSION_RE = re.compile(r'^version = "(?P<v>[^"]+)"', re.MULTILINE)
-_UNRELEASED_RE = re.compile(r"^## \[[^\]]+\][^\n]*Unreleased[^\n]*$", re.MULTILINE | re.IGNORECASE)
+# Matches the top unreleased heading in either form the changelog uses: a bare
+# `## [Unreleased]` (what a previous roll leaves behind) or `## [X] - Unreleased`.
+_UNRELEASED_RE = re.compile(r"^## .*Unreleased.*$", re.MULTILINE | re.IGNORECASE)
 
 
 def _run(cmd: list[str], *, capture: bool = False) -> str:

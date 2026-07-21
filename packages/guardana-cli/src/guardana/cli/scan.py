@@ -7,7 +7,13 @@ from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.core.registry import Registry
-from guardana.core.report import BaselineError, apply_baseline, load_baseline, serialize_baseline
+from guardana.core.report import (
+    BaselineError,
+    apply_baseline,
+    load_baseline,
+    relativize_findings,
+    serialize_baseline,
+)
 from guardana.core.runner import Runner, gate
 from guardana.core.target import ArtifactTarget
 from guardana.report import get_renderer
@@ -55,6 +61,10 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     registry = Registry() if no_plugins else Registry.discover()
     load_custom_rules(registry, prof, rules)
     result = Runner(registry=registry, profile=prof).run(ArtifactTarget(path))
+    # Make file paths repo-relative (relative to the checkout root) before we
+    # render, baseline, or emit SARIF — so alerts attach to real repo paths and a
+    # baseline fingerprint is portable between a dev machine and CI.
+    result = relativize_findings(result, Path.cwd())
 
     if write_baseline is not None:
         write_baseline.write_text(serialize_baseline(result), encoding="utf-8")

@@ -50,8 +50,15 @@ class ArtifactTarget(Target):
         """Walk the tree in a stable order, skipping caches and virtualenvs.
 
         Deterministic ordering matters: two scans of the same tree must produce
-        findings in the same order, or a CI diff is noise.
+        findings in the same order, or a CI diff is noise. A single file is a valid
+        target too — `os.walk` of a file yields nothing, which would silently scan
+        nothing (a fail-open on `guardana scan suspicious.pkl`), so it is handled
+        explicitly.
         """
+        if self._root.is_file():
+            if suffixes is None or self._root.suffix in suffixes:
+                yield self._root
+            return
         matches: list[Path] = []
         for dirpath, dirnames, filenames in os.walk(self._root):
             dirnames[:] = [d for d in sorted(dirnames) if not _is_ignored(d)]

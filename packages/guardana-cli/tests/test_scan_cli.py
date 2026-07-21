@@ -27,6 +27,15 @@ def test_scan_clean_tree_exits_zero(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
+def test_scan_single_file_is_not_a_silent_pass(tmp_path: Path) -> None:
+    # A single-file target must scan that file, not walk-nothing and pass clean.
+    single = tmp_path / "x.py"
+    single.write_text("import torch\ntorch.load('m.pt')\n")
+    result = runner.invoke(app, ["scan", str(single)])
+    assert result.exit_code == 1
+    assert "dependency_risk" in result.stdout
+
+
 def test_scan_baseline_waives_findings(tmp_path: Path) -> None:
     target = tmp_path / "src"
     target.mkdir()
@@ -40,6 +49,21 @@ def test_scan_baseline_waives_findings(tmp_path: Path) -> None:
     scanned = runner.invoke(app, ["scan", str(target), "--baseline", str(baseline)])
     assert scanned.exit_code == 0
     assert "WAIVED" in scanned.stdout
+
+
+def test_baseline_survives_a_line_shift(tmp_path: Path) -> None:
+    # F-E: an unrelated edit above a waived finding must not un-waive it.
+    target = tmp_path / "d"
+    target.mkdir()
+    (target / "m.py").write_text("import torch\ntorch.load('a.pt')\n")
+    baseline = tmp_path / "bl.yaml"
+    assert (
+        runner.invoke(app, ["scan", str(target), "--write-baseline", str(baseline)]).exit_code == 0
+    )
+    (target / "m.py").write_text("\n\n\nimport torch\ntorch.load('a.pt')\n")  # shift down 3 lines
+    result = runner.invoke(app, ["scan", str(target), "--baseline", str(baseline)])
+    assert result.exit_code == 0
+    assert "WAIVED" in result.stdout
 
 
 def test_scan_baseline_and_write_baseline_are_mutually_exclusive(tmp_path: Path) -> None:

@@ -1,8 +1,9 @@
+import base64
 from pathlib import Path
 
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
-from guardana.rules.supply_chain.hardcoded_secret import HardcodedSecretRule
+from guardana.rules.supply_chain.hardcoded_secret import HardcodedSecretRule, _is_printable_base64
 
 
 def _fake_aws_key() -> str:
@@ -97,6 +98,33 @@ def test_entropy_mode_ignores_config_named_and_low_entropy(tmp_path: Path) -> No
     ctx = RuleContext(config={"entropy": True})
     findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), ctx))
     assert findings == []
+
+
+def test_flags_secret_in_vue_file(tmp_path: Path) -> None:
+    key = _fake_aws_key()
+    (tmp_path / "App.vue").write_text(f'<script>const k = "{key}"</script>\n')
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert any(f.severity.name == "HIGH" for f in findings)
+
+
+def test_printable_base64_detection() -> None:
+    assert _is_printable_base64(base64.b64encode(b"hello world data").decode()) is True
+    assert _is_printable_base64(base64.b64encode(bytes(range(18))).decode()) is False
+
+
+def test_entropy_mode_skips_structured_nonsecrets(tmp_path: Path) -> None:
+    sha256 = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    uuid = "550e8400-e29b-41d4-a716-446655440000"
+    b64_text = base64.b64encode(b"hello world greetings").decode()
+    (tmp_path / "conf.py").write_text(
+        f'SECRET_HASH = "{sha256}"\n'
+        f'TOKEN_UUID = "{uuid}"\n'
+        'MODEL_SECRET = "BAAI/bge-m3-abc123def"\n'
+        f'CACHE_TOKEN = "{b64_text}"\n',
+        encoding="utf-8",
+    )
+    ctx = RuleContext(config={"entropy": True})
+    assert list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), ctx)) == []
 
 
 def test_ignores_binary_and_model_files(tmp_path: Path) -> None:

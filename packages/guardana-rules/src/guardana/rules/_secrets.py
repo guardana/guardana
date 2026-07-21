@@ -107,6 +107,8 @@ TEXT_SUFFIXES: frozenset[str] = frozenset(
         ".tfvars",
         ".gradle",
         ".xml",
+        ".vue",
+        ".svelte",
     }
 )
 

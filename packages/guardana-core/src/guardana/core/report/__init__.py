@@ -1,3 +1,4 @@
+from guardana.core.report._ref import split_ref
 from guardana.core.report.baseline import (
     BaselineError,
     apply_baseline,
@@ -5,6 +6,7 @@ from guardana.core.report.baseline import (
     serialize_baseline,
 )
 from guardana.core.report.finding import Evidence, Finding
+from guardana.core.report.location import relativize, relativize_findings
 from guardana.core.report.result import ScanResult
 from guardana.core.report.serialize import finding_to_dict
 
@@ -16,5 +18,8 @@ __all__ = [
     "apply_baseline",
     "finding_to_dict",
     "load_baseline",
+    "relativize",
+    "relativize_findings",
     "serialize_baseline",
+    "split_ref",
 ]
