@@ -10,7 +10,7 @@ from guardana.core.severity import Severity
 # Typos must fail loudly: a misspelled `fail_on:` would otherwise silently
 # fall back to defaults and weaken the gate the user thinks they configured.
 _ALLOWED_PROFILE_KEYS = frozenset({"name", "rules", "fail_on", "rule_config", "evaluators"})
-_ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths"})
+_ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
 _ALLOWED_FAIL_ON_KEYS = frozenset({"severity", "min_confidence", "fail_on_inconclusive"})
 
 
@@ -116,4 +116,5 @@ def load_profile(path: Path) -> Profile:
         rule_config=_as_mapping(raw.get("rule_config"), "rule_config", path),
         evaluator_config=_as_mapping(raw.get("evaluators"), "evaluators", path),
         rule_paths=_as_glob_list(rules.get("paths"), "rules.paths", path),
+        path_excludes=_as_glob_list(rules.get("paths_exclude"), "rules.paths_exclude", path),
     )

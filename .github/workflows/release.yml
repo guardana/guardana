@@ -18,7 +18,9 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    # Full version tags only (vX.Y.Z), so the moving major/minor tags used for the
+    # Marketplace Action (v0.1, v1) don't re-trigger a publish when they move.
+    tags: ["v*.*.*"]
 
 jobs:
   publish:

@@ -60,7 +60,8 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     # safe degradation, never a crash.
     registry = Registry() if no_plugins else Registry.discover()
     load_custom_rules(registry, prof, rules)
-    result = Runner(registry=registry, profile=prof).run(ArtifactTarget(path))
+    target = ArtifactTarget(path, excludes=prof.path_excludes)
+    result = Runner(registry=registry, profile=prof).run(target)
     # Make file paths repo-relative (relative to the checkout root) before we
     # render, baseline, or emit SARIF — so alerts attach to real repo paths and a
     # baseline fingerprint is portable between a dev machine and CI.

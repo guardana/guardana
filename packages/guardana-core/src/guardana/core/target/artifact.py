@@ -1,5 +1,6 @@
 import os
 from collections.abc import Iterator
+from fnmatch import fnmatch
 from pathlib import Path
 
 from guardana.core.target.base import Capability, Target, TargetKind
@@ -23,10 +24,22 @@ _IGNORED_DIRS: frozenset[str] = frozenset(
         ".vscode",
     }
 )
+_IGNORE_FILE = ".guardanaignore"
 
 
 def _is_ignored(dirname: str) -> bool:
     return dirname in _IGNORED_DIRS or dirname.endswith(".egg-info")
+
+
+def _read_ignore_file(root: Path) -> tuple[str, ...]:
+    """Read glob patterns from a `.guardanaignore` at the scan root (blank/`#` skipped)."""
+    try:
+        text = (root / _IGNORE_FILE).read_text(encoding="utf-8")
+    except OSError:
+        return ()
+    return tuple(
+        line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")
+    )
 
 
 class ArtifactTarget(Target):
@@ -34,8 +47,11 @@ class ArtifactTarget(Target):
 
     kind = TargetKind.ARTIFACT
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, excludes: tuple[str, ...] = ()) -> None:
         self._root = root
+        # Profile `rules.paths_exclude` plus any `.guardanaignore` at the root, both
+        # matched (via fnmatch) against each entry's path relative to the root.
+        self._excludes = tuple(excludes) + _read_ignore_file(root)
 
     def capabilities(self) -> set[Capability]:
         """Files can be read; nothing can be asked."""
@@ -46,8 +62,14 @@ class ArtifactTarget(Target):
         """The scanned root, as it appears in findings."""
         return str(self._root)
 
+    def _excluded(self, path: Path) -> bool:
+        if not self._excludes:
+            return False
+        rel = os.path.relpath(path, self._root)
+        return any(fnmatch(rel, pattern) for pattern in self._excludes)
+
     def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
-        """Walk the tree in a stable order, skipping caches and virtualenvs.
+        """Walk the tree in a stable order, skipping caches, virtualenvs, and excludes.
 
         Deterministic ordering matters: two scans of the same tree must produce
         findings in the same order, or a CI diff is noise. A single file is a valid
@@ -61,9 +83,13 @@ class ArtifactTarget(Target):
             return
         matches: list[Path] = []
         for dirpath, dirnames, filenames in os.walk(self._root):
-            dirnames[:] = [d for d in sorted(dirnames) if not _is_ignored(d)]
+            dirnames[:] = [
+                d
+                for d in sorted(dirnames)
+                if not _is_ignored(d) and not self._excluded(Path(dirpath) / d)
+            ]
             for filename in filenames:
                 path = Path(dirpath) / filename
-                if suffixes is None or path.suffix in suffixes:
+                if (suffixes is None or path.suffix in suffixes) and not self._excluded(path):
                     matches.append(path)
         yield from sorted(matches)

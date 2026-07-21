@@ -6,6 +6,27 @@ _TOTAL_FILES = 2
 _KEPT_FILES = 2
 
 
+def test_excludes_prune_matching_dirs_and_files(tmp_path: Path) -> None:
+    (tmp_path / "keep.py").write_text("x")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "big.py").write_text("y")
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "a.py").write_text("z")
+    target = ArtifactTarget(tmp_path, excludes=("data", "logs/*"))
+    names = {p.name for p in target.iter_files((".py",))}
+    assert names == {"keep.py"}
+
+
+def test_guardanaignore_is_honored(tmp_path: Path) -> None:
+    (tmp_path / "keep.py").write_text("x")
+    (tmp_path / "archive").mkdir()
+    (tmp_path / "archive" / "old.py").write_text("y")
+    (tmp_path / ".guardanaignore").write_text("# skip archives\narchive\n")
+    target = ArtifactTarget(tmp_path)
+    names = {p.name for p in target.iter_files((".py",))}
+    assert names == {"keep.py"}
+
+
 def test_artifact_target_lists_files_and_filters_by_suffix(tmp_path: Path) -> None:
     (tmp_path / "model.pkl").write_bytes(b"x")
     (tmp_path / "notes.txt").write_text("y")

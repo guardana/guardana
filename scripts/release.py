@@ -134,7 +134,30 @@ def main(argv: list[str]) -> None:
     _run(["git", "tag", "-a", tag, "-m", f"Guardana {tag}"])
     _run(["git", "push", "origin", "main"])
     _run(["git", "push", "origin", tag])
+    _move_marketplace_tag(version, tag)
     print(f"pushed {tag} — release.yml is building; approve the 'pypi' deployment to publish.")
+
+
+def _move_marketplace_tag(version: str, tag: str) -> None:
+    """Point the moving `vMAJOR.MINOR` tag (e.g. v0.1) at this release.
+
+    That is the tag users pin for the GitHub Marketplace Action, so it should
+    always follow the latest patch — without a manual step per release. Only for a
+    final release (a pre-release must not move a stable pin), and best-effort: a
+    failure here (e.g. tag protection) must not fail an already-published release.
+    The `release.yml` trigger is `v*.*.*`, so moving this two-part tag does not
+    re-trigger a publish.
+    """
+    if not version.replace(".", "").isdigit():
+        return
+    major, minor = version.split(".")[:2]
+    moving = f"v{major}.{minor}"
+    try:
+        _run(["git", "tag", "-f", moving, tag])
+        _run(["git", "push", "--force", "origin", moving])
+        print(f"moved {moving} -> {tag} (pin this for the Marketplace Action)")
+    except subprocess.CalledProcessError:
+        print(f"note: could not move {moving} (tag protection?) — move it by hand if you pin it")
 
 
 if __name__ == "__main__":

@@ -38,3 +38,4 @@ class Profile:
     rule_config: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
     evaluator_config: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
     rule_paths: tuple[str, ...] = ()
+    path_excludes: tuple[str, ...] = ()

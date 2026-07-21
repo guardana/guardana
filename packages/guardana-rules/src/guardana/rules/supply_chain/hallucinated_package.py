@@ -120,10 +120,14 @@ class HallucinatedPackageRule(Rule):
                     taxonomy=self.meta.taxonomy,
                     target_ref=f"{path}:{lineno}",
                     evidence=Evidence(
-                        summary=f"unknown import '{name}' (lead — verify it exists on PyPI)",
+                        summary=(
+                            f"import '{name}' isn't a known package or a declared dependency "
+                            f"— declare it in requirements/pyproject, or verify it exists on PyPI"
+                        ),
                         detail=f"{path.name}:{lineno}",
                     ),
                     verdict=lead_verdict(
-                        f"unknown import '{name}'; a possible slopsquat, not a certainty"
+                        f"import '{name}' is not in Guardana's known packages nor the repo's "
+                        f"declared dependencies; an undeclared-or-slopsquat lead, not a certainty"
                     ),
                 )

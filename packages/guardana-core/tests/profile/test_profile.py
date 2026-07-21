@@ -19,6 +19,14 @@ def test_default_profile_fails_on_high() -> None:
     assert prof.policy.fail_on.severity is Severity.HIGH
 
 
+def test_load_profile_parses_paths_exclude(tmp_path: Path) -> None:
+    (tmp_path / "guardana.yaml").write_text(
+        "rules:\n  paths_exclude: ['data/*', 'archive']\n", encoding="utf-8"
+    )
+    prof = load_profile(tmp_path / "guardana.yaml")
+    assert prof.path_excludes == ("data/*", "archive")
+
+
 def test_load_profile_from_yaml(tmp_path: Path) -> None:
     (tmp_path / "guardana.yaml").write_text(
         "name: ci-fast\n"
