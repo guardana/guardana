@@ -3,6 +3,7 @@ import pickle
 from pathlib import Path
 
 from guardana.cli.main import app
+from guardana.core import __version__
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -99,7 +100,8 @@ def test_version_prints_and_exits_zero() -> None:
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert "guardana" in result.stdout
-    assert "0.1.0" in result.stdout
+    # The actual version, not a hardcoded literal, so a release bump doesn't break it.
+    assert __version__ in result.stdout
 
 
 def test_scan_with_custom_rules_dir_runs_clean(tmp_path: Path) -> None:
