@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["fastapi>=0.115", "pydantic>=2.7"]
+dependencies = ["fastapi>=0.139.2", "pydantic>=2.7"]
 
 [project.urls]
 Homepage = "https://guardana.io"
