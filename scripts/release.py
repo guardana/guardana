@@ -153,7 +153,9 @@ def _move_marketplace_tag(version: str, tag: str) -> None:
     major, minor = version.split(".")[:2]
     moving = f"v{major}.{minor}"
     try:
-        _run(["git", "tag", "-f", moving, tag])
+        # Peel to the commit (`tag` is annotated) so the moving tag is a clean
+        # lightweight pointer straight at the release commit, not at a tag object.
+        _run(["git", "tag", "-f", moving, f"{tag}^{{commit}}"])
         _run(["git", "push", "--force", "origin", moving])
         print(f"moved {moving} -> {tag} (pin this for the Marketplace Action)")
     except subprocess.CalledProcessError:
