@@ -12,7 +12,7 @@ from guardana.core.surface import Surface
 from guardana.core.target import Capability, Target, TargetKind
 from guardana.core.taxonomy import TaxonomyRef
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 __all__ = [
     "Capability",

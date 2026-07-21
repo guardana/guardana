@@ -1,6 +1,6 @@
 [project]
 name = "guardana-rules"
-version = "0.1.2"
+version = "0.1.3"
 description = "Guardana built-in rule and evaluator pack."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["guardana-core>=0.1.2,<0.2", "defusedxml>=0.7.1"]
+dependencies = ["guardana-core>=0.1.3,<0.2", "defusedxml>=0.7.1"]
 
 [project.urls]
 Homepage = "https://guardana.io"
