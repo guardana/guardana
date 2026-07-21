@@ -66,11 +66,11 @@ runner. Priorities, roughly in order:
    can take down `Registry.discover()`. Isolate both, and split "skipped for
    capability" from "errored" into a separate `errors` channel on `ScanResult`.
 4. **OSV/CVE dependency matching** — turn `dependency_risk`/`malicious_dependency`
-   from pattern- and blocklist-based to advisory-backed, and track aliased
-   imports (`import torch as t; t.load(...)`), the one documented static gap.
-5. **Distribution.** PyPI publish (the pipeline is ready), an official **GitHub
-   Action** and **pre-commit hook**, and preset presets settable by name inside
-   `guardana.yaml` (not only via `--preset`).
+   from pattern- and blocklist-based to advisory-backed.
+5. **Distribution.** Presets settable by name inside `guardana.yaml` (not only via
+   `--preset`), and a `rules.paths_exclude` glob so a scan can skip large
+   `data/`/`archive/` trees. *(PyPI publish, the official **GitHub Action**, the
+   **pre-commit** integration, and alias-aware static sinks shipped in v0.1.x.)*
 
 ## v0.3 — Sharpen runtime depth
 

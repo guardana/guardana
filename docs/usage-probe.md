@@ -58,12 +58,25 @@ response_path: data.reply                       # dotted path to the reply text
 guardana probe --url https://api.example.com --model wellness --adapter wellness-adapter.yaml
 ```
 
-The mapping is **fail-closed**: a `body` with no `{{prompt}}` slot is rejected at
-load (the probe would otherwise send the same static request for every check and
-pass everything), and a `response_path` that does not resolve to a string is an
-error, never a blank reply graded as clean. A planted system prompt with no
-`{{system}}` slot in the body is folded into the prompt rather than dropped, so a
-canary/leak check is never silently disarmed. Programmatically, the same mapping
+For a **multi-turn** scenario (gradual jailbreak, indirect injection), give the
+body a `{{messages}}` slot to receive the full transcript as a `[{role, content}]`
+list, if your endpoint speaks multi-turn:
+
+```yaml
+body:
+  messages: "{{messages}}"     # the whole conversation, not just the last turn
+```
+
+Without a `{{messages}}` slot, every turn is folded into `{{prompt}}` as a labelled
+transcript — so a scenario's escalation reaches the endpoint instead of collapsing
+to the final message.
+
+The mapping is **fail-closed**: a `body` with no `{{prompt}}` or `{{messages}}`
+slot is rejected at load (the probe would otherwise send the same static request
+for every check and pass everything), and a `response_path` that does not resolve
+to a string is an error, never a blank reply graded as clean. A planted system
+prompt with no `{{system}}` slot is folded into the prompt rather than dropped, so
+a canary/leak check is never silently disarmed. Programmatically, the same mapping
 is `guardana.core.target.HttpAdapterTransport` / `AdapterConfig`.
 
 ## How canary rules work

@@ -19,7 +19,14 @@ two cannot silently drift.
 Scan takes a **per-finding baseline** (`--write-baseline` to snapshot, `--baseline`
 to apply): accept today's findings with a reason so a blocking gate can go live on
 an existing repo, while a new finding still fails — waived findings stay reported
-(`WAIVED` / `waived` / SARIF `suppressions`), never silently dropped.
+(`WAIVED` / `waived` / SARIF `suppressions`), never silently dropped. Waivers are
+matched by rule + file + description, so they survive unrelated line shifts. Scan a
+single file or a whole directory; a single-file target never walks nothing.
+
+**Drops into CI in one step:** the official **GitHub Action**
+(`guardana/guardana@vX.Y.Z`) scans and uploads SARIF to code scanning, and a
+**pre-commit** hook installs straight from PyPI — see
+[`docs/integrations.md`](docs/integrations.md).
 
 Plus `guardana rules` (list everything installed, incl. your own, **grouped by
 security layer**, filterable with `--surface build|runtime`, and able to include
@@ -115,10 +122,12 @@ honoured — a typo'd key, an out-of-range confidence, an empty include —
 `/generate`). Unknown provider = loud error.
 
 Or map a **guarded product endpoint** with `--adapter <file>`: a body template
-(`{{prompt}}`/`{{system}}`), `${ENV}`-expanded headers, and a dotted
-`response_path` to the reply — so the probe exercises your gateway and guardrails,
-not just the bare model. Fail-closed (no `{{prompt}}` slot, or a response path that
-isn't text, is an error). Public API: `HttpAdapterTransport` / `AdapterConfig`.
+(`{{prompt}}`/`{{system}}`, or `{{messages}}` for the full multi-turn transcript),
+`${ENV}`-expanded headers, and a dotted `response_path` to the reply — so the probe
+exercises your gateway and guardrails, not just the bare model. Fail-closed (no
+`{{prompt}}`/`{{messages}}` slot, or a response path that isn't text, is an error);
+a multi-turn scenario's escalation is folded in, never dropped. Public API:
+`HttpAdapterTransport` / `AdapterConfig`.
 
 ### A framework, not just a CLI
 
@@ -154,7 +163,9 @@ unchanged (do not expose to an untrusted network).
 ## What you can achieve
 
 **Gate a repo in CI.** `guardana scan .` exits `1` on a HIGH finding;
-`--format sarif` feeds GitHub code scanning so findings annotate PRs.
+`--format sarif` feeds GitHub code scanning — with a repo-relative URI,
+`region.startLine`, `partialFingerprints`, and a populated `driver.rules[]` — so
+alerts annotate the exact source line on a PR.
 
 **Vet a model file before you load it.** Download a `.pt`/`.pkl`/GGUF from a
 hub, `guardana scan ./downloads` — pickle-borne code execution is caught

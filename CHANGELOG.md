@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Field-hardening from a second deep-test of the packages on a real ML codebase.
+
+### Added
+
+- **Official GitHub Action** (`guardana/guardana@v0.1.2`) and a documented
+  **pre-commit** integration ([`docs/integrations.md`](docs/integrations.md)): a
+  one-step CI job that scans and uploads SARIF to code scanning, and a local hook
+  that installs `guardana-cli` from PyPI.
+- **`guardana scan <file>`** now scans a single file, not only a directory —
+  previously a single-file target walked nothing and reported a clean bill (a
+  fail-open on `guardana scan suspicious.pkl`).
+
+### Changed
+
+- **SARIF is now valid for GitHub code scanning.** The line number goes in
+  `region.startLine` (not glued onto the artifact URI), the URI is repo-relative
+  (not an absolute checkout path), each result carries `partialFingerprints` and a
+  `ruleIndex`, and `tool.driver.rules[]` lists the rules — so alerts attach to the
+  source line instead of a non-existent path.
+- **Static sinks are alias-aware.** `import pandas as pd; pd.read_pickle(...)`,
+  `import numpy as np; np.load(..., allow_pickle=True)`, `import torch as t;
+  t.load(...)`, and `import os as o; o.system(...)` are now caught — the dominant
+  idiom, previously missed.
+- **`hallucinated_package` reads the target repo's declared dependencies**
+  (`requirements*.txt`, `pyproject.toml`), so a real in-requirements package
+  (`jsonlines`, `langdetect`, `PyPDF2`, …) is not flagged under an isolated install
+  where it isn't importable in Guardana's own environment.
+- **Baseline waivers survive line shifts.** A finding's fingerprint is now rule +
+  file + description (no line number), so an unrelated edit above a waived finding
+  no longer un-waives it — while a genuinely different finding still fails the gate.
+- **Entropy mode skips structured public values** — a UUID, a hex digest
+  (md5/sha1/sha256), a model id / slash-path, or base64 of printable text is no
+  longer flagged as a provider-less secret.
+- **Multi-turn scenarios are no longer neutered through `--adapter`.** A body can
+  carry a `{{messages}}` slot for the full transcript, and otherwise every turn is
+  folded into `{{prompt}}` as a labelled transcript — the escalation context a
+  scenario is *about* is never silently dropped to the last turn.
+- **`hardcoded_secret` also scans `.vue`/`.svelte`** (frontend single-file
+  components that embed JS/TS).
+- **`dependency_risk` precision:** `torch.load(..., weights_only=False)` says so
+  (not "without weights_only=True"); `yaml.load(..., Loader=FullLoader)` is a
+  MEDIUM note that names the loader (materially safer than `Loader`/`UnsafeLoader`).
+- **A 4xx from a probed endpoint** is reported distinctly ("rejected the request —
+  check the auth header / body") from an unreachable host.
+
+### Fixed
+
+- `scripts/release.py` now recognizes a bare `## [Unreleased]` changelog heading,
+  so a release after the first no longer fails to find the section to roll.
+
 ## [0.1.1] - 2026-07-21
 
 Production-hardening from the first real-world use of the packages.

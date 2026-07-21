@@ -135,8 +135,8 @@ Full flag references and example output:
 
 ### Drop it into GitHub Actions
 
-Works today, straight from the repo (no PyPI needed) — scans on every push and
-uploads results to GitHub code scanning:
+The official Action scans on every push and uploads results to GitHub code
+scanning (alerts annotate the exact source line):
 
 ```yaml
 # .github/workflows/ai-security.yml
@@ -146,20 +146,17 @@ jobs:
   guardana:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - name: Scan for AI supply-chain risk
-        run: >
-          uvx --from
-          git+https://github.com/guardana/guardana#subdirectory=packages/guardana-cli
-          guardana scan . --format sarif > guardana.sarif
-      - uses: github/codeql-action/upload-sarif@v3
-        if: always()           # upload findings even when the gate fails the build
-        with:
-          sarif_file: guardana.sarif
+      - uses: guardana/guardana@v0.1.2
+        # with:
+        #   args: --preset ci --baseline guardana-baseline.yaml
 ```
+
+Prefer a local gate? A **pre-commit** hook installs straight from PyPI. Both are
+in [`docs/integrations.md`](docs/integrations.md).
 
 ## What's in the box
 
@@ -310,6 +307,7 @@ and why, and the project's non-goals — is [`ROADMAP.md`](ROADMAP.md). See
 - [`docs/install.md`](docs/install.md) — installation
 - [`docs/usage-scan.md`](docs/usage-scan.md) · [`docs/usage-probe.md`](docs/usage-probe.md) · [`docs/usage-monitor.md`](docs/usage-monitor.md)
 - [`docs/profiles.md`](docs/profiles.md) — the `guardana.yaml` policy file
+- [`docs/integrations.md`](docs/integrations.md) — GitHub Action & pre-commit
 - [`docs/writing-rules.md`](docs/writing-rules.md) — author a rule (YAML or Python)
 - [`docs/architecture.md`](docs/architecture.md) · [`docs/extending.md`](docs/extending.md)
 
