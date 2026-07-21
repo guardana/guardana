@@ -27,17 +27,23 @@ with `uv run guardana ...` from inside the checkout. See
 [`CONTRIBUTING.md`](../CONTRIBUTING.md) for the full contributor setup and
 test/lint gates.
 
-## PyPI package — coming soon
+## Install from PyPI
 
-`uvx --from guardana-cli guardana scan .` and `pip install guardana-cli` will
-work once the `guardana-cli` distribution (and its `guardana-core` /
-`guardana-rules` / `guardana-report` dependencies) are published to PyPI. The
-console script is `guardana` but its distribution is `guardana-cli`, so `uvx`
-needs `--from guardana-cli` to find it. That has not happened yet — until then,
-install from source as shown above rather than relying on a package name that
-isn't live.
+All five packages are on PyPI (Apache-2.0). For most users the CLI is all you
+need:
 
-To run the current code with zero install *today*, point `uvx` at the git repo:
+```bash
+uvx --from guardana-cli guardana scan .   # zero-install run
+uv add guardana-cli                       # or add it to a project
+pip install guardana-cli                  # or plain pip
+```
+
+The console script is `guardana`; its distribution is `guardana-cli`, which pulls
+in `guardana-core` / `guardana-rules` / `guardana-report`, so `uvx` needs
+`--from guardana-cli` to find the script by name. The optional collector is a
+separate install: `pip install guardana-server`.
+
+To run an unreleased revision with zero install, point `uvx` at the git repo:
 
 ```bash
 uvx --from git+https://github.com/guardana/guardana#subdirectory=packages/guardana-cli guardana scan .

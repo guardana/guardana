@@ -11,6 +11,7 @@ that runs on your laptop, in CI, and next to a served model.**
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#roadmap)
 [![OWASP LLM Top 10](https://img.shields.io/badge/mapped-OWASP%20%C2%B7%20MITRE%20ATLAS%20%C2%B7%20NIST-informational.svg)](#standards-and-architecture)
+[![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 [Quickstart](#quickstart) · [Features](FEATURES.md) · [The 25 rules](#whats-in-the-box) · [Docs](docs/index.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
@@ -63,16 +64,21 @@ Corrections welcome via PR.</sub>
 
 ## Quickstart
 
-Guardana is a `uv` workspace. Until the packages land on PyPI (see
-[Roadmap](#roadmap)), install from source:
+Run it with zero install straight from PyPI:
 
 ```bash
-git clone https://github.com/guardana/guardana
-cd guardana
-uv sync
+uvx --from guardana-cli guardana scan .        # zero-install run (uv)
+# or add it to a project:
+uv add guardana-cli        # or: pip install guardana-cli
 ```
 
-See it find something real — a bundled deliberately-vulnerable model directory:
+The console script is `guardana`; its distribution is `guardana-cli` (which pulls
+in `guardana-core`/`guardana-rules`/`guardana-report`), hence the `--from`.
+Working on Guardana itself? Clone and `uv sync` instead — see
+[`docs/install.md`](docs/install.md).
+
+See it find something real — a bundled deliberately-vulnerable model directory
+(from a clone; run `uv run guardana …` inside the checkout):
 
 ```console
 $ uv run guardana scan examples/vulnerable-model
@@ -102,11 +108,12 @@ uv run guardana --version              # print the installed version
 bundles the deliberately-vulnerable `examples/vulnerable-model/` fixture. Point
 it at `packages/` for a clean run.)
 
-> **PyPI coming soon.** Once published you'll be able to run
-> `uvx --from guardana-cli guardana scan .` with zero install, or
-> `uv add guardana-cli`. Until then, the source checkout above is the supported
-> path. (The console script is `guardana`; its distribution is `guardana-cli`,
-> hence `--from`.)
+> **On PyPI:** [`guardana-cli`](https://pypi.org/project/guardana-cli/) ·
+> [`guardana-core`](https://pypi.org/project/guardana-core/) ·
+> [`guardana-rules`](https://pypi.org/project/guardana-rules/) ·
+> [`guardana-report`](https://pypi.org/project/guardana-report/) ·
+> [`guardana-server`](https://pypi.org/project/guardana-server/) — all Apache-2.0,
+> published via PyPI Trusted Publishing (no stored token).
 
 ## Three ways to run it
 
