@@ -146,7 +146,7 @@ dev = [
     "pre-commit>=4.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
-    "ruff>=0.15.21",
+    "ruff>=0.15.22",
 ]
 
 [tool.coverage.run]
