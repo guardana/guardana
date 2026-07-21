@@ -1,3 +1,5 @@
+import re
+
 from guardana.core import (
     Evaluator,
     Finding,
@@ -12,7 +14,10 @@ from guardana.core import (
 
 
 def test_core_imports_and_has_version() -> None:
-    assert __version__ == "0.1.0"
+    # A pattern, not a literal: a hardcoded version breaks this smoke test on every
+    # release bump. The precise __init__/pyproject match is guarded in
+    # test_release_tooling; here we only assert core exposes a semver-shaped version.
+    assert re.match(r"^\d+\.\d+\.\d+", __version__) is not None
 
 
 def test_public_api_reexported_at_top_level() -> None:
