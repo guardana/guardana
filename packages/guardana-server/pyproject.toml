@@ -1,6 +1,6 @@
 [project]
 name = "guardana-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "Guardana collector: minimal FastAPI server that ingests and lists findings."
 readme = "README.md"
 requires-python = ">=3.11"
