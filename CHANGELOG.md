@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Configurable scan scope** (`rules.paths_exclude` globs in `guardana.yaml`, and
+  a `.guardanaignore` file at the scan root): skip large non-code trees (`data/`,
+  `archive/`, model dirs) for speed and less noise. Both are matched against each
+  path relative to the scan root.
+- **The Marketplace Action follows a moving `v0.1` tag.** `scripts/release.py` now
+  points the `vMAJOR.MINOR` tag at each release, so `guardana/guardana@v0.1` always
+  resolves to the latest patch — no manual step per release. The release workflow
+  triggers on full `v*.*.*` tags only, so moving a two-part tag never re-triggers a
+  publish.
+
+### Changed
+
+- **`hallucinated_package` wording is clearer.** An import that is neither a known
+  package nor a declared dependency now reads "isn't a known package or a declared
+  dependency — declare it in requirements/pyproject, or verify it exists on PyPI",
+  instead of the more alarming slopsquat framing (offline, the rule can't tell an
+  undeclared-but-real package from a nonexistent one).
+
 ## [0.1.2] - 2026-07-21
 
 Field-hardening from a second deep-test of the packages on a real ML codebase.

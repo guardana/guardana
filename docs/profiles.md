@@ -34,6 +34,10 @@ rules:
   exclude: ["guardana.output.*"]     # optional; defaults to []
   paths: ["./team-rules"]            # optional; directories/files of custom
                                       # YAML rules to load — see writing-rules.md
+  paths_exclude: ["data/*", "archive"]  # optional; globs (matched relative to the
+                                         # scan root) of files/dirs to skip. A
+                                         # `.guardanaignore` file at the root adds
+                                         # more, one glob per line.
 
 fail_on:
   severity: high                # one of: info | low | medium | high | critical

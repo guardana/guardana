@@ -88,7 +88,7 @@ $ uv run guardana scan examples/vulnerable-model
 ✖ [HIGH] guardana.supply_chain.dependency_risk — Unsafe model/deserialization loader call
     torch.load without weights_only=True  (examples/vulnerable-model/load_model.py:3)
 ▲ [MEDIUM] guardana.supply_chain.hallucinated_package — Import of unknown package (possible slopsquat lead)
-    unknown import 'torchutilz' (lead — verify it exists on PyPI)  (examples/vulnerable-model/train.py:1)
+    import 'torchutilz' isn't a known package or a declared dependency — declare it in requirements/pyproject, or verify it exists on PyPI  (examples/vulnerable-model/train.py:1)
 
 3 finding(s); 17 rule(s) run, 0 skipped.
 ```
@@ -150,7 +150,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.1.2
+      - uses: guardana/guardana@v0.1   # moving tag → latest 0.1.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```

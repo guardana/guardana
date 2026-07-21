@@ -53,7 +53,7 @@ $ guardana scan ./some-model-repo
 ✖ [CRITICAL] guardana.supply_chain.pickle_opcode — Dangerous pickle opcode (arbitrary code on load)
     unpickling imports non-allowlisted callable: os.system  (./some-model-repo)
 ▲ [MEDIUM] guardana.supply_chain.hallucinated_package — Import of unknown package (possible slopsquat lead)
-    unknown import 'torchutilz' (lead — verify it exists on PyPI)  (./some-model-repo)
+    import 'torchutilz' isn't a known package or a declared dependency — declare it in requirements/pyproject, or verify it exists on PyPI  (./some-model-repo)
 
 2 finding(s); 17 rule(s) run, 0 skipped.
 ```
