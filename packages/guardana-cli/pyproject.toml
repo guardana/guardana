@@ -1,6 +1,6 @@
 [project]
 name = "guardana-cli"
-version = "0.1.1"
+version = "0.1.2"
 description = "Guardana command-line interface: scan, probe, monitor, init, rules, new-rule."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["guardana-core>=0.1.1,<0.2", "guardana-rules>=0.1.1,<0.2", "guardana-report>=0.1.1,<0.2", "typer>=0.12"]
+dependencies = ["guardana-core>=0.1.2,<0.2", "guardana-rules>=0.1.2,<0.2", "guardana-report>=0.1.2,<0.2", "typer>=0.12"]
 
 [project.urls]
 Homepage = "https://guardana.io"
