@@ -142,7 +142,7 @@ filterwarnings = [
 [dependency-groups]
 dev = [
     "import-linter>=2.1",
-    "mypy>=2.2.0",
+    "mypy>=2.3.0",
     "pre-commit>=4.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
