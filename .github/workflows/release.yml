@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write
+      id-token: write   # OIDC trusted publishing
+      contents: write   # create the GitHub Release
 
     steps:
       - name: Check out repository
@@ -52,3 +53,23 @@ jobs:
           # Idempotent re-runs: a version already on PyPI (e.g. bootstrapped by a
           # one-time token upload, or a re-tagged release) is skipped, not failed.
           skip-existing: true
+
+      # After a successful publish, create the GitHub Release from the tag's
+      # CHANGELOG section — so the Releases page (and the Marketplace listing) never
+      # lags PyPI. Idempotent: skipped if the release already exists.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { f=1; next }
+            /^## \[/ && f { exit }
+            f { print }
+          ' CHANGELOG.md > notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — leaving it as is"
+          else
+            gh release create "$TAG" --title "Guardana $TAG" --notes-file notes.md --verify-tag
+          fi
