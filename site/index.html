@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guardana — verify the AI you run yourself</title>
+<meta name="description" content="Open-source security verification for self-hosted AI: scan model files for supply-chain risk, probe live endpoints for prompt injection and jailbreaks, and grade every finding with a confidence.">
+<meta property="og:title" content="Guardana — verify the AI you run yourself">
+<meta property="og:description" content="Scan model files, probe live endpoints, grade every finding with a confidence. Apache-2.0.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<style>
+  :root{
+    --paper:#F6F7F9; --panel:#FFFFFF; --ink:#14161A; --muted:#5B6472;
+    --rule:#E2E6EC; --brand:#5B3DF5; --brand-soft:#EEEBFE;
+    --critical:#A81E12; --high:#C2410C; --medium:#B07213; --info:#3B6FB0;
+    --term:#12141A; --term-ink:#E6E9EF; --term-dim:#8892A4;
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:17px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+  .disp{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif; font-weight:700; letter-spacing:-.015em; line-height:1.02}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+  /* eyebrow labels carry real data (surface + rule counts), not decoration */
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 14px;
+  }
+
+  /* ---- header ---- */
+  .top{border-bottom:1px solid var(--rule); background:rgba(246,247,249,.9); backdrop-filter:blur(8px); position:sticky; top:0; z-index:10}
+  .top .wrap{display:flex; align-items:center; gap:16px; height:62px}
+  .brand{display:flex; align-items:center; gap:9px; font-family:"IBM Plex Sans Condensed",sans-serif; font-weight:700; font-size:20px; letter-spacing:-.01em; text-decoration:none}
+  .brand svg{width:19px;height:19px;flex:none}
+  .ver{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--brand); background:var(--brand-soft); padding:3px 8px; border-radius:999px}
+  .top nav{margin-left:auto; display:flex; gap:22px; font-size:15px}
+  .top nav a{color:var(--muted); text-decoration:none}
+  .top nav a:hover{color:var(--ink)}
+
+  /* ---- hero ---- */
+  .hero{padding:78px 0 68px}
+  .hero-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:52px; align-items:start}
+  h1{margin:0 0 20px; font-size:clamp(2.5rem,5.4vw,4.1rem)}
+  .lede{font-size:1.12rem; color:var(--muted); margin:0 0 28px; max-width:46ch}
+  .lede strong{color:var(--ink); font-weight:600}
+
+  .cmd{
+    display:flex; align-items:center; gap:12px; background:var(--panel);
+    border:1px solid var(--rule); border-radius:9px; padding:13px 15px;
+    font-family:"IBM Plex Mono",monospace; font-size:14.5px; overflow-x:auto;
+  }
+  .cmd .sig{color:var(--brand); user-select:none}
+  .cmd code{white-space:nowrap}
+  .alt{font-size:14px; color:var(--muted); margin:11px 0 0}
+  .alt code{font-family:"IBM Plex Mono",monospace; background:var(--panel); border:1px solid var(--rule); padding:2px 6px; border-radius:5px; font-size:13px}
+
+  .cta{display:flex; gap:12px; margin-top:26px; flex-wrap:wrap}
+  .btn{
+    display:inline-block; text-decoration:none; font-weight:600; font-size:15px;
+    padding:11px 19px; border-radius:8px; border:1px solid transparent;
+  }
+  .btn-1{background:var(--ink); color:var(--paper)}
+  .btn-1:hover{background:#2A2E36}
+  .btn-2{background:transparent; color:var(--ink); border-color:var(--rule)}
+  .btn-2:hover{border-color:var(--muted)}
+  .btn:focus-visible,.top nav a:focus-visible,.brand:focus-visible,.foot a:focus-visible{outline:2px solid var(--brand); outline-offset:3px}
+
+  /* ---- terminal: the one dark artifact, the proof ---- */
+  .term{
+    background:var(--term); color:var(--term-ink); border-radius:11px; overflow:hidden;
+    box-shadow:0 18px 42px -18px rgba(18,20,26,.45); font-family:"IBM Plex Mono",monospace; font-size:13.2px; line-height:1.72;
+  }
+  .term-bar{display:flex; align-items:center; gap:7px; padding:11px 14px; border-bottom:1px solid #23262F}
+  .dot{width:9px;height:9px;border-radius:50%;background:#333844}
+  .term-bar span{margin-left:6px; color:var(--term-dim); font-size:11.5px; letter-spacing:.05em}
+  .term-body{padding:15px 16px 18px; overflow-x:auto}
+  .term-body p{margin:0; white-space:pre; animation:rise .42s ease-out both}
+  .term-body p:nth-child(1){animation-delay:.05s} .term-body p:nth-child(2){animation-delay:.16s}
+  .term-body p:nth-child(3){animation-delay:.27s} .term-body p:nth-child(4){animation-delay:.38s}
+  .term-body p:nth-child(5){animation-delay:.49s} .term-body p:nth-child(6){animation-delay:.60s}
+  .term-body p:nth-child(7){animation-delay:.71s} .term-body p:nth-child(8){animation-delay:.82s}
+  @keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .c-crit{color:#FF6B5E} .c-high{color:#FF9E64} .c-med{color:#E8C468}
+  .c-dim{color:var(--term-dim)} .c-ok{color:#7BD88F}
+  .prompt{color:#7C6BFF}
+
+  /* ---- sections ---- */
+  section{padding:64px 0; border-top:1px solid var(--rule)}
+  h2{font-size:clamp(1.7rem,3vw,2.3rem); margin:0 0 14px}
+  .sec-lede{color:var(--muted); max-width:62ch; margin:0 0 34px}
+
+  .surfaces{display:grid; grid-template-columns:1fr 1fr; gap:22px}
+  .card{background:var(--panel); border:1px solid var(--rule); border-radius:11px; padding:24px}
+  .card h3{margin:0 0 4px; font-family:"IBM Plex Sans Condensed",sans-serif; font-weight:700; font-size:1.3rem}
+  .card .when{color:var(--muted); font-size:14px; margin:0 0 16px}
+  .rules{list-style:none; margin:0; padding:0; font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--muted)}
+  .rules li{padding:5px 0; border-top:1px dotted var(--rule)}
+  .rules li:first-child{border-top:0}
+  .rules b{color:var(--ink); font-weight:500}
+
+  /* ---- signature: the verdict, with its confidence ---- */
+  .verdict{background:var(--panel); border:1px solid var(--rule); border-radius:11px; padding:22px 24px; max-width:640px}
+  .vrow{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .chip{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.09em; padding:3px 8px; border-radius:4px; color:#fff; background:var(--critical)}
+  .chip.high{background:var(--high)}
+  .vid{font-family:"IBM Plex Mono",monospace; font-size:13.5px}
+  .vwhy{color:var(--muted); font-size:15px; margin:12px 0 18px}
+  .meter{display:flex; align-items:center; gap:13px}
+  .meter-label{font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); flex:none}
+  .track{flex:1; height:6px; background:var(--rule); border-radius:99px; overflow:hidden; min-width:90px}
+  .fill{display:block; height:100%; width:95%; background:var(--brand); border-radius:99px}
+  .meter b{font-family:"IBM Plex Mono",monospace; font-size:14px; flex:none}
+  .stat{margin:26px 0 0; color:var(--muted); font-size:15px; max-width:60ch}
+  .stat a{color:var(--brand)}
+
+  /* ---- ci ---- */
+  .yml{background:var(--term); color:var(--term-ink); border-radius:11px; padding:18px 20px; overflow-x:auto;
+       font-family:"IBM Plex Mono",monospace; font-size:13.2px; line-height:1.7; margin:0 0 16px}
+  .yml .k{color:#7C6BFF} .yml .s{color:#7BD88F} .yml .c{color:var(--term-dim)}
+  .ci-note{color:var(--muted); font-size:15px; margin:0}
+  .ci-note code{font-family:"IBM Plex Mono",monospace; font-size:13px; background:var(--panel); border:1px solid var(--rule); padding:2px 6px; border-radius:5px}
+
+  /* ---- footer ---- */
+  .foot{border-top:1px solid var(--rule); padding:36px 0 52px; color:var(--muted); font-size:14.5px}
+  .foot-grid{display:flex; gap:26px; flex-wrap:wrap; align-items:center}
+  .foot a{color:var(--muted)}
+  .foot a:hover{color:var(--ink)}
+  .foot .sep{margin-left:auto}
+
+  @media (max-width:860px){
+    .hero-grid,.surfaces{grid-template-columns:1fr}
+    .hero{padding:52px 0 46px}
+    .top nav{gap:16px; font-size:14px}
+    .top nav .hide-sm{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .term-body p{animation:none}
+    *{transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5 4 5.6v6.1c0 4.6 3.2 8.4 8 9.8 4.8-1.4 8-5.2 8-9.8V5.6L12 2.5Z" stroke="#5B3DF5" stroke-width="1.9" stroke-linejoin="round"/></svg>
+      Guardana
+    </a>
+    <span class="ver mono">v0.1.3</span>
+    <nav>
+      <a href="https://github.com/guardana/guardana#readme" class="hide-sm">Docs</a>
+      <a href="https://pypi.org/project/guardana-cli/" class="hide-sm">PyPI</a>
+      <a href="https://github.com/marketplace/actions/guardana-ai-security-scan">Action</a>
+      <a href="https://github.com/guardana/guardana">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div class="hero-grid">
+      <div>
+        <h1 class="disp">Verify the AI you run yourself.</h1>
+        <p class="lede">Guardana scans model files for supply-chain risk, probes live endpoints for prompt injection and jailbreaks, and <strong>grades every finding with a confidence</strong>. One rule engine for your laptop, your CI, and a served model.</p>
+        <div class="cmd"><span class="sig">$</span><code>uvx --from guardana-cli guardana scan .</code></div>
+        <p class="alt">or <code>pip install guardana-cli</code> — Apache-2.0, runs fully offline.</p>
+        <div class="cta">
+          <a class="btn btn-1" href="https://github.com/guardana/guardana">Read the docs</a>
+          <a class="btn btn-2" href="https://github.com/marketplace/actions/guardana-ai-security-scan">Add to CI</a>
+        </div>
+      </div>
+
+      <div class="term" role="img" aria-label="Terminal output: Guardana scanning a model directory and reporting three findings, including a critical pickle opcode that would execute code on load.">
+        <div class="term-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>guardana scan examples/vulnerable-model</span></div>
+        <div class="term-body" aria-hidden="true">
+<p><span class="prompt">$</span> guardana scan examples/vulnerable-model</p>
+<p> </p>
+<p><span class="c-crit">✖ [CRITICAL]</span> guardana.supply_chain.pickle_opcode</p>
+<p><span class="c-dim">    unpickling imports non-allowlisted callable: posix.system</span></p>
+<p><span class="c-high">✖ [HIGH]</span> guardana.supply_chain.dependency_risk</p>
+<p><span class="c-dim">    torch.load without weights_only=True  (load_model.py:3)</span></p>
+<p><span class="c-med">▲ [MEDIUM]</span> guardana.supply_chain.hallucinated_package</p>
+<p><span class="c-dim">    3 finding(s); 17 rule(s) run, 0 skipped.  → exit 1</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">25 rules · two surfaces</p>
+      <h2 class="disp">What it checks</h2>
+      <p class="sec-lede">Static checks are deterministic — no model, no network, no false-positive theatre. Dynamic checks talk to a live endpoint and are graded by a swappable evaluator.</p>
+      <div class="surfaces">
+        <div class="card">
+          <h3>Build-time</h3>
+          <p class="when">17 rules · your laptop, CI, a training box</p>
+          <ul class="rules">
+            <li><b>pickle_opcode</b> — code that runs on model load</li>
+            <li><b>keras_lambda</b> — Lambda-layer RCE in .keras/.h5</li>
+            <li><b>remote_code_config</b> — auto_map RCE in config.json</li>
+            <li><b>dependency_risk</b> — torch.load, joblib, unsafe yaml</li>
+            <li><b>hardcoded_secret</b> — provider keys across 30+ file types</li>
+            <li><b>hidden_instructions</b> — invisible rules-file backdoors</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Runtime</h3>
+          <p class="when">8 rules · against a served model</p>
+          <ul class="rules">
+            <li><b>system_prompt_leak</b> — proven by a planted canary</li>
+            <li><b>injection.ignore_previous</b> — instruction override</li>
+            <li><b>scenario.gradual_jailbreak</b> — multi-turn escalation</li>
+            <li><b>scenario.indirect_injection</b> — poisoned retrieval</li>
+            <li><b>agent.excessive_tool_use</b> — reaches for a destructive tool</li>
+            <li><b>output.secrets</b> — keys leaking in replies</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">The differentiator</p>
+      <h2 class="disp">Did the attack actually work?</h2>
+      <p class="sec-lede">Most scanners are good at <em>sending</em> attacks and bad at telling you whether one landed. Guardana treats that judgement as a first-class, swappable, versioned component — so every dynamic finding arrives with an outcome, a rationale, and a number you can gate on.</p>
+
+      <div class="verdict">
+        <div class="vrow">
+          <span class="chip">CRITICAL</span>
+          <span class="vid mono">guardana.prompt.system_prompt_leak.canary</span>
+        </div>
+        <p class="vwhy">The reply contained the canary token planted in the system prompt — unambiguous evidence of disclosure, not a keyword guess.</p>
+        <div class="meter">
+          <span class="meter-label">Confidence</span>
+          <span class="track"><b class="fill"></b></span>
+          <b class="mono">0.95</b>
+        </div>
+      </div>
+
+      <p class="stat">Keyword-graded checks misjudge whether an attack succeeded at rates reported as high as <strong>37%</strong> — <a href="https://arxiv.org/abs/2410.16527">Fujitsu Research, 2024</a>. A scanner that can't tell a refusal from a compliance isn't a security tool.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">CI in one step</p>
+      <h2 class="disp">Gate it on every push</h2>
+      <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every finding maps to OWASP LLM Top 10, MITRE ATLAS, and NIST.</p>
+      <pre class="yml"><code><span class="c">// .github/workflows/ai-security.yml</span>
+<span class="k">- uses:</span> <span class="s">actions/checkout@v4</span>
+<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.1</span>
+  <span class="k">with:</span>
+    <span class="k">args:</span> <span class="s">--preset ci</span></code></pre>
+      <p class="ci-note">Turning a gate on for an existing repo? <code>--write-baseline</code> accepts today's findings with a reason, so only new ones fail the build. There's a pre-commit hook too.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-grid">
+    <span>Apache-2.0</span>
+    <a href="https://github.com/guardana/guardana">GitHub</a>
+    <a href="https://pypi.org/project/guardana-cli/">PyPI</a>
+    <a href="https://github.com/marketplace/actions/guardana-ai-security-scan">Marketplace</a>
+    <a href="https://github.com/guardana/guardana/releases">Releases</a>
+    <span class="sep">Security verification for self-hosted AI.</span>
+  </div>
+</footer>
+
+</body>
+</html>
