@@ -1,6 +1,6 @@
 [project]
 name = "guardana-report"
-version = "0.2.0"
+version = "0.3.0"
 description = "Guardana renderers: human, SARIF, JSON, and JUnit output."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["guardana-core>=0.2.0,<0.3"]
+dependencies = ["guardana-core>=0.3.0,<0.4"]
 
 [project.urls]
 Homepage = "https://guardana.io"
