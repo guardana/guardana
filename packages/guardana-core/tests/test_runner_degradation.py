@@ -45,7 +45,7 @@ def _runner_with(*rules: Rule) -> tuple[Registry, Profile]:
     return registry, Profile("t", Policy())
 
 
-def test_rule_with_an_unregistered_evaluator_is_skipped_not_fatal(tmp_path: Path) -> None:
+def test_rule_with_an_unregistered_evaluator_is_recorded_not_fatal(tmp_path: Path) -> None:
     (tmp_path / "r.yaml").write_text(_RULE_YAML, encoding="utf-8")
     registry = Registry()
     loaded = registry.load_yaml_rule_dirs([tmp_path])
@@ -54,18 +54,25 @@ def test_rule_with_an_unregistered_evaluator_is_skipped_not_fatal(tmp_path: Path
 
     result = Runner(registry=registry, profile=Profile("t", Policy())).run(target)
 
+    # An evaluator nobody configured is a check that did not run, and it is
+    # recorded as one — the same error routed through the load path already
+    # failed the gate, and the identical defect must not be silent here.
     assert result.findings == ()
-    assert result.rules_skipped == ("acme.prompt.needs_missing_evaluator",)
+    assert result.rules_skipped == ()
+    assert [e.source for e in result.errors] == ["acme.prompt.needs_missing_evaluator"]
 
 
-def test_rule_raising_ruleerror_is_skipped_not_fatal() -> None:
+def test_rule_raising_ruleerror_is_recorded_not_fatal() -> None:
+    # Not fatal — the scan finishes — but not silent either: the rule is in
+    # `errors`, so the gate will not green-light a run where it never executed.
     registry, profile = _runner_with(_ExplodingRule())
     target = EndpointTarget("http://x", "m", transport=RefusingTransport())
 
     result = Runner(registry=registry, profile=profile).run(target)
 
     assert result.findings == ()
-    assert result.rules_skipped == ("acme.explodes",)
+    assert result.rules_skipped == ()
+    assert [e.source for e in result.errors] == ["acme.explodes"]
 
 
 def test_rule_whose_capabilities_are_unmet_is_skipped() -> None:
@@ -110,4 +117,4 @@ def test_a_malformed_rule_file_never_aborts_the_load(tmp_path: Path) -> None:
 
     assert loaded.loaded == ("acme.prompt.needs_missing_evaluator",)
     assert len(loaded.errors) == 1
-    assert "broken.yaml" in loaded.errors[0]
+    assert "broken.yaml" in loaded.errors[0].source

@@ -120,15 +120,19 @@ no planted canary, an unparseable judge answer — it returns `inconclusive`, ne
 
 ### Finding / Report — the normalized result
 Every check produces `Finding`s in one shape. A run collects them into a
-`ScanResult` — the findings, a count of what ran and what was skipped, and a
-separate **`unverified`** channel for checks that ran but couldn't reach a
-verdict. Renderers turn a `ScanResult` into `human`, `json`, `sarif` (for GitHub
-code scanning), or `junit` output.
+`ScanResult`, which keeps the three meanings of "no findings" apart: the
+**findings** themselves, an **`unverified`** channel for checks that ran but
+could not reach a verdict, and an **`errors`** channel for checks that never ran
+at all — a plugin that failed to import, a rule file that would not load, a rule
+that raised. That last one fails the gate by default, because a report that looks
+clean because nothing looked is the failure this engine exists to prevent.
+Renderers turn a `ScanResult` into `human`, `json`, `sarif` (for GitHub code
+scanning), or `junit` output.
 
 ### Profile — what to run and when to fail
 A `guardana.yaml` (or a named preset — §5) that decides which rules run
 (include/exclude globs) and where the bar is (`fail_on.severity`,
-`min_confidence`, `fail_on_inconclusive`). A profile that can't be honoured — a
+`min_confidence`, `fail_on_inconclusive`, `fail_on_error`). A profile that can't be honoured — a
 typo'd key, an out-of-range number, an empty include — **raises at load time**,
 because a gate you think you configured but didn't is worse than no gate.
 
@@ -138,9 +142,10 @@ because a gate you think you configured but didn't is worse than no gate.
   distinction — your private rule is discovered exactly like ours.
 - The **Runner** takes a registry, a profile, and a target, and does the loop:
   for each rule, skip it if it doesn't match the target's layer or the profile's
-  filters or the target's capabilities; otherwise run it, catching errors so one
-  bad rule can't abort the scan; sort each result into confirmed findings or the
-  `unverified` channel; and hand back a `ScanResult`.
+  filters or the target's capabilities; otherwise run it, catching any exception
+  so one bad rule can't abort the scan — while recording it, so a rule that blew
+  up never reads as a rule that passed; sort each result into confirmed findings
+  or the `unverified` channel; and hand back a `ScanResult`.
 
 ### One scan, end to end
 `guardana scan ./model-dir` →

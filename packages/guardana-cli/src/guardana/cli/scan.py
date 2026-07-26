@@ -74,7 +74,21 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
             f"— add a reason to each before committing it.",
             err=True,
         )
-        return
+        # A baseline is written from what the scan saw, so a check that could not
+        # run makes the snapshot incomplete: the team would commit a baseline
+        # missing whatever that rule would have found, and never be told. Report
+        # and gate on it before returning.
+        for error in result.errors:
+            typer.echo(
+                f"warning: {error.source} did not run ({error.stage}) — the baseline "
+                f"cannot account for it: {error.reason}",
+                err=True,
+            )
+        # Only the errors gate here, never the findings: snapshotting today's
+        # findings is the whole point of this flag, but a check that never ran
+        # means the snapshot is missing whatever it would have found.
+        blocked = bool(result.errors) and prof.policy.fail_on.fail_on_error
+        raise typer.Exit(code=1 if blocked else 0)
     if baseline is not None:
         try:
             result = apply_baseline(result, load_baseline(baseline))

@@ -105,11 +105,15 @@ class _RaisesRuleError(Rule):
         raise RuleError("boom")
 
 
-def test_runner_records_rule_that_raises_as_skipped(tmp_path: Path) -> None:
+def test_runner_records_rule_that_raises_as_an_error_not_a_skip(tmp_path: Path) -> None:
+    # A rule that raised used to land in `rules_skipped`, indistinguishable from
+    # "this target has nothing for that rule to read" — so a check that blew up
+    # read as a check that did not apply, and the build stayed green.
     result = _runner(_RaisesRuleError()).run(ArtifactTarget(tmp_path))
     assert result.findings == ()
     assert result.rules_run == 0
-    assert "guardana.err.demo" in result.rules_skipped
+    assert result.rules_skipped == ()
+    assert [e.source for e in result.errors] == ["guardana.err.demo"]
 
 
 class _Inconclusive(Rule):

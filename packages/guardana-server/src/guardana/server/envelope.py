@@ -10,7 +10,11 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+# A fleet upgrades one agent at a time, so the collector accepts the previous
+# envelope too. A v2 agent simply reports no `errors` — which is honest, because
+# a v2 agent could not observe them.
+SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3})
 
 # Ingest is untrusted input: an unbounded body would let one POST exhaust the
 # collector's memory (the store bounds submission *count*, not bytes). These caps
@@ -56,6 +60,14 @@ class FindingIn(BaseModel):
     verdict: VerdictIn | None = None
 
 
+class CheckErrorIn(BaseModel):
+    """A check that could not run, as reported by an agent."""
+
+    source: _Str
+    stage: _Str
+    reason: _Text
+
+
 class SummaryIn(BaseModel):
     """What the run did, beyond the findings themselves."""
 
@@ -63,6 +75,7 @@ class SummaryIn(BaseModel):
     rules_skipped: list[_Str] = Field(default_factory=list, max_length=_MAX_SKIPPED)
     max_severity: _Str | None = None
     unverified: int = 0
+    errors: int = 0
 
 
 class Submission(BaseModel):
@@ -77,4 +90,8 @@ class Submission(BaseModel):
     # Checks that ran but could not reach a verdict — stored, never discarded, so
     # the collector can surface "these were not graded" instead of an all-clear.
     unverified: list[FindingIn] = Field(default_factory=list, max_length=_MAX_FINDINGS)
+    # Checks that could not run at all (v3). Defaulted, so a v2 agent still
+    # submits successfully — but an agent whose checks are crashing can no longer
+    # look clean on the dashboard.
+    errors: list[CheckErrorIn] = Field(default_factory=list, max_length=_MAX_FINDINGS)
     summary: SummaryIn | None = None

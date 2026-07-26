@@ -53,7 +53,11 @@ class Monitor:
     config: MonitorConfig
 
     def _alert_reason(
-        self, result: ScanResult, findings_baseline: int, unverified_baseline: int
+        self,
+        result: ScanResult,
+        findings_baseline: int,
+        unverified_baseline: int,
+        errors_baseline: int,
     ) -> str | None:
         """Why this cycle should alert, or None if it shouldn't."""
         if gate(result, self.policy):
@@ -62,6 +66,12 @@ class Monitor:
             return "finding count exceeded baseline"
         if len(result.unverified) > unverified_baseline:
             return "unverified count exceeded baseline"
+        # The strictly worse sibling of the unverified rise: those checks ran and
+        # could not grade, these never ran at all. Baselined too, so a monitor
+        # whose rules start crashing cannot keep reporting all-clear — including
+        # when `fail_on_error` is off and the gate stays quiet.
+        if len(result.errors) > errors_baseline:
+            return "checks that could not run exceeded baseline"
         return None
 
     def run(
@@ -83,6 +93,7 @@ class Monitor:
         established = False
         findings_baseline = 0
         unverified_baseline = 0
+        errors_baseline = 0
         cycle = 0
         while self.config.max_cycles is None or cycle < self.config.max_cycles:
             if cycle:
@@ -101,7 +112,10 @@ class Monitor:
                 established = True
                 findings_baseline = len(result.findings)
                 unverified_baseline = len(result.unverified)
-            reason = self._alert_reason(result, findings_baseline, unverified_baseline)
+                errors_baseline = len(result.errors)
+            reason = self._alert_reason(
+                result, findings_baseline, unverified_baseline, errors_baseline
+            )
             if reason is not None:
                 on_alert(Alert(cycle, result, reason))
             cycle += 1

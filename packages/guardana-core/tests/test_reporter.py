@@ -8,7 +8,7 @@ import pytest
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.result import ScanResult
-from guardana.core.reporter import HttpReporter
+from guardana.core.reporter import ENVELOPE_SCHEMA_VERSION, HttpReporter
 from guardana.core.severity import Severity
 from guardana.core.taxonomy import OWASP_LLM01
 
@@ -75,7 +75,7 @@ def test_http_reporter_forwards_the_unverified_channel() -> None:
     )
 
     payload = json.loads(captured[0])
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == ENVELOPE_SCHEMA_VERSION
     assert payload["findings"] == []
     assert payload["summary"]["unverified"] == 1
     assert len(payload["unverified"]) == 1

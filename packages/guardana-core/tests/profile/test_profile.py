@@ -151,3 +151,32 @@ def test_a_proper_list_still_loads(tmp_path: Path) -> None:
     assert prof.policy.include == ("guardana.*",)
     assert prof.policy.exclude == ("*.experimental",)
     assert prof.rule_paths == ("./my-rules",)
+
+
+def test_fail_on_error_can_be_turned_off(tmp_path: Path) -> None:
+    path = tmp_path / "guardana.yaml"
+    path.write_text("name: t\nfail_on:\n  fail_on_error: false\n", encoding="utf-8")
+    assert load_profile(path).policy.fail_on.fail_on_error is False
+
+
+def test_fail_on_error_defaults_to_true(tmp_path: Path) -> None:
+    # The opposite default to fail_on_inconclusive, on purpose: a check that never
+    # ran is a defect, not an honest "I cannot tell".
+    path = tmp_path / "guardana.yaml"
+    path.write_text("name: t\n", encoding="utf-8")
+    assert load_profile(path).policy.fail_on.fail_on_error is True
+
+
+def test_a_misspelled_fail_on_error_is_refused(tmp_path: Path) -> None:
+    # A gate you think you configured but did not is worse than no gate.
+    path = tmp_path / "guardana.yaml"
+    path.write_text("name: t\nfail_on:\n  fail_on_erorr: false\n", encoding="utf-8")
+    with pytest.raises(ProfileError, match="fail_on_erorr"):
+        load_profile(path)
+
+
+def test_a_non_boolean_fail_on_error_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "guardana.yaml"
+    path.write_text("name: t\nfail_on:\n  fail_on_error: maybe\n", encoding="utf-8")
+    with pytest.raises(ProfileError, match="fail_on_error"):
+        load_profile(path)

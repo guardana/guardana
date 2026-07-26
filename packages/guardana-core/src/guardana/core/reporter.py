@@ -9,13 +9,16 @@ from guardana.core.report.serialize import finding_to_dict
 
 _TIMEOUT_SECONDS = 30
 
-ENVELOPE_SCHEMA_VERSION = 2
+ENVELOPE_SCHEMA_VERSION = 3
 """Version of the JSON envelope POSTed to a collector.
 
 The collector is a separate service on its own release cadence, so the envelope
 is versioned: a collector that doesn't understand a version rejects it outright
 rather than silently misreading a renamed field.
 
+v3 added the `errors` channel (checks that could not run at all): a collector
+that showed an agent as clean while its checks were crashing would be the same
+false all-clear v2 fixed, one layer further out.
 v2 added the `unverified` channel (checks that ran but could not reach a
 verdict). v1 dropped them, so a model whose CRITICAL checks could not be graded
 was forwarded as `findings: []` — a false all-clear at the collector boundary.
@@ -40,11 +43,15 @@ def _serialize(result: ScanResult, *, source: str) -> bytes:
         # collector must see it, or a dashboard renders a false all-clear on a
         # model whose CRITICAL checks silently failed to run.
         "unverified": [finding_to_dict(f) for f in result.unverified],
+        "errors": [
+            {"source": e.source, "stage": e.stage, "reason": e.reason} for e in result.errors
+        ],
         "summary": {
             "rules_run": result.rules_run,
             "rules_skipped": list(result.rules_skipped),
             "max_severity": max_sev.name if max_sev else None,
             "unverified": len(result.unverified),
+            "errors": len(result.errors),
         },
     }
     return json.dumps(payload).encode("utf-8")

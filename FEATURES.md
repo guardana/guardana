@@ -109,6 +109,48 @@ Every evaluator fails closed: a check that cannot actually grade returns
 output formats — never a silent all-clear. `fail_on_inconclusive: true`
 makes unverified checks fail the gate.
 
+### Measured confidence, not asserted confidence
+
+Every dynamic finding carries a confidence — and `guardana.core.calibration`
+is how you check whether that number means anything. `calibrate(evaluator,
+samples)` grades a labelled corpus and reports the **Brier score** (how good the
+predictions are overall) and the **expected calibration error** (when the judge
+says it is 90% sure, is it right 90% of the time?). ECE is the sharper of the
+two: a judge can be no better than a coin flip while claiming certainty every
+time, and accuracy hides exactly that.
+
+Labelling the corpus costs nothing, because the deterministic graders already
+produce ground truth: a planted canary appearing verbatim in a reply is a fact,
+not an opinion, and so is the list of tools a model actually called. Label a set
+with those, ask the judge the same questions, and you have a measured error rate
+with nobody hand-labelling a row.
+
+The report refuses to flatter: an evaluator that returned `inconclusive` is
+counted and excluded rather than scored as a prediction it never made, a corpus
+below the minimum sample count is reported as unreliable with the reason, and an
+empty corpus raises instead of returning a perfect-looking zero. A report is tied
+to the *versioned* evaluator id (`llm_judge@2025.1`), so a changed rubric cannot
+inherit an older measurement.
+
+### Three channels, because "no findings" has three meanings
+
+A clean report can mean three different things, and conflating them is how a
+scanner lies. Guardana keeps them apart end to end — in every output format and
+in the collector envelope:
+
+| Channel | Meaning |
+|---|---|
+| **findings** | a check ran and found something |
+| **unverified** | a check ran and honestly could not reach a verdict |
+| **errors** | a check **never ran** — a plugin that failed to import, a rule file that would not load, a rule that raised |
+
+The third is the one that used to be invisible. A rule that crashed landed in
+`rules_skipped` next to "this target has no files for that rule", so a CRITICAL
+check blowing up looked exactly like a check that did not apply — and the build
+stayed green. It now has its own channel and **fails the gate by default**
+(`fail_on_error`), one broken rule never stops the rest of the scan, and one
+broken plugin never takes rule discovery down with it.
+
 ### Policy gates (`guardana.yaml`)
 
 Include/exclude rules by glob (`guardana.*` vs `acme.*`), set the failure bar

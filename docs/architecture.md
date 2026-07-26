@@ -77,6 +77,12 @@ binary parsing in the engine. It is the same move as `guardana.core.testing`:
 core ships plumbing so a third-party pack ships judgement. Full contract in
 [`model-formats.md`](model-formats.md).
 
+**Skipped is not errored.** The `Runner` keeps two outcomes apart that used to
+share a bucket: a rule the target cannot satisfy is *skipped* (normal), and a
+rule that raised is an *error* (a defect) recorded in `ScanResult.errors`, which
+fails the gate by default. `Registry.discover()` isolates each entry point for
+the same reason — one broken third-party pack must not leave you with no rules.
+
 A rule declares which capabilities it needs (`required_capabilities` in
 `RuleMeta`); the `Runner` skips a rule outright — no crash — when the
 target it's given can't satisfy them, e.g. an endpoint-only prompt-injection

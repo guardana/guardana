@@ -57,34 +57,32 @@ runner. Priorities, roughly in order:
    deduplicated against model refusal-training — plus new single-turn rules and
    scenarios (role-play leaks, encoding-smuggling variants, system-prompt
    extraction families).
-2. **Judge calibration, measured not asserted.** Today's confidence is agreement
-   across samples; v0.2 adds a labeled calibration set and reports measured error
-   (ECE/Brier) per judge+rubric version, keyed off the versioned `evaluator_id`.
-   This is the project's core bet — it gets the investment first, and it unblocks
-   every judge-graded item below (adaptive attacks, misinformation).
-3. **Engine robustness.** `Runner` catches only `RuleError`; a buggy third-party
-   rule raising anything else can still abort a scan, and one broken entry point
-   can take down `Registry.discover()`. Isolate both, and split "skipped for
-   capability" from "errored" into a separate `errors` channel on `ScanResult`.
-4. **Compliance evidence, exported.** EU AI Act Art. 11 / Annex IV technical
+2. **Judge calibration — finish wiring it.** The measurement itself shipped
+   (`guardana.core.calibration`: Brier + ECE against known-correct labels, keyed
+   to the versioned `evaluator_id`). What is left is the plumbing that makes it
+   routine: a `guardana calibrate` command over a corpus file, a bundled starter
+   corpus generated from canary- and tool-call-graded runs, and letting
+   `llm_judge` report a *calibrated* confidence when a report is supplied instead
+   of raw sample agreement. This still gates the judge-graded items below.
+3. **Compliance evidence, exported.** EU AI Act Art. 11 / Annex IV technical
    documentation applies from 2 August 2026, and AI-BOM is turning from a nice
    artifact into a procurement question. A scan already *observes* everything the
    answer needs — models and their formats, dependencies, datasets, what was
    tested, what was waived and why — so this is a renderer plus a dated assurance
    record, not new engine work: **CycloneDX ML-BOM export** and a per-deployment
    evidence pack. It is also the natural thing for the collector to retain.
-5. **Multilingual attack corpora.** Safety alignment is English-centric and does
+4. **Multilingual attack corpora.** Safety alignment is English-centric and does
    not generalise: translating a prompt into a low-resource language bypasses
    GPT-4's guardrails in **79%** of cases, and multi-turn attacks in those
    languages reach **52.7–83.6%** harmful-response rates (arXiv:2605.18239). The
    engine already carries this — what is missing is a `lang` facet on YAML rules
    and scenarios, a `--lang` filter, and a first non-English corpus. A
    language-specialised classifier slots in as a `guard` backend unchanged.
-6. **Distribution.** Presets settable by name inside `guardana.yaml` (not only via
+5. **Distribution.** Presets settable by name inside `guardana.yaml` (not only via
    `--preset`). *(PyPI publish, the official **GitHub Action** on the Marketplace,
    the **pre-commit** integration, alias-aware static sinks, configurable scan
-   scope (`rules.paths_exclude` / `.guardanaignore`), and advisory-backed
-   dependency matching shipped in v0.1.x–v0.2.)*
+   scope (`rules.paths_exclude` / `.guardanaignore`), advisory-backed dependency
+   matching, and the fail-closed `errors` channel shipped in v0.1.x–v0.3.)*
 
 ## v0.3 — Sharpen runtime depth
 

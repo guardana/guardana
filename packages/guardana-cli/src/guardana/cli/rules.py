@@ -50,8 +50,11 @@ def rules(
     never silently dropped.
     """
     registry = Registry.discover()
-    outcome = registry.load_yaml_rule_dirs(rules)
-    for error in outcome.errors:
+    registry.load_yaml_rule_dirs(rules)
+    # Includes entry-point failures, not just YAML: this command exists to confirm
+    # a pack was picked up, so a pack that failed to import must not be an empty
+    # line in the listing.
+    for error in registry.load_errors:
         typer.echo(f"warning: could not load rule — {error}", err=True)
     discovered = [r for r in registry.rules() if _keep(r, surface)]
     if format == RulesFormat.json:

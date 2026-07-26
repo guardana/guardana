@@ -5,7 +5,7 @@ from guardana.cli._endpoint import build_endpoint
 from guardana.core.evaluator.base import Expectation
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
-from guardana.core.report import Finding, ScanResult
+from guardana.core.report import ScanResult
 from guardana.core.rule import Rule, YamlRule
 from guardana.core.rule.scenario_rule import ScenarioRule
 from guardana.core.runner import Runner
@@ -83,25 +83,21 @@ def _canary_system_prompt(canary: str, base_system_prompt: str | None) -> str:
 
 
 def _sub_registry(rules: list[Rule], source: Registry) -> Registry:
+    """Build a registry holding a subset of rules, carrying the source's load failures.
+
+    The load errors travel with it deliberately: a plugin that failed to import is
+    a check that will not run, and the sub-registry is what the Runner reads to
+    seed its error channel. Dropping them here made a broken pack invisible to
+    every probe and monitor run.
+    """
     sub = Registry()
     for rule in rules:
         sub.register_rule(rule)
     for evaluator in source.evaluators().values():
         sub.register_evaluator(evaluator)
+    for error in source.load_errors:
+        sub.record_load_error(error)
     return sub
-
-
-def _merge(results: list[ScanResult]) -> ScanResult:
-    findings: list[Finding] = []
-    unverified: list[Finding] = []
-    rules_run = 0
-    skipped: list[str] = []
-    for result in results:
-        findings.extend(result.findings)
-        unverified.extend(result.unverified)
-        rules_run += result.rules_run
-        skipped.extend(result.rules_skipped)
-    return ScanResult(tuple(findings), rules_run, tuple(skipped), tuple(unverified))
 
 
 def run_probe(registry: Registry, profile: Profile, connection: Connection) -> ScanResult:
@@ -151,4 +147,4 @@ def run_probe(registry: Registry, profile: Profile, connection: Connection) -> S
             Runner(registry=_sub_registry([rule], registry), profile=profile).run(canary_target)
         )
 
-    return _merge(results) if results else ScanResult((), 0, ())
+    return ScanResult.merged(results) if results else ScanResult((), 0, ())

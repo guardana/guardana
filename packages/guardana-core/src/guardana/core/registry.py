@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from guardana.core.evaluator.base import Evaluator
+from guardana.core.report.check_error import CheckError
 from guardana.core.rule.base import Rule
 from guardana.core.rule.errors import RuleLoadError
 from guardana.core.rule.yaml_rule import load_yaml_rules
@@ -20,7 +21,7 @@ class RuleDirLoad:
     """Outcome of loading YAML rules from a set of directories/files."""
 
     loaded: tuple[str, ...]
-    errors: tuple[str, ...]
+    errors: tuple[CheckError, ...]
 
 
 class Registry:
@@ -30,6 +31,16 @@ class Registry:
         self._rules: list[Rule] = []
         self._evaluators: dict[str, Evaluator] = {}
         self._targets: list[type[Target]] = []
+        self._load_errors: list[CheckError] = []
+
+    @property
+    def load_errors(self) -> tuple[CheckError, ...]:
+        """Every plugin or rule file that could not be loaded, and why."""
+        return tuple(self._load_errors)
+
+    def record_load_error(self, error: CheckError) -> None:
+        """Record something that could not be loaded, so the run can report it."""
+        self._load_errors.append(error)
 
     def register_rule(self, rule: Rule) -> None:
         """Add a rule, keyed by id: a later rule with the same id replaces the earlier.
@@ -73,7 +84,7 @@ class Registry:
         `RuleDirLoad.errors` instead of aborting the caller's scan.
         """
         loaded: list[str] = []
-        errors: list[str] = []
+        errors: list[CheckError] = []
         for path in paths:
             for file in _yaml_files(path):
                 try:
@@ -81,7 +92,8 @@ class Registry:
                         self.register_rule(rule)
                         loaded.append(rule.meta.id)
                 except (RuleLoadError, OSError) as exc:
-                    errors.append(f"{file}: {exc}")
+                    errors.append(CheckError.from_exception(str(file), "load", exc))
+        self._load_errors.extend(errors)
         return RuleDirLoad(tuple(loaded), tuple(errors))
 
     @classmethod
@@ -90,20 +102,43 @@ class Registry:
 
         This imports third-party code: an installed plugin is trusted code (see
         SECURITY.md). `guardana scan --no-plugins` skips discovery entirely.
+
+        Each entry point is isolated. One that fails to import — a pack pinned to a
+        library you do not have, a typo in a provider — is recorded in
+        `load_errors` and the rest still load. Without that isolation a single
+        broken third-party package left the user with no rules at all, built-ins
+        included, which is the most complete failure mode a scanner has.
         """
         reg = cls()
-        for ep in entry_points(group=_RULE_GROUP):
-            _absorb(ep.load()(), reg.register_rule)
-        for ep in entry_points(group=_EVALUATOR_GROUP):
-            _absorb(ep.load()(), reg.register_evaluator)
-        for ep in entry_points(group=_TARGET_GROUP):
-            _absorb(ep.load()(), reg.register_target)
+        for group, expected, register in (
+            (_RULE_GROUP, Rule, reg.register_rule),
+            (_EVALUATOR_GROUP, Evaluator, reg.register_evaluator),
+            (_TARGET_GROUP, Target, reg.register_target),
+        ):
+            for ep in entry_points(group=group):
+                try:
+                    _absorb(ep.load()(), expected, register)
+                except Exception as exc:
+                    reg.record_load_error(CheckError.from_exception(ep.name, "discovery", exc))
         return reg
 
 
-def _absorb(produced: Any, register: Callable[[Any], None]) -> None:  # noqa: ANN401
+def _absorb(
+    produced: object, expected: type | tuple[type, ...], register: Callable[[Any], None]
+) -> None:
+    """Register everything a provider returned, refusing anything of the wrong type.
+
+    Validated before registering, not after: a provider that returns a mapping
+    (or a bare string, which is iterable) used to put junk into the rule list, and
+    the *next* provider then crashed on it — so whether isolation worked at all
+    depended on entry-point ordering.
+    """
     items = produced if isinstance(produced, Iterable) else (produced,)
     for item in items:
+        if not isinstance(item, expected) and not (
+            isinstance(item, type) and issubclass(item, expected)
+        ):
+            raise TypeError(f"provider returned {type(item).__name__}, expected {expected}")
         register(item)
 
 

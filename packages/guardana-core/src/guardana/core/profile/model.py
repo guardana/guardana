@@ -12,6 +12,11 @@ class FailOn:
     severity: Severity = Severity.HIGH
     min_confidence: float = 0.0
     fail_on_inconclusive: bool = False
+    # Defaults to True where `fail_on_inconclusive` defaults to False, because the
+    # two are not the same thing. `inconclusive` is a verdict — the check ran and
+    # honestly said "I cannot tell", and you cannot gate on that. An error is a
+    # defect: the check did not run, while the result looks as though it did.
+    fail_on_error: bool = True
 
 
 @dataclass(frozen=True, slots=True)

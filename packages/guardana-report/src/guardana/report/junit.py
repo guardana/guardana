@@ -41,11 +41,24 @@ class JUnitRenderer:
                 f"      <skipped message={message}>{reason}</skipped>\n"
                 f"    </testcase>"
             )
+        # `<error>` rather than `<failure>`: CI tooling reads the first as "the
+        # test could not run" and the second as "the test ran and failed", which is
+        # exactly the distinction this channel exists to make.
+        for e in result.errors:
+            name = quoteattr(e.source)
+            classname = quoteattr(f"guardana.{e.stage}")
+            message = quoteattr("check did not run")
+            cases.append(
+                f"    <testcase name={name} classname={classname}>\n"
+                f"      <error message={message}>{escape(e.reason)}</error>\n"
+                f"    </testcase>"
+            )
         body = "\n".join(cases)
         skipped = len(result.unverified) + len(result.waived)
         return (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<testsuite name="guardana" tests="{result.rules_run}" '
-            f'failures="{len(result.findings)}" skipped="{skipped}">\n'
+            f'failures="{len(result.findings)}" skipped="{skipped}" '
+            f'errors="{len(result.errors)}">\n'
             f"{body}\n</testsuite>"
         )

@@ -106,4 +106,4 @@ def test_load_yaml_rule_dirs_reports_bad_file_without_raising(tmp_path: Path) ->
 
     assert report.loaded == ("acme.prompt.demo",)
     assert len(report.errors) == 1
-    assert "bad.yaml" in report.errors[0]
+    assert "bad.yaml" in report.errors[0].source

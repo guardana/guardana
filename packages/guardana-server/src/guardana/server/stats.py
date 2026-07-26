@@ -28,6 +28,7 @@ class SourceStat:
     source: str
     findings: int
     unverified: int
+    errors: int
     worst_severity: str | None
     last_seen: float
 
@@ -47,6 +48,7 @@ class TimeBucket:
     t: float
     findings: int
     unverified: int
+    errors: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +59,7 @@ class Totals:
     sources: int
     findings: int
     unverified: int
+    errors: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,10 +82,12 @@ def compute_stats(
     by_rule_counts: dict[str, int] = {}
     source_findings: dict[str, int] = {}
     source_unverified: dict[str, int] = {}
+    source_errors: dict[str, int] = {}
     source_worst: dict[str, int] = {}
     source_last_seen: dict[str, float] = {}
     total_findings = 0
     total_unverified = 0
+    total_errors = 0
 
     for record in ordered:
         submission = record.submission
@@ -92,6 +97,12 @@ def compute_stats(
         source_unverified.setdefault(source, 0)
         source_unverified[source] += len(submission.unverified)
         total_unverified += len(submission.unverified)
+        # A submission carrying only errors has zero findings and zero unverified:
+        # without this the dashboard renders an agent whose checks are all
+        # crashing as a clean one.
+        source_errors.setdefault(source, 0)
+        source_errors[source] += len(submission.errors)
+        total_errors += len(submission.errors)
         for finding in submission.findings:
             total_findings += 1
             by_severity[finding.severity] = by_severity.get(finding.severity, 0) + 1
@@ -106,6 +117,7 @@ def compute_stats(
             source=source,
             findings=source_findings[source],
             unverified=source_unverified[source],
+            errors=source_errors[source],
             worst_severity=(
                 _SEVERITY_ORDER[source_worst[source]] if source in source_worst else None
             ),
@@ -129,6 +141,7 @@ def compute_stats(
             sources=len(source_findings),
             findings=total_findings,
             unverified=total_unverified,
+            errors=total_errors,
         ),
     )
 
@@ -146,17 +159,25 @@ def _series(ordered: list[StoredSubmission], buckets: int) -> list[TimeBucket]:
                 t=t_min,
                 findings=sum(len(r.submission.findings) for r in ordered),
                 unverified=sum(len(r.submission.unverified) for r in ordered),
+                errors=sum(len(r.submission.errors) for r in ordered),
             )
         ]
     n = max(1, min(buckets, len(ordered)))
     width = span / n
     findings = [0] * n
     unverified = [0] * n
+    errors = [0] * n
     for record in ordered:
         index = min(n - 1, int((record.received_at - t_min) / width))
         findings[index] += len(record.submission.findings)
         unverified[index] += len(record.submission.unverified)
+        errors[index] += len(record.submission.errors)
     return [
-        TimeBucket(t=t_min + i * width, findings=findings[i], unverified=unverified[i])
+        TimeBucket(
+            t=t_min + i * width,
+            findings=findings[i],
+            unverified=unverified[i],
+            errors=errors[i],
+        )
         for i in range(n)
     ]

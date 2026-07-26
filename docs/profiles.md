@@ -44,6 +44,7 @@ fail_on:
                                  # (case-insensitive); defaults to "high"
   min_confidence: 0.7           # 0.0-1.0; defaults to 0.0
   fail_on_inconclusive: false   # true: unverified checks also fail the gate
+  fail_on_error: true           # false: a check that could not run stops blocking
 
 evaluators:                     # config-wired evaluators — see the section below
   llm_judge:
@@ -66,6 +67,7 @@ evaluators:                     # config-wired evaluators — see the section be
 | `fail_on.severity` | `info\|low\|medium\|high\|critical` | `high` | The minimum severity a finding needs to be eligible to fail the gate |
 | `fail_on.min_confidence` | float `0.0`–`1.0` | `0.0` | For findings that carry a `Verdict` (dynamic checks), the minimum confidence required to count toward the gate. Static findings have no verdict and always count once their severity threshold is met. |
 | `fail_on.fail_on_inconclusive` | bool | `false` | When `true`, a check that ran but could not reach a verdict (reported on the `unverified` channel) also fails the gate — the strict posture for a hard CI gate. |
+| `fail_on.fail_on_error` | bool | **`true`** | A check that could not run *at all* — a plugin that failed to import, a custom rule file that would not load, a rule that raised — fails the gate. Note the default is the opposite of `fail_on_inconclusive`, and deliberately so: `inconclusive` is a verdict (the check ran and honestly could not tell), while an error means the check never happened while the result looked as though it had. Set `false` only if you would rather ship than fix the broken check. |
 | `evaluators` | mapping | `{}` | Config blocks for evaluators that need a model of their own, keyed by evaluator id — `llm_judge` and `guard` today. `probe` and `monitor` build and register them from this block at startup; see the next section. With no block, a rule naming that evaluator is skipped **visibly**, never silently passed. |
 
 `include`/`exclude` are matched with shell-style globbing (`fnmatch`) against

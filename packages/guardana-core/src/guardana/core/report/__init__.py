@@ -5,6 +5,7 @@ from guardana.core.report.baseline import (
     load_baseline,
     serialize_baseline,
 )
+from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.location import relativize, relativize_findings
 from guardana.core.report.result import ScanResult
@@ -12,6 +13,7 @@ from guardana.core.report.serialize import finding_to_dict
 
 __all__ = [
     "BaselineError",
+    "CheckError",
     "Evidence",
     "Finding",
     "ScanResult",

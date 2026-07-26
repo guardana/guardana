@@ -11,7 +11,9 @@ from guardana.core.severity import Severity
 # fall back to defaults and weaken the gate the user thinks they configured.
 _ALLOWED_PROFILE_KEYS = frozenset({"name", "rules", "fail_on", "rule_config", "evaluators"})
 _ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
-_ALLOWED_FAIL_ON_KEYS = frozenset({"severity", "min_confidence", "fail_on_inconclusive"})
+_ALLOWED_FAIL_ON_KEYS = frozenset(
+    {"severity", "min_confidence", "fail_on_inconclusive", "fail_on_error"}
+)
 
 
 def default_profile() -> Profile:
@@ -74,10 +76,14 @@ def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
     fail_on_inconclusive = raw.get("fail_on_inconclusive", False)
     if not isinstance(fail_on_inconclusive, bool):
         raise ProfileError(f"invalid profile {path}: fail_on_inconclusive must be true or false")
+    fail_on_error = raw.get("fail_on_error", True)
+    if not isinstance(fail_on_error, bool):
+        raise ProfileError(f"invalid profile {path}: fail_on_error must be true or false")
     return FailOn(
         severity=Severity[severity_name.upper()],
         min_confidence=min_confidence,
         fail_on_inconclusive=fail_on_inconclusive,
+        fail_on_error=fail_on_error,
     )
 
 

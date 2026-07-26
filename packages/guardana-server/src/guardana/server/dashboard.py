@@ -174,6 +174,7 @@ function renderTiles(t) {
   const tile = (n, l, warn) => `<div class="card tile${warn ? " warn" : ""}">`
     + `<div class="n">${n}</div><div class="l">${l}</div></div>`;
   el("tiles").innerHTML = tile(t.findings, "findings")
+        + tile(t.errors || 0, "could not run")
     + tile(t.unverified, "unverified", t.unverified > 0)
     + tile(t.sources, "sources") + tile(t.submissions, "submissions");
 }
@@ -265,7 +266,14 @@ async function loadFindings() {
   const url = "findings?limit=100" + (src ? "&source=" + encodeURIComponent(src) : "");
   const box = el("findings"), innerScroll = box.scrollTop;
   const items = (await (await fetch(url)).json())
-    .flatMap(sub => (sub.findings || []).concat(sub.unverified || []));
+    
+      .flatMap(sub => (sub.findings || []).concat(
+        sub.unverified || [],
+        (sub.errors || []).map(e => ({
+          rule_id: e.source, severity: 'ERROR', target_ref: sub.source,
+          title: 'check did not run (' + e.stage + ')', evidence: {summary: e.reason}
+        }))
+      ));
   renderFindings(items.slice(0, 100));
   box.scrollTop = innerScroll;  // keep the reader's place across refresh
 }

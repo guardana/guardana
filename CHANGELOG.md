@@ -7,6 +7,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Security: the `errors` channel was dropped on three of the four paths that
+  carry a result.** `ScanResult` gained a defaulted sixth field, and every place
+  that rebuilt the dataclass field by field silently lost it — so `guardana probe`,
+  `guardana monitor` and any `scan --baseline` run still printed `✓ No findings.`
+  and exited 0 when a CRITICAL check had crashed. Fixed at the root: `ScanResult`
+  now owns a `merged()` constructor, `apply_baseline` uses `dataclasses.replace`,
+  and `_sub_registry` carries the source registry's load failures. A future
+  channel cannot go missing the same way.
+- **Security: `--write-baseline` never reported or gated checks that could not
+  run**, so a team could commit a baseline missing whatever a crashed rule would
+  have found. It now names each one and exits non-zero on them — while still never
+  gating on the findings it is snapshotting, which is the point of the flag.
+- **Security: a run-time `RuleLoadError` was a silent skip** while the identical
+  error at load time failed the gate. Both are now recorded: the check did not
+  run, and where it failed does not change that.
+- **Security: the collector's read paths ignored `errors`.** `/stats` never
+  aggregated them and the dashboard neither tiled nor listed them, so an agent
+  whose checks were all crashing rendered as a clean one — the failure the v3
+  envelope was added to prevent, one layer further out.
+- **Security: the monitor had no `errors` alert condition**, so with
+  `fail_on_error: false` a monitored model whose rules had started raising ran
+  silently for days. It is baselined like `unverified`, of which it is the
+  strictly worse sibling.
+- **Security: calibration inverted every verdict at or below half confidence.**
+  The prediction was re-derived from the probability instead of carrying the
+  evaluator's stated outcome, so `LengthEvaluator` — which passes at exactly 0.5
+  — measured as 0% accurate while grading every sample correctly. The module that
+  exists to audit judges was publishing inverted numbers about them. The
+  abstention caveat also now fires at half the corpus, as its docstring promised,
+  instead of only above 50% of the *graded* subset.
+- **A rule-local `OSError` no longer reports a healthy endpoint as down.** The
+  re-raise is narrowed to connection failures (`URLError`/`EndpointError`); a rule
+  that merely opens a missing local file is recorded instead of abandoning the run.
+- **A provider returning the wrong type can no longer poison discovery.**
+  `_absorb` validates before registering, so a provider returning a mapping (which
+  iterates to strings) can no longer make the *next*, healthy entry point fail —
+  isolation no longer depends on entry-point ordering.
+- **`guardana rules` reports packs that failed to import**, and the human renderer
+  no longer prints the `✓` all-clear next to a `! [ERROR]` line.
+- **A rejected envelope is no longer swallowed as an outage.** A v3 agent posting
+  to a not-yet-upgraded v2 collector gets a distinct message naming the schema
+  mismatch, instead of one indistinguishable from an unreachable host.
+
+### Added
+
+- **`guardana.core.calibration` — the confidence, measured.** The project's
+  central claim is that other scanners misjudge whether an attack succeeded and
+  Guardana reports an honest confidence instead. That confidence was agreement
+  across samples: a reasonable proxy, but an assertion, which is the same thing
+  everyone else offers. `calibrate(evaluator, samples)` now measures it against
+  known-correct labels and reports **Brier** and **expected calibration error**.
+  ECE is the one that bites: an evaluator can be no better than a coin flip while
+  claiming certainty every time, and accuracy alone will not show it.
+  Building the labelled corpus needs no human: the deterministic graders already
+  produce ground truth — a planted canary appearing verbatim is a fact, and so is
+  the list of tools a model actually called. The report refuses to flatter, too —
+  `inconclusive` verdicts are counted and excluded rather than scored as
+  predictions nobody made, a corpus under `MIN_RELIABLE_SAMPLES` is returned as
+  unreliable *with the reason*, and an empty corpus raises instead of returning a
+  zero that reads like a perfect score. A report is keyed to the versioned
+  evaluator id, so a changed rubric cannot inherit an old measurement.
+
+### Fixed
+
+- **Security: the engine could report a green build on a check that never ran.**
+  A rule that raised landed in `rules_skipped` — the same bucket as "this target
+  cannot satisfy that rule's capabilities", a normal and expected outcome — and
+  `gate()` only failed when *zero* rules ran. So a CRITICAL rule crashing on a
+  crafted artifact left 26 others running, `rules_run > 0`, and the build green.
+  Reproduced against 0.2.0 before the fix. Checks that could not run now have
+  their own `errors` channel and **fail the gate by default**.
+- **Security: one broken plugin took the whole tool down.** `Registry.discover()`
+  called `ep.load()()` with no isolation, so a single third-party entry point that
+  failed to import — a pack pinned to a library you do not have, a typo in a
+  provider — raised out of discovery and left the user with *no rules at all*,
+  built-ins included. That got sharper the moment 0.2.0 published
+  `guardana.core.formats` and started inviting third-party packs. Each entry point
+  is now isolated; a broken one is recorded and the rest still load.
+- **Security: a third-party rule with an ordinary bug aborted the scan.** The
+  runner caught only `RuleError`, so a plugin raising `ValueError` (or anything
+  else) ended the run. Every `Exception` is caught per rule now — and
+  `BaseException` deliberately is not, so Ctrl-C and `SystemExit` still stop the
+  scan. Findings a rule already yielded before dying are kept.
+- **Security: a custom rule that would not load was only a stderr warning.**
+  `CLAUDE.md` requires a YAML typo to raise at load time, because a gate you think
+  you configured but do not have is worse than no gate — but `load_yaml_rule_dirs`
+  downgraded exactly that to a warning and carried on green. It now feeds the same
+  `errors` channel.
+
+### Added
+
+- **The `errors` channel, everywhere.** "No findings" had three meanings and only
+  two were distinguishable. A *finding* is "a check ran and found something",
+  *unverified* is "a check ran and could not tell", and an **error** is "a check
+  never ran". The third is now first-class in `ScanResult`, in all four renderers
+  (human, JSON, JUnit `<error>` rather than `<failure>`, SARIF
+  `toolExecutionNotifications` with `executionSuccessful: false`), and in the
+  collector envelope.
+- **`fail_on_error` in `guardana.yaml`** (default **`true`**). The opposite
+  default to `fail_on_inconclusive`, on purpose: `inconclusive` is a verdict — the
+  check ran and honestly could not tell — while an error means it never happened.
+  Set `false` if you would rather ship than fix the broken check.
+
+### Changed
+
+- **`rules_skipped` means one thing again:** the target cannot satisfy the rule's
+  capabilities. A rule that raised no longer hides there. A rule whose *evaluator
+  was never configured* is still a skip, not an error — that is a configuration
+  state, not a defect.
+- **Collector envelope `schema_version` 2 → 3**, carrying `errors` and its count.
+  The collector accepts **both** 2 and 3, so a fleet can upgrade one agent at a
+  time; a v2 agent simply reports no errors, which is honest, because a v2 agent
+  could not observe them.
+- **An unreachable endpoint still exits 2, not 1.** Connection failures against an
+  endpoint target propagate rather than being swallowed into `errors`: every rule
+  would fail identically, so it is a fact about the run, reported once at the top
+  with its own exit code. The same exception from an artifact rule *is* rule-local
+  and is recorded.
+
 ## [0.2.0] - 2026-07-26
 
 ### Added

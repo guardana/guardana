@@ -265,6 +265,24 @@ won't collide (`acme.*` in the example package). This is what lets a
 `guardana.yaml` profile's `rules.include`/`exclude` globs cleanly separate
 "Guardana's checks" from "our checks" (see [`profiles.md`](profiles.md)).
 
+## What happens when your rule raises
+
+Nothing catastrophic, and nothing silent. The runner catches any `Exception` your
+rule throws, records it in the result's `errors` channel with your rule id and the
+exception, and carries on with the other rules — but the gate **fails** on it by
+default, because a check that did not run must never read as a check that passed.
+Findings you already yielded before raising are kept.
+
+Two exceptions to that. `KeyboardInterrupt` and `SystemExit` are deliberately not
+caught, so Ctrl-C still works. And raising `RuleLoadError` means "I could not be
+resolved for this run" — a missing evaluator, say — which is a configuration
+state rather than a defect, so it is recorded as a *skip*.
+
+The practical consequence for you: do not swallow your own errors to be polite.
+Letting an exception out is now the honest thing to do — it is reported, it is
+attributed to your rule, and it stops a build from going green on a check that
+never happened.
+
 ## Testing a rule
 
 Every rule needs at least a positive fixture (proves it fires) and a
@@ -309,7 +327,25 @@ def test_stays_silent_when_the_model_refuses() -> None:
     assert not list(MyRule().run(target, RuleContext()))
 ```
 
-### Testing a rule that reads a model file
+### What happens when your rule raises
+
+Nothing catastrophic, and nothing silent. The runner catches any `Exception` your
+rule throws, records it in the result's `errors` channel with your rule id and the
+exception, and carries on with the other rules — but the gate **fails** on it by
+default, because a check that did not run must never read as a check that passed.
+Findings you already yielded before raising are kept.
+
+Two exceptions to that. `KeyboardInterrupt` and `SystemExit` are deliberately not
+caught, so Ctrl-C still works. And raising `RuleLoadError` means "I could not be
+resolved for this run" — a missing evaluator, say — which is a configuration
+state rather than a defect, so it is recorded as a *skip*.
+
+The practical consequence for you: do not swallow your own errors to be polite.
+Letting an exception out is now the honest thing to do — it is reported, it is
+attributed to your rule, and it stops a build from going green on a check that
+never happened.
+
+## Testing a rule that reads a model file
 
 Artifact rules get the mirror image: builders that write a crafted model, so a
 *malicious* fixture is a dict literal in a test rather than a binary committed to

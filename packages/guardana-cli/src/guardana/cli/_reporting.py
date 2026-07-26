@@ -1,4 +1,4 @@
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 import typer
 from guardana.core.report import ScanResult
@@ -32,5 +32,15 @@ def submit_safely(url: str, result: ScanResult, *, source: str) -> None:
     """
     try:
         reporter_from_url(url).submit(result, source=source)
+    except HTTPError as exc:
+        # A rejected envelope is not an outage — most often a collector that has
+        # not been upgraded yet and does not speak this agent's schema version.
+        # Swallowing it as "unreachable" is how a whole fleet can stop reporting
+        # while the dashboard keeps showing stale data as current.
+        typer.echo(
+            f"warning: the collector rejected this submission (HTTP {exc.code}): {exc.reason} "
+            "— check that its schema version matches this agent's",
+            err=True,
+        )
     except _COLLECTOR_UNREACHABLE as exc:
         typer.echo(f"warning: could not submit to reporter: {exc}", err=True)

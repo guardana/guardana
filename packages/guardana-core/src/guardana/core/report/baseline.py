@@ -9,6 +9,7 @@ the one place the engine deliberately does not fail on a finding, so it is kept
 deliberately narrow and loud about malformed input.
 """
 
+from dataclasses import replace
 from pathlib import Path
 
 import yaml
@@ -56,13 +57,11 @@ def apply_baseline(result: ScanResult, waived_fingerprints: frozenset[str]) -> S
     """Return a copy of `result` with baselined findings moved to the `waived` channel."""
     kept = tuple(f for f in result.findings if f.fingerprint not in waived_fingerprints)
     newly_waived = tuple(f for f in result.findings if f.fingerprint in waived_fingerprints)
-    return ScanResult(
-        findings=kept,
-        rules_run=result.rules_run,
-        rules_skipped=result.rules_skipped,
-        unverified=result.unverified,
-        waived=result.waived + newly_waived,
-    )
+    # `replace` rather than a fresh ScanResult: a waiver decides which *findings*
+    # are accepted, and must never quietly drop a channel it says nothing about.
+    # Rebuilding field by field is how `errors` used to vanish the moment anyone
+    # passed --baseline.
+    return replace(result, findings=kept, waived=result.waived + newly_waived)
 
 
 def serialize_baseline(result: ScanResult) -> str:

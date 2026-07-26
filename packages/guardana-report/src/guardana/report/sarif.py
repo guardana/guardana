@@ -1,6 +1,6 @@
 import json
 
-from guardana.core.report import Finding, ScanResult, split_ref
+from guardana.core.report import CheckError, Finding, ScanResult, split_ref
 from guardana.core.severity import Severity
 
 _LEVEL = {
@@ -117,7 +117,25 @@ class SarifRenderer:
                         }
                     },
                     "results": _results(result, index),
+                    # SARIF's own vocabulary for "the tool could not complete a
+                    # check": a notification, not a result. `executionSuccessful`
+                    # false is what stops a viewer reading an empty result list as
+                    # a clean run.
+                    "invocations": [
+                        {
+                            "executionSuccessful": not result.errors,
+                            "toolExecutionNotifications": [_notification(e) for e in result.errors],
+                        }
+                    ],
                 }
             ],
         }
         return json.dumps(doc, indent=2)
+
+
+def _notification(error: CheckError) -> dict[str, object]:
+    return {
+        "level": "error",
+        "message": {"text": f"{error.source} did not run ({error.stage}): {error.reason}"},
+        "descriptor": {"id": f"guardana.check_error.{error.stage}"},
+    }

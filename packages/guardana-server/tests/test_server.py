@@ -231,3 +231,41 @@ def test_concurrent_reads_and_writes_do_not_500() -> None:
         t.join()
 
     assert errors == []
+
+
+def test_collector_accepts_a_v2_agent_that_cannot_report_errors() -> None:
+    # A fleet upgrades one agent at a time. A v2 agent simply reports no errors —
+    # honest, because a v2 agent could not observe them — and must not be rejected.
+    client = TestClient(create_app(store=InMemoryStore()))
+    response = client.post(
+        "/findings",
+        json={"source": "old-agent", "schema_version": 2, "findings": [], "unverified": []},
+    )
+    assert response.status_code == _OK
+
+
+def test_collector_retains_the_errors_channel() -> None:
+    # An agent whose checks are crashing must not render as clean on a dashboard —
+    # the same reason v2 had to carry `unverified`, one layer further out.
+    client = TestClient(create_app(store=InMemoryStore()))
+    payload = {
+        "source": "ci",
+        "schema_version": 3,
+        "findings": [],
+        "unverified": [],
+        "errors": [{"source": "acme.buggy", "stage": "run", "reason": "ValueError: typo"}],
+        "summary": {"rules_run": 3, "errors": 1},
+    }
+    assert client.post("/findings", json=payload).status_code == _OK
+
+    stored = client.get("/findings").json()
+    assert stored[0]["errors"][0]["source"] == "acme.buggy"
+    assert stored[0]["summary"]["errors"] == 1
+
+
+def test_collector_still_rejects_a_version_it_does_not_speak() -> None:
+    client = TestClient(create_app(store=InMemoryStore()))
+    response = client.post(
+        "/findings", json={"source": "future", "schema_version": 99, "findings": []}
+    )
+    assert response.status_code == _UNPROCESSABLE

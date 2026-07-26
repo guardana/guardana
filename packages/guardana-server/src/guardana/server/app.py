@@ -4,7 +4,7 @@ from dataclasses import asdict
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from guardana.server.dashboard import render_dashboard
-from guardana.server.envelope import SCHEMA_VERSION, Submission
+from guardana.server.envelope import SUPPORTED_SCHEMA_VERSIONS, Submission
 from guardana.server.rule_catalog import rule_catalog
 from guardana.server.stats import compute_stats
 from guardana.server.store import InMemoryStore, Store
@@ -31,12 +31,12 @@ def create_app(
 
     @app.post("/findings")
     def post_findings(submission: Submission) -> dict[str, object]:
-        if submission.schema_version != SCHEMA_VERSION:
+        if submission.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise HTTPException(
                 status_code=_UNPROCESSABLE,
                 detail=(
                     f"unsupported schema_version {submission.schema_version}; "
-                    f"this collector speaks version {SCHEMA_VERSION}"
+                    f"this collector speaks {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
                 ),
             )
         active_store.add(submission)

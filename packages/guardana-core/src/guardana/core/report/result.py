@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 
+from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
 from guardana.core.severity import Severity
 
@@ -22,6 +24,25 @@ class ScanResult:
     rules_skipped: tuple[str, ...]
     unverified: tuple[Finding, ...] = ()
     waived: tuple[Finding, ...] = ()
+    errors: tuple[CheckError, ...] = ()
+
+    @classmethod
+    def merged(cls, results: Sequence["ScanResult"]) -> "ScanResult":
+        """Combine several results into one, carrying every channel.
+
+        Callers used to rebuild this dataclass field by field, which meant a
+        channel added later was silently dropped by whoever forgot to pass it —
+        exactly how `errors` went missing from probe, monitor and baselines. One
+        constructor knows the full shape, so there is nowhere left to forget.
+        """
+        return cls(
+            findings=tuple(f for r in results for f in r.findings),
+            rules_run=sum(r.rules_run for r in results),
+            rules_skipped=tuple(s for r in results for s in r.rules_skipped),
+            unverified=tuple(f for r in results for f in r.unverified),
+            waived=tuple(f for r in results for f in r.waived),
+            errors=tuple(e for r in results for e in r.errors),
+        )
 
     def max_severity(self) -> Severity | None:
         """Return the worst severity found, or None on a clean result."""
