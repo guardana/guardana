@@ -5,10 +5,10 @@ from pathlib import Path
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
+from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
 from guardana.rules.supply_chain._leads import lead_verdict
-from guardana.rules.supply_chain._reading import read_text_bounded
 
 # Bare call names that fetch a model, dataset, or file over the network. A
 # plaintext `http://` URL only matters as an argument to one of these — an
@@ -87,19 +87,13 @@ class InsecureTransportRule(Rule):
         if not isinstance(target, ArtifactTarget):
             return
         for path in target.iter_files((".py",)):
-            yield from self._scan(path)
+            source = target.python_source(path)
+            if source is not None:
+                yield from self._scan(source)
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
-        source = read_text_bounded(path)
-        if source is None:
-            return
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            return
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                yield from self._call_findings(node, path)
+    def _scan(self, source: PythonSource) -> Iterator[Finding]:
+        for node in source.nodes(ast.Call):
+            yield from self._call_findings(node, source.path)
 
     def _call_findings(self, node: ast.Call, path: Path) -> Iterator[Finding]:
         if _tls_verification_disabled(node):

@@ -8,6 +8,7 @@ re-implementing — and diverging on — the same list.
 import ast
 from collections.abc import Iterator
 
+from guardana.core.source import PythonSource
 from guardana.rules.supply_chain._ast_names import import_aliases, resolved_call_name
 
 # Builtins that run a string as code. Matched only as a *bare* call — `eval(x)`,
@@ -27,16 +28,14 @@ def _uses_shell_true(node: ast.Call) -> bool:
     )
 
 
-def code_sinks(tree: ast.AST) -> Iterator[tuple[int, str]]:
-    """Yield `(line, why)` for each dynamic-code / shell execution sink in the tree.
+def code_sinks(source: PythonSource) -> Iterator[tuple[int, str]]:
+    """Yield `(line, why)` for each dynamic-code / shell execution sink in the source.
 
     Call names are resolved through import aliases, so `import os as o; o.system(...)`
     is caught as well as the canonical `os.system(...)`.
     """
-    aliases = import_aliases(tree)
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
+    aliases = import_aliases(source)
+    for node in source.nodes(ast.Call):
         if _is_bare_builtin(node):
             yield node.lineno, f"{resolved_call_name(node, aliases)}(...) runs a string as code"
         elif resolved_call_name(node, aliases) == "os.system":

@@ -8,24 +8,28 @@ rule resolve `pd.read_pickle` back to `pandas.read_pickle` before matching.
 
 import ast
 
+from guardana.core.source import PythonSource
 
-def import_aliases(tree: ast.AST) -> dict[str, str]:
+
+def import_aliases(source: PythonSource) -> dict[str, str]:
     """Map each name bound by a module import to the module it refers to.
 
     `import torch` -> {torch: torch}; `import numpy as np` -> {np: numpy};
     `import os.path as p` -> {p: os.path}. Only `import` statements are tracked —
     a `from x import y` binds a value, not a module receiver, so it is not a dotted
     call prefix this resolver is concerned with.
+
+    Reads the import nodes straight off the shared index rather than walking the
+    tree again: this used to be one full traversal per rule per file.
     """
     aliases: dict[str, str] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.asname:
-                    aliases[alias.asname] = alias.name
-                else:
-                    top = alias.name.split(".")[0]
-                    aliases[top] = top
+    for node in source.nodes(ast.Import):
+        for alias in node.names:
+            if alias.asname:
+                aliases[alias.asname] = alias.name
+            else:
+                top = alias.name.split(".")[0]
+                aliases[top] = top
     return aliases
 
 

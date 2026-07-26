@@ -1,14 +1,13 @@
 import ast
 from collections.abc import Iterable, Iterator
-from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
+from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
 from guardana.rules.supply_chain._ast_names import import_aliases, resolved_call_name
-from guardana.rules.supply_chain._reading import read_text_bounded
 
 _SAFE_YAML_LOADERS = frozenset({"SafeLoader", "CSafeLoader"})
 
@@ -82,11 +81,9 @@ def _yaml_load_finding(node: ast.Call) -> tuple[str, Severity] | None:
     return f"yaml.load with {shown}", Severity.HIGH
 
 
-def _sinks(tree: ast.AST) -> Iterator[tuple[int, str, Severity]]:
-    aliases = import_aliases(tree)
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
+def _sinks(source: PythonSource) -> Iterator[tuple[int, str, Severity]]:
+    aliases = import_aliases(source)
+    for node in source.nodes(ast.Call):
         name = resolved_call_name(node, aliases)
         if name in _PICKLE_FAMILY_LOADERS:
             yield node.lineno, f"{name} on possibly-untrusted data", Severity.HIGH
@@ -125,17 +122,13 @@ class DependencyRiskRule(Rule):
         if not isinstance(target, ArtifactTarget):
             return
         for path in target.iter_files((".py",)):
-            yield from self._scan(path)
+            source = target.python_source(path)
+            if source is not None:
+                yield from self._scan(source)
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
-        source = read_text_bounded(path)
-        if source is None:
-            return
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            return
-        for lineno, message, severity in _sinks(tree):
+    def _scan(self, source: PythonSource) -> Iterator[Finding]:
+        path = source.path
+        for lineno, message, severity in _sinks(source):
             yield Finding(
                 rule_id=self.meta.id,
                 severity=severity,

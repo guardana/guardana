@@ -1,14 +1,12 @@
-import ast
 from collections.abc import Iterable, Iterator
-from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
+from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
 from guardana.rules.supply_chain._code_sinks import code_sinks
-from guardana.rules.supply_chain._reading import read_text_bounded
 
 
 class CodeExecutionRule(Rule):
@@ -28,17 +26,13 @@ class CodeExecutionRule(Rule):
         if not isinstance(target, ArtifactTarget):
             return
         for path in target.iter_files((".py",)):
-            yield from self._scan(path)
+            source = target.python_source(path)
+            if source is not None:
+                yield from self._scan(source)
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
-        source = read_text_bounded(path)
-        if source is None:
-            return
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            return
-        for lineno, why in code_sinks(tree):
+    def _scan(self, source: PythonSource) -> Iterator[Finding]:
+        path = source.path
+        for lineno, why in code_sinks(source):
             yield Finding(
                 rule_id=self.meta.id,
                 severity=self.meta.severity,

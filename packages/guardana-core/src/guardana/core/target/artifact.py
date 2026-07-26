@@ -3,7 +3,15 @@ from collections.abc import Iterator
 from fnmatch import fnmatch
 from pathlib import Path
 
+from guardana.core.source import PythonSource, read_python_source
 from guardana.core.target.base import Capability, Target, TargetKind
+
+# Budget for the parsed-source cache, counted in bytes of *source*. The trees are
+# what costs: measured at ~9.3x the size of the file they came from, so this caps
+# the cache near 75 MB of real memory. Past it the cache stops growing and reads
+# fall back to recomputing — slower, never wrong. Sized so an 8 MB Python
+# codebase (an order of magnitude larger than this repo) caches whole.
+_SOURCE_CACHE_BYTES = 8 * 1024 * 1024
 
 _IGNORED_DIRS: frozenset[str] = frozenset(
     {
@@ -47,11 +55,20 @@ class ArtifactTarget(Target):
 
     kind = TargetKind.ARTIFACT
 
-    def __init__(self, root: Path, *, excludes: tuple[str, ...] = ()) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        excludes: tuple[str, ...] = (),
+        source_cache_bytes: int = _SOURCE_CACHE_BYTES,
+    ) -> None:
         self._root = root
         # Profile `rules.paths_exclude` plus any `.guardanaignore` at the root, both
         # matched (via fnmatch) against each entry's path relative to the root.
         self._excludes = tuple(excludes) + _read_ignore_file(root)
+        self._sources: dict[Path, PythonSource | None] = {}
+        self._source_budget = source_cache_bytes
+        self._files: tuple[Path, ...] | None = None
 
     def capabilities(self) -> set[Capability]:
         """Files can be read; nothing can be asked."""
@@ -61,6 +78,25 @@ class ArtifactTarget(Target):
     def ref(self) -> str:
         """The scanned root, as it appears in findings."""
         return str(self._root)
+
+    def python_source(self, path: Path) -> PythonSource | None:
+        """Return the parsed, indexed source for `path`, reading it at most once.
+
+        Every rule that inspects Python asks through here, so a file is read,
+        decoded, parsed and walked once per scan instead of once per rule. `None`
+        means the file could not be turned into a tree (see `read_python_source`)
+        and is cached too — deliberately. A failure that is retried would let two
+        rules disagree about the same scan if the file changed underneath them,
+        making the report depend on rule ordering.
+        """
+        if path in self._sources:
+            return self._sources[path]
+        source = read_python_source(path)
+        cost = 0 if source is None else len(source.text)
+        if cost <= self._source_budget:
+            self._sources[path] = source
+            self._source_budget -= cost
+        return source
 
     def _excluded(self, path: Path) -> bool:
         if not self._excludes:
@@ -76,10 +112,25 @@ class ArtifactTarget(Target):
         target too — `os.walk` of a file yields nothing, which would silently scan
         nothing (a fail-open on `guardana scan suspicious.pkl`), so it is handled
         explicitly.
+
+        The listing is taken once and filtered per call, because each rule asks for
+        its own suffixes and the walk used to repeat for every one of them. Holding
+        it for the target's lifetime also makes the scan self-consistent: every rule
+        sees the same tree, rather than whichever files existed when it happened to
+        run.
         """
+        for path in self._listing():
+            if suffixes is None or path.suffix in suffixes:
+                yield path
+
+    def _listing(self) -> tuple[Path, ...]:
+        if self._files is None:
+            self._files = tuple(self._walk())
+        return self._files
+
+    def _walk(self) -> Iterator[Path]:
         if self._root.is_file():
-            if suffixes is None or self._root.suffix in suffixes:
-                yield self._root
+            yield self._root
             return
         matches: list[Path] = []
         for dirpath, dirnames, filenames in os.walk(self._root):
@@ -90,6 +141,6 @@ class ArtifactTarget(Target):
             ]
             for filename in filenames:
                 path = Path(dirpath) / filename
-                if (suffixes is None or path.suffix in suffixes) and not self._excluded(path):
+                if not self._excluded(path):
                     matches.append(path)
         yield from sorted(matches)

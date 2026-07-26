@@ -5,6 +5,7 @@ from pathlib import Path
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
+from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
 from guardana.rules.supply_chain._leads import lead_verdict
@@ -30,10 +31,8 @@ def _has_revision_kw(node: ast.Call) -> bool:
     return any(kw.arg == "revision" for kw in node.keywords)
 
 
-def _unpinned_downloads(tree: ast.AST) -> Iterator[int]:
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
+def _unpinned_downloads(source: PythonSource) -> Iterator[int]:
+    for node in source.nodes(ast.Call):
         if _bare_call_name(node) in _DOWNLOAD_CALLS and not _has_revision_kw(node):
             yield node.lineno
 
@@ -62,20 +61,16 @@ class ProvenanceRule(Rule):
         if not isinstance(target, ArtifactTarget):
             return
         for path in target.iter_files((".py",)):
-            yield from self._scan_downloads(path)
+            source = target.python_source(path)
+            if source is not None:
+                yield from self._scan_downloads(source)
         for path in target.iter_files((".md",)):
             if path.name.lower() in _CARD_NAMES:
                 yield from self._scan_license(path)
 
-    def _scan_downloads(self, path: Path) -> Iterator[Finding]:
-        source = read_text_bounded(path)
-        if source is None:
-            return
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            return
-        for lineno in _unpinned_downloads(tree):
+    def _scan_downloads(self, source: PythonSource) -> Iterator[Finding]:
+        path = source.path
+        for lineno in _unpinned_downloads(source):
             yield Finding(
                 rule_id=self.meta.id,
                 severity=self.meta.severity,

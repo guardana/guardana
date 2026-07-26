@@ -1,13 +1,12 @@
 import ast
 from collections.abc import Iterable, Iterator
-from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
+from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
-from guardana.rules.supply_chain._reading import read_text_bounded
 
 # `trust_remote_code=True` tells transformers / datasets to import and run code
 # that ships inside a Hub repo — arbitrary code execution at load time, and the
@@ -40,10 +39,8 @@ def _is_hub_load(node: ast.Call) -> bool:
     )
 
 
-def _remote_code_calls(tree: ast.AST) -> Iterator[tuple[int, str]]:
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
+def _remote_code_calls(source: PythonSource) -> Iterator[tuple[int, str]]:
+    for node in source.nodes(ast.Call):
         if _trust_remote_code_true(node):
             yield node.lineno, f"{_FLAG}=True runs code from the repo (arbitrary code on load)"
         elif _is_hub_load(node):
@@ -70,17 +67,13 @@ class RemoteCodeRule(Rule):
         if not isinstance(target, ArtifactTarget):
             return
         for path in target.iter_files((".py",)):
-            yield from self._scan(path)
+            source = target.python_source(path)
+            if source is not None:
+                yield from self._scan(source)
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
-        source = read_text_bounded(path)
-        if source is None:
-            return
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            return
-        for lineno, summary in _remote_code_calls(tree):
+    def _scan(self, source: PythonSource) -> Iterator[Finding]:
+        path = source.path
+        for lineno, summary in _remote_code_calls(source):
             yield Finding(
                 rule_id=self.meta.id,
                 severity=self.meta.severity,

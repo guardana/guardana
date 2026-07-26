@@ -57,7 +57,9 @@ per-rule declaration; `guardana rules` groups by it and takes `--surface`.
 
 Built-ins: `ArtifactTarget` (walks a directory, exposing `iter_files(suffixes)`
 over model files, dependency manifests, and source, skipping `.git`,
-`.venv`, `node_modules`, etc.) and `EndpointTarget` (a live chat endpoint,
+`.venv`, `node_modules`, etc., plus `python_source(path)` — a Python file read,
+parsed and indexed **once per scan** rather than once per rule, so scan cost
+grows with the target instead of with the rule count) and `EndpointTarget` (a live chat endpoint,
 exposing `chat(messages) -> str`, with a pluggable `ChatTransport` so tests
 never hit the network). The transport is selected by a provider name —
 `openai` (the default, any OpenAI-compatible server), `ollama` (native

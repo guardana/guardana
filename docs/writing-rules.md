@@ -222,15 +222,34 @@ class MyRule(Rule):
 declares for this rule id (`ctx.get(key, default)`); none of the built-ins
 currently read it, but it's there for tunable checks.
 
+**Ask the target for parsed source — never parse it yourself.** A scan runs
+every rule over the same tree, so a rule that reads and parses a file for itself
+multiplies the cost of the whole scan by the number of rules:
+
+```python
+for path in target.iter_files((".py",)):
+    source = target.python_source(path)   # read, parsed and indexed once per scan
+    if source is None:
+        continue                          # unreadable or unparseable — not "clean"
+    for node in source.nodes(ast.Call):   # no ast.walk: the index is already built
+        ...
+```
+
+`PythonSource` gives you `text`, `tree`, and `nodes(<node type>)` in document
+order ([`guardana.core.source`](../packages/guardana-core/src/guardana/core/source.py)).
+`None` means the file could not be turned into a tree — not a regular file, too
+large, not UTF-8, or a syntax error — and if your rule wants to *report* that,
+it must say so itself; silence would be an all-clear on something nobody read.
+
 **Worth copying as a pattern:** the AST-based supply-chain rules are written to
-be read. Each is one short file that walks `ast.parse(read_text_bounded(path))`,
+be read. Each is one short file that pulls its nodes off the shared index,
 yields `(line, why)` tuples from a small module-level `_sinks` helper, and
 matches call names precisely enough to avoid false positives — e.g.
 `code_execution.py` flags the builtin `eval(...)` but *not* the method
 `df.eval(...)`, and `insecure_transport.py` treats a plaintext `http://` URL as
-a finding only when it is an argument to a fetch call. They share
-`read_text_bounded` (a scanned repo is untrusted input — a crafted file must
-never hang the scan) and `lead_verdict` (a probabilistic signal is a
+a finding only when it is an argument to a fetch call. For non-Python files they
+share `read_text_bounded` (a scanned repo is untrusted input — a crafted file
+must never hang the scan) and `lead_verdict` (a probabilistic signal is a
 low-confidence lead, not a certainty). Start from the one closest to your
 check.
 

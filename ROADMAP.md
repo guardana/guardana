@@ -99,31 +99,41 @@ taxonomy references need to follow.
 
 ## v0.4 — Linear cost, controlled concurrency, measured speed
 
-The engine currently pays for knowledge with time. Measured on a 452-file tree
-with the 19 build-time rules:
+The engine paid for knowledge with time: every rule walked the tree, read each
+file and parsed it for itself, so each new rule made every scan slower.
 
-| What | Today | Target |
+**Shipped (unreleased):** a shared, cached read on `ArtifactTarget`. Measured on
+a 452-file tree with the 19 build-time rules:
+
+| What | Before | After |
 |---|---|---|
-| Full tree walks per scan | **26** (one per rule) | 1 |
-| File opens / unique files | **2025 / 422** (4.8×, up to 8× on one file) | 1× |
-| `ast.parse` calls / `.py` files | **1477 / 211** (7×) | 1× |
-| Probe round-trips | fully sequential | bounded concurrency |
+| Full tree walks per scan | 26 (one per rule) | **2** |
+| File opens (422 unique files) | 2025 | **462** |
+| `ast.parse` calls (211 sources) | 1477 | **213** |
+| Engine run | 1090 ms | **175 ms** (6.2×) |
+| `guardana scan packages`, end to end | 1.27 s | **0.36 s** (3.5×) |
 
-1. **A shared run context.** One tree walk, one bounded read per file, one parsed
-   AST, handed to rules through the existing `RuleContext` — the `Rule` contract
-   does not change, and a rule that ignores it still works. The fail-closed
-   invariant survives the cache: a file that could not be read must still produce
-   an `errors` entry for *every* rule that would have read it, never a cached
-   "nothing here". This is the trap the whole increment has to be tested against.
-2. **Bounded concurrency in `probe`/`monitor`.** Dynamic rules are network-bound
+`guardana.core.source` reads and indexes a Python file once — text, tree, and
+nodes grouped by type — and `ArtifactTarget.python_source()` caches that for the
+life of one scan, under a memory budget (trees measure ~9.3× their source, so the
+cache stops growing rather than growing unbounded). The `Rule` contract did not
+change. A **cost gate** (`test_scan_cost.py`) counts operations rather than
+seconds, so it means the same on CI as on a laptop, and it is proven to catch the
+regression it exists for: with the cache disabled the same fixture parses 42
+times instead of 6.
+
+Still open in this theme:
+
+1. **Bounded concurrency in `probe`/`monitor`.** Dynamic rules are network-bound
    and run strictly one after another today. A worker pool with a configurable
    limit, backoff on 429, and deterministic result ordering — two runs against
    the same model must produce the same report in the same order, or a CI diff
    becomes noise.
-3. **Performance as a gate, not a promise.** A benchmark test pins the budget —
-   tree walks, file reads, wall-clock on a fixture tree — the same way coverage
-   is pinned. A change that reintroduces per-rule walking fails the build.
-4. **The observation seam.** A single read is where a finding and an *inventory
+2. **Share the binary reads too.** Model artifacts are still opened per rule; the
+   Python path is done, the `read_bytes_bounded` path is not. Same invariant
+   applies: a file that could not be read must still produce an `errors` entry
+   for *every* rule that would have read it, never a cached "nothing here".
+3. **The observation seam.** A single read is where a finding and an *inventory
    entry* are both born. Making that seam explicit — a neutral "what was
    observed" channel, engine-side and free of any regulatory vocabulary — is what
    makes the evidence extension below a package rather than a fork.

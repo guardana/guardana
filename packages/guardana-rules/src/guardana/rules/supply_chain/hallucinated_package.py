@@ -6,6 +6,7 @@ from pathlib import Path
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
+from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM03
 from guardana.rules.supply_chain._declared_deps import declared_import_names, normalize
@@ -14,18 +15,25 @@ from guardana.rules.supply_chain._known_packages import (
     installed_import_names,
 )
 from guardana.rules.supply_chain._leads import lead_verdict
-from guardana.rules.supply_chain._reading import read_text_bounded
 
 _STDLIB = frozenset(sys.stdlib_module_names)
 
 
-def _imports(tree: ast.AST) -> Iterator[tuple[int, str]]:
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                yield node.lineno, alias.name.split(".")[0]
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            yield node.lineno, node.module.split(".")[0]
+def _imports(source: PythonSource) -> Iterator[tuple[int, str]]:
+    # Sorted by line because the index groups nodes by type: reporting every
+    # `import x` before every `from y import z` would reorder findings in the
+    # report for no reason a reader could see.
+    found: list[tuple[int, str]] = [
+        (node.lineno, alias.name.split(".")[0])
+        for node in source.nodes(ast.Import)
+        for alias in node.names
+    ]
+    found.extend(
+        (node.lineno, node.module.split(".")[0])
+        for node in source.nodes(ast.ImportFrom)
+        if node.level == 0 and node.module
+    )
+    yield from sorted(found)
 
 
 def _iterdir(path: Path) -> tuple[Path, ...]:
@@ -99,19 +107,15 @@ class HallucinatedPackageRule(Rule):
         # where it isn't importable in Guardana's env.
         declared = declared_import_names(root)
         for path in target.iter_files((".py",)):
-            yield from self._scan(path, known, declared)
+            source = target.python_source(path)
+            if source is not None:
+                yield from self._scan(source, known, declared)
 
     def _scan(
-        self, path: Path, known: frozenset[str], declared: frozenset[str]
+        self, source: PythonSource, known: frozenset[str], declared: frozenset[str]
     ) -> Iterator[Finding]:
-        source = read_text_bounded(path)
-        if source is None:
-            return
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            return
-        for lineno, name in _imports(tree):
+        path = source.path
+        for lineno, name in _imports(source):
             if name not in known and normalize(name) not in declared:
                 yield Finding(
                     rule_id=self.meta.id,

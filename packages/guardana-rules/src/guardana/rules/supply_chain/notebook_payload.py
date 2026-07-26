@@ -8,6 +8,7 @@ from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
+from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
 from guardana.rules.supply_chain._code_sinks import code_sinks
@@ -120,7 +121,10 @@ class NotebookPayloadRule(Rule):
                 lead_verdict("unparsed notebook cell"),
             )
             return
-        for _lineno, why in code_sinks(tree):
+        # A notebook cell is source without a file of its own, so it is wrapped in
+        # the same index the `.py` rules use — one walk, and `code_sinks` needs no
+        # second shape to understand.
+        for _lineno, why in code_sinks(PythonSource(path, python, tree)):
             yield self._finding(path, index, Severity.HIGH, why)
 
     def _finding(

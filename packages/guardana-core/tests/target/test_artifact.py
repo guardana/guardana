@@ -1,9 +1,44 @@
+import os
 from pathlib import Path
 
+import pytest
 from guardana.core.target import ArtifactTarget, Capability, TargetKind
 
 _TOTAL_FILES = 2
 _KEPT_FILES = 2
+
+
+def test_the_tree_is_walked_once_however_many_rules_ask(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Every rule calls `iter_files` with its own suffixes, so the walk used to
+    # repeat once per rule: 26 full traversals of the target on this repo.
+    (tmp_path / "a.py").write_text("x")
+    (tmp_path / "b.gguf").write_bytes(b"y")
+    target = ArtifactTarget(tmp_path)
+    walks = 0
+    real_walk = os.walk
+
+    def counting_walk(top: str | Path, *args: object, **kwargs: object) -> object:
+        nonlocal walks
+        walks += 1
+        return real_walk(top)
+
+    monkeypatch.setattr(os, "walk", counting_walk)
+    assert [p.name for p in target.iter_files((".py",))] == ["a.py"]
+    assert [p.name for p in target.iter_files((".gguf",))] == ["b.gguf"]
+    assert len(list(target.iter_files())) == _TOTAL_FILES
+    assert walks == 1
+
+
+def test_each_target_walks_for_itself(tmp_path: Path) -> None:
+    # The cache is per-target — one scan — so a second run sees a changed tree.
+    (tmp_path / "a.py").write_text("x")
+    first = ArtifactTarget(tmp_path)
+    assert len(list(first.iter_files())) == 1
+    (tmp_path / "b.py").write_text("y")
+    assert len(list(first.iter_files())) == 1
+    assert len(list(ArtifactTarget(tmp_path).iter_files())) == _TOTAL_FILES
 
 
 def test_excludes_prune_matching_dirs_and_files(tmp_path: Path) -> None:

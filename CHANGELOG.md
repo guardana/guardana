@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`guardana.core.source` — read a Python file once, not once per rule.**
+  `read_python_source()` returns a `PythonSource`: the text, the parsed tree, and
+  the tree's nodes grouped by type, built with a single walk. It returns data and
+  never a verdict, the same split `guardana.core.formats` draws for model files.
+  `ArtifactTarget.python_source()` caches it for the life of one scan, under a
+  memory budget — trees measure ~9.3× the size of their source, so past the
+  budget the cache stops growing instead of growing unbounded. A file that cannot
+  be read or parsed caches as `None` too, deliberately: a retried failure would
+  let two rules disagree about the same scan and make the report depend on rule
+  ordering. `ArtifactTarget` also lists the tree once and filters per call
+  instead of walking it for every rule.
+
+  Measured on this repository (452 files, 19 build-time rules): tree walks 26 →
+  2, file opens 2025 → 462, `ast.parse` 1477 → 213, engine run 1090 ms → 175 ms,
+  and `guardana scan packages` end to end 1.27 s → 0.36 s. The deliberately
+  vulnerable demo fixture still reports the same 12 findings — faster, not
+  shallower.
+
+  This is a security property, not a comfort: a scan nobody waits for is one that
+  gets switched off, and a switched-off scanner fails open at a level no rule can
+  defend. A **cost gate** (`test_scan_cost.py`) now pins it by counting
+  operations rather than seconds, so it behaves the same on a loaded CI runner as
+  on a laptop — and it is verified to fail when the sharing is removed (42 parses
+  instead of 6 on the same fixture).
+
 ### Fixed
 
 - **The documented GitHub Action pin pointed two releases back.** The README, the
