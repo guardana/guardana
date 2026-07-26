@@ -1,7 +1,9 @@
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from time import sleep as _sleep
 from typing import Literal, Protocol, runtime_checkable
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
@@ -10,6 +12,28 @@ from guardana.core.target.base import Capability, Target, TargetKind
 _TIMEOUT_SECONDS = 30
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
+
+# A probe sends many requests to one model, so a rate limit is an ordinary event
+# rather than an outage — and the runner treats a connection failure as fatal to
+# the whole run, because every rule would hit it identically. Retrying the
+# statuses that mean "ask again" keeps one 429 from ending a probe, which matters
+# more now that rules can run concurrently.
+_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+_MAX_ATTEMPTS = 3
+_BACKOFF_BASE_SECONDS = 0.5
+# A server answering `Retry-After: 86400` must not be able to park a scan for a
+# day, so its request to wait is honoured only up to this bound.
+_MAX_BACKOFF_SECONDS = 30.0
+
+
+def _retry_delay(attempt: int, retry_after: str | None) -> float:
+    """Seconds to wait before attempt `attempt` + 1 — the server's ask, or exponential."""
+    if retry_after is not None:
+        try:
+            return min(max(float(retry_after), 0.0), _MAX_BACKOFF_SECONDS)
+        except ValueError:
+            pass  # not a delay-seconds form (an HTTP-date, or junk): fall back
+    return float(min(_BACKOFF_BASE_SECONDS * (2**attempt), _MAX_BACKOFF_SECONDS))
 
 
 class EndpointError(Exception):
@@ -92,6 +116,28 @@ class ToolCallingTransport(Protocol):
         ...
 
 
+def _read_with_retry(request: Request, ref: str) -> bytes:
+    """Send `request`, retrying only the statuses that mean "ask again".
+
+    A failure that survives the retries is raised, never swallowed: a rule handed
+    silence here would grade a model it never actually reached. One byte past the
+    cap is read so an over-limit reply is reported as truncated rather than
+    mis-diagnosed as non-JSON once `json.loads` chokes on the tail.
+    """
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:  # noqa: S310
+                raw: bytes = response.read(_MAX_RESPONSE_BYTES + 1)
+        except HTTPError as exc:
+            last_attempt = attempt == _MAX_ATTEMPTS - 1
+            if exc.code not in _RETRY_STATUSES or last_attempt:
+                raise
+            _sleep(_retry_delay(attempt, exc.headers.get("Retry-After")))
+        else:
+            return raw
+    raise EndpointError(f"exhausted retries for {ref}")  # unreachable: the loop returns or raises
+
+
 def post_json(url: str, payload: dict[str, object], api_key: str | None, ref: str) -> object:
     """POST a JSON payload and return the parsed JSON reply — bounded and fail-closed.
 
@@ -104,10 +150,7 @@ def post_json(url: str, payload: dict[str, object], api_key: str | None, ref: st
         headers["Authorization"] = f"Bearer {api_key}"
     # S310 x2: the scheme is validated to be http/https in EndpointTarget.__init__.
     request = Request(url, data=body, headers=headers, method="POST")  # noqa: S310
-    # Read one byte past the cap so an over-limit reply is reported as truncated
-    # rather than mis-diagnosed as "non-JSON" once json.loads chokes on the tail.
-    with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:  # noqa: S310
-        raw = response.read(_MAX_RESPONSE_BYTES + 1)
+    raw = _read_with_retry(request, ref)
     if len(raw) > _MAX_RESPONSE_BYTES:
         raise EndpointError(f"response from {ref} exceeds {_MAX_RESPONSE_BYTES} bytes; refusing it")
     try:
@@ -263,6 +306,11 @@ class EndpointTarget(Target):
         if isinstance(self._transport, ToolCallingTransport):
             caps.add(Capability.CALL_TOOLS)
         return caps
+
+    @property
+    def model(self) -> str:
+        """The model under test, by the name the endpoint knows it as."""
+        return self._model
 
     @property
     def ref(self) -> str:

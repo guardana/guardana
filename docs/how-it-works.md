@@ -129,6 +129,16 @@ clean because nothing looked is the failure this engine exists to prevent.
 Renderers turn a `ScanResult` into `human`, `json`, `sarif` (for GitHub code
 scanning), or `junit` output.
 
+A fourth channel answers a different question. **`observations`** is what the run
+*saw* — models and their formats, dependency manifests, datasets, notebooks —
+rather than what it found wrong, so "what is deployed here" and "what changed
+since the last run" are answerable without walking the target again. It comes
+from the target, not from the rules: if it came from the rules, excluding one
+would quietly shrink the list of components a report claims are deployed. It
+deliberately speaks no compliance vocabulary — turning these facts into a
+CycloneDX ML-BOM or an audit template is an extension package's job, so no
+external calendar ages the engine.
+
 ### Profile — what to run and when to fail
 A `guardana.yaml` (or a named preset — §5) that decides which rules run
 (include/exclude globs) and where the bar is (`fail_on.severity`,

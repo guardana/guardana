@@ -20,6 +20,7 @@ guardana monitor --url <base-url> --model <name> [OPTIONS]
 | `--system-prompt-file PATH` | none | File containing the system prompt already deployed in front of the model — same meaning as on `probe` |
 | `--interval FLOAT` | `60.0` | Seconds between sampling cycles |
 | `--max-cycles INTEGER` | none (run forever) | Stop after this many cycles — mainly for testing/demos |
+| `--concurrency INTEGER` | `4` | How many rules may query the model at once, per cycle — same meaning as on `probe` |
 | `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file |
 | `--preset [ci\|pre-training\|monitor]` | none | Named policy preset (mutually exclusive with `--profile`); `--preset monitor` fails on HIGH **and** on inconclusive — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--rules PATH` | none | Directory or file of custom YAML rules; repeatable. Combined with the profile's `rules.paths` — see [`writing-rules.md`](writing-rules.md). A malformed rule file is a warning, never an abort. |

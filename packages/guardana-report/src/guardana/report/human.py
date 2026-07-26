@@ -55,4 +55,8 @@ def _summary(result: ScanResult) -> str:
         summary += f" {len(result.waived)} waived."
     if result.errors:
         summary += f" {len(result.errors)} check(s) could not run."
+    if result.observations:
+        # Says what the run actually looked at, so "no findings" reads as "nothing
+        # wrong in these N components" rather than the ambiguous "nothing here".
+        summary += f" {len(result.observations)} component(s) observed."
     return summary

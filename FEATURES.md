@@ -13,7 +13,7 @@ two cannot silently drift.
 | Mode | Command | What it gives you |
 |---|---|---|
 | **Static scan** | `guardana scan <path>` | Offline, no-network, deterministic supply-chain checks over a repo or model directory. Exit code `1` on a gate failure — drops into CI like a linter. |
-| **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. |
+| **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. Rules run concurrently (`--concurrency`, default 4) with rate-limit backoff, and results stay in rule order so two runs match. |
 | **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, a finding-count rise over its baseline, or a rise in *unverified* checks (a model whose safety checks go blind is itself the alert). Plants a fresh random canary every cycle. |
 
 Scan takes a **per-finding baseline** (`--write-baseline` to snapshot, `--baseline`
@@ -143,6 +143,15 @@ in the collector envelope:
 | **findings** | a check ran and found something |
 | **unverified** | a check ran and honestly could not reach a verdict |
 | **errors** | a check **never ran** — a plugin that failed to import, a rule file that would not load, a rule that raised |
+
+A fourth channel answers a different question: **observations** is what the run
+*saw* — models and their formats, dependency manifests, datasets, notebooks —
+so "what is deployed here" and "what changed since the last run" don't require
+walking the target again. It is taken from the target rather than from the rules,
+so narrowing a profile can never quietly shrink the component list, and a
+component that could not be read is listed as unread instead of dropped. It
+carries no compliance vocabulary: mapping these facts onto CycloneDX or an audit
+template is an extension's job, never the engine's.
 
 The third is the one that used to be invisible. A rule that crashed landed in
 `rules_skipped` next to "this target has no files for that rule", so a CRITICAL

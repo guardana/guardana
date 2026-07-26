@@ -16,6 +16,12 @@ from guardana.core.runner import gate
 from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport
 from guardana.report import get_renderer
 
+# Four in flight is a meaningful speed-up on a probe that is almost entirely
+# waiting on a model, while staying polite to a single-slot local server; 429s
+# are retried with backoff, so a busy endpoint slows the probe instead of
+# failing it. Raise it for a hosted endpoint you own the quota for.
+_DEFAULT_CONCURRENCY = 4
+
 
 def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
     url: Annotated[str, typer.Option(help="Base URL of the OpenAI-compatible endpoint")],
@@ -46,6 +52,12 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         list[Path],
         typer.Option("--rules", help="Directory or file of custom YAML rules; repeatable."),
     ] = [],  # noqa: B006 — typer builds the option from a literal default
+    concurrency: Annotated[
+        int,
+        typer.Option(
+            min=1, help="How many rules may query the model at once (raises probe throughput)"
+        ),
+    ] = _DEFAULT_CONCURRENCY,
     reporter: Annotated[
         str | None, typer.Option(help="Collector URL to forward findings to, e.g. server://URL")
     ] = None,
@@ -74,7 +86,9 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         transport=transport,
     )
 
-    result = run_against_endpoint(url, lambda: run_probe(registry, prof, connection))
+    result = run_against_endpoint(
+        url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
+    )
     typer.echo(get_renderer(format.value).render(result))
     if reporter:
         submit_safely(reporter, result, source=f"{url}#{model}")

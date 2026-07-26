@@ -14,9 +14,14 @@ from guardana.cli._rules_loading import load_custom_rules
 from guardana.core.monitor import Alert, Monitor, MonitorConfig
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
+from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY
 from guardana.report import get_renderer
 
 _DEFAULT_INTERVAL_SECONDS = 60.0
+# Matches `probe`: a monitor cycle is the same probe, so it gets the same default
+# — fast enough to finish a cycle well inside the interval, polite enough for a
+# single-slot local server.
+_DEFAULT_CONCURRENCY = 4
 
 
 def _print_alert(alert: Alert) -> None:
@@ -49,6 +54,7 @@ def run_monitor(  # noqa: PLR0913 — the test seam needs every hook injectable
     *,
     interval_seconds: float = _DEFAULT_INTERVAL_SECONDS,
     max_cycles: int | None = None,
+    concurrency: int = DEFAULT_ENDPOINT_CONCURRENCY,
     on_alert: Callable[[Alert], None] = _print_alert,
     on_error: Callable[[int, Exception], None] = _warn_cycle_failed,
     sleep: Callable[[float], None] = time.sleep,
@@ -59,7 +65,7 @@ def run_monitor(  # noqa: PLR0913 — the test seam needs every hook injectable
     endpoint surfaces (via `run_against_endpoint`, exit 2) instead of spinning.
     """
     monitor = Monitor(
-        scan=lambda: run_probe(registry, profile, connection),
+        scan=lambda: run_probe(registry, profile, connection, concurrency=concurrency),
         policy=profile.policy,
         config=MonitorConfig(interval_seconds=interval_seconds, max_cycles=max_cycles),
     )
@@ -84,6 +90,10 @@ def monitor(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the com
     max_cycles: Annotated[
         int | None, typer.Option("--max-cycles", help="Stop after this many cycles")
     ] = None,
+    concurrency: Annotated[
+        int,
+        typer.Option(min=1, help="How many rules may query the model at once, per cycle"),
+    ] = _DEFAULT_CONCURRENCY,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[
         str | None, typer.Option(help="Named policy preset: ci|pre-training|monitor")
@@ -123,6 +133,7 @@ def monitor(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the com
             connection,
             interval_seconds=interval,
             max_cycles=max_cycles,
+            concurrency=concurrency,
             on_alert=on_alert,
         ),
     )

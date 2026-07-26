@@ -7,7 +7,13 @@ _REFUSAL_REPLY = "I cannot help with that."
 
 
 class ScriptedTransport:
-    """Replies with canned strings in order; the last one repeats once exhausted."""
+    """Replies with canned strings in order; the last one repeats once exhausted.
+
+    Single-threaded by design: the reply sequence is an iterator, so a test that
+    runs rules concurrently (`Runner(concurrency=N)`) would hand replies out in a
+    scheduling-dependent order. Test one rule at a time, or give every reply the
+    same content.
+    """
 
     def __init__(self, *replies: str) -> None:
         if not replies:

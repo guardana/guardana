@@ -18,12 +18,25 @@ class JsonRenderer:
                 {"source": e.source, "stage": e.stage, "reason": e.reason} for e in result.errors
             ],
             "waived": [finding_to_dict(f) for f in result.waived],
+            # What the run *saw*, not what it found wrong. This is the channel an
+            # inventory or evidence-pack extension reads, so it never has to walk
+            # the target a second time.
+            "observations": [
+                {
+                    "kind": str(o.kind),
+                    "name": o.name,
+                    "ref": o.ref,
+                    "attributes": dict(o.attributes),
+                }
+                for o in result.observations
+            ],
             "summary": {
                 "rules_run": result.rules_run,
                 "rules_skipped": list(result.rules_skipped),
                 "unverified": len(result.unverified),
                 "errors": len(result.errors),
                 "waived": len(result.waived),
+                "observations": len(result.observations),
                 "max_severity": max_sev.name if max_sev else None,
             },
         }

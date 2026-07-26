@@ -172,9 +172,11 @@ class Finding:
 ```
 
 One shape regardless of which rule produced it. `guardana-report` renders a
-`ScanResult` — the findings, a rule-run/skip count, and the `unverified`
+`ScanResult` — the findings, a rule-run/skip count, the `unverified`
 channel (checks that ran but could not reach a verdict — surfaced in every
-format, never dropped into a false all-clear) — as `human`, `json`, `sarif`,
+format, never dropped into a false all-clear), and `observations` (the
+components the run saw, taken from the target rather than from the rules, so a
+narrowed profile cannot shrink the inventory) — as `human`, `json`, `sarif`,
 or `junit` via the `Renderer` protocol
 (`render(result: ScanResult) -> str`). `Severity` is an `IntEnum`
 (`INFO < LOW < MEDIUM < HIGH < CRITICAL`) so policies threshold with `>=`.

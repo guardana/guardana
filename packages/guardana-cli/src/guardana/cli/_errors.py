@@ -7,6 +7,7 @@ from guardana.core.target import EndpointError
 
 _CONNECTION_EXIT_CODE = 2
 _HTTP_CLIENT_ERROR = 400
+_HTTP_RATE_LIMITED = 429
 _HTTP_SERVER_ERROR = 500
 
 T = TypeVar("T")
@@ -24,7 +25,16 @@ def run_against_endpoint(url: str, action: Callable[[], T]) -> T:
     try:
         return action()
     except HTTPError as exc:
-        if _HTTP_CLIENT_ERROR <= exc.code < _HTTP_SERVER_ERROR:
+        if exc.code == _HTTP_RATE_LIMITED:
+            # Reaching here means the retries were already exhausted, so this is a
+            # sustained limit rather than a blip. Naming the knob beats the generic
+            # 4xx advice, which would send someone to check an auth header that is
+            # working fine.
+            message = (
+                f"endpoint {url} kept rate-limiting the probe (HTTP 429) even after retries — "
+                f"lower --concurrency, or wait for the quota to reset"
+            )
+        elif _HTTP_CLIENT_ERROR <= exc.code < _HTTP_SERVER_ERROR:
             message = (
                 f"endpoint {url} rejected the request (HTTP {exc.code}) — "
                 f"check the auth header / body (an --adapter's headers, or --api-key-env)"

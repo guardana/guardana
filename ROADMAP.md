@@ -122,21 +122,32 @@ seconds, so it means the same on CI as on a laptop, and it is proven to catch th
 regression it exists for: with the cache disabled the same fixture parses 42
 times instead of 6.
 
-Still open in this theme:
+**Also shipped (unreleased):**
 
-1. **Bounded concurrency in `probe`/`monitor`.** Dynamic rules are network-bound
-   and run strictly one after another today. A worker pool with a configurable
-   limit, backoff on 429, and deterministic result ordering — two runs against
-   the same model must produce the same report in the same order, or a CI diff
-   becomes noise.
-2. **Share the binary reads too.** Model artifacts are still opened per rule; the
-   Python path is done, the `read_bytes_bounded` path is not. Same invariant
-   applies: a file that could not be read must still produce an `errors` entry
-   for *every* rule that would have read it, never a cached "nothing here".
-3. **The observation seam.** A single read is where a finding and an *inventory
-   entry* are both born. Making that seam explicit — a neutral "what was
-   observed" channel, engine-side and free of any regulatory vocabulary — is what
-   makes the evidence extension below a package rather than a fork.
+- **Bounded concurrency in `probe`/`monitor`** (`--concurrency`, default 4).
+  Dynamic rules are network-bound, so overlapping them is the largest wall-clock
+  win available: the 8 runtime rules against a stubbed endpoint go from 1.91 s to
+  **0.69 s** at the default, 0.36 s at 8. Results are collected in rule order regardless of which finishes
+  first — two runs of the same probe produce the same report, or a CI diff stops
+  being signal. Rate limits are retried with capped exponential backoff honouring
+  `Retry-After`, so a busy endpoint slows a probe instead of ending it; a
+  sustained 429 names `--concurrency` rather than sending you to debug an auth
+  header. File scanning stays sequential: it is local, already linear-cost, and a
+  pool there would buy little while costing determinism.
+- **The observation seam** (`guardana.core.observation` / `inventory`).
+  `ScanResult.observations` records what a run *saw* — models and their formats,
+  dependency manifests, datasets, notebooks — separately from what it found
+  wrong. Taken from the target rather than from the rules, so narrowing a profile
+  cannot quietly shrink the component list, and a component that could not be
+  read is listed as unread rather than dropped. Free of any framework's
+  vocabulary: mapping these facts onto CycloneDX or an audit template is the
+  extension's job, which is what makes that extension a package instead of a fork.
+
+**Closed by measurement, not by code:** sharing the *binary* reads was on this
+list until the Python fix landed. Re-measured afterwards, a scan of the demo model
+directory opens 20 files for 22 on disk — the amplification was the shared `.py`
+files all along, and a bytes cache would have added an OOM risk (model files run
+to gigabytes) for no measurable gain. Reopened only if a profile says otherwise.
 
 ## v0.5 — Agents as a first-class target
 

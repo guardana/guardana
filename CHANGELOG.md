@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`probe` and `monitor` run rules concurrently** (`--concurrency`, default 4).
+  Dynamic rules spend nearly all their time waiting on a model, so overlapping
+  them is the biggest wall-clock win available. Results are collected in rule
+  order whatever finishes first, so two runs of the same probe produce the same
+  report and a CI diff stays signal. Artifact scanning stays sequential on
+  purpose: it is local, already linear-cost, and a pool there would cost
+  determinism for little gain. `Runner` defaults to sequential so embedding
+  Guardana never silently opens N connections to someone's model. Measured
+  against a stubbed endpoint with the 8 shipped runtime rules: **1.91 s → 0.69 s
+  at the default 4** (2.8×), and 0.36 s at 8 — the ratio holds at real model
+  latency, since the run is almost entirely waiting.
+- **Rate limits are retried instead of ending the probe.** `429` and the
+  transient `5xx` statuses get capped exponential backoff that honours
+  `Retry-After` — bounded to 30 s, so a server answering `Retry-After: 86400`
+  cannot park a scan for a day. Retries are bounded and a failure that survives
+  them is raised, never turned into a silent "no reply". A sustained 429 now
+  names `--concurrency` rather than repeating the generic 4xx advice to check an
+  auth header that is working fine.
+- **`ScanResult.observations` — what the scan saw, beside what it found.**
+  `guardana.core.observation` and `guardana.core.inventory` record the components
+  a run encountered: models with their format and size, dependency manifests,
+  datasets, notebooks. Rules produce findings, which is a record of *problems* and
+  the wrong shape for "what is deployed here" or "what changed since last run".
+  The inventory is taken from the target, not from the rules — otherwise
+  excluding a rule would quietly shrink the component list — and a component that
+  could not be read is listed as unread rather than dropped. It carries no
+  regulatory vocabulary at all: mapping these facts onto CycloneDX or an audit
+  template belongs to an extension package, so no external calendar ages the
+  engine. Surfaced in the JSON renderer and counted in the human summary.
+
 - **`guardana.core.source` — read a Python file once, not once per rule.**
   `read_python_source()` returns a `PythonSource`: the text, the parsed tree, and
   the tree's nodes grouped by type, built with a single walk. It returns data and

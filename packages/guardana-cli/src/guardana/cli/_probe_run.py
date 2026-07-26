@@ -8,7 +8,7 @@ from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
 from guardana.core.rule import Rule, YamlRule
 from guardana.core.rule.scenario_rule import ScenarioRule
-from guardana.core.runner import Runner
+from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY, Runner
 from guardana.core.target import Capability, ChatTransport
 
 _CANARY_SYSTEM_PROMPT_TEMPLATE = (
@@ -100,7 +100,13 @@ def _sub_registry(rules: list[Rule], source: Registry) -> Registry:
     return sub
 
 
-def run_probe(registry: Registry, profile: Profile, connection: Connection) -> ScanResult:
+def run_probe(
+    registry: Registry,
+    profile: Profile,
+    connection: Connection,
+    *,
+    concurrency: int = DEFAULT_ENDPOINT_CONCURRENCY,
+) -> ScanResult:
     """Run every endpoint-kind rule in `registry` against a live model.
 
     Canary rules (those requiring `PLANT_SYSTEM_PROMPT` with a declared canary) are run
@@ -108,6 +114,10 @@ def run_probe(registry: Registry, profile: Profile, connection: Connection) -> S
     rule's canary marker — otherwise the rule could never observe a leak. All other
     rules run together against a single target built from `connection.system_prompt`
     (if any).
+
+    `concurrency` bounds how many rules may be in flight at once. It applies to the
+    shared pass; each canary rule keeps its own target and runs on its own, because
+    a canary planted for one rule must never be visible to another.
     """
     canary_rules: list[tuple[Rule, str]] = []
     normal_rules: list[Rule] = []
@@ -129,9 +139,11 @@ def run_probe(registry: Registry, profile: Profile, connection: Connection) -> S
             transport=connection.transport,
         )
         results.append(
-            Runner(registry=_sub_registry(normal_rules, registry), profile=profile).run(
-                normal_target
-            )
+            Runner(
+                registry=_sub_registry(normal_rules, registry),
+                profile=profile,
+                concurrency=concurrency,
+            ).run(normal_target)
         )
 
     for rule, canary in canary_rules:
@@ -144,7 +156,11 @@ def run_probe(registry: Registry, profile: Profile, connection: Connection) -> S
             transport=connection.transport,
         )
         results.append(
-            Runner(registry=_sub_registry([rule], registry), profile=profile).run(canary_target)
+            Runner(
+                registry=_sub_registry([rule], registry),
+                profile=profile,
+                concurrency=concurrency,
+            ).run(canary_target)
         )
 
     return ScanResult.merged(results) if results else ScanResult((), 0, ())

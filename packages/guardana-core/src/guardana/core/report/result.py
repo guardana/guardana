@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from guardana.core.observation import Observation
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
 from guardana.core.severity import Severity
@@ -16,7 +17,10 @@ class ScanResult:
     judge, a guard model that declined, an empty reply) is surfaced here, never
     dropped into a false all-clear. `waived` holds findings a baseline explicitly
     accepted with a reason: they no longer fail the gate, but they are still
-    reported — a suppression you can see, never a silent drop.
+    reported — a suppression you can see, never a silent drop. `observations` is
+    the one channel that is not about problems: the components the run saw, so
+    "what is deployed here" and "what changed since last time" are answerable
+    without walking the target again.
     """
 
     findings: tuple[Finding, ...]
@@ -25,6 +29,7 @@ class ScanResult:
     unverified: tuple[Finding, ...] = ()
     waived: tuple[Finding, ...] = ()
     errors: tuple[CheckError, ...] = ()
+    observations: tuple[Observation, ...] = ()
 
     @classmethod
     def merged(cls, results: Sequence["ScanResult"]) -> "ScanResult":
@@ -42,6 +47,10 @@ class ScanResult:
             unverified=tuple(f for r in results for f in r.unverified),
             waived=tuple(f for r in results for f in r.waived),
             errors=tuple(e for r in results for e in r.errors),
+            # De-duplicated by ref: probe runs the same target several times (one
+            # pass per planted canary), and the model under test is one component,
+            # not one per pass.
+            observations=tuple({o.ref: o for r in results for o in r.observations}.values()),
         )
 
     def max_severity(self) -> Severity | None:

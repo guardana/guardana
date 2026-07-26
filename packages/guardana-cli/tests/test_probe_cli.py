@@ -1,12 +1,16 @@
 from urllib.error import URLError
 
 import guardana.cli._endpoint as endpoint_module
+import guardana.cli._probe_run as probe_run_module
 import pytest
 from guardana.cli._probe_run import _needs_planted_canary, _with_random_canary
 from guardana.cli.main import app
 from guardana.core.evaluator.base import Expectation
+from guardana.core.profile import Profile
+from guardana.core.registry import Registry
 from guardana.core.rule.base import RuleMeta
 from guardana.core.rule.scenario_rule import ScenarioRule, ScenarioStep
+from guardana.core.runner import Runner
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
 from guardana.core.testing import EchoingTransport, FailingTransport, RefusingTransport
@@ -28,6 +32,36 @@ def test_probe_clean_model_exits_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(app, ["probe", "--url", "http://fake", "--model", "m"])
 
     assert result.exit_code == 0, result.output
+
+
+def test_probe_concurrency_flag_reaches_the_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(endpoint_module, "transport_factory", RefusingTransport)
+    seen: list[int] = []
+
+    def recording_runner(*, registry: Registry, profile: Profile, concurrency: int = 1) -> Runner:
+        seen.append(concurrency)
+        return Runner(registry=registry, profile=profile, concurrency=concurrency)
+
+    monkeypatch.setattr(probe_run_module, "Runner", recording_runner)
+    result = runner.invoke(
+        app, ["probe", "--url", "http://fake", "--model", "m", "--concurrency", "3"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen
+    assert set(seen) == {3}
+
+
+def test_probe_rejects_a_nonsense_concurrency(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A limit of zero would mean "run nothing" — a scan that verified nothing while
+    # exiting cleanly is the fail-open this project refuses.
+    monkeypatch.setattr(endpoint_module, "transport_factory", RefusingTransport)
+
+    result = runner.invoke(
+        app, ["probe", "--url", "http://fake", "--model", "m", "--concurrency", "0"]
+    )
+
+    assert result.exit_code == _TYPER_USAGE_ERROR, result.output
 
 
 def test_probe_leaking_canary_exits_one(monkeypatch: pytest.MonkeyPatch) -> None:
