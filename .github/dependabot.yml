@@ -21,3 +21,17 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: "chore(deps):"
+
+  # `examples/vulnerable-model/` is a deliberately insecure demo fixture: it pins
+  # a compromised `ultralytics` release and the loader versions that would arm the
+  # poisoned `config.json` and `chat_template.jinja` next to it. Those pins ARE the
+  # demo, so an "upgrade" here silently deletes the findings the example exists to
+  # show. Both channels are disabled: the limit stops version updates, and the
+  # wildcard `ignore` stops security updates, which run regardless of the limit.
+  - package-ecosystem: "pip"
+    directory: "/examples/vulnerable-model"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
