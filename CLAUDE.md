@@ -16,6 +16,42 @@ optional central collector.
 Full design rationale and architecture: [`docs/how-it-works.md`](docs/how-it-works.md)
 and [`docs/architecture.md`](docs/architecture.md).
 
+## Product principles — they outrank convenience, in every 0.x
+
+These decide what belongs in the engine at all. They are not style advice: a
+change that violates one is wrong even when it is small, tested, and useful.
+[`ROADMAP.md`](ROADMAP.md) is this list expressed as a plan.
+
+1. **The engine knows no regulation and no vendor.** The name of a law (AI Act,
+   NIST, ISO), of a model vendor, or of a file format is never *logic* in
+   `guardana-core` — it is data in a rule, a taxonomy entry, or a separate
+   extension package. Legal deadlines move and frameworks are renamed; an engine
+   that encodes them ages with someone else's calendar.
+2. **Cost grows with the target, not with the rule count.** A new rule must not
+   add a tree walk, a re-read, or a re-parse of something already read this run.
+   A scan nobody waits for is a scan nobody runs, and an excluded scanner is an
+   organisation-level fail-open — so performance is a security property here, and
+   it is pinned by a benchmark the same way coverage is.
+3. **Offline, and no account, always.** The only network traffic is to the target
+   under test. No telemetry, no phone-home, no license check; the collector is
+   optional in every direction and never required for a feature to work.
+4. **The commercial boundary is fixed.** The engine and every built-in rule stay
+   open source, permanently. Only *hosting* (managed collector, hosted runners)
+   and *curated content* (language/industry corpora, extended advisory data) may
+   ever be paid. Never withhold a security capability from the OSS build to make
+   a paid tier look better — that trade destroys the trust the project runs on.
+5. **Every rule maps to a public framework** (OWASP LLM / OWASP ASI / MITRE
+   ATLAS / NIST). A rule without a mapping does not ship: the mapping is what
+   makes a finding answerable in someone else's audit.
+6. **The dependency surface is part of the security posture.** `guardana-core`
+   depends on `pyyaml`; `guardana-rules` adds `defusedxml`. A security scanner
+   with a sprawling dependency tree is its own supply-chain risk. A new
+   dependency needs a justification in the PR description, not just a green CI.
+7. **Tests are never a leak.** No fixture carries real customer data, real
+   secrets, or a real production prompt; evidence stays redacted. Crafted
+   fixtures are built in code (`guardana.core.testing`), which is also why they
+   are readable in review.
+
 ## Architecture in brief
 
 Five packages under `packages/`, each a `src/guardana/...` namespace package:
@@ -286,10 +322,14 @@ registry level, only namespacing by `id`.
 ## Your edits are linted automatically
 
 `.claude/settings.json` registers a `PostToolUse` hook
-(`.claude/hooks/ruff_on_edit.py`) that runs `ruff check --fix` and
-`ruff format` on every `.py` file you write. You still own the gates above —
-the hook only removes the excuse for lint drift, it does not type-check, test,
-or think for you.
+(`scripts/ruff_on_edit.py`) that runs `ruff check --fix` and
+`ruff format` on every `.py` file you write. Both files are checked in, so every
+agent working here gets the hook; the script lives in `scripts/` rather than
+under `.claude/` because `mypy --strict .` skips dot-directories, and a
+checked-in script the gate cannot see is the sort of unverified corner this
+project refuses everywhere else. You still own the gates above — the hook only
+removes the excuse for lint drift, it does not type-check, test, or think for
+you.
 
 ## Git / commits / PRs
 

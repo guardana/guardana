@@ -150,7 +150,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.1   # moving tag → latest 0.1.x
+      - uses: guardana/guardana@v0.3   # moving tag → latest 0.3.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -271,6 +271,13 @@ Either way the engine stays fully independent: `guardana-core` never imports
 promise. The collector is strictly additive; the engine delivers its full value
 with or without it.
 
+**What stays free, stated plainly:** the engine and every built-in rule are open
+source permanently. If a managed service happens, it can only ever charge for
+*hosting* and for *curated content* (language- and industry-specific attack
+corpora, extended advisory data) — never for a security capability withheld from
+the OSS build. That boundary is written into the project's
+[principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
+
 ## Why "Guardana"?
 
 **Guard** + **-ana**. *Guard* is the whole job — standing watch over the models,
@@ -287,15 +294,18 @@ so the name is the project's alone.
 
 ## Roadmap
 
-Guardana v0.1 is the reliable static front door plus an evaluator-graded dynamic
-core. Where it's headed:
+Guardana 0.3 is the reliable static front door, an evaluator-graded dynamic core,
+and a result that distinguishes "found nothing" from "could not tell" from
+"never ran". Where it's headed:
 
 | Version | Theme | Highlights |
 |---|---|---|
-| **v0.1** *(current)* | Reliable core | 27 rules · supply-chain + training-data + config-RCE + **chat-template SSTI** + **ONNX graph** + advisory-backed deps + notebook + rules-file-backdoor · runtime: injection, jailbreaks, RAG-injection, **excessive-agency (tool-calling)**, **unbounded-consumption**, canary leak · scan/probe/monitor · LLM-judge & guard evaluators · SARIF & CI gate · plugin engine · optional collector |
-| **v0.2** | Depth & calibration | OSV/CVE dependency matching + aliased imports · measured judge calibration (ECE/Brier) · engine robustness (plugin isolation, `errors` channel) · official GitHub Action & pre-commit hook |
-| **v0.3** | Sharpen runtime depth | Sharpen LLM10 (finish_reason/latency signal) · deeper LLM06 tool-chains · adaptive attackers (Crescendo/GOAT) · behavioural drift gate · PII/toxicity evaluators |
-| **v0.4+** | Compliance & provenance | AIBOM / CycloneDX ML-BOM export · model-signature verification · fine-tuning dataset hygiene |
+| **0.3** *(current)* | Honest verdicts | 27 rules · supply-chain + training-data + config-RCE + **chat-template SSTI** + **ONNX graph** + advisory-backed deps + notebook + rules-file-backdoor · runtime: injection, jailbreaks, RAG-injection, **excessive-agency (tool-calling)**, **unbounded-consumption**, canary leak · three result channels · **measured judge calibration (Brier/ECE)** · SARIF & CI gate · GitHub Action & pre-commit · optional collector |
+| **0.4** | Linear cost | One tree walk instead of 26, one file read instead of 4.8, one AST parse instead of 7 · bounded concurrency in `probe` · **performance pinned by a benchmark gate**, because a scan nobody waits for gets switched off |
+| **0.5** | Agents, first-class | **OWASP ASI01–ASI10** + new ATLAS agentic techniques · grade the **trajectory**, not the reply · memory & context poisoning · live MCP/registry supply chain · `guardana calibrate` |
+| **0.6** | Regression & language | **`guardana diff`** — fail on deterioration after a model/prompt/tool change · `lang` facet + first Polish corpus · an order of magnitude more prompts per rule |
+| **1.0** | Frozen extension API | Compatibility guarantees on `Rule`/`Evaluator`/`Target`/`formats` — the point where a third-party rule pack is a safe investment |
+| **Extensions** | Deliberately not the engine | CycloneDX **ML-BOM** evidence pack · model-signature provenance — separate packages, so no regulator's calendar ages the engine |
 | **Cloud** | Fleet visibility | Productized collector: dashboards, trends, multi-repo/model rollups, policy management — the additive layer the OSS engine already reports into |
 
 The detailed, maintained version — priorities, what's deliberately deferred

@@ -74,6 +74,51 @@ def test_main_dry_run_lists_the_core_dunder_file(
     assert "src/guardana/core/__init__.py" in capsys.readouterr().out
 
 
+def test_rewrite_action_pin_follows_the_released_minor() -> None:
+    # The docs tell users to pin the moving `vMAJOR.MINOR` tag for the Marketplace
+    # Action. Left behind by a release, that line silently serves an Action from
+    # two versions ago — one without the fixes the release shipped.
+    assert (
+        _BUMP._rewrite_action_pin("- uses: guardana/guardana@v0.1   # moving tag\n", "0.3.0")
+        == "- uses: guardana/guardana@v0.3   # moving tag\n"
+    )
+
+
+def test_rewrite_action_pin_leaves_a_prerelease_alone() -> None:
+    # `release.py` deliberately does not move the stable moving tag for a
+    # pre-release, so rewriting the docs to `v1.0` would point users at a tag that
+    # does not exist yet.
+    text = "- uses: guardana/guardana@v0.3\n"
+    assert _BUMP._rewrite_action_pin(text, "1.0.0rc1") == text
+
+
+def test_every_documented_action_pin_file_actually_carries_a_pin() -> None:
+    # The list is what the bump rewrites. A file that stopped carrying a pin (a
+    # reworded snippet, a renamed tag form) must fail loudly here rather than
+    # quietly drop out of the rewrite and go stale again.
+    for relative in _BUMP._ACTION_PIN_FILES:
+        text = (_repo_root() / relative).read_text(encoding="utf-8")
+        assert _BUMP._ACTION_PIN_RE.search(text) is not None, f"no action pin in {relative}"
+
+
+def test_documented_action_pins_match_the_current_release() -> None:
+    major, minor, _ = _BUMP._core(_BUMP._current_version())
+    for relative in _BUMP._ACTION_PIN_FILES:
+        text = (_repo_root() / relative).read_text(encoding="utf-8")
+        for found in _BUMP._ACTION_PIN_RE.finditer(text):
+            assert found.group(0).endswith(f"@v{major}.{minor}"), (
+                f"{relative} pins {found.group(0)}, but the released series is {major}.{minor}"
+            )
+
+
+def test_main_dry_run_lists_the_action_pin_files(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", "minor", "--dry-run"])
+    assert _BUMP.main() == 0
+    assert "README.md" in capsys.readouterr().out
+
+
 def test_next_version_bumps_the_numeric_core() -> None:
     assert _BUMP._next_version("0.1.0", "patch") == "0.1.1"
     assert _BUMP._next_version("0.1.0", "minor") == "0.2.0"

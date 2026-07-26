@@ -31,7 +31,11 @@ Thumbs.db
 # Logs
 *.log
 
-# AI-agent tooling and internal working docs (not part of the published project)
-.claude/
+# AI-agent tooling and internal working docs (not part of the published project).
+# `.claude/settings.json` and `.claude/hooks/` ARE checked in on purpose: CLAUDE.md
+# promises every agent working here gets the auto-format hook, and an ignored hook
+# is a promise nobody keeps. Only machine-local state stays out.
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 docs/superpowers/
 .playwright-mcp/

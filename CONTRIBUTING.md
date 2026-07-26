@@ -97,6 +97,27 @@ If a rule fires on code you believe is right, argue it in the PR with a
 `# noqa: RULE — reason` and the reason must be about *this* code, not about
 disliking the rule.
 
+## Product principles
+
+Before the code standards, the seven rules that decide whether a change belongs
+in the engine *at all*. A PR that breaks one gets sent back however good the code
+is — these are what [`ROADMAP.md`](ROADMAP.md) is planned against. The full
+wording lives in [`CLAUDE.md`](CLAUDE.md); in short:
+
+1. **No regulation or vendor name is logic in `guardana-core`** — it is data in a
+   rule, a taxonomy entry, or a separate extension package.
+2. **Cost grows with the target, not the rule count** — no new tree walk,
+   re-read, or re-parse per rule. Performance is a security property: a scan
+   nobody waits for gets excluded from CI, which is a fail-open one level up.
+3. **Offline, no account, no phone-home.** The only traffic is to the target.
+4. **The engine and every built-in rule stay open source, permanently.** Only
+   hosting and curated content may ever be paid.
+5. **Every rule maps to a public framework** (OWASP LLM / OWASP ASI / MITRE
+   ATLAS / NIST). No mapping, no merge.
+6. **Adding a dependency needs a justification in the PR** — a security scanner
+   with a sprawling dependency tree is its own supply-chain risk.
+7. **No fixture carries real data, secrets, or production prompts.**
+
 ## Code standards
 
 Guardana's code standard is: write it like a senior developer would.

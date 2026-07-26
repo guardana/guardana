@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/scripts/ruff_on_edit.py\"",
+            "statusMessage": "ruff check --fix + format",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The documented GitHub Action pin pointed two releases back.** The README, the
+  integrations guide and the landing page all told users to pin
+  `guardana/guardana@v0.1` while 0.3.0 was current. That is worse than a broken
+  link — the workflow still runs, just without the fail-closed fixes 0.2 and 0.3
+  shipped. The pins now name the current series, and `scripts/bump_version.py`
+  rewrites them in lockstep with the package versions, failing loudly if a
+  documented file stops carrying one and deliberately leaving a pre-release alone
+  (`release.py` does not move the stable tag for one either). A test pins the
+  documented pins to the released version, so the two cannot drift again.
+
+- **The agent auto-format hook was never actually shipped.** `CLAUDE.md` and the
+  hook's own docstring both said it was checked in so every agent gets it, while
+  `.gitignore` excluded all of `.claude/`. The hook now lives in
+  `scripts/ruff_on_edit.py` — inside the tree `mypy --strict .` walks, since it
+  skips dot-directories — and `.claude/settings.json` is tracked alongside it.
+  Only machine-local state (`settings.local.json`) stays ignored.
+
+### Changed
+
+- **Seven product principles are now project law** (`CLAUDE.md`,
+  restated for humans in `CONTRIBUTING.md`): no regulation or vendor name as
+  logic in the engine, cost that grows with the target rather than the rule
+  count, offline with no account, a fixed commercial boundary (engine and
+  built-in rules stay open source — only hosting and curated content may ever be
+  paid), a public-framework mapping on every rule, a justified dependency
+  surface, and no real data in fixtures. A change that breaks one is wrong
+  regardless of how it tests.
+- **The roadmap is rewritten around the engine instead of around a regulation.**
+  0.4 makes scan cost linear (one tree walk instead of 26, one file read instead
+  of 4.8, one AST parse instead of 7, bounded concurrency in `probe`, and a
+  benchmark that gates regressions); 0.5 makes agents a first-class target
+  (OWASP ASI01–ASI10, the new MITRE ATLAS agentic techniques, trajectory
+  grading, memory poisoning, live MCP supply chain); 0.6 adds run-to-run
+  regression (`guardana diff`) and multilingual corpora; 1.0 freezes the
+  extension API. The compliance evidence pack (CycloneDX ML-BOM) moves out of the
+  engine into a separate extension package — the EU AI Act's high-risk duties
+  were deferred to December 2027, and an engine that encodes a legal calendar
+  ages with it.
+
 ## [0.3.0] - 2026-07-26
 
 ### Fixed

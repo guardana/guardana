@@ -65,8 +65,11 @@ is the classic place a monorepo release drifts — `core` goes to `0.2.0` while
 
 `scripts/bump_version.py` does the whole thing atomically: sets all five
 versions, rewrites every inter-package pin to `>=<new>,<<next-breaking>`,
-updates `guardana.core.__version__` (what `guardana --version` prints), and
-re-locks `uv.lock`.
+updates `guardana.core.__version__` (what `guardana --version` prints), rewrites
+the documented `guardana/guardana@vMAJOR.MINOR` Action pins (README, integrations
+guide, landing page) to match the moving tag `release.py` will repoint, and
+re-locks `uv.lock`. A pre-release leaves those pins alone, because the stable tag
+does not move for one.
 
 ```bash
 python scripts/bump_version.py patch          # 0.1.0 -> 0.1.1  (pins stay <0.2)

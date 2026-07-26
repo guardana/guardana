@@ -36,6 +36,16 @@ _PIN_RE = re.compile(r"(guardana-[a-z]+)>=\d+\.\d+\.\d+,<\d+(?:\.\d+)?")
 # the pyprojects or the CLI lies about what is installed.
 _DUNDER_PATH = Path("packages/guardana-core/src/guardana/core/__init__.py")
 _DUNDER_RE = re.compile(r'^__version__ = "[^"]+"', re.MULTILINE)
+# The docs tell users to pin `guardana/guardana@vMAJOR.MINOR` — the moving tag
+# `release.py` repoints at each final release. Left behind by a bump, that line
+# keeps serving an Action from an older series, which is worse than a broken
+# link: the workflow still runs, just without the fixes the release shipped.
+_ACTION_PIN_FILES = (
+    Path("README.md"),
+    Path("docs/integrations.md"),
+    Path("site/index.html"),
+)
+_ACTION_PIN_RE = re.compile(r"(guardana/guardana@v)\d+\.\d+")
 # The `major.minor.patch` core that drives bumps and the pin ceiling — the
 # leading numbers of any version, ignoring a PEP 440 pre/post/dev suffix.
 _CORE_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
@@ -100,6 +110,18 @@ def _rewrite_dunder(text: str, new: str) -> str:
     return _DUNDER_RE.sub(f'__version__ = "{new}"', text, count=1)
 
 
+def _rewrite_action_pin(text: str, new: str) -> str:
+    """Point every documented Action pin at this release's moving `vMAJOR.MINOR` tag.
+
+    A pre-release is left alone on purpose: `release.py` does not move the stable
+    tag for one, so rewriting the docs would advertise a tag that does not exist.
+    """
+    if Version(new).is_prerelease:
+        return text
+    major, minor, _ = _core(new)
+    return _ACTION_PIN_RE.sub(rf"\g<1>{major}.{minor}", text)
+
+
 def main() -> int:
     """Parse the bump argument, rewrite all five pyprojects, and re-lock."""
     parser = argparse.ArgumentParser(description="Bump all five packages in lockstep.")
@@ -130,6 +152,21 @@ def main() -> int:
     else:
         dunder_path.write_text(updated, encoding="utf-8")
         print(f"  updated {_DUNDER_PATH}")
+
+    for relative in _ACTION_PIN_FILES:
+        path = _REPO / relative
+        text = path.read_text(encoding="utf-8")
+        # Fail loudly rather than skip: a file that stopped carrying a pin has
+        # either been reworded or renamed, and silently dropping it from the
+        # rewrite is how the pin went stale in the first place.
+        if _ACTION_PIN_RE.search(text) is None:
+            sys.exit(f"error: no `guardana/guardana@vX.Y` pin found in {relative}")
+        updated = _rewrite_action_pin(text, new)
+        if args.dry_run:
+            print(f"  would update {relative}")
+        elif updated != text:
+            path.write_text(updated, encoding="utf-8")
+            print(f"  updated {relative}")
 
     if args.dry_run:
         print("dry run: uv.lock not re-locked; no files written.")
