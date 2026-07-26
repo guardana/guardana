@@ -162,7 +162,7 @@ Three ways, all real:
 ## Path 2: Python plugin (when YAML can't express the logic)
 
 Use this for custom parsers, stateful probes, or any check against an
-**artifact** target. Of the 25 built-in rules, 17 are build-time (artifact-kind)
+**artifact** target. Of the 27 built-in rules, 19 are build-time (artifact-kind)
 Python plugins — pickle opcodes (incl. ZIP-archive recursion), model format,
 Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk,
 remote-code (`trust_remote_code`/`torch.hub.load`) and its config form
@@ -308,3 +308,31 @@ def test_stays_silent_when_the_model_refuses() -> None:
     target = EndpointTarget("http://test", "m", transport=RefusingTransport())
     assert not list(MyRule().run(target, RuleContext()))
 ```
+
+### Testing a rule that reads a model file
+
+Artifact rules get the mirror image: builders that write a crafted model, so a
+*malicious* fixture is a dict literal in a test rather than a binary committed to
+your repository.
+
+```python
+from guardana.core.testing import build_gguf, build_onnx, build_safetensors
+
+# positive: a chat template that runs a shell command when rendered
+payload = "{{ lipsum.__globals__['os'].popen('id').read() }}"
+(tmp_path / "m.gguf").write_bytes(build_gguf({"tokenizer.chat_template": payload}))
+
+# negative: an inert model
+(tmp_path / "clean.safetensors").write_bytes(build_safetensors(metadata={"format": "pt"}))
+```
+
+Add a third fixture that your reader *cannot* parse, and assert your rule reports
+it. A rule that silently skips a file it failed to read is reporting "clean" about
+something it never looked at, which is the one failure mode this project treats as
+unacceptable.
+
+The parsing itself is not your job: `guardana.core.formats` ships bounded,
+fail-closed readers for GGUF, safetensors and ONNX, and its contract is in
+[`model-formats.md`](model-formats.md).
+[`examples/custom_rule/src/acme_rules/approved_model.py`](../examples/custom_rule/src/acme_rules/approved_model.py)
+is a complete rule built that way — every line of it is policy.

@@ -1,4 +1,3 @@
-import io
 import pickletools
 import zipfile
 from collections.abc import Iterable, Iterator
@@ -14,6 +13,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM03,
     OWASP_LLM05,
 )
+from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 _SUFFIXES = (".pkl", ".pickle", ".pt", ".ckpt", ".joblib", ".dill")
 _ALLOWED_MODULES = frozenset({"torch", "numpy", "collections"})
@@ -65,6 +65,13 @@ _XZ_MAGIC = b"\xfd7zXZ\x00"
 # tensor bytes negligible, so ordinary models produce no noise here.
 _NESTED_CONTAINER_MAGICS = (_ZIP_MAGIC, _7Z_MAGIC, _XZ_MAGIC)
 _MEMBER_MAX_BYTES = 64 * 1024 * 1024
+# A raw pickle stream is read whole because `pickletools` needs it, so the read
+# is capped: a model checkpoint is a zip container (streamed from disk below),
+# and a half-gigabyte *raw* pickle is anomalous rather than routine. Reading
+# without a cap turned a multi-GB `.pt` — or a symlink to /dev/zero — into an
+# out-of-memory kill of the whole scan.
+_MAX_PICKLE_BYTES = 512 * 1024 * 1024
+_MAGIC_SNIFF_BYTES = 8
 
 _UNSCANNED_TITLE = "Unscanned model file"
 
@@ -176,34 +183,48 @@ class PickleOpcodeRule(Rule):
             yield from self._scan(path)
 
     def _scan(self, path: Path) -> Iterator[Finding]:
-        try:
-            data = path.read_bytes()
-        except OSError:
+        sniffed = read_bytes_bounded(path, _MAGIC_SNIFF_BYTES)
+        if sniffed is None:
+            # Not a regular file (a FIFO named `model.pkl` blocks a plain read
+            # forever) or unreadable. Either way it is unexamined, not clean.
+            yield self._unscanned(path, "not a readable regular file; not scanned")
             return
-        if data[: len(_ZIP_MAGIC)] == _ZIP_MAGIC:
-            yield from self._scan_zip(path, data)
+        magic = sniffed[0]
+        if magic.startswith(_ZIP_MAGIC):
+            yield from self._scan_zip(path)
             return
-        if data[: len(_7Z_MAGIC)] == _7Z_MAGIC:
+        if magic.startswith(_7Z_MAGIC):
             yield self._unscanned(
                 path, "7z-compressed archive; cannot decompress to scan — treat as suspicious"
             )
             return
+        prefix = read_bytes_bounded(path, _MAX_PICKLE_BYTES)
+        if prefix is None:
+            yield self._unscanned(path, "not a readable regular file; not scanned")
+            return
+        data, oversized = prefix
         refs, truncated = _scan_opcodes(data)
         if refs:
             yield from (self._critical(path, ref) for ref in refs)
+        elif oversized:
+            yield self._unscanned(
+                path, f"raw pickle larger than {_MAX_PICKLE_BYTES} bytes; not scanned in full"
+            )
         elif truncated:
             yield self._unscanned(
                 path,
                 "could not parse as a pickle stream (may be a zip-based container); not scanned",
             )
 
-    def _scan_zip(self, path: Path, data: bytes) -> Iterator[Finding]:
+    def _scan_zip(self, path: Path) -> Iterator[Finding]:
+        # Opened from the path, not from bytes in memory: a checkpoint for a 7B
+        # model is a multi-GB zip, and holding it whole just to list its members
+        # would make scanning a real model cost more RAM than serving it.
         try:
-            with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                names = archive.namelist()
-                for name in names:
+            with zipfile.ZipFile(path) as archive:
+                for name in archive.namelist():
                     yield from self._scan_member(path, archive, name)
-        except zipfile.BadZipFile:
+        except (zipfile.BadZipFile, OSError):
             yield self._unscanned(path, "malformed zip container; not scanned")
 
     def _scan_member(self, path: Path, archive: zipfile.ZipFile, name: str) -> Iterator[Finding]:

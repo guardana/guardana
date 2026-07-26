@@ -159,9 +159,10 @@ the renderer prints them →
 
 `guardana rules` prints the catalogue grouped by layer, so you can see the split:
 
-- **Build-time (static, artifact)** — 17 rules: pickle-opcode scanning, unsafe
+- **Build-time (static, artifact)** — 19 rules: pickle-opcode scanning, unsafe
   deserialization sinks, `trust_remote_code`/`torch.hub.load`, config-`auto_map`
-  RCE, notebook payloads, Keras/TF/model-format code execution, malicious &
+  and kernel-dispatch RCE, chat-template SSTI, ONNX graph risk, notebook
+  payloads, Keras/TF/model-format code execution, advisory-backed malicious &
   hallucinated dependencies, insecure transport, hardcoded secrets, MCP tool
   poisoning, hidden-instruction "rules-file backdoors", and training-data
   integrity.
@@ -226,17 +227,31 @@ teach it a new backend (a `Target`) — same entry-point mechanism. A rule
 references an evaluator by string id, so swapping the grader never touches the
 rule.
 
+### Model formats you don't have to parse yourself
+A rule that inspects a model file needs to read a binary format first, and that is
+where scanners quietly go wrong — a byte window around a keyword both misses
+payloads further away and invents findings from unrelated neighbouring bytes.
+`guardana.core.formats` ships the parsing as public API (`read_gguf_metadata`,
+`read_safetensors_header`, `read_onnx_summary`): bounded, offline, deterministic,
+fail-closed, and returning **data, never a verdict**. Your pack brings the
+judgement; the engine brings the plumbing. Contract:
+[`model-formats.md`](model-formats.md).
+
 ### Test doubles, so your rule ships with proof
 Every rule — ours or yours — needs a **positive and a negative** fixture (proof it
 fires when it should and stays quiet when it shouldn't). `guardana.core.testing`
 ships scripted model doubles (`ScriptedTransport`, `RefusingTransport`,
 `ToolCallingScriptedTransport`, …) so a dynamic rule's two fixtures are a few
-lines and no network.
+lines and no network — and artifact builders (`build_gguf`, `build_safetensors`,
+`build_onnx`) so a static rule's *malicious* fixture is a dict literal instead of
+a binary committed to your repo.
 
 ### A complete, runnable example
-`examples/custom_rule/` is a real third-party package — a plugin rule, two YAML
+`examples/custom_rule/` is a real third-party package — two plugin rules, two YAML
 rules, and a custom classifier — discovered through entry points with zero changes
-to Guardana. That is the whole extensibility story in one folder.
+to Guardana. One of the plugin rules inspects a GGUF model file and consists
+entirely of policy, because the parsing comes from the engine. That is the whole
+extensibility story in one folder.
 
 ---
 

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from guardana.core.rule import RuleContext
+from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain.remote_code_config import RemoteCodeConfigRule
 
@@ -63,3 +64,49 @@ def test_non_config_json_is_ignored(tmp_path: Path) -> None:
 def test_malformed_json_config_does_not_crash(tmp_path: Path) -> None:
     (tmp_path / "config.json").write_text("{ not valid json", encoding="utf-8")
     assert _findings(tmp_path) == []
+
+
+def test_flags_the_internal_kernel_field_as_critical(tmp_path: Path) -> None:
+    # CVE-2026-4372: any `owner/repo` string in this private field is downloaded
+    # from the Hub and imported, and the kernel path sits outside the reach of
+    # trust_remote_code=False — the "safe mode" users rely on.
+    document = {"model_type": "llama", "_attn_implementation_internal": "attacker/kernel-repo"}
+    (tmp_path / "config.json").write_text(json.dumps(document))
+    findings = list(RemoteCodeConfigRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.severity for f in findings] == [Severity.CRITICAL]
+    assert findings[0].verdict is None
+    assert "CVE-2026-4372" in findings[0].evidence.summary
+
+
+def test_a_normal_model_reference_is_not_a_kernel_reference(tmp_path: Path) -> None:
+    # `_name_or_path` holds an `owner/repo` string in a large share of real
+    # configs on the Hub. Matching on shape alone would flag almost every model.
+    document = {"model_type": "llama", "_name_or_path": "meta-llama/Meta-Llama-3-8B"}
+    (tmp_path / "config.json").write_text(json.dumps(document))
+    assert list(RemoteCodeConfigRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+def test_a_builtin_attention_implementation_is_not_flagged(tmp_path: Path) -> None:
+    document = {"model_type": "llama", "_attn_implementation_internal": "flash_attention_2"}
+    (tmp_path / "config.json").write_text(json.dumps(document))
+    assert list(RemoteCodeConfigRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+def test_a_public_kernel_request_is_a_lead(tmp_path: Path) -> None:
+    # Asking for a Hub kernel through the documented field is an opt-in, so it is
+    # reported the way `trust_remote_code=True` is: a lead, not a compromise.
+    document = {"model_type": "llama", "attn_implementation": "kernels-community/flash-attn"}
+    (tmp_path / "config.json").write_text(json.dumps(document))
+    findings = list(RemoteCodeConfigRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.severity for f in findings] == [Severity.MEDIUM]
+    assert findings[0].verdict is not None
+
+
+def test_kernel_injection_and_auto_map_are_reported_separately(tmp_path: Path) -> None:
+    document = {
+        "auto_map": {"AutoModel": "modeling_evil.EvilModel"},
+        "_attn_implementation_internal": "attacker/kernel-repo",
+    }
+    (tmp_path / "config.json").write_text(json.dumps(document))
+    findings = list(RemoteCodeConfigRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert sorted(f.severity for f in findings) == sorted([Severity.MEDIUM, Severity.CRITICAL])

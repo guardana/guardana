@@ -7,6 +7,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import ATLAS_T0018, NIST_SUPPLY_CHAIN, OWASP_LLM05, OWASP_ML06
 from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 # TensorFlow SavedModel graph operators that touch the filesystem on model load.
 # In a serialized GraphDef these op types appear verbatim as ASCII, so a bounded
@@ -39,11 +40,10 @@ class SavedModelOpsRule(Rule):
             yield from self._scan(path)
 
     def _scan(self, path: Path) -> Iterator[Finding]:
-        try:
-            with path.open("rb") as handle:
-                data = handle.read(_MAX_SCAN_BYTES)
-        except OSError:
+        prefix = read_bytes_bounded(path, _MAX_SCAN_BYTES)
+        if prefix is None:
             return
+        data = prefix[0]
         for op in _FILESYSTEM_OPS:
             if op in data:
                 name = op.decode()

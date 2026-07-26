@@ -1,0 +1,7 @@
+{
+  "model_type": "llama",
+  "_name_or_path": "meta-llama/Meta-Llama-3-8B",
+  "_attn_implementation_internal": "attacker/kernel-repo",
+  "vocab_size": 32000,
+  "hidden_size": 4096
+}

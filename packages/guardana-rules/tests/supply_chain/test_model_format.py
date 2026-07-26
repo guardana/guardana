@@ -6,31 +6,12 @@ from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain.model_format import ModelFormatRule
 
 
-def test_flags_gguf_jinja_ssti(tmp_path: Path) -> None:
-    # minimal GGUF-like file carrying a dangerous chat_template string
-    (tmp_path / "m.gguf").write_bytes(b"GGUF...chat_template...{{ cycler.__init__.__globals__ }}")
-    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
-    assert any(f.severity.name == "HIGH" for f in findings)
-
-
 def test_safetensors_wellformed_not_flagged(tmp_path: Path) -> None:
     header = json.dumps({"weight": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}}).encode()
     blob = len(header).to_bytes(8, "little") + header + b"\x00\x00\x00\x00"
     (tmp_path / "w.safetensors").write_bytes(blob)
     findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert findings == []
-
-
-def test_keras_lambda_flagged(tmp_path: Path) -> None:
-    config = json.dumps(
-        {
-            "class_name": "Sequential",
-            "config": {"layers": [{"class_name": "Lambda", "config": {"function": "..."}}]},
-        }
-    ).encode()
-    (tmp_path / "m.keras").write_bytes(config)
-    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
-    assert any(f.severity.name == "HIGH" for f in findings)
 
 
 def test_safetensors_corrupt_header_low(tmp_path: Path) -> None:
@@ -41,16 +22,6 @@ def test_safetensors_corrupt_header_low(tmp_path: Path) -> None:
     findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert all(f.severity.name != "HIGH" for f in findings)
     assert all(f.severity.name == "INFO" for f in findings)
-
-
-def test_gguf_large_benign_file_is_fast_and_clean(tmp_path: Path) -> None:
-    # ~5MB of benign filler containing many `chat_template` occurrences but
-    # no SSTI sink token nearby; must scan quickly (bounded read + linear
-    # regex) and report zero findings.
-    filler = b"chat_template: hello world, nothing dangerous here. " * 90_000
-    (tmp_path / "big.gguf").write_bytes(b"GGUF" + filler[:5_000_000])
-    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
-    assert findings == []
 
 
 def test_safetensors_large_valid_header_not_flagged(tmp_path: Path) -> None:
@@ -93,12 +64,6 @@ def test_xml_suffix_routed_to_xxe_detector(tmp_path: Path) -> None:
     findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert len(findings) == 1
     assert findings[0].severity.name == "HIGH"
-
-
-def test_h5_suffix_routed_to_keras_detector(tmp_path: Path) -> None:
-    (tmp_path / "model.h5").write_bytes(b'{"class_name": "Lambda", "config": {}}')
-    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
-    assert any(f.severity.name == "HIGH" for f in findings)
 
 
 def test_utf16_xxe_caught_by_defused_parser(tmp_path: Path) -> None:

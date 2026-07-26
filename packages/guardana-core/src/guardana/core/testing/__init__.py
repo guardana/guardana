@@ -1,0 +1,44 @@
+"""Test doubles for writing rule tests without a network or a hand-crafted binary.
+
+Two families, one purpose: a rule fixture (a positive *and* a negative sample) is
+required for every rule Guardana ships, and the same bar applies to plugins.
+
+**Transports** stand in for a live model, so a dynamic rule can be graded
+end-to-end against a scripted one:
+
+    from guardana.core.target import EndpointTarget
+    from guardana.core.testing import RefusingTransport, ScriptedTransport
+
+    target = EndpointTarget("http://x", "m", transport=ScriptedTransport("Sure! Here goes..."))
+    assert list(MyRule().run(target, RuleContext()))          # positive: it fires
+
+    target = EndpointTarget("http://x", "m", transport=RefusingTransport())
+    assert not list(MyRule().run(target, RuleContext()))      # negative: it stays silent
+
+**Artifact builders** stand in for a model file, so a static rule can be driven
+against a crafted artifact without checking a malicious binary into the repo:
+
+    from guardana.core.testing import build_gguf
+
+    (tmp_path / "m.gguf").write_bytes(build_gguf({"tokenizer.chat_template": payload}))
+"""
+
+from guardana.core.testing.artifacts import build_gguf, build_onnx, build_safetensors
+from guardana.core.testing.transports import (
+    EchoingTransport,
+    FailingTransport,
+    RefusingTransport,
+    ScriptedTransport,
+    ToolCallingScriptedTransport,
+)
+
+__all__ = [
+    "EchoingTransport",
+    "FailingTransport",
+    "RefusingTransport",
+    "ScriptedTransport",
+    "ToolCallingScriptedTransport",
+    "build_gguf",
+    "build_onnx",
+    "build_safetensors",
+]

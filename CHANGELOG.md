@@ -7,6 +7,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Public model-format readers — `guardana.core.formats`.** Bounded, offline,
+  deterministic, fail-closed readers for GGUF metadata and safetensors headers.
+  They return data and no verdicts, so a third-party pack can ship threat
+  knowledge without first writing a binary parser. Sizes claimed *inside* a file
+  are checked against an explicit `Limits` before anything is allocated, so a
+  crafted artifact costs a `FormatError`, not the scan. `guardana.core.testing`
+  gains `build_gguf` / `build_safetensors`, so a crafted fixture is a dict
+  literal in a test rather than a malicious binary in the repo.
+- **New rule `guardana.supply_chain.chat_template` (CRITICAL/HIGH).** A model's
+  chat template is Jinja source that ships inside the artifact and renders the
+  moment the model is used — a gadget in it executes code with no inference and
+  no `trust_remote_code` (CVE-2024-34359 in llama-cpp-python; CVE-2026-5760 in
+  SGLang's rerank path, 2026). The rule reads the template as a *parsed value*
+  from every carrier it can hide in: GGUF `tokenizer.chat_template`,
+  `tokenizer_config.json` (both the string and the named-list form),
+  `chat_template.json`, and the standalone `chat_template.jinja` that
+  transformers has written by default since 4.47. It flags dunder chains, the
+  `|attr` sandbox escape (CVE-2025-27516 — the escape from the very sandbox
+  `transformers` renders templates in), `lipsum`/`cycler` gadget entry points,
+  shell/`os` sinks, and template inclusion (HIGH). A template it cannot read is
+  reported as *not scanned*, never as clean.
+
+- **`remote_code_config` covers kernel-dispatch config injection (CVE-2026-4372).**
+  A `config.json` whose private `_attn_implementation_internal` field names a Hub
+  repository gets that repository downloaded and imported on load — and the kernel
+  path never consults `trust_remote_code`, so `trust_remote_code=False` does not
+  stop it. That is CRITICAL, and it is matched by key name rather than by value
+  shape, because `_name_or_path` carries an identical-looking `owner/repo` string
+  in most real configs. A kernel requested through the documented
+  `attn_implementation` field is reported the way `trust_remote_code=True` is: a
+  lead. Affects transformers 4.56.0–5.2.x with `kernels` installed; fixed in 5.3.0.
+
+- **`hidden_instructions` reads safetensors `__metadata__`.** safetensors is the
+  format people choose precisely because it cannot carry code, which makes its one
+  free-text channel the natural hiding place for a directive in an artifact
+  reviewers treat as inert — and hubs render it while agents read it back. Same
+  contract as the rest of the rule: concealment is the signal, not prose.
+
+- **New rule `guardana.supply_chain.onnx_graph` (HIGH/MEDIUM).** ONNX carries no
+  pickle, which is why scanners skip it — ModelScan covers H5, pickle and
+  SavedModel only. Three of its structural features are worth reading, and the
+  rule reads all three: an operator **domain outside the standard set** (the
+  runtime has to register a native operator library, i.e. machine code, before
+  the model will run), an **`external_data` location** that climbs out of the
+  model directory or is absolute (an arbitrary file-read primitive — firm HIGH),
+  and **`metadata_props`** carrying invisible smuggling characters or an
+  executable-looking payload. The graph is walked straight off disk with a
+  dependency-free streaming protobuf reader that seeks past tensor payloads, so a
+  multi-gigabyte model costs kilobytes of reading. A graph it cannot walk — or
+  could not finish walking — is reported as *not scanned*.
+  `guardana.core.testing.build_onnx` builds the fixtures.
+
+- **`malicious_dependency` is advisory-backed.** A bundled, offline, **AI/ML-only**
+  dataset replaces the one-package blocklist. It is deliberately not a general CVE
+  feed — that stays a non-goal — because an entry only earns its place by closing
+  the loop between an artifact this scan already finds and the code that would run
+  it. Two channels: a **compromised release** (`ultralytics` 8.3.41–46, `lightning`
+  2.6.2/2.6.3, the `torchtriton` dependency-confusion name), which is the only
+  signal that catches a *legitimate* package that was poisoned; and a **vulnerable
+  loader** — `transformers` <5.3.0 for the kernel-injection config, `llama-cpp-python`
+  and `sglang` for a poisoned chat template, `torch` <2.6 for a pickle, `keras`
+  <3.11.3 for an `.h5` Lambda — reported as a lead, because it matters only once
+  something poisoned reaches it. Only *exact* pins are matched (a range constraint
+  pins nothing, and guessing would manufacture findings). Every entry carries a
+  public reference, a malformed dataset raises at load rather than scanning as
+  empty, and `MaliciousDependencyRule(advisories=…)` takes your own.
+- **A worked extension example on the new primitives.**
+  [`docs/model-formats.md`](docs/model-formats.md) documents the reader contract,
+  and `examples/custom_rule` gains a second plugin rule that inspects a GGUF model
+  and is *entirely* policy — the binary parsing comes from the engine.
+
+### Changed
+
+- **The legacy `.h5` Keras Lambda finding is firm, not a lead.** It is matched on
+  the exact `"class_name": "Lambda"` marker instead of the bare word, so a layer a
+  user merely *named* "Lambda" is no longer reported as code execution — and since
+  `load_model` silently ignores `safe_mode` for `.h5` (CVE-2025-9905), a declared
+  Lambda there *will* run, which is a verdict rather than a hedge. A `.keras` file
+  that is not a readable archive falls back to the byte marker and, failing that,
+  is reported as *not scanned*.
+- **`model_format` no longer inspects Keras or GGUF files.** Those formats belong
+  to `keras_lambda` and `chat_template`; previously a single `.h5` Lambda produced
+  two findings at two different severities.
+
+### Fixed
+
+- **Security: a crafted repository could stall a scan indefinitely.** Every binary
+  scanner (`pickle_opcode`, `keras_lambda`, `model_format`, `saved_model_ops`,
+  `hardcoded_secret`) opened files directly, so a FIFO named `model.pkl` blocked
+  the read until a writer appeared — forever, in CI. All of them now go through one
+  guarded bounded reader, and the file is reported as *not scanned* rather than
+  skipped in silence. The same guard covers `guardana.core.formats`.
+- **Security: scanning a real checkpoint could exhaust memory.** `pickle_opcode`
+  read whole files with `path.read_bytes()`, so a multi-GB `.pt` — or a symlink to
+  `/dev/zero` — took the scan down with it. Zip containers are now streamed from
+  disk instead of held in memory, and a *raw* pickle is capped at 512 MiB and
+  reported as not fully scanned beyond that.
+- **Security: a chat-template payload could hide past the scanner.**
+  `model_format` looked for a Jinja gadget only within 4 KiB of the literal
+  `chat_template`, so a gadget appended to the end of a real 8 KiB template
+  scanned clean — verified against the shipping rule before the fix. The
+  template value is now graded in full, whatever its length.
+- **Security: the same window produced findings out of thin air.** Because the
+  scan covered a byte window rather than a value, a code model's vocabulary
+  (which contains tokens like `__init__`) was reported as a HIGH chat-template
+  gadget on a model carrying no chat template at all.
+- **One fact, one finding.** `model_format` no longer inspects `.gguf`;
+  ownership sits with `chat_template`, so a single poisoned template can no
+  longer produce two findings at two severities.
+
 ## [0.1.3] - 2026-07-21
 
 ### Added

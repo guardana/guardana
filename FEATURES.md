@@ -47,7 +47,7 @@ on MEDIUM so leads block a training run), `--preset monitor` (fail on HIGH and o
 inconclusive). A preset tunes only the failure bar; the command still picks the
 layer. Mutually exclusive with `--profile`.
 
-### 25 built-in rules, mapped to the frameworks auditors speak
+### 27 built-in rules, mapped to the frameworks auditors speak
 
 Every finding carries typed OWASP LLM Top 10 / MITRE ATLAS / NIST references.
 
@@ -56,21 +56,23 @@ Every finding carries typed OWASP LLM Top 10 / MITRE ATLAS / NIST references.
 | `guardana.supply_chain.pickle_opcode` | CRITICAL | Pickle payloads (incl. inside `.pt`) importing non-allowlisted callables — arbitrary code on `load()`. |
 | `guardana.supply_chain.dependency_risk` | HIGH | Unsafe deserialization sinks in source: the pickle family (`pickle`/`joblib`/`dill`/`pandas.read_pickle`), `torch.load` without `weights_only=True`, `yaml.load` with an unsafe `Loader` (value-aware, keyword or positional), `numpy.load` with `allow_pickle`. |
 | `guardana.supply_chain.remote_code` | HIGH | `trust_remote_code=True` on a transformers/datasets load, and `torch.hub.load(...)` (runs a remote repo's `hubconf.py`) — arbitrary code from a Hub repo at load time (today's most common model-download RCE). |
-| `guardana.supply_chain.remote_code_config` | HIGH/MED | A model `config.json` whose `auto_map`/`custom_pipelines` points at custom Python run on a `trust_remote_code=True` load — the artifact form of the RCE the `.py` scan can't see; HIGH when the module ships alongside. |
+| `guardana.supply_chain.remote_code_config` | CRITICAL/HIGH/MED | A model `config.json` that asks for code to run on load. `auto_map`/`custom_pipelines` point at custom Python run under `trust_remote_code=True` (HIGH when the module ships alongside) — the artifact form of the RCE the `.py` scan can't see. **`_attn_implementation_internal` naming a Hub repo is CRITICAL: the kernel-dispatch path ignores `trust_remote_code=False`, so the "safe mode" does not stop it (CVE-2026-4372, transformers 4.56–5.2.x with `kernels`; fixed in 5.3.0).** Matched by key name, never by value shape — `_name_or_path` looks identical and appears in most real configs. |
 | `guardana.supply_chain.notebook_payload` | HIGH | Dangerous sinks inside Jupyter `.ipynb` code cells — `eval`/`exec`/`os.system`/`shell=True`, and `!curl … \| sh` shell escapes; an unparseable cell is surfaced, never silently skipped. |
 | `guardana.training.dataset_integrity` | MED/LOW | Training-data hygiene: a Hugging Face dataset loading script (code runs on load) and unpinned `load_dataset(...)` (a swappable, poisonable source). |
 | `guardana.supply_chain.code_execution` | HIGH | Dynamic code / shell sinks in source: builtin `eval`/`exec`, `os.system`, `subprocess(..., shell=True)` — distinguishing `df.eval(...)` (a method) from the dangerous builtin. |
 | `guardana.supply_chain.insecure_transport` | HIGH/MED | TLS verification disabled (`verify=False` → MITM) and model/dataset fetched over plaintext `http://` (a lead; localhost excluded). |
-| `guardana.supply_chain.keras_lambda` | HIGH/MED | Keras `Lambda` layer — arbitrary Python that runs on `load_model` (`.keras` parsed structurally, legacy `.h5` bytes-scanned); escalates when it references `os`/`subprocess`/…. CVE-2025-1550/9905. |
+| `guardana.supply_chain.keras_lambda` | HIGH | Keras `Lambda` layer — arbitrary Python that runs on `load_model`. `.keras` is parsed structurally; legacy `.h5`/`.hdf5` is matched on the exact `"class_name": "Lambda"` marker and is a **firm** finding, because `load_model` silently ignores `safe_mode` for that format (CVE-2025-9905) — a layer merely *named* "Lambda" is not flagged. Escalates when the body references `os`/`subprocess`/…. A model whose config could not be read is reported as *not scanned*. CVE-2025-1550/9905. |
 | `guardana.supply_chain.saved_model_ops` | MEDIUM | TensorFlow SavedModel `ReadFile`/`WriteFile` graph operators — load-time filesystem read/overwrite (lead; JFrog TFLOW-MALOPS). |
-| `guardana.supply_chain.malicious_dependency` | HIGH/MED | Known-malicious package releases (curated blocklist, e.g. the `ultralytics` compromise) in manifests, plus install-time network fetch in `setup.py`. |
-| `guardana.supply_chain.model_format` | HIGH | Model files in formats that can carry code; a well-formed safetensors file is never flagged. |
+| `guardana.supply_chain.malicious_dependency` | HIGH/MED | **Advisory-backed**, from a bundled offline **AI/ML-only** dataset (never a general CVE feed — that is an explicit non-goal). Two channels: a **compromised release** (`ultralytics` 8.3.41–46, `lightning` 2.6.2/2.6.3, the `torchtriton` dependency-confusion name) — the one signal that catches a *legitimate* package which was poisoned — and a **vulnerable loader**, a library whose flaw is what arms an artifact this same scan finds (`transformers` <5.3.0 ↔ the kernel-injection config, `llama-cpp-python`/`sglang` ↔ a poisoned chat template, `torch` <2.6 ↔ a pickle, `keras` <3.11.3 ↔ an `.h5` Lambda). Only *exact* pins are matched, so a range constraint never manufactures a version. Every entry carries a public reference; a malformed dataset fails loudly at load. Bring your own with `MaliciousDependencyRule(advisories=…)`. Plus install-time network fetch in `setup.py`. |
+| `guardana.supply_chain.model_format` | HIGH/INFO | XXE in PMML/XML model files, and safetensors container integrity (a well-formed safetensors file is never flagged). Format-specific depth belongs to the rule that owns the format — `keras_lambda`, `chat_template` — so one artifact never yields two findings about one fact. |
+| `guardana.supply_chain.chat_template` | CRITICAL/HIGH | **Chat-template SSTI.** The Jinja template that ships *inside* a model runs the moment the model is used — a gadget in it is code execution with no inference and no `trust_remote_code`. Read as a parsed value (not a byte window) from all four carriers: GGUF `tokenizer.chat_template`, `tokenizer_config.json` (string *and* named-list form), a standalone `chat_template.jinja`, and `chat_template.json`. Catches dunder chains, the `\|attr` sandbox escape (CVE-2025-27516), `lipsum`/`cycler` gadget entry points, shell/`os` sinks, and template inclusion (HIGH). An unreadable template is reported as *not scanned*, never as clean. CVE-2024-34359, CVE-2026-5760. |
+| `guardana.supply_chain.onnx_graph` | HIGH/MED | **ONNX, which pickle scanners skip entirely** (ModelScan covers H5/pickle/SavedModel only). Walks the graph structure straight off disk — a multi-GB model costs kilobytes of reading. Flags an operator **domain outside the standard set** (the runtime must register a native operator library to run the model — machine code at inference), an **`external_data` path** that climbs out of the model directory or is absolute (an arbitrary file-read primitive — HIGH, firm), and **`metadata_props`** carrying invisible smuggling characters or executable-looking payloads. A graph it cannot walk, or could not finish walking, is reported as *not scanned*. |
 | `guardana.supply_chain.hallucinated_package` | MEDIUM | Imports of unknown packages — slopsquat *leads*, at honest lead-level confidence. |
 | `guardana.supply_chain.provenance` | MEDIUM | Unpinned model downloads and missing licenses (leads). |
 | `guardana.supply_chain.hardcoded_secret` | HIGH | Current-era keys — `sk-proj-`/`sk-ant-api03-` (OpenAI/Anthropic), GitHub token forms, private-key headers — across Python, config, **and** web/systems source (`.ts`/`.js`/`.go`/`.java`/`.rs`/`.tf`/…). Opt-in `entropy: true` mode also catches provider-less secrets (a DB password, a shared JWT key). |
 | `guardana.output.secrets` | HIGH | A live model leaking secret-shaped strings in its replies to benign probes. |
 | `guardana.prompt.mcp_tool_poisoning` | HIGH/MED | Hidden instructions in an MCP tool manifest — invisible Unicode, instruction-override phrases, base64 payloads in tool descriptions (indirect prompt injection). |
-| `guardana.prompt.hidden_instructions` | HIGH | Invisible instruction-smuggling characters (bidi overrides, the Unicode Tags block, zero-width) in agent rule files (`.cursorrules`) and Markdown model cards — the "Rules File Backdoor". Concealment, not imperative prose, is the signal. |
+| `guardana.prompt.hidden_instructions` | HIGH | Invisible instruction-smuggling characters (bidi overrides, the Unicode Tags block, zero-width) in agent rule files (`.cursorrules`), Markdown model cards, **and a safetensors `__metadata__` block** — the one free-text channel in the format everyone picks *because* it cannot carry code, and one that hubs render and agents read back. The "Rules File Backdoor" mechanism. Concealment, not imperative prose, is the signal. |
 | `guardana.prompt.injection.ignore_previous` | HIGH | Direct instruction-override injection. |
 | `guardana.prompt.jailbreak.dan_style` | HIGH | Persona-override / encoding-smuggling jailbreaks. |
 | `guardana.scenario.gradual_jailbreak` | HIGH | **Multi-turn** escalation the single prompts miss — a scripted conversation graded per step and as a whole. |
@@ -138,10 +140,21 @@ a multi-turn scenario's escalation is folded in, never dropped. Public API:
   `guardana.targets` — discovered identically for built-ins and third-party
   packages; namespace by id, override built-ins, or go YAML-only with
   `--no-plugins`.
+- **Public model-format readers** (`guardana.core.formats`, documented in
+  [`docs/model-formats.md`](docs/model-formats.md)): `read_gguf_metadata`,
+  `read_safetensors_header`, `read_onnx_summary`. Bounded, offline,
+  deterministic, and fail-closed — sizes claimed *inside* a file are checked
+  before anything is allocated, a non-regular file is refused rather than
+  opened, and anything unparseable raises `FormatError` instead of reading as
+  "clean". They return data and never a verdict, which is the whole point: your
+  pack brings the threat knowledge, the engine brings the binary parsing. Adding
+  a reader for a new format is a module with one function.
 - **Test doubles included** (`guardana.core.testing`): `ScriptedTransport`,
   `RefusingTransport`, `EchoingTransport`, `ToolCallingScriptedTransport`,
   `FailingTransport` — a positive and negative fixture for your dynamic rule is
-  a few lines, no network.
+  a few lines, no network. Plus artifact builders `build_gguf`,
+  `build_safetensors`, `build_onnx`, so a crafted *malicious* fixture for a
+  static rule is a dict literal in a test instead of a binary in your repo.
 - **Embeddable engine** — drive `Registry` + `Runner` from your own code and
   skip the CLI entirely.
 - A complete runnable third-party package: [`examples/custom_rule/`](examples/custom_rule/).

@@ -1,0 +1,5 @@
+pytorch:V
+"Conv
+"Relu:ai.onnx
+"SecretOp:com.evil.ops*!j
+location../../../etc/passwd

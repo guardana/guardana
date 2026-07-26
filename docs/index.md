@@ -28,6 +28,7 @@ detail below.
 
 - [`architecture.md`](architecture.md) — the five abstractions, the Registry, the core↔server boundary
 - [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin, and ship it
+- [`model-formats.md`](model-formats.md) — the public GGUF / safetensors / ONNX readers your rule builds on, and their bounded, fail-closed contract
 - [`extending.md`](extending.md) — add a Rule, an Evaluator, or a Target; the entry-point contract
 
 ## Runnable example
@@ -35,9 +36,11 @@ detail below.
 [`examples/custom_rule/`](../examples/custom_rule/) is a complete,
 installable third-party extension (fictional company "Acme") that declares
 its own `guardana.rules` and `guardana.evaluators` entry points and ships,
-under an `acme.*` namespace, a Python plugin rule, two YAML rules, and a
+under an `acme.*` namespace, two Python plugin rules, two YAML rules, and a
 **custom classifier** (an `Evaluator`) — with tests proving Guardana
-discovers and uses each one end-to-end.
+discovers and uses each one end-to-end. One of the plugin rules inspects a
+**GGUF model file** and is pure policy, because the binary parsing comes from
+[`model-formats.md`](model-formats.md).
 [`examples/guardana.yaml`](../examples/guardana.yaml) is a sample profile
 that includes both Guardana's built-ins and Acme's custom rules.
 

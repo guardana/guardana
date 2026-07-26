@@ -14,7 +14,7 @@ that runs on your laptop, in CI, and next to a served model.**
 [![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Quickstart](#quickstart) · [Features](FEATURES.md) · [The 25 rules](#whats-in-the-box) · [Docs](docs/index.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
+[Quickstart](#quickstart) · [Features](FEATURES.md) · [The 27 rules](#whats-in-the-box) · [Docs](docs/index.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
 
 </div>
 
@@ -160,7 +160,7 @@ in [`docs/integrations.md`](docs/integrations.md).
 
 ## What's in the box
 
-Twenty-five built-in rules, every finding tagged into the frameworks your compliance
+Twenty-seven built-in rules, every finding tagged into the frameworks your compliance
 process already speaks:
 
 | Rule id | Severity | Kind | Standards |
@@ -168,7 +168,9 @@ process already speaks:
 | `guardana.supply_chain.pickle_opcode` | CRITICAL | artifact | OWASP LLM03/LLM05 · ATLAS T0018 · NIST supply-chain |
 | `guardana.supply_chain.dependency_risk` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
 | `guardana.supply_chain.remote_code` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
-| `guardana.supply_chain.remote_code_config` | HIGH | artifact | OWASP LLM03 · ATLAS T0018 · NIST supply-chain |
+| `guardana.supply_chain.remote_code_config` | CRITICAL/HIGH | artifact | OWASP LLM03 · ATLAS T0018 · NIST supply-chain |
+| `guardana.supply_chain.chat_template` | CRITICAL/HIGH | artifact | OWASP LLM03/LLM05 · ATLAS T0018 · NIST supply-chain |
+| `guardana.supply_chain.onnx_graph` | HIGH/MEDIUM | artifact | OWASP LLM03/LLM05 · ATLAS T0018 · NIST supply-chain |
 | `guardana.supply_chain.notebook_payload` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
 | `guardana.training.dataset_integrity` | MEDIUM | artifact | OWASP LLM04 · ML02 · NIST poisoning |
 | `guardana.supply_chain.code_execution` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
@@ -290,7 +292,7 @@ core. Where it's headed:
 
 | Version | Theme | Highlights |
 |---|---|---|
-| **v0.1** *(current)* | Reliable core | 25 rules · supply-chain + training-data + config-RCE + notebook + rules-file-backdoor · runtime: injection, jailbreaks, RAG-injection, **excessive-agency (tool-calling)**, **unbounded-consumption**, canary leak · scan/probe/monitor · LLM-judge & guard evaluators · SARIF & CI gate · plugin engine · optional collector |
+| **v0.1** *(current)* | Reliable core | 27 rules · supply-chain + training-data + config-RCE + **chat-template SSTI** + **ONNX graph** + advisory-backed deps + notebook + rules-file-backdoor · runtime: injection, jailbreaks, RAG-injection, **excessive-agency (tool-calling)**, **unbounded-consumption**, canary leak · scan/probe/monitor · LLM-judge & guard evaluators · SARIF & CI gate · plugin engine · optional collector |
 | **v0.2** | Depth & calibration | OSV/CVE dependency matching + aliased imports · measured judge calibration (ECE/Brier) · engine robustness (plugin isolation, `errors` channel) · official GitHub Action & pre-commit hook |
 | **v0.3** | Sharpen runtime depth | Sharpen LLM10 (finish_reason/latency signal) · deeper LLM06 tool-chains · adaptive attackers (Crescendo/GOAT) · behavioural drift gate · PII/toxicity evaluators |
 | **v0.4+** | Compliance & provenance | AIBOM / CycloneDX ML-BOM export · model-signature verification · fine-tuning dataset hygiene |

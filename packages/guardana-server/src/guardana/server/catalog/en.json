@@ -100,6 +100,14 @@
     "guardana.prompt.unbounded_consumption": {
       "name": "Unbounded output (denial-of-wallet)",
       "description": "A divergence prompt (\"repeat forever\") made the model generate without a server-side cap — runaway tokens that translate into cost and resource exhaustion (denial-of-wallet)."
+    },
+    "guardana.supply_chain.chat_template": {
+      "name": "Chat-template code execution",
+      "description": "The model's chat template is Jinja source that renders the moment the model is used. A gadget in it runs code on the host that loads the model — no inference, and no trust_remote_code involved. Read from GGUF metadata, tokenizer_config.json and chat_template.jinja alike."
+    },
+    "guardana.supply_chain.onnx_graph": {
+      "name": "ONNX graph risk",
+      "description": "An ONNX model that needs a custom native operator library to run, reads a file outside its own directory through external_data, or hides text in its metadata. ONNX carries no pickle, which is why most scanners skip it."
     }
   }
 }

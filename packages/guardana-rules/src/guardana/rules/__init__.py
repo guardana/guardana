@@ -9,6 +9,7 @@ from guardana.rules.agent.excessive_agency import ExcessiveAgencyRule
 from guardana.rules.output.secrets import OutputSecretsRule
 from guardana.rules.prompt.hidden_instructions import HiddenInstructionsRule
 from guardana.rules.prompt.mcp_tool_poisoning import McpToolPoisoningRule
+from guardana.rules.supply_chain.chat_template import ChatTemplateRule
 from guardana.rules.supply_chain.code_execution import CodeExecutionRule
 from guardana.rules.supply_chain.dependency_risk import DependencyRiskRule
 from guardana.rules.supply_chain.hallucinated_package import HallucinatedPackageRule
@@ -18,6 +19,7 @@ from guardana.rules.supply_chain.keras_lambda import KerasLambdaRule
 from guardana.rules.supply_chain.malicious_dependency import MaliciousDependencyRule
 from guardana.rules.supply_chain.model_format import ModelFormatRule
 from guardana.rules.supply_chain.notebook_payload import NotebookPayloadRule
+from guardana.rules.supply_chain.onnx_graph import OnnxGraphRule
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule
 from guardana.rules.supply_chain.provenance import ProvenanceRule
 from guardana.rules.supply_chain.remote_code import RemoteCodeRule
@@ -51,6 +53,8 @@ def provide_rules() -> list[Rule]:
         HallucinatedPackageRule(),
         HardcodedSecretRule(),
         ModelFormatRule(),
+        ChatTemplateRule(),
+        OnnxGraphRule(),
         NotebookPayloadRule(),
         ProvenanceRule(),
         OutputSecretsRule(),

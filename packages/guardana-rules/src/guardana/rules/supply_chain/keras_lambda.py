@@ -1,4 +1,5 @@
 import json
+import re
 import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -9,6 +10,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import ATLAS_T0018, NIST_SUPPLY_CHAIN, OWASP_LLM05, OWASP_ML06
 from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 # A Keras `Lambda` layer wraps an arbitrary Python callable that runs on
 # `load_model` — a code-execution primitive, no inference needed. `safe_mode` is
@@ -19,8 +21,12 @@ _LAMBDA = "Lambda"
 # malicious rather than a benign in-graph tensor op — Keras 3.9's own fix draws
 # the same line by whitelisting Keras-internal modules only.
 _DANGEROUS_MODULES = ("os", "subprocess", "sys", "socket", "shutil", "pty", "importlib")
-_H5_MARKER = b'"Lambda"'
+# The model config is JSON wherever it is stored, and a Lambda layer declares
+# itself with this exact key/value pair. Matching the bare word "Lambda" instead
+# reported any layer a user happened to *name* "Lambda" as code execution.
+_CLASS_MARKER = re.compile(rb'"class_name"\s*:\s*"Lambda"')
 _MAX_CONFIG_BYTES = 16 * 1024 * 1024
+_UNSCANNED_TITLE = "Keras model not scanned"
 
 
 def _iter_lambda_configs(node: object) -> Iterator[object]:
@@ -57,51 +63,67 @@ class KerasLambdaRule(Rule):
     )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Parse `.keras` archives structurally; bytes-scan legacy `.h5`/`.hdf5`."""
+        """Parse `.keras` archives structurally; scan legacy `.h5`/`.hdf5` for the class marker."""
         if not isinstance(target, ArtifactTarget):
             return
         for path in target.iter_files((".keras",)):
             yield from self._scan_keras(path)
         for path in target.iter_files((".h5", ".hdf5")):
-            yield from self._scan_h5(path)
+            yield from self._byte_scan(path, fallback_reason=None)
 
     def _scan_keras(self, path: Path) -> Iterator[Finding]:
         config = _read_keras_config(path)
         if config is None:
+            # Real `.keras` files are zip archives. A file that is not one is
+            # malformed, so fall back to the byte marker — a payload inside a
+            # deliberately broken archive must not become invisible.
+            yield from self._byte_scan(path, fallback_reason="not a readable .keras archive")
             return
         for lambda_config in _iter_lambda_configs(config):
             module = _dangerous_module(lambda_config)
             summary = "Keras Lambda layer runs arbitrary code on load"
             if module is not None:
                 summary += f"; references the {module!r} module (near-certain malicious)"
-            yield Finding(
-                rule_id=self.meta.id,
-                severity=self.meta.severity,
-                title=self.meta.title,
-                taxonomy=self.meta.taxonomy,
-                target_ref=str(path),
-                evidence=Evidence(summary=summary, detail=f"file={path.name}"),
-            )
+            yield self._finding(path, summary)
 
-    def _scan_h5(self, path: Path) -> Iterator[Finding]:
-        try:
-            with path.open("rb") as handle:
-                data = handle.read(_MAX_CONFIG_BYTES)
-        except OSError:
+    def _byte_scan(self, path: Path, *, fallback_reason: str | None) -> Iterator[Finding]:
+        prefix = read_bytes_bounded(path, _MAX_CONFIG_BYTES)
+        if prefix is None:
+            yield self._unscanned(path, "file could not be read")
             return
-        if _H5_MARKER not in data:
-            return
-        yield Finding(
+        data, truncated = prefix
+        if _CLASS_MARKER.search(data) is not None:
+            # Firm, not a lead: the config declares the layer, and `load_model`
+            # ignores `safe_mode` for the legacy format (CVE-2025-9905), so this
+            # will execute.
+            yield self._finding(path, "model config declares a Lambda layer, which runs on load")
+        elif fallback_reason is not None:
+            yield self._unscanned(path, fallback_reason)
+        elif truncated:
+            yield self._unscanned(path, f"only the first {_MAX_CONFIG_BYTES} bytes were read")
+
+    def _finding(self, path: Path, summary: str) -> Finding:
+        return Finding(
             rule_id=self.meta.id,
-            severity=Severity.MEDIUM,
+            severity=self.meta.severity,
             title=self.meta.title,
             taxonomy=self.meta.taxonomy,
             target_ref=str(path),
+            evidence=Evidence(summary=summary, detail=f"file={path.name}"),
+        )
+
+    def _unscanned(self, path: Path, reason: str) -> Finding:
+        return Finding(
+            rule_id=self.meta.id,
+            severity=Severity.LOW,
+            title=_UNSCANNED_TITLE,
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
             evidence=Evidence(
-                summary="legacy HDF5 model references a Lambda layer (arbitrary code on load)",
+                summary=f"Keras model not scanned for Lambda layers: {reason}",
                 detail=f"file={path.name}",
             ),
-            verdict=lead_verdict("HDF5 Lambda marker found by bytes-scan; a lead, not a certainty"),
+            verdict=lead_verdict("the model config could not be read, so nothing was cleared"),
         )
 
 

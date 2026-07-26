@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "advisories": [
+    {
+      "id": "GUARDANA-ADV-2024-ULTRALYTICS",
+      "package": "ultralytics",
+      "kind": "malicious_release",
+      "versions": ["8.3.41", "8.3.42", "8.3.45", "8.3.46"],
+      "severity": "high",
+      "summary": "compromised build pipeline shipped a cryptominer downloader; 8.3.43 is the clean release",
+      "reference": "https://blog.pypi.org/posts/2024-12-11-ultralytics-attack-analysis/"
+    },
+    {
+      "id": "GUARDANA-ADV-2026-LIGHTNING",
+      "package": "lightning",
+      "kind": "malicious_release",
+      "versions": ["2.6.2", "2.6.3"],
+      "severity": "high",
+      "summary": "credential-stealing payload runs on import (GitHub/npm/AWS/Azure/GCP tokens); 2.6.1 is the last known-clean release",
+      "reference": "https://socket.dev/blog/lightning-pypi-package-compromised"
+    },
+    {
+      "id": "GUARDANA-ADV-2022-TORCHTRITON",
+      "package": "torchtriton",
+      "kind": "malicious_release",
+      "versions": ["*"],
+      "severity": "high",
+      "summary": "dependency-confusion package: the name on PyPI is not PyTorch's; the legitimate dependency is pytorch-triton on PyTorch's own index",
+      "reference": "https://pytorch.org/blog/compromised-nightly-dependency/"
+    },
+    {
+      "id": "GUARDANA-ADV-2026-4372-TRANSFORMERS",
+      "package": "transformers",
+      "kind": "vulnerable_loader",
+      "versions": [">=4.56.0,<5.3.0"],
+      "severity": "medium",
+      "summary": "CVE-2026-4372: a config.json field can name a Hub kernel repository that is downloaded and imported on load, outside the reach of trust_remote_code=False (requires the 'kernels' extra)",
+      "reference": "https://github.com/huggingface/transformers/security/advisories"
+    },
+    {
+      "id": "GUARDANA-ADV-2024-34359-LLAMA-CPP-PYTHON",
+      "package": "llama-cpp-python",
+      "kind": "vulnerable_loader",
+      "versions": ["<0.2.72"],
+      "severity": "medium",
+      "summary": "CVE-2024-34359: a GGUF model's chat template is rendered with an unsandboxed Jinja2 environment, so a template gadget executes code on load",
+      "reference": "https://github.com/abetlen/llama-cpp-python/security/advisories/GHSA-56xg-wfcc-g829"
+    },
+    {
+      "id": "GUARDANA-ADV-2026-5760-SGLANG",
+      "package": "sglang",
+      "kind": "vulnerable_loader",
+      "versions": ["0.5.9"],
+      "severity": "medium",
+      "summary": "CVE-2026-5760: the rerank endpoint renders a model-supplied chat template with jinja2.Environment() instead of the sandboxed one, giving RCE on the inference server",
+      "reference": "https://github.com/sgl-project/sglang/security/advisories"
+    },
+    {
+      "id": "GUARDANA-ADV-2025-32434-TORCH",
+      "package": "torch",
+      "kind": "vulnerable_loader",
+      "versions": ["<2.6.0"],
+      "severity": "medium",
+      "summary": "CVE-2025-32434: torch.load reaches code execution even with weights_only=True, so the documented safe path is not one",
+      "reference": "https://github.com/pytorch/pytorch/security/advisories/GHSA-53q9-r3pm-6pq6"
+    },
+    {
+      "id": "GUARDANA-ADV-2025-9905-KERAS",
+      "package": "keras",
+      "kind": "vulnerable_loader",
+      "versions": [">=3.0.0,<3.11.3"],
+      "severity": "medium",
+      "summary": "CVE-2025-9905: load_model silently ignores safe_mode for legacy .h5/.hdf5 files, so a Lambda layer in one executes regardless",
+      "reference": "https://github.com/advisories/GHSA-36rr-ww3j-vrjv"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM02
 from guardana.rules._secrets import ALLOWLIST, FILE_SECRET_PATTERNS, is_scannable_text, redact
-from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES
+from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 _RULE_ID = "guardana.supply_chain.hardcoded_secret"
 
@@ -141,14 +141,10 @@ class HardcodedSecretRule(Rule):
                 yield from self._scan(path, entropy=entropy)
 
     def _scan(self, path: Path, *, entropy: bool) -> Iterator[Finding]:
-        try:
-            # Bounded read, mirroring model_format.py: a crafted huge file
-            # can't stall the scan.
-            with path.open("rb") as fh:
-                data = fh.read(MAX_SCAN_BYTES)
-            text = data.decode("utf-8", errors="ignore")
-        except OSError:
+        prefix = read_bytes_bounded(path)
+        if prefix is None:
             return
+        text = prefix[0].decode("utf-8", errors="ignore")
         for lineno, label, secret in _scan_prefixed(text):
             yield self._finding(
                 path,

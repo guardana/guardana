@@ -19,6 +19,9 @@ def test_acme_rules_are_discoverable_via_the_real_registry() -> None:
     assert "acme.prompt.overreach" in acme_ids, (
         "the YAML rule was not discovered via the guardana.rules entry point"
     )
+    assert "acme.supply_chain.approved_model" in acme_ids, (
+        "the rule built on the public model-format readers was not discovered"
+    )
 
 
 def test_builtin_guardana_rules_are_still_discovered_alongside_acme() -> None:

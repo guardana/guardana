@@ -128,7 +128,7 @@ capabilities it needs via `required_capabilities` in `RuleMeta`; the
 `Runner` skips a rule whose target can't satisfy them rather than crashing
 — so a new `Target` subclass is usable by any existing rule that only needs
 capabilities your target also provides (e.g. a new artifact-like target
-that provides `READ_FILES` can run all 17 build-time artifact rules unmodified).
+that provides `READ_FILES` can run all 19 build-time artifact rules unmodified).
 
 **`guardana.targets` is discovered by `Registry.discover()`**, the same way
 as rules and evaluators (see

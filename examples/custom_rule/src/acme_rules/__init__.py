@@ -2,8 +2,12 @@
 
 This package is a runnable example of the "extend Guardana in your own repo"
 story: a third-party distribution with its own namespace (`acme.*`) shipping
-one Python plugin rule, two declarative YAML rules, and a custom Evaluator
+two Python plugin rules, two declarative YAML rules, and a custom Evaluator
 (classifier) — following the exact contract Guardana's own built-ins use.
+
+`approved_model.py` is the one to read if you want to inspect a *model file*:
+it is pure policy, because `guardana.core.formats` does the binary parsing —
+bounded, offline, and fail-closed — so the rule never touches a byte offset.
 
 Nothing here is special-cased: `guardana scan`/`probe`/`monitor` discover these
 through the public `guardana.rules` and `guardana.evaluators` entry points
@@ -16,6 +20,7 @@ from guardana.core.evaluator import Evaluator
 from guardana.core.rule import Rule
 from guardana.core.rule.yaml_rule import load_yaml_rules
 
+from acme_rules.approved_model import ApprovedModelRule
 from acme_rules.hardcoded_secret import HardcodedAcmeKeyRule
 from acme_rules.refusal_classifier import StrictRefusalClassifier
 
@@ -41,4 +46,4 @@ def _load_catalog_rules() -> list[Rule]:
 
 def provide_rules() -> list[Rule]:
     """Entry point target for `guardana.rules`: every rule Acme ships."""
-    return [HardcodedAcmeKeyRule(), *_load_catalog_rules()]
+    return [HardcodedAcmeKeyRule(), ApprovedModelRule(), *_load_catalog_rules()]

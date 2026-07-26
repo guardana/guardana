@@ -11,7 +11,8 @@ public entry points (`guardana.rules`, `guardana.evaluators`) the built-ins use
 
 | File | What it demonstrates |
 |---|---|
-| `src/acme_rules/hardcoded_secret.py` | A **Python plugin rule** (`acme.artifact.hardcoded_key`) — logic YAML can't express. |
+| `src/acme_rules/hardcoded_secret.py` | A **Python plugin rule** (`acme.supply_chain.hardcoded_key`) — logic YAML can't express. |
+| `src/acme_rules/approved_model.py` | A rule that **inspects a model file** (`acme.supply_chain.approved_model`) — and is entirely policy, because the GGUF parsing comes from the public [`guardana.core.formats`](../../docs/model-formats.md) readers. Its fixtures are built with `guardana.core.testing.build_gguf`, so no binary is checked in. |
 | `src/acme_rules/catalog/overreach.yaml` | A **declarative YAML rule** graded with Guardana's built-in `keyword` evaluator. |
 | `src/acme_rules/catalog/refusal.yaml` | A YAML rule graded with Acme's **own** evaluator — referenced by id, resolved from the registry at run time. |
 | `src/acme_rules/refusal_classifier.py` | A **custom `Evaluator`** (`acme.strict_refusal`) — bring-your-own "did the attack succeed, and how sure are we" grader. |
@@ -28,8 +29,9 @@ uv pip install -e examples/custom_rule
 uv run guardana rules | grep acme
 ```
 
-You should see `acme.artifact.hardcoded_key`, `acme.prompt.overreach`, and
-`acme.prompt.refusal` in the listing. Run its tests directly:
+You should see `acme.supply_chain.hardcoded_key`, `acme.supply_chain.approved_model`,
+`acme.prompt.overreach`, and `acme.prompt.refusal` in the listing. Run its tests
+directly:
 
 ```bash
 uv run pytest examples/custom_rule/tests

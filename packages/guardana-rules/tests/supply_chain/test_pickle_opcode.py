@@ -218,3 +218,14 @@ def test_binput_binget_memo_indirection_is_flagged(tmp_path: Path) -> None:
     findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert findings, "BINPUT/BINGET memo indirection must not scan clean"
     assert {f.severity.name for f in findings} <= {"CRITICAL", "LOW"}
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="mkfifo is POSIX-only")
+def test_a_fifo_named_like_a_checkpoint_cannot_stall_the_scan(tmp_path: Path) -> None:
+    # A plain read of a FIFO blocks until a writer appears, so a crafted repo
+    # could hang `guardana scan` indefinitely by naming one `model.pkl`. It must
+    # be skipped — and skipped visibly, because nothing was examined.
+    os.mkfifo(tmp_path / "model.pkl")
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.severity.name for f in findings] == ["LOW"]
+    assert "not scanned" in findings[0].evidence.summary

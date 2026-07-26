@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -17,6 +18,19 @@ from guardana.rules.supply_chain._reading import read_text_bounded
 # file `remote_code`'s `.py`-only scan never sees.
 _CODE_POINTER_KEYS = ("auto_map", "custom_pipelines")
 _CONFIG_NAME_SUFFIX = "config.json"
+
+# CVE-2026-4372: transformers applied config entries to internal objects through a
+# generic `setattr`, so a private field in a downloaded `config.json` could name a
+# Hub repository, which the kernel loader then downloaded and imported. The path
+# never consults `trust_remote_code`, so `trust_remote_code=False` — the setting
+# users treat as the safe mode — does not stop it. Fixed in transformers 5.3.0.
+#
+# Detection is by *key name*, never by value shape: `_name_or_path` carries an
+# `owner/repo` string in a large share of real configs, so a shape-only rule would
+# flag almost every model on the Hub.
+_INTERNAL_KERNEL_KEY = "_attn_implementation_internal"
+_PUBLIC_KERNEL_KEYS = ("attn_implementation", "_attn_implementation")
+_KERNEL_REFERENCE = re.compile(r"^[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*$")
 
 
 def _is_config(path: Path) -> bool:
@@ -47,7 +61,13 @@ def _local_module_present(reference: str, directory: Path) -> bool:
 
 
 class RemoteCodeConfigRule(Rule):
-    """Flags a model config that points at custom Python run on `trust_remote_code=True` load."""
+    """Flags a model config that asks for code to be run when the model loads.
+
+    Two shapes, one artifact: `auto_map`/`custom_pipelines` point at Python that
+    runs under `trust_remote_code=True`, while a kernel reference runs *whatever
+    the flag is set to* — the config is the request, and the `.py` scan never
+    sees it.
+    """
 
     meta = RuleMeta(
         id="guardana.supply_chain.remote_code_config",
@@ -79,6 +99,38 @@ class RemoteCodeConfigRule(Rule):
         for key in _CODE_POINTER_KEYS:
             if key in doc:
                 yield self._finding(path, key, doc[key])
+        for key in (_INTERNAL_KERNEL_KEY, *_PUBLIC_KERNEL_KEYS):
+            reference = doc.get(key)
+            if isinstance(reference, str) and _KERNEL_REFERENCE.match(reference):
+                yield self._kernel_finding(path, key, reference)
+
+    def _kernel_finding(self, path: Path, key: str, reference: str) -> Finding:
+        """Build the finding for a config entry naming a Hub kernel repository.
+
+        Through the private field this is the CVE — code runs on a load the user
+        believes is sandboxed. Through the documented field it is an opt-in, so it
+        is reported the way `trust_remote_code=True` is: a lead, not a compromise.
+        """
+        internal = key == _INTERNAL_KERNEL_KEY
+        summary = (
+            f"'{key}' names the Hub kernel repository '{reference}', "
+            "which transformers downloads and imports on load"
+        )
+        if internal:
+            summary += " — a private field, so trust_remote_code=False does not stop it "
+            summary += "(CVE-2026-4372)"
+        return Finding(
+            rule_id=self.meta.id,
+            severity=Severity.CRITICAL if internal else Severity.MEDIUM,
+            title=self.meta.title,
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(
+                summary=summary,
+                detail=f"file={path.name}; kernel={reference}; fixed in transformers 5.3.0",
+            ),
+            verdict=None if internal else lead_verdict(summary),
+        )
 
     def _finding(self, path: Path, key: str, pointer: object) -> Finding:
         references = list(_module_targets(pointer))

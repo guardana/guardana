@@ -4,7 +4,10 @@
 
 ```
 guardana-core     Target / Rule / Evaluator / Finding / Profile,
-                   the Registry (discovery) and Runner (execution).
+                   the Registry (discovery) and Runner (execution),
+                   plus threat-agnostic plumbing rules build on:
+                   `formats` (bounded model-file readers) and `testing`
+                   (doubles and artifact builders).
                    No network I/O beyond what a Target itself performs.
 guardana-rules     Built-in rules (YAML + Python plugin), each mapped to
                    OWASP / MITRE ATLAS / NIST.
@@ -65,6 +68,14 @@ implements the optional `ToolCallingTransport` protocol, so `EndpointTarget`
 advertises `CALL_TOOLS` and exposes `offer_tools(messages, tools)` — the seam
 the excessive-agency rule uses to observe which tools a model calls (`ollama`
 and `tgi` simply don't advertise the capability).
+
+`ArtifactTarget` finds the files; **`guardana.core.formats` reads them**.
+`read_gguf_metadata`, `read_safetensors_header` and `read_onnx_summary` are
+public, bounded, offline, deterministic and fail-closed, and they return *data,
+never a verdict* — which is the line that keeps threat knowledge in rules and
+binary parsing in the engine. It is the same move as `guardana.core.testing`:
+core ships plumbing so a third-party pack ships judgement. Full contract in
+[`model-formats.md`](model-formats.md).
 
 A rule declares which capabilities it needs (`required_capabilities` in
 `RuleMeta`); the `Runner` skips a rule outright — no crash — when the

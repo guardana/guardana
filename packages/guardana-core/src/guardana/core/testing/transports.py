@@ -1,20 +1,3 @@
-"""Test doubles for writing rule tests without touching a real model.
-
-Every dynamic rule talks to a model through the `ChatTransport` seam, so a rule
-can be graded end-to-end against a scripted model. Third-party rule authors are
-expected to use these — a rule fixture (a positive and a negative sample) is
-required for every rule Guardana ships, and the same bar applies to plugins.
-
-    from guardana.core.target import EndpointTarget
-    from guardana.core.testing import RefusingTransport, ScriptedTransport
-
-    target = EndpointTarget("http://x", "m", transport=ScriptedTransport("Sure! Here goes..."))
-    assert list(MyRule().run(target, RuleContext()))          # positive: it fires
-
-    target = EndpointTarget("http://x", "m", transport=RefusingTransport())
-    assert not list(MyRule().run(target, RuleContext()))      # negative: it stays silent
-"""
-
 from collections.abc import Sequence
 from itertools import chain, repeat
 
