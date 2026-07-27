@@ -1,5 +1,5 @@
+import threading
 from collections.abc import Iterator, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from urllib.error import URLError
 
@@ -8,7 +8,8 @@ from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.report import CheckError, Finding, ScanResult
 from guardana.core.rule.base import Rule, RuleContext
-from guardana.core.target import EndpointError, Target, TargetKind
+from guardana.core.source import UnreadSource
+from guardana.core.target import ArtifactTarget, EndpointError, Target, TargetKind
 
 DEFAULT_ENDPOINT_CONCURRENCY = 1
 """Rules run one at a time unless a caller asks for more.
@@ -88,6 +89,13 @@ class Runner:
                 errors.append(outcome.error)
             else:
                 run_count += 1
+        # A file the rules were prevented from reading is a check that did not
+        # run, so it joins `errors` rather than disappearing. Collected after the
+        # rules, because that is when the target knows what it was asked for.
+        errors.extend(
+            CheckError(source="guardana.core.source", stage="read", reason=unread.reason)
+            for unread in _unread_sources(target)
+        )
         return ScanResult(
             tuple(findings),
             run_count,
@@ -106,19 +114,57 @@ class Runner:
             for rule in plan:
                 yield self._execute_one(rule, target)
             return
-        executor = ThreadPoolExecutor(max_workers=limit, thread_name_prefix="guardana-rule")
-        try:
-            futures: list[Future[_RuleOutcome]] = [
-                executor.submit(self._execute_one, rule, target) for rule in plan
-            ]
-            # Iterated in submission order, so the report never depends on which
-            # rule the scheduler happened to finish first. A propagating failure
-            # (an unreachable endpoint) surfaces here, at the first rule that hit
-            # it in rule order — deterministically, not whichever thread lost.
-            for future in futures:
-                yield future.result()
-        finally:
-            executor.shutdown(wait=False, cancel_futures=True)
+        yield from self._execute_pooled(plan, target, limit)
+
+    def _execute_pooled(
+        self, plan: Sequence[Rule], target: Target, limit: int
+    ) -> Iterator[_RuleOutcome]:
+        """Run `plan` across `limit` daemon threads, yielding outcomes in rule order.
+
+        Deliberately hand-rolled rather than a `ThreadPoolExecutor`. That pool's
+        workers are non-daemon and CPython joins them at interpreter exit, so a
+        probe that hit an unreachable endpoint — or a Ctrl-C — printed its error
+        and then sat there until every in-flight rule had finished its network
+        work. Daemon threads let the process leave when the caller decides to.
+
+        Once a rule reports the endpoint itself is gone, no further rule is
+        started: they would all fail identically, and continuing to send prompts
+        to a dead or rate-limited model is pure harm.
+        """
+        outcomes: list[_RuleOutcome | Exception | None] = [None] * len(plan)
+        aborted = threading.Event()
+        cursor = iter(range(len(plan)))
+        lock = threading.Lock()
+
+        def take_next() -> int | None:
+            with lock:
+                return None if aborted.is_set() else next(cursor, None)
+
+        def worker() -> None:
+            while (index := take_next()) is not None:
+                try:
+                    outcomes[index] = self._execute_one(plan[index], target)
+                except Exception as exc:  # a propagating endpoint failure
+                    outcomes[index] = exc
+                    aborted.set()
+
+        threads = [
+            threading.Thread(target=worker, daemon=True, name=f"guardana-rule-{n}")
+            for n in range(min(limit, len(plan)))
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        # Rule order, not completion order: two runs of the same probe must
+        # produce the same report. A propagating failure surfaces at the first
+        # rule that hit it, deterministically, rather than whichever thread lost.
+        for outcome in outcomes:
+            if isinstance(outcome, Exception):
+                raise outcome
+            if outcome is not None:  # None: never started, because an abort won
+                yield outcome
 
     def _execute_one(self, rule: Rule, target: Target) -> _RuleOutcome:
         """Run one rule, converting anything it throws into a recorded error.
@@ -162,6 +208,13 @@ class Runner:
                 CheckError.from_exception(rule.meta.id, "run", exc),
             )
         return _RuleOutcome(tuple(findings), tuple(unverified))
+
+
+def _unread_sources(target: Target) -> tuple[UnreadSource, ...]:
+    """Return what this target could not read, for targets that track it."""
+    if isinstance(target, ArtifactTarget):
+        return target.unread_sources()
+    return ()
 
 
 def _is_inconclusive(finding: Finding) -> bool:

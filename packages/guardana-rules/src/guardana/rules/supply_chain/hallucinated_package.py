@@ -20,9 +20,9 @@ _STDLIB = frozenset(sys.stdlib_module_names)
 
 
 def _imports(source: PythonSource) -> Iterator[tuple[int, str]]:
-    # Sorted by line because the index groups nodes by type: reporting every
-    # `import x` before every `from y import z` would reorder findings in the
-    # report for no reason a reader could see.
+    # Sorted by line because this reads two node types: the index orders each type
+    # by position, but interleaving `import x` with `from y import z` is this
+    # function's own job, and findings that jump around the file read as noise.
     found: list[tuple[int, str]] = [
         (node.lineno, alias.name.split(".")[0])
         for node in source.nodes(ast.Import)

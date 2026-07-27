@@ -49,11 +49,16 @@ _MANIFEST_PREFIX = "requirements"
 
 
 def _size_attributes(path: Path) -> dict[str, str]:
+    # Opened, not just `stat`ed. `stat()` needs only traverse permission on the
+    # parent, so it happily reports a size for a file whose contents nobody can
+    # read — and the component would then sit in the report wearing that size,
+    # looking examined, while every rule had silently skipped it. Listed anyway
+    # when the open fails: an inventory that drops what it could not read lies by
+    # omission, which is the same failure as a check reporting clean.
     try:
-        return {"size_bytes": str(path.stat().st_size)}
+        with path.open("rb"):
+            return {"size_bytes": str(path.stat().st_size)}
     except OSError:
-        # Listed anyway, marked unread: an inventory that drops what it could not
-        # open is an inventory that lies by omission.
         return {"read": "failed"}
 
 

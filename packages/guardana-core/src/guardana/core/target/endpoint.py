@@ -1,4 +1,5 @@
 import json
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from time import sleep as _sleep
@@ -30,9 +31,15 @@ def _retry_delay(attempt: int, retry_after: str | None) -> float:
     """Seconds to wait before attempt `attempt` + 1 — the server's ask, or exponential."""
     if retry_after is not None:
         try:
-            return min(max(float(retry_after), 0.0), _MAX_BACKOFF_SECONDS)
+            asked = float(retry_after)
         except ValueError:
-            pass  # not a delay-seconds form (an HTTP-date, or junk): fall back
+            asked = math.nan  # not a delay-seconds form (an HTTP-date, or junk)
+        # `float("nan")` parses happily and then survives both `max` and `min`,
+        # because every NaN comparison is false — and `time.sleep(nan)` raises,
+        # which would turn a rate limit into "check could not run" for every rule
+        # that touched the endpoint. `isfinite` rejects nan and inf together.
+        if math.isfinite(asked):
+            return min(max(asked, 0.0), _MAX_BACKOFF_SECONDS)
     return float(min(_BACKOFF_BASE_SECONDS * (2**attempt), _MAX_BACKOFF_SECONDS))
 
 

@@ -137,6 +137,26 @@ def test_an_unparseable_retry_after_falls_back_to_backoff(
     assert all(delay > 0 for delay in slept)
 
 
+@pytest.mark.parametrize("header", ["nan", "inf", "-inf"])
+def test_a_non_finite_retry_after_falls_back_instead_of_crashing(
+    monkeypatch: pytest.MonkeyPatch, slept: list[float], header: str
+) -> None:
+    # `float("nan")` parses without raising and survives both `max` and `min`
+    # (every NaN comparison is false), and `time.sleep(nan)` raises ValueError —
+    # which the runner records as "check could not run" for every rule that
+    # touched the endpoint. A rate limit must never do that.
+    _install(
+        monkeypatch,
+        [
+            _rate_limited({"Retry-After": header}),
+            _CannedResponse(json.dumps(_REPLY).encode("utf-8")),
+        ],
+    )
+    assert post_json("http://x", {}, None, "ref") == _REPLY
+    assert slept
+    assert all(0 < delay <= _MAX_BACKOFF for delay in slept)
+
+
 def test_an_oversized_reply_is_still_refused_after_a_retry(
     monkeypatch: pytest.MonkeyPatch, slept: list[float]
 ) -> None:

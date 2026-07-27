@@ -40,6 +40,16 @@ def test_nodes_returns_every_node_of_a_type_in_document_order(tmp_path: Path) ->
     assert [call.lineno for call in calls] == [6, 7]
 
 
+def test_document_order_survives_nesting(tmp_path: Path) -> None:
+    # `ast.walk` is breadth-first, so a module-level call comes back before an
+    # earlier one nested inside a function. Rules emit a finding per node, and a
+    # report whose line numbers jump around is one a reviewer cannot follow.
+    nested = "def outer():\n    inner()\n\ntop_level()\n"
+    source = read_python_source(_write(tmp_path, "nested.py", nested))
+    assert source is not None
+    assert [call.lineno for call in source.nodes(ast.Call)] == [2, 4]
+
+
 def test_nodes_of_an_absent_type_is_empty_not_an_error(tmp_path: Path) -> None:
     source = read_python_source(_write(tmp_path, "sample.py", "x = 1\n"))
     assert source is not None

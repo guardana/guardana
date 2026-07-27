@@ -111,6 +111,20 @@ def test_documented_action_pins_match_the_current_release() -> None:
             )
 
 
+def test_a_missing_pin_aborts_before_anything_is_written(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The check has to come first. Failing partway through leaves five pyprojects
+    # and `__version__` bumped, `uv.lock` stale, and the docs half-rewritten — a
+    # broken tree in the middle of a release. LICENSE stands in for a docs file
+    # that was reworded and lost its pin.
+    before = _BUMP._current_version()
+    monkeypatch.setattr(_BUMP, "_ACTION_PIN_FILES", (Path("LICENSE"),))
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", "minor"])
+
+    with pytest.raises(SystemExit):
+        _BUMP.main()
+    assert _BUMP._current_version() == before
+
+
 def test_main_dry_run_lists_the_action_pin_files(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

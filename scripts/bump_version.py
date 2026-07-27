@@ -110,6 +110,22 @@ def _rewrite_dunder(text: str, new: str) -> str:
     return _DUNDER_RE.sub(f'__version__ = "{new}"', text, count=1)
 
 
+def _check_action_pins() -> None:
+    """Refuse the bump if any documented file stopped carrying an Action pin.
+
+    Fails loudly rather than skipping: a file that lost its pin has been reworded
+    or renamed, and silently dropping it from the rewrite is exactly how the docs
+    came to advertise an Action two releases old.
+    """
+    missing = [
+        str(relative)
+        for relative in _ACTION_PIN_FILES
+        if _ACTION_PIN_RE.search((_REPO / relative).read_text(encoding="utf-8")) is None
+    ]
+    if missing:
+        sys.exit(f"error: no `guardana/guardana@vX.Y` pin found in {', '.join(missing)}")
+
+
 def _rewrite_action_pin(text: str, new: str) -> str:
     """Point every documented Action pin at this release's moving `vMAJOR.MINOR` tag.
 
@@ -135,6 +151,12 @@ def main() -> int:
         sys.exit(f"error: {new} is not newer than the current {current}; refusing to downgrade")
     ceiling = _breaking_ceiling(_core(new))
 
+    # Everything is validated before anything is written. A bump that fails
+    # halfway leaves five pyprojects and `__version__` at the new version, an
+    # un-relocked `uv.lock` at the old one, and docs pinned inconsistently — a
+    # state someone has to unpick by hand mid-release.
+    _check_action_pins()
+
     print(f"{current} -> {new}  (dependents pin >={new},<{ceiling})")
     for package in _PACKAGES:
         path = _pyproject(package)
@@ -156,11 +178,6 @@ def main() -> int:
     for relative in _ACTION_PIN_FILES:
         path = _REPO / relative
         text = path.read_text(encoding="utf-8")
-        # Fail loudly rather than skip: a file that stopped carrying a pin has
-        # either been reworded or renamed, and silently dropping it from the
-        # rewrite is how the pin went stale in the first place.
-        if _ACTION_PIN_RE.search(text) is None:
-            sys.exit(f"error: no `guardana/guardana@vX.Y` pin found in {relative}")
         updated = _rewrite_action_pin(text, new)
         if args.dry_run:
             print(f"  would update {relative}")

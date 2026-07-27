@@ -14,6 +14,7 @@ fail-open one level up from any rule.
 
 import ast
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
@@ -32,6 +33,15 @@ vendored SDKs, small enough that a crafted file cannot exhaust memory.
 NodeT = TypeVar("NodeT", bound=ast.AST)
 
 
+def _position(node: ast.AST) -> tuple[int, int]:
+    """Where a node starts, for source ordering. Position-less nodes sort first.
+
+    `ast.Load`, `ast.Store` and friends carry no location; they are never what a
+    rule iterates, so any stable answer will do.
+    """
+    return getattr(node, "lineno", -1), getattr(node, "col_offset", -1)
+
+
 class PythonSource:
     """One parsed Python file: its path, its text, its tree, and its nodes by type.
 
@@ -48,8 +58,12 @@ class PythonSource:
         by_type: defaultdict[type[ast.AST], list[ast.AST]] = defaultdict(list)
         for node in ast.walk(tree):
             by_type[type(node)].append(node)
+        # Sorted into source order: `ast.walk` is breadth-first, so a call at
+        # module level comes back before an earlier one nested in a function.
+        # Rules emit a finding per node, and a report whose lines jump around is
+        # one a reviewer cannot follow.
         self._by_type: dict[type[ast.AST], tuple[ast.AST, ...]] = {
-            node_type: tuple(nodes) for node_type, nodes in by_type.items()
+            node_type: tuple(sorted(nodes, key=_position)) for node_type, nodes in by_type.items()
         }
 
     @property
@@ -78,23 +92,40 @@ class PythonSource:
         return tuple(node for node in found if isinstance(node, node_type))
 
 
-def read_python_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSource | None:
-    """Read and index one Python file. `None` means "not usable", never "clean".
+@dataclass(frozen=True, slots=True)
+class UnreadSource:
+    """A file the scan could not read, and why — so it is never a silent skip."""
 
-    `None` covers every way a file can fail to become a tree: it is not a regular
-    file (a FIFO would block the scan), it is unreadable, it is larger than
-    `limit`, it is not UTF-8, or it does not parse. Callers treat that as "this
-    file was not analysed" — a rule that wants to *report* an unreadable file
-    must say so itself, because silence here would be the all-clear this project
-    forbids.
+    path: Path
+    reason: str
+
+
+def read_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSource | UnreadSource | None:
+    """Read and index one Python file, distinguishing "could not" from "nothing to find".
+
+    Three outcomes, and the difference between the last two is the whole point:
+
+    * a `PythonSource` — the file was read and parsed;
+    * an `UnreadSource` — the scan was *prevented* from looking: the file is
+      larger than `limit`, is not a regular file, or could not be opened. Nobody
+      examined it, so the run must say so rather than let it disappear;
+    * `None` — the file is not runnable Python (invalid syntax, undecodable
+      bytes). A rule looking for Python constructs has genuinely nothing to find,
+      and reporting it would put noise on every repo with a Python 2 relic.
+
+    Collapsing the middle case into `None` is how an oversized file became a
+    scanner bypass: padding a malicious loader past the read limit removed it from
+    the scan and nothing in the report said so.
     """
     try:
         with open_regular(path) as handle:
             raw = handle.read(limit + 1)  # +1 byte reveals an oversized file
-    except (FormatError, OSError):
-        return None
+    except FormatError as exc:
+        return UnreadSource(path, str(exc))
+    except OSError as exc:
+        return UnreadSource(path, f"cannot read {path.name}: {exc}")
     if len(raw) > limit:
-        return None
+        return UnreadSource(path, f"{path.name} is too large to analyse (over {limit} bytes)")
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
@@ -104,3 +135,15 @@ def read_python_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSo
     except (SyntaxError, ValueError):  # ValueError: source containing a null byte
         return None
     return PythonSource(path, text, tree)
+
+
+def read_python_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSource | None:
+    """Read and index one Python file; `None` means "not analysed", never "clean".
+
+    The simple entry point for a rule that only wants the tree. A rule that needs
+    to know *why* a file yielded nothing — and to report it — calls `read_source`,
+    or goes through `ArtifactTarget.python_source()`, which records the difference
+    for the whole run.
+    """
+    result = read_source(path, limit=limit)
+    return result if isinstance(result, PythonSource) else None

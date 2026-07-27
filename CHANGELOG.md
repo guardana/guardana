@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Security: a Python file too large to read vanished from the scan.** The new
+  shared read returned "no tree" for an oversized file exactly as it does for one
+  that is not valid Python, so padding a malicious loader past the 16 MiB limit
+  removed it from every static rule and nothing in the report said so. Reading is
+  now three outcomes, not two: a file the scan was *prevented* from examining
+  (too large, unopenable, not a regular file) is recorded and surfaces in
+  `errors`, which fails the gate; a file that simply is not runnable Python stays
+  quiet, because a rule looking for Python constructs genuinely has nothing to
+  find there.
+- **Security: an unreadable component was inventoried as though it had been
+  examined.** The size probe used `stat()`, which succeeds on a file whose
+  contents cannot be opened, so a `model.onnx` with no read permission appeared
+  with a size while every rule had skipped it. It is now opened, and a component
+  that cannot be is marked `read: failed`. The test that was meant to pin this
+  asserted `read == "failed" or "size_bytes" in attributes` — a second disjunct
+  that is always true, so it passed either way. Fixed too.
+- **Ctrl-C and an unreachable endpoint end a concurrent probe again.**
+  `ThreadPoolExecutor` workers are non-daemon and CPython joins them at
+  interpreter exit, so a probe printed `could not reach endpoint`, returned, and
+  then sat there while every in-flight rule finished — up to the socket timeout
+  times the retry count, per request. The pool is now hand-rolled from daemon
+  threads, and once the endpoint is known to be down no further rule is started
+  against it.
+- **`Retry-After: nan` no longer wrecks a probe.** `float("nan")` parses without
+  raising and survives both `max` and `min` (every NaN comparison is false), and
+  `time.sleep(nan)` raises — so a rate limit was reported as "check could not
+  run" for every rule that touched the endpoint. Non-finite values now fall back
+  to the exponential backoff.
+- **`observations` paths are relativized with the findings.** A report mixed
+  repo-relative finding paths with absolute component paths, so the run-to-run
+  diff the channel exists for called every component changed as soon as the
+  checkout moved, and an uploaded report carried the checkout path that the
+  findings beside it were deliberately scrubbed of.
+- **`PythonSource.nodes()` really is in document order.** The index was built
+  from `ast.walk`, which is breadth-first, so a module-level call came back
+  before an earlier one nested in a function — while the docstring and
+  `docs/writing-rules.md` promised source order to rule authors. Nodes are now
+  sorted by position.
+- **A failed source read is cached even once the cache budget is spent**, so the
+  "every rule sees the same answer" guarantee no longer depends on how much
+  Python the target contains.
+- **`bump_version.py` validates before it writes.** A docs file that had lost its
+  Action pin aborted the run *after* the five pyprojects and `__version__` were
+  already rewritten, leaving a half-bumped tree with a stale `uv.lock`.
+
 ### Added
 
 - **`probe` and `monitor` run rules concurrently** (`--concurrency`, default 4).
@@ -85,6 +132,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`probe` and `monitor` now default to 4 concurrent requests, not 1.** An
+  existing cron against a metered endpoint quadruples its request rate on upgrade
+  with no config change; pass `--concurrency 1` to keep the old behaviour. The
+  library default stays sequential (`DEFAULT_ENDPOINT_CONCURRENCY = 1`), so
+  embedding the engine never opens connections you did not ask for.
 - **Seven product principles are now project law** (`CLAUDE.md`,
   restated for humans in `CONTRIBUTING.md`): no regulation or vendor name as
   logic in the engine, cost that grows with the target rather than the rule

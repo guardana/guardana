@@ -42,4 +42,10 @@ def relativize_findings(result: ScanResult, base: Path) -> ScanResult:
         findings=rel(result.findings),
         unverified=rel(result.unverified),
         waived=rel(result.waived),
+        # Observations too, or one report mixes relative finding paths with
+        # absolute component paths: the run-to-run diff the channel exists for
+        # would call every component changed the moment the checkout moved, and
+        # an uploaded report would carry the checkout path the findings beside it
+        # were deliberately scrubbed of.
+        observations=tuple(replace(o, ref=relativize(o.ref, base)) for o in result.observations),
     )

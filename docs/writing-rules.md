@@ -237,9 +237,15 @@ for path in target.iter_files((".py",)):
 
 `PythonSource` gives you `text`, `tree`, and `nodes(<node type>)` in document
 order ([`guardana.core.source`](../packages/guardana-core/src/guardana/core/source.py)).
-`None` means the file could not be turned into a tree — not a regular file, too
-large, not UTF-8, or a syntax error — and if your rule wants to *report* that,
-it must say so itself; silence would be an all-clear on something nobody read.
+
+`None` means there is no tree, and the engine has already dealt with the half of
+that which matters: a file the scan was *prevented* from reading — too large, not
+a regular file, unopenable — is recorded by the target and surfaces in the run's
+`errors`, so it fails the gate rather than disappearing. A file that is simply
+not runnable Python (invalid syntax, undecodable bytes) stays quiet, because a
+rule looking for Python constructs has nothing to find there. Call
+`read_source()` instead of `python_source()` if your rule wants that distinction
+in its own hands — it returns `PythonSource | UnreadSource | None`.
 
 **Worth copying as a pattern:** the AST-based supply-chain rules are written to
 be read. Each is one short file that pulls its nodes off the shared index,

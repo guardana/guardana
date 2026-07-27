@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from fnmatch import fnmatch
 from pathlib import Path
 
-from guardana.core.source import PythonSource, read_python_source
+from guardana.core.source import MAX_SOURCE_BYTES, PythonSource, UnreadSource, read_source
 from guardana.core.target.base import Capability, Target, TargetKind
 
 # Budget for the parsed-source cache, counted in bytes of *source*. The trees are
@@ -61,13 +61,16 @@ class ArtifactTarget(Target):
         *,
         excludes: tuple[str, ...] = (),
         source_cache_bytes: int = _SOURCE_CACHE_BYTES,
+        source_read_limit: int = MAX_SOURCE_BYTES,
     ) -> None:
         self._root = root
         # Profile `rules.paths_exclude` plus any `.guardanaignore` at the root, both
         # matched (via fnmatch) against each entry's path relative to the root.
         self._excludes = tuple(excludes) + _read_ignore_file(root)
         self._sources: dict[Path, PythonSource | None] = {}
+        self._unread: dict[Path, UnreadSource] = {}
         self._source_budget = source_cache_bytes
+        self._source_read_limit = source_read_limit
         self._files: tuple[Path, ...] | None = None
 
     def capabilities(self) -> set[Capability]:
@@ -83,20 +86,42 @@ class ArtifactTarget(Target):
         """Return the parsed, indexed source for `path`, reading it at most once.
 
         Every rule that inspects Python asks through here, so a file is read,
-        decoded, parsed and walked once per scan instead of once per rule. `None`
-        means the file could not be turned into a tree (see `read_python_source`)
-        and is cached too — deliberately. A failure that is retried would let two
+        decoded, parsed and walked once per scan instead of once per rule.
+
+        `None` means no tree, for either of two reasons, and the difference is
+        kept: a file the scan was *prevented* from reading (too large, unopenable)
+        is recorded in `unread_sources()` so the run reports it instead of letting
+        it vanish, while a file that simply is not runnable Python stays quiet.
+
+        Outcomes are cached, failures included. Retrying a failure would let two
         rules disagree about the same scan if the file changed underneath them,
-        making the report depend on rule ordering.
+        which would make the report depend on rule ordering. Caching a failure
+        costs no memory, so it happens even once the cache budget is spent.
         """
         if path in self._sources:
             return self._sources[path]
-        source = read_python_source(path)
-        cost = 0 if source is None else len(source.text)
-        if cost <= self._source_budget:
+        result = read_source(path, limit=self._source_read_limit)
+        if isinstance(result, UnreadSource):
+            self._unread[path] = result
+            self._sources[path] = None
+            return None
+        source = result
+        # A `None` costs nothing to keep, so it is always cached — that is what
+        # holds the "same answer for every rule" promise above even past the
+        # budget. Only real trees are charged against it.
+        if source is None or len(source.text) <= self._source_budget:
             self._sources[path] = source
-            self._source_budget -= cost
+            self._source_budget -= 0 if source is None else len(source.text)
         return source
+
+    def unread_sources(self) -> tuple[UnreadSource, ...]:
+        """Every Python file the scan was prevented from reading, in path order.
+
+        The runner turns these into `errors`, because a file nobody could look at
+        is a check that did not run — not a clean one. Padding a malicious loader
+        past the read limit would otherwise remove it from the scan silently.
+        """
+        return tuple(self._unread[path] for path in sorted(self._unread))
 
     def _excluded(self, path: Path) -> bool:
         if not self._excludes:

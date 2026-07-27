@@ -16,6 +16,7 @@ from guardana.core.inventory import observe
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
+from guardana.core.report import relativize_findings
 from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget, EndpointTarget
 from guardana.core.testing import ScriptedTransport
@@ -61,16 +62,34 @@ def test_a_model_carries_its_format_and_size(tmp_path: Path) -> None:
 
 def test_an_unreadable_component_is_listed_as_unread_not_dropped(tmp_path: Path) -> None:
     # Omitting it would silently shrink the inventory — the same class of lie as a
-    # check that could not run reporting clean.
+    # check that could not run reporting clean. `stat()` is not the test: it
+    # succeeds on a file whose contents cannot be opened, which would let an
+    # unreadable component sit in the report wearing a size, looking examined.
     root = _repo(tmp_path)
     unreadable = root / "locked.onnx"
     unreadable.write_bytes(b"\x08\x01")
     unreadable.chmod(0o000)
     try:
         found = next(item for item in observe(ArtifactTarget(root)) if item.name == "locked.onnx")
-        assert found.attributes.get("read") == "failed" or "size_bytes" in found.attributes
+        assert found.attributes.get("read") == "failed"
+        assert "size_bytes" not in found.attributes
     finally:
         unreadable.chmod(0o644)
+
+
+def test_observation_refs_are_relativized_with_the_findings(tmp_path: Path) -> None:
+    # One report must not mix repo-relative finding paths with absolute component
+    # paths: the run-to-run diff this channel exists for would call every
+    # component changed as soon as the checkout moved, and an uploaded report
+    # would leak the checkout path the findings were scrubbed of.
+    root = _repo(tmp_path)
+    result = Runner(registry=Registry.discover(), profile=Profile(name="t", policy=Policy())).run(
+        ArtifactTarget(root)
+    )
+    relativized = relativize_findings(result, root)
+    refs = {item.ref for item in relativized.observations}
+    assert "model.gguf" in refs
+    assert not any(ref.startswith("/") for ref in refs)
 
 
 def test_the_inventory_is_deterministic(tmp_path: Path) -> None:

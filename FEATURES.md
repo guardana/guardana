@@ -193,11 +193,14 @@ a multi-turn scenario's escalation is folded in, never dropped. Public API:
   `--no-plugins`.
 - **One shared read per file, not one per rule** (`guardana.core.source`):
   `ArtifactTarget.python_source(path)` returns a `PythonSource` — text, parsed
-  tree, and nodes grouped by type — read, parsed and walked **once per scan** and
-  cached under a memory budget. Your rule asks for `source.nodes(ast.Call)`
-  instead of walking the tree itself, and costs the scan nothing extra. On this
-  repo that took a scan from 1.27 s to 0.36 s while reporting identical findings;
-  a cost gate counts the operations so a regression fails the build.
+  tree, and nodes grouped by type in source order — read, parsed and walked
+  **once per scan** and cached under a memory budget. Your rule asks for
+  `source.nodes(ast.Call)` instead of walking the tree itself, and costs the scan
+  nothing extra. On this repo that took a scan from 1.27 s to 0.36 s while
+  reporting identical findings; a cost gate counts the operations so a regression
+  fails the build. A file the scan is *prevented* from reading (too large,
+  unopenable) lands in `errors` rather than vanishing — padding a malicious
+  loader past the read limit buys no silence.
 - **Public model-format readers** (`guardana.core.formats`, documented in
   [`docs/model-formats.md`](docs/model-formats.md)): `read_gguf_metadata`,
   `read_safetensors_header`, `read_onnx_summary`. Bounded, offline,
