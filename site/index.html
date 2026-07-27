@@ -262,7 +262,7 @@
       <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every finding maps to OWASP LLM Top 10, MITRE ATLAS, and NIST.</p>
       <pre class="yml"><code><span class="c">// .github/workflows/ai-security.yml</span>
 <span class="k">- uses:</span> <span class="s">actions/checkout@v4</span>
-<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.3</span>
+<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.4</span>
   <span class="k">with:</span>
     <span class="k">args:</span> <span class="s">--preset ci</span></code></pre>
       <p class="ci-note">Turning a gate on for an existing repo? <code>--write-baseline</code> accepts today's findings with a reason, so only new ones fail the build. There's a pre-commit hook too.</p>
