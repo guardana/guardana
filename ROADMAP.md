@@ -32,7 +32,7 @@ whose cost grows with the number of rules eventually gets excluded from CI, and
 an excluded scanner is an organisation-level fail-open. Cost must grow with the
 size of the target, not with how much we know.
 
-## What ships today (0.3.0)
+## What ships today (0.4.0)
 
 **27 rules** across two layers — 19 **build-time** (static, artifact: pickle
 opcodes, deserialization sinks, `trust_remote_code`/`torch.hub.load`,
@@ -51,6 +51,14 @@ build/runtime `Surface` split, a tool-calling endpoint target, 3 endpoint
 providers plus a guarded-endpoint adapter, the plugin contract with test doubles
 and [public model-format readers](docs/model-formats.md), a GitHub Action and
 pre-commit hook, and the optional collector with its dashboard.
+
+0.4 made the engine's cost grow with the target rather than the rule count — one
+shared read, parse and index per file (`guardana.core.source`), a scan of this
+repo down from 1.27 s to 0.36 s and pinned there by a cost gate that counts
+operations rather than seconds — added bounded concurrency to `probe`/`monitor`
+with rate-limit backoff, and introduced `ScanResult.observations`: what a run
+*saw*, taken from the target rather than from the rules, so a narrowed profile
+cannot shrink the component list.
 
 ## Coverage, honestly
 
@@ -97,57 +105,18 @@ including *Publish Poisoned AI Agent Tool* and *Escape to Host*, and v5.6.0
 (May 2026) added *Acquire Public AI Artifacts: AI Agent Configuration*. Our
 taxonomy references need to follow.
 
-## v0.4 — Linear cost, controlled concurrency, measured speed
+## Still open from the cost work
 
-The engine paid for knowledge with time: every rule walked the tree, read each
-file and parsed it for itself, so each new rule made every scan slower.
+Sharing the *binary* reads was on the v0.4 list until the Python fix landed.
+Re-measured afterwards, a scan of the demo model directory opens 20 files for 22
+on disk — the amplification had been the shared `.py` files all along, and a bytes
+cache would have added an OOM risk (model files run to gigabytes) for no
+measurable gain. Reopened only if a real profile says otherwise.
 
-**Shipped (unreleased):** a shared, cached read on `ArtifactTarget`. Measured on
-a 452-file tree with the 19 build-time rules:
-
-| What | Before | After |
-|---|---|---|
-| Full tree walks per scan | 26 (one per rule) | **2** |
-| File opens (422 unique files) | 2025 | **462** |
-| `ast.parse` calls (211 sources) | 1477 | **213** |
-| Engine run | 1090 ms | **175 ms** (6.2×) |
-| `guardana scan packages`, end to end | 1.27 s | **0.36 s** (3.5×) |
-
-`guardana.core.source` reads and indexes a Python file once — text, tree, and
-nodes grouped by type — and `ArtifactTarget.python_source()` caches that for the
-life of one scan, under a memory budget (trees measure ~9.3× their source, so the
-cache stops growing rather than growing unbounded). The `Rule` contract did not
-change. A **cost gate** (`test_scan_cost.py`) counts operations rather than
-seconds, so it means the same on CI as on a laptop, and it is proven to catch the
-regression it exists for: with the cache disabled the same fixture parses 42
-times instead of 6.
-
-**Also shipped (unreleased):**
-
-- **Bounded concurrency in `probe`/`monitor`** (`--concurrency`, default 4).
-  Dynamic rules are network-bound, so overlapping them is the largest wall-clock
-  win available: the 8 runtime rules against a stubbed endpoint go from 1.91 s to
-  **0.69 s** at the default, 0.36 s at 8. Results are collected in rule order regardless of which finishes
-  first — two runs of the same probe produce the same report, or a CI diff stops
-  being signal. Rate limits are retried with capped exponential backoff honouring
-  `Retry-After`, so a busy endpoint slows a probe instead of ending it; a
-  sustained 429 names `--concurrency` rather than sending you to debug an auth
-  header. File scanning stays sequential: it is local, already linear-cost, and a
-  pool there would buy little while costing determinism.
-- **The observation seam** (`guardana.core.observation` / `inventory`).
-  `ScanResult.observations` records what a run *saw* — models and their formats,
-  dependency manifests, datasets, notebooks — separately from what it found
-  wrong. Taken from the target rather than from the rules, so narrowing a profile
-  cannot quietly shrink the component list, and a component that could not be
-  read is listed as unread rather than dropped. Free of any framework's
-  vocabulary: mapping these facts onto CycloneDX or an audit template is the
-  extension's job, which is what makes that extension a package instead of a fork.
-
-**Closed by measurement, not by code:** sharing the *binary* reads was on this
-list until the Python fix landed. Re-measured afterwards, a scan of the demo model
-directory opens 20 files for 22 on disk — the amplification was the shared `.py`
-files all along, and a bytes cache would have added an OOM risk (model files run
-to gigabytes) for no measurable gain. Reopened only if a profile says otherwise.
+The parsed-source cache degrades past its 8 MiB budget: beyond it, files are
+re-read and re-parsed per rule. Correctness is unaffected (a failed read is still
+cached, so every rule sees the same answer), but a repository with more Python
+than that loses the speed-up. Worth revisiting if someone reports it.
 
 ## v0.5 — Agents as a first-class target
 

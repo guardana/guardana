@@ -111,6 +111,27 @@ def test_documented_action_pins_match_the_current_release() -> None:
             )
 
 
+def test_documented_versions_match_the_released_one() -> None:
+    # The Action pins are not the only place a version is written down. The
+    # landing page, the security policy and the README's roadmap table all name
+    # the current release, and all three silently stayed on 0.3 through the 0.4.0
+    # release — the same staleness the pin check was added to prevent, one file
+    # over. Every one of these is rewritten by `bump_version.py`.
+    current = _BUMP._current_version()
+    major, minor, _ = _BUMP._core(current)
+    for relative, pattern, expected in (
+        (Path("site/index.html"), _BUMP._SITE_VERSION_RE, f"v{current}"),
+        (Path("SECURITY.md"), _BUMP._SECURITY_VERSION_RE, f"({major}.{minor}.x)"),
+        (Path("README.md"), _BUMP._README_CURRENT_RE, f"**{major}.{minor}**"),
+    ):
+        text = (_repo_root() / relative).read_text(encoding="utf-8")
+        found = pattern.search(text)
+        assert found is not None, f"no version marker in {relative}"
+        assert expected in found.group(0), (
+            f"{relative} says {found.group(0)!r}, expected {expected}"
+        )
+
+
 def test_a_missing_pin_aborts_before_anything_is_written(monkeypatch: pytest.MonkeyPatch) -> None:
     # The check has to come first. Failing partway through leaves five pyprojects
     # and `__version__` bumped, `uv.lock` stale, and the docs half-rewritten — a

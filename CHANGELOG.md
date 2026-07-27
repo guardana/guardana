@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-07-27
+### Fixed
+
+- **Three documented versions sat on 0.3 through the 0.4.0 release.** The landing
+  page header, the security policy's supported-versions line, and the README's
+  roadmap table all still said 0.3 — the same staleness the Action-pin automation
+  was added to prevent, one file over, because only the pins were automated.
+  `scripts/bump_version.py` now rewrites these markers in the same pass and
+  refuses the bump if any of them has been reworded away, and a test pins all
+  three to the released version. The delivered v0.4 section is out of
+  `ROADMAP.md`, where shipped work does not belong.
 
 ### Fixed
 

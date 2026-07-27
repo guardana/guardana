@@ -46,6 +46,13 @@ _ACTION_PIN_FILES = (
     Path("site/index.html"),
 )
 _ACTION_PIN_RE = re.compile(r"(guardana/guardana@v)\d+\.\d+")
+# The other places a release version is written down in prose. All three sat on
+# 0.3 through the 0.4.0 release, because only the Action pins were automated —
+# the same staleness one file over. Each is `(pattern, replacement template)`,
+# rewritten in the same pass and checked by the same pre-flight.
+_SITE_VERSION_RE = re.compile(r'(<span class="ver mono">)v\d+\.\d+\.\d+')
+_SECURITY_VERSION_RE = re.compile(r"(pre-1\.0 )\(\d+\.\d+\.x\)")
+_README_CURRENT_RE = re.compile(r"\| \*\*\d+\.\d+\*\* \*\(current\)\*")
 # The `major.minor.patch` core that drives bumps and the pin ceiling — the
 # leading numbers of any version, ignoring a PEP 440 pre/post/dev suffix.
 _CORE_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
@@ -110,20 +117,46 @@ def _rewrite_dunder(text: str, new: str) -> str:
     return _DUNDER_RE.sub(f'__version__ = "{new}"', text, count=1)
 
 
-def _check_action_pins() -> None:
-    """Refuse the bump if any documented file stopped carrying an Action pin.
+_VERSION_MARKERS: tuple[tuple[Path, re.Pattern[str]], ...] = (
+    (Path("site/index.html"), _SITE_VERSION_RE),
+    (Path("SECURITY.md"), _SECURITY_VERSION_RE),
+    (Path("README.md"), _README_CURRENT_RE),
+)
 
-    Fails loudly rather than skipping: a file that lost its pin has been reworded
-    or renamed, and silently dropping it from the rewrite is exactly how the docs
-    came to advertise an Action two releases old.
+
+def _documented_versions(new: str) -> tuple[tuple[Path, re.Pattern[str], str], ...]:
+    """Pair every prose version marker with what this release turns it into."""
+    major, minor, _ = _core(new)
+    replacements = (
+        rf"\g<1>v{new}",
+        rf"\g<1>({major}.{minor}.x)",
+        rf"| **{major}.{minor}** *(current)*",
+    )
+    return tuple(
+        (path, pattern, replacement)
+        for (path, pattern), replacement in zip(_VERSION_MARKERS, replacements, strict=True)
+    )
+
+
+def _check_documented_markers() -> None:
+    """Refuse the bump if any documented file lost the marker the rewrite needs.
+
+    Fails loudly rather than skipping: a file that lost its marker has been
+    reworded or renamed, and silently dropping it from the rewrite is exactly how
+    the docs came to advertise an Action two releases old — and, one release
+    later, how the landing page, the security policy and the README's roadmap
+    table all stayed on 0.3 through the 0.4.0 release.
     """
     missing = [
-        str(relative)
-        for relative in _ACTION_PIN_FILES
-        if _ACTION_PIN_RE.search((_REPO / relative).read_text(encoding="utf-8")) is None
+        f"{relative} (no {label})"
+        for relative, pattern, label in (
+            *((path, _ACTION_PIN_RE, "`guardana/guardana@vX.Y` pin") for path in _ACTION_PIN_FILES),
+            *((path, pattern, "version marker") for path, pattern in _VERSION_MARKERS),
+        )
+        if pattern.search((_REPO / relative).read_text(encoding="utf-8")) is None
     ]
     if missing:
-        sys.exit(f"error: no `guardana/guardana@vX.Y` pin found in {', '.join(missing)}")
+        sys.exit(f"error: release marker missing — {', '.join(missing)}")
 
 
 def _rewrite_action_pin(text: str, new: str) -> str:
@@ -136,6 +169,16 @@ def _rewrite_action_pin(text: str, new: str) -> str:
         return text
     major, minor, _ = _core(new)
     return _ACTION_PIN_RE.sub(rf"\g<1>{major}.{minor}", text)
+
+
+def _apply(path: Path, updated: str, *, dry_run: bool) -> None:
+    """Write `updated` to `path`, or say what would happen on a dry run."""
+    label = path.relative_to(_REPO)
+    if dry_run:
+        print(f"  would update {label}")
+    elif updated != path.read_text(encoding="utf-8"):
+        path.write_text(updated, encoding="utf-8")
+        print(f"  updated {label}")
 
 
 def main() -> int:
@@ -155,35 +198,30 @@ def main() -> int:
     # halfway leaves five pyprojects and `__version__` at the new version, an
     # un-relocked `uv.lock` at the old one, and docs pinned inconsistently — a
     # state someone has to unpick by hand mid-release.
-    _check_action_pins()
+    _check_documented_markers()
 
     print(f"{current} -> {new}  (dependents pin >={new},<{ceiling})")
     for package in _PACKAGES:
         path = _pyproject(package)
-        updated = _rewrite(path.read_text(encoding="utf-8"), new, ceiling)
-        if args.dry_run:
-            print(f"  would update {path.relative_to(_REPO)}")
-        else:
-            path.write_text(updated, encoding="utf-8")
-            print(f"  updated {path.relative_to(_REPO)}")
+        _apply(path, _rewrite(path.read_text(encoding="utf-8"), new, ceiling), dry_run=args.dry_run)
 
     dunder_path = _REPO / _DUNDER_PATH
-    updated = _rewrite_dunder(dunder_path.read_text(encoding="utf-8"), new)
-    if args.dry_run:
-        print(f"  would update {_DUNDER_PATH}")
-    else:
-        dunder_path.write_text(updated, encoding="utf-8")
-        print(f"  updated {_DUNDER_PATH}")
+    _apply(
+        dunder_path,
+        _rewrite_dunder(dunder_path.read_text(encoding="utf-8"), new),
+        dry_run=args.dry_run,
+    )
 
     for relative in _ACTION_PIN_FILES:
         path = _REPO / relative
-        text = path.read_text(encoding="utf-8")
-        updated = _rewrite_action_pin(text, new)
-        if args.dry_run:
-            print(f"  would update {relative}")
-        elif updated != text:
-            path.write_text(updated, encoding="utf-8")
-            print(f"  updated {relative}")
+        pinned = _rewrite_action_pin(path.read_text(encoding="utf-8"), new)
+        _apply(path, pinned, dry_run=args.dry_run)
+
+    for relative, pattern, replacement in _documented_versions(new):
+        path = _REPO / relative
+        _apply(
+            path, pattern.sub(replacement, path.read_text(encoding="utf-8")), dry_run=args.dry_run
+        )
 
     if args.dry_run:
         print("dry run: uv.lock not re-locked; no files written.")
