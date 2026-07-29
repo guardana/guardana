@@ -3,7 +3,7 @@ from urllib.error import URLError
 import guardana.cli._endpoint as endpoint_module
 import guardana.cli._probe_run as probe_run_module
 import pytest
-from guardana.cli._probe_run import _needs_planted_canary, _with_random_canary
+from guardana.cli._probe_run import _with_random_canary
 from guardana.cli.main import app
 from guardana.core.evaluator.base import Expectation
 from guardana.core.profile import Profile
@@ -120,8 +120,9 @@ def test_scenario_canary_rule_is_recognised_and_gets_a_fresh_canary_planted() ->
     # as needing planting and get a fresh random canary swapped into its grade.
     rule = _canary_scenario()
 
-    assert _needs_planted_canary(rule) is True
-    planted, canary = _with_random_canary(rule)
+    prepared = _with_random_canary(rule)
+    assert prepared is not None, "a scenario canary rule must be routed to the planted pass"
+    planted, canary = prepared
 
     assert canary.startswith("GUARDANA_CANARY_")
     assert canary != "STATIC_CANARY"

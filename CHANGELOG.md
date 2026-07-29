@@ -7,8 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The OWASP Top 10 for Agentic Applications (ASI01–ASI10) and the agentic MITRE
+  ATLAS techniques.** `guardana.core.taxonomy` is now a package, and rules carry
+  the references they had already earned: `AML.T0080` (AI Agent Context
+  Poisoning) and its `Memory` sub-technique, `AML.T0110` (AI Agent Tool
+  Poisoning), `AML.T0053` (Tool Invocation), `AML.T0086` (Exfiltration via Tool
+  Invocation), `AML.T0109` (Supply Chain Rug Pull), `AML.T0011.002`/`AML.T0104`
+  (poisoned agent tool, used and published). The ASI edition label is **2026**
+  though publication was December 2025 — the same convention `OWASP-LLM-2025`
+  follows, that edition having shipped in 2024.
+- **A fourth entry-point group, `guardana.taxonomies`.** Mapping every rule to a
+  public framework is mandatory here, so the framework list could not stay
+  closed: a company mapping to its own control catalogue registers `TaxonomyRef`s
+  and writes `taxonomy: [ACME-14]` in YAML beside `LLM01`. Registration happens
+  through an installed package rather than a string in a rule file, so an unknown
+  id in `taxonomy:` is still a load error. Redefining a known short id is refused
+  — overriding a *rule* changes what you check, overriding `LLM01` changes what a
+  report claims to an auditor, for the built-in rules too.
+- **Evaluators declare the `expect:` fields they read** (`Evaluator.expects`), and
+  `Expectation` carries evaluator-specific fields alongside the two the engine
+  handles itself. `expect:` accepted exactly `canary` and `goal` before, so a
+  third-party evaluator could never be configured from YAML at all — strictness
+  with no seam. The strictness is unchanged: a field the named evaluator does not
+  read is an error, at load for the evaluators core ships and in the `errors`
+  channel for a plugin's, which is the first moment the plugin exists.
+
 ### Fixed
 
+- **Security: a rule shape the engine did not recognise never got its canary
+  planted.** The probe resolved a rule's canary through
+  `isinstance(rule, YamlRule | ScenarioRule)`; anything else was routed to the
+  pass where nothing is planted, so `CanaryEvaluator` looked for a marker that
+  was never there and reported a confident `pass` — a fully leaking model graded
+  clean. That had already shipped once for `ScenarioRule`, and it applied to
+  *every* third-party rule class until now. Planting is a contract on `Rule`
+  (`with_canary`), and a rule that grades by canary while refusing to take one is
+  rejected at registration.
+- **The `[0.4.0]` changelog heading was deleted by the release-notes fix that
+  followed it**, leaving the whole 0.4.0 section under `[Unreleased]` — where the
+  next release would have rolled it into 0.5.0 and left 0.4.0 with no notes.
 - **Three documented versions sat on 0.3 through the 0.4.0 release.** The landing
   page header, the security policy's supported-versions line, and the README's
   roadmap table all still said 0.3 — the same staleness the Action-pin automation
@@ -17,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuses the bump if any of them has been reworded away, and a test pins all
   three to the released version. The delivered v0.4 section is out of
   `ROADMAP.md`, where shipped work does not belong.
+
+## [0.4.0] - 2026-07-27
 
 ### Fixed
 

@@ -1,5 +1,6 @@
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import ClassVar
 
 from guardana.core.evaluator.base import Evaluator, Expectation, Outcome, Verdict
 from guardana.core.exchange import Exchange
@@ -45,6 +46,7 @@ class LlmJudgeEvaluator(Evaluator):
     """
 
     id = "llm_judge"
+    expects: ClassVar[Mapping[str, bool]] = {"goal": True}
 
     def __init__(
         self,

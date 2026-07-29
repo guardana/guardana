@@ -210,10 +210,12 @@ build on it — is [`FEATURES.md`](FEATURES.md).
 
 ## Standards and architecture
 
-Every finding carries typed references into **OWASP LLM Top 10 (2025)**, **OWASP
-ML Top 10 (2023)**, **MITRE ATLAS v5.6.0**, and **NIST AI 100-2e2025** attack
-classes — so results are filterable and reportable by whichever framework your
-audit already uses.
+Every finding carries typed references into **OWASP LLM Top 10 (2025)**, the
+**OWASP Top 10 for Agentic Applications (ASI01–ASI10)**, **OWASP ML Top 10
+(2023)**, **MITRE ATLAS v5.6.0**, and **NIST AI 100-2e2025** attack classes — so
+results are filterable and reportable by whichever framework your audit already
+uses. The list is not closed: register your own control catalogue through the
+`guardana.taxonomies` entry point and rules can map to it the same way.
 
 Guardana is built on five extension points — **Target, Rule, Evaluator,
 Report/Finding, Profile** — plus a **Registry** that discovers rules and

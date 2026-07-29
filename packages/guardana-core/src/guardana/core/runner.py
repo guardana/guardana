@@ -80,7 +80,13 @@ class Runner:
 
         findings: list[Finding] = []
         unverified: list[Finding] = []
-        errors: list[CheckError] = list(self.registry.load_errors)
+        # Both are "this check will not grade what it claims to", collected before
+        # a single rule runs: a plugin that failed to import, and a rule whose
+        # `expect:` block does not satisfy its evaluator's declared contract.
+        errors: list[CheckError] = [
+            *self.registry.load_errors,
+            *self.registry.expectation_errors(),
+        ]
         run_count = 0
         for outcome in self._execute(plan, target):
             findings.extend(outcome.findings)

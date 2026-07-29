@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.exchange import Exchange
@@ -35,10 +35,26 @@ class ScenarioRule(Rule):
     conversation_evaluator: str | None = None
     conversation_expect: Expectation | None = None
 
-    @property
-    def planted_canary(self) -> str | None:
-        """The canary this scenario expects planted, taken from its conversation grade."""
-        return self.conversation_expect.canary if self.conversation_expect is not None else None
+    def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
+        """Every grade the scenario carries: one per graded step, plus the conversation."""
+        pairs = [(s.evaluator, s.expect) for s in self.steps]
+        pairs.append((self.conversation_evaluator, self.conversation_expect))
+        return tuple((e, x) for e, x in pairs if e is not None and x is not None)
+
+    def with_canary(self, canary: str) -> "Rule | None":
+        """Swap every declared canary — per-step and whole-conversation — for the planted one.
+
+        All of them, because a scenario that graded one step against the shipped
+        marker and the conversation against the planted one would look configured
+        and check nothing on the step.
+        """
+        expectations = [step.expect for step in self.steps] + [self.conversation_expect]
+        if not any(e is not None and e.canary for e in expectations):
+            return None
+        steps = tuple(replace(s, expect=_planted(s.expect, canary)) for s in self.steps)
+        return replace(
+            self, steps=steps, conversation_expect=_planted(self.conversation_expect, canary)
+        )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Drive the turns, grade each `expect` as it comes, and the conversation at the end."""
@@ -83,6 +99,11 @@ class ScenarioRule(Rule):
             evidence=Evidence(summary=f"[{scope}] {verdict.rationale}", detail=exchange.transcript),
             verdict=verdict,
         )
+
+
+def _planted(expect: Expectation | None, canary: str) -> Expectation | None:
+    """Point one expectation at the planted token, leaving canary-free ones alone."""
+    return replace(expect, canary=canary) if expect is not None and expect.canary else expect
 
 
 def _resolve(ctx: RuleContext, evaluator_id: str | None) -> Evaluator:

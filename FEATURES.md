@@ -49,7 +49,11 @@ layer. Mutually exclusive with `--profile`.
 
 ### 27 built-in rules, mapped to the frameworks auditors speak
 
-Every finding carries typed OWASP LLM Top 10 / MITRE ATLAS / NIST references.
+Every finding carries typed **OWASP LLM Top 10 (2025)**, **OWASP Top 10 for
+Agentic Applications (ASI01–ASI10, 2026 edition)**, **OWASP ML Top 10 (2023)**,
+**MITRE ATLAS v5.6.0** — including the agentic techniques (`AML.T0080` context
+poisoning, `AML.T0110` tool poisoning, `AML.T0053` tool invocation,
+`AML.T0109` rug pull) — and **NIST AI 100-2e2025** references.
 
 | Rule | Severity | What it catches |
 |---|---|---|
@@ -187,10 +191,25 @@ a multi-turn scenario's escalation is folded in, never dropped. Public API:
 - **Declarative YAML rules** — single-turn `prompts:` or multi-turn `steps:`
   scenarios; load from a plain directory (`--rules`, `rules.paths`) with no
   packaging, or bundle in a package.
-- **Three entry-point groups** — `guardana.rules`, `guardana.evaluators`,
-  `guardana.targets` — discovered identically for built-ins and third-party
-  packages; namespace by id, override built-ins, or go YAML-only with
-  `--no-plugins`.
+- **Four entry-point groups** — `guardana.rules`, `guardana.evaluators`,
+  `guardana.targets`, `guardana.taxonomies` — discovered identically for
+  built-ins and third-party packages; namespace by id, override built-ins, or go
+  YAML-only with `--no-plugins`.
+- **Map rules to your own framework.** Mapping is mandatory for a rule, so the
+  framework list is open: register `TaxonomyRef`s through `guardana.taxonomies`
+  and a YAML rule can name them (`taxonomy: [ACME-14]`) beside `LLM01`. Because
+  registration goes through an installed package rather than a string in a rule
+  file, an unknown id in `taxonomy:` still fails at load. Redefining a known
+  short id is refused: overriding a rule changes what you check, overriding
+  `LLM01` changes what a report claims to an auditor.
+- **Evaluators declare the `expect:` fields they read** (`Evaluator.expects`), so
+  a third-party evaluator is configurable from YAML exactly like a built-in —
+  and a misspelled field for *that* evaluator is an error, not a rule that looks
+  configured and grades nothing.
+- **Canary planting is a contract, not a list of known classes**
+  (`Rule.with_canary`). Any rule shape — ours or yours — takes part in the fresh
+  per-run token; a rule that grades by canary and refuses one is rejected at
+  registration rather than silently passing every model.
 - **One shared read per file, not one per rule** (`guardana.core.source`):
   `ArtifactTarget.python_source(path)` returns a `PythonSource` — text, parsed
   tree, and nodes grouped by type in source order — read, parsed and walked

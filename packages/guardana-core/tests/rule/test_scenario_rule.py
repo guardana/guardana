@@ -118,10 +118,13 @@ def test_scenario_ignores_a_non_endpoint_target(tmp_path: Path) -> None:
     assert list(scenario.run(ArtifactTarget(tmp_path), _ctx())) == []
 
 
-def test_planted_canary_comes_from_the_conversation_expect() -> None:
+def test_the_conversation_canary_is_swapped_for_the_planted_one() -> None:
     scenario = _scenario(
         (ScenarioStep("x", None, None),),
         conv_eval="canary",
         conv_expect=Expectation(canary="SECRET_TOKEN"),
     )
-    assert scenario.planted_canary == "SECRET_TOKEN"
+    planted = scenario.with_canary("FRESH_TOKEN")
+    assert isinstance(planted, ScenarioRule)
+    assert planted.conversation_expect is not None
+    assert planted.conversation_expect.canary == "FRESH_TOKEN"

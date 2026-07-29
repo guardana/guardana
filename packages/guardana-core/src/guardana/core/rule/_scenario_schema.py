@@ -9,9 +9,9 @@ false-negative the fixture law exists to prevent.
 from pathlib import Path
 from typing import Any
 
-from guardana.core.evaluator.base import Expectation
+from guardana.core.evaluator.base import Expectation, check_expectation
 from guardana.core.rule._yaml_schema import (
-    _EVALUATOR_REQUIRED_EXPECT,
+    _BUILTIN_EXPECTS,
     _parse_capabilities,
     _parse_severity,
     _parse_target_kind,
@@ -38,7 +38,7 @@ _ALLOWED_SCENARIO_KEYS = frozenset(
     }
 )
 _ALLOWED_STEP_KEYS = frozenset({"send", "expect"})
-_ALLOWED_STEP_EXPECT_KEYS = frozenset({"evaluator", "goal", "canary"})
+_TYPED_STEP_EXPECT_KEYS = frozenset({"evaluator", "goal", "canary"})
 
 
 def is_scenario(raw: dict[str, Any]) -> bool:
@@ -99,14 +99,17 @@ def _parse_expect_block(raw: object, path: Path) -> tuple[str | None, Expectatio
         return None, None
     if not isinstance(raw, dict):
         raise RuleLoadError(f"invalid scenario in {path}: 'expect' must be a mapping")
-    reject_unknown_keys(raw, _ALLOWED_STEP_EXPECT_KEYS, "expect", path)
     evaluator = _require_str(raw, "evaluator", path)
-    expectation = Expectation(canary=raw.get("canary"), goal=raw.get("goal"))
-    required = _EVALUATOR_REQUIRED_EXPECT.get(evaluator)
-    if required and getattr(expectation, required) is None:
-        raise RuleLoadError(
-            f"invalid scenario in {path}: evaluator {evaluator!r} requires 'expect.{required}'"
-        )
+    expectation = Expectation(
+        canary=raw.get("canary"),
+        goal=raw.get("goal"),
+        fields={k: v for k, v in raw.items() if k not in _TYPED_STEP_EXPECT_KEYS},
+    )
+    expects = _BUILTIN_EXPECTS.get(evaluator)
+    if expects is not None:
+        problem = check_expectation(evaluator, expects, expectation)
+        if problem is not None:
+            raise RuleLoadError(f"invalid scenario in {path}: {problem}")
     return evaluator, expectation
 
 

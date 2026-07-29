@@ -7,15 +7,21 @@ false-negative the fixture law exists to prevent. Kept separate from
 `yaml_rule.py` so the parsing vocabulary and the `YamlRule` type each stay small.
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from guardana.core.evaluator.base import Expectation
+from guardana.core.evaluator.base import Expectation, check_expectation
+from guardana.core.evaluator.canary import CanaryEvaluator
+from guardana.core.evaluator.guard import GuardEvaluator
+from guardana.core.evaluator.keyword import KeywordEvaluator
+from guardana.core.evaluator.length import LengthEvaluator
+from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
 from guardana.core.rule.base import RuleMeta
 from guardana.core.rule.errors import RuleLoadError
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
-from guardana.core.taxonomy import TaxonomyRef, by_short_id
+from guardana.core.taxonomy import TaxonomyRef, resolve
 
 _ALLOWED_RULE_KEYS = frozenset(
     {
@@ -30,13 +36,17 @@ _ALLOWED_RULE_KEYS = frozenset(
         "expect",
     }
 )
-_ALLOWED_EXPECT_KEYS = frozenset({"canary", "goal"})
+_TYPED_EXPECT_KEYS = frozenset({"canary", "goal"})
 
-# The built-in evaluators that consume a specific `expect` field. A rule naming
-# one of these must carry the field, or the evaluator would run against nothing
-# and report a confident "all clear" (canary) — so we reject it at load. A
-# third-party evaluator's needs are unknown to us, so we don't invent any.
-_EVALUATOR_REQUIRED_EXPECT = {"canary": "canary", "llm_judge": "goal"}
+# What each evaluator reads is declared by the evaluator (`Evaluator.expects`), not
+# duplicated here. Core knows its own at parse time, so a built-in rule missing a
+# required field still fails at load — the moment it is cheapest to notice. A rule
+# naming a third-party evaluator is checked by `Runner`, once discovery has
+# actually loaded the package that defines it.
+_BUILTIN_EXPECTS: dict[str, Mapping[str, bool]] = {
+    e.id: e.expects for e in (CanaryEvaluator, GuardEvaluator, KeywordEvaluator, LengthEvaluator)
+}
+_BUILTIN_EXPECTS[LlmJudgeEvaluator.id] = LlmJudgeEvaluator.expects
 
 
 def reject_unknown_keys(
@@ -79,7 +89,7 @@ def str_list(value: object, what: str, path: Path) -> tuple[str, ...]:
 def _parse_taxonomy(value: object, path: Path) -> tuple[TaxonomyRef, ...]:
     refs = []
     for ref_id in str_list(value, "taxonomy", path):
-        ref = by_short_id.get(ref_id)
+        ref = resolve(ref_id)
         if ref is None:
             raise RuleLoadError(f"invalid rule in {path}: unknown taxonomy id {ref_id!r}")
         refs.append(ref)
@@ -135,22 +145,30 @@ def parse_meta(raw: dict[str, Any], path: Path) -> RuleMeta:
 
 
 def parse_expectation(raw: object, path: Path) -> Expectation:
-    """Validate the `expect:` mapping into an `Expectation`."""
+    """Validate the `expect:` mapping into an `Expectation`.
+
+    Keys beyond the two the engine handles itself are carried as evaluator fields
+    rather than rejected here: which of them are legal depends on the evaluator,
+    and that is checked once the evaluator is known.
+    """
     if raw is None:
         return Expectation()
     if not isinstance(raw, dict):
         raise RuleLoadError(f"invalid rule in {path}: 'expect' must be a mapping")
-    reject_unknown_keys(raw, _ALLOWED_EXPECT_KEYS, "expect", path)
-    return Expectation(canary=raw.get("canary"), goal=raw.get("goal"))
+    return Expectation(
+        canary=raw.get("canary"),
+        goal=raw.get("goal"),
+        fields={k: v for k, v in raw.items() if k not in _TYPED_EXPECT_KEYS},
+    )
 
 
 def check_evaluator_expectations(meta: RuleMeta, expectation: Expectation, path: Path) -> None:
-    """Reject a rule whose built-in evaluator needs an `expect` field it didn't set."""
-    required = _EVALUATOR_REQUIRED_EXPECT.get(meta.evaluator or "")
-    if required and getattr(expectation, required) is None:
-        raise RuleLoadError(
-            f"invalid rule in {path}: evaluator {meta.evaluator!r} requires 'expect.{required}'"
-        )
+    """Reject a rule whose evaluator — one core ships — needs an `expect` field it lacks."""
+    expects = _BUILTIN_EXPECTS.get(meta.evaluator or "")
+    if expects is not None:
+        problem = check_expectation(meta.evaluator or "", expects, expectation)
+        if problem is not None:
+            raise RuleLoadError(f"invalid rule in {path}: {problem}")
     require_canary_is_plantable(meta.evaluator == "canary", meta.required_capabilities, path)
 
 

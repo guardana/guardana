@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import yaml
@@ -27,10 +27,15 @@ class YamlRule(Rule):
     prompts: tuple[str, ...]
     expectation: Expectation
 
-    @property
-    def planted_canary(self) -> str | None:
-        """The canary marker this rule expects to see planted in the target's setup, if any."""
-        return self.expectation.canary
+    def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
+        """Report the single evaluator and expectation every prompt is graded with."""
+        return ((self.meta.evaluator or "", self.expectation),)
+
+    def with_canary(self, canary: str) -> "Rule | None":
+        """Swap the declared canary for the token the probe planted this run."""
+        if self.expectation.canary is None:
+            return None
+        return replace(self, expectation=replace(self.expectation, canary=canary))
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Send each prompt, grade each reply, and yield a finding per failure."""

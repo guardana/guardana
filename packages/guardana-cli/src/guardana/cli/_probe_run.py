@@ -1,13 +1,11 @@
 import secrets
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from guardana.cli._endpoint import build_endpoint
-from guardana.core.evaluator.base import Expectation
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
-from guardana.core.rule import Rule, YamlRule
-from guardana.core.rule.scenario_rule import ScenarioRule
+from guardana.core.rule import Rule
 from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY, Runner
 from guardana.core.target import Capability, ChatTransport
 
@@ -28,51 +26,24 @@ class Connection:
     transport: ChatTransport | None = None
 
 
-def _planted_canary(rule: Rule) -> str | None:
-    """Return the canary a rule expects planted, for either declarative rule shape."""
-    if isinstance(rule, YamlRule | ScenarioRule):
-        return rule.planted_canary
-    return None
+def _with_random_canary(rule: Rule) -> tuple[Rule, str] | None:
+    """Give a canary rule a fresh per-run token, or None if it plants no canary.
 
+    A fixed, publicly-known canary (the value shipped in a rules YAML file) could
+    in principle be trained around; a random token generated at probe time cannot,
+    since it does not exist until the run starts.
 
-def _needs_planted_canary(rule: Rule) -> bool:
-    """Report whether this rule needs its canary planted in the system prompt to run.
-
-    True for a single-turn `YamlRule` or a multi-turn `ScenarioRule` alike: keying
-    off the rule type left a scenario canary rule routed to the normal pass, where
-    its canary was never planted and it silently passed a fully-leaky model.
+    Which rules take part is asked of the rule itself (`Rule.with_canary`) rather
+    than decided from a list of known classes. Keying off the type routed every
+    unlisted shape — a scenario rule once, any third-party rule class until now —
+    into the pass where nothing is planted, where the evaluator finds no marker
+    and reports a confident pass for a fully leaking model.
     """
-    return (
-        Capability.PLANT_SYSTEM_PROMPT in rule.meta.required_capabilities
-        and _planted_canary(rule) is not None
-    )
-
-
-def _plant(expect: Expectation | None, canary: str) -> Expectation | None:
-    return replace(expect, canary=canary) if expect is not None and expect.canary else expect
-
-
-def _with_random_canary(rule: Rule) -> tuple[Rule, str]:
-    """Swap a rule's static canary for a fresh per-run random token.
-
-    A fixed, publicly-known canary (e.g. the value shipped in a rules YAML file)
-    could in principle be trained around; a random token generated at probe time
-    can't be, since it doesn't exist until the run starts. The YAML canary is
-    never used to detect a leak here — it only marks the rule as canary-capable.
-    Every canary expectation the rule carries (a scenario's per-step and whole-
-    conversation grades included) is swapped for the same fresh token, so each
-    canary check looks for exactly what was planted.
-    """
+    if Capability.PLANT_SYSTEM_PROMPT not in rule.meta.required_capabilities:
+        return None
     canary = "GUARDANA_CANARY_" + secrets.token_hex(8)
-    if isinstance(rule, YamlRule):
-        return replace(rule, expectation=replace(rule.expectation, canary=canary)), canary
-    if isinstance(rule, ScenarioRule):
-        steps = tuple(replace(s, expect=_plant(s.expect, canary)) for s in rule.steps)
-        planted = replace(
-            rule, steps=steps, conversation_expect=_plant(rule.conversation_expect, canary)
-        )
-        return planted, canary
-    return rule, canary  # unreachable: _needs_planted_canary gates the two shapes above
+    planted = rule.with_canary(canary)
+    return None if planted is None else (planted, canary)
 
 
 def _canary_system_prompt(canary: str, base_system_prompt: str | None) -> str:
@@ -122,10 +93,11 @@ def run_probe(
     canary_rules: list[tuple[Rule, str]] = []
     normal_rules: list[Rule] = []
     for rule in registry.rules():
-        if _needs_planted_canary(rule):
-            canary_rules.append(_with_random_canary(rule))
-        else:
+        planted = _with_random_canary(rule)
+        if planted is None:
             normal_rules.append(rule)
+        else:
+            canary_rules.append(planted)
 
     results: list[ScanResult] = []
 

@@ -10,7 +10,7 @@ from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
+from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_ASI05, OWASP_LLM03
 from guardana.rules.supply_chain._code_sinks import code_sinks
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
@@ -76,7 +76,11 @@ class NotebookPayloadRule(Rule):
         title="Dangerous payload in a notebook cell",
         severity=Severity.HIGH,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03, NIST_SUPPLY_CHAIN),
+        taxonomy=(
+            OWASP_LLM03,
+            NIST_SUPPLY_CHAIN,
+            OWASP_ASI05,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

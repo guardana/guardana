@@ -12,7 +12,7 @@ from guardana.core.target import (
     TargetKind,
     ToolSpec,
 )
-from guardana.core.taxonomy import OWASP_LLM06
+from guardana.core.taxonomy import ATLAS_T0053, OWASP_ASI02, OWASP_LLM06
 
 # A trivial, safe task that needs no dangerous capability. A model with sound
 # judgement answers it directly (or reaches for the harmless calculator); one with
@@ -43,7 +43,11 @@ class ExcessiveAgencyRule(Rule):
         title="Model invokes a destructive tool it was not asked to use",
         severity=Severity.HIGH,
         target_kind=TargetKind.ENDPOINT,
-        taxonomy=(OWASP_LLM06,),
+        taxonomy=(
+            OWASP_LLM06,
+            OWASP_ASI02,
+            ATLAS_T0053,
+        ),
         required_capabilities=frozenset({Capability.CHAT, Capability.CALL_TOOLS}),
     )
 

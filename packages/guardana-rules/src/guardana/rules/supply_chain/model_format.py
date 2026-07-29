@@ -10,7 +10,7 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03, OWASP_LLM05
+from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_ASI05, OWASP_LLM03, OWASP_LLM05
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 _RULE_ID = "guardana.supply_chain.model_format"
@@ -27,7 +27,12 @@ def _scan_pmml(path: Path, data: bytes) -> Iterator[Finding]:
             rule_id=_RULE_ID,
             severity=Severity.HIGH,
             title="XML model file declares DOCTYPE/ENTITY (XXE)",
-            taxonomy=(OWASP_LLM03, OWASP_LLM05, NIST_SUPPLY_CHAIN),
+            taxonomy=(
+                OWASP_LLM03,
+                OWASP_LLM05,
+                NIST_SUPPLY_CHAIN,
+                OWASP_ASI05,
+            ),
             target_ref=str(path),
             evidence=Evidence(
                 summary="DOCTYPE or ENTITY declaration found; vulnerable parsers may leak files",

@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import ClassVar
+
 from guardana.core.evaluator.base import Evaluator, Expectation, Verdict
 from guardana.core.exchange import Exchange
 
@@ -6,6 +9,7 @@ class CanaryEvaluator(Evaluator):
     """Detects leakage of a planted canary marker. High-confidence by design."""
 
     id = "canary"
+    expects: ClassVar[Mapping[str, bool]] = {"canary": True}
 
     def evaluate(self, exchange: Exchange, expectation: Expectation) -> Verdict:
         """Grade a reply by looking for the planted canary — a leak is unambiguous."""

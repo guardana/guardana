@@ -7,7 +7,13 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import ATLAS_T0018, NIST_SUPPLY_CHAIN, OWASP_LLM03, OWASP_LLM05
+from guardana.core.taxonomy import (
+    ATLAS_T0018,
+    NIST_SUPPLY_CHAIN,
+    OWASP_ASI05,
+    OWASP_LLM03,
+    OWASP_LLM05,
+)
 from guardana.rules.supply_chain._jinja_gadgets import Gadget, jinja_gadgets
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded, read_text_bounded
@@ -39,7 +45,13 @@ class ChatTemplateRule(Rule):
         title="Chat template carries a code-execution gadget",
         severity=Severity.CRITICAL,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03, OWASP_LLM05, ATLAS_T0018, NIST_SUPPLY_CHAIN),
+        taxonomy=(
+            OWASP_LLM03,
+            OWASP_LLM05,
+            ATLAS_T0018,
+            NIST_SUPPLY_CHAIN,
+            OWASP_ASI05,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 
-from guardana.core.evaluator.base import Evaluator
+from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.report import Finding
 from guardana.core.severity import Severity
 from guardana.core.surface import Surface
@@ -53,6 +53,32 @@ class Rule(ABC):
     """A single security check. Authored as a plugin (this class) or as YAML."""
 
     meta: RuleMeta
+
+    def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
+        """Return the (evaluator id, expectation) pairs this rule will grade with.
+
+        Declaring them lets the engine check, once discovery has loaded the package
+        that defines an evaluator, that every rule naming it actually satisfies its
+        contract. A rule that grades entirely in Python declares nothing and is not
+        checked — there is nothing to check against.
+        """
+        return ()
+
+    def with_canary(self, canary: str) -> "Rule | None":
+        """Return a copy of this rule looking for `canary`, or None if it plants none.
+
+        The probe plants a fresh random token per run — a canary shipped in a rules
+        file is public and could be trained around — and hands it here so the rule
+        looks for exactly what was planted. Default None: this rule uses no canary
+        and runs in the ordinary pass.
+
+        **A rule graded by a canary must override this.** Returning None leaves the
+        marker unplanted, the evaluator then finds nothing, and the rule reports a
+        confident pass for every model, leaky or not. Registration refuses a rule
+        that grades by canary and does not participate, so the mistake cannot ship
+        quietly.
+        """
+        return None
 
     @abstractmethod
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:

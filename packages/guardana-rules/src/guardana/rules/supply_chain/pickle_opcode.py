@@ -10,6 +10,7 @@ from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import (
     ATLAS_T0018,
     NIST_SUPPLY_CHAIN,
+    OWASP_ASI05,
     OWASP_LLM03,
     OWASP_LLM05,
 )
@@ -171,7 +172,13 @@ class PickleOpcodeRule(Rule):
         title="Dangerous pickle opcode (arbitrary code on load)",
         severity=Severity.CRITICAL,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03, OWASP_LLM05, ATLAS_T0018, NIST_SUPPLY_CHAIN),
+        taxonomy=(
+            OWASP_LLM03,
+            OWASP_LLM05,
+            ATLAS_T0018,
+            NIST_SUPPLY_CHAIN,
+            OWASP_ASI05,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

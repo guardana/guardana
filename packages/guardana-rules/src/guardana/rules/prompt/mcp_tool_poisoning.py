@@ -7,7 +7,14 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import ATLAS_T0051, OWASP_LLM01, OWASP_LLM05
+from guardana.core.taxonomy import (
+    ATLAS_T0011_002,
+    ATLAS_T0051,
+    ATLAS_T0110,
+    OWASP_ASI04,
+    OWASP_LLM01,
+    OWASP_LLM05,
+)
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_hidden_char
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
@@ -49,7 +56,14 @@ class McpToolPoisoningRule(Rule):
         title="MCP tool description carries a hidden instruction (tool poisoning)",
         severity=Severity.HIGH,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM01, OWASP_LLM05, ATLAS_T0051),
+        taxonomy=(
+            OWASP_LLM01,
+            OWASP_LLM05,
+            ATLAS_T0051,
+            OWASP_ASI04,
+            ATLAS_T0110,
+            ATLAS_T0011_002,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

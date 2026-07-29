@@ -4,7 +4,7 @@ import pytest
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.rule import RuleContext
 from guardana.core.rule.errors import RuleLoadError
-from guardana.core.rule.yaml_rule import load_yaml_rules
+from guardana.core.rule.yaml_rule import YamlRule, load_yaml_rules
 from guardana.core.target.endpoint import EndpointTarget
 from guardana.core.testing import RefusingTransport, ScriptedTransport
 
@@ -66,7 +66,7 @@ def test_unknown_severity_raises_ruleloaderror(tmp_path: Path) -> None:
     assert "severity" in str(exc_info.value).lower()
 
 
-def test_planted_canary_returns_expectation_canary(tmp_path: Path) -> None:
+def test_the_declared_canary_is_swapped_for_the_planted_one(tmp_path: Path) -> None:
     yaml_text = (
         "id: guardana.prompt.canary.demo\n"
         "title: canary demo\nseverity: critical\ntarget_kind: endpoint\n"
@@ -77,14 +77,16 @@ def test_planted_canary_returns_expectation_canary(tmp_path: Path) -> None:
 
     rules = load_yaml_rules(tmp_path / "r.yaml")
 
-    assert rules[0].planted_canary == "SECRET_TOKEN_123"  # type: ignore[attr-defined]
+    planted = rules[0].with_canary("FRESH_TOKEN")
+    assert isinstance(planted, YamlRule)
+    assert planted.expectation.canary == "FRESH_TOKEN"
 
 
-def test_planted_canary_none_when_no_canary_set(tmp_path: Path) -> None:
+def test_a_rule_without_a_canary_does_not_join_the_planted_pass(tmp_path: Path) -> None:
     (tmp_path / "r.yaml").write_text(_RULE_YAML)
     rules = load_yaml_rules(tmp_path / "r.yaml")
 
-    assert rules[0].planted_canary is None  # type: ignore[attr-defined]
+    assert rules[0].with_canary("FRESH_TOKEN") is None
 
 
 def test_unknown_top_level_key_raises(tmp_path: Path) -> None:
