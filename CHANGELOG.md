@@ -39,6 +39,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cost gate caught the moment the first one landed. `TrajectoryRule.budget` states
   the real number, because a cost that is only true per session is not one anyone
   can plan a probe around.
+- **A live MCP server is a target** (`guardana probe --mcp <url>`, ASI04). A tool
+  description is fed to the agent's model as trusted context, so an instruction
+  hidden in one is indirect prompt injection with an audience of one — and reading
+  it from the *running* server is what catches a description changed after it was
+  approved, which a file scan cannot see. Approve a manifest with
+  `--write-mcp-pin`, compare with `--mcp-pin`, and a divergence is a **rug pull**
+  (`AML.T0109`). Without a pin, drift is reported `inconclusive`, never as a clean
+  server: "nothing changed" and "we have no idea whether anything changed" are
+  different answers. The client is JSON-RPC on the standard library — **no new
+  dependency**. Streamable HTTP talks to something already running; an stdio
+  server is *started* by Guardana, which is the only place the engine executes the
+  thing it examines, so it takes an explicit `--allow-exec`. **32 built-in rules.**
 - **A `tool_call` evaluator** with four criteria — `forbidden_tools`,
   `canary_in_arguments`, `forbidden_argument_values` and `delivered_by`. The last
   is what keeps the check honest: it names the tool whose result carries the
@@ -87,6 +99,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A dynamic YAML rule must now declare `requires: [chat]`.** Every built-in
+  already did, but nothing enforced it — harmless while one endpoint-kind target
+  existed, and a trap the moment a second one did: a rule without it would be
+  planned against an MCP server, find no chat interface, return nothing, and be
+  counted as a rule that ran and found nothing wrong. For the same reason the five
+  `if not isinstance(target, EndpointTarget): return` guards now raise instead of
+  returning quietly; capabilities already guarantee compatibility, so reaching one
+  means the contract broke, and that belongs in `errors`.
 - **Security: a rule shape the engine did not recognise never got its canary
   planted.** The probe resolved a rule's canary through
   `isinstance(rule, YamlRule | ScenarioRule)`; anything else was routed to the

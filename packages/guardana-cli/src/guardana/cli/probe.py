@@ -7,6 +7,7 @@ from guardana.cli._adapter import load_adapter_config
 from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._formats import OutputFormat
+from guardana.cli._mcp_run import McpConnection, run_mcp_probe
 from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
@@ -61,12 +62,41 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     reporter: Annotated[
         str | None, typer.Option(help="Collector URL to forward findings to, e.g. server://URL")
     ] = None,
+    mcp: Annotated[
+        str | None,
+        typer.Option(help="MCP server to examine instead of a model: an http(s) URL, or a "
+                          "command to run with --allow-exec"),
+    ] = None,
+    allow_exec: Annotated[
+        bool,
+        typer.Option("--allow-exec", help="Permit --mcp to START the server, executing it"),
+    ] = False,
+    mcp_pin: Annotated[
+        Path | None, typer.Option("--mcp-pin", help="Approved MCP manifest to compare against")
+    ] = None,
+    write_mcp_pin: Annotated[
+        Path | None,
+        typer.Option("--write-mcp-pin", help="Write the server's current manifest and exit"),
+    ] = None,
 ) -> None:
-    """Run dynamic security checks against a live model endpoint."""
+    """Run dynamic security checks against a live model endpoint, or an MCP server."""
     prof = resolve_profile(profile, preset)
     registry = Registry.discover()
     wire_config_evaluators(registry, prof)
     load_custom_rules(registry, prof, rules)
+
+    if mcp is not None:
+        result = run_mcp_probe(
+            registry, prof, McpConnection(mcp, allow_exec=allow_exec, pin=mcp_pin), write_mcp_pin
+        )
+        if result is None:
+            return
+        typer.echo(get_renderer(format.value).render(result))
+        if reporter:
+            submit_safely(reporter, result, source=mcp)
+        if gate(result, prof.policy):
+            raise typer.Exit(code=1)
+        return
 
     transport: ChatTransport | None = None
     if adapter is not None:

@@ -142,7 +142,7 @@ def test_a_healthy_yaml_rule_alongside_a_broken_one_still_loads(tmp_path: Path) 
     (tmp_path / "broken.yaml").write_text("id: acme.x\nbogus: 1\n", encoding="utf-8")
     (tmp_path / "good.yaml").write_text(
         "id: acme.good\ntitle: t\nseverity: high\ntarget_kind: endpoint\n"
-        "evaluator: keyword\nprompts:\n  - hello\n",
+        "evaluator: keyword\nrequires: [chat]\nprompts:\n  - hello\n",
         encoding="utf-8",
     )
     reg = Registry()

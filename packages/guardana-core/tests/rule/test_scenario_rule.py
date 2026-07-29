@@ -9,7 +9,7 @@ from guardana.core.evaluator.base import Expectation
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.rule import RuleContext
 from guardana.core.rule.base import RuleMeta
-from guardana.core.rule.errors import RuleLoadError
+from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.rule.scenario_rule import ScenarioRule, ScenarioStep
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, EndpointTarget, TargetKind
@@ -113,9 +113,13 @@ def test_unknown_evaluator_raises_at_run() -> None:
         list(scenario.run(target, RuleContext(evaluators={})))
 
 
-def test_scenario_ignores_a_non_endpoint_target(tmp_path: Path) -> None:
+def test_scenario_handed_a_non_endpoint_target_says_so_loudly(tmp_path: Path) -> None:
+    # It used to return nothing, which the runner counted as a rule that ran and
+    # found nothing wrong. Since 0.5 there is a second endpoint-kind target, so a
+    # broken capability contract has to surface in `errors` instead.
     scenario = _scenario((ScenarioStep("x", "keyword", Expectation(goal="g")),))
-    assert list(scenario.run(ArtifactTarget(tmp_path), _ctx())) == []
+    with pytest.raises(RuleError):
+        list(scenario.run(ArtifactTarget(tmp_path), _ctx()))
 
 
 def test_the_conversation_canary_is_swapped_for_the_planted_one() -> None:

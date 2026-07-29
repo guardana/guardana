@@ -14,12 +14,18 @@ class Capability(StrEnum):
 
     A rule declares what it needs; the runner skips the rule rather than crashing
     when a target cannot satisfy it.
+
+    Deliberately a closed list. Opening it to arbitrary strings would turn a typo
+    (`requires: [call_tols]`) from a load error into a requirement no target can
+    satisfy — a rule silently skipped forever, which is a fail-open. A third party
+    adding a capability adds it here, in a pull request someone reads.
     """
 
     READ_FILES = "read_files"
     CHAT = "chat"
     PLANT_SYSTEM_PROMPT = "plant_system_prompt"
     CALL_TOOLS = "call_tools"
+    LIST_TOOLS = "list_tools"
 
 
 class Target(ABC):

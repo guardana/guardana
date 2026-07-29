@@ -184,9 +184,15 @@ def test_malformed_field_raises_ruleloaderror_not_a_raw_crash(
 
 @pytest.mark.parametrize("key", ["requires", "taxonomy"])
 def test_a_null_optional_list_loads_as_empty(tmp_path: Path, key: str) -> None:
-    # `requires:` / `taxonomy:` left blank means "none" — legitimate, not a crash.
+    # `taxonomy:` left blank means "none" — legitimate, not a crash. `requires:`
+    # blank is not: a dynamic rule that declares no `chat` would be planned against
+    # an MCP server, find nothing to talk to, and report it clean.
     lines = [ln for ln in _RULE_YAML.splitlines(keepends=True) if not ln.startswith(f"{key}:")]
     (tmp_path / "m.yaml").write_text("".join(lines) + f"{key}:\n", encoding="utf-8")
+    if key == "requires":
+        with pytest.raises(RuleLoadError, match="chat"):
+            load_yaml_rules(tmp_path / "m.yaml")
+        return
     rules = load_yaml_rules(tmp_path / "m.yaml")
     assert len(rules) == 1
 

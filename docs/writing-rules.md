@@ -188,6 +188,15 @@ A run that hits a bound — steps, per-step tool calls, byte budget, or the 120 
 deadline — is `inconclusive` too, and the history is never trimmed to fit: the
 span that would be dropped is the one carrying the payload.
 
+### A note on capabilities
+
+A dynamic YAML rule must declare `requires: [chat]`. Since 0.5 there is more than
+one endpoint-kind target — an MCP server has a tool manifest and no model to talk
+to — so a rule that omitted it would be planned against that server, find nothing
+to say, return nothing, and be counted as a rule that ran and found nothing wrong.
+The loader refuses it instead. A rule that reads a live MCP manifest declares
+`requires: [list_tools]` and no `chat`.
+
 ### Shipping a YAML rule
 
 Three ways, all real:

@@ -12,6 +12,7 @@ from guardana.core.evaluator import (
 from guardana.core.rule import Rule
 from guardana.core.rule.yaml_rule import load_yaml_rules
 from guardana.rules.agent.excessive_agency import ExcessiveAgencyRule
+from guardana.rules.agent.mcp_server_manifest import McpServerManifestRule
 from guardana.rules.output.secrets import OutputSecretsRule
 from guardana.rules.prompt.hidden_instructions import HiddenInstructionsRule
 from guardana.rules.prompt.mcp_tool_poisoning import McpToolPoisoningRule
@@ -68,6 +69,7 @@ def provide_rules() -> list[Rule]:
         HiddenInstructionsRule(),
         DatasetIntegrityRule(),
         ExcessiveAgencyRule(),
+        McpServerManifestRule(),
         *_load_catalog_rules(),
     ]
 

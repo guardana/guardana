@@ -124,6 +124,10 @@
     "guardana.agent.memory_poisoning": {
       "name": "Poisoned memory steers a later session",
       "description": "A note saved in one conversation told the agent to email a third party, and it obeyed in the next conversation. Only the store crosses the boundary, so this is memory poisoning rather than an instruction the model can still see."
+    },
+    "guardana.agent.mcp_server_manifest": {
+      "name": "Live MCP manifest poisoned or drifted",
+      "description": "A tool description on the running server hides an instruction, or has changed since it was approved. The second is a rug pull: scrutiny happens at adoption, and the update arrives afterwards."
     }
   }
 }

@@ -14,6 +14,7 @@ two cannot silently drift.
 |---|---|---|
 | **Static scan** | `guardana scan <path>` | Offline, no-network, deterministic supply-chain checks over a repo or model directory. Exit code `1` on a gate failure — drops into CI like a linter. |
 | **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. Rules run concurrently (`--concurrency`, default 4) with rate-limit backoff, and results stay in rule order so two runs match. |
+| **MCP server** | `guardana probe --mcp <url>` | Examines a **live** MCP server's tool manifest: hidden instructions in tool descriptions, and drift from the manifest you approved (`--write-mcp-pin` to approve, `--mcp-pin` to compare). Streamable HTTP needs no permission; an stdio server is *started* by Guardana, so it takes an explicit `--allow-exec`. |
 | **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, a finding-count rise over its baseline, or a rise in *unverified* checks (a model whose safety checks go blind is itself the alert). Plants a fresh random canary every cycle. |
 
 Scan takes a **per-finding baseline** (`--write-baseline` to snapshot, `--baseline`
@@ -47,7 +48,7 @@ on MEDIUM so leads block a training run), `--preset monitor` (fail on HIGH and o
 inconclusive). A preset tunes only the failure bar; the command still picks the
 layer. Mutually exclusive with `--profile`.
 
-### 31 built-in rules, mapped to the frameworks auditors speak
+### 32 built-in rules, mapped to the frameworks auditors speak
 
 Every finding carries typed **OWASP LLM Top 10 (2025)**, **OWASP Top 10 for
 Agentic Applications (ASI01–ASI10, 2026 edition)**, **OWASP ML Top 10 (2023)**,
@@ -86,6 +87,7 @@ poisoning, `AML.T0110` tool poisoning, `AML.T0053` tool invocation,
 | `guardana.agent.credential_exfiltration` | CRITICAL | A marker planted fresh in the agent's context reappearing in an **outgoing tool argument**. The same standard as a canary-proven system-prompt leak, applied to an action instead of a reply — a match is proof, not an opinion. |
 | `guardana.agent.tool_argument_scope` | HIGH | The task names one file; the model passes a glob, a parent directory or a traversal. The call is permitted, the blast radius is not, and nothing in the reply text would show it. |
 | `guardana.agent.memory_poisoning` | CRITICAL | **ASI06 with a session boundary.** A note saved in one conversation comes back in the next, and the agent treats it as its own prior context. Guardana writes in session one and grades session two, started clean — only the store crosses the boundary, so this is memory poisoning rather than an instruction the model can still see. If the agent never read its memory back, the verdict is `inconclusive`. |
+| `guardana.agent.mcp_server_manifest` | CRITICAL/HIGH | **A live MCP server's tool manifest.** A tool description is fed to the agent's model as trusted context, so an instruction hidden in one is indirect prompt injection with an audience of one. Reading it from the *running* server is what catches a description changed after it was approved — a **rug pull** (`AML.T0109`), which a file scan cannot see. Pin the approved manifest with `--write-mcp-pin`; without a pin, drift is reported `inconclusive`, never as a clean server. |
 | `guardana.prompt.unbounded_consumption` | MEDIUM | Denial-of-wallet: a divergence ("repeat forever") prompt whose reply runs on with no server-side cap (lead-level, graded by reply length). |
 | `guardana.prompt.system_prompt_leak.canary` | CRITICAL | System-prompt disclosure, proven by a fresh random canary planted per run — unfakeable, unambiguous evidence. |
 

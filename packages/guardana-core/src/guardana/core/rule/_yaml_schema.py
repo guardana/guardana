@@ -176,6 +176,23 @@ def check_evaluator_expectations(meta: RuleMeta, expectation: Expectation, path:
         if problem is not None:
             raise RuleLoadError(f"invalid rule in {path}: {problem}")
     require_canary_is_plantable(meta.evaluator == "canary", meta.required_capabilities, path)
+    require_chat(meta.required_capabilities, path)
+
+
+def require_chat(capabilities: frozenset[Capability], path: Path) -> None:
+    """Reject a dynamic rule that never declares it needs a model to talk to.
+
+    Every declarative rule shape sends messages, so `chat` is not optional — and
+    since 0.5 there is more than one endpoint-kind target. A rule that omitted it
+    would be planned against an MCP server, find no chat interface, return
+    nothing, and be reported as a rule that ran and found nothing wrong.
+    """
+    if Capability.CHAT not in capabilities:
+        raise RuleLoadError(
+            f"invalid rule in {path}: a declarative rule sends messages, so it must declare "
+            f"requires: [chat] — without it the rule would be run against a target with no "
+            f"chat interface and report every one of them clean"
+        )
 
 
 def require_canary_is_plantable(

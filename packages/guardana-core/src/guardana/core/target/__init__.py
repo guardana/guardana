@@ -11,6 +11,7 @@ from guardana.core.target.endpoint import (
     ToolCallReply,
     ToolSpec,
 )
+from guardana.core.target.mcp import McpError, McpServerTarget, McpTool
 
 __all__ = [
     "AdapterConfig",
@@ -21,6 +22,9 @@ __all__ = [
     "EndpointError",
     "EndpointTarget",
     "HttpAdapterTransport",
+    "McpError",
+    "McpServerTarget",
+    "McpTool",
     "Target",
     "TargetKind",
     "ToolCall",

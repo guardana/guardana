@@ -5,7 +5,7 @@ from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.exchange import Exchange
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule.base import Rule, RuleContext, RuleMeta
-from guardana.core.rule.errors import RuleLoadError
+from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.target import ChatMessage, Target
 from guardana.core.target.endpoint import EndpointTarget
 
@@ -59,7 +59,11 @@ class ScenarioRule(Rule):
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Drive the turns, grade each `expect` as it comes, and the conversation at the end."""
         if not isinstance(target, EndpointTarget):
-            return
+            # Unreachable while the capability contract holds: the runner only
+            # plans this rule against a target that declared `chat`. If it ever
+            # runs, the contract is broken, and that belongs in `errors` rather
+            # than looking like a rule that ran and found nothing.
+            raise RuleError(f"{self.meta.id} needs a chat endpoint, got {type(target).__name__}")
         messages: list[ChatMessage] = []
         for step in self.steps:
             messages.append(ChatMessage(role="user", content=step.send))

@@ -15,7 +15,7 @@ from guardana.core.rule._yaml_schema import (
     str_list,
 )
 from guardana.core.rule.base import Rule, RuleContext, RuleMeta
-from guardana.core.rule.errors import RuleLoadError
+from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.target import ChatMessage, Target
 from guardana.core.target.endpoint import EndpointTarget
 
@@ -41,7 +41,11 @@ class YamlRule(Rule):
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Send each prompt, grade each reply, and yield a finding per failure."""
         if not isinstance(target, EndpointTarget):
-            return
+            # Unreachable while the capability contract holds: the runner only
+            # plans this rule against a target that declared `chat`. If it ever
+            # runs, the contract is broken, and that belongs in `errors` rather
+            # than looking like a rule that ran and found nothing.
+            raise RuleError(f"{self.meta.id} needs a chat endpoint, got {type(target).__name__}")
         evaluator_id = self.meta.evaluator or ""
         evaluator = ctx.evaluators.get(evaluator_id)
         if evaluator is None:

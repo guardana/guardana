@@ -3,6 +3,7 @@ from collections.abc import Iterable, Iterator
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule.errors import RuleError
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, ChatMessage, Target, TargetKind
 from guardana.core.target.endpoint import EndpointTarget
@@ -41,7 +42,11 @@ class OutputSecretsRule(Rule):
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Send benign prompts and flag any secret the model volunteers in reply."""
         if not isinstance(target, EndpointTarget):
-            return
+            # Unreachable while the capability contract holds: the runner only
+            # plans this rule against a target that declared `chat`. If it ever
+            # runs, the contract is broken, and that belongs in `errors` rather
+            # than looking like a rule that ran and found nothing.
+            raise RuleError(f"{self.meta.id} needs a chat endpoint, got {type(target).__name__}")
         for prompt in _PROBE_PROMPTS:
             reply = target.chat([ChatMessage(role="user", content=prompt)])
             for label, secret in _scan(reply):
