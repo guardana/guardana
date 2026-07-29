@@ -78,11 +78,12 @@ def _run(rule: Rule, transport: object) -> list[str]:
     return [f"{f.verdict.outcome if f.verdict else '?'}" for f in _planted(rule).run(target, _CTX)]
 
 
-def test_the_three_agent_rules_are_registered() -> None:
+def test_the_agent_rules_are_registered() -> None:
     assert set(_RULES) == {
         "guardana.agent.tool_result_injection",
         "guardana.agent.credential_exfiltration",
         "guardana.agent.tool_argument_scope",
+        "guardana.agent.memory_poisoning",
     }
 
 

@@ -17,7 +17,12 @@ from guardana.core.rule._yaml_schema import (
 from guardana.core.rule.errors import RuleLoadError
 from guardana.core.rule.trajectory_rule import TrajectoryRule
 from guardana.core.target.endpoint import ToolSpec
-from guardana.core.trajectory import DEFAULT_MAX_STEPS, MAX_STEPS_CEILING, StaticToolDouble
+from guardana.core.trajectory import (
+    DEFAULT_MAX_STEPS,
+    MAX_STEPS_CEILING,
+    StaticToolDouble,
+    UnmaterialisedDouble,
+)
 from guardana.core.trajectory.tool_double import ToolOffer
 
 _ALLOWED_KEYS = frozenset(
@@ -30,12 +35,14 @@ _ALLOWED_KEYS = frozenset(
         "evaluator",
         "requires",
         "task",
+        "then",
         "tools",
         "max_steps",
         "expect",
     }
 )
-_ALLOWED_TOOL_KEYS = frozenset({"name", "description", "returns"})
+_ALLOWED_TOOL_KEYS = frozenset({"name", "description", "returns", "memory"})
+_MEMORY_ROLES = frozenset({"read", "write"})
 
 
 def is_trajectory(raw: dict[str, Any]) -> bool:
@@ -51,6 +58,17 @@ def parse_trajectory(raw: dict[str, Any], path: Path) -> TrajectoryRule:
     if not isinstance(task, str) or not task:
         raise RuleLoadError(f"invalid rule in {path}: 'task' must be a non-empty string")
     tools = _parse_tools(raw.get("tools"), path)
+    then_task = raw.get("then")
+    if then_task is not None and (not isinstance(then_task, str) or not then_task):
+        raise RuleLoadError(f"invalid rule in {path}: 'then' must be a non-empty string")
+    if then_task is not None and not any(o.memory == "read" for o in tools):
+        # A second session with nothing to read back proves nothing: the store is
+        # the only thing that crosses the boundary.
+        raise RuleLoadError(
+            f"invalid rule in {path}: 'then' starts a fresh session, so one tool must "
+            f"declare 'memory: read' — otherwise nothing carries over and the second "
+            f"session can only repeat the first"
+        )
     expectation = parse_expectation(raw.get("expect"), path)
     check_evaluator_expectations(meta, expectation, path)
     return TrajectoryRule(
@@ -59,6 +77,7 @@ def parse_trajectory(raw: dict[str, Any], path: Path) -> TrajectoryRule:
         tools=tools,
         max_steps=_parse_max_steps(raw.get("max_steps"), path),
         expectation=expectation,
+        then_task=then_task,
     )
 
 
@@ -80,13 +99,30 @@ def _parse_tools(value: object, path: Path) -> tuple[ToolOffer, ...]:
             # and which one wins would depend on ordering.
             raise RuleLoadError(f"invalid rule in {path}: tool {name!r} is declared twice")
         seen.add(name)
-        offers.append(
-            ToolOffer(
-                spec=ToolSpec(name=name, description=_required_string(entry, "description", path)),
-                double=StaticToolDouble(_required_string(entry, "returns", path)),
-            )
-        )
+        offers.append(_offer(entry, name, path))
     return tuple(offers)
+
+
+def _offer(entry: dict[str, Any], name: str, path: Path) -> ToolOffer:
+    """Build one offer: a canned result, or a role in the shared memory store."""
+    spec = ToolSpec(name=name, description=_required_string(entry, "description", path))
+    role = entry.get("memory")
+    if role is None:
+        return ToolOffer(
+            spec=spec, double=StaticToolDouble(_required_string(entry, "returns", path))
+        )
+    if role not in _MEMORY_ROLES:
+        raise RuleLoadError(
+            f"invalid rule in {path}: tool {name!r} has memory: {role!r}; "
+            f"expected one of {', '.join(sorted(_MEMORY_ROLES))}"
+        )
+    if "returns" in entry:
+        # Both would mean one of them is dead configuration, and which one wins
+        # would depend on how this parser happens to be written.
+        raise RuleLoadError(
+            f"invalid rule in {path}: tool {name!r} declares both 'memory' and 'returns'"
+        )
+    return ToolOffer(spec=spec, double=UnmaterialisedDouble(), memory=role)
 
 
 def _parse_max_steps(value: object, path: Path) -> int:

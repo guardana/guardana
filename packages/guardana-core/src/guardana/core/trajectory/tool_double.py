@@ -34,9 +34,31 @@ class StaticToolDouble:
         return self.text
 
 
+class UnmaterialisedDouble:
+    """A placeholder that refuses to answer — a memory tool before its store exists.
+
+    A rule instance outlives a single run, so a memory store built while parsing
+    would carry one target's notes into the next probe. The store is built per
+    run; until it is, this stands in and fails loudly rather than answering with
+    silence that would read as an empty memory.
+    """
+
+    def respond(self, call: ToolCall) -> str:
+        """Refuse: this offer was never given a store to read or write."""
+        raise RuntimeError(
+            f"tool {call.name!r} is a memory tool whose store was never materialised"
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ToolOffer:
     """One tool as the run sees it: what the model is told, and what answers it."""
 
     spec: ToolSpec
     double: ToolDouble
+    memory: str | None = None
+    """`"write"`, `"read"`, or None for an ordinary canned tool.
+
+    Set from YAML's `memory:` key. The run materialises these against one store so
+    a note written in the first session is there to be read in the second.
+    """

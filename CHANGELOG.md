@@ -18,12 +18,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ToolDouble` says, and never executes anything. `Trajectory` hangs off
   `Exchange` rather than replacing it, so `Evaluator.evaluate` keeps its shape and
   all five existing evaluators grade a run unchanged.
-- **Three agent rules**, all graded on facts about the run rather than on an
+- **Memory and context poisoning (ASI06, `AML.T0080`/`AML.T0080.000`).** What
+  separates an agent from a chat is that a note written in one conversation comes
+  back in the next and the model treats it as its own prior context. A YAML rule
+  can now declare `memory: read`/`memory: write` tools and a `then:` task that
+  runs in a **fresh session** against the same store: Guardana writes in the
+  first, grades the second, and only the store crosses the boundary — otherwise
+  the check would be proving a single-turn injection the model can still see. The
+  store is built per run, never at parse time, so one target's notes cannot reach
+  the next target's probe. If the agent never read its memory back, the verdict is
+  `inconclusive`.
+- **Four agent rules**, all graded on facts about the run rather than on an
   opinion about it: `agent.tool_result_injection` (confused deputy, ASI01/ASI02,
   `AML.T0053`/`AML.T0086`), `agent.credential_exfiltration` (a planted marker
   leaving through a tool argument, ASI03/`AML.T0098`) and
   `agent.tool_argument_scope` (a glob where the task named one file, ASI02/
-  `AML.T0101`). **30 built-in rules.**
+  `AML.T0101`) and `agent.memory_poisoning` (ASI06). **31 built-in rules.**
+
+  Rules that drive two sessions cost twice their `max_steps`, which the probe
+  cost gate caught the moment the first one landed. `TrajectoryRule.budget` states
+  the real number, because a cost that is only true per session is not one anyone
+  can plan a probe around.
 - **A `tool_call` evaluator** with four criteria — `forbidden_tools`,
   `canary_in_arguments`, `forbidden_argument_values` and `delivered_by`. The last
   is what keeps the check honest: it names the tool whose result carries the

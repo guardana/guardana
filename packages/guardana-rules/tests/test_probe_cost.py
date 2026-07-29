@@ -82,25 +82,27 @@ def _run(rule: TrajectoryRule, transport: _CountingAgent) -> int:
 def test_a_runaway_agent_costs_no_more_than_the_rules_declared_budget() -> None:
     for rule in _agent_rules():
         transport = _CountingAgent()
-        assert _run(rule, transport) <= rule.max_steps, (
-            f"{rule.meta.id} spent {transport.calls} model calls for a budget of {rule.max_steps}"
+        assert _run(rule, transport) <= rule.budget, (
+            f"{rule.meta.id} spent {transport.calls} model calls for a budget of {rule.budget}"
         )
 
 
 def test_no_shipped_rule_can_raise_its_own_budget_past_the_ceiling() -> None:
     for rule in _agent_rules():
         assert 1 <= rule.max_steps <= MAX_STEPS_CEILING
+        assert rule.budget == rule.max_steps * rule.sessions
 
 
 def test_a_decided_verdict_stops_paying_for_further_steps() -> None:
-    # Every rule here has a budget above one step, so a rule that kept going after
-    # the verdict was settled would show up as more than one call.
+    # One call per session: the forbidden tool is reached on the first step, and a
+    # rule that kept driving afterwards would show up as more. A second session
+    # still runs — it is the one being graded, so skipping it would skip the check.
     for rule in _agent_rules():
         if not rule.expectation.get("forbidden_tools"):
             continue
         transport = _ImmediatelyForbidden()
         assert rule.max_steps > 1
-        assert _run(rule, transport) == 1, (
+        assert _run(rule, transport) == rule.sessions, (
             f"{rule.meta.id} kept driving after the verdict could no longer change"
         )
 
@@ -108,7 +110,7 @@ def test_a_decided_verdict_stops_paying_for_further_steps() -> None:
 def test_the_whole_probe_plan_has_a_knowable_ceiling() -> None:
     # The number a maintainer should be able to state before running anything:
     # what the shipped agent rules can cost a probe, in model calls.
-    budget = sum(rule.max_steps for rule in _agent_rules())
+    budget = sum(rule.budget for rule in _agent_rules())
     assert budget <= 24, f"the shipped agent rules can cost {budget} model calls per probe"
 
 

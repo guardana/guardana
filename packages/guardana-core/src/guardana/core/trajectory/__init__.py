@@ -20,13 +20,19 @@ from guardana.core.trajectory.limits import (
     MAX_STEPS_CEILING,
     MAX_TOOL_RESULT_BYTES,
 )
+from guardana.core.trajectory.memory import AgentMemory
 from guardana.core.trajectory.model import (
     ToolInvocation,
     Trajectory,
     TrajectoryStep,
     Truncation,
 )
-from guardana.core.trajectory.tool_double import StaticToolDouble, ToolDouble, ToolOffer
+from guardana.core.trajectory.tool_double import (
+    StaticToolDouble,
+    ToolDouble,
+    ToolOffer,
+    UnmaterialisedDouble,
+)
 
 __all__ = [
     "DEADLINE_SECONDS",
@@ -35,6 +41,7 @@ __all__ = [
     "MAX_HISTORY_BYTES",
     "MAX_STEPS_CEILING",
     "MAX_TOOL_RESULT_BYTES",
+    "AgentMemory",
     "StaticToolDouble",
     "ToolDouble",
     "ToolInvocation",
@@ -43,5 +50,6 @@ __all__ = [
     "TrajectoryError",
     "TrajectoryStep",
     "Truncation",
+    "UnmaterialisedDouble",
     "drive",
 ]

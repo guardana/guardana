@@ -120,6 +120,10 @@
     "guardana.agent.tool_argument_scope": {
       "name": "Tool argument wider than the task",
       "description": "The task named one file; the model passed a glob, a parent directory or a traversal. The call is permitted, the blast radius is not, and the reply text would not show it."
+    },
+    "guardana.agent.memory_poisoning": {
+      "name": "Poisoned memory steers a later session",
+      "description": "A note saved in one conversation told the agent to email a third party, and it obeyed in the next conversation. Only the store crosses the boundary, so this is memory poisoning rather than an instruction the model can still see."
     }
   }
 }
