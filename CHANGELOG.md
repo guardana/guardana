@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The prose beside the moving Action pin stayed on 0.3 through 0.5.0.** The pin
+  itself was rewritten to `@v0.5`, and the sentence next to it in `README.md` and
+  `docs/integrations.md` went on telling readers the tag points at "the latest
+  0.3.x" — the automation moved the tag and left its explanation, one line over.
+  Both are now rewritten in the same pass as every other version marker, and the
+  release-tooling test pins them to the released version, so the next release
+  cannot repeat it a third time.
+
 ## [0.5.0] - 2026-07-29
 
 ### Added

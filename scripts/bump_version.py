@@ -53,6 +53,10 @@ _ACTION_PIN_RE = re.compile(r"(guardana/guardana@v)\d+\.\d+")
 _SITE_VERSION_RE = re.compile(r'(<span class="ver mono">)v\d+\.\d+\.\d+')
 _SECURITY_VERSION_RE = re.compile(r"(pre-1\.0 )\(\d+\.\d+\.x\)")
 _README_CURRENT_RE = re.compile(r"\| \*\*\d+\.\d+\*\* \*\(current\)\*")
+# The prose beside the moving Action pin. Rewriting the pin and leaving the
+# sentence that explains it is how README and integrations.md shipped 0.5.0
+# telling readers the tag points at "the latest 0.3.x".
+_PIN_PROSE_RE = re.compile(r"(latest )\d+\.\d+(\.x)")
 # The `major.minor.patch` core that drives bumps and the pin ceiling — the
 # leading numbers of any version, ignoring a PEP 440 pre/post/dev suffix.
 _CORE_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
@@ -121,6 +125,8 @@ _VERSION_MARKERS: tuple[tuple[Path, re.Pattern[str]], ...] = (
     (Path("site/index.html"), _SITE_VERSION_RE),
     (Path("SECURITY.md"), _SECURITY_VERSION_RE),
     (Path("README.md"), _README_CURRENT_RE),
+    (Path("README.md"), _PIN_PROSE_RE),
+    (Path("docs/integrations.md"), _PIN_PROSE_RE),
 )
 
 
@@ -131,6 +137,8 @@ def _documented_versions(new: str) -> tuple[tuple[Path, re.Pattern[str], str], .
         rf"\g<1>v{new}",
         rf"\g<1>({major}.{minor}.x)",
         rf"| **{major}.{minor}** *(current)*",
+        rf"\g<1>{major}.{minor}\g<2>",
+        rf"\g<1>{major}.{minor}\g<2>",
     )
     return tuple(
         (path, pattern, replacement)

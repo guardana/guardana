@@ -123,6 +123,11 @@ def test_documented_versions_match_the_released_one() -> None:
         (Path("site/index.html"), _BUMP._SITE_VERSION_RE, f"v{current}"),
         (Path("SECURITY.md"), _BUMP._SECURITY_VERSION_RE, f"({major}.{minor}.x)"),
         (Path("README.md"), _BUMP._README_CURRENT_RE, f"**{major}.{minor}**"),
+        # The sentence beside the moving Action pin. 0.5.0 shipped with the pin
+        # rewritten to @v0.5 and the prose next to it still saying "the latest
+        # 0.3.x" — the pin automation moved the tag and left its explanation.
+        (Path("README.md"), _BUMP._PIN_PROSE_RE, f"latest {major}.{minor}.x"),
+        (Path("docs/integrations.md"), _BUMP._PIN_PROSE_RE, f"latest {major}.{minor}.x"),
     ):
         text = (_repo_root() / relative).read_text(encoding="utf-8")
         found = pattern.search(text)
