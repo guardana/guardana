@@ -21,6 +21,8 @@ ATLAS_T0080_000 = _atlas("AML.T0080.000", "AI Agent Context Poisoning: Memory")
 ATLAS_T0084_001 = _atlas("AML.T0084.001", "Discover AI Agent Configuration: Tool Definitions")
 ATLAS_T0084_003 = _atlas("AML.T0084.003", "Discover AI Agent Configuration: Call Chains")
 ATLAS_T0086 = _atlas("AML.T0086", "Exfiltration via AI Agent Tool Invocation")
+ATLAS_T0098 = _atlas("AML.T0098", "AI Agent Tool Credential Harvesting")
+ATLAS_T0101 = _atlas("AML.T0101", "Data Destruction via AI Agent Tool Invocation")
 ATLAS_T0104 = _atlas("AML.T0104", "Publish Poisoned AI Agent Tool")
 ATLAS_T0109 = _atlas("AML.T0109", "AI Supply Chain Rug Pull")
 ATLAS_T0110 = _atlas("AML.T0110", "AI Agent Tool Poisoning")
@@ -39,6 +41,8 @@ REFS: tuple[TaxonomyRef, ...] = (
     ATLAS_T0084_001,
     ATLAS_T0084_003,
     ATLAS_T0086,
+    ATLAS_T0098,
+    ATLAS_T0101,
     ATLAS_T0104,
     ATLAS_T0109,
     ATLAS_T0110,

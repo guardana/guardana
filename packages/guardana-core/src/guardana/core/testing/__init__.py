@@ -27,6 +27,7 @@ from guardana.core.testing.artifacts import build_gguf, build_onnx, build_safete
 from guardana.core.testing.transports import (
     EchoingTransport,
     FailingTransport,
+    GullibleAgentTransport,
     RefusingTransport,
     ScriptedTransport,
     ToolCallingScriptedTransport,
@@ -35,6 +36,7 @@ from guardana.core.testing.transports import (
 __all__ = [
     "EchoingTransport",
     "FailingTransport",
+    "GullibleAgentTransport",
     "RefusingTransport",
     "ScriptedTransport",
     "ToolCallingScriptedTransport",

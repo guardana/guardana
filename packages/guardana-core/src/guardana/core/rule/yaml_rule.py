@@ -7,6 +7,7 @@ from guardana.core.evaluator.base import Expectation
 from guardana.core.exchange import Exchange
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule._scenario_schema import is_scenario, parse_scenario
+from guardana.core.rule._trajectory_schema import is_trajectory, parse_trajectory
 from guardana.core.rule._yaml_schema import (
     check_evaluator_expectations,
     parse_expectation,
@@ -79,6 +80,8 @@ def _build_rule(raw: object, path: Path) -> Rule:
         )
     if is_scenario(raw):
         return parse_scenario(raw, path)
+    if is_trajectory(raw):
+        return parse_trajectory(raw, path)
     meta = parse_meta(raw, path)
     prompts = str_list(raw.get("prompts"), "prompts", path)
     if not prompts:

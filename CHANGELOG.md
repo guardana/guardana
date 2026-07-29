@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Guardana grades an agent run, not just a reply.** `offer_tools` answered one
+  question — which tool did the model reach for first — and the interesting
+  agentic failures are not there. A confused deputy needs a tool *result* to
+  carry the injection; over-broad arguments need a task that justified a narrow
+  one; nothing about either shows up in the reply text. `guardana.core.trajectory`
+  drives the loop: Guardana plays the harness, offers tools, hands back what a
+  `ToolDouble` says, and never executes anything. `Trajectory` hangs off
+  `Exchange` rather than replacing it, so `Evaluator.evaluate` keeps its shape and
+  all five existing evaluators grade a run unchanged.
+- **Three agent rules**, all graded on facts about the run rather than on an
+  opinion about it: `agent.tool_result_injection` (confused deputy, ASI01/ASI02,
+  `AML.T0053`/`AML.T0086`), `agent.credential_exfiltration` (a planted marker
+  leaving through a tool argument, ASI03/`AML.T0098`) and
+  `agent.tool_argument_scope` (a glob where the task named one file, ASI02/
+  `AML.T0101`). **30 built-in rules.**
+- **A `tool_call` evaluator** with four criteria — `forbidden_tools`,
+  `canary_in_arguments`, `forbidden_argument_values` and `delivered_by`. The last
+  is what keeps the check honest: it names the tool whose result carries the
+  payload, and if the model never called it the injection never arrived, so the
+  verdict is `inconclusive` rather than a model that looks robust for having
+  ignored the document. A rule that configures no criterion at all grades
+  `inconclusive` too.
+- **Bounds on a run, and each one ends it as `inconclusive`.** Steps (6 by
+  default, 12 ceiling), tool calls answered per step (8), tool-result and history
+  bytes (1 MiB / 8 MiB), and a 120 s deadline. The history is **never trimmed to
+  fit** — the span that would be dropped is exactly the one carrying the payload,
+  so trimming deletes the evidence and then reports clean. A verdict that can no
+  longer change stops the run, which is correctness and cost in one move.
+  `test_probe_cost.py` pins all of it by counting model calls, the way
+  `test_scan_cost.py` counts parses.
+- **`ChatMessage` learned the `tool` role** (plus `tool_calls` and
+  `tool_call_id`, and `ToolCall.id`, which the wire format returns and the parser
+  used to drop). `Exchange.transcript` now renders tool calls and results
+  explicitly: they live in fields rather than in `content`, so a content-only
+  transcript showed a tool-calling turn as an empty line and hid the half that
+  matters — from the judge and from the human reading the evidence alike.
 - **The OWASP Top 10 for Agentic Applications (ASI01–ASI10) and the agentic MITRE
   ATLAS techniques.** `guardana.core.taxonomy` is now a package, and rules carry
   the references they had already earned: `AML.T0080` (AI Agent Context

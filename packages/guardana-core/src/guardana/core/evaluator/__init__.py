@@ -9,6 +9,7 @@ from guardana.core.evaluator.guard import GuardEvaluator
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.evaluator.length import LengthEvaluator
 from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
+from guardana.core.evaluator.tool_call import ToolCallEvaluator
 
 __all__ = [
     "CanaryEvaluator",
@@ -19,5 +20,6 @@ __all__ = [
     "LengthEvaluator",
     "LlmJudgeEvaluator",
     "Outcome",
+    "ToolCallEvaluator",
     "Verdict",
 ]

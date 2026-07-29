@@ -2,7 +2,13 @@
 
 import importlib.resources
 
-from guardana.core.evaluator import CanaryEvaluator, Evaluator, KeywordEvaluator, LengthEvaluator
+from guardana.core.evaluator import (
+    CanaryEvaluator,
+    Evaluator,
+    KeywordEvaluator,
+    LengthEvaluator,
+    ToolCallEvaluator,
+)
 from guardana.core.rule import Rule
 from guardana.core.rule.yaml_rule import load_yaml_rules
 from guardana.rules.agent.excessive_agency import ExcessiveAgencyRule
@@ -76,4 +82,4 @@ def provide_evaluators() -> list[Evaluator]:
     `evaluator: llm_judge` resolves to nothing and is skipped visibly — never a
     silent pass.
     """
-    return [KeywordEvaluator(), CanaryEvaluator(), LengthEvaluator()]
+    return [KeywordEvaluator(), CanaryEvaluator(), LengthEvaluator(), ToolCallEvaluator()]

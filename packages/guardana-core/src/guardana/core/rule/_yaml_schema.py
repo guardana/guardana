@@ -130,9 +130,15 @@ def _parse_target_kind(raw: dict[str, Any], path: Path) -> TargetKind:
     return kind
 
 
-def parse_meta(raw: dict[str, Any], path: Path) -> RuleMeta:
-    """Validate the rule-level fields into a `RuleMeta`."""
-    reject_unknown_keys(raw, _ALLOWED_RULE_KEYS, "rule", path)
+def parse_meta(
+    raw: dict[str, Any], path: Path, *, allowed: frozenset[str] | None = None
+) -> RuleMeta:
+    """Validate the rule-level fields into a `RuleMeta`.
+
+    `allowed` lets a rule shape with extra top-level keys (an agent run's `task:`
+    and `tools:`) reuse this without those keys being rejected as typos.
+    """
+    reject_unknown_keys(raw, allowed or _ALLOWED_RULE_KEYS, "rule", path)
     return RuleMeta(
         id=_require_str(raw, "id", path),
         title=_require_str(raw, "title", path),

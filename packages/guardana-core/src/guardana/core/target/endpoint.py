@@ -49,10 +49,18 @@ class EndpointError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class ChatMessage:
-    """One message in a chat exchange, in the OpenAI role/content shape."""
+    """One message in a chat exchange, in the OpenAI role/content shape.
 
-    role: Literal["system", "user", "assistant"]
+    An agent run needs two more things than a plain conversation: an assistant
+    turn has to carry the tools it asked for, and the harness has to hand each
+    result back as a message of its own. Both live here rather than in a parallel
+    message type, so one history is the whole run.
+    """
+
+    role: Literal["system", "user", "assistant", "tool"]
     content: str
+    tool_calls: tuple["ToolCall", ...] = ()
+    tool_call_id: str | None = None
 
 
 class ChatTransport(Protocol):
@@ -83,10 +91,16 @@ class ToolSpec:
 
 @dataclass(frozen=True, slots=True)
 class ToolCall:
-    """A tool the model asked to invoke, with the raw arguments it passed."""
+    """A tool the model asked to invoke, with the raw arguments it passed.
+
+    `id` is what the wire format uses to pair a result with its request. Dropping
+    it worked while a run stopped at the first reply; a multi-step run has to send
+    the pairing back, and a server that cannot match them rejects the turn.
+    """
 
     name: str
     arguments: str = ""
+    id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,7 +196,7 @@ class UrllibTransport:
             f"{base_url}/v1/chat/completions",
             {
                 "model": model,
-                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "messages": [wire_message(m) for m in messages],
             },
             api_key,
             ref,
@@ -203,7 +217,7 @@ class UrllibTransport:
             f"{base_url}/v1/chat/completions",
             {
                 "model": model,
-                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "messages": [wire_message(m) for m in messages],
                 "tools": [
                     {
                         "type": "function",
@@ -251,7 +265,35 @@ def _parse_tool_call(raw: object) -> ToolCall | None:
     if not isinstance(name, str):
         return None
     arguments = function.get("arguments")
-    return ToolCall(name=name, arguments=arguments if isinstance(arguments, str) else "")
+    call_id = raw.get("id")
+    return ToolCall(
+        name=name,
+        arguments=arguments if isinstance(arguments, str) else "",
+        id=call_id if isinstance(call_id, str) else "",
+    )
+
+
+def wire_message(message: ChatMessage) -> dict[str, object]:
+    """Render one message in the OpenAI wire shape, tool turns included.
+
+    A transport that drops `tool_calls` or the tool role leaves the model unable
+    to see what it asked for or what came back, so it repeats itself until the
+    step budget runs out. That shows up as a truncated run, which is reported as
+    inconclusive rather than as a model that behaved.
+    """
+    wire: dict[str, object] = {"role": message.role, "content": message.content}
+    if message.tool_calls:
+        wire["tool_calls"] = [
+            {
+                "id": call.id,
+                "type": "function",
+                "function": {"name": call.name, "arguments": call.arguments},
+            }
+            for call in message.tool_calls
+        ]
+    if message.tool_call_id is not None:
+        wire["tool_call_id"] = message.tool_call_id
+    return wire
 
 
 def _extract_content(payload: object, *, ref: str) -> str:
