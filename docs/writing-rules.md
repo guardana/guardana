@@ -224,7 +224,7 @@ Three ways, all real:
 ## Path 2: Python plugin (when YAML can't express the logic)
 
 Use this for custom parsers, stateful probes, or any check against an
-**artifact** target. Of the 27 built-in rules, 19 are build-time (artifact-kind)
+**artifact** target. Of the 32 built-in rules, 19 are build-time (artifact-kind)
 Python plugins — pickle opcodes (incl. ZIP-archive recursion), model format,
 Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk,
 remote-code (`trust_remote_code`/`torch.hub.load`) and its config form

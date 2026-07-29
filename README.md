@@ -14,7 +14,7 @@ that runs on your laptop, in CI, and next to a served model.**
 [![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Quickstart](#quickstart) · [Features](FEATURES.md) · [The 27 rules](#whats-in-the-box) · [Docs](docs/index.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
+[Quickstart](#quickstart) · [Features](FEATURES.md) · [The 32 rules](#whats-in-the-box) · [Docs](docs/index.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
 
 </div>
 
@@ -160,8 +160,9 @@ in [`docs/integrations.md`](docs/integrations.md).
 
 ## What's in the box
 
-Twenty-seven built-in rules, every finding tagged into the frameworks your compliance
-process already speaks:
+Thirty-two built-in rules, every finding tagged into the frameworks your compliance
+process already speaks — OWASP LLM Top 10, the OWASP Top 10 for Agentic
+Applications (ASI), OWASP ML Top 10, MITRE ATLAS and NIST:
 
 | Rule id | Severity | Kind | Standards |
 |---|---|---|---|
@@ -189,7 +190,12 @@ process already speaks:
 | `guardana.prompt.jailbreak.dan_style` | HIGH | endpoint | OWASP LLM01 |
 | `guardana.scenario.gradual_jailbreak` | HIGH | endpoint | OWASP LLM01 · ATLAS T0051 |
 | `guardana.scenario.indirect_injection` | HIGH | endpoint | OWASP LLM01/LLM08 · ATLAS T0051 |
-| `guardana.agent.excessive_tool_use` | HIGH | endpoint | OWASP LLM06 |
+| `guardana.agent.excessive_tool_use` | HIGH | endpoint | OWASP LLM06 · ASI02 · ATLAS T0053 |
+| `guardana.agent.tool_result_injection` | CRITICAL | endpoint | OWASP LLM01 · ASI01/ASI02 · ATLAS T0053/T0086 |
+| `guardana.agent.credential_exfiltration` | CRITICAL | endpoint | OWASP LLM02 · ASI03 · ATLAS T0086/T0098 |
+| `guardana.agent.tool_argument_scope` | HIGH | endpoint | OWASP LLM06 · ASI02 · ATLAS T0053/T0101 |
+| `guardana.agent.memory_poisoning` | CRITICAL | endpoint | OWASP LLM01 · ASI06 · ATLAS T0080 |
+| `guardana.agent.mcp_server_manifest` | CRITICAL/HIGH | endpoint | OWASP LLM01/LLM03 · ASI04 · ATLAS T0110/T0109 |
 | `guardana.prompt.unbounded_consumption` | MEDIUM | endpoint | OWASP LLM10 |
 | `guardana.prompt.system_prompt_leak.canary` | CRITICAL | endpoint | OWASP LLM07 · ATLAS T0056 |
 
