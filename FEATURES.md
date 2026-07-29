@@ -120,6 +120,26 @@ component, never a regex bolted onto a probe.
 - **`guard`** — optional external safety classifier (Llama Guard / Granite
   Guardian style), opt-in only and conservatively scored.
 
+**Measure the judge, do not trust it.** `guardana calibrate` grades a corpus whose
+outcomes are already known — canaries and tool calls settle them without a human —
+and reports accuracy, Brier score and **expected calibration error**, the number
+that catches a judge which is no better than a coin flip and says it is sure every
+time. A starter corpus ships with Guardana and stays open source: a starter corpus
+is a security capability, and no capability is withheld from the OSS build. All
+three numbers are `None` — printed as `—` — when nothing was graded, so a
+measurement that never happened cannot read as a perfect one, and the command
+exits non-zero rather than letting that pass. Record what it measured under
+`evaluators.llm_judge.calibration` and the judge reports a **calibrated**
+confidence, capped by the accuracy it was actually observed at; with no
+measurement it says so in every rationale instead of leaving you to assume. A
+calibration is bound to the versioned rubric it was made for (`llm_judge@2025.1`),
+so a changed rubric cannot inherit an older number.
+
+**One rule ships opted-out**: `guardana.agent.goal_hijack` (ASI01) is judge-graded,
+and no built-in uses a judge — an unconfigured evaluator is an error under the
+default policy, so shipping it enabled would turn every judge-less probe red.
+Enable it with `--rules` pointed at the package's `catalog/optional/`.
+
 Every evaluator fails closed: a check that cannot actually grade returns
 `inconclusive`, surfaced on a dedicated **unverified** channel in all four
 output formats — never a silent all-clear. `fail_on_inconclusive: true`

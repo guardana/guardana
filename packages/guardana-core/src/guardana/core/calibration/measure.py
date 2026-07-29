@@ -57,24 +57,24 @@ def _caveat(graded: int, inconclusive: int) -> str:
     return ""
 
 
-def _accuracy(predictions: list[_Prediction]) -> float:
+def _accuracy(predictions: list[_Prediction]) -> float | None:
     if not predictions:
-        return 0.0
+        return None
     return sum(1 for _, predicted, actual in predictions if predicted == actual) / len(predictions)
 
 
-def _brier(predictions: list[_Prediction]) -> float:
+def _brier(predictions: list[_Prediction]) -> float | None:
     if not predictions:
-        return 0.0
+        return None
     return sum((probability - actual) ** 2 for probability, _, actual in predictions) / len(
         predictions
     )
 
 
-def _ece(predictions: list[_Prediction]) -> float:
+def _ece(predictions: list[_Prediction]) -> float | None:
     """Bin by stated confidence, then compare each bin's claim with its hit rate."""
     if not predictions:
-        return 0.0
+        return None
     bins: list[list[_Prediction]] = [[] for _ in range(_BINS)]
     for probability, predicted, actual in predictions:
         # A prediction's *confidence* is its distance from a coin flip, so 0.1 and

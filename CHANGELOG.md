@@ -72,6 +72,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicitly: they live in fields rather than in `content`, so a content-only
   transcript showed a tool-calling turn as an empty line and hid the half that
   matters — from the judge and from the human reading the evidence alike.
+- **`guardana calibrate`** — the plumbing that turns the calibration measurement
+  into a routine. It grades a JSONL corpus of labelled samples and reports
+  accuracy, Brier and ECE; a **starter corpus ships with Guardana**, generated
+  from the project's own scripted doubles, and stays open source because a starter
+  corpus is a security capability. A corpus line it cannot use is an error, never
+  a skipped sample: a corpus quietly one row shorter measures something other than
+  what its author meant and the number still looks like a calibration. An
+  unreliable measurement exits non-zero, because "we measured nothing" must not
+  read as "we measured, and it was fine".
+- **`llm_judge` reports a calibrated confidence**, capped by the accuracy it was
+  measured at — agreement between samples of one judge measures consistency, not
+  correctness, and a judge can agree with itself every time and still be wrong.
+  With no measurement recorded it reports raw agreement *and says so in the
+  rationale*. A calibration is bound to the versioned rubric it was made for, so a
+  changed rubric cannot inherit an older number.
+- **A judge-graded ASI01 goal-hijack rule, shipped opted-out** in
+  `catalog/optional/`. Whether an agent abandoned its goal is semantic and no
+  deterministic grader settles it — but no built-in rule uses `llm_judge`, and an
+  unconfigured evaluator is an error under the default policy, so enabling it by
+  default would turn every judge-less `probe` red.
 - **The OWASP Top 10 for Agentic Applications (ASI01–ASI10) and the agentic MITRE
   ATLAS techniques.** `guardana.core.taxonomy` is now a package, and rules carry
   the references they had already earned: `AML.T0080` (AI Agent Context
@@ -96,6 +116,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with no seam. The strictness is unchanged: a field the named evaluator does not
   read is an error, at load for the evaluators core ships and in the `errors`
   channel for a plugin's, which is the first moment the plugin exists.
+
+### Changed
+
+- **`CalibrationReport.brier`, `.expected_calibration_error` and `.accuracy` are
+  now `float | None`.** They returned `0.0` when nothing was graded — a flawless
+  score for a measurement that never happened, with `is_reliable` the only thing
+  between a reader and it. Anyone reaching for `report.brier` without checking
+  first saw perfect calibration where there had been none. The roadmap named two
+  of the three; `accuracy` lied in exactly the same way. A public API change, made
+  now because 0.5 is still before the compatibility promise 1.0 makes.
 
 ### Fixed
 

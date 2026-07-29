@@ -303,7 +303,7 @@ and a result that distinguishes "found nothing" from "could not tell" from
 | Version | Theme | Highlights |
 |---|---|---|
 | **0.4** *(current)* | Linear cost & honest verdicts | 27 rules · supply-chain + training-data + config-RCE + **chat-template SSTI** + **ONNX graph** + advisory-backed deps + notebook + rules-file-backdoor · runtime: injection, jailbreaks, RAG-injection, **excessive-agency (tool-calling)**, **unbounded-consumption**, canary leak · three result channels + **observations** · **measured judge calibration (Brier/ECE)** · one shared read per file (scan **1.27 s → 0.36 s**, pinned by a cost gate) · concurrent `probe` with rate-limit backoff · SARIF & CI gate · GitHub Action & pre-commit · optional collector |
-| **0.5** | Agents, first-class | **OWASP ASI01–ASI10** + new ATLAS agentic techniques · grade the **trajectory**, not the reply · memory & context poisoning · live MCP/registry supply chain · `guardana calibrate` |
+| **0.5** | Agents, first-class | **OWASP ASI01–ASI10** + the agentic ATLAS techniques · grade the **trajectory**, not the reply · memory & context poisoning across a session boundary · live MCP server + rug-pull pin · `guardana calibrate` |
 | **0.6** | Regression & language | **`guardana diff`** — fail on deterioration after a model/prompt/tool change · `lang` facet + first Polish corpus · an order of magnitude more prompts per rule |
 | **1.0** | Frozen extension API | Compatibility guarantees on `Rule`/`Evaluator`/`Target`/`formats` — the point where a third-party rule pack is a safe investment |
 | **Extensions** | Deliberately not the engine | CycloneDX **ML-BOM** evidence pack · model-signature provenance — separate packages, so no regulator's calendar ages the engine |

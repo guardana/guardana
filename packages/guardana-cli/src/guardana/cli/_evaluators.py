@@ -13,7 +13,7 @@ from collections.abc import Callable, Mapping
 
 from guardana.cli._endpoint import build_endpoint
 from guardana.core.evaluator.guard import GuardEvaluator
-from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
+from guardana.core.evaluator.llm_judge import JudgeCalibration, LlmJudgeEvaluator
 from guardana.core.profile import Profile
 from guardana.core.profile.errors import ProfileError
 from guardana.core.registry import Registry
@@ -47,9 +47,43 @@ def _build_llm_judge(cfg: Mapping[str, object]) -> LlmJudgeEvaluator:
     if not isinstance(min_agreement, int) or isinstance(min_agreement, bool):
         raise ProfileError("evaluators.llm_judge.min_agreement must be an integer")
     try:
-        return LlmJudgeEvaluator(judge, version, min_agreement)
+        return LlmJudgeEvaluator(judge, version, min_agreement, _calibration(cfg))
     except ValueError as exc:  # unknown prompt_version or min_agreement < 1 — config typos
         raise ProfileError(f"evaluators.llm_judge: {exc}") from exc
+
+
+def _calibration(cfg: Mapping[str, object]) -> JudgeCalibration | None:
+    """Read a measured accuracy from config, if the operator recorded one.
+
+    Deliberately numbers rather than a corpus path: measuring costs one judge call
+    per sample, and a scan is the wrong moment to spend that. Run
+    `guardana calibrate`, then record what it measured — an explicit, auditable
+    act rather than something that quietly happens on every run.
+    """
+    raw = cfg.get("calibration")
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ProfileError("evaluators.llm_judge.calibration must be a mapping")
+    accuracy = raw.get("accuracy")
+    samples = raw.get("samples")
+    evaluator_id = raw.get("evaluator_id")
+    if not isinstance(accuracy, int | float) or isinstance(accuracy, bool):
+        raise ProfileError("evaluators.llm_judge.calibration.accuracy must be a number")
+    if not isinstance(samples, int) or isinstance(samples, bool):
+        raise ProfileError("evaluators.llm_judge.calibration.samples must be an integer")
+    if not isinstance(evaluator_id, str) or not evaluator_id:
+        raise ProfileError(
+            "evaluators.llm_judge.calibration.evaluator_id must name the judge that was "
+            "measured, e.g. llm_judge@2025.1 — a changed rubric must not inherit an "
+            "older measurement"
+        )
+    try:
+        return JudgeCalibration(
+            evaluator_id=evaluator_id, accuracy=float(accuracy), samples=samples
+        )
+    except ValueError as exc:
+        raise ProfileError(f"evaluators.llm_judge.calibration: {exc}") from exc
 
 
 def _endpoint_call(cfg: Mapping[str, object], what: str) -> Callable[[str], str]:

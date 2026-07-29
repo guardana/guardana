@@ -83,6 +83,10 @@ def test_a_hedging_judge_is_better_calibrated_than_a_confident_one() -> None:
     # admits it is guessing scores better, which is the entire point.
     shouty = calibrate(_FixedJudge("shouty", "fail", 1.0), _mixed(40))
     honest = calibrate(_FixedJudge("honest", "fail", 0.5), _mixed(40))
+    assert honest.brier is not None
+    assert shouty.brier is not None
+    assert honest.expected_calibration_error is not None
+    assert shouty.expected_calibration_error is not None
     assert honest.brier < shouty.brier
     assert honest.expected_calibration_error < shouty.expected_calibration_error
 
@@ -96,6 +100,11 @@ def test_an_inconclusive_verdict_is_counted_not_scored() -> None:
     assert report.inconclusive == 40
     assert report.is_reliable is False
     assert "inconclusive" in report.caveat
+    # None, not 0.0: a flawless score for a measurement that never happened is a
+    # lie the type used to allow, guarded only by remembering to check `caveat`.
+    assert report.brier is None
+    assert report.expected_calibration_error is None
+    assert report.accuracy is None
 
 
 def test_too_few_samples_is_reported_as_unreliable_not_as_a_number() -> None:
@@ -116,6 +125,8 @@ def test_metrics_are_finite_even_when_every_sample_is_the_same_class() -> None:
     # A set with no negatives is a degenerate corpus; the metrics must still be
     # numbers a report can print rather than a NaN that silently propagates.
     report = calibrate(_OracleJudge(), [_sample(leaked=True) for _ in range(40)])
+    assert report.brier is not None
+    assert report.expected_calibration_error is not None
     assert math.isfinite(report.brier)
     assert math.isfinite(report.expected_calibration_error)
 

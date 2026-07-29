@@ -32,18 +32,20 @@ whose cost grows with the number of rules eventually gets excluded from CI, and
 an excluded scanner is an organisation-level fail-open. Cost must grow with the
 size of the target, not with how much we know.
 
-## What ships today (0.4.0)
+## What ships today (0.5.0)
 
-**27 rules** across two layers — 19 **build-time** (static, artifact: pickle
+**32 rules** across two layers — 19 **build-time** (static, artifact: pickle
 opcodes, deserialization sinks, `trust_remote_code`/`torch.hub.load`,
 `config.json` `auto_map` and kernel-dispatch RCE, chat-template SSTI, ONNX graph
 risk, notebook payloads, Keras/TF/model-format code execution, advisory-backed
 malicious & hallucinated dependencies, insecure transport, hardcoded secrets,
 MCP tool poisoning, hidden-instruction rules-file backdoors, training-data
-integrity) and 8 **runtime** (dynamic, endpoint: prompt injection, DAN
+integrity) and 13 **runtime** (dynamic, endpoint: prompt injection, DAN
 jailbreak, gradual-jailbreak scenario, indirect/RAG injection, excessive
 tool-use agency, unbounded consumption, output-secret leakage, canary-proven
-system-prompt leak).
+system-prompt leak, and five agentic checks — tool-result injection, credential
+exfiltration through a tool argument, over-broad tool arguments, memory
+poisoning across a session boundary, and a live MCP server's tool manifest).
 
 Plus scan/probe/monitor, 5 evaluators with measured calibration (Brier + ECE),
 the three-channel result, 4 report formats, profiles/gates/presets, the
@@ -82,28 +84,27 @@ below and are meant to be uncomfortable to read.
 
 ### OWASP Top 10 for Agentic Applications (ASI01–ASI10, December 2025)
 
-Published by the OWASP GenAI Security Project after our current taxonomy was
-built, and the reason v0.5 exists. Where a rule already covers part of a risk it
-is because the mechanism overlaps, not because we set out to cover it — the
-mapping itself is work v0.5 does.
+Published by the OWASP GenAI Security Project (2026 edition, December 2025) after
+our earlier taxonomy was built. 0.5 closed the largest gaps; what remains is
+listed as plainly as what shipped.
 
-| Risk | Coverage today | What closes the gap |
+| Risk | Coverage today | What closes the rest |
 |---|---|---|
-| ASI01 Agent Goal Hijack | **Partial** | injection/jailbreak rules hit the mechanism; goal-vs-trajectory grading does not exist |
-| ASI02 Tool Misuse | **Started** | `agent.excessive_tool_use` — one probe, single step |
-| ASI03 Identity & Privilege Abuse | **Gap** | needs a target that models delegated credentials and scope |
-| ASI04 Agentic Supply Chain | **Started** | `prompt.mcp_tool_poisoning` covers poisoned tool manifests; registries, agent cards and remote MCP servers are open |
-| ASI05 Unexpected Code Execution | **Strong (build side)** | the 19 static rules are exactly this, at artifact level; agent-generated code paths at runtime are open |
-| ASI06 Memory & Context Poisoning | **Gap** | `scenario.indirect_injection` is single-turn retrieval; persistent memory needs a stateful target |
+| ASI01 Agent Goal Hijack | **Good** | `agent.tool_result_injection` proves a hijack deterministically when it ends in a forbidden call; `agent.goal_hijack` judges the semantic case and is **opt-in** until a judge is configured and measured |
+| ASI02 Tool Misuse | **Good** | `agent.excessive_tool_use` (single step), `agent.tool_argument_scope` (over-broad arguments), `agent.tool_result_injection` (whole run) |
+| ASI03 Identity & Privilege Abuse | **Started** | `agent.credential_exfiltration` proves a secret leaving through a tool argument; delegated credentials and scope still need a target that models them |
+| ASI04 Agentic Supply Chain | **Good** | `prompt.mcp_tool_poisoning` on a manifest, `agent.mcp_server_manifest` on the **live** server plus rug-pull detection against a pin; registries and agent cards are open |
+| ASI05 Unexpected Code Execution | **Strong (build side)** | the 19 static rules are exactly this at artifact level; agent-generated code paths at runtime are open |
+| ASI06 Memory & Context Poisoning | **Good** | `agent.memory_poisoning` writes in one session and grades the next; a customer's own vector store still needs a `VectorStoreTarget` |
 | ASI07 Insecure Inter-Agent Communication | **Gap** | multi-agent protocols (A2A and friends) are not modelled |
-| ASI08 Cascading Failures | **Gap** | needs trajectory-level observation first |
-| ASI09 Human-Agent Trust Exploitation | **Gap** | judged behaviour; gated on calibration |
-| ASI10 Rogue Agents | **Gap** | drift over time — the natural extension of `monitor` |
+| ASI08 Cascading Failures | **Started** | the trajectory is observable now, so a run that compounds is expressible; no rule grades cascade depth yet |
+| ASI09 Human-Agent Trust Exploitation | **Gap** | judged behaviour; unblocked now that `calibrate` exists, not yet written |
+| ASI10 Rogue Agents | **Gap** | drift over time — the natural extension of `monitor`, and of `diff` once it lands |
 
-MITRE ATLAS is also moving: v5.4.0 (February 2026) added agentic techniques
-including *Publish Poisoned AI Agent Tool* and *Escape to Host*, and v5.6.0
-(May 2026) added *Acquire Public AI Artifacts: AI Agent Configuration*. Our
-taxonomy references need to follow.
+MITRE ATLAS references now follow v5.6.0, including the agentic techniques:
+`AML.T0080` (+ `Memory`), `AML.T0110`, `AML.T0109`, `AML.T0053`, `AML.T0086`,
+`AML.T0084.001`/`.003`, `AML.T0098`, `AML.T0101`, `AML.T0011.002`, `AML.T0104`,
+`AML.T0034.002`, `AML.T0010.005`.
 
 ## Still open from the cost work
 
@@ -117,34 +118,6 @@ The parsed-source cache degrades past its 8 MiB budget: beyond it, files are
 re-read and re-parsed per rule. Correctness is unaffected (a failed read is still
 cached, so every rule sees the same answer), but a repository with more Python
 than that loses the speed-up. Worth revisiting if someone reports it.
-
-## v0.5 — Agents as a first-class target
-
-The largest gap in the coverage map, the fastest-moving area of the field, and
-the place competitors are weakest (garak's own documentation calls agent and RAG
-coverage limited).
-
-1. **The ASI taxonomy, and remapping.** `guardana.core.taxonomy` learns
-   ASI01–ASI10 and the new ATLAS agentic techniques; existing rules gain the
-   references they already earn. Mapping is contract, not decoration — a rule
-   without one does not ship.
-2. **Grade the trajectory, not the reply (ASI01/ASI02/ASI08).** Multi-step tool
-   chains, over-broad tool arguments, and confused-deputy runs where a tool
-   *result* carries the injection. Each step can look permissible while the run
-   arrives somewhere nobody approved, which is why the interesting object is the
-   run. Needs `Exchange` to carry the whole trajectory, and a judge that grades
-   against the original goal.
-3. **Memory & context poisoning (ASI06).** A stateful target: write to the
-   agent's memory or retrieval store in one turn, prove influence on a later one
-   with a canary. Deterministic evidence, no judge required for the first slice.
-4. **Agentic supply chain (ASI04).** Extend `mcp_tool_poisoning` from a local
-   manifest to a live MCP server and its registry: tool descriptions that change
-   after approval (rug-pull), agent cards, and remote tool metadata.
-5. **Finish the calibration plumbing.** `guardana calibrate` over a corpus file,
-   a bundled starter corpus generated from canary- and tool-call-graded runs, and
-   `llm_judge` reporting a *calibrated* confidence. Trajectory grading needs a
-   judge; an adaptive attack graded by an uncalibrated judge amplifies exactly
-   the misclassification problem this project exists to fix.
 
 ## v0.6 — Regression between runs, and language
 
@@ -267,13 +240,17 @@ Designed-for, not forgotten — parked with reasons:
 
 Tracked here so it cannot quietly become permanent:
 
-- **Calibration is a measurement, not yet a routine** — see v0.5 item 5.
-- **`CalibrationReport` returns 0.0 for Brier and ECE when every verdict is
-  `inconclusive`.** The report disclaims those numbers (`is_reliable` False plus
-  a stated reason), but changing them to `NaN`/`None` is a public-API change and
-  deserves its own decision rather than a drive-by.
-- **Performance has no regression gate** until v0.4 lands one, so the numbers in
-  the table above can silently get worse.
+- **The agent harness is Guardana's, not the customer's.** Trajectory rules
+  measure a model's agentic judgement by playing the harness around it. Grading a
+  trace exported from someone's *running* agent is a different input that
+  `Trajectory` was shaped to accept later — designed for, not built.
+- **A calibration is recorded, not re-measured.** `evaluators.llm_judge.calibration`
+  takes the numbers a `guardana calibrate` run produced, because measuring costs a
+  judge call per sample and a scan is the wrong moment to spend that. The cost is
+  that the recorded number can go stale without anything noticing.
+- **The canary pass is serial.** Each canary rule gets its own target, run one at
+  a time, which is more expensive now that a canary rule can be a multi-step agent
+  run. Left alone until a measurement says it matters.
 
 ## Non-goals
 

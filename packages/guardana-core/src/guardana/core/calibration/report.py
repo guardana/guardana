@@ -21,14 +21,20 @@ class CalibrationReport:
     not made a prediction, and scoring an abstention as one would invent data —
     but a judge that abstains on half the corpus is not calibrated, it is absent,
     so the count is reported and `is_reliable` refuses.
+
+    All three numbers are `None` when nothing was graded. They used to be `0.0` —
+    a flawless score for a measurement that never happened — and `is_reliable` was
+    the only thing standing between a reader and that. Anyone reaching for
+    `report.brier` without checking first saw perfect calibration where there had
+    been none; `None` makes the type say what the caveat said.
     """
 
     evaluator_id: str
     graded: int
     inconclusive: int
-    accuracy: float
-    brier: float
-    expected_calibration_error: float
+    accuracy: float | None
+    brier: float | None
+    expected_calibration_error: float | None
     caveat: str
 
     @property

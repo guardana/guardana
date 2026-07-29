@@ -64,8 +64,10 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     ] = None,
     mcp: Annotated[
         str | None,
-        typer.Option(help="MCP server to examine instead of a model: an http(s) URL, or a "
-                          "command to run with --allow-exec"),
+        typer.Option(
+            help="MCP server to examine instead of a model: an http(s) URL, or a "
+            "command to run with --allow-exec"
+        ),
     ] = None,
     allow_exec: Annotated[
         bool,
