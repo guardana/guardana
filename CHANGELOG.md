@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-29
+
 ### Added
 
 - **Guardana grades an agent run, not just a reply.** `offer_tools` answered one

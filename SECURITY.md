@@ -99,5 +99,5 @@ leaves a contributor's machine.
 
 ## Supported versions
 
-Guardana is pre-1.0 (0.4.x). Security fixes land on the latest released
+Guardana is pre-1.0 (0.5.x). Security fixes land on the latest released
 version; there is no separate LTS branch yet.
