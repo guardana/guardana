@@ -60,7 +60,7 @@ def compare(
     _refuse_if_not_comparable(before, after)
     before_states = _states(before, root)
     after_states = _states(after, root)
-    ran_before, ran_after = frozenset(before.rules_run), frozenset(after.rules_run)
+    ran_before, ran_after = _executed(before), _executed(after)
     digests_before = rules_before or {}
     digests_after = rules_after or {}
 
@@ -95,6 +95,23 @@ def compare(
         unchanged=unchanged,
         notes=_notes(ran_before & ran_after, digests_before, digests_after),
     )
+
+
+def _executed(result: ScanResult) -> frozenset[str]:
+    """Which rules this run actually ran, trusting a finding over the plan.
+
+    A finding is proof its rule ran, and a stronger one than a list: the list is
+    assembled by the runner, while a report read off disk may be hand-edited,
+    truncated, or produced by a third-party tool. Where the two disagree, taking
+    the finding keeps the comparison closed — the alternative is dropping a real
+    check on the grounds that a list did not mention it.
+    """
+    reported = {
+        finding.rule_id
+        for channel in (result.findings, result.unverified, result.waived)
+        for finding in channel
+    }
+    return frozenset(result.rules_run) | reported
 
 
 def _refuse_if_not_comparable(before: ScanResult, after: ScanResult) -> None:

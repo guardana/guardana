@@ -2,6 +2,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from guardana.core.diff import IncomparableRunsError, compare
 from guardana.core.profile.model import Policy
 from guardana.core.report import ScanResult
 from guardana.core.runner import gate
@@ -34,10 +35,12 @@ class Alert:
 class Monitor:
     """A sampling observer: re-runs a scan on a loop and alerts on regression.
 
-    Alerts when the policy gate fails, when the finding count rises above the
-    baseline established on the first cycle, or when the count of checks it can no
-    longer grade (`unverified`) rises above that baseline — a monitor whose own
-    security checks quietly stop grading must never keep reporting all-clear.
+    Alerts when the policy gate fails, when a check that could not run appears, or
+    when the cycle is *worse* than the first one by the same definition
+    `guardana diff` uses — a new problem, a problem finally proven, a rising
+    severity, a rule that stopped running, or a check that can no longer grade
+    what it used to. That last one lowers the finding count, so a monitor
+    comparing counts would have read going blind as an improvement.
 
     The scan is injected as a plain callable, so the monitor stays agnostic about
     what it samples. The CLI passes the very same probe `guardana probe` runs —
@@ -52,27 +55,32 @@ class Monitor:
     policy: Policy
     config: MonitorConfig
 
-    def _alert_reason(
-        self,
-        result: ScanResult,
-        findings_baseline: int,
-        unverified_baseline: int,
-        errors_baseline: int,
-    ) -> str | None:
-        """Why this cycle should alert, or None if it shouldn't."""
+    def _alert_reason(self, result: ScanResult, baseline: ScanResult) -> str | None:
+        """Why this cycle should alert, or None if it shouldn't.
+
+        Regression is not decided here. It is decided by `guardana.core.diff`, the
+        same code `guardana diff` runs, because two definitions of "worse" in one
+        project drift apart and the one that drifts is the one nobody reads. What
+        this used to compare — three counts — could not see a finding that got more
+        severe, or a check that stopped being gradable while the count stayed flat.
+        """
         if gate(result, self.policy):
             return "gate failed"
-        if len(result.findings) > findings_baseline:
-            return "finding count exceeded baseline"
-        if len(result.unverified) > unverified_baseline:
-            return "unverified count exceeded baseline"
-        # The strictly worse sibling of the unverified rise: those checks ran and
-        # could not grade, these never ran at all. Baselined too, so a monitor
-        # whose rules start crashing cannot keep reporting all-clear — including
-        # when `fail_on_error` is off and the gate stays quiet.
-        if len(result.errors) > errors_baseline:
+        if len(result.errors) > len(baseline.errors):
             return "checks that could not run exceeded baseline"
-        return None
+        try:
+            diff = compare(baseline, result)
+        except IncomparableRunsError as exc:
+            # A cycle that cannot be compared to the first one is a change in
+            # itself — most likely the plan collapsing. Alerting is right; dying
+            # here would stop the watch, which is the worst outcome available.
+            return f"this cycle could not be compared with the first: {exc}"
+        regressions = diff.regressions
+        if not regressions:
+            return None
+        return "worse than the first cycle: " + ", ".join(
+            sorted({change.kind.value for change in regressions})
+        )
 
     def run(
         self,
@@ -90,10 +98,7 @@ class Monitor:
 
         `sleep` is injectable so tests exercise the loop without waiting.
         """
-        established = False
-        findings_baseline = 0
-        unverified_baseline = 0
-        errors_baseline = 0
+        baseline: ScanResult | None = None
         cycle = 0
         while self.config.max_cycles is None or cycle < self.config.max_cycles:
             if cycle:
@@ -101,21 +106,16 @@ class Monitor:
             try:
                 result = self.scan()
             except _TRANSIENT as exc:
-                if not established:
+                if baseline is None:
                     raise  # never worked once — surface it, don't loop on it
                 if on_error is not None:
                     on_error(cycle, exc)
                 cycle += 1
                 continue
 
-            if not established:
-                established = True
-                findings_baseline = len(result.findings)
-                unverified_baseline = len(result.unverified)
-                errors_baseline = len(result.errors)
-            reason = self._alert_reason(
-                result, findings_baseline, unverified_baseline, errors_baseline
-            )
+            if baseline is None:
+                baseline = result
+            reason = self._alert_reason(result, baseline)
             if reason is not None:
                 on_alert(Alert(cycle, result, reason))
             cycle += 1
