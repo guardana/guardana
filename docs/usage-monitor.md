@@ -43,19 +43,23 @@ cycle instead of being skipped for lack of a planted prompt. See
 ## How it decides to alert
 
 On each cycle, `monitor` re-runs the full endpoint-rule set against the
-target and compares against three conditions:
+target and checks three things:
 
 1. **Gate failure** — the same `fail_on` policy check `scan`/`probe` use.
-2. **Finding-count regression** — more findings than the very first cycle's
-   baseline count, even if none individually crosses the gate.
-3. **Unverified-count regression** — more checks that *could not be graded*
-   than the baseline (a judge going down, replies coming back empty). The
-   monitor going blind must itself alert, even under the default policy that
-   does not otherwise gate on inconclusive.
+2. **A check that could not run** — more errors than the first cycle. Kept
+   separate because an error is not a state a check moved into: the check
+   produced nothing at all. Under a policy with `fail_on_error` turned off, a
+   monitor would otherwise watch its own rules crash in silence.
+3. **Deterioration against the first cycle**, decided by exactly the same code
+   `guardana diff` runs (see [`usage-diff.md`](usage-diff.md)). That means a new
+   problem, a problem finally proven, a rising severity, a rule that stopped
+   running — and a check that used to reach a verdict and no longer can. The last
+   one *lowers* the finding count, which is why comparing tallies used to read
+   going blind as an improvement.
 
 Any condition fires an alert with the cycle number and a reason
-(`"gate failed"`, `"finding count exceeded baseline"`, or `"unverified count
-exceeded baseline"`). `monitor` never
+(`"gate failed"`, `"checks that could not run exceeded baseline"`, or
+`"worse than the first cycle: …"` naming what moved). `monitor` never
 exits on its own (unless `--max-cycles` is set) — it's meant to run as a
 long-lived process (e.g. a systemd unit or sidecar container) next to your
 served model.
@@ -64,7 +68,7 @@ served model.
 
 ```console
 $ guardana monitor --url http://localhost:11434 --model llama3 --interval 300 --max-cycles 3
---- ALERT (cycle 1): finding count exceeded baseline ---
+--- ALERT (cycle 1): worse than the first cycle: appeared ---
 ✖ [HIGH] guardana.prompt.jailbreak.dan_style — Jailbreak via persona override and encoding smuggling
     No refusal marker found; response likely complied.  (http://localhost:11434#llama3)
 

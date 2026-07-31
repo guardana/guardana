@@ -47,14 +47,18 @@ system-prompt leak, and five agentic checks — tool-result injection, credentia
 exfiltration through a tool argument, over-broad tool arguments, memory
 poisoning across a session boundary, and a live MCP server's tool manifest).
 
-Plus scan/probe/monitor, 5 evaluators with measured calibration (Brier + ECE),
+Plus scan/probe/monitor/diff, 5 evaluators with measured calibration (Brier + ECE),
 the three-channel result, 4 report formats, profiles/gates/presets, the
 build/runtime `Surface` split, a tool-calling endpoint target, 3 endpoint
 providers plus a guarded-endpoint adapter, the plugin contract with test doubles
 and [public model-format readers](docs/model-formats.md), a GitHub Action and
 pre-commit hook, and the optional collector with its dashboard.
 
-0.4 made the engine's cost grow with the target rather than the rule count — one
+0.6 added `guardana diff`: a run can be saved (`--output`, a versioned document
+that records which rules ran and a digest of each) and two of them compared, with
+deterioration failing the build and an impossible comparison refusing rather than
+going green. `monitor` was moved onto the same comparison, so "worse" is defined
+once. 0.4 made the engine's cost grow with the target rather than the rule count — one
 shared read, parse and index per file (`guardana.core.source`), a scan of this
 repo down from 1.27 s to 0.36 s and pinned there by a cost gate that counts
 operations rather than seconds — added bounded concurrency to `probe`/`monitor`
@@ -99,7 +103,7 @@ listed as plainly as what shipped.
 | ASI07 Insecure Inter-Agent Communication | **Gap** | multi-agent protocols (A2A and friends) are not modelled |
 | ASI08 Cascading Failures | **Started** | the trajectory is observable now, so a run that compounds is expressible; no rule grades cascade depth yet |
 | ASI09 Human-Agent Trust Exploitation | **Gap** | judged behaviour; unblocked now that `calibrate` exists, not yet written |
-| ASI10 Rogue Agents | **Gap** | drift over time — the natural extension of `monitor`, and of `diff` once it lands |
+| ASI10 Rogue Agents | **Started** | drift over time is now expressible: `diff` names deterioration between two runs and `monitor` alerts on it continuously; no rule yet grades an agent's drift as such |
 
 MITRE ATLAS references now follow v5.6.0, including the agentic techniques:
 `AML.T0080` (+ `Memory`), `AML.T0110`, `AML.T0109`, `AML.T0053`, `AML.T0086`,
@@ -119,27 +123,24 @@ re-read and re-parsed per rule. Correctness is unaffected (a failed read is stil
 cached, so every rule sees the same answer), but a repository with more Python
 than that loses the speed-up. Worth revisiting if someone reports it.
 
-## v0.6 — Regression between runs, and language
+## v0.6 — Language, and more corpus
 
-1. **`guardana diff` — the re-test gate.** Compare two runs and fail on
-   *deterioration*: a model swap, a system-prompt edit, a new tool, or a widened
-   scope that makes the same corpus land worse than it did yesterday. Security
-   testing becomes part of the change process rather than a launch ritual —
-   today `monitor` watches a live model and a baseline waives known findings, but
-   nothing answers "is this version worse than the last one?".
-2. **Multilingual corpora.** Safety alignment is English-centric and does not
+`guardana diff` has landed: two saved runs in, a verdict on whether the second is
+worse. What remains of this version:
+
+1. **Multilingual corpora.** Safety alignment is English-centric and does not
    generalise: translating a prompt into a low-resource language bypasses
    guardrails in **79%** of cases, and multi-turn attacks in those languages reach
    **52.7–83.6%** harmful-response rates (arXiv:2605.18239). What is missing is a
    `lang` facet on YAML rules and scenarios, a `--lang` filter, and a first
    non-English corpus. A language-specialised classifier (PL-Guard and similar)
    slots in as a `guard` backend unchanged.
-3. **Grow the corpora generally.** Dynamic rules ship a handful of prompts each;
+2. **Grow the corpora generally.** Dynamic rules ship a handful of prompts each;
    real coverage needs an order of magnitude more, curated per rule and
    deduplicated against refusal-training — plus new single-turn rules and
    scenarios (role-play leaks, encoding-smuggling variants, system-prompt
    extraction families).
-4. **Sharpen unbounded consumption (LLM10).** Surface `finish_reason`, latency
+3. **Sharpen unbounded consumption (LLM10).** Surface `finish_reason`, latency
    and token counts on `Exchange` so the check distinguishes a reply that hit the
    server cap from one that merely ran long.
 
@@ -195,9 +196,9 @@ The self-hosted OSS collector (`guardana-server`) ships ingest, list, trend and
 an opt-in dashboard; next it grows **auth** and a **persistent store** so a team
 can run its own central AI-security view for real. A managed **cloud** is the
 hosted version of the same, adding what only makes sense hosted: multi-team
-rollups, retention, policy management, and — the natural extension once `diff`
-exists — deployment history, so "what changed since the last green run" is a
-question with an answer.
+rollups, retention, policy management, and — the hosted extension of `diff` —
+deployment history, so "what changed since the last green run" is a question with
+an answer across a fleet rather than between two files on one machine.
 
 **The boundary is fixed and stated so it cannot drift:**
 
@@ -231,6 +232,15 @@ Designed-for, not forgotten — parked with reasons:
 - **Passive/out-of-band traffic tap** for `monitor` — the hard constraint is zero
   impact on model latency; `Exchange.provenance` already reserves the seam. Until
   then `monitor` stays a sampling prober, not an inline proxy.
+- **Repeated runs to smooth sampling noise.** `guardana diff` compares a check's
+  *state* precisely because a live model answers differently every run. Averaging
+  over N repetitions would be sharper still, and multiplies the cost of every
+  probe — so it needs its own design, with that cost knowable before the run
+  starts, rather than a flag bolted onto comparison.
+- **Comparing inventories between runs.** A run records what it *saw*
+  (`observations`), so "which components changed since the last run" is answerable
+  — but it is an inventory question, not a gate, and mixing it into the regression
+  verdict would blur what failing means.
 - **Gherkin scenario syntax** — structured YAML won; a translation layer can come
   later if demand shows up.
 - **Request/response mapping DSL** for exotic endpoint shapes — custom `Target`s

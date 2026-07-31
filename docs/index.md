@@ -22,6 +22,7 @@ detail below.
 - [`usage-scan.md`](usage-scan.md) — `guardana scan`: static, offline, CI-friendly
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: one-shot dynamic checks against a live endpoint
 - [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: a long-running sampling observer
+- [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two runs and fail on deterioration
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
 
 ## Contributor / extender docs

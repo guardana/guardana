@@ -116,3 +116,17 @@ guardana scan . --reporter server://https://collector.example.com
 Findings are POSTed to the collector after being printed locally — this
 never blocks the local exit-code gate. See
 [`architecture.md`](architecture.md#the-coreserver-boundary).
+
+## Saving a run for comparison
+
+`--output <path>` writes the report to a file instead of stdout. With
+`--format json` that file is a versioned document `guardana diff` reads back, so
+you can ask whether the next run is worse than this one — see
+[`usage-diff.md`](usage-diff.md).
+
+```bash
+guardana scan .  --format json --output run.json
+```
+
+Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
+on the other end cannot parse that.

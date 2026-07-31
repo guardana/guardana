@@ -6,7 +6,7 @@ confidence would therefore disable exactly the two signals that say a check
 stopped working — while looking like nothing more than a stricter setting.
 """
 
-from guardana.core.diff import ChangeKind, compare, gate_diff
+from guardana.core.diff import ChangeKind, RunContext, compare, gate_diff
 from guardana.core.diff.model import Change, CheckState, RunDiff
 from guardana.core.evaluator.base import Verdict
 from guardana.core.profile import FailOn, Policy
@@ -16,6 +16,7 @@ from guardana.core.severity import Severity
 _RULE = "guardana.prompt.injection"
 _OTHER = "guardana.prompt.leak"
 _ENDPOINT = "http://x#m"
+_CTX = RunContext(root=_ENDPOINT)
 
 
 def _finding(
@@ -42,7 +43,7 @@ def _run(
 
 
 def _diff_of(before: ScanResult, after: ScanResult) -> RunDiff:
-    return compare(before, after, root=_ENDPOINT)
+    return compare(before, after, before_context=_CTX, after_context=_CTX)
 
 
 def test_a_new_problem_fails_the_gate() -> None:

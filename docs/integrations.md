@@ -41,6 +41,25 @@ Inputs (all optional):
 The SARIF is uploaded even when the gate fails, so alerts always land; set
 `fail-on-findings: false` to run it purely advisory.
 
+## Failing a build on deterioration, not just on findings
+
+The Action gates on what a scan finds *today*. To gate on whether today is worse
+than the last accepted run, save both runs and compare them:
+
+```yaml
+      - name: Scan and save this run
+        run: guardana scan . --format json --output current.json
+
+      - name: Compare against the last accepted run
+        run: guardana diff accepted.json current.json --preset ci
+```
+
+Keep `accepted.json` in the repository (or in your CI's artifact store) and
+refresh it when you deliberately accept a change. `guardana diff` exits `1` on a
+regression and `2` when the two runs cannot honestly be compared — treat `2`
+exactly like `1` until you have read the reason, because "I could not compare
+these" is not "nothing got worse". See [`usage-diff.md`](usage-diff.md).
+
 ## pre-commit
 
 Guardana installs straight from PyPI as a pre-commit hook — scan before anything

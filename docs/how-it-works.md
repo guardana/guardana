@@ -57,6 +57,8 @@ This split is a first-class concept in the code — `RuleMeta.surface` — and
 **c) Three ways to run it, one engine underneath.** `scan` (build layer, static),
 `probe` (runtime layer, one-shot), and `monitor` (runtime layer, on a loop next
 to a served model). Same rules, same findings, same report — three entry points.
+A fourth command, `diff`, runs no rules: it reads two saved runs and answers
+whether the second is worse than the first.
 The command *is* the layer selector: `scan` runs the build rules, `probe` and
 `monitor` the runtime ones.
 
@@ -317,5 +319,6 @@ adversarial review. If you internalize one thing about this product, make it thi
 - [`extending.md`](extending.md) — evaluators, targets, and the entry-point contract.
 - [`profiles.md`](profiles.md) — the `guardana.yaml` schema and presets.
 - [`usage-scan.md`](usage-scan.md) · [`usage-probe.md`](usage-probe.md) · [`usage-monitor.md`](usage-monitor.md) — the three run modes in detail.
+- [`usage-diff.md`](usage-diff.md) — `guardana diff`: comparing two saved runs, and why "worse" needs five names rather than a bigger number.
 - [`../FEATURES.md`](../FEATURES.md) — the maintained capability surface.
 - [`../SECURITY.md`](../SECURITY.md) — the trust model, and why `--no-plugins` exists.

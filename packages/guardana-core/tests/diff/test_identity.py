@@ -116,3 +116,50 @@ def test_two_rules_on_one_file_are_two_identities() -> None:
     )
 
     assert finding_identity(pickle_rule, "models") != finding_identity(secret_rule, "models")
+
+
+def test_the_same_directory_scanned_from_two_checkouts_compares() -> None:
+    """A model directory mounted at a different path in CI than on a laptop.
+
+    `relativize_findings` makes paths repo-relative when the target sits inside the
+    checkout, and cannot when it does not — scanning `/models`, or a volume mounted
+    somewhere else. Without stripping the run's own root, the absolute prefix
+    differs between the two runs and every check reads as vanished and new.
+    """
+    laptop = Finding(
+        "guardana.supply_chain.pickle_opcode",
+        Severity.CRITICAL,
+        "t",
+        (),
+        "/Users/dev/models/a.pkl:12",
+        Evidence(summary="os.system"),
+    )
+    ci = Finding(
+        "guardana.supply_chain.pickle_opcode",
+        Severity.CRITICAL,
+        "t",
+        (),
+        "/home/runner/work/models/a.pkl:12",
+        Evidence(summary="os.system"),
+    )
+
+    assert finding_identity(laptop, "/Users/dev/models") == finding_identity(
+        ci, "/home/runner/work/models"
+    )
+
+
+def test_a_path_outside_the_run_root_is_kept_whole() -> None:
+    """Nothing is invented when the prefix does not match; the path stands as it is."""
+    stray = Finding(
+        "guardana.supply_chain.pickle_opcode",
+        Severity.CRITICAL,
+        "t",
+        (),
+        "/elsewhere/a.pkl:1",
+        Evidence(summary="os.system"),
+    )
+
+    assert finding_identity(stray, "/models") == (
+        "guardana.supply_chain.pickle_opcode",
+        "/elsewhere/a.pkl",
+    )

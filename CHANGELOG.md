@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`guardana diff` — the re-test gate.** `scan`, `probe` and `monitor` all answer
+  *how is it now*. Nothing answered the question a team has at every change — a
+  new model, an edited system prompt, one more tool: **is it worse than it was?**
+  `guardana diff before.json after.json` compares two saved runs and fails the
+  build on deterioration. Exit `1` on a regression, exit `2` when the two runs
+  cannot honestly be compared, and never a quiet `0` for either.
+
+  It is not list subtraction, and four things had to be right before it could be
+  written at all:
+
+  - **A check has to be recognisable across runs whose evidence differs by
+    design.** The waiver fingerprint is rule + file + description, and for a
+    dynamic finding the description is the evaluator's rationale — which three
+    built-in evaluators fill with a verbatim quote from the model. Comparing on it
+    would report movement on every re-run of an unchanged system. The comparison
+    key is that fingerprint minus the description, with the location taken
+    relative to what the run examined: against a live model it collapses to empty,
+    which is what lets a swap from `…#llama3` to `…#llama4` compare at all instead
+    of reading as every check vanishing and every check appearing.
+  - **"Worse" has five meanings**, and the one people forget is *we can no longer
+    tell*: a check that used to reach a verdict and now cannot lowers the finding
+    count, so a comparison that counted would call going blind an improvement.
+  - **A waiver is not a fix.** Adding a finding to a baseline reports as a changed
+    waiver, never as a resolved problem.
+  - **A narrower run is not a better one.** A run made with a tighter profile
+    reports its missing rules as lost coverage — a regression — rather than as
+    findings that went away.
+
+  Each side of the comparison carries its own `RunContext` (what that run examined,
+  and the digests of the rules it ran). Per-side on purpose: normalising both runs
+  against one root is exactly what breaks the model-swap case, and a shared
+  parameter makes that mistake writable.
+
+  Noise is handled by comparing a check's *state* rather than a tally: a model
+  either fails a check or it does not, which is far steadier than how many prompts
+  it failed. A changed count is reported and never gates on its own. Confidence
+  thresholds apply to regressions backed by a graded verdict — and deliberately
+  not to a check going blind or a rule that stopped running, because an ungraded
+  result carries confidence 0.0 by definition and a policy that filtered
+  everything by confidence would let a stricter setting switch those two off.
+
+- **A run can be saved and read back.** `--output <path>` on `scan` and `probe`
+  writes the report to a file (a shell redirect looked like enough until the file
+  became an input — PowerShell writes UTF-16). With `--format json` that file now
+  carries a `schema_version` and a `run` block: tool version, target, profile,
+  when, and **which** rules ran with a digest of each. `guardana.core.report.load_report`
+  reads it back — the first deserializer in the project — and refuses anything it
+  cannot read exactly, because a run silently read as empty produces a comparison
+  reporting that nothing got worse.
+
+- **`Rule.digest()`**, a contract on the base class: a short hash of what a rule
+  *is*, so a comparison can tell a worse model from a sharpened test. YAML rules
+  hash their own parsed declaration, which is also what keeps the probe's per-run
+  canary out of it. A third-party rule is comparable without its author doing
+  anything.
+
+### Changed
+
+- **`ScanResult.rules_run` names the rules that ran instead of counting them**
+  (`rules_run_count` is derived, so the two cannot drift apart). A count cannot
+  tell "this rule found nothing" from "this rule never ran", which means two runs
+  made with different profiles compared as an improvement — the same fail-open the
+  `observations` channel exists to prevent, one question further out. **Breaking
+  for anyone constructing a `ScanResult` directly.**
+- **The collector envelope is now v4**, adding `summary.rules_executed`. A
+  collector that only saw a count showed an agent with a narrowed profile as
+  green. The collector accepts v2, v3 and v4.
+- **`monitor` no longer has its own idea of "worse".** It compared three counts
+  and could not see a finding that got more severe, a check that stopped being
+  gradable while the count stayed flat, or one rule dropping out of a plan of the
+  same size. It now calls the same comparison `guardana diff` runs, so there is one
+  definition of regression in the project rather than two that drift apart.
+
 ### Fixed
 
 - **The prose beside the moving Action pin stayed on 0.3 through 0.5.0.** The pin

@@ -7,6 +7,8 @@ would be the one nobody was reading.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.model import Change, ChangeKind, CheckState, Outcome, RunDiff
@@ -35,34 +37,70 @@ def finding_identity(finding: Finding, root: str) -> Identity:
     if finding.target_ref == root:
         return (finding.rule_id, "")
     path, _line = split_ref(finding.target_ref)
-    return (finding.rule_id, path)
+    return (finding.rule_id, _within(path, root))
+
+
+def _within(path: str, root: str) -> str:
+    """Strip the run's root from a file path, so the key does not carry a checkout path.
+
+    `relativize_findings` already makes paths repo-relative when the target is
+    inside the checkout. It cannot when it is not — scanning `/models`, or a
+    directory mounted at a different place in CI than on a laptop — and the
+    absolute prefix would then differ between two runs of the same thing, making
+    every check read as vanished and every check as new.
+    """
+    if not root:
+        return path
+    root_path, _line = split_ref(root)
+    try:
+        return str(PurePosixPath(path).relative_to(PurePosixPath(root_path)))
+    except ValueError:
+        return path
+
+
+@dataclass(frozen=True, slots=True)
+class RunContext:
+    """What one run examined, and with which rules.
+
+    One per side, and never shared between them. Normalising both runs against a
+    single root is precisely what breaks the comparison this module exists for: a
+    model swap changes the root (`…#llama3` to `…#llama4`), and so does scanning
+    the same tree from a different checkout. Making the context per-side means
+    that mistake cannot be written.
+    """
+
+    root: str = ""
+    """What the run was pointed at: a directory, an endpoint, an MCP server."""
+
+    rules: Mapping[str, str] = field(default_factory=dict)
+    """Each rule that ran, mapped to its digest. Empty is fine — the monitor
+    compares two cycles of one process, where the rules are the same objects by
+    construction and there is nothing to tell apart."""
+
+
+_NO_CONTEXT = RunContext()
+"""What the monitor gets: two cycles of one process, one target, one rule set."""
 
 
 def compare(
     before: ScanResult,
     after: ScanResult,
     *,
-    root: str = "",
-    rules_before: Mapping[str, str] | None = None,
-    rules_after: Mapping[str, str] | None = None,
+    before_context: RunContext = _NO_CONTEXT,
+    after_context: RunContext = _NO_CONTEXT,
 ) -> RunDiff:
     """Compare two runs of the same kind of target.
-
-    `rules_before` / `rules_after` map each rule that ran to its digest. They are
-    optional because the monitor compares two cycles of one process, where the
-    rules are the same objects by construction; a caller reading two saved runs
-    passes them so a sharpened rule can be told apart from a worse system.
 
     Raises `IncomparableRunsError` when a comparison would be a fiction: a run that
     executed no rules (nothing was verified, so there is no baseline), or two runs
     with no rule in common (they tested different things).
     """
     _refuse_if_not_comparable(before, after)
-    before_states = _states(before, root)
-    after_states = _states(after, root)
+    before_states = _states(before, before_context.root)
+    after_states = _states(after, after_context.root)
     ran_before, ran_after = _executed(before), _executed(after)
-    digests_before = rules_before or {}
-    digests_after = rules_after or {}
+    digests_before = before_context.rules
+    digests_after = after_context.rules
 
     changes: list[Change] = []
     unchanged = 0

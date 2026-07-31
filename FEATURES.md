@@ -15,7 +15,7 @@ two cannot silently drift.
 | **Static scan** | `guardana scan <path>` | Offline, no-network, deterministic supply-chain checks over a repo or model directory. Exit code `1` on a gate failure — drops into CI like a linter. |
 | **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. Rules run concurrently (`--concurrency`, default 4) with rate-limit backoff, and results stay in rule order so two runs match. |
 | **MCP server** | `guardana probe --mcp <url>` | Examines a **live** MCP server's tool manifest: hidden instructions in tool descriptions, and drift from the manifest you approved (`--write-mcp-pin` to approve, `--mcp-pin` to compare). Streamable HTTP needs no permission; an stdio server is *started* by Guardana, so it takes an explicit `--allow-exec`. |
-| **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, a finding-count rise over its baseline, or a rise in *unverified* checks (a model whose safety checks go blind is itself the alert). Plants a fresh random canary every cycle. |
+| **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, on a check that could not run, and on any cycle that is *worse* than the first one by the same definition `diff` uses — including a check that can no longer grade what it used to. Plants a fresh random canary every cycle. |
 
 Scan takes a **per-finding baseline** (`--write-baseline` to snapshot, `--baseline`
 to apply): accept today's findings with a reason so a blocking gate can go live on
@@ -28,6 +28,23 @@ single file or a whole directory; a single-file target never walks nothing.
 (`guardana/guardana@vX.Y.Z`) scans and uploads SARIF to code scanning, and a
 **pre-commit** hook installs straight from PyPI — see
 [`docs/integrations.md`](docs/integrations.md).
+
+### The re-test gate: is this worse than last time? (`guardana diff`)
+
+A fourth command sits **on top of** the three above rather than beside them — it
+runs no rules. Save a run with `--output` on `scan`/`probe` (a versioned JSON
+document, not just output: it records the tool version, the target, the profile,
+and **which** rules ran with a digest of each), then hand two of them to
+`guardana diff`. It fails the build on deterioration: a new problem, a problem
+finally proven, a rising severity, a check that **went blind**, or a rule that
+stopped running. Exit `1` on a regression, exit `2` when the two runs cannot
+honestly be compared — never a quiet `0`.
+
+Comparison works on a check's *state* rather than a finding count, because a live
+model answers differently every run and a gate that tripped on tallies would be
+switched off. A waiver reports as a changed waiver, never as a fix; a run made
+with a narrower profile reports its missing rules as lost coverage, never as
+findings that went away. See [`docs/usage-diff.md`](docs/usage-diff.md).
 
 Plus `guardana rules` (list everything installed, incl. your own, **grouped by
 security layer**, filterable with `--surface build|runtime`, and able to include

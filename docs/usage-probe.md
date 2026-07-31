@@ -148,3 +148,17 @@ guardana probe --url http://localhost:11434 --model llama3
 
 Any other OpenAI-compatible local server (vLLM, HF-TGI, LM Studio, etc.)
 works the same way — just point `--url`/`--model` at it.
+
+## Saving a run for comparison
+
+`--output <path>` writes the report to a file instead of stdout. With
+`--format json` that file is a versioned document `guardana diff` reads back, so
+you can ask whether the next run is worse than this one — see
+[`usage-diff.md`](usage-diff.md).
+
+```bash
+guardana probe --url … --model …  --format json --output run.json
+```
+
+Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
+on the other end cannot parse that.

@@ -9,7 +9,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
-from guardana.core.diff import ChangeKind, IncomparableRunsError, compare
+from guardana.core.diff import ChangeKind, IncomparableRunsError, RunContext, compare
 from guardana.core.diff.reports import compare_reports
 from guardana.core.report import Evidence, Finding, RunMeta, RunReport, ScanResult
 from guardana.core.severity import Severity
@@ -108,7 +108,12 @@ def test_a_finding_from_a_rule_that_stopped_running_is_not_read_as_fixed() -> No
     before = ScanResult(findings=(found,), rules_run=("guardana.a", "guardana.b"), rules_skipped=())
     after = ScanResult(findings=(), rules_run=("guardana.a",), rules_skipped=("guardana.b",))
 
-    kinds = [c.kind for c in compare(before, after, root="x").changes]
+    kinds = [
+        c.kind
+        for c in compare(
+            before, after, before_context=RunContext("x"), after_context=RunContext("x")
+        ).changes
+    ]
     assert kinds == [ChangeKind.COVERAGE_LOST]
 
 
@@ -121,3 +126,44 @@ def test_comparing_two_different_targets_says_so() -> None:
     )
 
     assert any("different targets" in note for note in compare_reports(before, after).notes)
+
+
+def _report_with(target_ref: str, finding_ref: str) -> RunReport:
+    found = Finding("guardana.a", Severity.HIGH, "t", (), finding_ref, Evidence(summary="s"))
+    return RunReport(
+        meta=RunMeta(
+            tool_version="0.6.0",
+            target_kind=TargetKind.ENDPOINT,
+            target_ref=target_ref,
+            profile="default",
+            rules={"guardana.a": "digest"},
+        ),
+        result=ScanResult(findings=(found,), rules_run=("guardana.a",), rules_skipped=()),
+    )
+
+
+def test_swapping_the_model_compares_end_to_end() -> None:
+    """The first use case in the brief, checked where the roots are actually chosen.
+
+    A unit test on the identity function passes trivially here, because it is
+    handed one root per side by the test itself. The bug this pins lived one level
+    up: normalising *both* runs against the first one's root, which turns the model
+    swap into every check vanishing and every check appearing.
+    """
+    before = _report_with("http://x#llama3", "http://x#llama3")
+    after = _report_with("http://x#llama4", "http://x#llama4")
+
+    assert compare_reports(before, after).changes == ()
+
+
+def test_the_same_tree_scanned_from_two_checkouts_compares_end_to_end() -> None:
+    before = RunReport(
+        meta=replace(_report_with("/a/models", "/a/models/x.pkl:1").meta, target_ref="/a/models"),
+        result=_report_with("/a/models", "/a/models/x.pkl:1").result,
+    )
+    after = RunReport(
+        meta=replace(_report_with("/b/models", "/b/models/x.pkl:9").meta, target_ref="/b/models"),
+        result=_report_with("/b/models", "/b/models/x.pkl:9").result,
+    )
+
+    assert compare_reports(before, after).changes == ()

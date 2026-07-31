@@ -11,7 +11,7 @@ meanings and one of them is "we can no longer tell", and that comparing a
 narrower run against a wider one must never read as progress.
 """
 
-from guardana.core.diff.compare import Identity, compare, finding_identity
+from guardana.core.diff.compare import Identity, RunContext, compare, finding_identity
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.gate import gate_diff
 from guardana.core.diff.model import (
@@ -30,6 +30,7 @@ __all__ = [
     "CheckState",
     "Identity",
     "IncomparableRunsError",
+    "RunContext",
     "RunDiff",
     "compare",
     "compare_reports",

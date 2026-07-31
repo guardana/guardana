@@ -123,14 +123,21 @@ One engine, three entry points, no separate tools to learn:
 |---|---|---|
 | **Dev / CI** | `guardana scan <path>` | Fast, static, no-network scan of a repo or model directory. Drops into a pipeline as a linter-like gate. |
 | **Live probe** | `guardana probe --url <endpoint> --model <name>` | One-shot dynamic run against a live endpoint: prompt injection, jailbreak (single-turn and multi-turn scenarios), system-prompt leakage, output-secret checks — each graded by an Evaluator with a confidence. OpenAI-compatible by default; `--provider ollama\|tgi` speaks Ollama's native `/api/chat` or HF TGI's `/generate`. |
-| **Monitor** | `guardana monitor --url <endpoint> --model <name>` | Long-running sampling observer next to a served model; alerts on policy-gate failure, a rise in findings over baseline, or a rise in *unverified* checks — a model whose safety checks go blind is itself the alert. |
+| **Monitor** | `guardana monitor --url <endpoint> --model <name>` | Long-running sampling observer next to a served model; alerts on policy-gate failure, on a check that could not run, and on any cycle worse than the first — including a check that can no longer grade what it used to, because a model whose safety checks go blind is itself the alert. |
 
 Any of the three can forward findings to an optional central collector with
 `--reporter server://<collector-url>` (see [central monitoring](#central-monitoring--self-hosted-or-managed)).
 
+A fourth command sits **on top of** those three rather than beside them:
+`guardana diff before.json after.json` runs no rules at all — it reads two runs
+you saved with `--output` and answers whether the second is worse than the first,
+failing the build on deterioration and refusing (exit `2`, never a quiet `0`) when
+the two cannot honestly be compared. See [`docs/usage-diff.md`](docs/usage-diff.md).
+
 Full flag references and example output:
 [`docs/usage-scan.md`](docs/usage-scan.md) ·
 [`docs/usage-probe.md`](docs/usage-probe.md) ·
+[`docs/usage-diff.md`](docs/usage-diff.md) ·
 [`docs/usage-monitor.md`](docs/usage-monitor.md).
 
 ### Drop it into GitHub Actions
@@ -324,7 +331,8 @@ and why, and the project's non-goals — is [`ROADMAP.md`](ROADMAP.md). See
 - [`docs/index.md`](docs/index.md) — documentation map
 - [`docs/how-it-works.md`](docs/how-it-works.md) — **the whole product, A to Z** (engine, layers, extensions)
 - [`docs/install.md`](docs/install.md) — installation
-- [`docs/usage-scan.md`](docs/usage-scan.md) · [`docs/usage-probe.md`](docs/usage-probe.md) · [`docs/usage-monitor.md`](docs/usage-monitor.md)
+- [`docs/usage-scan.md`](docs/usage-scan.md) · [`docs/usage-probe.md`](docs/usage-probe.md) ·
+[`docs/usage-diff.md`](docs/usage-diff.md) · [`docs/usage-monitor.md`](docs/usage-monitor.md)
 - [`docs/profiles.md`](docs/profiles.md) — the `guardana.yaml` policy file
 - [`docs/integrations.md`](docs/integrations.md) — GitHub Action & pre-commit
 - [`docs/writing-rules.md`](docs/writing-rules.md) — author a rule (YAML or Python)

@@ -6,7 +6,7 @@ against a live-model probe is meaningless, and a pair handed over in the wrong
 order turns a regression into a clean bill of health without anyone noticing.
 """
 
-from guardana.core.diff.compare import compare
+from guardana.core.diff.compare import RunContext, compare
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.model import RunDiff
 from guardana.core.report import RunReport
@@ -30,9 +30,8 @@ def compare_reports(before: RunReport, after: RunReport) -> RunDiff:
     diff = compare(
         before.result,
         after.result,
-        root=before.meta.target_ref,
-        rules_before=before.meta.rules,
-        rules_after=after.meta.rules,
+        before_context=RunContext(root=before.meta.target_ref, rules=before.meta.rules),
+        after_context=RunContext(root=after.meta.target_ref, rules=after.meta.rules),
     )
     notes = _target_note(before, after) + _version_note(before, after) + diff.notes
     return RunDiff(changes=diff.changes, unchanged=diff.unchanged, notes=notes)
