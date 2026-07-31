@@ -1,5 +1,6 @@
 import typer
 from guardana.cli.calibrate import calibrate_command
+from guardana.cli.diff import diff
 from guardana.cli.init import init
 from guardana.cli.monitor import monitor
 from guardana.cli.new_rule import new_rule
@@ -29,6 +30,7 @@ app.command()(scan)
 app.command()(init)
 app.command()(rules)
 app.command()(probe)
+app.command()(diff)
 app.command()(monitor)
 app.command(name="new-rule")(new_rule)
 app.command(name="calibrate")(calibrate_command)

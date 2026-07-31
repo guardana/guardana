@@ -14,10 +14,17 @@ narrower run against a wider one must never read as progress.
 from guardana.core.diff.compare import Identity, compare, finding_identity
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.gate import gate_diff
-from guardana.core.diff.model import Change, ChangeKind, CheckState, RunDiff
+from guardana.core.diff.model import (
+    DIFF_SCHEMA_VERSION,
+    Change,
+    ChangeKind,
+    CheckState,
+    RunDiff,
+)
 from guardana.core.diff.reports import compare_reports
 
 __all__ = [
+    "DIFF_SCHEMA_VERSION",
     "Change",
     "ChangeKind",
     "CheckState",

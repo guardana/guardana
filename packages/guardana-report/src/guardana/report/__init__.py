@@ -1,7 +1,9 @@
 from collections.abc import Callable
 
 from guardana.core.report.run import RunMeta
-from guardana.report.base import Renderer
+from guardana.report.base import DiffRenderer, Renderer
+from guardana.report.diff_human import DiffHumanRenderer
+from guardana.report.diff_json import DiffJsonRenderer
 from guardana.report.human import HumanRenderer
 from guardana.report.json_report import JsonRenderer
 from guardana.report.junit import JUnitRenderer
@@ -13,6 +15,19 @@ _RENDERERS: dict[str, Callable[[RunMeta | None], Renderer]] = {
     SarifRenderer.name: lambda _run: SarifRenderer(),
     JUnitRenderer.name: lambda _run: JUnitRenderer(),
 }
+
+
+_DIFF_RENDERERS: dict[str, DiffRenderer] = {
+    r.name: r for r in (DiffHumanRenderer(), DiffJsonRenderer())
+}
+
+
+def get_diff_renderer(name: str) -> DiffRenderer:
+    """Look up a comparison renderer by the name `guardana diff --format` takes."""
+    try:
+        return _DIFF_RENDERERS[name]
+    except KeyError as exc:
+        raise ValueError(f"unknown diff renderer: {name!r}") from exc
 
 
 def get_renderer(name: str, *, run: RunMeta | None = None) -> Renderer:
@@ -30,10 +45,14 @@ def get_renderer(name: str, *, run: RunMeta | None = None) -> Renderer:
 
 
 __all__ = [
+    "DiffHumanRenderer",
+    "DiffJsonRenderer",
+    "DiffRenderer",
     "HumanRenderer",
     "JUnitRenderer",
     "JsonRenderer",
     "Renderer",
     "SarifRenderer",
+    "get_diff_renderer",
     "get_renderer",
 ]

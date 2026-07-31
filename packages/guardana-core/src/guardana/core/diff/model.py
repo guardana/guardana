@@ -15,6 +15,13 @@ from guardana.core.severity import Severity
 
 Outcome = Literal["fail", "unverified"]
 
+DIFF_SCHEMA_VERSION = 1
+"""Version of the JSON document `guardana diff --format json` writes.
+
+Its own number rather than the run report's: a comparison and a run are separate
+documents, and tying them together would force one to move because the other did.
+"""
+
 
 class ChangeKind(StrEnum):
     """One way a run can differ from the one before it."""
