@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The landing page advertised 25 rules while 32 shipped.** The count, the
+  build/runtime split and the terminal demo's output had all been hand-maintained
+  since 0.3, one element below a version marker the release tooling rewrote on
+  every release — automation covering the version and nothing else is what makes
+  stale prose look maintained. The page is reconciled with the registry, its
+  runtime list now shows the agentic checks 0.5 shipped, and
+  `test_landing_page.py` pins all three counts so the drift cannot recur.
+  `CLAUDE.md` and `CONTRIBUTING.md` state the five places a user-visible change
+  has to touch, and say to prefer a test over a promise.
+
 ## [0.6.0] - 2026-07-31
 
 ### Added

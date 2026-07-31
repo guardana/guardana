@@ -335,10 +335,29 @@ you.
 
 - Commits are made **manually, only after a milestone** — never automatically,
   never mid-task.
-- **A user-visible feature change updates `FEATURES.md` and `CHANGELOG.md` in
-  the same change.** `FEATURES.md` is the maintained capability surface, and a
-  registry test (`test_features_doc.py`) fails if a built-in rule or evaluator
-  ships without appearing there. Direction changes update `ROADMAP.md`.
+- **A user-visible change carries its own documentation, in the same commit.**
+  Not "later", not "in a docs pass" — a shipped capability nobody can find is a
+  capability nobody has. Five places, every time, and the answer for each is
+  either an edit or an explicit "not applicable":
+
+  | Where | When it needs an edit |
+  |---|---|
+  | `CHANGELOG.md` | any user-visible change at all — say *why*, not just what |
+  | `FEATURES.md` | a new capability, or one whose shape changed |
+  | `docs/` | a new command gets its own `usage-*.md`; a changed one gets its page reconciled, plus `docs/index.md` |
+  | `site/index.html` | a headline claim moved: a rule count, a run mode, what the terminal demo prints |
+  | `ROADMAP.md` | the direction moved — **delete what shipped**, and add what this work deliberately deferred, with the reason |
+
+  This list is not bureaucracy, it is the failure mode this project keeps
+  repeating. The landing page claimed "25 rules" through three releases that took
+  the number to 32, while the release tooling faithfully rewrote the version
+  marker one element above it. Automation covering the version and nothing else
+  is what makes stale prose *look* maintained.
+
+  **Prefer a test over a promise.** `test_features_doc.py` pins `FEATURES.md` to
+  the registry and `test_landing_page.py` pins the page's counts; a claim a test
+  can check is a claim that cannot rot. When you state a number anywhere, ask
+  what would notice if it changed.
 - Commit messages are **specific and conventional-commit style**
   (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`). Never `wip`,
   never `fixes`, never a message that doesn't say what changed and why.

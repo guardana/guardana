@@ -191,8 +191,9 @@
 <p><span class="c-dim">    unpickling imports non-allowlisted callable: posix.system</span></p>
 <p><span class="c-high">✖ [HIGH]</span> guardana.supply_chain.dependency_risk</p>
 <p><span class="c-dim">    torch.load without weights_only=True  (load_model.py:3)</span></p>
-<p><span class="c-med">▲ [MEDIUM]</span> guardana.supply_chain.hallucinated_package</p>
-<p><span class="c-dim">    3 finding(s); 17 rule(s) run, 0 skipped.  → exit 1</span></p>
+<p><span class="c-crit">✖ [CRITICAL]</span> guardana.supply_chain.remote_code_config</p>
+<p><span class="c-dim">    config.json names a Hub kernel repo transformers imports on load</span></p>
+<p><span class="c-dim">    12 finding(s); 19 rule(s) run, 0 skipped.  → exit 1</span></p>
         </div>
       </div>
     </div>
@@ -200,13 +201,13 @@
 
   <section>
     <div class="wrap">
-      <p class="eyebrow">25 rules · two surfaces</p>
+      <p class="eyebrow">32 rules · two surfaces</p>
       <h2 class="disp">What it checks</h2>
       <p class="sec-lede">Static checks are deterministic — no model, no network, no false-positive theatre. Dynamic checks talk to a live endpoint and are graded by a swappable evaluator.</p>
       <div class="surfaces">
         <div class="card">
           <h3>Build-time</h3>
-          <p class="when">17 rules · your laptop, CI, a training box</p>
+          <p class="when">19 rules · your laptop, CI, a training box</p>
           <ul class="rules">
             <li><b>pickle_opcode</b> — code that runs on model load</li>
             <li><b>keras_lambda</b> — Lambda-layer RCE in .keras/.h5</li>
@@ -218,13 +219,15 @@
         </div>
         <div class="card">
           <h3>Runtime</h3>
-          <p class="when">8 rules · against a served model</p>
+          <p class="when">13 rules · against a served model</p>
           <ul class="rules">
             <li><b>system_prompt_leak</b> — proven by a planted canary</li>
             <li><b>injection.ignore_previous</b> — instruction override</li>
             <li><b>scenario.gradual_jailbreak</b> — multi-turn escalation</li>
             <li><b>scenario.indirect_injection</b> — poisoned retrieval</li>
-            <li><b>agent.excessive_tool_use</b> — reaches for a destructive tool</li>
+            <li><b>agent.tool_result_injection</b> — a poisoned tool result hijacks the run</li>
+            <li><b>agent.memory_poisoning</b> — a note written in one session steers the next</li>
+            <li><b>agent.mcp_server_manifest</b> — a live MCP server's tools, and drift from your pin</li>
             <li><b>output.secrets</b> — keys leaking in replies</li>
           </ul>
         </div>

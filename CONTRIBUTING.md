@@ -206,10 +206,23 @@ option) needs documentation alongside the code that introduces it, not as a
 follow-up. Contributor-facing docs live near the code they describe; end-user
 docs live under `docs/`.
 
-A user-visible feature change also updates [`FEATURES.md`](FEATURES.md) (the
-maintained capability surface — a registry test fails if a built-in rule or
-evaluator ships without appearing there) and [`CHANGELOG.md`](CHANGELOG.md),
-in the same PR.
+A user-visible change carries its documentation in the **same PR**, and there are
+five places to consider, each answered with an edit or an explicit "not
+applicable":
+
+| Where | When it needs an edit |
+|---|---|
+| [`CHANGELOG.md`](CHANGELOG.md) | any user-visible change — say *why*, not only what |
+| [`FEATURES.md`](FEATURES.md) | a new capability, or one whose shape changed (a registry test fails if a built-in rule or evaluator ships without appearing there) |
+| [`docs/`](docs/) | a new command gets its own `usage-*.md`; a changed one gets its page reconciled, plus `docs/index.md` |
+| `site/index.html` | a headline claim moved: a rule count, a run mode, what the terminal demo prints |
+| [`ROADMAP.md`](ROADMAP.md) | the direction moved — delete what shipped, add what was deliberately deferred and why |
+
+This is a rule because it is a mistake the project has actually made: the landing
+page advertised "25 rules" across three releases that took the real number to 32,
+while the release tooling dutifully rewrote the version number one element above
+it. Where you can, pin a claim with a test instead of a promise — `test_features_doc.py`
+and `test_landing_page.py` are the pattern.
 
 ## For maintainers
 
