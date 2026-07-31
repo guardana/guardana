@@ -1,3 +1,4 @@
+from pathlib import Path
 from urllib.error import URLError
 
 import guardana.cli._endpoint as endpoint_module
@@ -8,6 +9,7 @@ from guardana.cli.main import app
 from guardana.core.evaluator.base import Expectation
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
+from guardana.core.report import load_report
 from guardana.core.rule.base import RuleMeta
 from guardana.core.rule.scenario_rule import ScenarioRule, ScenarioStep
 from guardana.core.runner import Runner
@@ -129,3 +131,39 @@ def test_scenario_canary_rule_is_recognised_and_gets_a_fresh_canary_planted() ->
     assert isinstance(planted, ScenarioRule)
     assert planted.conversation_expect is not None
     assert planted.conversation_expect.canary == canary
+
+
+def test_probe_saves_a_run_a_comparison_can_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The dynamic half of `--output`, which is where the interesting comparisons live.
+
+    Probe assembles its result from several runner passes (one per planted canary),
+    so the plan a saved run records has to survive that merge — if it did not, every
+    dynamic comparison would start by reporting most of its rules as never having run.
+    """
+    monkeypatch.setattr(endpoint_module, "transport_factory", RefusingTransport)
+    out = tmp_path / "run.json"
+
+    argv = ["probe", "--url", "http://fake", "--model", "m", "--format", "json"]
+    result = runner.invoke(app, [*argv, "--output", str(out)])
+
+    assert result.exit_code == 0, result.output
+    report = load_report(out)
+    assert report.meta.target_kind == TargetKind.ENDPOINT
+    assert report.meta.target_ref == "http://fake#m"
+    assert report.meta.rules, "a probe that ran rules must record which"
+    assert all(len(digest) == 16 for digest in report.meta.rules.values())
+
+
+def test_two_probe_runs_of_the_same_model_compare_as_unchanged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A canary is planted fresh every run, so two runs are never byte-identical."""
+    monkeypatch.setattr(endpoint_module, "transport_factory", RefusingTransport)
+    first, second = tmp_path / "a.json", tmp_path / "b.json"
+    argv = ["probe", "--url", "http://fake", "--model", "m", "--format", "json"]
+    for path in (first, second):
+        runner.invoke(app, [*argv, "--output", str(path)])
+
+    assert runner.invoke(app, ["diff", str(first), str(second)]).exit_code == 0
