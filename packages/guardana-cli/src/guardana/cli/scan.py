@@ -3,14 +3,17 @@ from typing import Annotated
 
 import typer
 from guardana.cli._formats import OutputFormat
+from guardana.cli._output import emit
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
+from guardana.cli._run_meta import build_run_meta
 from guardana.core.registry import Registry
 from guardana.core.report import (
     BaselineError,
     apply_baseline,
     load_baseline,
+    relativize,
     relativize_findings,
     serialize_baseline,
 )
@@ -48,6 +51,13 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     ] = None,
     reporter: Annotated[
         str | None, typer.Option(help="Collector URL to forward findings to, e.g. server://URL")
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            help="Write the report to this file instead of stdout (needed by `guardana diff`).",
+        ),
     ] = None,
 ) -> None:
     """Statically scan a path for AI supply-chain risk (no model needed)."""
@@ -96,7 +106,14 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
             typer.echo(f"error: {exc}", err=True)
             raise typer.Exit(code=_BASELINE_ERROR_EXIT_CODE) from exc
 
-    typer.echo(get_renderer(format.value).render(result))
+    run = build_run_meta(
+        registry,
+        prof,
+        result,
+        target_kind=target.kind,
+        target_ref=relativize(target.ref, Path.cwd()),
+    )
+    emit(get_renderer(format.value, run=run).render(result), output)
     if reporter:
         submit_safely(reporter, result, source=str(path))
     if gate(result, prof.policy):

@@ -8,13 +8,15 @@ from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._formats import OutputFormat
 from guardana.cli._mcp_run import McpConnection, run_mcp_probe
+from guardana.cli._output import emit
 from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
+from guardana.cli._run_meta import build_run_meta
 from guardana.core.registry import Registry
 from guardana.core.runner import gate
-from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport
+from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport, TargetKind
 from guardana.report import get_renderer
 
 # Four in flight is a meaningful speed-up on a probe that is almost entirely
@@ -80,6 +82,13 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         Path | None,
         typer.Option("--write-mcp-pin", help="Write the server's current manifest and exit"),
     ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            help="Write the report to this file instead of stdout (needed by `guardana diff`).",
+        ),
+    ] = None,
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
     prof = resolve_profile(profile, preset)
@@ -93,7 +102,10 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         )
         if result is None:
             return
-        typer.echo(get_renderer(format.value).render(result))
+        run = build_run_meta(
+            registry, prof, result, target_kind=TargetKind.ENDPOINT, target_ref=mcp
+        )
+        emit(get_renderer(format.value, run=run).render(result), output)
         if reporter:
             submit_safely(reporter, result, source=mcp)
         if gate(result, prof.policy):
@@ -121,7 +133,10 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     result = run_against_endpoint(
         url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
     )
-    typer.echo(get_renderer(format.value).render(result))
+    run = build_run_meta(
+        registry, prof, result, target_kind=TargetKind.ENDPOINT, target_ref=f"{url}#{model}"
+    )
+    emit(get_renderer(format.value, run=run).render(result), output)
     if reporter:
         submit_safely(reporter, result, source=f"{url}#{model}")
     if gate(result, prof.policy):
