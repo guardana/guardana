@@ -371,7 +371,7 @@ the people who'll shape where it goes:
   [Discussions](https://github.com/guardana/guardana/discussions) genuinely move
   this forward.
 
-Reach out: **hello@guardana.io** · [guardana.io](https://guardana.io) ·
+Reach out: **hello@guardana.io** · [guardana.dev](https://guardana.dev) ·
 [github.com/guardana](https://github.com/guardana)
 
 ## License

@@ -5,8 +5,8 @@ lockstep** — one number, one tag, one PyPI publish for all of them — so a
 release is a single deliberate act, not five.
 
 If you only remember one thing: **`uv run python scripts/release.py <part>`** —
-it runs the gate, bumps the version + pins + lock, rolls the changelog, commits,
-tags `vX.Y.Z`, and pushes. Pushing the tag triggers the PyPI publish (which pauses
+it runs the gate, bumps the version + pins + lock, syncs the landing page's rule
+counts, rolls the changelog, commits, tags `vX.Y.Z`, and pushes. Pushing the tag triggers the PyPI publish (which pauses
 on the `pypi` environment for one approval click). Preview with `--dry-run` first.
 
 ```bash

@@ -26,7 +26,7 @@ classifiers = [
 dependencies = ["guardana-core>=0.6.0,<0.7", "guardana-rules>=0.6.0,<0.7", "guardana-report>=0.6.0,<0.7", "typer>=0.12"]
 
 [project.urls]
-Homepage = "https://guardana.io"
+Homepage = "https://guardana.dev"
 Repository = "https://github.com/guardana/guardana"
 Documentation = "https://guardana.dev"
 Issues = "https://github.com/guardana/guardana/issues"

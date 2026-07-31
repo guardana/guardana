@@ -26,7 +26,7 @@ classifiers = [
 dependencies = ["fastapi>=0.115", "pydantic>=2.7"]
 
 [project.urls]
-Homepage = "https://guardana.io"
+Homepage = "https://guardana.dev"
 Repository = "https://github.com/guardana/guardana"
 Documentation = "https://guardana.dev"
 Issues = "https://github.com/guardana/guardana/issues"

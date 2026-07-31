@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CLAUDE.md` and `CONTRIBUTING.md` state the five places a user-visible change
   has to touch, and say to prefer a test over a promise.
 
+### Changed
+
+- **`scripts/sync_site.py` rewrites the landing page's rule counts from the
+  registry**, and `release.py` runs it in the same pass as the version bump — so
+  a release cannot ship a page claiming last quarter's numbers. `--check` reports
+  staleness without writing. Both it and `test_landing_page.py` fail loudly if a
+  claim disappears from the page rather than skipping it quietly, because a claim
+  nothing checks is how this drifted for three releases.
+- **`Homepage` on all five packages now points at `https://guardana.dev`**, the
+  landing page, instead of the organisation domain. Contact addresses stay on
+  `@guardana.io`.
+
 ## [0.6.0] - 2026-07-31
 
 ### Added

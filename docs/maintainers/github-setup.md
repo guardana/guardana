@@ -16,7 +16,7 @@ settings enforce).
 
 - **Description:** "Security verification for self-hosted and self-built AI —
   one rule engine for your laptop, CI, and a served model."
-- **Website:** `https://guardana.io`
+- **Website:** `https://guardana.dev`
 - **Topics:** `ai-security`, `llm-security`, `prompt-injection`, `mlsecops`,
   `security-scanner`, `owasp-llm`, `supply-chain-security`, `python`, `cli`,
   `sarif` — topics are how people discover the repo.
