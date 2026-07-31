@@ -8,6 +8,7 @@ nothing, watch it call nothing, and report every model clean.
 from pathlib import Path
 from typing import Any
 
+from guardana.core.rule._digest import declaration_digest
 from guardana.core.rule._yaml_schema import (
     check_evaluator_expectations,
     parse_expectation,
@@ -78,6 +79,7 @@ def parse_trajectory(raw: dict[str, Any], path: Path) -> TrajectoryRule:
         max_steps=_parse_max_steps(raw.get("max_steps"), path),
         expectation=expectation,
         then_task=then_task,
+        source_digest=declaration_digest(raw),
     )
 
 

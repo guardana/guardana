@@ -11,7 +11,7 @@ from guardana.core.report import Evidence, Finding, ScanResult
 from guardana.core.severity import Severity
 from guardana.core.target import EndpointError
 
-_CLEAN = ScanResult((), rules_run=1, rules_skipped=())
+_CLEAN = ScanResult((), rules_run=("r0",), rules_skipped=())
 _HIT = ScanResult(
     (
         Finding(
@@ -24,7 +24,7 @@ _HIT = ScanResult(
             verdict=Verdict(outcome="fail", confidence=0.9, rationale="r", evaluator_id="e"),
         ),
     ),
-    rules_run=1,
+    rules_run=("r0",),
     rules_skipped=(),
 )
 

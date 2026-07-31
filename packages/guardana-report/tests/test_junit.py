@@ -15,7 +15,7 @@ def test_junit_escapes_quotes_no_injection() -> None:
         "target.py",
         Evidence(summary="Test evidence"),
     )
-    result = ScanResult((f,), 1, ())
+    result = ScanResult((f,), ("r0",), ())
     renderer = get_renderer("junit")
     output = renderer.render(result)
 

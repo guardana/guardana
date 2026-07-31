@@ -28,7 +28,7 @@ def _make_result() -> ScanResult:
             evaluator_id="canary",
         ),
     )
-    return ScanResult(findings=(finding,), rules_run=1, rules_skipped=())
+    return ScanResult(findings=(finding,), rules_run=("r0",), rules_skipped=())
 
 
 def test_http_reporter_submits_serialized_findings() -> None:
@@ -68,7 +68,9 @@ def test_http_reporter_forwards_the_unverified_channel() -> None:
             outcome="inconclusive", confidence=0.0, rationale="no reply", evaluator_id="canary"
         ),
     )
-    result = ScanResult(findings=(), rules_run=1, rules_skipped=(), unverified=(inconclusive,))
+    result = ScanResult(
+        findings=(), rules_run=("r0",), rules_skipped=(), unverified=(inconclusive,)
+    )
     captured: list[bytes] = []
     HttpReporter("https://c/x", transport=lambda _u, b: captured.append(b)).submit(
         result, source="ci"

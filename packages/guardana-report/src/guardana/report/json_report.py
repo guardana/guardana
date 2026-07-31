@@ -31,7 +31,7 @@ class JsonRenderer:
                 for o in result.observations
             ],
             "summary": {
-                "rules_run": result.rules_run,
+                "rules_run": result.rules_run_count,
                 "rules_skipped": list(result.rules_skipped),
                 "unverified": len(result.unverified),
                 "errors": len(result.errors),

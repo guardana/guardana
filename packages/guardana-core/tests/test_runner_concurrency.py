@@ -128,7 +128,7 @@ def test_endpoint_rules_actually_overlap() -> None:
     result = Runner(
         registry=_registry(*rules), profile=Profile(name="t", policy=Policy()), concurrency=_LIMIT
     ).run(_target())
-    assert result.rules_run == _RULE_COUNT
+    assert result.rules_run_count == _RULE_COUNT
     assert _Tracked.peak > 1
 
 
@@ -163,7 +163,7 @@ def test_a_raising_rule_is_recorded_and_the_rest_still_run() -> None:
     result = Runner(
         registry=_registry(*rules), profile=Profile(name="t", policy=Policy()), concurrency=_LIMIT
     ).run(_target())
-    assert result.rules_run == 2
+    assert result.rules_run_count == 2
     assert [e.source for e in result.errors] == ["test.concurrency.raising"]
 
 

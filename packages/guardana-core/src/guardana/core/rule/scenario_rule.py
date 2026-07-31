@@ -34,6 +34,17 @@ class ScenarioRule(Rule):
     stateful: bool = False
     conversation_evaluator: str | None = None
     conversation_expect: Expectation | None = None
+    source_digest: str = ""
+    """Hash of the declaration this rule was parsed from; see `Rule.digest`."""
+
+    def digest(self) -> str:
+        """Return the declaration hash, falling back to the metadata-only default.
+
+        A rule built by hand rather than parsed (a test, or a plugin assembling one
+        programmatically) has no declaration to hash, and the base implementation
+        still gives it a stable identity.
+        """
+        return self.source_digest or super().digest()
 
     def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
         """Every grade the scenario carries: one per graded step, plus the conversation."""

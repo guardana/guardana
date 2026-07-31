@@ -9,13 +9,17 @@ from guardana.core.report.serialize import finding_to_dict
 
 _TIMEOUT_SECONDS = 30
 
-ENVELOPE_SCHEMA_VERSION = 3
+ENVELOPE_SCHEMA_VERSION = 4
 """Version of the JSON envelope POSTed to a collector.
 
 The collector is a separate service on its own release cadence, so the envelope
 is versioned: a collector that doesn't understand a version rejects it outright
 rather than silently misreading a renamed field.
 
+v4 names the rules that ran (`summary.rules_executed`) instead of only counting
+them: a collector that saw `rules_run: 12` could not tell a clean agent from one
+whose profile excluded the rules that would have found something, and showed
+both as green.
 v3 added the `errors` channel (checks that could not run at all): a collector
 that showed an agent as clean while its checks were crashing would be the same
 false all-clear v2 fixed, one layer further out.
@@ -47,7 +51,8 @@ def _serialize(result: ScanResult, *, source: str) -> bytes:
             {"source": e.source, "stage": e.stage, "reason": e.reason} for e in result.errors
         ],
         "summary": {
-            "rules_run": result.rules_run,
+            "rules_run": result.rules_run_count,
+            "rules_executed": list(result.rules_run),
             "rules_skipped": list(result.rules_skipped),
             "max_severity": max_sev.name if max_sev else None,
             "unverified": len(result.unverified),

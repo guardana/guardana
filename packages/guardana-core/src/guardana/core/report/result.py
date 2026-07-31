@@ -11,8 +11,12 @@ from guardana.core.severity import Severity
 class ScanResult:
     """Everything one run produced: what was found, what ran, and what was skipped.
 
-    `rules_skipped` is part of the result on purpose — a scan that quietly ran half
-    the rules it claimed to would be worse than no scan. `unverified` carries the
+    `rules_run` names the rules rather than counting them, and `rules_skipped` is
+    part of the result on purpose — a scan that quietly ran half the rules it
+    claimed to would be worse than no scan. A count cannot tell "this rule found
+    nothing" from "this rule never ran", so two runs with different profiles would
+    compare as an improvement; the names are what make that lie impossible.
+    `unverified` carries the
     same weight: a check that ran but could not reach a verdict (an unreachable
     judge, a guard model that declined, an empty reply) is surfaced here, never
     dropped into a false all-clear. `waived` holds findings a baseline explicitly
@@ -24,7 +28,7 @@ class ScanResult:
     """
 
     findings: tuple[Finding, ...]
-    rules_run: int
+    rules_run: tuple[str, ...]
     rules_skipped: tuple[str, ...]
     unverified: tuple[Finding, ...] = ()
     waived: tuple[Finding, ...] = ()
@@ -42,7 +46,9 @@ class ScanResult:
         """
         return cls(
             findings=tuple(f for r in results for f in r.findings),
-            rules_run=sum(r.rules_run for r in results),
+            # De-duplicated: probe runs the same rule once per planted canary, and
+            # a rule that ran three times still ran once as far as coverage goes.
+            rules_run=tuple(dict.fromkeys(rule for r in results for rule in r.rules_run)),
             rules_skipped=tuple(s for r in results for s in r.rules_skipped),
             unverified=tuple(f for r in results for f in r.unverified),
             waived=tuple(f for r in results for f in r.waived),
@@ -52,6 +58,11 @@ class ScanResult:
             # not one per pass.
             observations=tuple({o.ref: o for r in results for o in r.observations}.values()),
         )
+
+    @property
+    def rules_run_count(self) -> int:
+        """How many rules ran. Derived, never stored, so it cannot drift from the names."""
+        return len(self.rules_run)
 
     def max_severity(self) -> Severity | None:
         """Return the worst severity found, or None on a clean result."""

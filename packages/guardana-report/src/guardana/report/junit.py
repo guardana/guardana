@@ -57,7 +57,7 @@ class JUnitRenderer:
         skipped = len(result.unverified) + len(result.waived)
         return (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
-            f'<testsuite name="guardana" tests="{result.rules_run}" '
+            f'<testsuite name="guardana" tests="{result.rules_run_count}" '
             f'failures="{len(result.findings)}" skipped="{skipped}" '
             f'errors="{len(result.errors)}">\n'
             f"{body}\n</testsuite>"

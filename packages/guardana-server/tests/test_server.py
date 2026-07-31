@@ -48,7 +48,7 @@ def _real_envelope(source: str = "ci") -> dict[str, Any]:
                 evidence=Evidence(summary="GLOBAL opcode found"),
             ),
         ),
-        rules_run=2,
+        rules_run=("r0", "r1"),
         rules_skipped=(),
     )
     reporter = HttpReporter("http://collector", transport=lambda _url, body: captured.append(body))
@@ -71,7 +71,7 @@ def test_collector_accepts_and_retains_the_unverified_channel() -> None:
     captured: list[bytes] = []
     result = ScanResult(
         findings=(),
-        rules_run=1,
+        rules_run=("r0",),
         rules_skipped=(),
         unverified=(
             Finding(
@@ -269,3 +269,26 @@ def test_collector_still_rejects_a_version_it_does_not_speak() -> None:
         "/findings", json={"source": "future", "schema_version": 99, "findings": []}
     )
     assert response.status_code == _UNPROCESSABLE
+
+
+def test_collector_accepts_the_v4_envelope_and_keeps_which_rules_ran() -> None:
+    """A count cannot separate a clean fleet from a fleet with a narrowed profile.
+
+    Without the names, an agent that excluded half its rules reports the same
+    "0 findings" a fully-covered agent does, and the dashboard shows both green.
+    """
+    store = InMemoryStore()
+    response = TestClient(create_app(store)).post(
+        "/findings",
+        json={
+            "source": "agent",
+            "schema_version": 4,
+            "findings": [],
+            "summary": {"rules_run": 2, "rules_executed": ["guardana.a", "guardana.b"]},
+        },
+    )
+
+    assert response.status_code == _OK
+    summary = store.submissions()[0].summary
+    assert summary is not None
+    assert summary.rules_executed == ["guardana.a", "guardana.b"]

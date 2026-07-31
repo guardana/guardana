@@ -14,7 +14,7 @@ def _result() -> ScanResult:
         "model.pkl",
         Evidence(summary="REDUCE calls os.system"),
     )
-    return ScanResult((f,), rules_run=1, rules_skipped=())
+    return ScanResult((f,), rules_run=("r0",), rules_skipped=())
 
 
 def test_json_renderer_is_machine_readable() -> None:

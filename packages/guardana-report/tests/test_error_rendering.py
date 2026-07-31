@@ -16,8 +16,8 @@ _ERRORS = (
     CheckError(source="acme.buggy", stage="run", reason="ValueError: typo"),
     CheckError(source="broken-pack", stage="discovery", reason="ImportError: no module"),
 )
-_RESULT = ScanResult(findings=(), rules_run=3, rules_skipped=(), errors=_ERRORS)
-_CLEAN = ScanResult(findings=(), rules_run=3, rules_skipped=())
+_RESULT = ScanResult(findings=(), rules_run=("r0", "r1", "r2"), rules_skipped=(), errors=_ERRORS)
+_CLEAN = ScanResult(findings=(), rules_run=("r0", "r1", "r2"), rules_skipped=())
 
 
 def test_human_names_the_check_and_the_stage() -> None:

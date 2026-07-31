@@ -130,7 +130,7 @@ def test_chat_rules_are_skipped_against_an_mcp_server_rather_than_passing_it() -
 
     assert result.rules_skipped, "no rule was skipped, so chat rules ran against a server"
     assert all(rule_id != "guardana.agent.mcp_server_manifest" for rule_id in result.rules_skipped)
-    assert result.rules_run == 1
+    assert result.rules_run_count == 1
 
 
 def test_the_manifest_is_fetched_once_however_many_rules_read_it() -> None:

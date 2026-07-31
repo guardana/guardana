@@ -16,7 +16,7 @@ class HumanRenderer:
             lines.append(f"{icon} [{f.severity.name}] {f.rule_id} — {f.title}")
             lines.append(f"    {f.evidence.summary}  ({f.target_ref})")
         if not result.findings:
-            if result.rules_run == 0:
+            if not result.rules_run:
                 lines.append("⚠ 0 rules ran — nothing was checked (this is not an all-clear).")
             elif result.errors:
                 # The tick is what people scroll for and what job summaries grep
@@ -47,7 +47,7 @@ class HumanRenderer:
 def _summary(result: ScanResult) -> str:
     summary = (
         f"{len(result.findings)} finding(s); "
-        f"{result.rules_run} rule(s) run, {len(result.rules_skipped)} skipped."
+        f"{result.rules_run_count} rule(s) run, {len(result.rules_skipped)} skipped."
     )
     if result.unverified:
         summary += f" {len(result.unverified)} unverified."

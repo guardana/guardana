@@ -24,6 +24,7 @@ the library default is sequential and the CLI opts in (`probe`/`monitor` take
 class _RuleOutcome:
     """What one rule produced: findings, unverified findings, and whether it ran."""
 
+    rule_id: str
     findings: tuple[Finding, ...] = ()
     unverified: tuple[Finding, ...] = ()
     error: CheckError | None = None
@@ -87,14 +88,18 @@ class Runner:
             *self.registry.load_errors,
             *self.registry.expectation_errors(),
         ]
-        run_count = 0
+        # Names, not a count: the outcome carries its own rule id rather than being
+        # paired back up with the plan by position, because a run aborted by an
+        # unreachable endpoint yields fewer outcomes than it planned rules — and
+        # pairing by position would then attribute results to the wrong rules.
+        ran: list[str] = []
         for outcome in self._execute(plan, target):
             findings.extend(outcome.findings)
             unverified.extend(outcome.unverified)
             if outcome.error is not None:
                 errors.append(outcome.error)
             else:
-                run_count += 1
+                ran.append(outcome.rule_id)
         # A file the rules were prevented from reading is a check that did not
         # run, so it joins `errors` rather than disappearing. Collected after the
         # rules, because that is when the target knows what it was asked for.
@@ -104,7 +109,7 @@ class Runner:
         )
         return ScanResult(
             tuple(findings),
-            run_count,
+            tuple(ran),
             tuple(skipped),
             tuple(unverified),
             errors=tuple(errors),
@@ -203,17 +208,19 @@ class Runner:
             if target.kind is TargetKind.ENDPOINT:
                 raise
             return _RuleOutcome(
+                rule.meta.id,
                 tuple(findings),
                 tuple(unverified),
                 CheckError.from_exception(rule.meta.id, "run", exc),
             )
         except Exception as exc:
             return _RuleOutcome(
+                rule.meta.id,
                 tuple(findings),
                 tuple(unverified),
                 CheckError.from_exception(rule.meta.id, "run", exc),
             )
-        return _RuleOutcome(tuple(findings), tuple(unverified))
+        return _RuleOutcome(rule.meta.id, tuple(findings), tuple(unverified))
 
 
 def _unread_sources(target: Target) -> tuple[UnreadSource, ...]:
@@ -249,7 +256,7 @@ def gate(result: ScanResult, policy: Policy) -> bool:
     installed rule applies to. The result's `rules_skipped` says why nothing ran;
     the gate only refuses to green-light it.
     """
-    if result.rules_run == 0:
+    if not result.rules_run:
         return True
     threshold = policy.fail_on
     if result.errors and threshold.fail_on_error:

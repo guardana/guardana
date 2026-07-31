@@ -84,7 +84,7 @@ def test_an_ordinary_bug_in_a_third_party_rule_does_not_abort_the_scan() -> None
         _rule("acme.buggy", raises=ValueError("typo in a third-party rule")),
         _rule("guardana.healthy"),
     )
-    assert result.rules_run == 1  # type: ignore[attr-defined]
+    assert result.rules_run_count == 1  # type: ignore[attr-defined]
     assert [e.source for e in result.errors] == ["acme.buggy"]  # type: ignore[attr-defined]
     assert result.errors[0].stage == "run"  # type: ignore[attr-defined]
     assert "ValueError" in result.errors[0].reason  # type: ignore[attr-defined]
@@ -170,7 +170,7 @@ def test_an_os_error_from_an_artifact_rule_is_rule_local() -> None:
         _rule("guardana.healthy"),
     )
     assert [e.source for e in result.errors] == ["acme.unreadable"]  # type: ignore[attr-defined]
-    assert result.rules_run == 1  # type: ignore[attr-defined]
+    assert result.rules_run_count == 1  # type: ignore[attr-defined]
     assert failed is True
 
 
@@ -182,11 +182,11 @@ def test_merging_results_carries_every_channel() -> None:
     finding = _finding("acme.r")
     merged = ScanResult.merged(
         [
-            ScanResult((finding,), 1, ("skipped.a",), errors=(error,)),
-            ScanResult((), 2, (), unverified=(finding,), waived=(finding,)),
+            ScanResult((finding,), ("a",), ("skipped.a",), errors=(error,)),
+            ScanResult((), ("b", "c"), (), unverified=(finding,), waived=(finding,)),
         ]
     )
-    assert merged.rules_run == 3
+    assert merged.rules_run_count == 3
     assert merged.findings == (finding,)
     assert merged.rules_skipped == ("skipped.a",)
     assert merged.unverified == (finding,)
@@ -196,7 +196,7 @@ def test_merging_results_carries_every_channel() -> None:
 
 def test_applying_a_baseline_keeps_checks_that_could_not_run() -> None:
     error = CheckError("guardana.critical", "run", "ValueError: boom")
-    result = ScanResult((), 3, (), errors=(error,))
+    result = ScanResult((), ("a", "b", "c"), (), errors=(error,))
     waived = apply_baseline(result, frozenset())
 
     assert waived.errors == (error,)

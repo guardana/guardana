@@ -49,7 +49,7 @@ def _runner(*rules: Rule, policy: Policy | None = None) -> Runner:
 
 def test_runner_runs_matching_rule_and_skips_wrong_target_kind(tmp_path: Path) -> None:
     result = _runner(_Fires(), _EndpointOnly()).run(ArtifactTarget(tmp_path))
-    assert result.rules_run == 1
+    assert result.rules_run_count == 1
     assert len(result.findings) == 1
     assert result.findings[0].rule_id == "guardana.sc.demo"
 
@@ -87,7 +87,7 @@ class _MissingCapability(Rule):
 
 def test_runner_skips_rule_missing_capability(tmp_path: Path) -> None:
     result = _runner(_MissingCapability()).run(ArtifactTarget(tmp_path))
-    assert result.rules_run == 0
+    assert result.rules_run_count == 0
     assert len(result.findings) == 0
     assert "guardana.cap.demo" in result.rules_skipped
 
@@ -111,7 +111,7 @@ def test_runner_records_rule_that_raises_as_an_error_not_a_skip(tmp_path: Path) 
     # read as a check that did not apply, and the build stayed green.
     result = _runner(_RaisesRuleError()).run(ArtifactTarget(tmp_path))
     assert result.findings == ()
-    assert result.rules_run == 0
+    assert result.rules_run_count == 0
     assert result.rules_skipped == ()
     assert [e.source for e in result.errors] == ["guardana.err.demo"]
 
@@ -142,7 +142,7 @@ def test_inconclusive_finding_is_unverified_not_a_finding(tmp_path: Path) -> Non
     # never dropped into silence and never counted as a confirmed finding.
     result = _runner(_Inconclusive()).run(ArtifactTarget(tmp_path))
     assert result.findings == ()
-    assert result.rules_run == 1  # it DID run — unlike a capability skip
+    assert result.rules_run_count == 1  # it DID run — unlike a capability skip
     assert len(result.unverified) == 1
     assert result.unverified[0].verdict is not None
     assert result.unverified[0].verdict.outcome == "inconclusive"
@@ -164,6 +164,18 @@ def test_gate_fails_when_zero_rules_ran() -> None:
     # all-clear on a target nothing looked at — the fail-open the engine forbids.
     # This is the runtime backstop for a misconfigured include/exclude or an empty
     # registry, even under the most permissive policy.
-    empty = ScanResult(findings=(), rules_run=0, rules_skipped=())
+    empty = ScanResult(findings=(), rules_run=(), rules_skipped=())
     assert gate(empty, Policy()) is True
     assert gate(empty, Policy(fail_on=FailOn(severity=Severity.CRITICAL))) is True
+
+
+def test_runner_records_which_rules_ran_not_just_how_many(tmp_path: Path) -> None:
+    """A run that only counts its rules cannot tell "clean" from "never looked".
+
+    Two runs of a narrowed and a full profile produce the same count often enough
+    that a count is no evidence at all; the names are what let a later comparison
+    refuse to call a shrunken plan an improvement.
+    """
+    result = _runner(_Fires(), _EndpointOnly()).run(ArtifactTarget(tmp_path))
+    assert result.rules_run == ("guardana.sc.demo",)
+    assert result.rules_run_count == 1

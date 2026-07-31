@@ -81,7 +81,7 @@ def test_rule_whose_capabilities_are_unmet_is_skipped() -> None:
 
     result = Runner(registry=registry, profile=profile).run(target)
 
-    assert result.rules_run == 0
+    assert result.rules_run_count == 0
     assert result.rules_skipped == ("acme.needs_planted_prompt",)
 
 

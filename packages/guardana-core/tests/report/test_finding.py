@@ -23,11 +23,11 @@ def test_finding_defaults_verdict_none_and_is_frozen() -> None:
 def test_scan_result_reports_max_severity() -> None:
     result = ScanResult(
         findings=(_finding(Severity.LOW), _finding(Severity.HIGH)),
-        rules_run=2,
+        rules_run=("r0", "r1"),
         rules_skipped=(),
     )
     assert result.max_severity() is Severity.HIGH
 
 
 def test_scan_result_max_severity_none_when_empty() -> None:
-    assert ScanResult(findings=(), rules_run=0, rules_skipped=()).max_severity() is None
+    assert ScanResult(findings=(), rules_run=(), rules_skipped=()).max_severity() is None

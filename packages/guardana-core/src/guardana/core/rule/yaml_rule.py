@@ -6,6 +6,7 @@ import yaml
 from guardana.core.evaluator.base import Expectation
 from guardana.core.exchange import Exchange
 from guardana.core.report import Evidence, Finding
+from guardana.core.rule._digest import declaration_digest
 from guardana.core.rule._scenario_schema import is_scenario, parse_scenario
 from guardana.core.rule._trajectory_schema import is_trajectory, parse_trajectory
 from guardana.core.rule._yaml_schema import (
@@ -27,6 +28,17 @@ class YamlRule(Rule):
     meta: RuleMeta
     prompts: tuple[str, ...]
     expectation: Expectation
+    source_digest: str = ""
+    """Hash of the declaration this rule was parsed from; see `Rule.digest`."""
+
+    def digest(self) -> str:
+        """Return the declaration hash, falling back to the metadata-only default.
+
+        A rule built by hand rather than parsed (a test, or a plugin assembling one
+        programmatically) has no declaration to hash, and the base implementation
+        still gives it a stable identity.
+        """
+        return self.source_digest or super().digest()
 
     def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
         """Report the single evaluator and expectation every prompt is graded with."""
@@ -92,7 +104,12 @@ def _build_rule(raw: object, path: Path) -> Rule:
         raise RuleLoadError(f"invalid rule in {path}: at least one prompt is required")
     expectation = parse_expectation(raw.get("expect"), path)
     check_evaluator_expectations(meta, expectation, path)
-    return YamlRule(meta=meta, prompts=prompts, expectation=expectation)
+    return YamlRule(
+        meta=meta,
+        prompts=prompts,
+        expectation=expectation,
+        source_digest=declaration_digest(raw),
+    )
 
 
 def load_yaml_rules(path: Path) -> list[Rule]:

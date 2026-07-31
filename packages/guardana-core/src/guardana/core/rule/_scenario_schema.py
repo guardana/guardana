@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from guardana.core.evaluator.base import Expectation, check_expectation
+from guardana.core.rule._digest import declaration_digest
 from guardana.core.rule._yaml_schema import (
     _BUILTIN_EXPECTS,
     _parse_capabilities,
@@ -75,6 +76,7 @@ def parse_scenario(raw: dict[str, Any], path: Path) -> ScenarioRule:
         stateful=stateful,
         conversation_evaluator=conv_evaluator,
         conversation_expect=conv_expect,
+        source_digest=declaration_digest(raw),
     )
 
 

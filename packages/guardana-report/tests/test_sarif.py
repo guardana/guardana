@@ -14,7 +14,7 @@ def _result(target_ref: str = "src/deser.py:2") -> ScanResult:
         target_ref,
         Evidence(summary="REDUCE"),
     )
-    return ScanResult((finding,), 1, ())
+    return ScanResult((finding,), ("r0",), ())
 
 
 def test_sarif_is_valid_2_1_0_shape() -> None:

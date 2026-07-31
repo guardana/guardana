@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.report import Finding
+from guardana.core.rule._digest import digest_parts
 from guardana.core.severity import Severity
 from guardana.core.surface import Surface
 from guardana.core.target import Capability, Target, TargetKind
@@ -63,6 +64,38 @@ class Rule(ABC):
         checked — there is nothing to check against.
         """
         return ()
+
+    def digest(self) -> str:
+        """Return a short, stable hash of *what this rule is* — its declaration, not its results.
+
+        Two runs are only comparable if they ran the same tests. When a rule's
+        corpus is sharpened between runs, more findings are the sharper test
+        talking, not a worse model, and a comparison that could not tell the
+        difference would hand the customer the wrong culprit.
+
+        The default covers the declaration every rule has (`meta`), so a
+        third-party rule is comparable without its author doing anything. What it
+        cannot cover is the *implementation* of a rule written in Python: that
+        code can change while the declaration stays identical. The tool version
+        recorded alongside a run is what covers the rest, and an author who wants
+        it tighter overrides this to fold in their own package version.
+
+        **Never fold in a planted canary.** The probe plants a fresh random token
+        per run, so a digest covering its value would differ on every run and
+        report "this rule changed" every single time — which is the same as
+        reporting nothing at all.
+        """
+        return digest_parts(
+            (
+                self.meta.id,
+                self.meta.title,
+                self.meta.severity.name,
+                self.meta.target_kind,
+                self.meta.evaluator or "",
+                ",".join(f"{t.framework}:{t.id}" for t in self.meta.taxonomy),
+                ",".join(sorted(self.meta.required_capabilities)),
+            )
+        )
 
     def with_canary(self, canary: str) -> "Rule | None":
         """Return a copy of this rule looking for `canary`, or None if it plants none.

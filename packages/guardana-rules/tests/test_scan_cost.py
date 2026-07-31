@@ -54,7 +54,7 @@ def _run(root: Path) -> int:
     result = Runner(registry=Registry.discover(), profile=Profile(name="t", policy=Policy())).run(
         ArtifactTarget(root)
     )
-    return result.rules_run
+    return result.rules_run_count
 
 
 def test_a_source_file_is_parsed_once_however_many_rules_read_it(

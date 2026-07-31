@@ -18,9 +18,10 @@ def _result(*severities: Severity) -> ScanResult:
         )
         for i, severity in enumerate(severities)
     )
-    # A clean scan still ran rules; `rules_run` must be >= 1 or the gate treats it
-    # as "nothing was checked" and fails (see runner.gate).
-    return ScanResult(findings, rules_run=max(len(severities), 1), rules_skipped=())
+    # A clean scan still ran rules; `rules_run` must name at least one or the gate
+    # treats it as "nothing was checked" and fails (see runner.gate).
+    ran = tuple(f"guardana.demo.r{i}" for i in range(max(len(severities), 1)))
+    return ScanResult(findings, rules_run=ran, rules_skipped=())
 
 
 def _monitor(*cycles: ScanResult, max_cycles: int, interval: float = 0.0) -> Monitor:
@@ -91,7 +92,7 @@ def test_low_confidence_finding_does_not_trip_a_confidence_gated_policy() -> Non
                     ),
                 ),
             ),
-            rules_run=1,
+            rules_run=("r0",),
             rules_skipped=(),
         ),
         policy=Policy(fail_on=FailOn(severity=Severity.HIGH, min_confidence=0.9)),
@@ -118,7 +119,7 @@ def _unverified(count: int) -> ScanResult:
         )
         for i in range(count)
     )
-    return ScanResult((), rules_run=1, rules_skipped=(), unverified=ungraded)
+    return ScanResult((), rules_run=("r0",), rules_skipped=(), unverified=ungraded)
 
 
 def test_alerts_when_unverified_count_rises_above_baseline() -> None:

@@ -135,4 +135,4 @@ def run_probe(
             ).run(canary_target)
         )
 
-    return ScanResult.merged(results) if results else ScanResult((), 0, ())
+    return ScanResult.merged(results) if results else ScanResult((), (), ())

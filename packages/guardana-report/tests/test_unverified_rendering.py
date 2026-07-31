@@ -22,7 +22,7 @@ def _unverified_result() -> ScanResult:
         evidence=Evidence(summary="grading did not complete"),
         verdict=Verdict("inconclusive", 0.0, "judge endpoint unreachable", "llm_judge@2025.1"),
     )
-    return ScanResult(findings=(), rules_run=1, rules_skipped=(), unverified=(finding,))
+    return ScanResult(findings=(), rules_run=("r0",), rules_skipped=(), unverified=(finding,))
 
 
 def test_human_surfaces_unverified_distinctly() -> None:

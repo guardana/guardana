@@ -38,7 +38,7 @@ def test_fingerprint_is_line_independent_but_content_sensitive() -> None:
 def test_apply_baseline_moves_only_matching_to_waived() -> None:
     keep = _finding(ref="keep.py:1")
     waive = _finding(ref="waive.py:1")
-    result = ScanResult(findings=(keep, waive), rules_run=2, rules_skipped=())
+    result = ScanResult(findings=(keep, waive), rules_run=("r0", "r1"), rules_skipped=())
     out = apply_baseline(result, frozenset({waive.fingerprint}))
     assert out.findings == (keep,)
     assert out.waived == (waive,)
@@ -46,7 +46,7 @@ def test_apply_baseline_moves_only_matching_to_waived() -> None:
 
 def test_serialize_then_load_roundtrips_and_waives(tmp_path: Path) -> None:
     f = _finding(ref="x.py:9")
-    result = ScanResult(findings=(f,), rules_run=1, rules_skipped=())
+    result = ScanResult(findings=(f,), rules_run=("r0",), rules_skipped=())
     path = tmp_path / "guardana-baseline.yaml"
     path.write_text(serialize_baseline(result), encoding="utf-8")
     fingerprints = load_baseline(path)

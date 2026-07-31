@@ -133,5 +133,5 @@ def test_the_inventory_does_not_depend_on_which_rules_run(tmp_path: Path) -> Non
         registry=Registry.discover(),
         profile=Profile(name="t", policy=Policy(include=("nonexistent.*",))),
     ).run(ArtifactTarget(root))
-    assert nothing.rules_run == 0
+    assert nothing.rules_run_count == 0
     assert {i.ref for i in nothing.observations} == {i.ref for i in everything.observations}
