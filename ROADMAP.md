@@ -62,7 +62,7 @@ already failed at its job:
 | Collector (`guardana-server`) | **experimental** | Suitable for local evaluation only: in-memory storage, no authentication. Production use needs the v0.7 work below |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
-## What ships today (0.6.0)
+## What ships today (0.7.0)
 
 Counts come from the registry, not from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -83,12 +83,25 @@ and five agentic checks — tool-result injection, credential exfiltration throu
 a tool argument, over-broad tool arguments, memory poisoning across a session
 boundary, and a live MCP server's tool manifest).
 
-Plus `scan`/`probe`/`monitor`/`diff`, five evaluators with measured calibration
+Plus fourteen commands — `scan`/`probe`/`monitor`/`diff` and the ten that make
+them safe to gate on (`plan`, `target inspect`, `run inspect|migrate`,
+`baseline create|verify|update`, `doctor`, `config validate|explain`, `rules`,
+`init`, `new-rule`, `calibrate`) — five evaluators with measured calibration
 (Brier + ECE), the three-channel result, four report formats, profiles/gates/
 presets, the build/runtime `Surface` split, a tool-calling endpoint target, three
 endpoint providers plus a guarded-endpoint adapter, the plugin contract with test
 doubles and [public model-format readers](docs/model-formats.md), a GitHub Action
 and pre-commit hook, and the optional experimental collector.
+
+0.7 made a run something a pipeline can block on. A saved run became a **manifest**
+(what was verified, against what, at what cost, under which policy, with an
+explicit gate verdict), runs **count what they spend**, **budgets** stop a run
+before it overspends and an exhausted one exits `6` rather than passing,
+`guardana plan` prices a run **without sending a request**, `guardana target
+inspect` separates what an endpoint *claims* from what it *demonstrates*,
+**evidence is redacted at one seam** no output path can skip, rules declare how
+far they reach, plugin trust stopped being all-or-nothing, waivers **expire**, and
+the **exit-code table** became a tested contract. Full detail below.
 
 0.6 added `guardana diff`: a run can be saved (`--output`, a versioned document
 recording which rules ran and a digest of each) and two runs compared, with

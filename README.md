@@ -245,7 +245,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.6   # moving tag → latest 0.6.x
+      - uses: guardana/guardana@v0.7   # moving tag → latest 0.7.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -412,9 +412,9 @@ why platform work comes before coverage volume.
 
 | Version | Outcome |
 |---|---|
-| **0.6** *(current)* | Regression between runs — `guardana diff`, saved runs, one definition of "worse" |
-| **0.7** | Company-ready foundation — run manifest, budgets, redaction, stable exit codes, persistent authenticated collector, containers, CI beyond GitHub |
-| **0.8** | Application-aware verification — a common trace model, imported real agent traces, sink-aware output handling, live retrieval targets |
+| **0.6** | Regression between runs — `guardana diff`, saved runs, one definition of "worse" |
+| **0.7** *(current)* | Engine and CLI foundation — run manifest, usage accounting, budgets and `plan`, capability inspection, evidence redaction, safety modes, plugin trust, baseline lifecycle, stable exit codes |
+| **0.8** | The company-ready remainder (persistent authenticated collector, containers, CI beyond GitHub, SBOM) and application-aware verification — a common trace model, imported real agent traces, sink-aware output handling, live retrieval targets |
 | **0.9** | Team security platform — AI systems, deployments, RBAC, finding lifecycle, integrations |
 | **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
 | **1.1** | Continuous production verification — OTLP, replay, repeated runs with confidence intervals |
