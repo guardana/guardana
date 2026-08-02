@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Central evidence redaction.** One `EvidenceRedactor`, at one seam, between
+  findings and every way they leave the process — the renderers, the collector
+  envelope and baseline files. Applied by the renderer *factory*, so a format
+  added later is covered without its author knowing, and there is no way to obtain
+  a renderer that skips it. Evidence is **redacted by default** in every command;
+  `privacy:` in `guardana.yaml` configures the mode, the patterns and the size
+  bound. Secrets are removed even at `full`, which means "keep the model's words",
+  never "store a live credential". Redaction announces itself in the output and
+  truncation says so, because a report that looks complete and is not is the same
+  dishonesty `unverified` exists to prevent. See [`docs/privacy.md`](docs/privacy.md).
 - **`guardana target inspect`** — what an endpoint actually supports, as opposed
   to what it claims. Probes chat, whether the system message survives the hop,
   whether tool calls are honoured, and whether token counts come back; reports

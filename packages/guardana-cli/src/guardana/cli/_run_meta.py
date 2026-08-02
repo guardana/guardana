@@ -25,6 +25,7 @@ from guardana.core.manifest import (
     digest_of,
 )
 from guardana.core.manifest.records import RuleRecord
+from guardana.core.manifest.settings import PrivacyRecord
 from guardana.core.manifest.summary import summarize
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
@@ -148,4 +149,10 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         usage=_run_usage(result.usage, started_at, now),
         rules=rules,
         result_summary=summarize(result, gate),
+        # Recorded, so a reader knows what was applied to the evidence they are
+        # looking at rather than assuming the default of whatever build they run.
+        privacy=PrivacyRecord(
+            evidence_mode=profile.privacy.mode,
+            redaction_policy_digest=profile.privacy.digest,
+        ),
     )

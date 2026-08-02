@@ -39,6 +39,7 @@ detail below.
 
 ## For security teams
 
+- [`privacy.md`](privacy.md) — evidence redaction, modes, and what Guardana keeps
 - [`threat-model.md`](threat-model.md) — what Guardana defends against, what it does not, and where the trust boundaries sit
 - [`safe-testing.md`](safe-testing.md) — side effects, staging, and reading a result honestly
 - [`architecture.md`](architecture.md) — the five abstractions, the Registry, the core↔server boundary

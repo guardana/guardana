@@ -1,6 +1,6 @@
 # Design: privacy, redaction and safe evidence
 
-**Status:** proposed · **Target:** v0.7
+**Status:** implemented in 0.7 · user-facing description in [`docs/privacy.md`](../privacy.md)
 
 ## The problem
 
@@ -93,10 +93,17 @@ was correctly applied everywhere else.
 
 ## Open questions
 
-1. **Does redaction belong in `guardana-core` or `guardana-report`?** Leaning core:
-   the collector reporter lives in core too, and evidence must be redacted before
-   *any* dispatch, not only before rendering.
-2. **Should the redactor be pluggable?** An enterprise will want its own patterns.
+1. **Does redaction belong in `guardana-core` or `guardana-report`?** Answered:
+   core. The collector reporter lives there too, and evidence must be redacted
+   before *any* dispatch. What was not anticipated: the seam had to be the
+   renderer **factory** rather than each renderer, because only the factory can
+   guarantee that a format added later is covered.
+
+   Also unanticipated: redaction changes a finding's fingerprint, which a baseline
+   waiver matches on. Commands therefore redact once, early, before a baseline is
+   written or applied — and the redactor is idempotent so the output seam can
+   apply it again safely.
+2. **Should the redactor be pluggable?** Answered: no. An enterprise will want its own patterns.
    A pluggable redactor is also a pluggable *un*-redactor — a third-party
    implementation that returns its input unchanged silently disables the whole
    policy. Leaning: patterns are configurable data, the redactor itself is not an

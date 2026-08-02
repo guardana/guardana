@@ -22,6 +22,13 @@ against a crafted artifact without checking a malicious binary into the repo:
 
     (tmp_path / "m.gguf").write_bytes(build_gguf({"tokenizer.chat_template": payload}))
 
+**Fake credentials** are assembled at run time rather than written down, so a test
+about redaction does not put a secret-shaped literal in the repository:
+
+    from guardana.core.testing import fake_aws_key
+
+    evidence = Evidence(summary=f"the model replied with {fake_aws_key()}")
+
 **A run manifest** stands in for the circumstances of a run, so a test about what
 a renderer emits does not have to invent a clock, a run id and a tool version:
 
@@ -32,6 +39,12 @@ a renderer emits does not have to invent a clock, a run id and a tool version:
 
 from guardana.core.testing.artifacts import build_gguf, build_onnx, build_safetensors
 from guardana.core.testing.manifests import FIXED_RUN_TIME, manifest_for
+from guardana.core.testing.secrets import (
+    fake_aws_key,
+    fake_jwt,
+    fake_llm_key,
+    fake_secrets,
+)
 from guardana.core.testing.transports import (
     EchoingTransport,
     FailingTransport,
@@ -52,5 +65,9 @@ __all__ = [
     "build_gguf",
     "build_onnx",
     "build_safetensors",
+    "fake_aws_key",
+    "fake_jwt",
+    "fake_llm_key",
+    "fake_secrets",
     "manifest_for",
 ]

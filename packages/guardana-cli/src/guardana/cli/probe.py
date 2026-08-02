@@ -20,6 +20,7 @@ from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import build_manifest
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
+from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport, TargetKind
 from guardana.report import get_renderer
@@ -136,6 +137,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
             raise refuse_unenforceable_budget(exc) from exc
         if result is None:
             return
+        result = EvidenceRedactor(prof.privacy).redact_result(result)
         outcome = gate_outcome(result, prof.policy)
         run = build_manifest(
             registry,
@@ -177,6 +179,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         )
     except BudgetExhausted as exc:
         raise refuse_unenforceable_budget(exc) from exc
+    result = EvidenceRedactor(prof.privacy).redact_result(result)
     outcome = gate_outcome(result, prof.policy)
     run = build_manifest(
         registry,

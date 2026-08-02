@@ -9,11 +9,23 @@ and everything at a red build somebody explains away.
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from guardana.core.report.stop import StopReason
-
 if TYPE_CHECKING:  # `manifest` records a GateOutcome, and `report` is downstream of both
     from guardana.core.profile.model import Policy
     from guardana.core.report.result import ScanResult
+
+
+class StopReason(StrEnum):
+    """Why a run ended before it finished its plan.
+
+    Recorded on the result rather than left to the exit code alone: a report
+    written to disk outlives the process that wrote it, and one that does not say
+    it was cut short reads as a complete pass over the target. Both members mean
+    the same thing to a gate — the run is not entitled to a verdict — and differ
+    in who cut it short, which is what the operator needs to know to act.
+    """
+
+    BUDGET_EXHAUSTED = "budget_exhausted"
+    INTERRUPTED = "interrupted"
 
 
 class GateOutcome(StrEnum):

@@ -11,9 +11,13 @@ deliberately narrow and loud about malformed input.
 
 from dataclasses import replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 from guardana.core.report.result import ScanResult
+
+if TYPE_CHECKING:  # imported lazily below; the report package is downstream of redaction
+    from guardana.core.redaction import EvidenceRedactor
 
 _REASON_PLACEHOLDER = "accepted — REPLACE THIS with why this finding is acceptable"
 
@@ -64,8 +68,17 @@ def apply_baseline(result: ScanResult, waived_fingerprints: frozenset[str]) -> S
     return replace(result, findings=kept, waived=result.waived + newly_waived)
 
 
-def serialize_baseline(result: ScanResult) -> str:
-    """Render a baseline file that waives every current finding (fill in the reasons)."""
+def serialize_baseline(result: ScanResult, redactor: "EvidenceRedactor | None" = None) -> str:
+    """Render a baseline file that waives every current finding (fill in the reasons).
+
+    Redacted like every other output. A baseline is committed to a repository,
+    which makes it the worst possible resting place for a live credential — and
+    the one an author is least likely to think of as an output path.
+    """
+    from guardana.core.redaction import EvidenceRedactor  # noqa: PLC0415 — one-way dependency
+
+    policy = redactor if redactor is not None else EvidenceRedactor()
+    result = policy.redact_result(result)
     waivers = [
         {
             "fingerprint": f.fingerprint,

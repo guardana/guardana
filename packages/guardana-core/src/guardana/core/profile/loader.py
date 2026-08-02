@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -6,12 +7,13 @@ import yaml
 from guardana.core.budget import Budgets, parse_duration
 from guardana.core.profile.errors import ProfileError
 from guardana.core.profile.model import FailOn, Policy, Profile
+from guardana.core.redaction import DEFAULT_MAX_EVIDENCE_BYTES, EvidenceMode, RedactionPolicy
 from guardana.core.severity import Severity
 
 # Typos must fail loudly: a misspelled `fail_on:` would otherwise silently
 # fall back to defaults and weaken the gate the user thinks they configured.
 _ALLOWED_PROFILE_KEYS = frozenset(
-    {"name", "rules", "fail_on", "rule_config", "evaluators", "budgets"}
+    {"name", "rules", "fail_on", "rule_config", "evaluators", "budgets", "privacy"}
 )
 _ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
 _ALLOWED_FAIL_ON_KEYS = frozenset(
@@ -20,11 +22,31 @@ _ALLOWED_FAIL_ON_KEYS = frozenset(
 _ALLOWED_BUDGET_KEYS = frozenset(
     {"max_requests", "max_input_tokens", "max_output_tokens", "max_duration"}
 )
+_ALLOWED_PRIVACY_KEYS = frozenset(
+    {
+        "evidence_mode",
+        "redact_secrets",
+        "redact_emails",
+        "redact_ip_addresses",
+        "hash_identifiers",
+        "custom_patterns",
+        "max_evidence_bytes",
+    }
+)
 
 
 def default_profile() -> Profile:
-    """Every rule, failing on HIGH — what you get without a `guardana.yaml`."""
-    return Profile(name="default", policy=Policy())
+    """Every rule, failing on HIGH, evidence redacted — what you get without a `guardana.yaml`.
+
+    Redaction is on by default here because this is what a command uses. A tool
+    that quietly wrote model output to disk would be a liability the first time
+    somebody pointed it at a production support agent.
+    """
+    return Profile(
+        name="default",
+        policy=Policy(),
+        privacy=RedactionPolicy(mode=EvidenceMode.REDACTED),
+    )
 
 
 def _as_mapping(value: object, what: str, path: Path) -> dict[str, Any]:
@@ -131,6 +153,54 @@ def _budgets(raw: dict[str, Any], path: Path) -> Budgets:
     )
 
 
+def _flag(raw: dict[str, Any], key: str, default: bool, path: Path) -> bool:
+    value = raw.get(key, default)
+    if not isinstance(value, bool):
+        raise ProfileError(f"invalid profile {path}: privacy.{key} must be true or false")
+    return value
+
+
+def _privacy(raw: dict[str, Any], path: Path) -> RedactionPolicy:
+    """Parse the `privacy:` block, refusing a mode or a pattern nobody can honour.
+
+    An unreadable custom pattern raises rather than being dropped: a redaction
+    rule somebody believes is applied and is not is worse than none, because they
+    stop checking the output.
+    """
+    _reject_unknown_keys(raw, _ALLOWED_PRIVACY_KEYS, "privacy", path)
+    mode_name = str(raw.get("evidence_mode", EvidenceMode.REDACTED))
+    try:
+        mode = EvidenceMode(mode_name)
+    except ValueError as exc:
+        raise ProfileError(
+            f"invalid profile {path}: unknown privacy.evidence_mode {mode_name!r}; "
+            f"expected one of {[str(m) for m in EvidenceMode]}"
+        ) from exc
+    patterns = _as_glob_list(raw.get("custom_patterns"), "privacy.custom_patterns", path)
+    for pattern in patterns:
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise ProfileError(
+                f"invalid profile {path}: privacy.custom_patterns entry {pattern!r} "
+                f"is not a valid regular expression: {exc}"
+            ) from exc
+    limit = raw.get("max_evidence_bytes", DEFAULT_MAX_EVIDENCE_BYTES)
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ProfileError(
+            f"invalid profile {path}: privacy.max_evidence_bytes must be a positive whole number"
+        )
+    return RedactionPolicy(
+        mode=mode,
+        redact_secrets=_flag(raw, "redact_secrets", True, path),
+        redact_emails=_flag(raw, "redact_emails", True, path),
+        redact_ip_addresses=_flag(raw, "redact_ip_addresses", False, path),
+        hash_identifiers=_flag(raw, "hash_identifiers", True, path),
+        custom_patterns=patterns,
+        max_evidence_bytes=limit,
+    )
+
+
 def load_profile(path: Path) -> Profile:
     """Parse a `guardana.yaml`, rejecting anything it can't honour.
 
@@ -168,4 +238,5 @@ def load_profile(path: Path) -> Profile:
         rule_paths=_as_glob_list(rules.get("paths"), "rules.paths", path),
         path_excludes=_as_glob_list(rules.get("paths_exclude"), "rules.paths_exclude", path),
         budgets=_budgets(_as_mapping(raw.get("budgets"), "budgets", path), path),
+        privacy=_privacy(_as_mapping(raw.get("privacy"), "privacy", path), path),
     )

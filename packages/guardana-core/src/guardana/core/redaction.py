@@ -1,0 +1,193 @@
+"""One redactor, at one seam, between findings and every way they leave the process.
+
+Guardana's evidence is by construction the most sensitive text in a deployment:
+the prompt that worked, the reply that leaked, the tool argument that carried a
+key. Until now it was redacted by *convention* — rules were careful. Convention
+held while every rule was ours; it does not survive an extension API, where a
+third-party rule can put anything in `Evidence.detail` and it flows unchanged into
+the JSON report, the SARIF file and the collector envelope.
+
+So the policy lives in one place and every output path goes through it. A policy
+applied in thirty places has thirty exceptions, and the one that matters is the
+one somebody forgot.
+"""
+
+import re
+from dataclasses import dataclass, replace
+from enum import StrEnum
+from typing import TYPE_CHECKING
+
+from guardana.core.fingerprint import digest_of
+
+if TYPE_CHECKING:  # everything downstream builds on this module; the arrow runs one way
+    from guardana.core.report.finding import Finding
+    from guardana.core.report.result import ScanResult
+
+
+class EvidenceMode(StrEnum):
+    """How much of what the target said is kept in the evidence.
+
+    Lives with the policy rather than with the manifest that records it: the
+    profile has to parse this before anything has built a document, and a
+    dependency from configuration into the report format would tie the two
+    together for no reason.
+    """
+
+    METADATA_ONLY = "metadata_only"
+    REDACTED = "redacted"
+    FULL = "full"
+
+
+DEFAULT_MAX_EVIDENCE_BYTES = 16 * 1024
+"""Unbounded evidence is a denial-of-service against a collector and a memory risk
+locally, and a 64 MiB model reply in a report helps nobody."""
+
+_REDACTED = "[redacted:{label}]"
+_TRUNCATED = "… [truncated: evidence exceeded {limit} bytes]"
+
+# Ordered most specific first: a key that also matches a generic high-entropy
+# pattern should be labelled as the key it is.
+_SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("aws-key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{16,}\b")),
+    ("slack-token", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b")),
+    ("openai-key", re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b")),
+    ("anthropic-key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{16,}\b")),
+    ("google-key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
+    ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")),
+    ("bearer-token", re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._-]{16,}")),
+    (
+        "credential-assignment",
+        re.compile(
+            r"(?i)\b(?:api[_-]?key|secret|password|passwd|token)\b\s*[:=]\s*"
+            r"[\"']?([A-Za-z0-9/_+.-]{12,})[\"']?"
+        ),
+    ),
+)
+_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+_IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+
+
+@dataclass(frozen=True, slots=True)
+class RedactionPolicy:
+    """What evidence a run is allowed to keep.
+
+    `FULL` is the default only because it is what this build did before the
+    redactor existed, and changing behaviour silently would be worse than the
+    delay. The CLI defaults to `REDACTED`; a library caller opts in.
+    """
+
+    mode: EvidenceMode = EvidenceMode.FULL
+    redact_secrets: bool = True
+    redact_emails: bool = True
+    redact_ip_addresses: bool = False
+    """Off by default: an IP address is frequently the finding itself."""
+
+    hash_identifiers: bool = True
+    """Replace a redacted value with a short digest of it rather than a bare label.
+
+    Two occurrences of the same secret then stay comparable across runs — which is
+    what makes a finding fingerprint stable — without the value being stored.
+    """
+
+    custom_patterns: tuple[str, ...] = ()
+    max_evidence_bytes: int = DEFAULT_MAX_EVIDENCE_BYTES
+
+    @property
+    def digest(self) -> str:
+        """A digest of this policy, recorded in the manifest alongside the evidence."""
+        return digest_of(
+            str(self.mode),
+            str(self.redact_secrets),
+            str(self.redact_emails),
+            str(self.redact_ip_addresses),
+            str(self.hash_identifiers),
+            "|".join(self.custom_patterns),
+            str(self.max_evidence_bytes),
+        )
+
+
+class EvidenceRedactor:
+    """Removes what must not be stored, and says when it removed something.
+
+    Silent redaction produces a second kind of dishonest report: one that looks
+    complete and is not. So a finding whose evidence was changed says so in the
+    text a reader sees, for the same reason `unverified` exists.
+    """
+
+    def __init__(self, policy: RedactionPolicy | None = None) -> None:
+        self._policy = policy if policy is not None else RedactionPolicy()
+        self._custom = tuple(
+            (f"custom-{index}", re.compile(pattern))
+            for index, pattern in enumerate(self._policy.custom_patterns)
+        )
+
+    @property
+    def policy(self) -> RedactionPolicy:
+        """The policy in force, for recording in the manifest."""
+        return self._policy
+
+    def redact_text(self, text: str) -> str:
+        """Apply the policy to one piece of text."""
+        if not text:
+            return text
+        mode = self._policy.mode
+        if mode is EvidenceMode.METADATA_ONLY:
+            return ""
+        cleaned = text
+        if self._policy.redact_secrets or mode is not EvidenceMode.FULL:
+            # Secrets go at every mode, `full` included. `full` means "keep the
+            # model's words", never "store a live credential" — that is not a
+            # trade a user can usefully opt into, and the finding is that the
+            # secret appeared, not what it was.
+            cleaned = self._apply(cleaned, _SECRET_PATTERNS)
+        cleaned = self._apply(cleaned, self._custom)
+        if mode is EvidenceMode.FULL:
+            return self._bound(cleaned)
+        if self._policy.redact_emails:
+            cleaned = self._apply(cleaned, (("email", _EMAIL),))
+        if self._policy.redact_ip_addresses:
+            cleaned = self._apply(cleaned, (("ip", _IP),))
+        return self._bound(cleaned)
+
+    def redact(self, finding: "Finding") -> "Finding":
+        """Return this finding with its evidence brought within the policy."""
+        from guardana.core.report.finding import Evidence  # noqa: PLC0415 — one-way dependency
+
+        evidence = finding.evidence
+        summary = self.redact_text(evidence.summary)
+        detail = self.redact_text(evidence.detail)
+        if summary == evidence.summary and detail == evidence.detail:
+            return finding
+        note = "" if summary else "[evidence withheld: metadata_only]"
+        return replace(finding, evidence=Evidence(summary=summary or note, detail=detail))
+
+    def redact_result(self, result: "ScanResult") -> "ScanResult":
+        """Apply the policy to every finding channel of a result."""
+        return replace(
+            result,
+            findings=tuple(self.redact(f) for f in result.findings),
+            unverified=tuple(self.redact(f) for f in result.unverified),
+            waived=tuple(self.redact(f) for f in result.waived),
+        )
+
+    def _apply(self, text: str, patterns: tuple[tuple[str, re.Pattern[str]], ...]) -> str:
+        for label, pattern in patterns:
+            text = pattern.sub(lambda m, label=label: self._placeholder(label, m.group(0)), text)  # type: ignore[misc]
+        return text
+
+    def _placeholder(self, label: str, value: str) -> str:
+        if not self._policy.hash_identifiers:
+            return _REDACTED.format(label=label)
+        return _REDACTED.format(label=f"{label}:{digest_of(value)[7:19]}")
+
+    def _bound(self, text: str) -> str:
+        limit = self._policy.max_evidence_bytes
+        encoded = text.encode("utf-8")
+        if len(encoded) <= limit:
+            return text
+        # Truncation is announced, never silent: a report that quietly drops the
+        # half of the evidence that mattered looks complete and is not.
+        kept = encoded[:limit].decode("utf-8", errors="ignore")
+        return kept + _TRUNCATED.format(limit=limit)

@@ -13,6 +13,7 @@ from guardana.cli._run_meta import build_manifest, target_identity
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
+from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import (
     BaselineError,
@@ -86,6 +87,12 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     # render, baseline, or emit SARIF — so alerts attach to real repo paths and a
     # baseline fingerprint is portable between a dev machine and CI.
     result = relativize_findings(result, Path.cwd())
+    # Applied here, before the baseline is written or matched, because a finding's
+    # fingerprint is computed from its evidence summary: redacting later would
+    # change every fingerprint and silently stop every waiver from matching. The
+    # renderers redact again on the way out, which is idempotent and is what keeps
+    # the guarantee true for an embedder that skips this step.
+    result = EvidenceRedactor(prof.privacy).redact_result(result)
 
     if write_baseline is not None:
         write_baseline.write_text(serialize_baseline(result), encoding="utf-8")

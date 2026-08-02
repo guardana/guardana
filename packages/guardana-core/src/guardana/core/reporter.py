@@ -4,6 +4,7 @@ from typing import Protocol
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from guardana.core.redaction import EvidenceRedactor
 from guardana.core.report.result import ScanResult
 from guardana.core.report.serialize import finding_to_dict
 
@@ -88,6 +89,7 @@ class HttpReporter:
         *,
         api_key: str | None = None,
         transport: Callable[[str, bytes], None] | None = None,
+        redactor: EvidenceRedactor | None = None,
     ) -> None:
         scheme = urlsplit(url).scheme
         if scheme not in ("http", "https"):
@@ -95,11 +97,14 @@ class HttpReporter:
         self._url = url
         self._api_key = api_key
         self._transport = transport if transport is not None else self._default_transport
+        # Applied here rather than by the caller: this is the path that leaves the
+        # machine, and it must not depend on whoever wired the reporter up.
+        self._redactor = redactor if redactor is not None else EvidenceRedactor()
 
     def _default_transport(self, url: str, payload: bytes) -> None:
         _urllib_transport(url, payload, api_key=self._api_key)
 
     def submit(self, result: ScanResult, *, source: str) -> None:
         """POST the normalized envelope to the collector."""
-        payload = _serialize(result, source=source)
+        payload = _serialize(self._redactor.redact_result(result), source=source)
         self._transport(self._url, payload)

@@ -270,6 +270,27 @@ writes against it. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 
+### Evidence is redacted by default, at one seam (`privacy:`)
+
+The most sensitive text in a deployment is exactly what a security finding quotes.
+Until 0.7 that was handled by convention — rules were careful — which held while
+every rule was ours and does not survive an extension API.
+
+Now one redactor sits between findings and every output: the renderers, the
+collector envelope, and baseline files. It is applied by the renderer factory
+rather than by each renderer, so a format added next year is covered without its
+author knowing the policy exists.
+
+Three things keep it honest. **Secrets go even at `full`** — that mode means "keep
+the model's words", not "store a live key". **Redaction is never silent**: a
+finding says its evidence was changed, and truncation says so too. **Placeholders
+are hashed**, so the same secret redacts identically across runs and a baseline
+waiver keeps matching — a placeholder that drifted would have expired every waiver
+you had.
+
+A test enumerates every registered renderer from the registry and asserts a
+crafted credential cannot pass through any of them, per path rather than once.
+
 ### Ask the target what it can actually do (`guardana target inspect`)
 
 "OpenAI-compatible" is a claim about a URL shape. A gateway can accept a tools

@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from fnmatch import fnmatch
 
 from guardana.core.budget import Budgets
+from guardana.core.redaction import RedactionPolicy
 from guardana.core.severity import Severity
 
 
@@ -55,3 +56,11 @@ class Profile:
     rule_paths: tuple[str, ...] = ()
     path_excludes: tuple[str, ...] = ()
     budgets: Budgets = field(default_factory=Budgets)
+    privacy: RedactionPolicy = field(default_factory=RedactionPolicy)
+    """What evidence this run may keep. See `guardana.core.redaction`.
+
+    A `Profile` built in code defaults to `full`, matching what the engine did
+    before the redactor existed; `guardana.yaml` and every CLI command default to
+    `redacted`. The difference is deliberate: a library caller has already decided
+    what to do with the objects it is handed, while a command writes files.
+    """

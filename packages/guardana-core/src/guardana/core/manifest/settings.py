@@ -1,7 +1,15 @@
 """What settings produced this result, what limits it ran under, what it stored."""
 
 from dataclasses import dataclass
-from enum import StrEnum
+
+from guardana.core.redaction import EvidenceMode
+
+__all__ = [
+    "ConfigurationRef",
+    "EvidenceMode",
+    "ExecutionSettings",
+    "PrivacyRecord",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,14 +57,6 @@ class ExecutionSettings:
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
     max_duration_seconds: float | None = None
-
-
-class EvidenceMode(StrEnum):
-    """How much of what the target said is kept in the evidence."""
-
-    METADATA_ONLY = "metadata_only"
-    REDACTED = "redacted"
-    FULL = "full"
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,15 +1,10 @@
-from enum import StrEnum
+"""Kept for the import path. `StopReason` now lives beside the verdict it decides.
 
+It moved into `guardana.core.gate` because the gate needs it and `gate` must not
+import the report package: doing so made the two load each other, and the cycle
+only became visible once configuration started depending on the redaction policy.
+"""
 
-class StopReason(StrEnum):
-    """Why a run ended before it finished its plan.
+from guardana.core.gate import StopReason
 
-    Recorded on the result rather than left to the exit code alone: a report
-    written to disk outlives the process that wrote it, and one that does not say
-    it was cut short reads as a complete pass over the target. Both members mean
-    the same thing to a gate — the run is not entitled to a verdict — and differ
-    in who cut it short, which is what the operator needs to know to act.
-    """
-
-    BUDGET_EXHAUSTED = "budget_exhausted"
-    INTERRUPTED = "interrupted"
+__all__ = ["StopReason"]

@@ -226,7 +226,7 @@ output, usage metadata, finish reason, seed, context limits, rate-limit behaviou
 provider dialect. "OpenAI-compatible" is not a guarantee of identical behaviour,
 and a capability mismatch must never be classified as a pass.
 
-**Privacy and redaction defaults.** A central redactor applied before
+**Privacy and redaction defaults — shipped.** One redactor at one seam, applied by the renderer factory so no output path can skip it; redacted by default in every command, secrets removed even at `full`, redaction and truncation both announced, placeholders hashed so baseline waivers keep matching. Still open: separate local and collector policies, and log-level guarantees. Original scope: a central redactor applied before
 serialization and before any reporter dispatch; evidence redacted by default;
 prompts, responses and tool arguments not stored unless configured; an explicit
 warning when full evidence is enabled; tests proving sensitive fields cannot
