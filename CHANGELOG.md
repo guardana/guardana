@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **The saved-run schema is version 2.** Documents written by 0.6 still load —
+  they are migrated in memory — but documents written by 0.7 are not readable by
+  0.6. The root-level `summary` block is **gone**; its counts live in
+  `run.result_summary`, which also carries the new `gate` and `stopped_by` fields.
+  Two copies of one truth is a guarantee that they eventually disagree, and the
+  copy a reader happens to trust then decides whether a build is green.
+- **`RunMeta` is replaced by `RunManifest`** (`guardana.core.manifest`), and
+  `RunReport.meta` by `RunReport.manifest`. Anything embedding the engine and
+  reading run metadata needs the new names; the old shape carried seven fields and
+  could not answer what a run cost or how it was gated.
+- **A run that executed no rules now reports `indeterminate`, not a policy
+  failure.** The exit code moves from `1` to `2` for that case. Both are non-zero,
+  so no pipeline turns green by accident; what changes is that "nothing was
+  verified" is now distinguishable from "something is wrong".
+
 ### Changed
 
 - **Positioning: an AI security verification platform, not a model scanner.**
@@ -38,6 +55,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Run Manifest v2 — a saved run is now evidence, not a label.** Every run
+  records a run id and UTC timestamps, where it was started from (laptop, CI, and
+  which provider), the software that produced it, the target with a fingerprint
+  *and the fields that fingerprint covers*, the deployment it verifies, the
+  configuration by digest, the limits it ran under, what it consumed, the rules
+  and evaluators that did the checking, a result summary with an explicit gate,
+  and the evidence policy in force. Versioned independently of the CLI, with
+  [`schemas/run-v2.schema.json`](schemas/run-v2.schema.json) as the published
+  contract and a test validating what Guardana writes against it.
+  See [`docs/usage-run.md`](docs/usage-run.md).
+- **`guardana run inspect` and `guardana run migrate`.** Read a saved run without
+  re-running it, or rewrite an older one at the current schema. `inspect` prints
+  **"not recorded"**, never a blank and never `0`, for anything the run did not
+  measure — the two are different facts and only one of them lets you budget.
+- **Older runs migrate forward in memory, at load.** A run written by 0.6 (schema
+  1) is still comparable after upgrading: `diff` and `inspect` carry it forward as
+  they read it. What version 1 never recorded arrives as an explicit unknown — no
+  usage, no execution settings, and **no gate verdict**, because recomputing one
+  would apply today's thresholds to another build's run.
+- **Three gate outcomes instead of two** (`guardana.core.gate`): `pass`, `fail`,
+  and `indeterminate` — the run could not answer. A stopped run outranks a
+  finding, a finding outranks a check that could not run. `gate()` stays a boolean
+  for embedders; the distinction is what lets a CI job tell a broken setup from a
+  target that got worse.
+- **SARIF now fills in its `invocation` object**: `startTimeUtc`, `endTimeUtc`,
+  `exitCode` and `exitCodeDescription` alongside the `executionSuccessful` and
+  `toolExecutionNotifications` it already carried.
+- **`guardana.core.testing.manifest_for`** — a run manifest for tests, so a test
+  about rendering is not also a test about clocks and run ids.
 - **Generated documentation truth** (`scripts/generate_docs.py` →
   `docs/generated/`): rule summary, full catalog, evaluator catalog and taxonomy
   coverage, all read from the installed registry. Prose links to them instead of

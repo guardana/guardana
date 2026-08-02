@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -7,7 +8,8 @@ from guardana.cli._output import emit
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
-from guardana.cli._run_meta import build_run_meta
+from guardana.cli._run_meta import build_manifest, target_identity
+from guardana.core.gate import GateOutcome, gate_outcome
 from guardana.core.registry import Registry
 from guardana.core.report import (
     BaselineError,
@@ -17,7 +19,7 @@ from guardana.core.report import (
     relativize_findings,
     serialize_baseline,
 )
-from guardana.core.runner import Runner, gate
+from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget
 from guardana.report import get_renderer
 
@@ -71,6 +73,7 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     registry = Registry() if no_plugins else Registry.discover()
     load_custom_rules(registry, prof, rules)
     target = ArtifactTarget(path, excludes=prof.path_excludes)
+    started_at = datetime.now(UTC)
     result = Runner(registry=registry, profile=prof).run(target)
     # Make file paths repo-relative (relative to the checkout root) before we
     # render, baseline, or emit SARIF — so alerts attach to real repo paths and a
@@ -106,15 +109,20 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
             typer.echo(f"error: {exc}", err=True)
             raise typer.Exit(code=_BASELINE_ERROR_EXIT_CODE) from exc
 
-    run = build_run_meta(
+    outcome = gate_outcome(result, prof.policy)
+    target_ref = relativize(target.ref, Path.cwd())
+    run = build_manifest(
         registry,
         prof,
         result,
         target_kind=target.kind,
-        target_ref=relativize(target.ref, Path.cwd()),
+        target_ref=target_ref,
+        gate=outcome,
+        started_at=started_at,
+        identity=target_identity(target, target_ref),
     )
     emit(get_renderer(format.value, run=run).render(result), output)
     if reporter:
         submit_safely(reporter, result, source=str(path))
-    if gate(result, prof.policy):
+    if outcome is not GateOutcome.PASS:
         raise typer.Exit(code=1)

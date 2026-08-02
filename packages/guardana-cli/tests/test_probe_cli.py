@@ -150,10 +150,10 @@ def test_probe_saves_a_run_a_comparison_can_read(
 
     assert result.exit_code == 0, result.output
     report = load_report(out)
-    assert report.meta.target_kind == TargetKind.ENDPOINT
-    assert report.meta.target_ref == "http://fake#m"
-    assert report.meta.rules, "a probe that ran rules must record which"
-    assert all(len(digest) == 16 for digest in report.meta.rules.values())
+    assert report.manifest.target.kind == TargetKind.ENDPOINT
+    assert report.manifest.target.ref == "http://fake#m"
+    assert report.manifest.rules, "a probe that ran rules must record which"
+    assert all(len(rule.digest) == 16 for rule in report.manifest.rules)
 
 
 def test_two_probe_runs_of_the_same_model_compare_as_unchanged(

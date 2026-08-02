@@ -26,7 +26,10 @@ def test_output_writes_a_run_that_loads_back(tmp_path: Path) -> None:
     assert result.exit_code == 0  # a MEDIUM finding is below the default gate
     report = load_report(out)
     assert report.result.findings
-    assert report.meta.target_kind == "artifact"
+    assert report.manifest.target.kind == "artifact"
+    assert report.manifest.result_summary.gate is not None, (
+        "a run written today records its verdict rather than leaving a reader to infer one"
+    )
 
 
 def test_the_saved_run_names_the_rules_that_ran_with_their_digests(tmp_path: Path) -> None:
@@ -39,7 +42,7 @@ def test_the_saved_run_names_the_rules_that_ran_with_their_digests(tmp_path: Pat
     assert payload["schema_version"] == REPORT_SCHEMA_VERSION
     rules = payload["run"]["rules"]
     assert rules, "a scan that ran rules must say which"
-    assert all(len(digest) == 16 for digest in rules.values())
+    assert all(len(rule["digest"]) == 16 for rule in rules)
 
 
 def test_a_narrowed_profile_produces_a_visibly_smaller_plan(tmp_path: Path) -> None:
@@ -52,7 +55,10 @@ def test_a_narrowed_profile_produces_a_visibly_smaller_plan(tmp_path: Path) -> N
     runner.invoke(app, [*common, "--output", str(wide)])
     runner.invoke(app, [*common, "--profile", str(profile), "--output", str(narrow)])
 
-    assert set(load_report(narrow).meta.rules) < set(load_report(wide).meta.rules)
+    def _ran(path: Path) -> set[str]:
+        return {rule.id for rule in load_report(path).manifest.rules}
+
+    assert _ran(narrow) < _ran(wide)
 
 
 def test_a_report_that_cannot_be_written_exits_two_rather_than_looking_saved(

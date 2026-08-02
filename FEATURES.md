@@ -239,6 +239,35 @@ stayed green. It now has its own channel and **fails the gate by default**
 (`fail_on_error`), one broken rule never stops the rest of the scan, and one
 broken plugin never takes rule discovery down with it.
 
+### A saved run is evidence, not a screenshot (`guardana run`)
+
+`--output run.json` writes a **run manifest** alongside the findings: what was
+examined and under which configuration, by which software, at what cost, and how
+it was gated — with UTC timestamps and algorithm-qualified digests throughout.
+`guardana run inspect` reads it back without re-running anything.
+
+Three properties are the point:
+
+**Unknown is never zero.** A value nobody measured prints as `not recorded`, and
+serializes as `null`. A file scan that genuinely sends zero requests and a run
+from a version that never counted are different facts, and only one of them lets
+a team budget the next run.
+
+**The verdict is stored, never re-derived.** `result_summary.gate` is written by
+the engine as `pass`, `fail` or `indeterminate`. A consumer that recomputed it
+from the counts would eventually compute it differently — and the divergence
+would surface as a green build.
+
+**The fingerprint says what it covers.** `target.fingerprint_inputs` lists the
+fields the digest was computed from, so nobody mistakes a digest of a declared
+endpoint for a digest of model weights.
+
+The schema is published as [`schemas/run-v2.schema.json`](schemas/run-v2.schema.json)
+with its major version in its identifier, and a test validates what Guardana
+writes against it. Runs written by 0.6 are migrated forward in memory when read,
+so upgrading does not strand the evidence you already have — and what the older
+schema never recorded stays an explicit unknown rather than becoming a default.
+
 ### Policy gates (`guardana.yaml`)
 
 Include/exclude rules by glob (`guardana.*` vs `acme.*`), set the failure bar

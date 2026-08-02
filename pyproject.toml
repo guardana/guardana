@@ -142,6 +142,13 @@ filterwarnings = [
 [dependency-groups]
 dev = [
     "import-linter>=2.1",
+    # Test-only, and deliberately not a runtime dependency of any distribution:
+    # `schemas/run-v2.schema.json` is a published contract, and a schema
+    # nothing validates against is a promise rather than a gate. Guardana itself
+    # never validates at run time — it constructs manifests from typed
+    # dataclasses, so the shape is enforced by mypy on the way out.
+    "jsonschema>=4.23",
+    "types-jsonschema>=4.23",
     "mypy>=2.2.0",
     "pre-commit>=4.0",
     "pytest>=9.1.1",

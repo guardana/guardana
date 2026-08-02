@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from guardana.core.report.run import RunMeta
+from guardana.core.manifest import RunManifest
 from guardana.report.base import DiffRenderer, Renderer
 from guardana.report.diff_human import DiffHumanRenderer
 from guardana.report.diff_json import DiffJsonRenderer
@@ -9,10 +9,10 @@ from guardana.report.json_report import JsonRenderer
 from guardana.report.junit import JUnitRenderer
 from guardana.report.sarif import SarifRenderer
 
-_RENDERERS: dict[str, Callable[[RunMeta | None], Renderer]] = {
+_RENDERERS: dict[str, Callable[[RunManifest | None], Renderer]] = {
     JsonRenderer.name: JsonRenderer,
     HumanRenderer.name: lambda _run: HumanRenderer(),
-    SarifRenderer.name: lambda _run: SarifRenderer(),
+    SarifRenderer.name: SarifRenderer,
     JUnitRenderer.name: lambda _run: JUnitRenderer(),
 }
 
@@ -30,13 +30,14 @@ def get_diff_renderer(name: str) -> DiffRenderer:
         raise ValueError(f"unknown diff renderer: {name!r}") from exc
 
 
-def get_renderer(name: str, *, run: RunMeta | None = None) -> Renderer:
+def get_renderer(name: str, *, run: RunManifest | None = None) -> Renderer:
     """Look up a renderer by the name the CLI's `--format` takes.
 
-    Renderers are built per call rather than shared, because one of them takes the
-    run's metadata. Only the JSON document is read back, so only it needs to carry
-    what the run was; the rest accept the argument and ignore it, which is a
-    contract being honoured rather than a smell.
+    Renderers are built per call rather than shared, because two of them take the
+    run manifest: JSON writes it whole (that document is read back by `guardana
+    diff`), and SARIF folds the parts its `invocation` object has a place for.
+    The rest accept the argument and ignore it, which is a contract being
+    honoured rather than a smell.
     """
     try:
         return _RENDERERS[name](run)

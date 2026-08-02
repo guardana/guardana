@@ -1,6 +1,10 @@
 # Design: Run Manifest v2
 
-**Status:** proposed · **Target:** v0.7 · **Supersedes:** the `run` block introduced in 0.6
+**Status:** implemented in 0.7 · **Supersedes:** the `run` block introduced in 0.6
+
+> Shipped. Where the built shape differs from this proposal, the differences and
+> their reasons are recorded under "What changed during implementation" at the
+> bottom; the user-facing description lives in [`docs/usage-run.md`](../usage-run.md).
 
 ## The problem
 
@@ -50,9 +54,8 @@ unreadable and invites drift:
 | `result_summary` | the counts and the gate outcome |
 | `privacy` | what evidence policy was in force |
 
-The full field list lives in the plan document and in
-`schemas/run-manifest-v2.schema.json`; it is not repeated here, because two copies
-of a schema is one copy too many.
+The full field list lives in `schemas/run-v2.schema.json`; it is not repeated
+here, because two copies of a schema is one copy too many.
 
 ### Decisions
 
@@ -101,15 +104,53 @@ appear as a green build.
 - Every timestamp is UTC; every fingerprint names its algorithm.
 - Schema compatibility tests cover v1→v2 migration and unknown-field handling.
 
-### Open questions
+## What changed during implementation
 
-1. **Does `run_id` need to be globally unique, or unique per target?** A UUID is
-   free; the question is whether the collector should key on it or on
-   `(target, started_at)`. Leaning UUID, decided when the collector schema lands.
-2. **Cost estimation needs a price table Guardana does not have.** Either the
-   profile carries per-provider pricing, or `estimated_cost` stays null unless
-   configured. Leaning the latter — an invented cost is worse than no cost.
-3. **Should the manifest record the *effective* profile, not just its digest?** A
-   digest tells you it changed; it does not tell you what changed. An `--explain`
-   mode that stores the resolved profile may belong here, gated on the privacy
-   policy since profiles can carry endpoint URLs.
+Five decisions moved. Each is here because the reason only became visible once
+the code existed.
+
+**One version number, not two.** The proposal versioned "the manifest"; the file
+on disk is the manifest *plus* the finding channels, and giving it two numbers is
+how they start to disagree. `schema_version` is stated once, at the root, and the
+schema (`schemas/run-v2.schema.json`) describes the whole document. The manifest
+block carries no version of its own.
+
+**`schema_version` stays an integer.** The proposal wrote `"2"` as a string while
+version 1 on disk is the number `1`. A field that is sometimes a string and
+sometimes a number is a trap for every reader, ours included.
+
+**More fields are nullable than planned, and one of them matters.** A migrated
+version-1 document knows no `usage`, no `execution` settings, and — the important
+one — **no gate verdict**. `result_summary.gate` is therefore nullable. Computing
+a verdict during migration was the tempting alternative and would have been the
+re-derivation that storing the gate as a field exists to prevent, done with this
+build's thresholds against another build's run. Nullability is constrained rather
+than free: a document with `migrated_from: null` must carry its timestamps and a
+gate, enforced both in `RunManifest.__post_init__` and by an `if/then` in the
+schema, so the allowance made for migration cannot become a way for a fresh run
+to skip them.
+
+**The target fingerprint declares its inputs.** `fingerprint_inputs` was not in
+the proposal. Without it, a digest over a URL and a model name invites the
+stronger reading — "this identifies the model" — and nothing in the document
+contradicts it.
+
+**The writer moved into the engine, next to the reader.** Serialization used to
+live in `guardana-report` while the loader lived in `guardana-core`, so a field
+added on one side could sit unread on the other with nothing to notice. Both
+halves are now in `guardana.core.report.serialize` / `.load`.
+
+## Open questions
+
+1. **Does `run_id` need to be globally unique, or unique per target?** Answered
+   for the local case: a fresh run gets a UUID4, and a migrated run gets a
+   deterministic digest of what the old document contained, so opening the same
+   file twice does not mint a new run. Whether the collector keys on it or on
+   `(target, started_at)` is still open, and lands with the collector schema.
+2. **Cost estimation needs a price table Guardana does not have.** Settled as
+   proposed: `estimated_cost` stays null. A price table belongs in profile data
+   if it arrives at all, never in the engine — the engine knows no vendor.
+3. **Should the manifest record the *effective* profile, not just its digest?**
+   Still open. A digest tells you it changed; it does not tell you what changed.
+   An `--explain` mode that stores the resolved profile may belong here, gated on
+   the privacy policy since profiles can carry endpoint URLs.

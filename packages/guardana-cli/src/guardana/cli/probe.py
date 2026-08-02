@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -13,9 +14,9 @@ from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
-from guardana.cli._run_meta import build_run_meta
+from guardana.cli._run_meta import build_manifest
+from guardana.core.gate import GateOutcome, gate_outcome
 from guardana.core.registry import Registry
-from guardana.core.runner import gate
 from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport, TargetKind
 from guardana.report import get_renderer
 
@@ -91,6 +92,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     ] = None,
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
+    started_at = datetime.now(UTC)
     prof = resolve_profile(profile, preset)
     registry = Registry.discover()
     wire_config_evaluators(registry, prof)
@@ -102,13 +104,21 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         )
         if result is None:
             return
-        run = build_run_meta(
-            registry, prof, result, target_kind=TargetKind.ENDPOINT, target_ref=mcp
+        outcome = gate_outcome(result, prof.policy)
+        run = build_manifest(
+            registry,
+            prof,
+            result,
+            target_kind=TargetKind.ENDPOINT,
+            target_ref=mcp,
+            gate=outcome,
+            started_at=started_at,
+            concurrency=concurrency,
         )
         emit(get_renderer(format.value, run=run).render(result), output)
         if reporter:
             submit_safely(reporter, result, source=mcp)
-        if gate(result, prof.policy):
+        if outcome is not GateOutcome.PASS:
             raise typer.Exit(code=1)
         return
 
@@ -133,11 +143,19 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     result = run_against_endpoint(
         url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
     )
-    run = build_run_meta(
-        registry, prof, result, target_kind=TargetKind.ENDPOINT, target_ref=f"{url}#{model}"
+    outcome = gate_outcome(result, prof.policy)
+    run = build_manifest(
+        registry,
+        prof,
+        result,
+        target_kind=TargetKind.ENDPOINT,
+        target_ref=f"{url}#{model}",
+        gate=outcome,
+        started_at=started_at,
+        concurrency=concurrency,
     )
     emit(get_renderer(format.value, run=run).render(result), output)
     if reporter:
         submit_safely(reporter, result, source=f"{url}#{model}")
-    if gate(result, prof.policy):
+    if outcome is not GateOutcome.PASS:
         raise typer.Exit(code=1)

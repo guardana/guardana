@@ -2,6 +2,7 @@ from guardana.core.target.adapter import AdapterConfig, HttpAdapterTransport
 from guardana.core.target.artifact import ArtifactTarget
 from guardana.core.target.base import Capability, Target, TargetKind
 from guardana.core.target.endpoint import (
+    REQUEST_TIMEOUT_SECONDS,
     ChatMessage,
     ChatTransport,
     EndpointError,
@@ -14,6 +15,7 @@ from guardana.core.target.endpoint import (
 from guardana.core.target.mcp import McpError, McpServerTarget, McpTool
 
 __all__ = [
+    "REQUEST_TIMEOUT_SECONDS",
     "AdapterConfig",
     "ArtifactTarget",
     "Capability",

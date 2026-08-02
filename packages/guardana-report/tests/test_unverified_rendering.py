@@ -9,6 +9,7 @@ from guardana.core.evaluator.base import Verdict
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.result import ScanResult
 from guardana.core.severity import Severity
+from guardana.core.testing import manifest_for
 from guardana.report import get_renderer
 
 
@@ -34,11 +35,12 @@ def test_human_surfaces_unverified_distinctly() -> None:
 
 
 def test_json_lists_unverified_separately() -> None:
-    payload = json.loads(get_renderer("json").render(_unverified_result()))
+    result = _unverified_result()
+    payload = json.loads(get_renderer("json", run=manifest_for(result)).render(result))
     assert payload["findings"] == []
     assert len(payload["unverified"]) == 1
     assert payload["unverified"][0]["verdict"]["outcome"] == "inconclusive"
-    assert payload["summary"]["unverified"] == 1
+    assert payload["run"]["result_summary"]["unverified"] == 1
 
 
 def test_sarif_marks_unverified_as_review_note() -> None:

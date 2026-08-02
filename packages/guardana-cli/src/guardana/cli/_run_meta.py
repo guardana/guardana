@@ -1,43 +1,131 @@
-"""Assemble the `run` block a saved run carries.
+"""Assemble the manifest a saved run carries.
 
 Built here rather than in the runner because the circumstances of a run are the
 command's knowledge, not the engine's: which profile the user named, which
-version of the tool this is, and what time it is. The engine stays a library that
-does not consult a clock.
+version of the tool this is, what time it is, and whether this is a laptop or a
+pipeline. The engine stays a library that consults neither a clock nor an
+environment variable.
 """
 
+import os
+import uuid
 from datetime import UTC, datetime
 
 from guardana.core import __version__
+from guardana.core.gate import GateOutcome
+from guardana.core.manifest import (
+    ConfigurationRef,
+    ExecutionSettings,
+    RunManifest,
+    RunSource,
+    RunUsage,
+    SourceKind,
+    TargetIdentity,
+    ToolInfo,
+    digest_of,
+)
+from guardana.core.manifest.records import RuleRecord
+from guardana.core.manifest.summary import summarize
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
-from guardana.core.report import RunMeta, ScanResult
-from guardana.core.target import TargetKind
+from guardana.core.report import ScanResult
+from guardana.core.target import REQUEST_TIMEOUT_SECONDS, Target, TargetKind
+
+_CI_PROVIDERS = (
+    ("GITHUB_ACTIONS", "github"),
+    ("GITLAB_CI", "gitlab"),
+    ("JENKINS_URL", "jenkins"),
+    ("TF_BUILD", "azure"),
+)
 
 
-def build_run_meta(
+def detect_source() -> RunSource:
+    """Work out whether this run came from a laptop or a pipeline.
+
+    Read from the environment rather than asked of the user, because the answer
+    that matters is the one nobody had to remember to pass. A laptop run and a
+    gate that was supposed to hold are different evidence, and a dashboard that
+    cannot tell them apart reports an experiment as a deployment check.
+    """
+    for variable, provider in _CI_PROVIDERS:
+        if os.environ.get(variable):
+            return RunSource(kind=SourceKind.CI, provider=provider, run_url=_ci_run_url(provider))
+    if os.environ.get("CI"):
+        return RunSource(kind=SourceKind.CI, provider="other")
+    return RunSource(kind=SourceKind.LOCAL, provider="local")
+
+
+def _ci_run_url(provider: str) -> str | None:
+    if provider == "github":
+        server = os.environ.get("GITHUB_SERVER_URL")
+        repository = os.environ.get("GITHUB_REPOSITORY")
+        run_id = os.environ.get("GITHUB_RUN_ID")
+        if server and repository and run_id:
+            return f"{server}/{repository}/actions/runs/{run_id}"
+    return os.environ.get("CI_PIPELINE_URL") or os.environ.get("BUILD_URL")
+
+
+def target_identity(target: Target, ref: str) -> TargetIdentity:
+    """Describe what was examined, and say what the fingerprint was computed from.
+
+    The fingerprint covers the *declared* identity of the target — its reference
+    and kind — which is what the engine can honestly attest to without asking the
+    target to identify itself. `fingerprint_inputs` records exactly that, so no
+    consumer reads the digest as covering model weights it never saw. What a real
+    endpoint supports, and how it identifies itself, is `guardana target inspect`.
+    """
+    inputs = ("kind", "ref")
+    return TargetIdentity(
+        kind=target.kind,
+        ref=ref,
+        fingerprint=digest_of(str(target.kind), ref),
+        fingerprint_inputs=inputs,
+        capabilities=tuple(sorted(str(c) for c in target.capabilities())),
+    )
+
+
+def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independent facts
     registry: Registry,
     profile: Profile,
     result: ScanResult,
     *,
     target_kind: TargetKind,
     target_ref: str,
-) -> RunMeta:
+    gate: GateOutcome,
+    started_at: datetime,
+    identity: TargetIdentity | None = None,
+    usage: RunUsage | None = None,
+    concurrency: int = 1,
+) -> RunManifest:
     """Describe the run that produced `result`, digesting the rules that actually ran.
 
     Only the rules that ran are digested. A rule that was skipped or errored did
     not test anything, and listing it as part of the plan would let a later
     comparison treat a check that never happened as coverage it had.
     """
-    digests = {
-        rule.meta.id: rule.digest() for rule in registry.rules() if rule.meta.id in result.rules_run
-    }
-    return RunMeta(
-        tool_version=__version__,
-        target_kind=target_kind,
-        target_ref=target_ref,
-        profile=profile.name,
-        rules=digests,
-        rules_skipped=result.rules_skipped,
-        started_at=datetime.now(UTC),
+    now = datetime.now(UTC)
+    rules = tuple(
+        RuleRecord(id=rule.meta.id, digest=rule.digest())
+        for rule in registry.rules()
+        if rule.meta.id in result.rules_run
+    )
+    return RunManifest(
+        run_id=str(uuid.uuid4()),
+        created_at=now,
+        started_at=started_at,
+        completed_at=now,
+        source=detect_source(),
+        guardana=ToolInfo(version=__version__),
+        target=(
+            identity
+            if identity is not None
+            else TargetIdentity(kind=target_kind, ref=target_ref, fingerprint_inputs=())
+        ),
+        configuration=ConfigurationRef(profile_name=profile.name),
+        execution=ExecutionSettings(
+            concurrency=concurrency, timeout_seconds=REQUEST_TIMEOUT_SECONDS
+        ),
+        usage=usage if usage is not None else RunUsage(),
+        rules=rules,
+        result_summary=summarize(result, gate),
     )

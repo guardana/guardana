@@ -8,21 +8,29 @@ that was quietly read as empty, which reports "nothing got worse".
 """
 
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
 from guardana.core.evaluator.base import Outcome, Verdict
+from guardana.core.manifest.load import ManifestLoadError, manifest_from_dict, migrate_v1
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.result import ScanResult
-from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunMeta, RunReport
+from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunReport
+from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
-from guardana.core.target import TargetKind
 from guardana.core.taxonomy import TaxonomyRef, resolve
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
+_MIGRATIONS = {1: migrate_v1}
+"""Older document versions this build can carry forward, by the version they are.
+
+Migration happens in memory, at load: a team that upgrades Guardana on Wednesday
+must still be able to compare last week's run on Thursday. `guardana run migrate`
+uses the same functions to rewrite a file on disk for anyone who wants the richer
+document without re-running.
+"""
 
 
 class ReportLoadError(Exception):
@@ -34,7 +42,8 @@ def load_report(path: Path) -> RunReport:
 
     Refuses a document with no `schema_version` — every run written before 0.6,
     including every run a user still has on disk — rather than reading it as a run
-    that found nothing.
+    that found nothing. An older *declared* version is migrated forward in memory
+    instead, because refusing it would strand the evidence somebody kept.
     """
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -44,51 +53,53 @@ def load_report(path: Path) -> RunReport:
         raise ReportLoadError(f"{path} is not a readable Guardana run: {exc}") from exc
     if not isinstance(raw, dict):
         raise ReportLoadError(f"{path} is not a Guardana run: the top level must be an object")
-    _check_version(raw, path)
-    return RunReport(meta=_meta(raw.get("run"), path), result=_result(raw, path))
+    migrated_from = _check_version(raw, path)
+    if migrated_from is not None:
+        raw = _MIGRATIONS[migrated_from](raw)
+    try:
+        manifest = manifest_from_dict(raw.get("run"))
+    except ManifestLoadError as exc:
+        raise ReportLoadError(f"{path}: {exc}") from exc
+    return RunReport(manifest=manifest, result=_result(raw, path))
 
 
-def _check_version(raw: dict[str, Any], path: Path) -> None:
+def _check_version(raw: dict[str, Any], path: Path) -> int | None:
+    """Return the older version to migrate from, or None when the document is current.
+
+    A version this build has never heard of is refused rather than read
+    optimistically: a newer writer may have changed the meaning of a field this
+    reader still recognises, and a comparison against a misread run reports
+    "nothing got worse".
+    """
     version = raw.get("schema_version")
     if version is None:
         raise ReportLoadError(
             f"{path} has no schema_version, so it was written by Guardana 0.5 or earlier "
             f"— re-run the scan with this version to produce a comparable run"
         )
-    if version != REPORT_SCHEMA_VERSION:
-        raise ReportLoadError(
-            f"{path} has schema_version {version!r}; this build reads "
-            f"{REPORT_SCHEMA_VERSION} — upgrade whichever side is older"
-        )
-
-
-def _meta(raw: object, path: Path) -> RunMeta:
-    if not isinstance(raw, dict):
-        raise ReportLoadError(f"{path} has no 'run' block, so what it ran cannot be established")
-    rules = raw.get("rules", {})
-    if not isinstance(rules, dict) or not all(
-        isinstance(k, str) and isinstance(v, str) for k, v in rules.items()
-    ):
-        raise ReportLoadError(f"{path}: 'run.rules' must map each rule that ran to its digest")
-    return RunMeta(
-        tool_version=_str(raw, "tool_version", path),
-        target_kind=_target_kind(raw.get("target_kind"), path),
-        target_ref=_str(raw, "target_ref", path),
-        profile=_str(raw, "profile", path),
-        rules=dict(rules),
-        rules_skipped=_str_tuple(raw.get("rules_skipped"), "run.rules_skipped", path),
-        started_at=_started_at(raw.get("started_at"), path),
+    if version == REPORT_SCHEMA_VERSION:
+        return None
+    if version in _MIGRATIONS:
+        return int(version)
+    raise ReportLoadError(
+        f"{path} has schema_version {version!r}; this build reads "
+        f"{REPORT_SCHEMA_VERSION} and can migrate {sorted(_MIGRATIONS)} "
+        f"— upgrade whichever side is older"
     )
 
 
 def _result(raw: dict[str, Any], path: Path) -> ScanResult:
     run = raw.get("run")
+    summary = run.get("result_summary") if isinstance(run, dict) else None
     rules_run: tuple[str, ...] = ()
     rules_skipped: tuple[str, ...] = ()
-    if isinstance(run, dict):
-        rules = run.get("rules")
-        rules_run = tuple(rules) if isinstance(rules, dict) else ()
-        rules_skipped = _str_tuple(run.get("rules_skipped"), "run.rules_skipped", path)
+    stopped_by = None
+    if isinstance(summary, dict):
+        rules_run = _str_tuple(summary.get("rules_run"), "run.result_summary.rules_run", path)
+        rules_skipped = _str_tuple(
+            summary.get("rules_skipped"), "run.result_summary.rules_skipped", path
+        )
+        stopped_by = _stop_reason(summary.get("stopped_by"), path)
     return ScanResult(
         findings=_findings(raw.get("findings"), "findings", path),
         rules_run=rules_run,
@@ -97,6 +108,7 @@ def _result(raw: dict[str, Any], path: Path) -> ScanResult:
         waived=_findings(raw.get("waived"), "waived", path),
         errors=_errors(raw.get("errors"), path),
         observations=_observations(raw.get("observations"), path),
+        stopped_by=stopped_by,
     )
 
 
@@ -240,20 +252,18 @@ def _severity(raw: object, path: Path) -> Severity:
         ) from exc
 
 
-def _target_kind(raw: object, path: Path) -> TargetKind:
-    try:
-        return TargetKind(str(raw))
-    except ValueError as exc:
-        raise ReportLoadError(f"{path}: unknown target_kind {raw!r}") from exc
+def _stop_reason(raw: object, path: Path) -> StopReason | None:
+    """Read whether the run was cut short. An unknown reason is refused, not ignored.
 
-
-def _started_at(raw: object, path: Path) -> datetime | None:
+    Ignoring it would drop the one field that says the coverage is partial, and
+    the run would then read as a complete pass with fewer findings.
+    """
     if raw is None:
         return None
     try:
-        return datetime.fromisoformat(str(raw))
+        return StopReason(str(raw))
     except ValueError as exc:
-        raise ReportLoadError(f"{path}: 'run.started_at' is not an ISO 8601 timestamp") from exc
+        raise ReportLoadError(f"{path}: unknown stop reason {raw!r}") from exc
 
 
 def _str(raw: dict[str, Any], key: str, path: Path) -> str:

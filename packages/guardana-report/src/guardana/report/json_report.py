@@ -1,72 +1,50 @@
 import json
 
-from guardana.core.report import ScanResult, finding_to_dict
-from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunMeta
+from guardana.core.manifest import RunManifest
+from guardana.core.report import ScanResult, error_to_dict, finding_to_dict, run_to_dict
 
 
 class JsonRenderer:
-    """Machine-readable output: the canonical Finding shape, verdicts included.
+    """Machine-readable output: the run manifest plus the canonical Finding shape.
 
-    Carries a `schema_version` and, when the caller supplies one, a `run` block
-    describing the run itself. Both exist because this document is read back —
-    by `guardana diff`, and by anyone else's tooling — and a reader that cannot
-    establish which rules produced a result cannot tell a clean run from a
-    narrowed one.
+    The document is assembled by `guardana.core.report.serialize`, next to the
+    loader that reads it back. Writer and reader used to sit in different
+    packages, which is how a field added on one side goes unread on the other
+    with nothing to notice.
     """
 
     name = "json"
 
-    def __init__(self, run: RunMeta | None = None) -> None:
+    def __init__(self, run: RunManifest | None = None) -> None:
         self._run = run
 
     def render(self, result: ScanResult) -> str:
         """Render one scan result to text."""
-        max_sev = result.max_severity()
-        payload: dict[str, object] = {"schema_version": REPORT_SCHEMA_VERSION}
-        if self._run is not None:
-            payload["run"] = _run_block(self._run)
-        payload.update(
-            {
-                "findings": [finding_to_dict(f) for f in result.findings],
-                "unverified": [finding_to_dict(f) for f in result.unverified],
-                "errors": [
-                    {"source": e.source, "stage": e.stage, "reason": e.reason}
-                    for e in result.errors
-                ],
-                "waived": [finding_to_dict(f) for f in result.waived],
-                # What the run *saw*, not what it found wrong. This is the channel an
-                # inventory or evidence-pack extension reads, so it never has to walk
-                # the target a second time.
-                "observations": [
-                    {
-                        "kind": str(o.kind),
-                        "name": o.name,
-                        "ref": o.ref,
-                        "attributes": dict(o.attributes),
-                    }
-                    for o in result.observations
-                ],
-                "summary": {
-                    "rules_run": result.rules_run_count,
-                    "rules_skipped": list(result.rules_skipped),
-                    "unverified": len(result.unverified),
-                    "errors": len(result.errors),
-                    "waived": len(result.waived),
-                    "observations": len(result.observations),
-                    "max_severity": max_sev.name if max_sev else None,
-                },
-            }
-        )
-        return json.dumps(payload, indent=2)
+        if self._run is None:
+            return json.dumps(_without_manifest(result), indent=2)
+        return json.dumps(run_to_dict(result, self._run), indent=2)
 
 
-def _run_block(run: RunMeta) -> dict[str, object]:
+def _without_manifest(result: ScanResult) -> dict[str, object]:
+    """Render the findings of a run nobody described, and say that is what happened.
+
+    Every channel is still emitted in full. Dropping them would be the worst
+    possible reading of a missing manifest — a document with `findings: []` that
+    a consumer takes for a clean run. What is missing is the description of the
+    run, so the document simply has no `run` block, `load_report` refuses it, and
+    nothing downstream mistakes it for a saved run.
+    """
     return {
-        "tool_version": run.tool_version,
-        "target_kind": str(run.target_kind),
-        "target_ref": run.target_ref,
-        "profile": run.profile,
-        "rules": dict(run.rules),
-        "rules_skipped": list(run.rules_skipped),
-        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "findings": [finding_to_dict(f) for f in result.findings],
+        "unverified": [finding_to_dict(f) for f in result.unverified],
+        "waived": [finding_to_dict(f) for f in result.waived],
+        "errors": [error_to_dict(e) for e in result.errors],
+        "observations": [
+            {"kind": str(o.kind), "name": o.name, "ref": o.ref, "attributes": dict(o.attributes)}
+            for o in result.observations
+        ],
+        "note": (
+            "rendered without a run manifest, so this is not a saved run: it "
+            "cannot be compared and will be refused by `guardana diff`"
+        ),
     }

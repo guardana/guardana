@@ -23,6 +23,7 @@ detail below.
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live endpoint, agent or MCP server
 - [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two saved runs, fail on deterioration
 - [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
+- [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run and its manifest
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
 - [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin
 - [`extending.md`](extending.md) — add a Rule, an Evaluator, or a Target; the entry-point contract

@@ -10,7 +10,13 @@ from urllib.request import Request, urlopen
 
 from guardana.core.target.base import Capability, Target, TargetKind
 
-_TIMEOUT_SECONDS = 30
+REQUEST_TIMEOUT_SECONDS = 30
+"""How long one request to a target may take.
+
+Public because the run manifest records the limits a run was given, and a
+manifest that states a timeout the code does not use would be evidence of
+something that never happened.
+"""
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
 
@@ -147,7 +153,7 @@ def _read_with_retry(request: Request, ref: str) -> bytes:
     """
     for attempt in range(_MAX_ATTEMPTS):
         try:
-            with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:  # noqa: S310
+            with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:  # noqa: S310
                 raw: bytes = response.read(_MAX_RESPONSE_BYTES + 1)
         except HTTPError as exc:
             last_attempt = attempt == _MAX_ATTEMPTS - 1

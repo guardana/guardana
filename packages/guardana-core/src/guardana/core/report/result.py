@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from guardana.core.observation import Observation
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
+from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
 
 
@@ -25,6 +26,11 @@ class ScanResult:
     the one channel that is not about problems: the components the run saw, so
     "what is deployed here" and "what changed since last time" are answerable
     without walking the target again.
+
+    `stopped_by` is set when the run ended before finishing its plan. It belongs
+    to the result and not only to the exit code, because the report outlives the
+    process that wrote it: one that does not say it was cut short reads as a
+    complete pass, and its smaller finding count reads as an improvement.
     """
 
     findings: tuple[Finding, ...]
@@ -34,6 +40,7 @@ class ScanResult:
     waived: tuple[Finding, ...] = ()
     errors: tuple[CheckError, ...] = ()
     observations: tuple[Observation, ...] = ()
+    stopped_by: StopReason | None = None
 
     @classmethod
     def merged(cls, results: Sequence["ScanResult"]) -> "ScanResult":
@@ -57,6 +64,11 @@ class ScanResult:
             # pass per planted canary), and the model under test is one component,
             # not one per pass.
             observations=tuple({o.ref: o for r in results for o in r.observations}.values()),
+            # A stop recorded in any pass is a stop for the whole run: probe merges
+            # one result per planted canary, and a budget that ran out during the
+            # third pass leaves the first two looking complete. Dropping it here
+            # would hand the merged report a completeness it does not have.
+            stopped_by=next((r.stopped_by for r in results if r.stopped_by is not None), None),
         )
 
     @property

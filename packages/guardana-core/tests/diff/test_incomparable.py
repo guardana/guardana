@@ -11,9 +11,12 @@ from datetime import UTC, datetime
 import pytest
 from guardana.core.diff import ChangeKind, IncomparableRunsError, RunContext, compare
 from guardana.core.diff.reports import compare_reports
-from guardana.core.report import Evidence, Finding, RunMeta, RunReport, ScanResult
+from guardana.core.manifest import RunManifest
+from guardana.core.manifest.records import RuleRecord
+from guardana.core.report import Evidence, Finding, RunReport, ScanResult
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
+from guardana.core.testing import manifest_for
 
 
 def _result(*rules: str) -> ScanResult:
@@ -26,16 +29,34 @@ def _report(
     started_at: datetime | None = None,
     version: str = "0.6.0",
 ) -> RunReport:
+    result = _result(*rules)
     return RunReport(
-        meta=RunMeta(
-            tool_version=version,
-            target_kind=kind,
+        manifest=_manifest(
+            result,
+            kind=kind,
             target_ref="http://x#m",
-            profile="default",
-            rules=dict.fromkeys(rules, "digest"),
+            rules=rules,
             started_at=started_at,
+            version=version,
         ),
-        result=_result(*rules),
+        result=result,
+    )
+
+
+def _manifest(  # noqa: PLR0913 — one keyword per fact the fixture varies
+    result: ScanResult,
+    *,
+    kind: TargetKind,
+    target_ref: str,
+    rules: tuple[str, ...],
+    started_at: datetime | None = None,
+    version: str = "0.6.0",
+) -> RunManifest:
+    base = manifest_for(result, target_ref=target_ref, target_kind=kind, tool_version=version)
+    return replace(
+        base,
+        started_at=started_at if started_at is not None else base.started_at,
+        rules=tuple(RuleRecord(id=rule, digest="digest") for rule in rules),
     )
 
 
@@ -121,7 +142,12 @@ def test_comparing_two_different_targets_says_so() -> None:
     """Intended when comparing two candidate models; worth a second look otherwise."""
     before = _report("guardana.a")
     after = RunReport(
-        meta=replace(_report("guardana.a").meta, target_ref="http://y#other"),
+        manifest=_manifest(
+            _result("guardana.a"),
+            kind=TargetKind.ENDPOINT,
+            target_ref="http://y#other",
+            rules=("guardana.a",),
+        ),
         result=_result("guardana.a"),
     )
 
@@ -130,15 +156,15 @@ def test_comparing_two_different_targets_says_so() -> None:
 
 def _report_with(target_ref: str, finding_ref: str) -> RunReport:
     found = Finding("guardana.a", Severity.HIGH, "t", (), finding_ref, Evidence(summary="s"))
+    result = ScanResult(findings=(found,), rules_run=("guardana.a",), rules_skipped=())
     return RunReport(
-        meta=RunMeta(
-            tool_version="0.6.0",
-            target_kind=TargetKind.ENDPOINT,
+        manifest=_manifest(
+            result,
+            kind=TargetKind.ENDPOINT,
             target_ref=target_ref,
-            profile="default",
-            rules={"guardana.a": "digest"},
+            rules=("guardana.a",),
         ),
-        result=ScanResult(findings=(found,), rules_run=("guardana.a",), rules_skipped=()),
+        result=result,
     )
 
 
@@ -158,11 +184,21 @@ def test_swapping_the_model_compares_end_to_end() -> None:
 
 def test_the_same_tree_scanned_from_two_checkouts_compares_end_to_end() -> None:
     before = RunReport(
-        meta=replace(_report_with("/a/models", "/a/models/x.pkl:1").meta, target_ref="/a/models"),
+        manifest=replace(
+            _report_with("/a/models", "/a/models/x.pkl:1").manifest,
+            target=replace(
+                _report_with("/a/models", "/a/models/x.pkl:1").manifest.target, ref="/a/models"
+            ),
+        ),
         result=_report_with("/a/models", "/a/models/x.pkl:1").result,
     )
     after = RunReport(
-        meta=replace(_report_with("/b/models", "/b/models/x.pkl:9").meta, target_ref="/b/models"),
+        manifest=replace(
+            _report_with("/b/models", "/b/models/x.pkl:9").manifest,
+            target=replace(
+                _report_with("/b/models", "/b/models/x.pkl:9").manifest.target, ref="/b/models"
+            ),
+        ),
         result=_report_with("/b/models", "/b/models/x.pkl:9").result,
     )
 

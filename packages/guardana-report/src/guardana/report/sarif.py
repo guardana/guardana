@@ -1,5 +1,8 @@
 import json
+from datetime import UTC, datetime
 
+from guardana.core.gate import GateOutcome, exit_code_for
+from guardana.core.manifest import RunManifest
 from guardana.core.report import CheckError, Finding, ScanResult, split_ref
 from guardana.core.severity import Severity
 
@@ -95,10 +98,52 @@ def _results(result: ScanResult, index: dict[str, int]) -> list[dict[str, object
     return confirmed + unverified + waived
 
 
+_EXIT_CODE_DESCRIPTIONS = {
+    0: "run completed, policy passed",
+    1: "run completed, policy failed",
+    2: "result indeterminate",
+    6: "budget exhausted, coverage partial",
+    7: "run interrupted, partial evidence written",
+}
+
+
+def _utc(value: datetime | None) -> str | None:
+    return None if value is None else value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _invocation(result: ScanResult, manifest: RunManifest | None) -> dict[str, object]:
+    """Build `runs[].invocations[0]` — SARIF's own place for how the run itself went.
+
+    `executionSuccessful` is what stops a viewer reading an empty result list as
+    a clean run, so it is false whenever a check could not run or the run was cut
+    short. The timestamps and exit code come from the manifest when there is one;
+    SARIF marks them optional, and inventing them would be worse than omitting.
+    """
+    invocation: dict[str, object] = {
+        "executionSuccessful": not result.errors and result.stopped_by is None,
+        "toolExecutionNotifications": [_notification(e) for e in result.errors],
+    }
+    if manifest is None:
+        return invocation
+    summary = manifest.result_summary
+    code = exit_code_for(summary.gate or GateOutcome.INDETERMINATE, summary.stopped_by)
+    invocation["exitCode"] = code
+    invocation["exitCodeDescription"] = _EXIT_CODE_DESCRIPTIONS[code]
+    started, ended = _utc(manifest.started_at), _utc(manifest.completed_at)
+    if started is not None:
+        invocation["startTimeUtc"] = started
+    if ended is not None:
+        invocation["endTimeUtc"] = ended
+    return invocation
+
+
 class SarifRenderer:
     """SARIF 2.1.0 — what GitHub code scanning ingests."""
 
     name = "sarif"
+
+    def __init__(self, run: RunManifest | None = None) -> None:
+        self._run = run
 
     def render(self, result: ScanResult) -> str:
         """Render one scan result to text."""
@@ -117,16 +162,7 @@ class SarifRenderer:
                         }
                     },
                     "results": _results(result, index),
-                    # SARIF's own vocabulary for "the tool could not complete a
-                    # check": a notification, not a result. `executionSuccessful`
-                    # false is what stops a viewer reading an empty result list as
-                    # a clean run.
-                    "invocations": [
-                        {
-                            "executionSuccessful": not result.errors,
-                            "toolExecutionNotifications": [_notification(e) for e in result.errors],
-                        }
-                    ],
+                    "invocations": [_invocation(result, self._run)],
                 }
             ],
         }

@@ -5,29 +5,50 @@ second command consumes the JSON output, its shape stops being an implementation
 detail — hence a version on it from the first day rather than when it hurts.
 """
 
+import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from guardana.core.evaluator.base import Verdict
+from guardana.core.gate import GateOutcome
+from guardana.core.manifest import (
+    ConfigurationRef,
+    ExecutionSettings,
+    RunManifest,
+    RunUsage,
+    TargetIdentity,
+    ToolInfo,
+)
+from guardana.core.manifest.records import RuleRecord
+from guardana.core.manifest.summary import summarize
 from guardana.core.observation import Observation, ObservationKind
-from guardana.core.report import CheckError, Evidence, Finding, ScanResult
+from guardana.core.report import CheckError, Evidence, Finding, ScanResult, StopReason
 from guardana.core.report.load import ReportLoadError, load_report
-from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunMeta
+from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from guardana.core.taxonomy import OWASP_LLM01
 from guardana.report import get_renderer
 
-_META = RunMeta(
-    tool_version="0.6.0",
-    target_kind=TargetKind.ENDPOINT,
-    target_ref="http://localhost:11434#llama3",
-    profile="ci",
-    rules={"guardana.prompt.injection": "aaaabbbbccccdddd"},
-    rules_skipped=("guardana.agent.memory_poisoning",),
-    started_at=datetime(2026, 7, 31, 9, 12, 44, tzinfo=UTC),
-)
+_STARTED = datetime(2026, 7, 31, 9, 12, 44, tzinfo=UTC)
+
+
+def _manifest(result: ScanResult) -> RunManifest:
+    return RunManifest(
+        run_id="0191d4c2-0000-7000-8000-000000000000",
+        created_at=_STARTED,
+        started_at=_STARTED,
+        completed_at=datetime(2026, 7, 31, 9, 13, 26, tzinfo=UTC),
+        guardana=ToolInfo(version="0.6.0"),
+        target=TargetIdentity(kind=TargetKind.ENDPOINT, ref="http://localhost:11434#llama3"),
+        configuration=ConfigurationRef(profile_name="ci"),
+        execution=ExecutionSettings(concurrency=4, timeout_seconds=30),
+        usage=RunUsage(requests=7, wall_time_seconds=42.0),
+        rules=(RuleRecord(id="guardana.prompt.injection", digest="aaaabbbbccccdddd"),),
+        result_summary=summarize(result, GateOutcome.FAIL),
+    )
 
 
 def _finding(rule_id: str, *, outcome: str = "fail") -> Finding:
@@ -56,9 +77,9 @@ def _full_result() -> ScanResult:
     )
 
 
-def _write(tmp_path: Path, result: ScanResult, meta: RunMeta = _META) -> Path:
+def _write(tmp_path: Path, result: ScanResult) -> Path:
     path = tmp_path / "run.json"
-    path.write_text(get_renderer("json", run=meta).render(result), encoding="utf-8")
+    path.write_text(get_renderer("json", run=_manifest(result)).render(result), encoding="utf-8")
     return path
 
 
@@ -72,9 +93,26 @@ def test_every_channel_survives_a_round_trip(tmp_path: Path) -> None:
 
 
 def test_run_metadata_survives_a_round_trip(tmp_path: Path) -> None:
+    result = _full_result()
+
+    report = load_report(_write(tmp_path, result))
+
+    assert report.manifest == _manifest(result)
+
+
+def test_the_recorded_cost_survives_a_round_trip(tmp_path: Path) -> None:
+    """A usage figure that does not survive the file is a budget nobody can set."""
+    usage = load_report(_write(tmp_path, _full_result())).manifest.usage
+
+    assert usage.requests == 7
+    assert usage.wall_time_seconds == 42.0
+
+
+def test_the_recorded_gate_survives_a_round_trip(tmp_path: Path) -> None:
+    """Stored, never re-derived: a reader that recomputes it will eventually differ."""
     report = load_report(_write(tmp_path, _full_result()))
 
-    assert report.meta == _META
+    assert report.manifest.result_summary.gate is GateOutcome.FAIL
 
 
 def test_a_report_without_a_schema_version_is_refused(tmp_path: Path) -> None:
@@ -145,3 +183,40 @@ def test_an_unknown_severity_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(ReportLoadError, match="severity"):
         load_report(path)
+
+
+def test_a_stopped_run_survives_a_round_trip(tmp_path: Path) -> None:
+    """The field that says the coverage is partial must not be lost in the file.
+
+    A run cut short has fewer findings than a complete one. If the file does not
+    carry the reason it was cut short, the next comparison reads that shortfall as
+    an improvement — which is the whole point of recording it.
+    """
+    result = replace(_full_result(), stopped_by=StopReason.BUDGET_EXHAUSTED)
+
+    report = load_report(_write(tmp_path, result))
+
+    assert report.result.stopped_by is StopReason.BUDGET_EXHAUSTED
+    assert report.manifest.result_summary.stopped_by is StopReason.BUDGET_EXHAUSTED
+
+
+def test_a_document_with_no_run_block_is_refused(tmp_path: Path) -> None:
+    """Rendering without a manifest produces findings and no run; it is not a saved run.
+
+    Refused rather than read, because a document that cannot say which rules ran
+    cannot be compared against one that can — the narrowed-profile problem again.
+    """
+    path = tmp_path / "no-run.json"
+    path.write_text(get_renderer("json").render(_full_result()), encoding="utf-8")
+
+    with pytest.raises(ReportLoadError):
+        load_report(path)
+
+
+def test_rendering_without_a_manifest_still_reports_every_finding(tmp_path: Path) -> None:
+    """The worst reading of a missing manifest would be an empty findings list."""
+    document = json.loads(get_renderer("json").render(_full_result()))
+
+    assert len(document["findings"]) == 1
+    assert len(document["unverified"]) == 1
+    assert len(document["errors"]) == 1

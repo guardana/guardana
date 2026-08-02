@@ -6,13 +6,16 @@ third is the one that must never be green.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from guardana.cli.main import app
 from guardana.core.evaluator.base import Verdict
-from guardana.core.report import Evidence, Finding, RunMeta, ScanResult
+from guardana.core.manifest.records import RuleRecord
+from guardana.core.report import Evidence, Finding, ScanResult
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
+from guardana.core.testing import manifest_for
 from guardana.report import get_renderer
 from typer.testing import CliRunner
 
@@ -48,14 +51,11 @@ def _write(
     kind: TargetKind = TargetKind.ENDPOINT,
 ) -> Path:
     result = ScanResult(findings=findings, rules_run=ran, rules_skipped=(), unverified=unverified)
-    meta = RunMeta(
-        tool_version="0.6.0",
-        target_kind=kind,
-        target_ref=_ENDPOINT,
-        profile="default",
-        rules=dict.fromkeys(ran, "aaaabbbbccccdddd"),
+    manifest = replace(
+        manifest_for(result, target_ref=_ENDPOINT, target_kind=kind, tool_version="0.6.0"),
+        rules=tuple(RuleRecord(id=rule, digest="aaaabbbbccccdddd") for rule in ran),
     )
-    path.write_text(get_renderer("json", run=meta).render(result), encoding="utf-8")
+    path.write_text(get_renderer("json", run=manifest).render(result), encoding="utf-8")
     return path
 
 

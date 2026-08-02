@@ -10,6 +10,7 @@ import json
 from xml.etree.ElementTree import fromstring
 
 from guardana.core.report import CheckError, ScanResult
+from guardana.core.testing import manifest_for
 from guardana.report import HumanRenderer, JsonRenderer, JUnitRenderer, SarifRenderer
 
 _ERRORS = (
@@ -35,8 +36,8 @@ def test_human_stays_quiet_when_everything_ran() -> None:
 
 
 def test_json_carries_the_errors_and_their_count() -> None:
-    doc = json.loads(JsonRenderer().render(_RESULT))
-    assert doc["summary"]["errors"] == 2
+    doc = json.loads(JsonRenderer(manifest_for(_RESULT)).render(_RESULT))
+    assert doc["run"]["result_summary"]["errors"] == 2
     assert doc["errors"][0] == {
         "source": "acme.buggy",
         "stage": "run",

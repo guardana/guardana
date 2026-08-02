@@ -148,8 +148,8 @@ lane and does not gate the platform work.
 v0.7 is not done until every box is ticked. This list is the milestone.
 
 - [ ] official container images (CLI and server)
-- [ ] stable, versioned result schema
-- [ ] reproducible run manifest
+- [x] stable, versioned result schema
+- [x] reproducible run manifest
 - [ ] budgets and a pre-flight `plan`
 - [ ] documented, tested exit codes
 - [ ] privacy and redaction defaults
@@ -170,15 +170,22 @@ v0.7 is not done until every box is ticked. This list is the milestone.
 > **Outcome:** a real company can install, configure, run, secure, persist and
 > upgrade Guardana without relying on undocumented knowledge.
 
-**Run Manifest v2.** A saved run becomes a reproducibility and deployment-evidence
-record: run id, timestamps, source (local/CI/scheduled), tool and distribution
-versions, target type/ref/fingerprint/capabilities, deployment identifiers,
-configuration digests (profile, system prompt, tool manifest, retriever, adapter),
-execution settings and budgets, actual usage, the rules and evaluators that ran
-with their versions and calibration, a result summary with an explicit gate
-status, and the evidence privacy mode. Versioned independently of the CLI, with
-JSON Schema under `schemas/`, migrations for older documents, and
-`guardana run inspect`. See [`docs/design/run-manifest-v2.md`](docs/design/run-manifest-v2.md).
+**Run Manifest v2 — shipped.** A saved run is a reproducibility and
+deployment-evidence record: run id, UTC timestamps, source (local/CI, with the
+provider), tool version, target type/ref/fingerprint (and the fields that
+fingerprint covers) plus capabilities, deployment identifiers, configuration
+digests, execution settings, actual usage, the rules and evaluators that ran, a
+result summary with an explicit gate, and the evidence mode. Versioned
+independently of the CLI, with [`schemas/run-v2.schema.json`](schemas/run-v2.schema.json),
+in-memory migration of 0.6 documents, and `guardana run inspect|migrate`.
+See [`docs/usage-run.md`](docs/usage-run.md).
+
+Deliberately still open, and tracked here rather than assumed done:
+**the collector envelope does not carry the manifest yet** (it stays at v4 —
+the collector work is its own phase), **deployment identifiers are recorded but
+not yet populated from CI**, and **`configuration.*_digest` fields exist and are
+null until the settings they digest are wired through** (profile digest lands
+with the budgets work, system-prompt digest with target inspection).
 
 **Budgets and `guardana plan`.** Before probing a paid endpoint a team must be
 able to know the upper bound: rules, scenarios, minimum and maximum requests,

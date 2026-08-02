@@ -2,6 +2,7 @@ import json
 
 from guardana.core.report import Evidence, Finding, ScanResult
 from guardana.core.severity import Severity
+from guardana.core.testing import manifest_for
 from guardana.report import get_renderer
 
 
@@ -18,10 +19,11 @@ def _result() -> ScanResult:
 
 
 def test_json_renderer_is_machine_readable() -> None:
-    out = json.loads(get_renderer("json").render(_result()))
+    result = _result()
+    out = json.loads(get_renderer("json", run=manifest_for(result)).render(result))
     assert out["findings"][0]["rule_id"] == "guardana.sc.pickle"
     assert out["findings"][0]["severity"] == "CRITICAL"
-    assert out["summary"]["rules_run"] == 1
+    assert out["run"]["result_summary"]["rules_run"] == ["r0"]
 
 
 def test_human_renderer_mentions_rule_and_severity() -> None:

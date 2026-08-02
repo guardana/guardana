@@ -3,8 +3,9 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from urllib.error import URLError
 
+from guardana.core.gate import GateOutcome, gate, gate_outcome
 from guardana.core.inventory import observe
-from guardana.core.profile.model import Policy, Profile
+from guardana.core.profile.model import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import CheckError, Finding, ScanResult
 from guardana.core.rule.base import Rule, RuleContext
@@ -234,38 +235,4 @@ def _is_inconclusive(finding: Finding) -> bool:
     return finding.verdict is not None and finding.verdict.outcome == "inconclusive"
 
 
-def gate(result: ScanResult, policy: Policy) -> bool:
-    """Decide whether this result should fail the build.
-
-    A dynamic finding only counts when its evaluator was confident enough for the
-    policy's `min_confidence` — that threshold is what keeps a noisy heuristic from
-    breaking CI. An unverified result never fails the build by default (you cannot
-    gate on "we couldn't tell"), but a strict policy can opt in with
-    `fail_on_inconclusive` so a security check that could not run blocks a deploy.
-
-    A check that could not *run* fails the build unless `fail_on_error` is turned
-    off. That is the opposite default to `fail_on_inconclusive`, and deliberately
-    so: `inconclusive` is a verdict — the check ran and honestly could not tell —
-    whereas an error means the check never happened while the result looked as
-    though it had.
-
-    A scan that ran *zero* rules always fails: nothing was verified, so a pass
-    would be a confident all-clear on a target nothing looked at — the fail-open
-    the whole engine forbids. This catches a misconfigured include/exclude, an
-    empty registry (`--no-plugins` with no custom rules), or a target no
-    installed rule applies to. The result's `rules_skipped` says why nothing ran;
-    the gate only refuses to green-light it.
-    """
-    if not result.rules_run:
-        return True
-    threshold = policy.fail_on
-    if result.errors and threshold.fail_on_error:
-        return True
-    for f in result.findings:
-        if f.severity < threshold.severity:
-            continue
-        if f.verdict is None or f.verdict.confidence >= threshold.min_confidence:
-            return True
-    if threshold.fail_on_inconclusive:
-        return any(f.severity >= threshold.severity for f in result.unverified)
-    return False
+__all__ = ["DEFAULT_ENDPOINT_CONCURRENCY", "GateOutcome", "Runner", "gate", "gate_outcome"]

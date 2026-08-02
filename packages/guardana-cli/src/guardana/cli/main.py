@@ -6,6 +6,7 @@ from guardana.cli.monitor import monitor
 from guardana.cli.new_rule import new_rule
 from guardana.cli.probe import probe
 from guardana.cli.rules import rules
+from guardana.cli.run import run_app
 from guardana.cli.scan import scan
 from guardana.core import __version__
 
@@ -34,3 +35,4 @@ app.command()(diff)
 app.command()(monitor)
 app.command(name="new-rule")(new_rule)
 app.command(name="calibrate")(calibrate_command)
+app.add_typer(run_app, name="run")
