@@ -1,4 +1,5 @@
 import typer
+from guardana.cli.baseline import baseline_app
 from guardana.cli.calibrate import calibrate_command
 from guardana.cli.diff import diff
 from guardana.cli.exit_codes import ExitCode
@@ -65,3 +66,4 @@ app.command(name="calibrate")(calibrate_command)
 app.add_typer(run_app, name="run")
 app.add_typer(plan_app, name="plan")
 app.add_typer(target_app, name="target")
+app.add_typer(baseline_app, name="baseline")

@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`guardana baseline create|verify|update`, and waivers that expire.** A waiver
+  now carries an approver and an expiry, and **an expired waiver stops waiving** —
+  the finding comes back and fails the gate again. `verify` names the waivers that
+  lapsed and when, so a red gate is traceable to an acceptance running out rather
+  than looking like a new problem. A generated baseline is deliberately unusable
+  as-is: every waiver carries placeholder text and `verify` fails while it is
+  there, because a baseline nobody edited is a list of findings somebody silenced.
+  `update` only ever removes waivers for findings that are fixed; accepting a risk
+  stays a decision somebody makes. Version 1 baselines still load.
+  See [`docs/usage-baseline.md`](docs/usage-baseline.md).
 - **`--plugins all|builtins|allowlist|disabled`.** `--no-plugins` refused every
   entry point including Guardana's own, so the safe mode was also the empty mode —
   and a control that costs all your coverage is one people switch off. `builtins`

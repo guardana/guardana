@@ -252,9 +252,11 @@ decided by distribution name; a refused plugin lands in `errors` rather than bei
 dropped. Still open: signature or hash verification of installed packs, which
 needs a distribution story Guardana does not have yet.
 
-**Baseline lifecycle.** `baseline create|verify|update` with an approver, a reason,
-an expiry, the target fingerprint and the policy digest — accepted risk that
-expires, and a missing baseline that never silently passes.
+**Baseline lifecycle — shipped.** `baseline create|verify|update` with an
+approver, a reason and an expiry; an expired waiver stops waiving and `verify`
+says which lapsed. Still open: binding a waiver to the target fingerprint and the
+policy digest, so a waiver written for one model does not silently apply to
+another.
 
 **Operational diagnostics.** `guardana doctor` and `guardana config validate|explain`:
 versions, plugin inventory, profile parsing, target and evaluator connectivity,

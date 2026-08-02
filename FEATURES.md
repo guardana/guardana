@@ -270,6 +270,18 @@ writes against it. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 
+### Accepted risk that expires (`guardana baseline`)
+
+A waiver is the one place Guardana deliberately does not fail on a finding, so it
+is kept temporary and visible. Each one carries a reason, an approver and an
+expiry — and **an expired waiver stops waiving**: the finding comes back and the
+gate goes red again.
+
+`guardana baseline verify` names the waivers that lapsed and the ones still
+carrying generated placeholder text, so a red gate is traceable to an acceptance
+running out rather than looking like new breakage. `update` only removes waivers
+for findings that are fixed; it never adds one on your behalf.
+
 ### Safe mode that still checks things (`--plugins`)
 
 Importing a plugin is trusting it. The old `--no-plugins` refused everything
