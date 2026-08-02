@@ -30,6 +30,7 @@ from guardana.core.profile import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
 from guardana.core.target import REQUEST_TIMEOUT_SECONDS, Target, TargetKind
+from guardana.core.usage import TargetUsage
 
 _CI_PROVIDERS = (
     ("GITHUB_ACTIONS", "github"),
@@ -84,6 +85,26 @@ def target_identity(target: Target, ref: str) -> TargetIdentity:
     )
 
 
+def _run_usage(spent: TargetUsage | None, started_at: datetime, completed_at: datetime) -> RunUsage:
+    """Turn what the targets metered into the run's usage block.
+
+    Wall time is measured here rather than in the engine, which does not consult a
+    clock. Everything else is passed through untouched: `spent is None` means no
+    target counted, and it stays an explicit unknown instead of becoming a zero
+    somewhere between the meter and the file.
+    """
+    elapsed = (completed_at - started_at).total_seconds()
+    if spent is None:
+        return RunUsage(wall_time_seconds=elapsed)
+    return RunUsage(
+        requests=spent.requests,
+        input_tokens=spent.input_tokens,
+        output_tokens=spent.output_tokens,
+        requests_missing_token_counts=spent.requests_missing_token_counts,
+        wall_time_seconds=elapsed,
+    )
+
+
 def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independent facts
     registry: Registry,
     profile: Profile,
@@ -94,7 +115,6 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
     gate: GateOutcome,
     started_at: datetime,
     identity: TargetIdentity | None = None,
-    usage: RunUsage | None = None,
     concurrency: int = 1,
 ) -> RunManifest:
     """Describe the run that produced `result`, digesting the rules that actually ran.
@@ -125,7 +145,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         execution=ExecutionSettings(
             concurrency=concurrency, timeout_seconds=REQUEST_TIMEOUT_SECONDS
         ),
-        usage=usage if usage is not None else RunUsage(),
+        usage=_run_usage(result.usage, started_at, now),
         rules=rules,
         result_summary=summarize(result, gate),
     )

@@ -187,6 +187,14 @@ not yet populated from CI**, and **`configuration.*_digest` fields exist and are
 null until the settings they digest are wired through** (profile digest lands
 with the budgets work, system-prompt digest with target inspection).
 
+**Usage accounting — shipped.** A run records the requests it sent, the tokens
+the provider reported, and its wall time, metered on the target so no transport
+can route around it. A target that does not meter itself, and a provider that
+reports no tokens, are recorded as explicit unknowns — with
+`requests_missing_token_counts` so a partial token sum is never read as a
+complete bill. Still open: **cost in money stays null**, because a price table
+would have to be profile data and inventing one is worse than omitting it.
+
 **Budgets and `guardana plan`.** Before probing a paid endpoint a team must be
 able to know the upper bound: rules, scenarios, minimum and maximum requests,
 judge calls, approximate tokens and wall time, estimated cost, and which checks

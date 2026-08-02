@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from guardana.core.target.base import Capability, Target, TargetKind
+from guardana.core.usage import TargetUsage, TokenUsage, UsageMeter
 
 REQUEST_TIMEOUT_SECONDS = 30
 """How long one request to a target may take.
@@ -143,6 +144,43 @@ class ToolCallingTransport(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class ChatReply:
+    """A model's reply, with what it cost when the provider said so.
+
+    `usage` is None when the provider reported nothing — which is normal and is
+    recorded as a gap rather than as zero. Providers disagree about what they
+    return, which is the same reason NVIDIA's garak declined to build token
+    tracking at all ("output token counts are entirely target specific and could
+    vary wildly"). The disagreement is real; reporting a confident zero through it
+    is the part that would be wrong.
+    """
+
+    text: str
+    usage: TokenUsage | None = None
+
+
+@runtime_checkable
+class UsageReportingTransport(Protocol):
+    """A transport that can say what a request cost.
+
+    Optional and separate from `ChatTransport`, exactly as `ToolCallingTransport`
+    is: adding a method to the base protocol would break every transport anyone
+    else has written. A transport that does not implement this simply leaves token
+    counts unknown, and the run says so.
+    """
+
+    def send_reporting_usage(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+    ) -> ChatReply:
+        """Send `messages` and return the reply along with its token cost."""
+        ...
+
+
 def _read_with_retry(request: Request, ref: str) -> bytes:
     """Send `request`, retrying only the statuses that mean "ask again".
 
@@ -209,6 +247,25 @@ class UrllibTransport:
         )
         return _extract_content(payload, ref=ref)
 
+    def send_reporting_usage(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+    ) -> ChatReply:
+        """POST a chat completion and return the reply with the token counts the server sent."""
+        ref = f"{base_url}#{model}"
+        payload = post_json(
+            f"{base_url}/v1/chat/completions",
+            {"model": model, "messages": [wire_message(m) for m in messages]},
+            api_key,
+            ref,
+        )
+        return ChatReply(
+            text=_extract_content(payload, ref=ref), usage=extract_token_usage(payload)
+        )
+
     def send_tools(
         self,
         base_url: str,
@@ -240,6 +297,33 @@ class UrllibTransport:
             ref,
         )
         return _extract_tool_reply(payload, ref=ref)
+
+
+def extract_token_usage(payload: object) -> TokenUsage | None:
+    """Read the token counts an OpenAI-compatible reply carries, or None if it carries none.
+
+    Shared by the built-in providers, which name the fields differently but mean
+    the same thing. Anything unparseable is None — a gap the run reports — rather
+    than a zero it would present as a measurement.
+    """
+    if not isinstance(payload, dict):
+        return None
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    prompt = _token_count(usage, "prompt_tokens", "input_tokens", "prompt_eval_count")
+    completion = _token_count(usage, "completion_tokens", "output_tokens", "eval_count")
+    if prompt is None and completion is None:
+        return None
+    return TokenUsage(input_tokens=prompt, output_tokens=completion)
+
+
+def _token_count(usage: dict[str, object], *names: str) -> int | None:
+    for name in names:
+        value = usage.get(name)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    return None
 
 
 def _extract_tool_reply(payload: object, *, ref: str) -> ToolCallReply:
@@ -352,6 +436,10 @@ class EndpointTarget(Target):
 
             transport = select_transport(provider)
         self._transport = transport
+        # The meter sits on the target, not on the transport: every request to the
+        # model passes through `chat`/`offer_tools` whatever transport is plugged
+        # in, so a rule — including somebody else's — cannot route around it.
+        self._meter = UsageMeter()
 
     def capabilities(self) -> set[Capability]:
         """Declare CHAT, plus PLANT_SYSTEM_PROMPT and CALL_TOOLS when supported."""
@@ -372,11 +460,25 @@ class EndpointTarget(Target):
         """The endpoint and model under test, as it appears in findings."""
         return f"{self._base_url}#{self._model}"
 
+    def usage(self) -> TargetUsage:
+        """Return what this endpoint has been asked for, and what it reported costing."""
+        return self._meter.snapshot()
+
     def chat(self, messages: Sequence[ChatMessage]) -> str:
         """Send `messages`, prepending the planted system prompt when one is set."""
-        return self._transport.send(
-            self._base_url, self._model, self._with_system_prompt(messages), self._api_key
-        )
+        history = self._with_system_prompt(messages)
+        if isinstance(self._transport, UsageReportingTransport):
+            reply = self._transport.send_reporting_usage(
+                self._base_url, self._model, history, self._api_key
+            )
+            self._meter.record(reply.usage)
+            return reply.text
+        text = self._transport.send(self._base_url, self._model, history, self._api_key)
+        # Recorded with no token counts rather than not recorded: the request was
+        # sent and cost something, and the run should say it does not know how
+        # much instead of implying it was free.
+        self._meter.record(None)
+        return text
 
     def offer_tools(
         self, messages: Sequence[ChatMessage], tools: Sequence[ToolSpec]
@@ -388,9 +490,14 @@ class EndpointTarget(Target):
         """
         if not isinstance(self._transport, ToolCallingTransport):
             raise EndpointError(f"transport for {self.ref} does not support tool calling")
-        return self._transport.send_tools(
+        reply = self._transport.send_tools(
             self._base_url, self._model, self._with_system_prompt(messages), self._api_key, tools
         )
+        # An agent probe spends most of its budget here, not in `chat`. Counting
+        # only one of the two paths would under-report the most expensive thing
+        # Guardana does.
+        self._meter.record(None)
+        return reply
 
     def _with_system_prompt(self, messages: Sequence[ChatMessage]) -> list[ChatMessage]:
         if self._system_prompt is None:

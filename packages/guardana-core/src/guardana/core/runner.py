@@ -118,6 +118,10 @@ class Runner:
             # of what fired, narrowing a profile would quietly shrink the list of
             # components a report says are deployed.
             observations=observe(target),
+            # Taken from the target, which is the only thing that knows what left
+            # the machine. A target that does not meter itself reports None, and
+            # that travels all the way to the manifest as an explicit unknown.
+            usage=target.usage(),
         )
 
     def _execute(self, plan: Sequence[Rule], target: Target) -> Iterator[_RuleOutcome]:

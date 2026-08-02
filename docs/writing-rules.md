@@ -459,3 +459,36 @@ fail-closed readers for GGUF, safetensors and ONNX, and its contract is in
 [`model-formats.md`](model-formats.md).
 [`examples/custom_rule/src/acme_rules/approved_model.py`](../examples/custom_rule/src/acme_rules/approved_model.py)
 is a complete rule built that way — every line of it is policy.
+
+## Reporting what a request cost (optional)
+
+A transport can tell Guardana how many tokens a request used, which is what fills
+in `usage` in the run manifest and what a token budget is enforced against. It is
+opt-in through a second protocol, so an existing transport keeps working
+unchanged:
+
+```python
+from guardana.core.target.endpoint import ChatReply, UsageReportingTransport
+from guardana.core.usage import TokenUsage
+
+class MyTransport:
+    def send(self, base_url, model, messages, api_key) -> str:
+        ...
+
+    def send_reporting_usage(self, base_url, model, messages, api_key) -> ChatReply:
+        payload = ...
+        return ChatReply(
+            text=payload["choices"][0]["message"]["content"],
+            usage=TokenUsage(
+                input_tokens=payload["usage"]["prompt_tokens"],
+                output_tokens=payload["usage"]["completion_tokens"],
+            ),
+        )
+```
+
+`EndpointTarget` calls `send_reporting_usage` when the transport has it and
+`send` otherwise. A transport without it is not a problem: the request is still
+counted, and the token columns stay **unknown** rather than becoming zero. If a
+provider reports only one of the two counts, return the one it gave and leave the
+other `None` — a guessed number is worse than an absent one, because a budget
+would then be enforced against the guess.

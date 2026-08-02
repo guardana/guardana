@@ -6,6 +6,7 @@ from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
+from guardana.core.usage import TargetUsage, total
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,13 @@ class ScanResult:
     errors: tuple[CheckError, ...] = ()
     observations: tuple[Observation, ...] = ()
     stopped_by: StopReason | None = None
+    usage: TargetUsage | None = None
+    """What the target spent producing this result, or None if it does not count.
+
+    On the result rather than passed around beside it, so a caller that assembles
+    a report cannot forget to carry it — the same reason every other channel lives
+    here.
+    """
 
     @classmethod
     def merged(cls, results: Sequence["ScanResult"]) -> "ScanResult":
@@ -69,6 +77,10 @@ class ScanResult:
             # third pass leaves the first two looking complete. Dropping it here
             # would hand the merged report a completeness it does not have.
             stopped_by=next((r.stopped_by for r in results if r.stopped_by is not None), None),
+            # Summed across passes: probe builds one target per planted canary, and
+            # the run's bill is all of them. One unmetered pass makes the total
+            # unknown rather than partial — see `total`.
+            usage=total([r.usage for r in results]),
         )
 
     @property

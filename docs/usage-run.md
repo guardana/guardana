@@ -21,14 +21,36 @@ run 0191d4c2-8f1a-7c3e-9b21-6f0a2d8e4c11
   gate:      pass
   findings:  0 (0 unverified, 0 waived, 0 error(s))
   rules run: 19 (0 skipped)
-  requests:  not recorded
+  requests:  0
   tokens:    in not recorded, out not recorded
-  wall time: not recorded
+  wall time: 0.42
   evidence:  full
 ```
 
 `--format json` prints the manifest itself, for anything that would rather parse
 than read.
+
+`requests: 0` above is a **measurement** — a file scan sends nothing. Tokens are
+`not recorded` because there was no model to report them. The next section is
+about why those two are printed differently.
+
+## What a run costs
+
+`usage` carries what the run actually spent: requests sent, tokens in and out,
+and wall time.
+
+The counting happens on the **target**, not on the transport, so every request to
+a model is counted whatever transport is in use — a custom adapter, a scripted
+double in a test, or one of the built-ins. A target that does not meter itself
+(anything you wrote yourself, unless you override `Target.usage()`) reports
+nothing rather than zero.
+
+Token counts depend on the provider. The built-in OpenAI, Ollama and TGI paths
+read them from the response; a transport that does not implement the optional
+`UsageReportingTransport` protocol leaves them unknown. Where only *some*
+requests reported tokens, the manifest carries the sum **and**
+`requests_missing_token_counts`, so the number is never mistaken for the whole
+bill. See [`docs/writing-rules.md`](writing-rules.md) for the protocol.
 
 ## What "not recorded" means
 

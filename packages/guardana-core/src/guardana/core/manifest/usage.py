@@ -1,45 +1,15 @@
-"""What a run actually consumed — and, just as importantly, what it could not know.
+"""What a run consumed, as the manifest records it.
 
 Field names follow the OpenTelemetry GenAI semantic conventions
 (`gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`) minus the namespace,
 so a team already collecting those does not have to translate ours.
+
+The per-request and per-target shapes live in `guardana.core.usage`, next to the
+meter that produces them: a target has to be able to count without importing the
+document format its numbers eventually land in.
 """
 
 from dataclasses import dataclass
-
-
-@dataclass(frozen=True, slots=True)
-class TokenUsage:
-    """What one request cost in tokens, as the provider reported it.
-
-    Both fields are nullable because providers disagree about what they return —
-    the same reason NVIDIA's garak closed its token-tracking request as not
-    planned ("output token counts are entirely target specific"). A provider that
-    reports neither gives `None` twice, and that is recorded rather than rounded
-    to zero.
-    """
-
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class TargetUsage:
-    """What one target spent. Returned by targets that meter themselves.
-
-    `requests` is a plain integer here, not nullable: a target that returns this
-    object at all is claiming it counts. A target that does not count returns
-    `None` from `Target.usage()` instead, which is a different statement.
-
-    `requests_missing_token_counts` is what keeps a partial sum honest. Ten
-    requests where three reported tokens would otherwise present those three as
-    the whole bill.
-    """
-
-    requests: int = 0
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    requests_missing_token_counts: int = 0
 
 
 @dataclass(frozen=True, slots=True)

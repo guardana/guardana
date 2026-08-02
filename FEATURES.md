@@ -251,7 +251,9 @@ Three properties are the point:
 **Unknown is never zero.** A value nobody measured prints as `not recorded`, and
 serializes as `null`. A file scan that genuinely sends zero requests and a run
 from a version that never counted are different facts, and only one of them lets
-a team budget the next run.
+a team budget the next run. The same rule holds inside a single number: when some
+requests report token counts and others do not, the manifest carries the sum
+*and* `requests_missing_token_counts`, so a partial bill is labelled partial.
 
 **The verdict is stored, never re-derived.** `result_summary.gate` is written by
 the engine as `pass`, `fail` or `indeterminate`. A consumer that recomputed it

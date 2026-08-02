@@ -19,7 +19,8 @@ from guardana.core.manifest.settings import (
     ExecutionSettings,
     PrivacyRecord,
 )
-from guardana.core.manifest.usage import RunUsage, TargetUsage, TokenUsage
+from guardana.core.manifest.usage import RunUsage
+from guardana.core.usage import TargetUsage, TokenUsage
 
 __all__ = [
     "MANIFEST_SCHEMA_VERSION",

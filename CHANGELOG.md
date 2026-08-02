@@ -55,6 +55,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A run counts what it spends, and says so when it cannot.** `usage` in the
+  manifest now carries real numbers: requests sent, tokens in and out where the
+  provider reports them, and wall time. The meter sits on the **target**, not on
+  the transport, so every request to a model passes through it whatever transport
+  is plugged in — including a third party's.
+- **Token counts come from a new optional transport protocol**
+  (`UsageReportingTransport`), modelled on `ToolCallingTransport` so no existing
+  transport breaks. The built-in OpenAI, Ollama and TGI paths implement it. A
+  transport that does not leaves tokens **unknown**, and the manifest records
+  `requests_missing_token_counts` alongside the sums so a partial bill is never
+  presented as a complete one. (NVIDIA's garak closed the same feature request as
+  not planned, on the grounds that token counts vary by target — which is true,
+  and is an argument for recording the gap rather than reporting zero.)
+- **`Target.usage()`** on the base class, defaulting to `None`. A target somebody
+  else wrote reports "nobody counted", never a zero that would read as a free run.
+  `ArtifactTarget` overrides it with a measured `0`, because a file scan really
+  does send nothing — and the two must not print the same words.
 - **Run Manifest v2 — a saved run is now evidence, not a label.** Every run
   records a run id and UTC timestamps, where it was started from (laptop, CI, and
   which provider), the software that produced it, the target with a fingerprint

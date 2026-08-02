@@ -5,6 +5,7 @@ from pathlib import Path
 
 from guardana.core.source import MAX_SOURCE_BYTES, PythonSource, UnreadSource, read_source
 from guardana.core.target.base import Capability, Target, TargetKind
+from guardana.core.usage import TargetUsage
 
 # Budget for the parsed-source cache, counted in bytes of *source*. The trees are
 # what costs: measured at ~9.3x the size of the file they came from, so this caps
@@ -76,6 +77,15 @@ class ArtifactTarget(Target):
     def capabilities(self) -> set[Capability]:
         """Files can be read; nothing can be asked."""
         return {Capability.READ_FILES}
+
+    def usage(self) -> TargetUsage:
+        """Report a measured zero: a file scan really does send no requests.
+
+        Not `None`, which would mean "nobody counted". The difference matters to
+        anyone reading a manifest or setting a budget — this run cost nothing, and
+        that is a fact rather than a gap.
+        """
+        return TargetUsage(requests=0)
 
     @property
     def ref(self) -> str:
