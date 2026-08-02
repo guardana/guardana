@@ -6,6 +6,7 @@ import typer
 from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
 from guardana.cli._output import emit
+from guardana.cli._plugins import resolve_trust
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
@@ -40,7 +41,17 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     format: Annotated[
         OutputFormat, typer.Option(help="human|json|sarif|junit")
     ] = OutputFormat.human,
-    no_plugins: Annotated[bool, typer.Option("--no-plugins")] = False,
+    no_plugins: Annotated[
+        bool, typer.Option("--no-plugins", help="Deprecated alias for --plugins disabled.")
+    ] = False,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
     rules: Annotated[
         list[Path],
         typer.Option("--rules", help="Directory or file of custom YAML rules; repeatable."),
@@ -75,7 +86,7 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     # run (see SECURITY.md). Custom YAML rules still load, but one whose evaluator
     # lives behind an entry point resolves to nothing at run time and is skipped —
     # safe degradation, never a crash.
-    registry = Registry() if no_plugins else Registry.discover()
+    registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=no_plugins))
     load_custom_rules(registry, prof, rules)
     target = ArtifactTarget(path, excludes=prof.path_excludes)
     started_at = datetime.now(UTC)

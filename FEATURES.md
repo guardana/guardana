@@ -270,6 +270,19 @@ writes against it. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 
+### Safe mode that still checks things (`--plugins`)
+
+Importing a plugin is trusting it. The old `--no-plugins` refused everything
+including Guardana's own rules, which made the safe mode the empty mode — and an
+empty scan is a control people turn off.
+
+`--plugins builtins` loads the reviewed distributions and discovers nothing else;
+`--plugins allowlist --allow-plugin acme-rules` adds the ones you name. Trust goes
+by **distribution name**, because an entry point can call itself anything. A
+plugin that is refused lands in the `errors` channel, which fails the gate by
+default — a pack you installed and this run declined to load is coverage you think
+you have.
+
 ### Every rule says how far it reaches (`--safety`, `--allow-destructive`)
 
 A rule declares whether it only reads, sends prompts, or could make the target

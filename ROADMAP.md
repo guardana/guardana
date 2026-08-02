@@ -247,9 +247,10 @@ executed.
 **Stable exit codes.** A documented, tested table so machine consumers never parse
 human text to determine status. See [`docs/design/exit-codes.md`](docs/design/exit-codes.md).
 
-**Plugin allowlist.** `--no-plugins` currently removes the built-ins along with
-third-party entry points, which makes the safe mode expensive. A middle setting
-loads reviewed built-ins without discovering arbitrary installed packages.
+**Plugin allowlist — shipped.** `--plugins all|builtins|allowlist|disabled`,
+decided by distribution name; a refused plugin lands in `errors` rather than being
+dropped. Still open: signature or hash verification of installed packs, which
+needs a distribution story Guardana does not have yet.
 
 **Baseline lifecycle.** `baseline create|verify|update` with an approver, a reason,
 an expiry, the target fingerprint and the policy digest — accepted risk that

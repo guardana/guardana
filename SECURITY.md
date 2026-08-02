@@ -101,3 +101,33 @@ leaves a contributor's machine.
 
 Guardana is pre-1.0 (0.6.x). Security fixes land on the latest released
 version; there is no separate LTS branch yet.
+
+## Plugin trust (0.7)
+
+Installed plugins are code Guardana imports, and importing code is trusting it.
+Until 0.7 the only control was `--no-plugins`, which refused *everything* —
+Guardana's own rules included. A safe mode that costs all your coverage is one
+people switch off, and a control people switch off is not a control.
+
+```bash
+guardana scan .                              # all: every installed entry point
+guardana scan . --plugins builtins           # only Guardana's own distributions
+guardana scan . --plugins allowlist --allow-plugin acme-rules
+guardana scan . --plugins disabled           # nothing; YAML rules still load from disk
+```
+
+`builtins` is the setting most `--no-plugins` pipelines actually wanted: the
+reviewed rules run, nothing else is imported.
+
+Trust is decided by **distribution name** — what pip installed and what a lockfile
+pins — not by entry-point name or module path. A third party can name their entry
+point `builtin` and their module `guardana_rules`; neither is a claim anybody
+checked. An entry point that cannot name its origin is treated as third-party,
+because reading an unnamed origin as trusted would make the allowlist bypassable
+by anything that fails to record where it came from.
+
+A plugin that is refused is **recorded** in the run's `errors` channel, not
+silently dropped: a rule pack you installed and this run declined to load is
+coverage you think you have, and `errors` fails the gate by default.
+
+`--no-plugins` still works and still means "import nothing".

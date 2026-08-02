@@ -75,6 +75,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--plugins all|builtins|allowlist|disabled`.** `--no-plugins` refused every
+  entry point including Guardana's own, so the safe mode was also the empty mode —
+  and a control that costs all your coverage is one people switch off. `builtins`
+  is what most of those pipelines wanted: the reviewed rules run, nothing else is
+  imported. Trust is decided by distribution name rather than entry-point name or
+  module path, an entry point that cannot name its origin is treated as
+  third-party, and a refused plugin is recorded in `errors` rather than dropped.
+  `--no-plugins` still works as an alias for `disabled`.
 - **Rules declare their impact, and runs declare what they permit.** `passive`
   reads, `active` sends prompts, `side_effecting` may make the target act;
   `--safety passive|active|side-effecting` sets the ceiling, defaulting to

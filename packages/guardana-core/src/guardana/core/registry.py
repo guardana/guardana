@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from guardana.core.evaluator.base import Evaluator, check_expectation
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.report.check_error import CheckError
 from guardana.core.rule.base import Rule
 from guardana.core.rule.errors import RuleLoadError
@@ -127,11 +128,12 @@ class Registry:
         return RuleDirLoad(tuple(loaded), tuple(errors))
 
     @classmethod
-    def discover(cls) -> Self:
-        """Load every rule, evaluator, and target advertised by an installed package.
+    def discover(cls, trust: PluginTrust | None = None) -> Self:
+        """Load the rules, evaluators and targets that `trust` permits.
 
         This imports third-party code: an installed plugin is trusted code (see
-        SECURITY.md). `guardana scan --no-plugins` skips discovery entirely.
+        SECURITY.md). `PluginTrust` decides how much of it is loaded — everything,
+        only Guardana's own reviewed distributions, a named allowlist, or nothing.
 
         Each entry point is isolated. One that fails to import — a pack pinned to a
         library you do not have, a typo in a provider — is recorded in
@@ -139,7 +141,10 @@ class Registry:
         broken third-party package left the user with no rules at all, built-ins
         included, which is the most complete failure mode a scanner has.
         """
+        policy = trust if trust is not None else PluginTrust()
         reg = cls()
+        if policy.mode is PluginMode.DISABLED:
+            return reg
         for group, expected, register in (
             # Taxonomies first: a rule can only name a framework that is already
             # registered, and a YAML rule pack resolves its `taxonomy:` ids while
@@ -150,11 +155,39 @@ class Registry:
             (_TARGET_GROUP, Target, reg.register_target),
         ):
             for ep in entry_points(group=group):
+                if not policy.allows(_distribution_of(ep)):
+                    # Recorded, not silently dropped: a rule pack the user
+                    # installed and this run refused to load is coverage they
+                    # think they have. Landing in `load_errors` puts it in the
+                    # `errors` channel, which fails the gate by default.
+                    reg.record_load_error(
+                        CheckError(
+                            source=ep.name,
+                            stage="discovery",
+                            reason=(
+                                f"plugin from {_distribution_of(ep) or 'an unknown distribution'} "
+                                f"was not loaded: plugin trust is {policy.describe()}"
+                            ),
+                        )
+                    )
+                    continue
                 try:
                     _absorb(ep.load()(), expected, register)
                 except Exception as exc:
                     reg.record_load_error(CheckError.from_exception(ep.name, "discovery", exc))
         return reg
+
+
+def _distribution_of(ep: object) -> str | None:
+    """Which installed distribution advertised this entry point, if it says.
+
+    `EntryPoint.dist` is populated by `importlib.metadata` when the entry point
+    came from an installed distribution. An entry point that cannot name its
+    origin is treated as third-party, which is the cautious reading.
+    """
+    dist = getattr(ep, "dist", None)
+    name = getattr(dist, "name", None)
+    return str(name) if name else None
 
 
 def _require_canary_participation(rule: Rule) -> None:

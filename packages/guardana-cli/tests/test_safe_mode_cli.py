@@ -104,3 +104,40 @@ def test_scan_rejects_both_profile_and_preset(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0
     assert "not both" in result.output
+
+
+def test_builtins_mode_still_finds_the_evil_pickle(tmp_path: Path) -> None:
+    """Safe mode that keeps working is the whole point of this flag.
+
+    `--no-plugins` refused to import anything, built-ins included, so the safe
+    mode was also the empty mode — and an empty scan is a control people switch
+    off. `--plugins builtins` discovers the reviewed rules and nothing else.
+    """
+    (tmp_path / "m.pkl").write_bytes(pickle.dumps(_Evil()))
+
+    result = runner.invoke(app, ["scan", str(tmp_path), "--plugins", "builtins"])
+
+    assert result.exit_code == ExitCode.POLICY_FAILED, result.output
+    assert "pickle" in result.output
+
+
+def test_disabled_mode_runs_nothing_and_says_so(tmp_path: Path) -> None:
+    (tmp_path / "m.pkl").write_bytes(pickle.dumps(_Evil()))
+
+    result = runner.invoke(app, ["scan", str(tmp_path), "--plugins", "disabled"])
+
+    assert result.exit_code == ExitCode.INDETERMINATE
+    assert "nothing was checked" in result.output
+
+
+def test_an_unknown_plugin_mode_is_refused(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["scan", str(tmp_path), "--plugins", "sometimes"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+def test_naming_a_distribution_without_the_allowlist_mode_is_refused(tmp_path: Path) -> None:
+    # Ignoring it would leave the user believing they had restricted something.
+    result = runner.invoke(app, ["scan", str(tmp_path), "--allow-plugin", "acme-rules"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE

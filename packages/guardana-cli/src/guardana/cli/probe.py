@@ -13,6 +13,7 @@ from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
 from guardana.cli._mcp_run import McpConnection, run_mcp_probe
 from guardana.cli._output import emit
+from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
@@ -135,6 +136,14 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
             help="Permit rules that can destroy or alter something the target owns.",
         ),
     ] = False,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
     started_at = datetime.now(UTC)
@@ -151,7 +160,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
             max_duration=max_duration,
         ),
     )
-    registry = Registry.discover()
+    registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
     wire_config_evaluators(registry, prof)
     load_custom_rules(registry, prof, rules)
 
