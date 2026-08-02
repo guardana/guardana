@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/plan/v1.schema.json",
+  "title": "Guardana Run Plan v1",
+  "description": "What a run would cost, worked out without sending a request.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rules",
+    "skipped",
+    "unknown_cost",
+    "requests",
+    "complete",
+    "budgets",
+    "fits_budget"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "rules": { "type": "array", "items": { "type": "string" } },
+    "skipped": { "type": "array", "items": { "type": "string" } },
+    "unknown_cost": {
+      "description": "Rules that declare no request count. Named rather than counted as free: a plan containing one never claims to fit a budget, because its ceiling is not a ceiling.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "requests": {
+      "type": "object",
+      "required": ["min", "max"],
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer", "minimum": 0 },
+        "max": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "complete": { "type": "boolean" },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "max_requests",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_duration_seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_requests": { "type": ["integer", "null"], "minimum": 0 },
+        "max_input_tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "max_output_tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "max_duration_seconds": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "fits_budget": { "type": "boolean" }
+  }
+}

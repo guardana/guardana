@@ -121,6 +121,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enum value is invalid usage: nothing ran. Leaving them at Click's default would
   have made the documented table untrue for the one class of error every command
   shares and nobody writes by hand.
+- **JSON Schemas for every document Guardana emits**, under `schemas/`:
+  `run-v2`, `diff-v1`, `plan-v1`. A test derives the list from the directory, so
+  adding a schema without a test is impossible; each must be a valid 2020-12
+  schema, carry its version in its `$id`, refuse unknown top-level fields, and
+  agree with the version constant in the code.
 - **Central evidence redaction.** One `EvidenceRedactor`, at one seam, between
   findings and every way they leave the process — the renderers, the collector
   envelope and baseline files. Applied by the renderer *factory*, so a format

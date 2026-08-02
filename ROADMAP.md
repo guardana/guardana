@@ -145,22 +145,26 @@ lane and does not gate the platform work.
 
 ## Definition of company-ready
 
-v0.7 is not done until every box is ticked. This list is the milestone.
+The milestone, and it is **not** complete. The engine and CLI half is done; the
+collector, containers and CI-beyond-GitHub half is not, and no amount of polish on
+the first half substitutes for the second. Kept as an unticked list rather than
+quietly rescoped, because a checklist that moves to match what shipped is not a
+checklist.
 
 - [ ] official container images (CLI and server)
 - [x] stable, versioned result schema
 - [x] reproducible run manifest
 - [x] budgets and a pre-flight `plan`
 - [x] documented, tested exit codes
-- [ ] privacy and redaction defaults
+- [x] privacy and redaction defaults
 - [ ] persistent collector
 - [ ] authenticated runner ingest
 - [ ] project/environment isolation
 - [ ] migrations, backup, restore, upgrade
 - [ ] GitHub, GitLab and generic CI paths
 - [ ] production deployment guide
-- [ ] supported-version policy
-- [ ] published threat model
+- [x] supported-version policy
+- [x] published threat model
 - [ ] release SBOM and provenance
 - [ ] no known critical vulnerability
 - [ ] end-to-end installation test from a clean environment
@@ -296,11 +300,41 @@ migrations and upgrade instructions.
 **Supported-version policy.** Stated in `SECURITY.md` and `RELEASING.md`, with
 realistic language and no SLA the maintainers cannot honour.
 
+## Where this sits, and what the neighbours do better
+
+Checked 2026-08-02 against DeepEval, Ragas, DeepTeam and promptfoo. Two
+conclusions worth keeping in front of every roadmap decision.
+
+**Evaluation frameworks are not competitors.** DeepEval and Ragas measure quality;
+Guardana verifies security. Adding faithfulness or hallucination metrics would move
+this project onto their pitch, where it would lose and where it adds nothing.
+
+**On attack coverage we are behind, and that is the wrong race.** DeepTeam ships
+50+ vulnerabilities and 20+ attack techniques against our 32 rules. What it does
+not ship — and promptfoo does not document — is any of: an exit-code contract, a
+budget, a saved run, or a regression comparison. That is where this project
+competes, and the ordering of this roadmap reflects it.
+
+Three things worth taking from them, each recorded below where it belongs: a
+pytest-facing assertion API (v0.8), named adapters for LangChain / LlamaIndex /
+CrewAI (v0.8), and attack *technique* as a dimension separate from the rule, so
+coverage can grow without rules growing with it (content lane).
+
+Full notes: `docs/superpowers/research/2026-08-02-evaluation-landscape.md`.
+
 ## v0.8 — Application-aware verification
 
 > **Outcome:** Guardana can verify an AI *application*, not only an isolated model
 > endpoint.
 
+- **A pytest-facing assertion API** — `guardana.testing.assert_secure(target,
+  profile=...)`, raising `AssertionError` with the finding report. DeepEval's
+  strongest property is that a check lives in an ordinary test file run by an
+  ordinary pytest; Guardana has no way for a team to put verification where their
+  developers already are.
+- **Named adapters for the frameworks people search for**: LangChain, LlamaIndex,
+  CrewAI, PydanticAI. The `Trace` model below is what makes them possible; the
+  names matter because that is how the need is expressed.
 - **A common `Trace` model**: model calls, messages, tool offers, calls and
   results, retrieval queries and retrieved documents, identity and scopes,
   approvals, policy decisions, memory reads and writes, external side effects,
@@ -364,6 +398,14 @@ research; industry packs.
 ---
 
 ## Community and curated-content lane
+
+**Attack technique as its own dimension.** DeepTeam separates the *vulnerability*
+from the *technique* used to reach it — encoding, roleplay, multilingual,
+crescendo. Guardana bakes the technique into each rule, so every new technique
+costs rules-times-vulnerabilities. Separating them grows coverage without growing
+the rule count, which is the only way to close that gap without violating
+"cost grows with the target, not with the rule count".
+
 
 Runs **in parallel** and never gates the platform work above. Corpus size is not
 the metric this project competes on.

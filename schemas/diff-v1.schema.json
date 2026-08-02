@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/diff/v1.schema.json",
+  "title": "Guardana Run Comparison v1",
+  "description": "What changed between two saved runs. Versioned separately from a run: a comparison and a run are different documents, and tying them together would force one to move because the other did.",
+  "type": "object",
+  "required": ["schema_version", "changes", "notes", "incomplete", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "changes": { "type": "array", "items": { "$ref": "#/$defs/change" } },
+    "notes": {
+      "description": "Context a reader needs to weigh the changes. Never a substitute for a change.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "incomplete": {
+      "description": "Why this comparison could not be made in full. Non-empty always fails the gate: a run that stopped part-way answers 'is this worse' with a picture that was never finished.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["changes", "regressions", "improvements", "unchanged", "complete"],
+      "additionalProperties": false,
+      "properties": {
+        "changes": { "type": "integer", "minimum": 0 },
+        "regressions": { "type": "integer", "minimum": 0 },
+        "improvements": { "type": "integer", "minimum": 0 },
+        "unchanged": { "type": "integer", "minimum": 0 },
+        "complete": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "change": {
+      "type": "object",
+      "required": [
+        "kind",
+        "regression",
+        "improvement",
+        "rule_id",
+        "location",
+        "detail",
+        "rule_changed",
+        "before",
+        "after"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "appeared",
+            "proven",
+            "blinded",
+            "escalated",
+            "coverage_lost",
+            "resolved",
+            "clarified",
+            "de_escalated",
+            "coverage_gained",
+            "waiver_changed",
+            "count_changed"
+          ]
+        },
+        "regression": {
+          "description": "Stated rather than inferred from `kind`: a consumer gating on this must not keep its own copy of which kinds mean worse.",
+          "type": "boolean"
+        },
+        "improvement": { "type": "boolean" },
+        "rule_id": { "type": "string" },
+        "location": { "type": "string" },
+        "detail": { "type": "string" },
+        "rule_changed": {
+          "description": "Whether the rule's own definition differs between the runs. A sharpened rule finds more; blaming the model for that is the wrong answer.",
+          "type": "boolean"
+        },
+        "before": { "$ref": "#/$defs/state" },
+        "after": { "$ref": "#/$defs/state" }
+      }
+    },
+    "state": {
+      "type": ["object", "null"],
+      "required": ["outcome", "severity", "confidence", "count", "waived"],
+      "additionalProperties": false,
+      "properties": {
+        "outcome": { "type": "string", "enum": ["fail", "unverified"] },
+        "severity": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "count": { "type": "integer", "minimum": 0 },
+        "waived": { "type": "boolean" }
+      }
+    }
+  }
+}

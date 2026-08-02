@@ -96,3 +96,22 @@ def test_a_plan_that_fits_its_budget_exits_zero(
     result = _probe_plan(monkeypatch, "--profile", str(profile))
 
     assert result.exit_code == ExitCode.OK, result.output
+
+
+def test_a_plan_document_satisfies_its_published_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The document is a contract the moment something parses it."""
+    import json as _json  # noqa: PLC0415
+    from pathlib import Path as _Path  # noqa: PLC0415
+
+    from jsonschema import Draft202012Validator  # noqa: PLC0415
+
+    schema = _json.loads(
+        (_Path(__file__).resolve().parents[3] / "schemas" / "plan-v1.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    payload = _json.loads(_probe_plan(monkeypatch, "--format", "json").output)
+
+    Draft202012Validator(schema).validate(payload)

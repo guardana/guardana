@@ -268,7 +268,28 @@
 <span class="k">- uses:</span> <span class="s">guardana/guardana@v0.6</span>
   <span class="k">with:</span>
     <span class="k">args:</span> <span class="s">--preset ci</span></code></pre>
-      <p class="ci-note">Turning a gate on for an existing repo? <code>--write-baseline</code> accepts today's findings with a reason, so only new ones fail the build. There's a pre-commit hook too.</p>
+      <p class="ci-note">Turning a gate on for an existing repo? <code>guardana baseline create</code> accepts today's findings with a reason, an owner and an expiry date — and an expired waiver stops waiving. There's a pre-commit hook too.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">Built to be gated on</p>
+      <h2 class="disp">Know the cost. Know what ran. Know what changed.</h2>
+      <p class="sec-lede">Evaluation frameworks measure quality; red-teaming tools generate attacks. Guardana is built to be the thing a pipeline blocks on, which needs three properties those don't have to provide.</p>
+      <pre class="yml"><code><span class="c">// what will this cost, before it costs anything</span>
+<span class="k">$</span> <span class="s">guardana plan probe --url … --model …</span>
+<span class="c">   13 rule(s) would run, 0 skipped.</span>
+<span class="c">   requests: at least 13, at most 43</span>
+<span class="c">   No request was sent to produce this estimate.</span>
+
+<span class="c">// is this worse than last week?</span>
+<span class="k">$</span> <span class="s">guardana diff last-week.json today.json</span></code></pre>
+      <ul class="checks">
+        <li><strong>A budget that can't be used as an excuse.</strong> A run that hits its ceiling exits <code>6</code>, keeps what it found, and never passes — and a comparison refuses to read the missing findings as an improvement.</li>
+        <li><strong>Exit codes as a contract.</strong> Eight documented meanings, pinned by a test against the docs. Nothing to parse out of human text.</li>
+        <li><strong>Unknown is never zero.</strong> A check that couldn't grade, a capability the provider didn't confirm, a cost nobody measured — each is its own outcome, never a pass.</li>
+      </ul>
     </div>
   </section>
 </main>
