@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 runner = CliRunner()
 
-_ENDPOINT_UNREACHABLE = 2
+_ENDPOINT_UNREACHABLE = 4
 _CONNECTION = Connection(url="http://fake", model="m")
 
 

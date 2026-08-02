@@ -39,7 +39,12 @@ def compare_reports(before: RunReport, after: RunReport) -> RunDiff:
         + _migration_note(before, after)
         + diff.notes
     )
-    return RunDiff(changes=diff.changes, unchanged=diff.unchanged, notes=notes)
+    return RunDiff(
+        changes=diff.changes,
+        unchanged=diff.unchanged,
+        notes=notes,
+        incomplete=diff.incomplete,
+    )
 
 
 def _digests(report: RunReport) -> dict[str, str]:

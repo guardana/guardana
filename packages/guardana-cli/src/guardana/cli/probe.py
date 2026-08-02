@@ -1,12 +1,15 @@
 import os
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from guardana.cli._adapter import load_adapter_config
+from guardana.cli._budget_flags import override
 from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
+from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
 from guardana.cli._mcp_run import McpConnection, run_mcp_probe
 from guardana.cli._output import emit
@@ -15,7 +18,8 @@ from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import build_manifest
-from guardana.core.gate import GateOutcome, gate_outcome
+from guardana.core.budget import BudgetExhausted
+from guardana.core.gate import gate_outcome
 from guardana.core.registry import Registry
 from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport, TargetKind
 from guardana.report import get_renderer
@@ -90,18 +94,46 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
             help="Write the report to this file instead of stdout (needed by `guardana diff`).",
         ),
     ] = None,
+    max_requests: Annotated[
+        int | None, typer.Option("--max-requests", min=1, help="Stop after this many requests.")
+    ] = None,
+    max_input_tokens: Annotated[
+        int | None, typer.Option("--max-input-tokens", min=1, help="Input-token ceiling.")
+    ] = None,
+    max_output_tokens: Annotated[
+        int | None, typer.Option("--max-output-tokens", min=1, help="Output-token ceiling.")
+    ] = None,
+    max_duration: Annotated[
+        str | None, typer.Option("--max-duration", help="Wall-clock ceiling, e.g. 15m.")
+    ] = None,
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
     started_at = datetime.now(UTC)
     prof = resolve_profile(profile, preset)
+    prof = replace(
+        prof,
+        budgets=override(
+            prof.budgets,
+            max_requests=max_requests,
+            max_input_tokens=max_input_tokens,
+            max_output_tokens=max_output_tokens,
+            max_duration=max_duration,
+        ),
+    )
     registry = Registry.discover()
     wire_config_evaluators(registry, prof)
     load_custom_rules(registry, prof, rules)
 
     if mcp is not None:
-        result = run_mcp_probe(
-            registry, prof, McpConnection(mcp, allow_exec=allow_exec, pin=mcp_pin), write_mcp_pin
-        )
+        try:
+            result = run_mcp_probe(
+                registry,
+                prof,
+                McpConnection(mcp, allow_exec=allow_exec, pin=mcp_pin),
+                write_mcp_pin,
+            )
+        except BudgetExhausted as exc:
+            raise refuse_unenforceable_budget(exc) from exc
         if result is None:
             return
         outcome = gate_outcome(result, prof.policy)
@@ -118,8 +150,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         emit(get_renderer(format.value, run=run).render(result), output)
         if reporter:
             submit_safely(reporter, result, source=mcp)
-        if outcome is not GateOutcome.PASS:
-            raise typer.Exit(code=1)
+        exit_with(outcome, result)
         return
 
     transport: ChatTransport | None = None
@@ -140,9 +171,12 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         transport=transport,
     )
 
-    result = run_against_endpoint(
-        url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
-    )
+    try:
+        result = run_against_endpoint(
+            url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
+        )
+    except BudgetExhausted as exc:
+        raise refuse_unenforceable_budget(exc) from exc
     outcome = gate_outcome(result, prof.policy)
     run = build_manifest(
         registry,
@@ -157,5 +191,4 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     emit(get_renderer(format.value, run=run).render(result), output)
     if reporter:
         submit_safely(reporter, result, source=f"{url}#{model}")
-    if outcome is not GateOutcome.PASS:
-        raise typer.Exit(code=1)
+    exit_with(outcome, result)

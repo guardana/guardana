@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 
+from guardana.core.budget import Budgets
 from guardana.core.severity import Severity
 
 
@@ -44,3 +45,4 @@ class Profile:
     evaluator_config: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
     rule_paths: tuple[str, ...] = ()
     path_excludes: tuple[str, ...] = ()
+    budgets: Budgets = field(default_factory=Budgets)

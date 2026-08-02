@@ -8,6 +8,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from guardana.core.budget import BudgetExhausted, Budgets
 from guardana.core.target.base import Capability, Target, TargetKind
 from guardana.core.usage import TargetUsage, TokenUsage, UsageMeter
 
@@ -415,6 +416,7 @@ class EndpointTarget(Target):
         system_prompt: str | None = None,
         provider: str = "openai",
         transport: ChatTransport | None = None,
+        budgets: Budgets | None = None,
     ) -> None:
         scheme = urlsplit(base_url).scheme
         if scheme not in _ALLOWED_SCHEMES:
@@ -440,6 +442,7 @@ class EndpointTarget(Target):
         # model passes through `chat`/`offer_tools` whatever transport is plugged
         # in, so a rule — including somebody else's — cannot route around it.
         self._meter = UsageMeter()
+        self.apply_budgets(budgets if budgets is not None else Budgets())
 
     def capabilities(self) -> set[Capability]:
         """Declare CHAT, plus PLANT_SYSTEM_PROMPT and CALL_TOOLS when supported."""
@@ -460,6 +463,21 @@ class EndpointTarget(Target):
         """The endpoint and model under test, as it appears in findings."""
         return f"{self._base_url}#{self._model}"
 
+    def apply_budgets(self, budgets: Budgets) -> None:
+        """Adopt these ceilings, refusing a token ceiling this transport cannot enforce.
+
+        Refused before a single request rather than accepted and never enforced. A
+        ceiling that can never fire is worse than no ceiling: the user stops
+        watching the bill because they believe something else is.
+        """
+        if budgets.bounds_tokens and not isinstance(self._transport, UsageReportingTransport):
+            raise BudgetExhausted(
+                f"a token budget was set, but the transport for {self.ref} cannot report "
+                f"token counts, so the budget could never be enforced — remove the token "
+                f"ceiling, or use a provider that reports usage"
+            )
+        self._meter = UsageMeter(budgets)
+
     def usage(self) -> TargetUsage:
         """Return what this endpoint has been asked for, and what it reported costing."""
         return self._meter.snapshot()
@@ -467,6 +485,7 @@ class EndpointTarget(Target):
     def chat(self, messages: Sequence[ChatMessage]) -> str:
         """Send `messages`, prepending the planted system prompt when one is set."""
         history = self._with_system_prompt(messages)
+        self._meter.reserve()
         if isinstance(self._transport, UsageReportingTransport):
             reply = self._transport.send_reporting_usage(
                 self._base_url, self._model, history, self._api_key
@@ -490,6 +509,7 @@ class EndpointTarget(Target):
         """
         if not isinstance(self._transport, ToolCallingTransport):
             raise EndpointError(f"transport for {self.ref} does not support tool calling")
+        self._meter.reserve()
         reply = self._transport.send_tools(
             self._base_url, self._model, self._with_system_prompt(messages), self._api_key, tools
         )

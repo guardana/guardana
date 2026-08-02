@@ -108,6 +108,7 @@ def test_json_states_whether_each_change_is_a_regression() -> None:
         "regressions": 1,
         "improvements": 1,
         "unchanged": 2,
+        "complete": True,
     }
 
 
@@ -132,3 +133,26 @@ def test_a_change_that_is_neither_better_nor_worse_still_shows_up() -> None:
     assert "Also changed" in text
     assert "waived by a baseline" in text
     assert "No regression" in text
+
+
+def test_json_says_when_the_comparison_could_not_be_made_in_full() -> None:
+    """A consumer must be able to tell "nothing got worse" from "we did not finish looking"."""
+    payload = json.loads(
+        get_diff_renderer("json").render(
+            RunDiff(changes=(), unchanged=0, incomplete=("the second run ran out of budget",))
+        )
+    )
+
+    assert payload["summary"]["complete"] is False
+    assert payload["incomplete"] == ["the second run ran out of budget"]
+
+
+def test_human_output_leads_with_the_incompleteness_and_claims_no_all_clear() -> None:
+    text = get_diff_renderer("human").render(
+        RunDiff(changes=(), unchanged=0, incomplete=("the second run ran out of budget",))
+    )
+
+    assert text.startswith("⚠ This comparison is incomplete")
+    assert "No regression" not in text, (
+        "a run that never finished has not earned an all-clear, however few changes it shows"
+    )

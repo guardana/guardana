@@ -40,6 +40,16 @@ class YamlRule(Rule):
         """
         return self.source_digest or super().digest()
 
+    @property
+    def estimated_requests(self) -> int:
+        """One request per prompt: `run` sends all of them, and does not stop early.
+
+        Every prompt is a separate test of the same claim, so stopping at the
+        first failure would leave the rest ungraded — which means this is an exact
+        count rather than a ceiling.
+        """
+        return len(self.prompts)
+
     def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
         """Report the single evaluator and expectation every prompt is graded with."""
         return ((self.meta.evaluator or "", self.expectation),)

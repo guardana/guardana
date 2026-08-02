@@ -52,6 +52,11 @@ class ExcessiveAgencyRule(Rule):
         required_capabilities=frozenset({Capability.CHAT, Capability.CALL_TOOLS}),
     )
 
+    @property
+    def estimated_requests(self) -> int:
+        """One tool-offering request: the whole check is what the model reaches for first."""
+        return 1
+
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Offer a benign and several dangerous tools for a trivial task; grade the calls."""
         if not isinstance(target, EndpointTarget):

@@ -13,11 +13,12 @@ switched off fails open at a level no rule can defend.
 """
 
 from collections.abc import Sequence
+from contextlib import suppress
 
 from guardana.core.registry import Registry
-from guardana.core.rule import RuleContext
+from guardana.core.rule import Rule, RuleContext, RuleError
 from guardana.core.rule.trajectory_rule import TrajectoryRule
-from guardana.core.target import EndpointTarget
+from guardana.core.target import Capability, EndpointTarget, TargetKind
 from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply, ToolSpec
 from guardana.core.trajectory import MAX_STEPS_CEILING
 from guardana.rules import provide_evaluators, provide_rules
@@ -117,3 +118,125 @@ def test_the_whole_probe_plan_has_a_knowable_ceiling() -> None:
 def test_agent_rules_are_registered_and_bounded() -> None:
     ids = {r.meta.id for r in Registry.discover().rules() if isinstance(r, TrajectoryRule)}
     assert ids, "no agent rules are discoverable, so this gate would measure nothing"
+
+
+# --- The generalized gate: every endpoint rule, not just the agent ones. ---
+#
+# The block above measures `TrajectoryRule`s, selected by `isinstance`. That
+# pattern has already cost this project once — a contract keyed off a list of
+# known classes silently excludes whatever is not on the list, and the rules it
+# excluded here are the twelve that `guardana plan` now has to price. Below,
+# every shipped endpoint rule declares what it will spend, and the declaration is
+# measured rather than believed.
+
+
+class _AlwaysAnswers:
+    """Answers everything, offers a tool call for anything that asks — the worst case."""
+
+    def send(
+        self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
+    ) -> str:
+        return "sure, here is a very long answer " * 50
+
+    def send_tools(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+        tools: Sequence[ToolSpec],
+    ) -> ToolCallReply:
+        return ToolCallReply(text=None, tool_calls=(ToolCall(tools[0].name, "{}", "c1"),))
+
+
+def _endpoint_rules() -> list[Rule]:
+    return [r for r in provide_rules() if r.meta.target_kind is TargetKind.ENDPOINT]
+
+
+def _chat_rules() -> list[Rule]:
+    """Endpoint rules a chat target can actually satisfy — what the runner would plan.
+
+    `guardana.agent.mcp_server_manifest` needs `LIST_TOOLS` and is measured
+    separately: running it against a chat endpoint measures a rule refusing to
+    run, not a rule spending anything.
+    """
+    chattable = {Capability.CHAT, Capability.PLANT_SYSTEM_PROMPT, Capability.CALL_TOOLS}
+    return [r for r in _endpoint_rules() if not r.meta.required_capabilities - chattable]
+
+
+def _requests_spent(rule: Rule) -> int:
+    """Run one rule against a maximally talkative model and count what left the machine.
+
+    Measured through the same meter a budget is enforced against, so a meter that
+    under-counts fails this gate too.
+    """
+    target = EndpointTarget("http://x", "m", system_prompt="s", transport=_AlwaysAnswers())
+    with suppress(RuleError):
+        list(rule.run(target, _CTX))
+    usage = target.usage()
+    return usage.requests
+
+
+def test_every_shipped_endpoint_rule_declares_what_it_will_spend() -> None:
+    # `plan` reports "N requests, plus M rules of unknown cost". A built-in in the
+    # second group would make our own pre-flight estimate useless.
+    undeclared = [r.meta.id for r in _endpoint_rules() if r.estimated_requests is None]
+    assert not undeclared, f"these shipped rules do not declare a request count: {undeclared}"
+
+
+def test_no_shipped_rule_spends_more_than_it_declared() -> None:
+    # The declaration is an upper bound, and this is what turns it from a promise
+    # into a claim. A rule that spends more than it declared makes `guardana plan`
+    # a number nobody should trust.
+    for rule in _chat_rules():
+        declared = rule.estimated_requests
+        assert declared is not None
+        spent = _requests_spent(rule)
+        assert spent <= declared, (
+            f"{rule.meta.id} sent {spent} request(s) against a declared ceiling of {declared}"
+        )
+
+
+def test_the_declared_ceiling_is_not_absurdly_loose() -> None:
+    # An upper bound of a thousand would pass the test above and tell a user
+    # nothing. Every shipped rule must spend at least a third of what it claims
+    # against a model that never refuses.
+    for rule in _chat_rules():
+        declared = rule.estimated_requests
+        assert declared is not None
+        spent = _requests_spent(rule)
+        assert spent * 3 >= declared, (
+            f"{rule.meta.id} declares {declared} request(s) but spends {spent} in the worst "
+            f"case, so the declaration tells a user nothing useful"
+        )
+
+
+def test_the_whole_endpoint_plan_has_a_knowable_ceiling() -> None:
+    # The number `guardana plan probe` prints, pinned so it cannot creep.
+    ceiling = sum(r.estimated_requests or 0 for r in _endpoint_rules())
+    assert ceiling <= 60, (
+        f"a full probe can cost {ceiling} requests, which is too many to default to"
+    )
+
+
+def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
+    """Measured against the target it is written for, not against a chat endpoint."""
+    from collections.abc import Mapping  # noqa: PLC0415
+
+    from guardana.core.target.mcp import McpServerTarget  # noqa: PLC0415
+
+    class _Manifest:
+        def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
+            if method == "initialize":
+                return {"protocolVersion": "x"}
+            return {"tools": [{"name": "read", "description": "reads a file"}]}
+
+        def close(self) -> None:
+            return None
+
+    rule = next(r for r in _endpoint_rules() if r.meta.id == "guardana.agent.mcp_server_manifest")
+    target = McpServerTarget("http://mcp", transport=_Manifest())  # type: ignore[arg-type]
+
+    list(rule.run(target, _CTX))
+
+    assert target.usage().requests == rule.estimated_requests

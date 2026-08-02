@@ -3,16 +3,22 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core.budget import Budgets, parse_duration
 from guardana.core.profile.errors import ProfileError
 from guardana.core.profile.model import FailOn, Policy, Profile
 from guardana.core.severity import Severity
 
 # Typos must fail loudly: a misspelled `fail_on:` would otherwise silently
 # fall back to defaults and weaken the gate the user thinks they configured.
-_ALLOWED_PROFILE_KEYS = frozenset({"name", "rules", "fail_on", "rule_config", "evaluators"})
+_ALLOWED_PROFILE_KEYS = frozenset(
+    {"name", "rules", "fail_on", "rule_config", "evaluators", "budgets"}
+)
 _ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
 _ALLOWED_FAIL_ON_KEYS = frozenset(
     {"severity", "min_confidence", "fail_on_inconclusive", "fail_on_error"}
+)
+_ALLOWED_BUDGET_KEYS = frozenset(
+    {"max_requests", "max_input_tokens", "max_output_tokens", "max_duration"}
 )
 
 
@@ -87,6 +93,44 @@ def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
     )
 
 
+def _positive_int(raw: dict[str, Any], key: str, path: Path) -> int | None:
+    """Read one ceiling, refusing anything that would not actually bound a run."""
+    value = raw.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ProfileError(f"invalid profile {path}: budgets.{key} must be a whole number")
+    if value < 1:
+        raise ProfileError(
+            f"invalid profile {path}: budgets.{key} must be at least 1 — a ceiling of "
+            f"{value} would stop the run before it checked anything, which is not a budget"
+        )
+    return value
+
+
+def _budgets(raw: dict[str, Any], path: Path) -> Budgets:
+    """Parse the `budgets:` block, refusing every value that cannot bound a run.
+
+    Loud on a bad value, like every other part of a profile: a ceiling somebody
+    believes they set and did not is worse than no ceiling, because they stop
+    watching the bill.
+    """
+    _reject_unknown_keys(raw, _ALLOWED_BUDGET_KEYS, "budgets", path)
+    duration = raw.get("max_duration")
+    seconds: float | None = None
+    if duration is not None:
+        try:
+            seconds = parse_duration(str(duration))
+        except ValueError as exc:
+            raise ProfileError(f"invalid profile {path}: {exc}") from exc
+    return Budgets(
+        max_requests=_positive_int(raw, "max_requests", path),
+        max_input_tokens=_positive_int(raw, "max_input_tokens", path),
+        max_output_tokens=_positive_int(raw, "max_output_tokens", path),
+        max_duration_seconds=seconds,
+    )
+
+
 def load_profile(path: Path) -> Profile:
     """Parse a `guardana.yaml`, rejecting anything it can't honour.
 
@@ -123,4 +167,5 @@ def load_profile(path: Path) -> Profile:
         evaluator_config=_as_mapping(raw.get("evaluators"), "evaluators", path),
         rule_paths=_as_glob_list(rules.get("paths"), "rules.paths", path),
         path_excludes=_as_glob_list(rules.get("paths_exclude"), "rules.paths_exclude", path),
+        budgets=_budgets(_as_mapping(raw.get("budgets"), "budgets", path), path),
     )

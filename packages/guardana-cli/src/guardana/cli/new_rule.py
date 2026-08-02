@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from guardana.cli.exit_codes import ExitCode
 
 _ENDPOINT_TEMPLATE = """\
 id: {id}
@@ -33,13 +34,13 @@ def new_rule(
     """Scaffold a ready-to-edit endpoint YAML rule (the no-code path for --rules)."""
     if evaluator not in ("keyword", "canary"):
         typer.echo(f"error: unknown evaluator {evaluator!r}; use 'keyword' or 'canary'", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
     name = id.rsplit(".", 1)[-1]
     path = dir / f"{name}.yaml"
     if path.exists():
         typer.echo(f"error: {path} already exists; refusing to overwrite.", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
     requires = "chat, plant_system_prompt" if evaluator == "canary" else "chat"
     expect = _CANARY_EXPECT if evaluator == "canary" else _GOAL_EXPECT

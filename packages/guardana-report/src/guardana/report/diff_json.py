@@ -21,11 +21,15 @@ class DiffJsonRenderer:
             "schema_version": DIFF_SCHEMA_VERSION,
             "changes": [_change(c) for c in diff.changes],
             "notes": list(diff.notes),
+            # Its own key, not folded into notes: a consumer gating on this needs
+            # to tell "context worth reading" from "this answer is not available".
+            "incomplete": list(diff.incomplete),
             "summary": {
                 "changes": len(diff.changes),
                 "regressions": len(diff.regressions),
                 "improvements": len(diff.improvements),
                 "unchanged": diff.unchanged,
+                "complete": not diff.incomplete,
             },
         }
         return json.dumps(payload, indent=2)

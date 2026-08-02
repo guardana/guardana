@@ -26,7 +26,16 @@ def gate_diff(diff: RunDiff, policy: Policy) -> bool:
     regressions backed by a graded verdict — its confidence bar. A rule that ran
     before and not now always counts: what it would have found is unknown, and an
     unknown of unknown severity cannot be thresholded away.
+
+    An incomplete comparison — either side stopped part-way — fails before any
+    threshold is consulted. There is no verdict to weigh when half the picture was
+    never taken.
     """
+    # Before any threshold: a comparison that could not be made in full has no
+    # verdict to threshold. No policy setting can wave this through, deliberately
+    # — otherwise a spent budget would become a way to quiet a red comparison.
+    if diff.incomplete:
+        return True
     threshold = policy.fail_on
     for change in diff.changes:
         if not change.kind.is_regression:

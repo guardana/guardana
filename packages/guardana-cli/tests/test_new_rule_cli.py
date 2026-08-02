@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.registry import Registry
 from typer.testing import CliRunner
@@ -21,7 +22,7 @@ def test_new_rule_refuses_to_overwrite(tmp_path: Path) -> None:
     assert first.exit_code == 0
 
     second = runner.invoke(app, ["new-rule", "acme.prompt.demo", "--dir", str(tmp_path)])
-    assert second.exit_code == 1
+    assert second.exit_code == ExitCode.INVALID_USAGE
 
 
 def test_new_rule_tells_you_how_to_actually_run_it(tmp_path: Path) -> None:

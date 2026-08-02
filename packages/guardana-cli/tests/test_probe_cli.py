@@ -21,7 +21,7 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 _TYPER_USAGE_ERROR = 2
-_ENDPOINT_UNREACHABLE = 2
+_ENDPOINT_UNREACHABLE = 4
 
 
 def _unreachable() -> FailingTransport:

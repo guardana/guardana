@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- **The exit-code table changed.** `2` used to mean three unrelated things — a bad
+  baseline file, an unreachable endpoint, an impossible comparison. It now means
+  only "the result could not be established, or the comparison could not be made",
+  and the rest moved: `3` invalid configuration or usage, `4` target unavailable,
+  `5` internal error, `6` budget exhausted, `7` interrupted with partial evidence.
+  `0` and `1` are unchanged, and everything that moved, moved between non-zero
+  codes, so no pipeline turns green by accident. There is deliberately no
+  compatibility mode: a flag making the same command mean different things for two
+  users of one version is a worse contract than one announced break. The table is
+  an importable enum (`guardana.cli.exit_codes.ExitCode`) and a test asserts it
+  matches [`docs/exit-codes.md`](docs/exit-codes.md). Every command now shares it:
+  `init` refusing to overwrite, `new-rule` with an unknown evaluator and an
+  unreadable saved run all exit `3` rather than `1`, and `calibrate` distinguishes
+  a measurement that could not be made (`2`) from one that came out over the bar
+  (`1`). Reviewing the finished code is what surfaced those — the table would
+  otherwise have been a contract three commands did not honour.
 - **The saved-run schema is version 2.** Documents written by 0.6 still load —
   they are migrated in memory — but documents written by 0.7 are not readable by
   0.6. The root-level `summary` block is **gone**; its counts live in
@@ -55,6 +71,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Execution budgets.** `budgets:` in `guardana.yaml` (`max_requests`,
+  `max_input_tokens`, `max_output_tokens`, `max_duration`), with matching
+  `--max-*` flags on `probe`. Checked **before each request**, not after each
+  rule, so a ceiling of 200 means 200 requests were sent and never 201. A run
+  that hits its ceiling stops, keeps what it already found, records
+  `stopped_by: budget_exhausted`, exits `6`, and **never passes the gate** — a
+  team cannot quiet a red build by lowering the budget until the run ends early.
+  There is no `on_exhaustion` setting: two of its three proposed values differ
+  only in wording, and the third would have been a switch that turns an exhausted
+  budget into a pass.
+- **A budget that cannot be enforced is refused up front**, with exit `3`. A token
+  ceiling on a transport that reports no tokens, or any ceiling on a target that
+  does not meter itself, would be a ceiling the user believes in and nothing
+  watches. `Target.apply_budgets` defaults to refusing, so a third-party target
+  fails loudly rather than accepting a budget it ignores.
+- **`guardana diff` refuses to read truncation as improvement.** A run cut short
+  has fewer findings; comparing it against a complete one now reports the
+  comparison as incomplete, says which side stopped and why, and fails the gate
+  before any threshold is consulted. This was the same trick as exit code `6`, one
+  level further out, and the review of the design is where it surfaced.
+- **`guardana plan scan|probe`** — what a run would cost, **without sending a
+  single request**. Reports the rules that would run, those that would be skipped,
+  a lower and upper bound on requests, and whether the plan fits its budget
+  (exiting `3` if it does not). See [`docs/usage-plan.md`](docs/usage-plan.md).
+- **Every rule declares its request ceiling** (`Rule.estimated_requests`, on the
+  base class). A rule that declares nothing is **named in the plan**, never
+  counted as free, and a plan containing one never claims to fit a budget. The
+  cost gate in `guardana-rules` now measures *every* endpoint rule against its own
+  declaration rather than only the agent ones it recognised by type — the pattern
+  that has already cost this project once.
 - **A run counts what it spends, and says so when it cannot.** `usage` in the
   manifest now carries real numbers: requests sent, tokens in and out where the
   provider reports them, and wall time. The meter sits on the **target**, not on

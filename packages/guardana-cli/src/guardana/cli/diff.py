@@ -44,5 +44,11 @@ def diff(
         raise typer.Exit(code=_INCOMPARABLE_EXIT_CODE) from exc
 
     typer.echo(get_diff_renderer(format.value).render(comparison))
+    if comparison.incomplete:
+        # Exit 2, not 1: one side never finished, so this is "the question was not
+        # answered" rather than "the answer is bad". Both are non-zero, and the
+        # distinction is what tells a pipeline to raise a budget rather than to go
+        # looking for a regression that is not there.
+        raise typer.Exit(code=_INCOMPARABLE_EXIT_CODE)
     if gate_diff(comparison, prof.policy):
         raise typer.Exit(code=1)

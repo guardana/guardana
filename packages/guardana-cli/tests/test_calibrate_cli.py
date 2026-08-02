@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.calibration.corpus import CorpusError, bundled_corpus, dump_corpus, load_corpus
 from guardana.core.calibration.report import MIN_RELIABLE_SAMPLES
@@ -79,7 +80,7 @@ def test_an_unreliable_measurement_exits_nonzero(tmp_path: Path) -> None:
 
     result = runner.invoke(app, ["calibrate", "--evaluator", "canary", "--corpus", str(path)])
 
-    assert result.exit_code == 1
+    assert result.exit_code == ExitCode.INDETERMINATE
     assert "NOT RELIABLE" in result.stdout
 
 
@@ -98,7 +99,7 @@ def test_an_unmeasured_metric_renders_as_a_dash_not_a_zero(tmp_path: Path) -> No
 
     result = runner.invoke(app, ["calibrate", "--evaluator", "canary", "--corpus", str(path)])
 
-    assert result.exit_code == 1
+    assert result.exit_code == ExitCode.INDETERMINATE
     assert "accuracy      —" in result.stdout
 
 

@@ -23,6 +23,8 @@ detail below.
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live endpoint, agent or MCP server
 - [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two saved runs, fail on deterioration
 - [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
+- [`usage-plan.md`](usage-plan.md) — `guardana plan`: what a run would cost, before it costs anything
+- [`exit-codes.md`](exit-codes.md) — the exit-status contract every command honours
 - [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run and its manifest
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
 - [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin
@@ -54,7 +56,7 @@ Written before the code they describe, so the reasoning survives the review:
 - [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
 - [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam
-- [`design/exit-codes.md`](design/exit-codes.md) — the automation contract
+- [`design/exit-codes.md`](design/exit-codes.md) — why the codes are what they are
 
 ## Project direction
 

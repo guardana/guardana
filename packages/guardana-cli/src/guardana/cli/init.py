@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from guardana.cli.exit_codes import ExitCode
 
 _TEMPLATE = """\
 name: default
@@ -17,6 +18,6 @@ def init(path: Annotated[Path, typer.Argument()] = Path("guardana.yaml")) -> Non
     """Write a starter guardana.yaml policy file."""
     if path.exists():
         typer.echo(f"{path} already exists; not overwriting.")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
     path.write_text(_TEMPLATE)
     typer.echo(f"Wrote {path}")

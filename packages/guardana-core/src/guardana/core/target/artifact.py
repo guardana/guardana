@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from fnmatch import fnmatch
 from pathlib import Path
 
+from guardana.core.budget import BudgetExhausted, Budgets
 from guardana.core.source import MAX_SOURCE_BYTES, PythonSource, UnreadSource, read_source
 from guardana.core.target.base import Capability, Target, TargetKind
 from guardana.core.usage import TargetUsage
@@ -86,6 +87,20 @@ class ArtifactTarget(Target):
         that is a fact rather than a gap.
         """
         return TargetUsage(requests=0)
+
+    def apply_budgets(self, budgets: Budgets) -> None:
+        """Accept request and token ceilings, which a file scan cannot exceed; refuse a clock.
+
+        Scanning files sends nothing, so a request or token ceiling is satisfied
+        by construction and accepting it is honest. A duration ceiling is
+        different: this target does not stop itself part-way, so accepting one
+        would promise something it does not do.
+        """
+        if budgets.max_duration_seconds is not None:
+            raise BudgetExhausted(
+                "a duration budget was set, but a file scan does not interrupt itself "
+                "part-way — remove the duration ceiling for scans"
+            )
 
     @property
     def ref(self) -> str:

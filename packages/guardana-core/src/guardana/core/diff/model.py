@@ -166,6 +166,17 @@ class RunDiff:
     """Things a reader needs in order to weigh the changes: a different tool
     version, rules that changed definition. Never a substitute for a change."""
 
+    incomplete: tuple[str, ...] = ()
+    """Why this comparison could not be made in full, if it could not.
+
+    Separate from `notes`, which are context. This is a refusal: a comparison
+    against a run that stopped part-way answers "is this worse than last time"
+    with a picture that was never finished, and a non-empty value here always
+    fails the gate. Without it, lowering a budget until a run ends early would be
+    a way to quiet a red comparison — the same trick exit code 6 exists to stop,
+    one level further out.
+    """
+
     @property
     def regressions(self) -> tuple[Change, ...]:
         """Only the changes that mean things got worse."""

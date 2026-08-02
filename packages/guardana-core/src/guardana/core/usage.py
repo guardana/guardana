@@ -7,10 +7,13 @@ format its numbers eventually land in.
 
 import threading
 from dataclasses import dataclass
+from time import monotonic
 from typing import TYPE_CHECKING
 
+from guardana.core.budget import BudgetExhausted, Budgets
+
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +82,9 @@ def total(usages: "Sequence[TargetUsage | None]") -> TargetUsage | None:
 
 
 class UsageMeter:
-    """Tallies requests and tokens for one target. Safe to share across threads.
+    """Tallies requests and tokens for one target, and enforces its ceilings.
+
+    Safe to share across threads.
 
     Thread-safe because it has to be: `probe` runs four rules at once by default,
     and a lost increment understates the bill — which matters more once a budget
@@ -90,13 +95,51 @@ class UsageMeter:
     `requests_missing_token_counts` rather than contributing a guess to the sums.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        budgets: "Budgets | None" = None,
+        *,
+        clock: "Callable[[], float] | None" = None,
+    ) -> None:
+        self._budgets = budgets if budgets is not None else Budgets()
+        self._clock = clock if clock is not None else monotonic
+        self._started_at = self._clock()
         self._lock = threading.Lock()
         self._requests = 0
         self._input_tokens = 0
         self._output_tokens = 0
         self._missing_token_counts = 0
         self._any_tokens_reported = False
+
+    def reserve(self) -> None:
+        """Check there is room for one more request, or raise `BudgetExhausted`.
+
+        Called *before* the request goes out, not after, so a ceiling of 200 means
+        200 requests were sent and never 201. Token and duration ceilings can only
+        be checked after the fact — nothing knows what a request will cost before
+        it is answered — so those stop the *next* request rather than the one that
+        crossed the line. A single request of overshoot is the price of not being
+        able to see the future; a whole extra rule of overshoot is not, which is
+        why this is per request rather than per rule.
+        """
+        budgets = self._budgets
+        if budgets.is_unbounded:
+            return
+        with self._lock:
+            requests, input_tokens, output_tokens = (
+                self._requests,
+                self._input_tokens,
+                self._output_tokens,
+            )
+        elapsed = self._clock() - self._started_at
+        if budgets.max_requests is not None and requests >= budgets.max_requests:
+            raise BudgetExhausted(f"request budget of {budgets.max_requests} is spent")
+        if budgets.max_input_tokens is not None and input_tokens >= budgets.max_input_tokens:
+            raise BudgetExhausted(f"budget of {budgets.max_input_tokens} input tokens is spent")
+        if budgets.max_output_tokens is not None and output_tokens >= budgets.max_output_tokens:
+            raise BudgetExhausted(f"budget of {budgets.max_output_tokens} output tokens is spent")
+        if budgets.max_duration_seconds is not None and elapsed >= budgets.max_duration_seconds:
+            raise BudgetExhausted(f"time budget of {budgets.max_duration_seconds} seconds is spent")
 
     def record(self, tokens: TokenUsage | None) -> None:
         """Record one request, with the tokens it cost if the provider said so."""

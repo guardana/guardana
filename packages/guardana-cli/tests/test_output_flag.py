@@ -8,6 +8,7 @@ later, at which point nobody connects it to the redirect that caused it.
 import json
 from pathlib import Path
 
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.report import REPORT_SCHEMA_VERSION, load_report
 from typer.testing import CliRunner
@@ -70,4 +71,4 @@ def test_a_report_that_cannot_be_written_exits_two_rather_than_looking_saved(
         app, ["scan", str(tmp_path), "--format", "json", "--output", str(unwritable)]
     )
 
-    assert result.exit_code == 2
+    assert result.exit_code == ExitCode.INVALID_USAGE

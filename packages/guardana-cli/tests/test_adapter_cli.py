@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 import typer
 from guardana.cli._adapter import load_adapter_config
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from typer.testing import CliRunner
 
@@ -86,5 +87,7 @@ def test_probe_adapter_wires_without_contacting_network(tmp_path: Path) -> None:
             str(profile),
         ],
     )
-    assert result.exit_code == 1
+    # Zero rules were selected by that profile, so nothing was verified: this is
+    # `indeterminate` rather than a policy failure, and still non-zero.
+    assert result.exit_code == ExitCode.INDETERMINATE
     assert "Traceback" not in result.output

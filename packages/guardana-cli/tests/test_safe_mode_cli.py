@@ -3,6 +3,7 @@ import os
 import pickle
 from pathlib import Path
 
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from typer.testing import CliRunner
 
@@ -29,7 +30,9 @@ def test_no_plugins_runs_no_entry_point_rules(tmp_path: Path) -> None:
 
     # Safe mode ran zero rules, so it must NOT report a green all-clear — it exits
     # non-zero and says nothing was checked, rather than passing this evil pickle.
-    assert safe.exit_code == 1
+    # Nothing was verified, which is `indeterminate` rather than a policy failure —
+    # still non-zero, and now distinguishable from a target that got worse.
+    assert safe.exit_code == ExitCode.INDETERMINATE
     assert "pickle_opcode" not in safe.stdout
     assert "0 rule(s) run" in safe.stdout
     assert "nothing was checked" in safe.stdout
@@ -48,7 +51,7 @@ def test_no_plugins_reports_a_malformed_custom_rule_instead_of_crashing(tmp_path
     # The malformed rule degrades to a warning (no crash, no traceback). With that
     # rule dropped and plugins off, zero rules ran — so the exit is non-zero and
     # the run reports nothing was checked, never a silent all-clear.
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
     assert "warning: could not load rule" in result.output
     assert "nothing was checked" in result.output
 
@@ -63,7 +66,7 @@ def test_init_writes_profile_then_refuses_to_overwrite(tmp_path: Path) -> None:
 
     second = runner.invoke(app, ["init", str(target)])
 
-    assert second.exit_code == 1
+    assert second.exit_code == ExitCode.INVALID_USAGE
     assert "not overwriting" in second.stdout
 
 
@@ -90,7 +93,7 @@ def test_scan_preset_pre_training_gates_a_vulnerable_model(tmp_path: Path) -> No
     # A pre-training gate is stricter (fails on MEDIUM), so a slopsquat lead blocks.
     (tmp_path / "train.py").write_text("import torchutilz\n", encoding="utf-8")
     result = runner.invoke(app, ["scan", str(tmp_path), "--preset", "pre-training"])
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == ExitCode.POLICY_FAILED, result.output
 
 
 def test_scan_rejects_both_profile_and_preset(tmp_path: Path) -> None:

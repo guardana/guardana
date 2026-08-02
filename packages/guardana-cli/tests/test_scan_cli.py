@@ -2,6 +2,7 @@ import os
 import pickle
 from pathlib import Path
 
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core import __version__
 from typer.testing import CliRunner
@@ -79,7 +80,7 @@ def test_scan_malformed_baseline_is_clean_error_not_traceback(tmp_path: Path) ->
     baseline = tmp_path / "bad.yaml"
     baseline.write_text("waivers: not-a-list\n")
     result = runner.invoke(app, ["scan", str(tmp_path), "--baseline", str(baseline)])
-    assert result.exit_code == 2
+    assert result.exit_code == ExitCode.INVALID_USAGE
     assert "Traceback" not in result.output
 
 

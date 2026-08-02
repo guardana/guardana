@@ -12,7 +12,7 @@ from pathlib import PurePosixPath
 
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.model import Change, ChangeKind, CheckState, Outcome, RunDiff
-from guardana.core.report import Finding, ScanResult, split_ref
+from guardana.core.report import Finding, ScanResult, StopReason, split_ref
 
 _NO_VERDICT_CONFIDENCE = 1.0
 
@@ -132,6 +132,33 @@ def compare(
         changes=tuple(changes),
         unchanged=unchanged,
         notes=_notes(ran_before & ran_after, digests_before, digests_after),
+        incomplete=_incomplete(before, after),
+    )
+
+
+_STOP_EXPLANATIONS = {
+    StopReason.BUDGET_EXHAUSTED: (
+        "ran out of its budget and stopped early, so what it did not reach is unknown "
+        "rather than absent — raise the budget before reading this comparison"
+    ),
+    StopReason.INTERRUPTED: (
+        "was interrupted, so what it did not reach is unknown rather than absent"
+    ),
+}
+
+
+def _incomplete(before: ScanResult, after: ScanResult) -> tuple[str, ...]:
+    """Say which side never finished, and why.
+
+    A truncated run reports fewer findings than a complete one, and subtracting
+    two lists cannot tell that from a fix. Naming the reason matters as much as
+    naming the fact: the remedy for a spent budget is a bigger budget, not a
+    re-enabled rule.
+    """
+    return tuple(
+        f"the {label} run {_STOP_EXPLANATIONS[result.stopped_by]}"
+        for label, result in (("first", before), ("second", after))
+        if result.stopped_by is not None
     )
 
 

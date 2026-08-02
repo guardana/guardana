@@ -153,3 +153,35 @@ guardana monitor --url … --model … --preset monitor
 you need finer control (per-rule config, custom rule directories, a wired judge),
 write an explicit `guardana.yaml` as shown above; you can still ship as many
 differently-named profile *files* as you like and select one with `--profile`.
+
+## `budgets:` — a ceiling on what a run may spend
+
+```yaml
+budgets:
+  max_requests: 200
+  max_input_tokens: 250000
+  max_output_tokens: 100000
+  max_duration: 15m        # number with s / m / h; a bare number is seconds
+```
+
+Every ceiling is optional, and `probe` takes the same four as flags
+(`--max-requests`, `--max-input-tokens`, `--max-output-tokens`,
+`--max-duration`), which win over the file. A flag sets only the ceiling it
+names — it never clears one the profile configured.
+
+Ceilings are checked **before each request**, so `max_requests: 200` means 200
+requests were sent and never 201. Token and duration ceilings can only be checked
+once a request has been answered, so they stop the *next* one.
+
+A run that hits a ceiling stops, keeps the findings it already produced, records
+`stopped_by: budget_exhausted` in its manifest, and exits `6`. It never passes the
+gate, and [`guardana diff`](usage-diff.md) will not read its smaller finding count
+as an improvement.
+
+A budget nothing can enforce is refused before the first request, with exit `3` —
+a token ceiling on a transport that reports no token counts, or any ceiling on a
+target that does not meter itself. A ceiling the user believes in and nothing
+watches is worse than no ceiling.
+
+Use [`guardana plan`](usage-plan.md) to find out whether a budget fits, before
+paying for the answer.

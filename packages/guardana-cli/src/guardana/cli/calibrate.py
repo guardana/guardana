@@ -4,6 +4,7 @@ from typing import Annotated
 import typer
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._profile import resolve_profile
+from guardana.cli.exit_codes import ExitCode
 from guardana.core.calibration import CalibrationReport, calibrate
 from guardana.core.calibration.corpus import CorpusError, bundled_corpus, load_corpus
 from guardana.core.registry import Registry
@@ -50,12 +51,14 @@ def calibrate_command(
     report = calibrate(grader, samples)
     typer.echo(_render(report, len(samples)))
     if not report.is_reliable:
-        # An unreliable measurement is not a passing one. Exiting zero here would
-        # let "we measured nothing" read as "we measured, and it was fine".
-        raise typer.Exit(code=1)
+        # `INDETERMINATE`, not a policy failure: the measurement did not happen.
+        # Exiting zero would let "we measured nothing" read as "we measured, and
+        # it was fine"; exiting 1 would claim a verdict this did not reach.
+        raise typer.Exit(code=ExitCode.INDETERMINATE)
     measured_ece = report.expected_calibration_error
     if max_ece is not None and measured_ece is not None and measured_ece > max_ece:
-        raise typer.Exit(code=1)
+        # This one *is* a verdict: it measured, and the result is over the bar.
+        raise typer.Exit(code=ExitCode.POLICY_FAILED)
 
 
 def _render(report: CalibrationReport, total: int) -> str:

@@ -270,6 +270,29 @@ writes against it. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 
+### Know the cost before the run (`guardana plan`, `budgets:`)
+
+Probing a hosted model costs money. `guardana plan probe` states the upper bound
+**without sending a request**: which rules would run, which would be skipped, and
+at most how many requests they would send. Every rule declares its own ceiling,
+and a gate measures each shipped rule against its declaration — so the number is a
+claim somebody checks, not a promise.
+
+A rule that declares no cost is **named**, never counted as free, and a plan
+containing one never claims to fit a budget.
+
+`budgets:` sets the ceiling for real: requests, input and output tokens, wall
+time. It is checked before each request rather than after each rule, so a ceiling
+of 200 means 200. Three properties keep it from becoming an excuse:
+
+- a run that hits its ceiling **keeps what it already found**, and says it stopped;
+- it exits `6` and **never passes the gate**, whatever its partial findings say;
+- `guardana diff` **refuses to read the missing findings as an improvement**.
+
+A budget nothing can enforce — a token ceiling on a transport that reports no
+tokens — is refused before the first request, with exit `3`. A ceiling the user
+believes in and nothing watches is worse than no ceiling.
+
 ### Policy gates (`guardana.yaml`)
 
 Include/exclude rules by glob (`guardana.*` vs `acme.*`), set the failure bar

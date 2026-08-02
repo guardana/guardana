@@ -46,6 +46,11 @@ class ScenarioRule(Rule):
         """
         return self.source_digest or super().digest()
 
+    @property
+    def estimated_requests(self) -> int:
+        """One request per step: a conversation has to be walked through in order."""
+        return len(self.steps)
+
     def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
         """Every grade the scenario carries: one per graded step, plus the conversation."""
         pairs = [(s.evaluator, s.expect) for s in self.steps]

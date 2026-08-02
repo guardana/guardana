@@ -60,6 +60,15 @@ class TrajectoryRule(Rule):
         return 2 if self.then_task is not None else 1
 
     @property
+    def estimated_requests(self) -> int:
+        """The step budget, which is exactly what this rule can spend.
+
+        The same number as `budget`, exposed under the name every rule answers to
+        so `guardana plan` does not have to know what kind of rule this is.
+        """
+        return self.budget
+
+    @property
     def budget(self) -> int:
         """The most model calls this rule can cost, across every session it drives.
 

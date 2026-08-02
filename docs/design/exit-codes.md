@@ -1,6 +1,6 @@
 # Design: stable exit codes and gate semantics
 
-**Status:** proposed · **Target:** v0.7
+**Status:** implemented in 0.7 · the table lives in [`docs/exit-codes.md`](../exit-codes.md)
 
 ## The problem
 
@@ -51,14 +51,18 @@ policy failure, or a typo in a config file reads as a security finding.
 neither a pass nor a completed failure. The partial run is kept, and the code says
 it is partial.
 
-### Migration
+### Migration — decided against a transitional mode
 
-The current codes are a subset: `0` and `1` keep their meaning exactly, and `2`
-narrows from "several kinds of problem" to "indeterminate or incomparable" while
-`3`–`7` take over what it used to cover. That is a behaviour change for anyone
-branching on `2`, so it ships behind `--exit-code-mode legacy|strict` for one
-minor, defaulting to `legacy` in v0.7 and `strict` in v0.8, with the changelog
-saying so in the breaking-changes section.
+This proposed `--exit-code-mode legacy|strict` for one minor. That is **not** what
+shipped: the whole table landed in 0.7 as a single breaking change, announced in
+the changelog.
+
+The reason is that the flag would have made the same command mean different
+things for two users of the same version, for a full release cycle, and every
+tool reading those codes would have had to know which mode produced them. Weighed
+against that, the actual exposure is small: `0` and `1` are unchanged, and
+everything that moved, moved *between non-zero codes*. No pipeline turns green by
+accident, which is the only direction that would have justified the cost.
 
 ### What must be tested
 
@@ -70,9 +74,8 @@ saying so in the breaking-changes section.
 - a test that the documented table in `docs/exit-codes.md` matches the constants in
   code, so the documentation cannot drift from the behaviour.
 
-### Open question
+### Open question — resolved
 
-Should `diff` reuse this table or have its own? It currently uses `0/1/2` with
-compatible meanings. Leaning reuse — one table for the tool, not one per command —
-but `diff` has no target to be unavailable, so `4` would simply never occur there.
-That is acceptable: an unused code is better than a second table.
+`diff` reuses the table. It has no target to be unavailable, so `4` never occurs
+there, and it uses `2` for both "these runs cannot be compared" and "one of them
+never finished". An unused code is better than a second table.

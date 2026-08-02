@@ -3,13 +3,16 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
 from guardana.cli._output import emit
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import build_manifest, target_identity
-from guardana.core.gate import GateOutcome, gate_outcome
+from guardana.cli.exit_codes import ExitCode
+from guardana.core.budget import BudgetExhausted
+from guardana.core.gate import gate_outcome
 from guardana.core.registry import Registry
 from guardana.core.report import (
     BaselineError,
@@ -23,7 +26,8 @@ from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget
 from guardana.report import get_renderer
 
-_BASELINE_ERROR_EXIT_CODE = 2
+_BASELINE_ERROR_EXIT_CODE = ExitCode.INVALID_USAGE
+"""A baseline file that cannot be read is bad input, not an indeterminate result."""
 
 
 def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
@@ -74,7 +78,10 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     load_custom_rules(registry, prof, rules)
     target = ArtifactTarget(path, excludes=prof.path_excludes)
     started_at = datetime.now(UTC)
-    result = Runner(registry=registry, profile=prof).run(target)
+    try:
+        result = Runner(registry=registry, profile=prof).run(target)
+    except BudgetExhausted as exc:
+        raise refuse_unenforceable_budget(exc) from exc
     # Make file paths repo-relative (relative to the checkout root) before we
     # render, baseline, or emit SARIF — so alerts attach to real repo paths and a
     # baseline fingerprint is portable between a dev machine and CI.
@@ -101,7 +108,7 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
         # findings is the whole point of this flag, but a check that never ran
         # means the snapshot is missing whatever it would have found.
         blocked = bool(result.errors) and prof.policy.fail_on.fail_on_error
-        raise typer.Exit(code=1 if blocked else 0)
+        raise typer.Exit(code=ExitCode.POLICY_FAILED if blocked else ExitCode.OK)
     if baseline is not None:
         try:
             result = apply_baseline(result, load_baseline(baseline))
@@ -124,5 +131,4 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
     emit(get_renderer(format.value, run=run).render(result), output)
     if reporter:
         submit_safely(reporter, result, source=str(path))
-    if outcome is not GateOutcome.PASS:
-        raise typer.Exit(code=1)
+    exit_with(outcome, result)

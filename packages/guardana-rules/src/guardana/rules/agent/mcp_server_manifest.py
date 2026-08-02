@@ -58,6 +58,11 @@ class McpServerManifestRule(Rule):
         required_capabilities=frozenset({Capability.LIST_TOOLS}),
     )
 
+    @property
+    def estimated_requests(self) -> int:
+        """One manifest listing. Reading what a server advertises costs no model call."""
+        return 1
+
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Fetch the live manifest, scan every description, and compare it with the pin."""
         if not isinstance(target, McpServerTarget):

@@ -65,6 +65,27 @@ class Rule(ABC):
         """
         return ()
 
+    @property
+    def estimated_requests(self) -> int | None:
+        """Upper bound on the requests this rule will send, or None if it cannot say.
+
+        Declared on the base class so `guardana plan` can price a run *before*
+        spending anything, and so a budget can be checked against a plan rather
+        than discovered halfway through. Keying this off a list of known rule
+        classes instead would silently exclude every rule not on the list — the
+        mistake the canary contract already made once here.
+
+        **None means unknown, and `plan` says so out loud** ("N requests, plus M
+        rules of unknown cost"). Defaulting to 1 would be a convenient number that
+        is wrong for every multi-prompt rule, and a plan built on it would
+        understate a paid run.
+
+        It is an upper bound, not a prediction: spending less is fine, spending
+        more is a defect. A gate in `guardana-rules` measures every shipped rule
+        against its own declaration, so this cannot quietly drift.
+        """
+        return None
+
     def digest(self) -> str:
         """Return a short, stable hash of *what this rule is* — its declaration, not its results.
 

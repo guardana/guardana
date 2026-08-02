@@ -3,11 +3,12 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from urllib.error import URLError
 
+from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import GateOutcome, gate, gate_outcome
 from guardana.core.inventory import observe
 from guardana.core.profile.model import Profile
 from guardana.core.registry import Registry
-from guardana.core.report import CheckError, Finding, ScanResult
+from guardana.core.report import CheckError, Finding, ScanResult, StopReason
 from guardana.core.rule.base import Rule, RuleContext
 from guardana.core.source import UnreadSource
 from guardana.core.target import ArtifactTarget, EndpointError, Target, TargetKind
@@ -29,11 +30,20 @@ class _RuleOutcome:
     findings: tuple[Finding, ...] = ()
     unverified: tuple[Finding, ...] = ()
     error: CheckError | None = None
+    stopped_by: StopReason | None = None
+    """Set when the run ran out of budget part-way through this rule.
+
+    Separate from `error`, because the rule did not fail — and separate from a
+    clean outcome, because the rule did not finish either. A rule cut off here
+    must not join `rules_run`: listing it would claim coverage the run does not
+    have, and a later comparison would read the missing findings as an
+    improvement.
+    """
 
     @property
     def ran(self) -> bool:
-        """Whether the rule completed — an errored rule did not."""
-        return self.error is None
+        """Whether the rule completed — an errored or cut-off rule did not."""
+        return self.error is None and self.stopped_by is None
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +79,10 @@ class Runner:
         first, so two runs of the same probe produce the same report and a CI diff
         stays signal.
         """
+        # Installed before a single rule runs, so a budget set in a profile reaches
+        # the target that has to hold it. A target that cannot enforce it refuses
+        # here rather than letting the run proceed under a ceiling nothing watches.
+        target.apply_budgets(self.profile.budgets)
         skipped: list[str] = []
         plan: list[Rule] = []
         for rule in self.registry.rules():
@@ -94,10 +108,16 @@ class Runner:
         # unreachable endpoint yields fewer outcomes than it planned rules — and
         # pairing by position would then attribute results to the wrong rules.
         ran: list[str] = []
+        stopped_by: StopReason | None = None
         for outcome in self._execute(plan, target):
+            # Kept even from a rule the budget cut off: a finding produced before
+            # the ceiling is as real as one produced after it, and discarding it
+            # would punish the user for the budget they set.
             findings.extend(outcome.findings)
             unverified.extend(outcome.unverified)
-            if outcome.error is not None:
+            if outcome.stopped_by is not None:
+                stopped_by = outcome.stopped_by
+            elif outcome.error is not None:
                 errors.append(outcome.error)
             else:
                 ran.append(outcome.rule_id)
@@ -122,13 +142,19 @@ class Runner:
             # the machine. A target that does not meter itself reports None, and
             # that travels all the way to the manifest as an explicit unknown.
             usage=target.usage(),
+            stopped_by=stopped_by,
         )
 
     def _execute(self, plan: Sequence[Rule], target: Target) -> Iterator[_RuleOutcome]:
         limit = self.concurrency_for(target.kind)
         if limit == 1 or len(plan) < 2:  # noqa: PLR2004 — nothing to overlap with one rule
             for rule in plan:
-                yield self._execute_one(rule, target)
+                outcome = self._execute_one(rule, target)
+                yield outcome
+                # Every remaining rule would hit the same ceiling, and sending more
+                # requests to spend a budget that is already gone is pure cost.
+                if outcome.stopped_by is not None:
+                    return
             return
         yield from self._execute_pooled(plan, target, limit)
 
@@ -147,6 +173,24 @@ class Runner:
         started: they would all fail identically, and continuing to send prompts
         to a dead or rate-limited model is pure harm.
         """
+        outcomes = self._run_pool(plan, target, limit)
+        # Rule order, not completion order: two runs of the same probe must
+        # produce the same report. A propagating failure surfaces at the first
+        # rule that hit it, deterministically, rather than whichever thread lost.
+        for outcome in outcomes:
+            if isinstance(outcome, Exception):
+                raise outcome
+            if outcome is not None:  # None: never started, because an abort won
+                yield outcome
+
+    def _run_pool(
+        self, plan: Sequence[Rule], target: Target, limit: int
+    ) -> list["_RuleOutcome | Exception | None"]:
+        """Run the plan across `limit` daemon threads; return outcomes in plan order.
+
+        A `None` in the result never started, because something aborted the pool:
+        a propagating endpoint failure, or a budget that ran out.
+        """
         outcomes: list[_RuleOutcome | Exception | None] = [None] * len(plan)
         aborted = threading.Event()
         cursor = iter(range(len(plan)))
@@ -156,13 +200,22 @@ class Runner:
             with lock:
                 return None if aborted.is_set() else next(cursor, None)
 
+        def run_at(index: int) -> None:
+            try:
+                outcome = self._execute_one(plan[index], target)
+            except Exception as exc:  # a propagating endpoint failure
+                outcomes[index] = exc
+                aborted.set()
+                return
+            outcomes[index] = outcome
+            # Every remaining rule would hit the same ceiling; continuing would
+            # spend requests against a budget that is already gone.
+            if outcome.stopped_by is not None:
+                aborted.set()
+
         def worker() -> None:
             while (index := take_next()) is not None:
-                try:
-                    outcomes[index] = self._execute_one(plan[index], target)
-                except Exception as exc:  # a propagating endpoint failure
-                    outcomes[index] = exc
-                    aborted.set()
+                run_at(index)
 
         threads = [
             threading.Thread(target=worker, daemon=True, name=f"guardana-rule-{n}")
@@ -172,15 +225,7 @@ class Runner:
             thread.start()
         for thread in threads:
             thread.join()
-
-        # Rule order, not completion order: two runs of the same probe must
-        # produce the same report. A propagating failure surfaces at the first
-        # rule that hit it, deterministically, rather than whichever thread lost.
-        for outcome in outcomes:
-            if isinstance(outcome, Exception):
-                raise outcome
-            if outcome is not None:  # None: never started, because an abort won
-                yield outcome
+        return outcomes
 
     def _execute_one(self, rule: Rule, target: Target) -> _RuleOutcome:
         """Run one rule, converting anything it throws into a recorded error.
@@ -202,6 +247,16 @@ class Runner:
             for finding in rule.run(target, ctx):
                 bucket = unverified if _is_inconclusive(finding) else findings
                 bucket.append(finding)
+        except BudgetExhausted:
+            # Not a `CheckError`: the rule did not fail, the run ran out of room.
+            # Reported as a stop so the result says its coverage is partial, and
+            # so this rule stays out of `rules_run` — it did not finish.
+            return _RuleOutcome(
+                rule.meta.id,
+                tuple(findings),
+                tuple(unverified),
+                stopped_by=StopReason.BUDGET_EXHAUSTED,
+            )
         except (URLError, EndpointError) as exc:
             # The endpoint being unreachable is a fact about the run, not about
             # this rule: every rule would fail identically, so it is reported

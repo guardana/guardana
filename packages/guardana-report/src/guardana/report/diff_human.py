@@ -23,6 +23,13 @@ class DiffHumanRenderer:
             c for c in diff.changes if not c.kind.is_regression and not c.kind.is_improvement
         )
         blocks: list[str] = []
+        if diff.incomplete:
+            # First, above everything. A reader who stops after the first block
+            # must not walk away with a verdict this comparison cannot give.
+            blocks.append(
+                "⚠ This comparison is incomplete\n"
+                + "\n".join(f"  • {reason}" for reason in diff.incomplete)
+            )
         if regressions:
             blocks.append(_section("Worse than the previous run", regressions, worse=True))
         if improvements:
@@ -31,7 +38,7 @@ class DiffHumanRenderer:
             blocks.append(_section("Also changed", other, worse=False))
         if diff.notes:
             blocks.append("Worth knowing\n" + "\n".join(f"  • {note}" for note in diff.notes))
-        if not regressions:
+        if not regressions and not diff.incomplete:
             blocks.append("✓ No regression against the previous run.")
         blocks.append(
             f"{len(diff.changes)} change(s); {diff.unchanged} check(s) unchanged, "

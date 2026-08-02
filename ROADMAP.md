@@ -150,8 +150,8 @@ v0.7 is not done until every box is ticked. This list is the milestone.
 - [ ] official container images (CLI and server)
 - [x] stable, versioned result schema
 - [x] reproducible run manifest
-- [ ] budgets and a pre-flight `plan`
-- [ ] documented, tested exit codes
+- [x] budgets and a pre-flight `plan`
+- [x] documented, tested exit codes
 - [ ] privacy and redaction defaults
 - [ ] persistent collector
 - [ ] authenticated runner ingest
@@ -195,8 +195,20 @@ reports no tokens, are recorded as explicit unknowns — with
 complete bill. Still open: **cost in money stays null**, because a price table
 would have to be profile data and inventing one is worse than omitting it.
 
-**Budgets and `guardana plan`.** Before probing a paid endpoint a team must be
-able to know the upper bound: rules, scenarios, minimum and maximum requests,
+**Budgets and `guardana plan` — shipped.** `guardana plan scan|probe` reports the
+upper bound without sending a request; every rule declares its request ceiling and
+a gate measures the declaration against what the rule actually spends. Budgets are
+checked before each request, and an exhausted one stops the run, keeps its partial
+findings, exits `6` and never passes the gate — nor lets `guardana diff` read the
+missing findings as an improvement. **Stable exit codes shipped with it** (see
+[`docs/exit-codes.md`](docs/exit-codes.md)).
+
+Deliberately still open: **`--resume`** (checkpointing is its own design),
+**cost in money** (needs a price table as profile data), and **token/duration
+prediction in `plan`** (nothing can know a request's cost before it is answered,
+and a guessed figure is one a team would budget against).
+
+Original scope, for reference: rules, scenarios, minimum and maximum requests,
 judge calls, approximate tokens and wall time, estimated cost, and which checks
 have side effects. During a run, hard limits stop it cleanly, persist partial
 evidence, and report `budget_exhausted` as its own outcome — **never as a pass**.

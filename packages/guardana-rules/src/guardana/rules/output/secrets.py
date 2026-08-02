@@ -39,6 +39,11 @@ class OutputSecretsRule(Rule):
         required_capabilities=frozenset({Capability.CHAT}),
     )
 
+    @property
+    def estimated_requests(self) -> int:
+        """One request per probe prompt; every prompt is sent, none stops the loop."""
+        return len(_PROBE_PROMPTS)
+
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Send benign prompts and flag any secret the model volunteers in reply."""
         if not isinstance(target, EndpointTarget):

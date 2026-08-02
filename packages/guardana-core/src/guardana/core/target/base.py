@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from guardana.core.budget import BudgetExhausted, Budgets
+
 if TYPE_CHECKING:
     from guardana.core.usage import TargetUsage
 
@@ -61,3 +63,22 @@ class Target(ABC):
         Overriding this is how a target opts in to being budgeted.
         """
         return None
+
+    def apply_budgets(self, budgets: Budgets) -> None:
+        """Adopt these ceilings, or refuse if this target cannot enforce them.
+
+        Called by the runner before a single rule runs, so a budget set in a
+        profile reaches the only thing that can hold it. The default refuses any
+        ceiling at all, which is the fail-closed direction: a target that quietly
+        accepted a budget it does not enforce would leave the user believing they
+        had a ceiling while nothing was watching the bill.
+
+        Refusing costs a third-party target nothing until someone actually sets a
+        budget against it, and at that point an error naming the target is the
+        only useful outcome.
+        """
+        if not budgets.is_unbounded:
+            raise BudgetExhausted(
+                f"a budget was set, but {type(self).__name__} ({self.ref}) does not enforce "
+                f"budgets — remove the ceiling, or implement apply_budgets on the target"
+            )
