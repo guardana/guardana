@@ -75,6 +75,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`guardana doctor` and `guardana config validate|explain`.** `doctor` reports
+  what this installation is — distribution versions and whether they agree, which
+  plugins loaded and which failed, whether third-party rules are installed, and
+  which settings weaken the gate — and **contacts nothing**, because a diagnostic
+  that costs money is one people avoid. `config validate` fails on a bad profile
+  before a pipeline pays for a probe; `config explain` prints the settings
+  actually in force, defaults included, because most of a gate is defaults and an
+  unseen default is one nobody checked.
+  See [`docs/usage-doctor.md`](docs/usage-doctor.md).
 - **`guardana baseline create|verify|update`, and waivers that expire.** A waiver
   now carries an approver and an expiry, and **an expired waiver stops waiving** —
   the finding comes back and fails the gate again. `verify` names the waivers that

@@ -270,6 +270,18 @@ writes against it. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 
+### "Why did it do that" (`guardana doctor`, `guardana config explain`)
+
+`doctor` reports what this installation actually is: distribution versions and
+whether they agree, which plugins loaded and which failed to import, whether
+third-party rules are installed, and which settings weaken the gate. It **contacts
+nothing** — a diagnostic that costs money or appears in production logs is one
+people avoid running.
+
+`config explain` prints the settings in force rather than the ones somebody typed.
+Most of a gate is defaults, and a default nobody can see is a default nobody
+checked.
+
 ### Accepted risk that expires (`guardana baseline`)
 
 A waiver is the one place Guardana deliberately does not fail on a finding, so it

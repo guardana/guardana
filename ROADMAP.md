@@ -258,9 +258,12 @@ says which lapsed. Still open: binding a waiver to the target fingerprint and th
 policy digest, so a waiver written for one model does not silently apply to
 another.
 
-**Operational diagnostics.** `guardana doctor` and `guardana config validate|explain`:
-versions, plugin inventory, profile parsing, target and evaluator connectivity,
-collector reachability, TLS verification, pending migrations, unsafe settings.
+**Operational diagnostics — shipped.** `guardana doctor` and
+`guardana config validate|explain`: versions and version agreement, plugin
+inventory and load failures, profile parsing, and settings that weaken the gate.
+Still open, deliberately: target and collector connectivity checks, which would
+make a diagnostic cost money and appear in production logs — they belong behind an
+explicit flag, alongside `target inspect`.
 
 **Production-grade collector.** The largest gap. PostgreSQL persistence with
 migrations; API-key authentication for runners; organization/project isolation;

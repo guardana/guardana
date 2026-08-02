@@ -21,6 +21,7 @@ detail below.
 
 - [`usage-scan.md`](usage-scan.md) — `guardana scan`: static, offline, CI-friendly
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live endpoint, agent or MCP server
+- [`usage-doctor.md`](usage-doctor.md) — `guardana doctor`, `config validate|explain`
 - [`usage-baseline.md`](usage-baseline.md) — `guardana baseline`: accepted risk that expires
 - [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two saved runs, fail on deterioration
 - [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
