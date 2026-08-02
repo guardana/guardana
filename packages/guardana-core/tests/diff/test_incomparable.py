@@ -13,7 +13,14 @@ from guardana.core.diff import ChangeKind, IncomparableRunsError, RunContext, co
 from guardana.core.diff.reports import compare_reports
 from guardana.core.manifest import RunManifest
 from guardana.core.manifest.records import RuleRecord
-from guardana.core.report import Evidence, Finding, RunReport, ScanResult
+from guardana.core.report import (
+    Evidence,
+    Finding,
+    RunReport,
+    ScanResult,
+    SkippedRule,
+    SkipReason,
+)
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from guardana.core.testing import manifest_for
@@ -127,7 +134,11 @@ def test_a_finding_from_a_rule_that_stopped_running_is_not_read_as_fixed() -> No
     """
     found = Finding("guardana.b", Severity.CRITICAL, "t", (), "x.py:1", Evidence(summary="s"))
     before = ScanResult(findings=(found,), rules_run=("guardana.a", "guardana.b"), rules_skipped=())
-    after = ScanResult(findings=(), rules_run=("guardana.a",), rules_skipped=("guardana.b",))
+    after = ScanResult(
+        findings=(),
+        rules_run=("guardana.a",),
+        rules_skipped=(SkippedRule("guardana.b", SkipReason.MISSING_CAPABILITY, ("chat",), "d"),),
+    )
 
     kinds = [
         c.kind

@@ -54,7 +54,7 @@ def test_monitor_plants_a_canary_like_probe_does(monkeypatch: pytest.MonkeyPatch
     # (A tool-calling rule like excessive_tool_use is legitimately skipped here,
     # since a plain chat transport can't offer tools — and it is recorded, not
     # silently dropped.)
-    assert "guardana.prompt.system_prompt_leak.canary" not in alerts[0].result.rules_skipped
+    assert "guardana.prompt.system_prompt_leak.canary" not in alerts[0].result.skipped_rule_ids
 
 
 def test_monitor_clean_model_no_alert(monkeypatch: pytest.MonkeyPatch) -> None:

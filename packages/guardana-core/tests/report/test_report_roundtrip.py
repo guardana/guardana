@@ -24,7 +24,15 @@ from guardana.core.manifest import (
 from guardana.core.manifest.records import RuleRecord
 from guardana.core.manifest.summary import summarize
 from guardana.core.observation import Observation, ObservationKind
-from guardana.core.report import CheckError, Evidence, Finding, ScanResult, StopReason
+from guardana.core.report import (
+    CheckError,
+    Evidence,
+    Finding,
+    ScanResult,
+    SkippedRule,
+    SkipReason,
+    StopReason,
+)
 from guardana.core.report.load import ReportLoadError, load_report
 from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from guardana.core.severity import Severity
@@ -67,7 +75,14 @@ def _full_result() -> ScanResult:
     return ScanResult(
         findings=(_finding("guardana.prompt.injection"),),
         rules_run=("guardana.prompt.injection",),
-        rules_skipped=("guardana.agent.memory_poisoning",),
+        rules_skipped=(
+            SkippedRule(
+                "guardana.agent.memory_poisoning",
+                SkipReason.MISSING_CAPABILITY,
+                ("call_tools",),
+                "d",
+            ),
+        ),
         unverified=(_finding("guardana.prompt.leak", outcome="inconclusive"),),
         waived=(_finding("guardana.prompt.waived"),),
         errors=(CheckError("acme.broken", "run", "ValueError: boom"),),

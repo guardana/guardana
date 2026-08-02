@@ -18,6 +18,7 @@ from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleR
 from guardana.core.manifest.settings import ConfigurationRef, EvidenceMode, ExecutionSettings
 from guardana.core.manifest.settings import PrivacyRecord as _PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
+from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.report.stop import StopReason
 from guardana.core.target import TargetKind
 
@@ -206,6 +207,33 @@ def _evaluators(raw: object) -> tuple[EvaluatorRecord, ...]:
     )
 
 
+def _skipped(raw: object) -> tuple[SkippedRule, ...]:
+    """Rebuild the skips, refusing a reason this build has never heard of.
+
+    Closed like `Severity`: a reason nobody can place cannot be gated on, and
+    guessing at one would invent the very distinction this type exists to keep.
+    """
+    if not isinstance(raw, list):
+        return ()
+    out: list[SkippedRule] = []
+    for entry in raw:
+        block = _mapping(entry, "run.result_summary.rules_skipped[]")
+        missing = block.get("missing")
+        try:
+            reason = SkipReason(_text(block, "reason", "run.result_summary.rules_skipped[]"))
+        except ValueError as exc:
+            raise ManifestLoadError(f"unknown skip reason {block.get('reason')!r}") from exc
+        out.append(
+            SkippedRule(
+                rule_id=_text(block, "rule_id", "run.result_summary.rules_skipped[]"),
+                reason=reason,
+                missing=tuple(str(v) for v in missing) if isinstance(missing, list) else (),
+                detail=_optional_text(block, "detail") or "",
+            )
+        )
+    return tuple(out)
+
+
 def _result_summary(raw: object) -> ResultSummary:
     block = _mapping(raw, "run.result_summary")
     rules_run = block.get("rules_run")
@@ -217,9 +245,7 @@ def _result_summary(raw: object) -> ResultSummary:
         errors=_optional_int(block, "errors") or 0,
         observations=_optional_int(block, "observations") or 0,
         rules_run=tuple(str(v) for v in rules_run) if isinstance(rules_run, list) else (),
-        rules_skipped=(
-            tuple(str(v) for v in rules_skipped) if isinstance(rules_skipped, list) else ()
-        ),
+        rules_skipped=_skipped(rules_skipped),
         max_severity=_optional_text(block, "max_severity"),
         gate=_gate(block.get("gate")),
         stopped_by=_stop_reason(block.get("stopped_by")),
@@ -405,8 +431,18 @@ def migrate_v1(document: Mapping[str, Any]) -> dict[str, Any]:
                 "errors": len(errors) if isinstance(errors, list) else 0,
                 "observations": len(observations) if isinstance(observations, list) else 0,
                 "rules_run": list(rules) if isinstance(rules, dict) else [],
+                # Version 1 recorded ids without a reason. `missing` stays empty
+                # and the detail says so, rather than inventing a capability the
+                # old document never named.
                 "rules_skipped": [
-                    str(v) for v in run.get("rules_skipped", []) if isinstance(v, str)
+                    {
+                        "rule_id": str(v),
+                        "reason": str(SkipReason.MISSING_CAPABILITY),
+                        "missing": [],
+                        "detail": "recorded before skip reasons existed",
+                    }
+                    for v in run.get("rules_skipped", [])
+                    if isinstance(v, str)
                 ],
                 "max_severity": max_severity,
                 "gate": None,

@@ -139,7 +139,15 @@ def _result_summary(summary: ResultSummary) -> dict[str, object]:
         "errors": summary.errors,
         "observations": summary.observations,
         "rules_run": list(summary.rules_run),
-        "rules_skipped": list(summary.rules_skipped),
+        "rules_skipped": [
+            {
+                "rule_id": skip.rule_id,
+                "reason": str(skip.reason),
+                "missing": list(skip.missing),
+                "detail": skip.detail,
+            }
+            for skip in summary.rules_skipped
+        ],
         "max_severity": summary.max_severity,
         "gate": str(summary.gate),
         "stopped_by": None if summary.stopped_by is None else str(summary.stopped_by),

@@ -18,6 +18,7 @@ from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.result import ScanResult
 from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunReport
+from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
 from guardana.core.taxonomy import TaxonomyRef, resolve
@@ -92,13 +93,11 @@ def _result(raw: dict[str, Any], path: Path) -> ScanResult:
     run = raw.get("run")
     summary = run.get("result_summary") if isinstance(run, dict) else None
     rules_run: tuple[str, ...] = ()
-    rules_skipped: tuple[str, ...] = ()
+    rules_skipped: tuple[SkippedRule, ...] = ()
     stopped_by = None
     if isinstance(summary, dict):
         rules_run = _str_tuple(summary.get("rules_run"), "run.result_summary.rules_run", path)
-        rules_skipped = _str_tuple(
-            summary.get("rules_skipped"), "run.result_summary.rules_skipped", path
-        )
+        rules_skipped = _skipped_rules(summary.get("rules_skipped"), path)
         stopped_by = _stop_reason(summary.get("stopped_by"), path)
     return ScanResult(
         findings=_findings(raw.get("findings"), "findings", path),
@@ -250,6 +249,17 @@ def _severity(raw: object, path: Path) -> Severity:
         raise ReportLoadError(
             f"{path}: unknown severity {raw!r}; expected one of {[s.name for s in Severity]}"
         ) from exc
+
+
+def _skipped_rules(raw: object, path: Path) -> tuple[SkippedRule, ...]:
+    """Read the skips, delegating the shape to the manifest loader that owns it."""
+    from guardana.core.manifest.load import ManifestLoadError  # noqa: PLC0415
+    from guardana.core.manifest.load import _skipped as parse_skipped  # noqa: PLC0415
+
+    try:
+        return parse_skipped(raw)
+    except ManifestLoadError as exc:
+        raise ReportLoadError(f"{path}: {exc}") from exc
 
 
 def _stop_reason(raw: object, path: Path) -> StopReason | None:

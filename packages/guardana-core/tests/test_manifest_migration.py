@@ -91,7 +91,11 @@ def test_a_migrated_run_keeps_the_rules_that_ran_and_their_digests(tmp_path: Pat
     # not read as an improvement.
     manifest = load_report(_write(tmp_path, _V1_RUN)).manifest
     assert [(r.id, r.digest) for r in manifest.rules] == [("guardana.demo", "abc123")]
-    assert manifest.result_summary.rules_skipped == ("guardana.other",)
+    skipped = manifest.result_summary.rules_skipped
+    assert [s.rule_id for s in skipped] == ["guardana.other"]
+    assert skipped[0].missing == (), (
+        "version 1 recorded no capability, so migration must not invent one"
+    )
 
 
 def test_migrating_the_same_document_twice_gives_the_same_run_id(tmp_path: Path) -> None:

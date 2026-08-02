@@ -454,6 +454,16 @@ class EndpointTarget(Target):
         return caps
 
     @property
+    def transport(self) -> ChatTransport:
+        """The transport in use, so an inspection can ask what it implements.
+
+        Exposed read-only: capability inspection has to distinguish "the provider
+        declined" from "this client never offered", and only the transport knows
+        which optional protocols it satisfies.
+        """
+        return self._transport
+
+    @property
     def model(self) -> str:
         """The model under test, by the name the endpoint knows it as."""
         return self._model

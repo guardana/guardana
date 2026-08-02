@@ -9,13 +9,17 @@ from guardana.core.report.serialize import finding_to_dict
 
 _TIMEOUT_SECONDS = 30
 
-ENVELOPE_SCHEMA_VERSION = 4
+ENVELOPE_SCHEMA_VERSION = 5
 """Version of the JSON envelope POSTed to a collector.
 
 The collector is a separate service on its own release cadence, so the envelope
 is versioned: a collector that doesn't understand a version rejects it outright
 rather than silently misreading a renamed field.
 
+v5 says *why* each rule was skipped, not just that it was: a collector that saw
+`rules_skipped: ["guardana.agent.tool_argument_scope"]` could not tell a rule
+that never applied from one the provider could not support, and showed a fleet
+with a coverage hole as fully checked.
 v4 names the rules that ran (`summary.rules_executed`) instead of only counting
 them: a collector that saw `rules_run: 12` could not tell a clean agent from one
 whose profile excluded the rules that would have found something, and showed
@@ -53,7 +57,10 @@ def _serialize(result: ScanResult, *, source: str) -> bytes:
         "summary": {
             "rules_run": result.rules_run_count,
             "rules_executed": list(result.rules_run),
-            "rules_skipped": list(result.rules_skipped),
+            "rules_skipped": [
+                {"rule_id": s.rule_id, "reason": str(s.reason), "missing": list(s.missing)}
+                for s in result.rules_skipped
+            ],
             "max_severity": max_sev.name if max_sev else None,
             "unverified": len(result.unverified),
             "errors": len(result.errors),

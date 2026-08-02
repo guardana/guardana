@@ -213,7 +213,14 @@ judge calls, approximate tokens and wall time, estimated cost, and which checks
 have side effects. During a run, hard limits stop it cleanly, persist partial
 evidence, and report `budget_exhausted` as its own outcome — **never as a pass**.
 
-**Target capability inspection.** `guardana target inspect` reports what an
+**Target capability inspection — shipped.** `guardana target inspect` probes what
+an endpoint really supports and separates *declared* from *verified*; unknown is
+never folded into unsupported. Skipped rules carry their reason and the missing
+capability, and `fail_on.fail_on_skipped` makes a coverage hole indeterminate.
+Still open: streaming, structured output, seed and log-probability probes, and
+rate-limit characterisation.
+
+Original scope, for reference: `guardana target inspect` reports what an
 endpoint actually supports: system messages, streaming, tool calls, structured
 output, usage metadata, finish reason, seed, context limits, rate-limit behaviour,
 provider dialect. "OpenAI-compatible" is not a guarantee of identical behaviour,

@@ -270,6 +270,22 @@ writes against it. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 
+### Ask the target what it can actually do (`guardana target inspect`)
+
+"OpenAI-compatible" is a claim about a URL shape. A gateway can accept a tools
+array and never call anything; a proxy can drop the system message. Both turn a
+rule into a check that runs and proves nothing — which reads as a pass.
+
+Inspection probes each capability with one small request and reports **supported**,
+**unsupported**, or **unknown**, keeping the third apart from the second on
+purpose. Anything the target declared and no probe confirmed is listed as such,
+and the rules that become unrunnable are named rather than counted.
+
+Every skipped rule in a run now carries the reason and the missing capability, so
+"this never applied" and "this provider cannot do it" stop looking alike.
+`fail_on.fail_on_skipped` turns the second into an `indeterminate` verdict for
+teams paying for coverage they expect to get.
+
 ### Know the cost before the run (`guardana plan`, `budgets:`)
 
 Probing a hosted model costs money. `guardana plan probe` states the upper bound

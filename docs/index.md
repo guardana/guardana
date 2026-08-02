@@ -23,6 +23,7 @@ detail below.
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live endpoint, agent or MCP server
 - [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two saved runs, fail on deterioration
 - [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
+- [`usage-target.md`](usage-target.md) — `guardana target inspect`: what an endpoint really supports
 - [`usage-plan.md`](usage-plan.md) — `guardana plan`: what a run would cost, before it costs anything
 - [`exit-codes.md`](exit-codes.md) — the exit-status contract every command honours
 - [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run and its manifest

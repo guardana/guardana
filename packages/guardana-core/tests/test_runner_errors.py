@@ -13,7 +13,15 @@ from pathlib import Path
 import pytest
 from guardana.core.profile import FailOn, Policy, Profile
 from guardana.core.registry import Registry
-from guardana.core.report import CheckError, Evidence, Finding, ScanResult, apply_baseline
+from guardana.core.report import (
+    CheckError,
+    Evidence,
+    Finding,
+    ScanResult,
+    SkippedRule,
+    SkipReason,
+    apply_baseline,
+)
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError
 from guardana.core.runner import Runner, gate
@@ -66,7 +74,7 @@ def _rule(
     return _Constructed()
 
 
-def _run(*rules: Rule, fail_on_error: bool = True) -> tuple[object, bool]:
+def _run(*rules: Rule, fail_on_error: bool = True) -> tuple[ScanResult, bool]:
     registry = Registry()
     for rule in rules:
         registry.register_rule(rule)
@@ -84,10 +92,10 @@ def test_an_ordinary_bug_in_a_third_party_rule_does_not_abort_the_scan() -> None
         _rule("acme.buggy", raises=ValueError("typo in a third-party rule")),
         _rule("guardana.healthy"),
     )
-    assert result.rules_run_count == 1  # type: ignore[attr-defined]
-    assert [e.source for e in result.errors] == ["acme.buggy"]  # type: ignore[attr-defined]
-    assert result.errors[0].stage == "run"  # type: ignore[attr-defined]
-    assert "ValueError" in result.errors[0].reason  # type: ignore[attr-defined]
+    assert result.rules_run_count == 1
+    assert [e.source for e in result.errors] == ["acme.buggy"]
+    assert result.errors[0].stage == "run"
+    assert "ValueError" in result.errors[0].reason
 
 
 def test_a_rule_that_errored_fails_the_gate() -> None:
@@ -98,7 +106,7 @@ def test_a_rule_that_errored_fails_the_gate() -> None:
         _rule("guardana.healthy"),
     )
     assert failed is True
-    assert [e.source for e in result.errors] == ["guardana.critical"]  # type: ignore[attr-defined]
+    assert [e.source for e in result.errors] == ["guardana.critical"]
 
 
 def test_a_rule_skipped_for_capability_is_not_an_error() -> None:
@@ -107,8 +115,8 @@ def test_a_rule_skipped_for_capability_is_not_an_error() -> None:
     result, failed = _run(
         _rule("guardana.needs_chat", capabilities=frozenset({Capability.CHAT})),
     )
-    assert result.rules_skipped == ("guardana.needs_chat",)  # type: ignore[attr-defined]
-    assert result.errors == ()  # type: ignore[attr-defined]
+    assert result.skipped_rule_ids == ("guardana.needs_chat",)
+    assert result.errors == ()
     assert failed is True  # zero rules ran — the pre-existing zero-rule guard
 
 
@@ -119,8 +127,8 @@ def test_findings_produced_before_the_exception_are_kept() -> None:
         _rule("guardana.partial", yields=2, raises=RuntimeError("died halfway")),
         _rule("guardana.healthy"),
     )
-    assert len(result.findings) == 2  # type: ignore[attr-defined]
-    assert len(result.errors) == 1  # type: ignore[attr-defined]
+    assert len(result.findings) == 2
+    assert len(result.errors) == 1
     assert failed is True
 
 
@@ -143,7 +151,7 @@ def test_fail_on_error_false_restores_a_green_build() -> None:
         _rule("guardana.healthy"),
         fail_on_error=False,
     )
-    assert len(result.errors) == 1  # type: ignore[attr-defined]
+    assert len(result.errors) == 1
     assert failed is False
 
 
@@ -151,7 +159,7 @@ def test_a_giant_exception_message_is_bounded() -> None:
     # An exception message from third-party code is untrusted input that lands in
     # a report, so it is truncated rather than pasted whole.
     result, _ = _run(_rule("acme.verbose", raises=ValueError("x" * 10_000)))
-    assert len(result.errors[0].reason) < 1_000  # type: ignore[attr-defined]
+    assert len(result.errors[0].reason) < 1_000
 
 
 def test_check_error_records_the_exception_type_and_message() -> None:
@@ -169,8 +177,8 @@ def test_an_os_error_from_an_artifact_rule_is_rule_local() -> None:
         _rule("acme.unreadable", raises=PermissionError("denied")),
         _rule("guardana.healthy"),
     )
-    assert [e.source for e in result.errors] == ["acme.unreadable"]  # type: ignore[attr-defined]
-    assert result.rules_run_count == 1  # type: ignore[attr-defined]
+    assert [e.source for e in result.errors] == ["acme.unreadable"]
+    assert result.rules_run_count == 1
     assert failed is True
 
 
@@ -182,13 +190,18 @@ def test_merging_results_carries_every_channel() -> None:
     finding = _finding("acme.r")
     merged = ScanResult.merged(
         [
-            ScanResult((finding,), ("a",), ("skipped.a",), errors=(error,)),
+            ScanResult(
+                (finding,),
+                ("a",),
+                (SkippedRule("skipped.a", SkipReason.MISSING_CAPABILITY, ("chat",), "d"),),
+                errors=(error,),
+            ),
             ScanResult((), ("b", "c"), (), unverified=(finding,), waived=(finding,)),
         ]
     )
     assert merged.rules_run_count == 3
     assert merged.findings == (finding,)
-    assert merged.rules_skipped == ("skipped.a",)
+    assert merged.skipped_rule_ids == ("skipped.a",)
     assert merged.unverified == (finding,)
     assert merged.waived == (finding,)
     assert merged.errors == (error,)

@@ -10,12 +10,12 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 # A fleet upgrades one agent at a time, so the collector accepts the previous
 # envelopes too. An older agent simply reports less — which is honest, because it
 # could not observe more: a v2 agent had no `errors` channel, and a v3 agent
 # counted its rules without naming them.
-SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4})
+SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4, 5})
 
 # Ingest is untrusted input: an unbounded body would let one POST exhaust the
 # collector's memory (the store bounds submission *count*, not bytes). These caps
@@ -69,6 +69,14 @@ class CheckErrorIn(BaseModel):
     reason: _Text
 
 
+class SkippedIn(BaseModel):
+    """One rule a run did not execute, with the reason it did not."""
+
+    rule_id: _Str
+    reason: _Str
+    missing: list[_Str] = Field(default_factory=list, max_length=_MAX_SKIPPED)
+
+
 class SummaryIn(BaseModel):
     """What the run did, beyond the findings themselves."""
 
@@ -79,7 +87,11 @@ class SummaryIn(BaseModel):
     # the same false all-clear the `unverified` and `errors` channels exist for,
     # one layer further out. Defaulted, so a v3 agent still submits.
     rules_executed: list[_Str] = Field(default_factory=list, max_length=_MAX_SKIPPED)
-    rules_skipped: list[_Str] = Field(default_factory=list, max_length=_MAX_SKIPPED)
+    # v5 carries the reason a rule was skipped, not just its id: a fleet view that
+    # cannot tell "never applied" from "this provider cannot do it" shows an agent
+    # with a coverage hole as fully checked. A plain list of strings is still
+    # accepted, because a v2-to-v4 agent submits that and a fleet upgrades gradually.
+    rules_skipped: list[_Str | SkippedIn] = Field(default_factory=list, max_length=_MAX_SKIPPED)
     max_severity: _Str | None = None
     unverified: int = 0
     errors: int = 0

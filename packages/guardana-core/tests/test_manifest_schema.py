@@ -32,7 +32,7 @@ from guardana.core.manifest import (
     digest_of,
 )
 from guardana.core.manifest.serialize import SCHEMA_URL
-from guardana.core.report import ScanResult, StopReason
+from guardana.core.report import ScanResult, SkippedRule, SkipReason, StopReason
 from guardana.core.report.serialize import run_to_dict
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
@@ -157,7 +157,11 @@ def _fully_populated() -> RunManifest:
             errors=0,
             observations=1,
             rules_run=("guardana.demo",),
-            rules_skipped=("guardana.other",),
+            rules_skipped=(
+                SkippedRule(
+                    "guardana.other", SkipReason.MISSING_CAPABILITY, ("call_tools",), "no tools"
+                ),
+            ),
             max_severity=Severity.HIGH.name,
             gate=GateOutcome.FAIL,
             stopped_by=None,

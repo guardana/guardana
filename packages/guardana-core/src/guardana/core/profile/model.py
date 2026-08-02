@@ -18,6 +18,15 @@ class FailOn:
     # honestly said "I cannot tell", and you cannot gate on that. An error is a
     # defect: the check did not run, while the result looks as though it did.
     fail_on_error: bool = True
+    fail_on_skipped: bool = False
+    """Whether a rule the target could not satisfy makes the run indeterminate.
+
+    Off by default, because most skips are ordinary — a file rule against an
+    endpoint, a tool-calling rule against a model nobody claimed could call tools.
+    On, it says "I am paying for this coverage and I want to know when I did not
+    get it", which is the setting a team uses once they have decided what their
+    provider must support.
+    """
 
 
 @dataclass(frozen=True, slots=True)

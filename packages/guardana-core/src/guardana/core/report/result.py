@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from guardana.core.observation import Observation
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
+from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
 from guardana.core.usage import TargetUsage, total
@@ -14,8 +15,10 @@ class ScanResult:
     """Everything one run produced: what was found, what ran, and what was skipped.
 
     `rules_run` names the rules rather than counting them, and `rules_skipped` is
-    part of the result on purpose — a scan that quietly ran half the rules it
-    claimed to would be worse than no scan. A count cannot tell "this rule found
+    part of the result on purpose, and each skip carries *why* — a scan that
+    quietly ran half the rules it claimed to would be worse than no scan, and a
+    rule skipped because the provider cannot do something is a different fact
+    from one that never applied. A count cannot tell "this rule found
     nothing" from "this rule never ran", so two runs with different profiles would
     compare as an improvement; the names are what make that lie impossible.
     `unverified` carries the
@@ -36,7 +39,7 @@ class ScanResult:
 
     findings: tuple[Finding, ...]
     rules_run: tuple[str, ...]
-    rules_skipped: tuple[str, ...]
+    rules_skipped: tuple[SkippedRule, ...]
     unverified: tuple[Finding, ...] = ()
     waived: tuple[Finding, ...] = ()
     errors: tuple[CheckError, ...] = ()
@@ -64,7 +67,9 @@ class ScanResult:
             # De-duplicated: probe runs the same rule once per planted canary, and
             # a rule that ran three times still ran once as far as coverage goes.
             rules_run=tuple(dict.fromkeys(rule for r in results for rule in r.rules_run)),
-            rules_skipped=tuple(s for r in results for s in r.rules_skipped),
+            # De-duplicated by rule: probe runs several passes against one
+            # target, and a rule the target cannot satisfy is one gap, not three.
+            rules_skipped=tuple({s.rule_id: s for r in results for s in r.rules_skipped}.values()),
             unverified=tuple(f for r in results for f in r.unverified),
             waived=tuple(f for r in results for f in r.waived),
             errors=tuple(e for r in results for e in r.errors),
@@ -82,6 +87,11 @@ class ScanResult:
             # unknown rather than partial — see `total`.
             usage=total([r.usage for r in results]),
         )
+
+    @property
+    def skipped_rule_ids(self) -> tuple[str, ...]:
+        """Just the ids of the rules that did not run, for callers that need only those."""
+        return tuple(skip.rule_id for skip in self.rules_skipped)
 
     @property
     def rules_run_count(self) -> int:

@@ -307,7 +307,24 @@
             "errors": { "type": "integer", "minimum": 0 },
             "observations": { "type": "integer", "minimum": 0 },
             "rules_run": { "type": "array", "items": { "type": "string" } },
-            "rules_skipped": { "type": "array", "items": { "type": "string" } },
+            "rules_skipped": {
+              "description": "Rules that did not run, each with the reason. A bare list of ids could not tell a rule that never applied from one the target could not support.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["rule_id", "reason", "missing", "detail"],
+                "additionalProperties": false,
+                "properties": {
+                  "rule_id": { "type": "string" },
+                  "reason": {
+                    "type": "string",
+                    "enum": ["missing_capability", "unsafe_mode"]
+                  },
+                  "missing": { "type": "array", "items": { "type": "string" } },
+                  "detail": { "type": "string" }
+                }
+              }
+            },
             "max_severity": { "type": ["string", "null"] },
             "gate": {
               "description": "Written by the engine, never re-derived by a consumer: a reader that recomputes the verdict will eventually compute it differently, and the divergence shows up as a green build. Null only in a migrated document, whose original schema recorded no verdict.",

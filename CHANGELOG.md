@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- **`ScanResult.rules_skipped` is a list of `SkippedRule`, not of strings** —
+  each carries the reason, the missing capabilities, and a sentence. Use
+  `result.skipped_rule_ids` where only the ids are needed. The collector envelope
+  moves to **v5** to carry the same, and still accepts v2–v4.
 - **The exit-code table changed.** `2` used to mean three unrelated things — a bad
   baseline file, an unreachable endpoint, an impossible comparison. It now means
   only "the result could not be established, or the comparison could not be made",
@@ -71,6 +75,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`guardana target inspect`** — what an endpoint actually supports, as opposed
+  to what it claims. Probes chat, whether the system message survives the hop,
+  whether tool calls are honoured, and whether token counts come back; reports
+  each as supported, unsupported or **unknown**, names the capabilities that were
+  declared but not confirmed, and lists the rules the target leaves unrunnable.
+  `--require chat,call_tools` exits `2` when a capability was not confirmed.
+  See [`docs/usage-target.md`](docs/usage-target.md).
+- **A skipped rule now records why it was skipped**, and which capability was
+  missing. A bare list of ids could not tell a rule that never applied from one
+  the provider cannot support — the second is a coverage hole somebody may be
+  paying to avoid. `fail_on.fail_on_skipped` makes it `indeterminate`; a real
+  finding still outranks it.
 - **Execution budgets.** `budgets:` in `guardana.yaml` (`max_requests`,
   `max_input_tokens`, `max_output_tokens`, `max_duration`), with matching
   `--max-*` flags on `probe`. Checked **before each request**, not after each

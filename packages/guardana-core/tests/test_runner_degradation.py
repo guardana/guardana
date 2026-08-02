@@ -58,7 +58,7 @@ def test_rule_with_an_unregistered_evaluator_is_recorded_not_fatal(tmp_path: Pat
     # recorded as one — the same error routed through the load path already
     # failed the gate, and the identical defect must not be silent here.
     assert result.findings == ()
-    assert result.rules_skipped == ()
+    assert result.skipped_rule_ids == ()
     assert [e.source for e in result.errors] == ["acme.prompt.needs_missing_evaluator"]
 
 
@@ -71,7 +71,7 @@ def test_rule_raising_ruleerror_is_recorded_not_fatal() -> None:
     result = Runner(registry=registry, profile=profile).run(target)
 
     assert result.findings == ()
-    assert result.rules_skipped == ()
+    assert result.skipped_rule_ids == ()
     assert [e.source for e in result.errors] == ["acme.explodes"]
 
 
@@ -82,7 +82,7 @@ def test_rule_whose_capabilities_are_unmet_is_skipped() -> None:
     result = Runner(registry=registry, profile=profile).run(target)
 
     assert result.rules_run_count == 0
-    assert result.rules_skipped == ("acme.needs_planted_prompt",)
+    assert result.skipped_rule_ids == ("acme.needs_planted_prompt",)
 
 
 class _CanaryNeedingRule(Rule):

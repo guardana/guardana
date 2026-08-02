@@ -89,7 +89,7 @@ def test_runner_skips_rule_missing_capability(tmp_path: Path) -> None:
     result = _runner(_MissingCapability()).run(ArtifactTarget(tmp_path))
     assert result.rules_run_count == 0
     assert len(result.findings) == 0
-    assert "guardana.cap.demo" in result.rules_skipped
+    assert "guardana.cap.demo" in result.skipped_rule_ids
 
 
 class _RaisesRuleError(Rule):

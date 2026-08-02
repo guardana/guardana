@@ -9,6 +9,7 @@ from guardana.cli.probe import probe
 from guardana.cli.rules import rules
 from guardana.cli.run import run_app
 from guardana.cli.scan import scan
+from guardana.cli.target import target_app
 from guardana.core import __version__
 
 
@@ -38,3 +39,4 @@ app.command(name="new-rule")(new_rule)
 app.command(name="calibrate")(calibrate_command)
 app.add_typer(run_app, name="run")
 app.add_typer(plan_app, name="plan")
+app.add_typer(target_app, name="target")

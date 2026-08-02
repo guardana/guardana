@@ -9,6 +9,7 @@ from guardana.core.inventory import observe
 from guardana.core.profile.model import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import CheckError, Finding, ScanResult, StopReason
+from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.rule.base import Rule, RuleContext
 from guardana.core.source import UnreadSource
 from guardana.core.target import ArtifactTarget, EndpointError, Target, TargetKind
@@ -83,14 +84,28 @@ class Runner:
         # the target that has to hold it. A target that cannot enforce it refuses
         # here rather than letting the run proceed under a ceiling nothing watches.
         target.apply_budgets(self.profile.budgets)
-        skipped: list[str] = []
+        skipped: list[SkippedRule] = []
         plan: list[Rule] = []
         for rule in self.registry.rules():
             meta = rule.meta
             if meta.target_kind != target.kind or not self.profile.policy.matches(meta.id):
                 continue
-            if meta.required_capabilities - target.capabilities():
-                skipped.append(meta.id)
+            missing = meta.required_capabilities - target.capabilities()
+            if missing:
+                # The reason is recorded here because here is where it is known.
+                # Reconstructing it later, from a bare id, is guesswork.
+                names = tuple(sorted(str(c) for c in missing))
+                skipped.append(
+                    SkippedRule(
+                        rule_id=meta.id,
+                        reason=SkipReason.MISSING_CAPABILITY,
+                        missing=names,
+                        detail=(
+                            f"{target.ref} does not support {', '.join(names)}, "
+                            f"which {meta.id} needs"
+                        ),
+                    )
+                )
                 continue
             plan.append(rule)
 

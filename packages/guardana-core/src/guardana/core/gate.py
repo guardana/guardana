@@ -30,7 +30,9 @@ class GateOutcome(StrEnum):
     INDETERMINATE = "indeterminate"
 
 
-def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
+def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them would hide the order
+    result: "ScanResult", policy: "Policy"
+) -> GateOutcome:
     """Judge one result against a policy, in three states rather than two.
 
     Precedence, and the reasoning for each step:
@@ -45,8 +47,9 @@ def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
     reporting the missing check instead would bury it.
 
     **Everything else that leaves a question open is `INDETERMINATE`** — no rule
-    ran at all, a check could not run under `fail_on_error`, or a check ran and
-    could not grade under `fail_on_inconclusive`.
+    ran at all, a check could not run under `fail_on_error`, a check ran and could
+    not grade under `fail_on_inconclusive`, or a check the target could not
+    support was skipped under `fail_on_skipped`.
     """
     if result.stopped_by is not None:
         return GateOutcome.INDETERMINATE
@@ -68,6 +71,8 @@ def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
     if threshold.fail_on_inconclusive and any(
         f.severity >= threshold.severity for f in result.unverified
     ):
+        return GateOutcome.INDETERMINATE
+    if threshold.fail_on_skipped and any(s.is_coverage_gap for s in result.rules_skipped):
         return GateOutcome.INDETERMINATE
     return GateOutcome.PASS
 

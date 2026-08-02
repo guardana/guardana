@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from guardana.core.gate import GateOutcome
+from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 
 
@@ -67,7 +68,7 @@ class ResultSummary:
     errors: int
     observations: int
     rules_run: tuple[str, ...]
-    rules_skipped: tuple[str, ...]
+    rules_skipped: tuple[SkippedRule, ...]
     max_severity: str | None
     gate: GateOutcome | None
     stopped_by: StopReason | None = None
