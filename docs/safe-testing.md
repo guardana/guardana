@@ -95,3 +95,52 @@ checks never running by default, and every attempted action reported as
 - [Threat model](threat-model.md) — including what a hostile endpoint can do to Guardana
 - [Product status](product-status.md) — what is and is not covered
 - [`docs/usage-probe.md`](usage-probe.md) · [`docs/usage-monitor.md`](usage-monitor.md)
+
+## Declared impact, and what a run permits (0.7)
+
+Every rule declares how far it reaches, and every run declares how far it is
+willing to let a rule reach.
+
+| Impact | What it does |
+|---|---|
+| `passive` | reads only — a file scan, or reading a tool manifest |
+| `active` | sends prompts to a model: costs money, appears in the target's logs |
+| `side_effecting` | may cause the target to *act* — call a real tool, write to a real memory store |
+
+```bash
+guardana probe --url ... --model ... --safety passive   # send nothing
+guardana probe --url ... --model ...                    # active, the default
+guardana probe --url ... --model ... --safety side-effecting
+```
+
+`active` is the default because sending prompts is what a probe is for; a passive
+default would make the ordinary command do nothing. `guardana scan` is passive
+whatever this says — a file scan sends nothing.
+
+**Nothing Guardana ships is `side_effecting` today, and that is a statement about
+today rather than about the checks.** The agent rules drive Guardana's own harness
+with its own tool doubles, so when a model "calls" a tool nothing outside the
+process happens. The level is reserved for the case that changes it — evaluating a
+trace from *your* agent, where the tools are real — because declaring it now would
+label a risk that does not exist yet and devalue the label for when it does.
+
+### Destructive is a separate switch
+
+```bash
+guardana probe ... --allow-destructive
+```
+
+A rule that can destroy or alter something the target owns never runs without
+this, **whatever the impact ceiling says**. Two independent switches rather than a
+fourth impact level, so raising one can never reach the other by accident.
+
+Nothing shipped is destructive, and a test asserts it: if a built-in ever sets the
+flag, that is a decision argued in a pull request rather than discovered by a user
+whose `--allow-destructive` did something they did not expect.
+
+### A rule refused for safety is reported, not dropped
+
+It appears in `rules_skipped` with `reason: unsafe_mode` and a sentence naming the
+flag that would permit it. A check that did not happen is a coverage gap whatever
+the reason — and here the fix is a flag rather than a different provider, which is
+what the reader needs to know.

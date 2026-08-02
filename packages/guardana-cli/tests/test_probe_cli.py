@@ -5,6 +5,7 @@ import guardana.cli._endpoint as endpoint_module
 import guardana.cli._probe_run as probe_run_module
 import pytest
 from guardana.cli._probe_run import _with_random_canary
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.evaluator.base import Expectation
 from guardana.core.profile import Profile
@@ -20,7 +21,8 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
-_TYPER_USAGE_ERROR = 2
+_TYPER_USAGE_ERROR = int(ExitCode.INVALID_USAGE)
+"""Argument-parsing errors use Guardana's invalid-usage code, not Click's default."""
 _ENDPOINT_UNREACHABLE = 4
 
 

@@ -270,6 +270,19 @@ writes against it. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 
+### Every rule says how far it reaches (`--safety`, `--allow-destructive`)
+
+A rule declares whether it only reads, sends prompts, or could make the target
+act; a run declares what it permits. `--safety passive` sends nothing at all — a
+zero-cost check of the wiring that is visibly empty rather than quietly green.
+
+`--allow-destructive` is a **separate switch**, not a fourth level, so raising the
+impact ceiling can never reach a destructive rule by accident. Nothing shipped is
+destructive, and a test keeps it that way.
+
+A rule refused for safety appears in `rules_skipped` with the reason and the flag
+that would permit it — a coverage gap you can see, never a silent drop.
+
 ### Evidence is redacted by default, at one seam (`privacy:`)
 
 The most sensitive text in a deployment is exactly what a security finding quotes.

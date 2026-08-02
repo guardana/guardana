@@ -240,3 +240,30 @@ def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
     list(rule.run(target, _CTX))
 
     assert target.usage().requests == rule.estimated_requests
+
+
+def test_every_endpoint_rule_declares_at_least_active_impact() -> None:
+    """A rule that sends prompts and calls itself passive would run in a passive run.
+
+    The default is `PASSIVE`, which is safe in the direction that matters — an
+    under-declared rule gets skipped rather than run — but a *shipped* rule that
+    is quietly skipped in the mode most people use is lost coverage nobody asked
+    for. This is the gate that stops the next endpoint rule from forgetting.
+    """
+    from guardana.core.safety import Impact  # noqa: PLC0415
+
+    understated = [r.meta.id for r in _endpoint_rules() if r.meta.impact is Impact.PASSIVE]
+    assert not understated, (
+        f"these rules talk to a model but declare themselves passive: {understated}"
+    )
+
+
+def test_no_shipped_rule_is_destructive() -> None:
+    """Nothing shipped may destroy anything, and this is how that stays true.
+
+    The switch exists for third-party rules. If a built-in ever sets it, that is a
+    decision to be argued in a pull request rather than discovered by a user whose
+    `--allow-destructive` did something they did not expect.
+    """
+    destructive = [r.meta.id for r in provide_rules() if r.meta.destructive]
+    assert not destructive, f"a shipped rule declares itself destructive: {destructive}"

@@ -22,6 +22,7 @@ from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
+from guardana.core.safety import Impact
 from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport, TargetKind
 from guardana.report import get_renderer
 
@@ -30,6 +31,22 @@ from guardana.report import get_renderer
 # are retried with backoff, so a busy endpoint slows the probe instead of
 # failing it. Raise it for a hosted endpoint you own the quota for.
 _DEFAULT_CONCURRENCY = 4
+
+
+def _impact(name: str) -> Impact:
+    """Read the `--safety` flag, refusing a level nobody defined.
+
+    Refused rather than defaulted: a typo that silently fell back to `active`
+    would run more than the user asked for, which is the one direction this flag
+    exists to prevent.
+    """
+    try:
+        return Impact(name.replace("-", "_"))
+    except ValueError as exc:
+        raise typer.BadParameter(
+            f"unknown safety level {name!r}; expected one of "
+            f"{[str(i).replace('_', '-') for i in Impact]}"
+        ) from exc
 
 
 def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
@@ -107,12 +124,25 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     max_duration: Annotated[
         str | None, typer.Option("--max-duration", help="Wall-clock ceiling, e.g. 15m.")
     ] = None,
+    safety: Annotated[
+        str,
+        typer.Option(help="How far rules may reach: passive|active|side-effecting"),
+    ] = "active",
+    allow_destructive: Annotated[
+        bool,
+        typer.Option(
+            "--allow-destructive",
+            help="Permit rules that can destroy or alter something the target owns.",
+        ),
+    ] = False,
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
     started_at = datetime.now(UTC)
     prof = resolve_profile(profile, preset)
     prof = replace(
         prof,
+        max_impact=_impact(safety),
+        allow_destructive=allow_destructive,
         budgets=override(
             prof.budgets,
             max_requests=max_requests,

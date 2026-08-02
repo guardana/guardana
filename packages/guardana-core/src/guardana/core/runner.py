@@ -11,6 +11,7 @@ from guardana.core.registry import Registry
 from guardana.core.report import CheckError, Finding, ScanResult, StopReason
 from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.rule.base import Rule, RuleContext
+from guardana.core.safety import permits
 from guardana.core.source import UnreadSource
 from guardana.core.target import ArtifactTarget, EndpointError, Target, TargetKind
 
@@ -90,6 +91,10 @@ class Runner:
             meta = rule.meta
             if meta.target_kind != target.kind or not self.profile.policy.matches(meta.id):
                 continue
+            refusal = self._safety_refusal(rule)
+            if refusal is not None:
+                skipped.append(refusal)
+                continue
             missing = meta.required_capabilities - target.capabilities()
             if missing:
                 # The reason is recorded here because here is where it is known.
@@ -159,6 +164,37 @@ class Runner:
             usage=target.usage(),
             stopped_by=stopped_by,
         )
+
+    def _safety_refusal(self, rule: Rule) -> SkippedRule | None:
+        """Refuse a rule that reaches further than this run permits, and say so.
+
+        Reported as a skip rather than dropped: a check that did not happen is a
+        coverage gap whatever the reason, and the reason here points at a flag
+        rather than at the target — which is what somebody reading the log needs
+        to know.
+        """
+        meta = rule.meta
+        if meta.destructive and not self.profile.allow_destructive:
+            return SkippedRule(
+                rule_id=meta.id,
+                reason=SkipReason.UNSAFE_MODE,
+                missing=("allow_destructive",),
+                detail=(
+                    f"{meta.id} can destroy or alter something the target owns, and this "
+                    f"run does not permit that"
+                ),
+            )
+        if not permits(self.profile.max_impact, meta.impact):
+            return SkippedRule(
+                rule_id=meta.id,
+                reason=SkipReason.UNSAFE_MODE,
+                missing=(str(meta.impact),),
+                detail=(
+                    f"{meta.id} is {meta.impact}, and this run permits at most "
+                    f"{self.profile.max_impact}"
+                ),
+            )
+        return None
 
     def _execute(self, plan: Sequence[Rule], target: Target) -> Iterator[_RuleOutcome]:
         limit = self.concurrency_for(target.kind)

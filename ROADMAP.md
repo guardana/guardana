@@ -232,7 +232,13 @@ prompts, responses and tool arguments not stored unless configured; an explicit
 warning when full evidence is enabled; tests proving sensitive fields cannot
 bypass redaction. See [`docs/design/privacy-and-redaction.md`](docs/design/privacy-and-redaction.md).
 
-**Safe active testing.** Rules declare `impact` (passive / active /
+**Safe active testing — shipped.** Rules declare `impact`, whether they are
+destructive, and their estimated request count; `--safety` sets the ceiling and
+`--allow-destructive` is an independent switch. Still open: reporting each
+attempted action as simulated / proposed / executed, which needs the customer's
+own harness (v0.8).
+
+Original scope: rules declare `impact` (passive / active /
 side_effecting), whether they are destructive, and their estimated request count.
 `--safety passive|active` and `--allow-side-effects`, with destructive checks never
 running by default and every attempted action reported as simulated, proposed or

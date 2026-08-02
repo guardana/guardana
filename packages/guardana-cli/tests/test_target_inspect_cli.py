@@ -140,3 +140,34 @@ def test_inspection_states_what_it_cost(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert "cost" in result.output
     assert "request" in result.output
+
+
+def test_a_passive_probe_skips_the_rules_that_would_send_prompts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--safety passive` against a live endpoint: nothing is sent, and it says so.
+
+    The value of this mode is a dry, zero-cost sanity check of the wiring. It has
+    to be visibly empty rather than quietly green — a run that verified nothing
+    must not look like a run that found nothing.
+    """
+    monkeypatch.setattr(endpoint_module, "transport_factory", _PlainChat)
+
+    result = runner.invoke(
+        app,
+        ["probe", "--url", "http://fake", "--model", "m", "--safety", "passive"],
+    )
+
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+    assert "0 rules ran" in result.output or "nothing was checked" in result.output
+
+
+def test_an_unknown_safety_level_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A typo must not fall back to a more permissive level.
+    monkeypatch.setattr(endpoint_module, "transport_factory", _PlainChat)
+
+    result = runner.invoke(
+        app, ["probe", "--url", "http://fake", "--model", "m", "--safety", "acive"]
+    )
+
+    assert result.exit_code == ExitCode.INVALID_USAGE

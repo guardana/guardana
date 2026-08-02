@@ -6,6 +6,7 @@ from pathlib import Path
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, McpServerTarget, McpTool, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -56,6 +57,7 @@ class McpServerManifestRule(Rule):
         target_kind=TargetKind.ENDPOINT,
         taxonomy=(OWASP_LLM01, OWASP_LLM03, OWASP_ASI04, ATLAS_T0110, ATLAS_T0109, ATLAS_T0084_001),
         required_capabilities=frozenset({Capability.LIST_TOOLS}),
+        impact=Impact.ACTIVE,
     )
 
     @property

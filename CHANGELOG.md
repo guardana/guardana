@@ -75,6 +75,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rules declare their impact, and runs declare what they permit.** `passive`
+  reads, `active` sends prompts, `side_effecting` may make the target act;
+  `--safety passive|active|side-effecting` sets the ceiling, defaulting to
+  `active`. **`--allow-destructive` is a separate switch**, so raising the impact
+  ceiling can never reach a destructive rule by accident — and a test asserts no
+  shipped rule is destructive. Nothing shipped is `side_effecting` either: the
+  agent rules drive Guardana's own tool doubles, and labelling a risk that does
+  not exist yet would devalue the label for when it does.
+  See [`docs/safe-testing.md`](docs/safe-testing.md).
+- **`RuleMeta` gains `impact`, `destructive` and `maturity`.** Impact is derived
+  for YAML rules from what they already declare, so no rule file changes and none
+  can drift out of step with what it does. A gate asserts every shipped endpoint
+  rule declares at least `active` — the default is `passive`, which fails safe by
+  skipping rather than running, but a shipped rule silently skipped in the mode
+  most people use is lost coverage nobody asked for.
+- **Argument-parsing errors now exit `3`, not `2`.** An unknown option or a bad
+  enum value is invalid usage: nothing ran. Leaving them at Click's default would
+  have made the documented table untrue for the one class of error every command
+  shares and nobody writes by hand.
 - **Central evidence redaction.** One `EvidenceRedactor`, at one seam, between
   findings and every way they leave the process — the renderers, the collector
   envelope and baseline files. Applied by the renderer *factory*, so a format

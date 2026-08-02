@@ -4,6 +4,7 @@ from fnmatch import fnmatch
 
 from guardana.core.budget import Budgets
 from guardana.core.redaction import RedactionPolicy
+from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 
 
@@ -56,6 +57,25 @@ class Profile:
     rule_paths: tuple[str, ...] = ()
     path_excludes: tuple[str, ...] = ()
     budgets: Budgets = field(default_factory=Budgets)
+    max_impact: Impact = Impact.ACTIVE
+    """How far this run permits a rule to reach.
+
+    `ACTIVE` by default: sending prompts is what a probe is for, and defaulting to
+    `PASSIVE` would make the ordinary command do nothing. Side-effecting rules are
+    opt-in because making an agent *act* is a different decision from talking to
+    it, and `guardana scan` never reaches either — a file scan is passive whatever
+    this says.
+    """
+
+    allow_destructive: bool = False
+    """Whether a rule that can destroy something may run.
+
+    A separate switch, not a fourth impact level, so raising the impact ceiling
+    can never reach it by accident. Nothing shipped is destructive today; the
+    switch exists so that a third-party rule which is has somewhere to declare it
+    and something to be stopped by.
+    """
+
     privacy: RedactionPolicy = field(default_factory=RedactionPolicy)
     """What evidence this run may keep. See `guardana.core.redaction`.
 

@@ -4,6 +4,7 @@ from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError
+from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.target import (
     Capability,
@@ -50,6 +51,7 @@ class ExcessiveAgencyRule(Rule):
             ATLAS_T0053,
         ),
         required_capabilities=frozenset({Capability.CHAT, Capability.CALL_TOOLS}),
+        impact=Impact.ACTIVE,
     )
 
     @property

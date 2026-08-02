@@ -141,3 +141,32 @@ def test_new_rule_with_an_unknown_evaluator_is_usage_not_policy(tmp_path: Path) 
     )
 
     assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+def test_an_unknown_option_exits_three_not_two() -> None:
+    """Argument parsing is invalid usage, not an indeterminate result.
+
+    Pinned as behaviour rather than as mechanism: it is implemented by repointing
+    Click's usage-error exit code, including Typer's vendored copy, and this test
+    is what makes a Typer release that rearranges that fail loudly.
+    """
+    result = runner.invoke(app, ["scan", ".", "--no-such-option"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+def test_a_bad_enum_value_exits_three() -> None:
+    result = runner.invoke(app, ["scan", ".", "--format", "yaml"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+def test_two_mutually_exclusive_flags_exit_three(tmp_path: Path) -> None:
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("name: x\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["scan", str(tmp_path), "--profile", str(profile), "--preset", "ci"]
+    )
+
+    assert result.exit_code == ExitCode.INVALID_USAGE

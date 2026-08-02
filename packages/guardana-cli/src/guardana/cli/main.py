@@ -1,6 +1,7 @@
 import typer
 from guardana.cli.calibrate import calibrate_command
 from guardana.cli.diff import diff
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.init import init
 from guardana.cli.monitor import monitor
 from guardana.cli.new_rule import new_rule
@@ -26,6 +27,30 @@ def _main(
 ) -> None:
     pass
 
+
+def _use_guardana_exit_code_for_usage_errors() -> None:
+    """Make argument-parsing errors exit `3` rather than Click's default of `2`.
+
+    An unknown option or a bad enum value is invalid usage: nothing ran. Exit `2`
+    in Guardana's table means "the result could not be established", which is a
+    statement about a run that happened — so leaving these at `2` would make the
+    documented table untrue for the one class of error every command shares and
+    nobody writes by hand.
+
+    Applied to Typer's vendored copy of Click as well as to Click itself, because
+    they are different modules and Typer raises from its own. Reaching into a
+    private module is not something to do lightly; it is pinned by a test that
+    asserts the behaviour rather than the mechanism, so a Typer release that
+    rearranges this fails loudly instead of quietly restoring `2`.
+    """
+    import click  # noqa: PLC0415
+    from typer import _click as vendored_click  # noqa: PLC0415
+
+    for module in (click, vendored_click):
+        module.exceptions.UsageError.exit_code = int(ExitCode.INVALID_USAGE)
+
+
+_use_guardana_exit_code_for_usage_errors()
 
 app = typer.Typer(help="Guardana — verify the security of self-hosted/self-built AI.")
 app.callback()(_main)

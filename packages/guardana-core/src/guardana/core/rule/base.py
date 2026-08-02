@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.report import Finding
 from guardana.core.rule._digest import digest_parts
+from guardana.core.safety import Impact, Maturity
 from guardana.core.severity import Severity
 from guardana.core.surface import Surface
 from guardana.core.target import Capability, Target, TargetKind
@@ -26,6 +27,31 @@ class RuleMeta:
     taxonomy: tuple[TaxonomyRef, ...] = ()
     required_capabilities: frozenset[Capability] = frozenset()
     evaluator: str | None = None
+    impact: Impact = Impact.PASSIVE
+    """What running this rule does to the world. See `guardana.core.safety`.
+
+    Defaults to `PASSIVE`, which is the safe default in the direction that
+    matters: a rule that under-declares gets *skipped* by a cautious run rather
+    than being run by a permissive one. An author who forgets loses coverage; they
+    do not gain a side effect nobody asked for.
+    """
+
+    destructive: bool = False
+    """Whether this rule can destroy or alter something the target owns.
+
+    Never runs unless explicitly permitted, whatever the impact level says. A
+    separate flag rather than a fourth impact level, because "irreversible" is a
+    different question from "how far does this reach", and a policy wants to say
+    no to it independently.
+    """
+
+    maturity: Maturity = Maturity.STABLE
+    """How much this rule's verdict should be trusted.
+
+    Defaults to `STABLE` because every built-in is, and a default of
+    `EXPERIMENTAL` would make the honest label meaningless by applying it to
+    everything.
+    """
 
     @property
     def surface(self) -> Surface:
@@ -115,6 +141,8 @@ class Rule(ABC):
                 self.meta.evaluator or "",
                 ",".join(f"{t.framework}:{t.id}" for t in self.meta.taxonomy),
                 ",".join(sorted(self.meta.required_capabilities)),
+                str(self.meta.impact),
+                str(self.meta.destructive),
             )
         )
 

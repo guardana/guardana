@@ -4,6 +4,7 @@ from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError
+from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, ChatMessage, Target, TargetKind
 from guardana.core.target.endpoint import EndpointTarget
@@ -37,6 +38,7 @@ class OutputSecretsRule(Rule):
         target_kind=TargetKind.ENDPOINT,
         taxonomy=(OWASP_LLM02,),
         required_capabilities=frozenset({Capability.CHAT}),
+        impact=Impact.ACTIVE,
     )
 
     @property

@@ -19,6 +19,7 @@ from guardana.core.evaluator.length import LengthEvaluator
 from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
 from guardana.core.rule.base import RuleMeta
 from guardana.core.rule.errors import RuleLoadError
+from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
 from guardana.core.taxonomy import TaxonomyRef, resolve
@@ -139,15 +140,39 @@ def parse_meta(
     and `tools:`) reuse this without those keys being rejected as typos.
     """
     reject_unknown_keys(raw, allowed or _ALLOWED_RULE_KEYS, "rule", path)
+    kind = _parse_target_kind(raw, path)
+    capabilities = _parse_capabilities(raw.get("requires"), path)
     return RuleMeta(
         id=_require_str(raw, "id", path),
         title=_require_str(raw, "title", path),
         severity=_parse_severity(raw, path),
-        target_kind=_parse_target_kind(raw, path),
+        target_kind=kind,
         taxonomy=_parse_taxonomy(raw.get("taxonomy"), path),
-        required_capabilities=_parse_capabilities(raw.get("requires"), path),
+        required_capabilities=capabilities,
         evaluator=_require_str(raw, "evaluator", path),
+        impact=impact_for(kind, capabilities),
     )
+
+
+def impact_for(kind: TargetKind, capabilities: frozenset[Capability]) -> Impact:
+    """Derive impact from what the rule already declares, rather than asking again.
+
+    A YAML author should not have to restate something the engine can see: a rule
+    against files reads, a rule against an endpoint sends prompts. Deriving it
+    means no existing rule file has to change, and none can drift out of step with
+    what it actually does.
+
+    A tool-calling rule is `ACTIVE`, not `SIDE_EFFECTING`, and that is a statement
+    about today rather than about the check. Guardana drives its own harness with
+    its own tool doubles, so nothing outside this process happens when a model
+    "calls" a tool. `SIDE_EFFECTING` is reserved for the case that changes it —
+    evaluating a trace from the customer's own agent, where the tools are real —
+    and declaring it now would be labelling a risk that does not exist yet, which
+    devalues the label for when it does.
+    """
+    if kind is not TargetKind.ENDPOINT:
+        return Impact.PASSIVE
+    return Impact.ACTIVE
 
 
 def parse_expectation(raw: object, path: Path) -> Expectation:

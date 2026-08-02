@@ -18,6 +18,7 @@ from guardana.core.rule._yaml_schema import (
     _parse_target_kind,
     _parse_taxonomy,
     _require_str,
+    impact_for,
     reject_unknown_keys,
     require_canary_is_plantable,
 )
@@ -50,14 +51,16 @@ def is_scenario(raw: dict[str, Any]) -> bool:
 def parse_scenario(raw: dict[str, Any], path: Path) -> ScenarioRule:
     """Validate a scenario mapping into a `ScenarioRule`, failing loudly on any error."""
     reject_unknown_keys(raw, _ALLOWED_SCENARIO_KEYS, "scenario", path)
+    kind = _parse_target_kind(raw, path)
     meta = RuleMeta(
         id=_require_str(raw, "id", path),
         title=_require_str(raw, "title", path),
         severity=_parse_severity(raw, path),
-        target_kind=_parse_target_kind(raw, path),
+        target_kind=kind,
         taxonomy=_parse_taxonomy(raw.get("taxonomy"), path),
         required_capabilities=_parse_capabilities(raw.get("requires"), path),
         evaluator=None,
+        impact=impact_for(kind, frozenset()),
     )
     steps = _parse_steps(raw.get("steps"), path)
     stateful = _parse_bool(raw.get("stateful", False), "stateful", path)
