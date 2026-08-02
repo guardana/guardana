@@ -2,33 +2,59 @@
 
 # 🛡️ Guardana
 
-**Security verification for self-hosted and self-built AI —
-model files, live endpoints, and agents — from one rule engine
-that runs on your laptop, in CI, and next to a served model.**
+**Open-source AI security verification, from build to production.**
+
+Guardana scans AI artifacts, probes deployed models and agents, records
+reproducible security evidence, and detects regressions between releases.
+Run it locally, in CI/CD, as scheduled health checks, or with an optional
+self-hosted collector.
 
 [![CI](https://github.com/guardana/guardana/actions/workflows/ci.yml/badge.svg)](https://github.com/guardana/guardana/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
-[![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#roadmap)
+[![Status: beta](https://img.shields.io/badge/status-beta-yellow.svg)](docs/product-status.md)
 [![OWASP LLM Top 10](https://img.shields.io/badge/mapped-OWASP%20%C2%B7%20MITRE%20ATLAS%20%C2%B7%20NIST-informational.svg)](#standards-and-architecture)
 [![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Quickstart](#quickstart) · [Features](FEATURES.md) · [The 32 rules](#whats-in-the-box) · [Docs](docs/index.md) · [Architecture](docs/architecture.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
+[Quickstart](#quickstart) · [Features](FEATURES.md) · [Rule catalog](docs/generated/rule-catalog.md) · [Docs](docs/index.md) · [Status & limits](docs/product-status.md) · [Roadmap](ROADMAP.md) · [Partner with us](#partner-with-us)
 
 </div>
 
 ---
 
+> **Status.** The CLI and engine are **beta** — used to gate real builds, with the
+> public API still moving between minor releases. The self-hosted collector is
+> **experimental**: in-memory storage and no authentication, suitable for local
+> evaluation, not yet for team production use. See
+> [product status and known limitations](docs/product-status.md) before adopting.
+
+- No account, no telemetry, no phone-home. The only network traffic is to the target you point it at.
+- Offline static scanning; explicit `findings`, `unverified` and `errors` channels.
+- Confidence and evaluator provenance on every dynamic verdict.
+- SARIF, JSON, JUnit, CI gates, and release-to-release comparison.
+
 ## Why Guardana exists
 
-Existing AI red-team scanners (garak, Giskard, PyRIT, CyberSecEval, and
-friends) are good at *sending* attacks. Their shared, documented weakness is
-telling you whether an attack **actually succeeded**: keyword-graded dynamic
-checks misjudge outcomes at rates reported as high as **37%**
-([Fujitsu Research, 2024](https://arxiv.org/abs/2410.16527)).
-A scanner that can't tell a refusal from a compliance isn't a security tool —
-it's a random number generator with a progress bar.
+AI systems have several security boundaries: the model artifact and its
+dependencies, the prompts and templates, the endpoint's behaviour, the tools and
+credentials an agent holds, retrieval and memory, and every deployment change
+after that. Most tools cover one of them.
+
+The harder problem is the verdict. Sending an attack is easy; knowing whether it
+**landed** is not. Fujitsu Research measured keyword-based judging of jailbreak
+attempts and found misclassification rates of up to **37%** against human labels
+([arXiv:2410.16527](https://arxiv.org/abs/2410.16527)) — a limitation of *keyword
+grading as a technique*, not a measurement of any particular tool. A check that
+cannot tell a refusal from a compliance is not a security control.
+
+**Guardana's approach:** deterministic evidence where the question allows it, an
+evaluator-graded verdict where it does not, and an explicit "could not tell" where
+neither is honest. Grading is a first-class, versioned, swappable component — the
+**Evaluator** — so every dynamic finding carries an `outcome`, a `confidence`, a
+`rationale`, and the id of the evaluator that produced it. Our own judge's
+confidence is *measured* (Brier score and expected calibration error via
+`guardana calibrate`), not asserted.
 
 **Guardana's answer:** treat *"did it succeed, and how confident are we?"* as a
 first-class, pluggable, versioned component — the **Evaluator** — instead of
@@ -43,24 +69,22 @@ risk) don't have this problem — they're deterministic. So Guardana ships them
 as the reliable, no-false-positive-theater **front door**, and builds
 evaluator-graded dynamic checks and a live monitor around that core.
 
-## How it compares
+## Where Guardana fits
 
-Most tools do one of these things well. Guardana's bet is that the team running
-a self-hosted model wants one engine covering the model file, the live endpoint,
-*and* the running service — with a confidence on every dynamic verdict.
+The AI-security tooling landscape has distinct categories, and Guardana is
+complementary to most of them rather than a replacement:
 
-| | Static model-artifact scan | Live endpoint probe | Long-running monitor | Graded confidence (not keyword) | OWASP-LLM / ATLAS mapping | SARIF / CI gate |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|
-| **Guardana** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| garak | — | ✅ | — | partial | partial | partial |
-| ModelScan | ✅ | — | — | n/a | — | — |
-| promptfoo | — | ✅ | — | ✅ | — | ✅ |
-| PyRIT | — | ✅ | — | partial | — | — |
-| Giskard | — | ✅ | — | ✅ | partial | — |
+| Category | Examples | What it does | Guardana's relationship |
+|---|---|---|---|
+| **Model/artifact scanners** | ModelScan, picklescan | Inspect model files for unsafe serialization | Overlapping — Guardana's static layer does this and reads more formats |
+| **Red-team harnesses** | garak, PyRIT, promptfoo | Generate and send large volumes of attacks | Complementary — they send more; Guardana focuses on grading what landed and on regression |
+| **Runtime guardrails** | LlamaFirewall, Llama Guard | Block or filter in the request path | Different job — Guardana verifies and gates, it is never inline |
+| **AI observability** | LangSmith, Langfuse and friends | Trace and debug application behaviour | Complementary — trace ingestion is on the roadmap so their output becomes Guardana's input |
+| **SAST / CVE / secrets** | Semgrep, Trivy, gitleaks | General code and dependency security | Complementary — Guardana stays dedicated to AI-specific risk |
 
-<sub>Checkmarks reflect each tool's primary, documented focus as of July 2026 —
-these are excellent tools with different goals, not competitors to dismiss.
-Corrections welcome via PR.</sub>
+What Guardana adds that none of the above provides as its primary job: **a
+reproducible evidence record per run, and a verdict on whether the next release is
+worse than the last one.**
 
 ## Quickstart
 
@@ -87,10 +111,12 @@ $ uv run guardana scan examples/vulnerable-model
     unpickling imports non-allowlisted callable: posix.system  (examples/vulnerable-model/model.pt)
 ✖ [HIGH] guardana.supply_chain.dependency_risk — Unsafe model/deserialization loader call
     torch.load without weights_only=True  (examples/vulnerable-model/load_model.py:3)
+✖ [CRITICAL] guardana.supply_chain.remote_code_config — Model config requests custom-code execution on load
+    '_attn_implementation_internal' names a Hub kernel repository transformers downloads and imports on load  (examples/vulnerable-model/config.json)
 ▲ [MEDIUM] guardana.supply_chain.hallucinated_package — Import of unknown package (possible slopsquat lead)
-    import 'torchutilz' isn't a known package or a declared dependency — declare it in requirements/pyproject, or verify it exists on PyPI  (examples/vulnerable-model/train.py:1)
+    import 'torchutilz' isn't a known package or a declared dependency  (examples/vulnerable-model/train.py:1)
 
-3 finding(s); 17 rule(s) run, 0 skipped.
+12 finding(s); 19 rule(s) run, 0 skipped.
 ```
 
 That exits `1` — the same signal a CI gate reads. Now point it at your own code:
@@ -108,6 +134,36 @@ uv run guardana --version              # print the installed version
 bundles the deliberately-vulnerable `examples/vulnerable-model/` fixture. Point
 it at `packages/` for a clean run.)
 
+### Test a deployed model
+
+```bash
+guardana probe --url http://localhost:11434 --model llama3 \
+  --preset ci --format json --output run.json
+```
+
+### Compare a release against the last accepted one
+
+```bash
+guardana diff accepted-run.json run.json
+```
+
+Exit `0` means nothing got worse, `1` means it did, and `2` means the two runs
+could not honestly be compared — see [`docs/usage-diff.md`](docs/usage-diff.md).
+
+### Before you probe anything that matters
+
+Active checks send real requests and cost real money. Read this once:
+
+- **Prefer staging.** A probe against production consumes tokens and may trip a
+  provider's abuse detection.
+- **Guardana never executes a real tool** — tool calls go to doubles. But a *model*
+  wired to real tools by its own deployment can act on what Guardana prompted.
+- **Evidence can contain sensitive text.** It is redacted by default; do not enable
+  full evidence collection without reading
+  [`docs/privacy-and-redaction.md`](docs/design/privacy-and-redaction.md).
+- **`guardana monitor` is a scheduled active prober**, not passive traffic
+  inspection and not an inline firewall.
+
 > **On PyPI:** [`guardana-cli`](https://pypi.org/project/guardana-cli/) ·
 > [`guardana-core`](https://pypi.org/project/guardana-core/) ·
 > [`guardana-rules`](https://pypi.org/project/guardana-rules/) ·
@@ -115,24 +171,31 @@ it at `packages/` for a clean run.)
 > [`guardana-server`](https://pypi.org/project/guardana-server/) — all Apache-2.0,
 > published via PyPI Trusted Publishing (no stored token).
 
-## Three ways to run it
+## Four things you do with it
 
-One engine, three entry points, no separate tools to learn:
+One engine, four verbs:
 
-| Mode | Command | Use it for |
+| Verb | Command | What it does |
 |---|---|---|
-| **Dev / CI** | `guardana scan <path>` | Fast, static, no-network scan of a repo or model directory. Drops into a pipeline as a linter-like gate. |
-| **Live probe** | `guardana probe --url <endpoint> --model <name>` | One-shot dynamic run against a live endpoint: prompt injection, jailbreak (single-turn and multi-turn scenarios), system-prompt leakage, output-secret checks — each graded by an Evaluator with a confidence. OpenAI-compatible by default; `--provider ollama\|tgi` speaks Ollama's native `/api/chat` or HF TGI's `/generate`. |
-| **Monitor** | `guardana monitor --url <endpoint> --model <name>` | Long-running sampling observer next to a served model; alerts on policy-gate failure, on a check that could not run, and on any cycle worse than the first — including a check that can no longer grade what it used to, because a model whose safety checks go blind is itself the alert. |
+| **Verify artifacts** | `guardana scan <path>` | Fast, static, no-network scan of a repository or model directory. Drops into a pipeline as a linter-like gate. |
+| **Verify a deployed system** | `guardana probe --url … --model …` | One-shot adversarial run against a live target: prompt injection, single- and multi-turn jailbreaks, system-prompt leakage, agent trajectories, output-secret checks — each graded by an Evaluator with a confidence. |
+| **Continuously re-verify** | `guardana monitor --url … --model …` | Scheduled re-runs next to a served model, alerting when a cycle is worse than the first. |
+| **Compare evidence** | `guardana diff before.json after.json` | Runs no rules: reads two saved runs and answers whether the second is worse. Exit `2` — never a quiet `0` — when they cannot honestly be compared. |
 
-Any of the three can forward findings to an optional central collector with
-`--reporter server://<collector-url>` (see [central monitoring](#central-monitoring--self-hosted-or-managed)).
+**Targets, not modes.** `probe` points at an OpenAI-compatible endpoint, an Ollama
+or HF TGI server, a guarded endpoint via an adapter, or a **live MCP server**
+(`--mcp`). Those are targets the same verb supports, not separate ways to run the
+tool.
 
-A fourth command sits **on top of** those three rather than beside them:
-`guardana diff before.json after.json` runs no rules at all — it reads two runs
-you saved with `--output` and answers whether the second is worse than the first,
-failing the build on deterioration and refusing (exit `2`, never a quiet `0`) when
-the two cannot honestly be compared. See [`docs/usage-diff.md`](docs/usage-diff.md).
+> **What `monitor` is, precisely.** `guardana monitor` performs **scheduled
+> synthetic security checks** against a configured target. It does **not** passively
+> inspect production user traffic and does **not** sit inline in the request path.
+> If you need in-path blocking, you need a guardrail product; Guardana verifies
+> and gates.
+
+`scan`, `probe` and `monitor` can each forward findings to an optional collector
+with `--reporter server://<collector-url>` (see
+[central monitoring](#central-monitoring--self-hosted-or-managed)).
 
 Full flag references and example output:
 [`docs/usage-scan.md`](docs/usage-scan.md) ·
@@ -271,12 +334,19 @@ beyond the target itself, no account, no lock-in. When you want fleet-wide
 visibility, any run can forward its normalized findings to a collector with
 `--reporter server://…`:
 
+> **Maturity: experimental.** The collector today keeps submissions **in memory**
+> and has **no authentication**. It is suitable for local evaluation and
+> development, not for team production use. Persistence (PostgreSQL), migrations,
+> API-key authentication, project isolation, a finding lifecycle, an audit log and
+> backup/restore are the v0.7 milestone — see
+> [the collector design](docs/design/collector-domain-model.md). The label moves to
+> `beta` when that ships.
+
 - **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
   agent — dev machines, CI, live monitors — in one place. Ingest/list/trend over
   a versioned JSON API, plus an **opt-in monitoring dashboard**
   (`GUARDANA_DASHBOARD=1`, off by default) — a single self-contained page with
-  severity, per-source/per-rule, and activity-over-time views. Auth and
-  persistent storage are on the [roadmap](ROADMAP.md).
+  severity, per-source/per-rule, and activity-over-time views.
 - **Managed cloud (planned):** the same collector, hosted for you, with
   dashboards, multi-team rollups, retention, and policy management — for teams
   that would rather not run it themselves.
@@ -309,22 +379,31 @@ so the name is the project's alone.
 
 ## Roadmap
 
-Guardana 0.3 is the reliable static front door, an evaluator-graded dynamic core,
-and a result that distinguishes "found nothing" from "could not tell" from
-"never ran". Where it's headed:
+Guardana 0.6 is a reliable static front door, an evaluator-graded dynamic core, a
+result that distinguishes "found nothing" from "could not tell" from "never ran",
+and a release-to-release regression gate. The next milestones are ordered by one
+question — *what does a real company need before it can adopt this?* — which is
+why platform work comes before coverage volume.
 
-| Version | Theme | Highlights |
-|---|---|---|
-| **0.6** *(current)* | Linear cost & honest verdicts | 27 rules · supply-chain + training-data + config-RCE + **chat-template SSTI** + **ONNX graph** + advisory-backed deps + notebook + rules-file-backdoor · runtime: injection, jailbreaks, RAG-injection, **excessive-agency (tool-calling)**, **unbounded-consumption**, canary leak · three result channels + **observations** · **measured judge calibration (Brier/ECE)** · one shared read per file (scan **1.27 s → 0.36 s**, pinned by a cost gate) · concurrent `probe` with rate-limit backoff · SARIF & CI gate · GitHub Action & pre-commit · optional collector |
-| **0.5** | Agents, first-class | **OWASP ASI01–ASI10** + the agentic ATLAS techniques · grade the **trajectory**, not the reply · memory & context poisoning across a session boundary · live MCP server + rug-pull pin · `guardana calibrate` |
-| **0.6** | Regression & language | **`guardana diff`** — fail on deterioration after a model/prompt/tool change · `lang` facet + first Polish corpus · an order of magnitude more prompts per rule |
-| **1.0** | Frozen extension API | Compatibility guarantees on `Rule`/`Evaluator`/`Target`/`formats` — the point where a third-party rule pack is a safe investment |
-| **Extensions** | Deliberately not the engine | CycloneDX **ML-BOM** evidence pack · model-signature provenance — separate packages, so no regulator's calendar ages the engine |
-| **Cloud** | Fleet visibility | Productized collector: dashboards, trends, multi-repo/model rollups, policy management — the additive layer the OSS engine already reports into |
+| Version | Outcome |
+|---|---|
+| **0.6** *(current)* | Regression between runs — `guardana diff`, saved runs, one definition of "worse" |
+| **0.7** | Company-ready foundation — run manifest, budgets, redaction, stable exit codes, persistent authenticated collector, containers, CI beyond GitHub |
+| **0.8** | Application-aware verification — a common trace model, imported real agent traces, sink-aware output handling, live retrieval targets |
+| **0.9** | Team security platform — AI systems, deployments, RBAC, finding lifecycle, integrations |
+| **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
+| **1.1** | Continuous production verification — OTLP, replay, repeated runs with confidence intervals |
+| **1.2** | Agent and protocol security — deep MCP, multi-agent identity and delegation |
+| **1.3** | Multimodal and advanced assurance — images, documents, OCR, audio, adaptive attackers |
 
-The detailed, maintained version — priorities, what's deliberately deferred
-and why, and the project's non-goals — is [`ROADMAP.md`](ROADMAP.md). See
-[`CHANGELOG.md`](CHANGELOG.md) for released changes.
+Language and industry corpora grow in a **parallel content lane** that does not
+gate the platform work — corpus size is not the metric this project competes on.
+
+The detailed version — exit criteria per milestone, what is deliberately deferred
+and why, the commercial boundary, and the non-goals — is
+[`ROADMAP.md`](ROADMAP.md). What ships *today*, with counts generated from the
+registry rather than typed by hand, is [`FEATURES.md`](FEATURES.md) and the
+[rule catalog](docs/generated/rule-catalog.md).
 
 ## Documentation
 

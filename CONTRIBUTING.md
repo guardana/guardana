@@ -224,6 +224,38 @@ while the release tooling dutifully rewrote the version number one element above
 it. Where you can, pin a claim with a test instead of a promise — `test_features_doc.py`
 and `test_landing_page.py` are the pattern.
 
+## Contribution lanes
+
+Different changes need different review, so say which lane you are in:
+
+| Lane | What it touches | What review focuses on |
+|---|---|---|
+| **engine** | `guardana-core` | fail-closed behaviour, cost, API shape |
+| **rule / scenario** | `guardana-rules` | positive *and* negative fixture, taxonomy mapping, false-positive discussion |
+| **target / provider** | `guardana-core/target` | capability declaration, bounded reads, no credential in findings |
+| **evaluator** | `guardana-core/evaluator` | honest confidence, `inconclusive` never rendered as pass |
+| **reporter** | `guardana-report` | evidence redaction, schema version |
+| **collector** | `guardana-server` | tenancy, authorization, migration, redaction on ingest |
+| **documentation** | `docs/`, `*.md`, `site/` | claims generated or cited, no future promises in FEATURES |
+| **integration** | CI examples, Action | secret handling, stable exit codes |
+| **curated pack** | separate package | does not delay platform work; own namespace |
+
+## Pull-request checklist
+
+Answer each with a sentence or an explicit "not applicable":
+
+- [ ] What user outcome does this deliver?
+- [ ] Security impact — does it change what is trusted, executed or exposed?
+- [ ] Privacy impact — does it change what is stored, logged or sent?
+- [ ] Compatibility impact — does it change a public API, CLI flag or exit code?
+- [ ] Schema and migration impact — does a persisted document change shape?
+- [ ] Performance and execution-cost impact — more requests, more tokens, more time?
+- [ ] Side-effect classification — can this cause an action on the system under test?
+- [ ] Tests, including a negative case
+- [ ] Documentation, per the five places above
+- [ ] `CHANGELOG.md` entry saying *why*
+- [ ] Generated docs refreshed (`uv run python scripts/generate_docs.py`)
+
 ## For maintainers
 
 - Cutting a release (version bump, changelog, tag, PyPI publish):

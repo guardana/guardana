@@ -6,9 +6,24 @@ capability surface. It is updated with every user-visible feature change, and
 a test (`test_features_doc.py`) pins it to the rule/evaluator registry so the
 two cannot silently drift.
 
+## Product maturity
+
+FEATURES describes **what ships today**. Anything not here is a plan, and plans
+live in [`ROADMAP.md`](ROADMAP.md).
+
+| Component | Maturity |
+|---|---|
+| Engine + built-in rules | beta |
+| `scan` / `probe` / `monitor` / `diff` | beta |
+| Collector (`guardana-server`) | **experimental** — in-memory, unauthenticated, local evaluation only |
+| Extension API | unstable by design until 1.0 |
+
+Full detail, including what is deliberately not covered:
+[`docs/product-status.md`](docs/product-status.md).
+
 ## Out of the box
 
-### Three ways to run one engine
+### Four things you do with one engine
 
 | Mode | Command | What it gives you |
 |---|---|---|
@@ -32,7 +47,11 @@ single file or a whole directory; a single-file target never walks nothing.
 ### The re-test gate: is this worse than last time? (`guardana diff`)
 
 A fourth command sits **on top of** the three above rather than beside them — it
-runs no rules. Save a run with `--output` on `scan`/`probe` (a versioned JSON
+runs no rules. > **What `monitor` is, precisely.** It performs **scheduled synthetic security
+> checks** against a configured target. It does **not** passively inspect
+> production user traffic and does **not** sit inline in the request path.
+
+Save a run with `--output` on `scan`/`probe` (a versioned JSON
 document, not just output: it records the tool version, the target, the profile,
 and **which** rules ran with a digest of each), then hand two of them to
 `guardana diff`. It fails the build on deterioration: a new problem, a problem
@@ -65,7 +84,14 @@ on MEDIUM so leads block a training run), `--preset monitor` (fail on HIGH and o
 inconclusive). A preset tunes only the failure bar; the command still picks the
 layer. Mutually exclusive with `--profile`.
 
-### 32 built-in rules, mapped to the frameworks auditors speak
+### Built-in rules, mapped to the frameworks auditors speak
+
+**Counts and the full catalog are generated from the installed registry, never
+typed by hand:** [rule summary](docs/generated/rule-summary.md) ·
+[full catalog](docs/generated/rule-catalog.md) ·
+[evaluators](docs/generated/evaluator-catalog.md) ·
+[taxonomy coverage](docs/generated/taxonomy-coverage.md). A count in prose drifts;
+these do not.
 
 Every finding carries typed **OWASP LLM Top 10 (2025)**, **OWASP Top 10 for
 Agentic Applications (ASI01–ASI10, 2026 edition)**, **OWASP ML Top 10 (2023)**,
@@ -289,6 +315,10 @@ a multi-turn scenario's escalation is folded in, never dropped. Public API:
 - A complete runnable third-party package: [`examples/custom_rule/`](examples/custom_rule/).
 
 ### Optional central collector + dashboard
+
+> **Maturity: experimental.** In-memory storage, no authentication — local
+> evaluation only. Persistence, API keys, project isolation, finding lifecycle and
+> audit log are the v0.7 milestone.
 
 Any run forwards normalized findings with `--reporter server://…` (versioned
 JSON envelope). The collector (`guardana-server`) is strictly additive and

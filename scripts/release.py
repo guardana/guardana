@@ -125,6 +125,7 @@ def main(argv: list[str]) -> None:
     # and a release that ships a page claiming last-quarter's numbers is the same
     # staleness one element over. Run after the bump so both land in one commit.
     _run(["uv", "run", "python", "scripts/sync_site.py", *(["--check"] if dry_run else [])])
+    _run(["uv", "run", "python", "scripts/generate_docs.py", *(["--check"] if dry_run else [])])
 
     _roll_changelog(version, dry_run)
 

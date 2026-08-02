@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Positioning: an AI security verification platform, not a model scanner.**
+  Guardana verifies AI *systems* — build artifacts, deployed endpoints and agents,
+  and whether the next release is worse — which is what companies actually deploy.
+  README, `FEATURES.md`, `ROADMAP.md`, `CLAUDE.md`, `CONTRIBUTING.md` and
+  `docs/index.md` all say the same thing now, organised around four verbs: verify
+  artifacts (`scan`), verify a deployed system (`probe`), continuously re-verify
+  (`monitor`), compare evidence (`diff`). MCP is a target `probe` supports, not a
+  fifth mode.
+- **The roadmap is ordered by company readiness, not by coverage volume.** v0.7 is
+  the run manifest, budgets, redaction, stable exit codes, a persistent
+  authenticated collector, containers and CI beyond GitHub — with a definition of
+  company-ready as a checklist that must be ticked before the version is cut.
+  Language and industry corpora move to a parallel content lane that does not gate
+  platform work.
+- **Maturity is stated per component, everywhere it matters.** The engine and CLI
+  are beta; the collector is **experimental** — in-memory, unauthenticated, local
+  evaluation only — and the README, FEATURES and its own documentation now say so
+  instead of implying a team product.
+- **`monitor` is described as what it is:** scheduled *active* synthetic checks. It
+  does not passively inspect production traffic and does not sit inline.
+- **The competitor checkbox table is gone**, replaced by "Where Guardana fits" —
+  categories and honest complementarity, instead of six rows of ✅ that would need
+  re-verifying every quarter to stay true.
+- **The 37% figure now says what it measured.** It is Fujitsu Research's measured
+  misclassification rate for *keyword-based judging* against human labels, not a
+  claim about any competing tool.
+
+### Added
+
+- **Generated documentation truth** (`scripts/generate_docs.py` →
+  `docs/generated/`): rule summary, full catalog, evaluator catalog and taxonomy
+  coverage, all read from the installed registry. Prose links to them instead of
+  repeating counts that drift. `release.py` regenerates them; a test fails if they
+  are stale.
+- **`test_docs_consistency.py`** — one canonical version. It fails when the README
+  calls the wrong version current, when a version appears twice in the roadmap
+  table, when `ROADMAP.md` describes a version other than the released one, when
+  the changelog has no entry for it, or when a documented Action pin drifts from
+  the released minor. Every one of those had actually happened.
+- **`docs/product-status.md`** — maturity per component and the limitations worth
+  knowing before adoption: the agent harness is ours rather than yours, `monitor`
+  is scheduled, RAG coverage is a slice, text only, "OpenAI-compatible" is not a
+  guarantee, plugins are code you install.
+- **`docs/threat-model.md`** — assets, ten threats with an honest stance on each,
+  and what is not mitigated today (plugin trust is the sharpest edge).
+- **`docs/safe-testing.md`** — what an active run really does, what Guardana never
+  does, and the gap that remains: Guardana simulates the tool, your deployment
+  might not.
+- **Design documents** for the v0.7 work, written before the code:
+  `docs/design/run-manifest-v2.md`, `collector-domain-model.md`,
+  `privacy-and-redaction.md`, `exit-codes.md`.
+- **Eight further project principles** in `CLAUDE.md` (company usability before
+  coverage volume; no public claim without generated or cited evidence; no false
+  green from any direction; versioned migratable schemas; tenancy considered on
+  every server change; declared impact and cost per active rule; no API freeze
+  before the domain model is complete; documentation as acceptance criteria), plus
+  contribution lanes and a PR checklist in `CONTRIBUTING.md`.
+
 ### Fixed
 
 - **The landing page advertised 25 rules while 32 shipped.** The count, the

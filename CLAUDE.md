@@ -7,14 +7,34 @@ people.
 
 ## What this project is
 
-Guardana is an open-source engine and CLI for verifying the security of
-self-hosted and self-built AI. One rule engine runs in three places — a
-developer's machine (`guardana scan`), CI/CD, and a long-running monitor next
-to a served model (`guardana monitor`) — and reports findings locally or to an
-optional central collector.
+Guardana is an **open-source AI security verification platform** that
+continuously verifies what you built, what you deployed, and whether it became
+less secure.
+
+It scans model and application artifacts, probes live endpoints and agents,
+records reproducible security evidence, detects regressions between deployments,
+and optionally aggregates results in a self-hosted collector. One rule engine runs
+in every one of those places, so a verdict does not change because the runner did.
+
+Four verbs: **verify artifacts** (`scan`), **verify a deployed system** (`probe`),
+**continuously re-verify** (`monitor`), **compare evidence** (`diff`). MCP is a
+target `probe` supports, not a fifth mode.
 
 Full design rationale and architecture: [`docs/how-it-works.md`](docs/how-it-works.md)
 and [`docs/architecture.md`](docs/architecture.md).
+
+## What "done" means right now
+
+The current milestone is **v0.7 — company-ready foundation**: a real company can
+install, configure, run, secure, persist and upgrade Guardana without relying on
+undocumented knowledge. The exit criteria are the checklist in
+[`ROADMAP.md`](ROADMAP.md#definition-of-company-ready), and they outrank new
+coverage.
+
+**Do not implement broad corpora, new protocols or new modalities while a
+company-readiness item is open**, unless the change is isolated in a content pack
+and does not delay the milestone. Coverage volume is not what this project
+competes on, and it is not what is blocking adoption.
 
 ## Product principles — they outrank convenience, in every 0.x
 
@@ -51,6 +71,30 @@ change that violates one is wrong even when it is small, tested, and useful.
    secrets, or a real production prompt; evidence stays redacted. Crafted
    fixtures are built in code (`guardana.core.testing`), which is also why they
    are readable in review.
+8. **Company usability before coverage volume.** A capability nobody can deploy,
+   secure or upgrade is not a capability. When the two compete, the platform wins.
+9. **No public claim without generated or cited evidence.** Every count comes from
+   the registry (`scripts/generate_docs.py`), every external statistic names its
+   source and what it measured, and every capability claim is testable. The
+   landing page advertised 25 rules for three releases; that is what this
+   principle exists to prevent.
+10. **No false green — from any direction.** Not from an unsupported capability,
+    not from an exhausted budget, not from a redaction failure, not from missing
+    coverage, not from a comparison that could not be made. Each of those is its
+    own outcome and never a pass.
+11. **Every persisted schema is versioned and migratable.** A document a user
+    keeps is a contract. A schema change without a version and a migration path
+    strands the evidence someone is relying on.
+12. **Every server change considers tenancy and authorization.** For the collector,
+    "does this leak across organizations" is part of the definition of done, not a
+    later hardening pass.
+13. **Every active rule declares its impact and expected cost.** A check that
+    sends requests, costs money or has side effects says so, so a policy can
+    select on it and a budget can bound it.
+14. **No API freeze before the domain model is complete.** `Trace`, `AISystem` and
+    `Deployment` land before 1.0 promises stability, because freezing the wrong
+    shape is worse than freezing late.
+15. **Documentation is part of the acceptance criteria**, not a follow-up.
 
 ## Architecture in brief
 
@@ -62,8 +106,8 @@ guardana-core     The engine. Target / Rule / Evaluator / Finding / Profile,
                    No network I/O beyond what a Target itself performs.
 guardana-rules    Built-in rules (YAML + Python plugin), each mapped to
                    OWASP / MITRE ATLAS / NIST.
-guardana-cli      The `guardana` command: scan, probe, monitor, init, rules,
-                   new-rule.
+guardana-cli      The `guardana` command: scan, probe, monitor, diff, init,
+                   rules, new-rule, calibrate.
 guardana-report   Renderers: human, SARIF, JSON, JUnit.
 guardana-server   OPTIONAL collector. Ingests normalized Findings from many
                    agents; list/trend view. A separate, separately-deployed
@@ -346,6 +390,7 @@ you.
   | `FEATURES.md` | a new capability, or one whose shape changed |
   | `docs/` | a new command gets its own `usage-*.md`; a changed one gets its page reconciled, plus `docs/index.md` |
   | `site/index.html` | a headline claim moved: a rule count, a run mode, what the terminal demo prints |
+  | `docs/generated/` | a rule, evaluator or taxonomy mapping changed — run `uv run python scripts/generate_docs.py`, never edit by hand |
   | `ROADMAP.md` | the direction moved — **delete what shipped**, and add what this work deliberately deferred, with the reason |
 
   This list is not bureaucracy, it is the failure mode this project keeps

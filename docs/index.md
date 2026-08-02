@@ -10,27 +10,55 @@ what/why, then read [`how-it-works.md`](how-it-works.md) for the whole product
 from A to Z — the concept, the engine, and how extensions plug in — before the
 detail below.
 
-## Understand the whole product
+## Start here
 
-- [`how-it-works.md`](how-it-works.md) — **start here**: what Guardana is, how the engine works, the two layers, the three run modes, and how extensions plug in — end to end
-
-## End-user docs
-
-- [`FEATURES.md`](../FEATURES.md) — everything that ships out of the box, and what you can achieve with it
-- [`ROADMAP.md`](../ROADMAP.md) — where the project is headed, what's deferred, and the non-goals
+- [`product-status.md`](product-status.md) — **read first**: maturity per component, and the limitations you should know before adopting
+- [`how-it-works.md`](how-it-works.md) — what Guardana is, how the engine works, the two rule layers, the four verbs, and how extensions plug in
 - [`install.md`](install.md) — installing the CLI
+- [`safe-testing.md`](safe-testing.md) — before you point an active check at anything that matters
+
+## For developers
+
 - [`usage-scan.md`](usage-scan.md) — `guardana scan`: static, offline, CI-friendly
-- [`usage-probe.md`](usage-probe.md) — `guardana probe`: one-shot dynamic checks against a live endpoint
-- [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: a long-running sampling observer
-- [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two runs and fail on deterioration
+- [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live endpoint, agent or MCP server
+- [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two saved runs, fail on deterioration
+- [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
-
-## Contributor / extender docs
-
-- [`architecture.md`](architecture.md) — the five abstractions, the Registry, the core↔server boundary
-- [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin, and ship it
-- [`model-formats.md`](model-formats.md) — the public GGUF / safetensors / ONNX readers your rule builds on, and their bounded, fail-closed contract
+- [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin
 - [`extending.md`](extending.md) — add a Rule, an Evaluator, or a Target; the entry-point contract
+- [`model-formats.md`](model-formats.md) — the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract
+
+## For platform and CI teams
+
+- [`integrations.md`](integrations.md) — GitHub Action, pre-commit, and gating on deterioration
+- [`usage-diff.md`](usage-diff.md) — the baseline-and-compare workflow
+
+## For security teams
+
+- [`threat-model.md`](threat-model.md) — what Guardana defends against, what it does not, and where the trust boundaries sit
+- [`safe-testing.md`](safe-testing.md) — side effects, staging, and reading a result honestly
+- [`architecture.md`](architecture.md) — the five abstractions, the Registry, the core↔server boundary
+
+## Reference — generated from the registry, never typed by hand
+
+- [`generated/rule-summary.md`](generated/rule-summary.md) — counts by surface, target kind and severity
+- [`generated/rule-catalog.md`](generated/rule-catalog.md) — every built-in rule and what it maps to
+- [`generated/evaluator-catalog.md`](generated/evaluator-catalog.md) — every evaluator
+- [`generated/taxonomy-coverage.md`](generated/taxonomy-coverage.md) — which framework entries are covered
+
+## Design documents
+
+Written before the code they describe, so the reasoning survives the review:
+
+- [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
+- [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
+- [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam
+- [`design/exit-codes.md`](design/exit-codes.md) — the automation contract
+
+## Project direction
+
+- [`FEATURES.md`](../FEATURES.md) — everything that ships out of the box
+- [`ROADMAP.md`](../ROADMAP.md) — where the project is headed, what's deferred, and the non-goals
 
 ## Runnable example
 

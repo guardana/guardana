@@ -1,0 +1,172 @@
+# Threat model
+
+What Guardana defends against, what it deliberately does not, and where the
+trust boundaries sit. A security tool without a stated threat model is asking to
+be trusted on vibes.
+
+**Status:** first published for v0.7. Reviewed each minor release.
+
+## The shape of the system
+
+```
+┌─ your machine / CI runner ──────────────────────────────┐
+│  guardana CLI                                           │
+│    ├─ reads: repositories, model files, config, profiles│
+│    ├─ loads: built-in rules, third-party plugins ⚠      │
+│    ├─ talks to: the target under test ⚠                 │
+│    └─ writes: reports, saved runs                       │
+└──────────────────────┬──────────────────────────────────┘
+                       │ optional, redacted envelope
+┌──────────────────────▼──────────────────────────────────┐
+│  guardana-server (self-hosted collector)                │
+│    ├─ authenticated ingest from runners                 │
+│    ├─ persistence, tenancy, audit                       │
+│    └─ dashboard ⚠ renders attacker-influenced evidence  │
+└─────────────────────────────────────────────────────────┘
+```
+
+⚠ marks a boundary where untrusted input crosses into Guardana.
+
+## Assets
+
+1. **The credentials Guardana is given** — API keys for the target endpoint, the
+   judge, the collector.
+2. **The evidence it collects** — prompts that worked, replies that leaked, tool
+   arguments. Frequently the most sensitive text in a deployment.
+3. **The verdict itself.** An attacker who can make Guardana report "clean" has
+   defeated the control, without touching the model.
+4. **The machine it runs on** — a CI runner with repository write access is a
+   valuable target in its own right.
+
+## Threats, and where we stand
+
+### T1 — A malicious repository or model file under scan
+
+**Scenario:** someone runs `guardana scan` over a repository containing a crafted
+pickle, a zip bomb, a 40 GB "model", or a file designed to exploit a parser.
+
+**Stance:** scanning must never execute what it reads. Model-format readers are
+bounded and fail closed: size caps, member caps, recursion caps, and a read that
+fails becomes an `errors` entry rather than an exception or a silent skip. Pickle
+is parsed at the opcode level, never unpickled.
+
+**Residual risk:** a parser bug is still a parser bug. Readers are fuzz-worthy and
+not yet fuzzed — tracked for v0.7.
+
+### T2 — A malicious or hostile target endpoint
+
+**Scenario:** the endpoint under test returns a 10 GB response, hangs forever,
+returns crafted content designed to exploit the evaluator, or is not the endpoint
+the user thought it was.
+
+**Stance:** responses are size-bounded and timed out; a hang is an error, not a
+pass. Model output is treated as untrusted throughout — it is never executed, and
+after v0.7 it is redacted before it reaches any output path.
+
+**Residual risk:** SSRF. A profile can point Guardana at any URL, including
+`169.254.169.254`. Today that is the user's responsibility; an allowlist and a
+metadata-endpoint denylist are v0.7 work.
+
+### T3 — A malicious plugin or rule pack
+
+**Scenario:** `pip install` of a package that registers a `guardana.rules` entry
+point and runs arbitrary code on discovery.
+
+**Stance:** this is the sharpest edge in the product, and it is **not currently
+mitigated beyond documentation**. Entry-point discovery imports installed
+packages; a malicious one runs with the user's privileges. `--no-plugins` disables
+discovery entirely — but it also disables the built-in rules, which makes the safe
+mode expensive enough that nobody uses it.
+
+**v0.7:** a plugin allowlist (`--plugins disabled|builtins|allowlist`) so reviewed
+built-ins load without discovering arbitrary installed packages, plus an extension
+manifest declaring what a pack needs. **v1.0:** a declarative pack format that
+executes no Python at all, and subprocess isolation for those that do.
+
+**Until then:** treat installing a Guardana pack exactly like installing any other
+Python package into your environment — because that is what it is. `SECURITY.md`
+says so.
+
+### T4 — Evidence containing secrets
+
+**Scenario:** a rule finds a leaked API key, records it as evidence, and the
+report is committed to a repository or uploaded to a collector.
+
+**Stance:** evidence is redacted, and after v0.7 centrally rather than by
+convention (see [privacy design](design/privacy-and-redaction.md)). Prompts and
+responses are not stored by default; `full` evidence mode warns loudly.
+
+**Residual risk:** a third-party rule that writes a secret into a field the
+redactor does not know about. Mitigated by redacting at one seam every output path
+goes through, rather than trusting rules.
+
+### T5 — A compromised collector API key
+
+**Scenario:** a CI secret leaks; the holder can write findings to the collector.
+
+**Stance (v0.7):** keys are scoped to a project, revocable, hashed at rest, shown
+once. A runner key can **write runs, not read other projects** — so a leaked CI
+key does not become a read of the whole fleet's findings.
+
+**Residual risk:** a write-capable key can poison history with fabricated clean
+runs. Audit log records the key used; detecting a fabricated *pass* is harder than
+detecting a fabricated *finding*, and is an open problem.
+
+### T6 — Cross-tenant access in the collector
+
+**Scenario:** one organization reads another's findings by guessing an id.
+
+**Stance (v0.7):** tenancy enforced at the query boundary, not in handlers; no
+unscoped query exists. Tested per entity, both read and write.
+
+### T7 — Stored XSS through evidence in the dashboard
+
+**Scenario:** a model's reply contains a script tag; it lands in evidence; the
+dashboard renders it.
+
+**Stance:** evidence is attacker-influenced text by definition. It is escaped and
+sanitized on render, and the dashboard ships a restrictive CSP. Tested with a
+crafted payload.
+
+### T8 — Denial of service through huge inputs
+
+**Scenario:** a 40 GB file, a 5 GB model response, a report with a million
+findings posted to the collector.
+
+**Stance:** size caps in readers, response caps in transports, request-size and
+rate limits on ingest, bounded submission counts in storage.
+
+### T9 — Unsafe active testing against production
+
+**Scenario:** a probe against a production agent calls a real tool, writes to real
+memory, sends a real email.
+
+**Stance:** tool calls go to doubles; Guardana never executes a real tool. After
+v0.7, rules declare `impact` and destructive checks require an explicit
+`--allow-side-effects`. Documented in [safe testing](safe-testing.md).
+
+**Residual risk:** a *model* wired to real tools by its own deployment can take
+actions Guardana merely prompted. Probing staging is the recommendation, and the
+README says so before the quickstart.
+
+### T10 — A compromised Guardana release
+
+**Scenario:** a malicious version is published to PyPI.
+
+**Stance:** trusted publishing via OIDC (no long-lived token), signed tags, and
+from v0.7: SBOM, provenance attestations, checksums and container signatures.
+Documented immutable pins for high-security environments, not just the moving tag.
+
+## Explicit non-goals
+
+- Guardana is **not an inline control**. It does not sit in the request path and
+  cannot block an attack in production.
+- Guardana **does not protect the model from its own users** at run time. It tells
+  you what a model does when attacked; a guardrail is a different product.
+- Guardana **does not verify the correctness of a model's outputs** beyond
+  security-relevant behaviour.
+
+## Reporting
+
+Vulnerabilities in Guardana itself: see [`SECURITY.md`](../SECURITY.md). Private
+vulnerability reporting is enabled on the repository.
