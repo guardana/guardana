@@ -169,136 +169,72 @@ checklist.
 - [ ] no known critical vulnerability
 - [ ] end-to-end installation test from a clean environment
 
-## v0.7 — Company-ready foundation
+## v0.7 — Engine and CLI foundation *(released)*
 
-> **Outcome:** a real company can install, configure, run, secure, persist and
-> upgrade Guardana without relying on undocumented knowledge.
+> **Outcome:** the engine and the command line are ready to be gated on: a run
+> knows its own cost, says what it verified, refuses to call an unanswered
+> question a pass, and can be compared against last week's.
 
-**Run Manifest v2 — shipped.** A saved run is a reproducibility and
-deployment-evidence record: run id, UTC timestamps, source (local/CI, with the
-provider), tool version, target type/ref/fingerprint (and the fields that
-fingerprint covers) plus capabilities, deployment identifiers, configuration
-digests, execution settings, actual usage, the rules and evaluators that ran, a
-result summary with an explicit gate, and the evidence mode. Versioned
-independently of the CLI, with [`schemas/run-v2.schema.json`](schemas/run-v2.schema.json),
-in-memory migration of 0.6 documents, and `guardana run inspect|migrate`.
-See [`docs/usage-run.md`](docs/usage-run.md).
+**This is half of the company-ready milestone, and the checklist above says which
+half.** The collector, containers and CI-beyond-GitHub work is v0.8; calling this
+release company-ready would have meant moving the checklist to match what shipped.
 
-Deliberately still open, and tracked here rather than assumed done:
-**the collector envelope does not carry the manifest yet** (it stays at v4 —
-the collector work is its own phase), **deployment identifiers are recorded but
-not yet populated from CI**, and **`configuration.*_digest` fields exist and are
-null until the settings they digest are wired through** (profile digest lands
-with the budgets work, system-prompt digest with target inspection).
+**Run Manifest v2.** A saved run is a reproducibility and deployment-evidence
+record: run id, UTC timestamps, source, tool version, target identity with a
+fingerprint *and the fields that fingerprint covers*, deployment identifiers,
+configuration digests, execution limits, actual usage, the rules and evaluators
+that ran, a result summary with an explicit gate, and the evidence mode. Versioned
+independently of the CLI ([`schemas/run-v2.schema.json`](schemas/run-v2.schema.json)),
+with in-memory migration of 0.6 documents and `guardana run inspect|migrate`.
 
-**Usage accounting — shipped.** A run records the requests it sent, the tokens
-the provider reported, and its wall time, metered on the target so no transport
-can route around it. A target that does not meter itself, and a provider that
-reports no tokens, are recorded as explicit unknowns — with
-`requests_missing_token_counts` so a partial token sum is never read as a
-complete bill. Still open: **cost in money stays null**, because a price table
-would have to be profile data and inventing one is worse than omitting it.
+**Usage accounting.** Requests, tokens and wall time, metered on the target so no
+transport can route around it. A target that does not meter itself and a provider
+that reports no tokens are recorded as explicit unknowns.
 
-**Budgets and `guardana plan` — shipped.** `guardana plan scan|probe` reports the
-upper bound without sending a request; every rule declares its request ceiling and
-a gate measures the declaration against what the rule actually spends. Budgets are
-checked before each request, and an exhausted one stops the run, keeps its partial
-findings, exits `6` and never passes the gate — nor lets `guardana diff` read the
-missing findings as an improvement. **Stable exit codes shipped with it** (see
-[`docs/exit-codes.md`](docs/exit-codes.md)).
+**Budgets and `guardana plan`.** The upper bound before anything is spent, without
+sending a request. Budgets are checked before *each* request; an exhausted one
+stops the run, keeps its partial findings, exits `6`, never passes the gate, and
+cannot be used to make `guardana diff` read the missing findings as an improvement.
 
-Deliberately still open: **`--resume`** (checkpointing is its own design),
-**cost in money** (needs a price table as profile data), and **token/duration
-prediction in `plan`** (nothing can know a request's cost before it is answered,
-and a guessed figure is one a team would budget against).
+**Stable exit codes.** Eight documented meanings, pinned by a test against
+[`docs/exit-codes.md`](docs/exit-codes.md).
 
-Original scope, for reference: rules, scenarios, minimum and maximum requests,
-judge calls, approximate tokens and wall time, estimated cost, and which checks
-have side effects. During a run, hard limits stop it cleanly, persist partial
-evidence, and report `budget_exhausted` as its own outcome — **never as a pass**.
+**Target capability inspection.** `guardana target inspect` separates *declared*
+from *verified*, and never folds "could not find out" into "not supported".
+Skipped rules carry their reason; `fail_on.fail_on_skipped` makes a coverage hole
+indeterminate.
 
-**Target capability inspection — shipped.** `guardana target inspect` probes what
-an endpoint really supports and separates *declared* from *verified*; unknown is
-never folded into unsupported. Skipped rules carry their reason and the missing
-capability, and `fail_on.fail_on_skipped` makes a coverage hole indeterminate.
-Still open: streaming, structured output, seed and log-probability probes, and
-rate-limit characterisation.
+**Privacy and redaction.** One redactor at one seam, applied by the renderer
+factory so no output path can skip it. Redacted by default everywhere; secrets go
+even at `full`; redaction and truncation both announce themselves.
 
-Original scope, for reference: `guardana target inspect` reports what an
-endpoint actually supports: system messages, streaming, tool calls, structured
-output, usage metadata, finish reason, seed, context limits, rate-limit behaviour,
-provider dialect. "OpenAI-compatible" is not a guarantee of identical behaviour,
-and a capability mismatch must never be classified as a pass.
+**Safe active testing.** Rules declare `impact` and whether they are destructive;
+`--safety` sets the ceiling and `--allow-destructive` is an independent switch.
 
-**Privacy and redaction defaults — shipped.** One redactor at one seam, applied by the renderer factory so no output path can skip it; redacted by default in every command, secrets removed even at `full`, redaction and truncation both announced, placeholders hashed so baseline waivers keep matching. Still open: separate local and collector policies, and log-level guarantees. Original scope: a central redactor applied before
-serialization and before any reporter dispatch; evidence redacted by default;
-prompts, responses and tool arguments not stored unless configured; an explicit
-warning when full evidence is enabled; tests proving sensitive fields cannot
-bypass redaction. See [`docs/design/privacy-and-redaction.md`](docs/design/privacy-and-redaction.md).
+**Plugin trust.** `--plugins all|builtins|allowlist|disabled`, decided by
+distribution name. A refused plugin lands in `errors` rather than being dropped.
 
-**Safe active testing — shipped.** Rules declare `impact`, whether they are
-destructive, and their estimated request count; `--safety` sets the ceiling and
-`--allow-destructive` is an independent switch. Still open: reporting each
-attempted action as simulated / proposed / executed, which needs the customer's
-own harness (v0.8).
+**Baseline lifecycle.** `baseline create|verify|update` with an approver, a reason
+and an expiry — and an expired waiver stops waiving.
 
-Original scope: rules declare `impact` (passive / active /
-side_effecting), whether they are destructive, and their estimated request count.
-`--safety passive|active` and `--allow-side-effects`, with destructive checks never
-running by default and every attempted action reported as simulated, proposed or
-executed.
+**Operational diagnostics.** `guardana doctor` and `config validate|explain`,
+contacting nothing.
 
-**Stable exit codes.** A documented, tested table so machine consumers never parse
-human text to determine status. See [`docs/design/exit-codes.md`](docs/design/exit-codes.md).
+**Published schemas.** `run-v2`, `diff-v1`, `plan-v1`, each pinned to the version
+constant in the code by a test.
 
-**Plugin allowlist — shipped.** `--plugins all|builtins|allowlist|disabled`,
-decided by distribution name; a refused plugin lands in `errors` rather than being
-dropped. Still open: signature or hash verification of installed packs, which
-needs a distribution story Guardana does not have yet.
+### Deliberately left open, and why
 
-**Baseline lifecycle — shipped.** `baseline create|verify|update` with an
-approver, a reason and an expiry; an expired waiver stops waiving and `verify`
-says which lapsed. Still open: binding a waiver to the target fingerprint and the
-policy digest, so a waiver written for one model does not silently apply to
-another.
-
-**Operational diagnostics — shipped.** `guardana doctor` and
-`guardana config validate|explain`: versions and version agreement, plugin
-inventory and load failures, profile parsing, and settings that weaken the gate.
-Still open, deliberately: target and collector connectivity checks, which would
-make a diagnostic cost money and appear in production logs — they belong behind an
-explicit flag, alongside `target inspect`.
-
-**Production-grade collector.** The largest gap. PostgreSQL persistence with
-migrations; API-key authentication for runners; organization/project isolation;
-minimum RBAC; the domain model (organization, project, AI system, environment,
-deployment, run, finding, waiver, audit event, API key); a finding lifecycle with
-statuses and expiring waivers; audit log; retention; pagination and filtering; a
-stable versioned API with OpenAPI; health and readiness; rate and request-size
-limits; no default credentials; backup and restore that has been restore-tested.
-The UI stays deliberately small — sign-in, project switcher, AI systems, runs,
-findings, finding detail, deployment regression, policies, API keys, audit log.
-See [`docs/design/collector-domain-model.md`](docs/design/collector-domain-model.md).
-
-**Containers and installation.** `ghcr.io/guardana/guardana-cli` and
-`…/guardana-server`: non-root, minimal base, pinned digests in examples, OCI
-labels, SBOM, provenance attestation, vulnerability scan. Documented paths for
-`uvx`, `pipx`, project dependency, Docker, air-gapped wheelhouse, and Compose.
-
-**CI beyond GitHub.** A generic container pipeline, an official GitLab template,
-and documented Jenkins and Azure DevOps examples — plus three recommended tiers:
-a fast PR check (static, deterministic, no judge, under a minute), a standard
-deployment check (capability inspection, key scenarios, saved run and diff,
-bounded cost), and a scheduled deep run.
-
-**Release and supply-chain hardening.** Signed tags, immutable version tags
-alongside the moving minor tag, SBOM per distribution and container, checksums,
-container signatures, dependency scanning, and release notes that separate
-user-visible changes, security changes, breaking changes, schema changes,
-migrations and upgrade instructions.
-
-**Supported-version policy.** Stated in `SECURITY.md` and `RELEASING.md`, with
-realistic language and no SLA the maintainers cannot honour.
+| Deferred | Reason |
+|---|---|
+| `--resume` for an interrupted run | needs a checkpoint format; exit `7` already says a run was partial |
+| cost in money (`estimated_cost` stays null) | needs a price table, which must be profile data — an invented cost is worse than none |
+| token and duration prediction in `plan` | nothing can know a request's cost before it is answered, and a guessed figure is one a team would budget against |
+| the collector envelope carrying the manifest | belongs with the collector work, not ahead of it |
+| deployment identifiers populated from CI | recorded but not yet filled in; needs the CI-integration work |
+| streaming, seed, log-prob and rate-limit probes | `target inspect` covers the four capabilities rules actually depend on |
+| separate local and collector evidence policies | lands with the collector |
+| signature verification of plugin packs | needs a distribution story this project does not have yet |
 
 ## Where this sits, and what the neighbours do better
 
@@ -322,10 +258,20 @@ coverage can grow without rules growing with it (content lane).
 
 Full notes: `docs/superpowers/research/2026-08-02-evaluation-landscape.md`.
 
-## v0.8 — Application-aware verification
+## v0.8 — The other half of company-ready, and application awareness
 
-> **Outcome:** Guardana can verify an AI *application*, not only an isolated model
-> endpoint.
+> **Outcome:** the checklist above is finished, and Guardana can verify an AI
+> *application*, not only an isolated model endpoint.
+
+**The company-ready remainder comes first**, because the milestone is not a matter
+of taste: a **persistent collector** (PostgreSQL, migrations, API-key auth for
+runners, organization/project isolation, audit log, retention, restore-tested
+backup), **official containers** for CLI and server, **CI beyond GitHub** (GitLab
+template, generic container pipeline, Jenkins and Azure DevOps examples), a
+**production deployment and upgrade guide**, **SBOM and provenance** on every
+release, and an **end-to-end installation test from a clean environment**.
+
+Then the application work:
 
 - **A pytest-facing assertion API** — `guardana.testing.assert_secure(target,
   profile=...)`, raising `AssertionError` with the finding report. DeepEval's

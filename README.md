@@ -77,7 +77,8 @@ complementary to most of them rather than a replacement:
 | Category | Examples | What it does | Guardana's relationship |
 |---|---|---|---|
 | **Model/artifact scanners** | ModelScan, picklescan | Inspect model files for unsafe serialization | Overlapping — Guardana's static layer does this and reads more formats |
-| **Red-team harnesses** | garak, PyRIT, promptfoo | Generate and send large volumes of attacks | Complementary — they send more; Guardana focuses on grading what landed and on regression |
+| **Red-team harnesses** | garak, PyRIT, promptfoo, DeepTeam | Generate and send large volumes of attacks | Complementary, and honestly: **they ship more attacks than Guardana does.** What they do not ship is an exit-code contract, a cost ceiling, a saved run, or a regression comparison — which is what makes a check something a pipeline can block on |
+| **Evaluation frameworks** | DeepEval, Ragas | Measure answer quality: faithfulness, relevancy, hallucination | Different job — they measure whether the answer is *good*, Guardana verifies whether the system is *safe*. Run both |
 | **Runtime guardrails** | LlamaFirewall, Llama Guard | Block or filter in the request path | Different job — Guardana verifies and gates, it is never inline |
 | **AI observability** | LangSmith, Langfuse and friends | Trace and debug application behaviour | Complementary — trace ingestion is on the roadmap so their output becomes Guardana's input |
 | **SAST / CVE / secrets** | Semgrep, Trivy, gitleaks | General code and dependency security | Complementary — Guardana stays dedicated to AI-specific risk |
@@ -202,6 +203,30 @@ Full flag references and example output:
 [`docs/usage-probe.md`](docs/usage-probe.md) ·
 [`docs/usage-diff.md`](docs/usage-diff.md) ·
 [`docs/usage-monitor.md`](docs/usage-monitor.md).
+
+### And five commands that make those four safe to gate on
+
+| Command | Answers |
+|---|---|
+| [`guardana plan`](docs/usage-plan.md) | what would this run cost? — **without sending a request** |
+| [`guardana target inspect`](docs/usage-target.md) | what does this endpoint *actually* support, as opposed to what it claims? |
+| [`guardana run inspect\|migrate`](docs/usage-run.md) | what exactly was verified, at what cost, and under which policy? |
+| [`guardana baseline create\|verify\|update`](docs/usage-baseline.md) | which findings have we accepted, by whom, and until when? |
+| [`guardana doctor`](docs/usage-doctor.md) · `config explain` | what is this installation, and what is actually in force? |
+
+Three properties run through all of them, and they are what make this a gate
+rather than a report:
+
+**Unknown is never zero.** A check that could not grade, a capability the provider
+did not confirm, a cost nobody measured — each is its own outcome, never a pass.
+
+**A budget cannot be used as an excuse.** A run that hits its ceiling exits `6`,
+keeps what it found, and never passes; `guardana diff` refuses to read the missing
+findings as an improvement.
+
+**Exit codes are a contract.** Eight documented meanings
+([`docs/exit-codes.md`](docs/exit-codes.md)), pinned by a test against the
+documentation. Nothing to parse out of human-readable text.
 
 ### Drop it into GitHub Actions
 
