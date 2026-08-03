@@ -28,6 +28,15 @@ updates:
   # demo, so an "upgrade" here silently deletes the findings the example exists to
   # show. Both channels are disabled: the limit stops version updates, and the
   # wildcard `ignore` stops security updates, which run regardless of the limit.
+  #
+  # This file does NOT govern Dependabot *alerts*. Those come from the dependency
+  # graph and are a separate feature with no configuration file, so every alert
+  # the fixture's pins deserve still appears in the Security tab — as of
+  # 2026-08-03, all twelve of them, and none from a real dependency of any
+  # shipped package. They are dismissed by hand with a reason, which is the only
+  # mechanism GitHub offers. Do not "fix" the pins to clear them: the roadmap's
+  # "no known critical vulnerability" box is about what Guardana ships, and this
+  # directory is not shipped.
   - package-ecosystem: "pip"
     directory: "/examples/vulnerable-model"
     schedule:

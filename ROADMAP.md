@@ -180,7 +180,10 @@ checklist.
 - [x] supported-version policy
 - [x] published threat model
 - [ ] release SBOM and provenance
-- [ ] no known critical vulnerability
+- [ ] no known critical vulnerability *(all twelve open Dependabot alerts are
+      `examples/vulnerable-model/`, which exists to be vulnerable; none come from a
+      shipped dependency. They need dismissing with a reason — `dependabot.yml`
+      governs updates, not alerts)*
 - [ ] end-to-end installation test from a clean environment
 
 ## v0.7 — Engine and CLI foundation *(released)*
