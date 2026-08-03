@@ -359,13 +359,16 @@ beyond the target itself, no account, no lock-in. When you want fleet-wide
 visibility, any run can forward its normalized findings to a collector with
 `--reporter server://…`:
 
-> **Maturity: experimental.** The collector today keeps submissions **in memory**
-> and has **no authentication**. It is suitable for local evaluation and
-> development, not for team production use. Persistence (PostgreSQL), migrations,
-> API-key authentication, project isolation, a finding lifecycle, an audit log and
-> backup/restore are the v0.7 milestone — see
-> [the collector design](docs/design/collector-domain-model.md). The label moves to
-> `beta` when that ships.
+> **Maturity: experimental.** The collector now **keeps what it is given** —
+> PostgreSQL with reversible migrations, a storage choice it refuses to make for
+> you, and separate health and readiness endpoints. It still has **no
+> authentication and no tenancy**: anyone who can reach the port can read every
+> finding in it, so do not expose it. API keys, organization/project isolation, a
+> finding lifecycle, an audit log and backup/restore are the rest of the v0.8
+> milestone — see [`docs/usage-collector.md`](docs/usage-collector.md) and
+> [the collector design](docs/design/collector-domain-model.md). The label moves
+> to `beta` when authentication and tenancy ship, not before: a database does not
+> make a service safe to expose.
 
 - **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
   agent — dev machines, CI, live monitors — in one place. Ingest/list/trend over

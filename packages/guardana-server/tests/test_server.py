@@ -16,7 +16,7 @@ _UNPROCESSABLE = 422
 
 
 def _client() -> TestClient:
-    return TestClient(create_app())
+    return TestClient(create_app(store=InMemoryStore()))
 
 
 def _real_envelope(source: str = "ci") -> dict[str, Any]:

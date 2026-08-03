@@ -9,7 +9,7 @@ _NOT_FOUND = 404
 
 
 def test_dashboard_is_off_by_default() -> None:
-    client = TestClient(create_app())
+    client = TestClient(create_app(store=InMemoryStore()))
     assert client.get("/").status_code == _NOT_FOUND
     assert client.get("/stats").status_code == _NOT_FOUND
     assert client.get("/catalog").status_code == _NOT_FOUND
@@ -18,7 +18,7 @@ def test_dashboard_is_off_by_default() -> None:
 
 
 def test_catalog_endpoint_serves_human_rule_descriptions() -> None:
-    client = TestClient(create_app(dashboard=True))
+    client = TestClient(create_app(store=InMemoryStore(), dashboard=True))
     catalog = client.get("/catalog").json()
     entry = catalog["guardana.supply_chain.pickle_opcode"]
     assert entry["name"]
@@ -32,7 +32,7 @@ def test_rule_catalog_loader_returns_entries_and_handles_unknown_language() -> N
 
 
 def test_dashboard_page_and_stats_mount_when_enabled() -> None:
-    client = TestClient(create_app(dashboard=True))
+    client = TestClient(create_app(store=InMemoryStore(), dashboard=True))
 
     page = client.get("/")
     assert page.status_code == _OK
@@ -48,7 +48,7 @@ def test_dashboard_page_and_stats_mount_when_enabled() -> None:
 
 def test_env_var_enables_the_dashboard(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GUARDANA_DASHBOARD", "1")
-    client = TestClient(create_app())
+    client = TestClient(create_app(store=InMemoryStore()))
     assert client.get("/").status_code == _OK
 
 

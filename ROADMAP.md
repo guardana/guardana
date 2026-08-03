@@ -59,7 +59,7 @@ already failed at its job:
 | Engine + built-in rules | **beta** | Stable enough to gate a build on; API still moves between minors |
 | `scan` / `probe` / `diff` | **beta** | Used in CI; exit codes and formats stable in practice, not yet contractually |
 | `monitor` | **beta** | Scheduled *active* verification. Not passive traffic inspection, not inline |
-| Collector (`guardana-server`) | **experimental** | Suitable for local evaluation only: in-memory storage, no authentication. Production use needs the v0.7 work below |
+| Collector (`guardana-server`) | **experimental** | Persistent since 0.8 (PostgreSQL, reversible migrations, explicit storage choice). Still no authentication and no tenancy, so still not exposable — those are the next two items |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
 ## What ships today (0.7.0)
@@ -170,10 +170,11 @@ checklist.
 - [x] budgets and a pre-flight `plan`
 - [x] documented, tested exit codes
 - [x] privacy and redaction defaults
-- [ ] persistent collector
+- [x] persistent collector
 - [ ] authenticated runner ingest
 - [ ] project/environment isolation
-- [ ] migrations, backup, restore, upgrade
+- [ ] migrations, backup, restore, upgrade *(migrations and upgrade done; backup
+      and restore need the retention work)*
 - [ ] GitHub, GitLab and generic CI paths
 - [ ] production deployment guide
 - [x] supported-version policy

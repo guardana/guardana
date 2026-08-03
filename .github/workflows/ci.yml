@@ -14,6 +14,30 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
+    # The collector's tests need a real PostgreSQL. They skip without one, so that
+    # a contributor changing a rule does not have to run a database — and
+    # GUARDANA_REQUIRE_POSTGRES below turns that skip into a failure here, because
+    # "the isolation test did not run" reading as a green build is the same
+    # fail-open this project refuses everywhere else.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: guardana
+          POSTGRES_PASSWORD: guardana
+          POSTGRES_DB: guardana_test
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd "pg_isready -U guardana"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GUARDANA_TEST_DATABASE_URL: postgresql://guardana:guardana@127.0.0.1:55439/guardana_test
+      GUARDANA_REQUIRE_POSTGRES: "1"
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

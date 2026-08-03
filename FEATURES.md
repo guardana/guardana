@@ -15,7 +15,7 @@ live in [`ROADMAP.md`](ROADMAP.md).
 |---|---|
 | Engine + built-in rules | beta |
 | `scan` / `probe` / `monitor` / `diff` | beta |
-| Collector (`guardana-server`) | **experimental** — in-memory, unauthenticated, local evaluation only |
+| Collector (`guardana-server`) | **experimental** — durable now (PostgreSQL, reversible migrations), still unauthenticated and untenanted; do not expose it |
 | Extension API | unstable by design until 1.0 |
 
 Full detail, including what is deliberately not covered:

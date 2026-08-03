@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the collector keeps what it is given
+
+First item of the collector work. The engine still never imports it, nothing is
+sent anywhere without `--reporter`, and the maturity label stays **experimental**:
+there is still no authentication and no tenancy, so it must not be exposed. A
+database does not make a service safe, and saying otherwise is how the label would
+stop meaning anything.
+
+- **PostgreSQL persistence** behind the same `Store` protocol the in-memory store
+  implements. One parametrised contract test runs every assertion against both,
+  because two implementations tested apart become two implementations that behave
+  differently — and the one nobody runs locally is the one that differs in
+  production. New dependency on `guardana-server` only: `psycopg[binary]`.
+- **Reversible migrations, from the first row.** Numbered SQL files with a
+  required down file, one transaction per migration including its own bookkeeping
+  row, and a Postgres advisory lock so two replicas starting together cannot both
+  apply the same version. The runner refuses three things outright: a migration
+  edited after it was applied (its checksum is recorded and checked — otherwise
+  two databases disagree about what version four *is* and nothing notices), a
+  migration numbered below the highest applied one (a rebase accident that would
+  skip it on that database forever), and a database holding a migration this build
+  does not ship.
+- **`guardana-collector migrate | status | rollback`**, with the same exit codes
+  the rest of the tool uses. Migrating on boot is opt-in
+  (`GUARDANA_MIGRATE_ON_START=1`) rather than default, because a rolling deploy
+  that migrates on boot briefly runs two versions of the code against one schema.
+- **Storage is chosen, never defaulted.** Without `GUARDANA_DATABASE_URL` or an
+  explicit `GUARDANA_STORAGE=memory`, the collector **refuses to start** and names
+  both options. An ephemeral store that is the default is an ephemeral store that
+  reaches production, and it is found out on the first restart. This is "no
+  default credentials", one layer down.
+- **`/healthz` and `/readyz` as separate endpoints.** Readiness returns `503`
+  while a migration is pending — and again after a rollback — so a rolling deploy
+  does not send traffic at a schema that is not there. One endpoint answering both
+  questions would make the deploy decide that.
+- `deploy/docker-compose.dev.yml` for a local database, and
+  [`docs/usage-collector.md`](docs/usage-collector.md).
+
+**Contributor note.** The collector's tests need a real PostgreSQL and **skip**
+without one, so changing a rule does not require running a database.
+`GUARDANA_REQUIRE_POSTGRES=1` turns that skip into a failure and CI sets it: "the
+isolation test did not run" reading as a green build is the same fail-open this
+project refuses everywhere else, relocated into the test suite. The cross-tenant
+tests land behind the same fixture.
+
 ### Security
 
 Fourteen defects found by an adversarial review of the *finished* 0.7 code, all

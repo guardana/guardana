@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["fastapi>=0.115", "pydantic>=2.7"]
+dependencies = ["fastapi>=0.115", "pydantic>=2.7", "psycopg[binary]>=3.2"]
 
 [project.urls]
 Homepage = "https://guardana.dev"
@@ -43,3 +43,6 @@ packages = ["src/guardana"]
 dev = [
     "httpx>=0.27",
 ]
+
+[project.scripts]
+guardana-collector = "guardana.server.cli:main"

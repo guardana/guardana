@@ -38,6 +38,7 @@ detail below.
 
 - [`integrations.md`](integrations.md) — GitHub Action, pre-commit, and gating on deterioration
 - [`usage-diff.md`](usage-diff.md) — the baseline-and-compare workflow
+- [`usage-collector.md`](usage-collector.md) — the optional collector: persistence, migrations, health and readiness
 
 ## For security teams
 
@@ -61,6 +62,7 @@ Written before the code they describe, so the reasoning survives the review:
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
 - [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam
 - [`design/exit-codes.md`](design/exit-codes.md) — why the codes are what they are
+- [`design/2026-08-03-collector-persistence-design.md`](design/2026-08-03-collector-persistence-design.md) — collector persistence and migrations
 
 ## Project direction
 

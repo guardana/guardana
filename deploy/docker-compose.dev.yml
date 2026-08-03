@@ -1,0 +1,34 @@
+# A PostgreSQL for running Guardana's collector tests and for local evaluation.
+#
+# Deliberately not a production deployment. There is no TLS, no reverse proxy, and
+# the credentials below are in a file in a public repository — which is exactly why
+# they are only ever pointed at a throwaway database. The production Compose file
+# lands with the hardening item, and it will generate its own secrets.
+#
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+#   export GUARDANA_DATABASE_URL=postgresql://guardana:guardana@127.0.0.1:55439/guardana
+#   uv run guardana-collector migrate
+#
+# The test suite uses the same server on the same port and creates a private
+# database per test, so running the tests does not disturb anything you have here.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: guardana
+      POSTGRES_PASSWORD: guardana
+      POSTGRES_DB: guardana_test
+    ports:
+      # 55439 rather than 5432, so this never fights a PostgreSQL you already run.
+      - "55439:5432"
+    volumes:
+      - guardana-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guardana"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  guardana-pgdata:
