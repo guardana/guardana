@@ -245,7 +245,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.7   # moving tag → latest 0.7.x
+      - uses: guardana/guardana@v0.8   # moving tag → latest 0.8.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -407,17 +407,18 @@ so the name is the project's alone.
 
 ## Roadmap
 
-Guardana 0.6 is a reliable static front door, an evaluator-graded dynamic core, a
+Guardana is a reliable static front door, an evaluator-graded dynamic core, a
 result that distinguishes "found nothing" from "could not tell" from "never ran",
-and a release-to-release regression gate. The next milestones are ordered by one
+a release-to-release regression gate, and an optional collector that keeps what
+it is given. The next milestones are ordered by one
 question — *what does a real company need before it can adopt this?* — which is
 why platform work comes before coverage volume.
 
 | Version | Outcome |
 |---|---|
 | **0.6** | Regression between runs — `guardana diff`, saved runs, one definition of "worse" |
-| **0.7** *(current)* | Engine and CLI foundation — run manifest, usage accounting, budgets and `plan`, capability inspection, evidence redaction, safety modes, plugin trust, baseline lifecycle, stable exit codes |
-| **0.8** | The company-ready remainder (persistent authenticated collector, containers, CI beyond GitHub, SBOM) and application-aware verification — a common trace model, imported real agent traces, sink-aware output handling, live retrieval targets |
+| **0.7** | Engine and CLI foundation — run manifest, usage accounting, budgets and `plan`, capability inspection, evidence redaction, safety modes, plugin trust, baseline lifecycle, stable exit codes |
+| **0.8** *(current)* | The company-ready remainder and application-aware verification. **Shipped so far:** a persistent, authenticated collector — PostgreSQL, reversible migrations, scoped API keys. **Still open:** project isolation, containers, CI beyond GitHub, SBOM, and the application work — a common trace model, imported real agent traces, sink-aware output handling, live retrieval targets |
 | **0.9** | Team security platform — AI systems, deployments, RBAC, finding lifecycle, integrations |
 | **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
 | **1.1** | Continuous production verification — OTLP, replay, repeated runs with confidence intervals |

@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-03
+
 ### Security — found by reviewing this release's own code
 
-Same pass applied to the fixes and the collector work above, before either was
-pushed. Reviewing a design and reviewing the code that came out of it find
-different things; so does reviewing code you wrote an hour ago.
+The same adversarial pass applied to the collector work and the 0.7 fixes below,
+before either was pushed. Reviewing a design and reviewing the code that came out
+of it find different things; so does reviewing code written an hour ago.
 
 - **The redactor's output format was a smuggling envelope.** A second pass skips
   spans the redactor already wrote — that is what makes redacting twice idempotent
@@ -118,10 +120,9 @@ isolation test did not run" reading as a green build is the same fail-open this
 project refuses everywhere else, relocated into the test suite. The cross-tenant
 tests land behind the same fixture.
 
-### Security
+### Security — fourteen defects in released 0.7 code
 
-Fourteen defects found by an adversarial review of the *finished* 0.7 code, all
-under a green gate. Reviewing a design and reviewing the code that came out of it
+Found by an adversarial review of the *finished* 0.7 code, all under a green gate. Reviewing a design and reviewing the code that came out of it
 find different things; this is the second kind, and every fix below ships with a
 test that was verified by inverting the implementation and watching it fail.
 
@@ -151,7 +152,7 @@ test that was verified by inverting the implementation and watching it fail.
   spliced in once, and a placeholder claims its own span so redacting twice is
   genuinely idempotent rather than accidentally stable.
 
-### Fixed
+### Fixed — the rest of that review
 
 - **`guardana run migrate` wrote a document that fails its own published schema.**
   A version-1 run without a `target_kind` became the literal `"None"`, over the
@@ -186,7 +187,7 @@ test that was verified by inverting the implementation and watching it fail.
   did not load; the one mode that loads no checks at all was the only one that said
   nothing, and a run with no rules whose report is silent means nothing.
 
-### Added
+### Added — while fixing the above
 
 - `guardana monitor --plugins` / `--allow-plugin`, matching `scan` and `probe`. It
   was the one command with no way to restrict what it imported.

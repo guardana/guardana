@@ -62,7 +62,7 @@ already failed at its job:
 | Collector (`guardana-server`) | **experimental** | Persistent and authenticated since 0.8 (PostgreSQL, reversible migrations, scoped API keys). Still no tenancy, so one instance cannot yet serve two teams — that is the next item |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
-## What ships today (0.7.0)
+## What ships today (0.8.0)
 
 Counts come from the registry, not from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -91,7 +91,30 @@ them safe to gate on (`plan`, `target inspect`, `run inspect|migrate`,
 presets, the build/runtime `Surface` split, a tool-calling endpoint target, three
 endpoint providers plus a guarded-endpoint adapter, the plugin contract with test
 doubles and [public model-format readers](docs/model-formats.md), a GitHub Action
-and pre-commit hook, and the optional experimental collector.
+and pre-commit hook, and the optional collector.
+
+0.8 made the collector something a team can keep. It persists to **PostgreSQL**
+with **reversible migrations** — every change ships a rollback, each runs in its
+own committed transaction under an advisory lock, and the runner refuses a
+migration edited after it was applied, one numbered below the highest applied, or
+a database written by a newer build. Storage is a **decision**: without a database
+URL or an explicit `memory`, the collector does not start, because an ephemeral
+store that is the default is one that reaches production. Every route carrying a
+finding needs a **scoped API key**, hashed at rest and shown once, and a collector
+with nowhere to keep a key refuses to serve rather than serving openly.
+**Readiness is separate from health** and fails while a migration is pending.
+
+It is still marked **experimental**, and the reason is named rather than softened:
+there is no tenancy, so every key sees everything and one instance cannot serve two
+teams. The company-ready checklist above is not moved to match what shipped.
+
+0.8 also carries **nineteen defects an adversarial review found in released 0.7
+code and in this release's own** — among them `monitor` ignoring the privacy
+policy on both the printed alert and the collector submission, a documented
+`fail_on_skipped` the profile loader rejected, `run migrate` writing a document
+that failed its own published schema over the original file, and the redactor's
+placeholder format working as a smuggling envelope for the credentials it exists
+to remove.
 
 0.7 made a run something a pipeline can block on. A saved run became a **manifest**
 (what was verified, against what, at what cost, under which policy, with an
@@ -291,18 +314,30 @@ coverage can grow without rules growing with it (content lane).
 
 Full notes: `docs/superpowers/research/2026-08-02-evaluation-landscape.md`.
 
-## v0.8 — The other half of company-ready, and application awareness
+## v0.8 — The other half of company-ready, and application awareness *(in progress)*
 
 > **Outcome:** the checklist above is finished, and Guardana can verify an AI
 > *application*, not only an isolated model endpoint.
 
-**The company-ready remainder comes first**, because the milestone is not a matter
-of taste: a **persistent collector** (PostgreSQL, migrations, API-key auth for
-runners, organization/project isolation, audit log, retention, restore-tested
-backup), **official containers** for CLI and server, **CI beyond GitHub** (GitLab
-template, generic container pipeline, Jenkins and Azure DevOps examples), a
-**production deployment and upgrade guide**, **SBOM and provenance** on every
-release, and an **end-to-end installation test from a clean environment**.
+**The milestone is not finished, and 0.8.0 is a release inside it, not the end of
+it.** Same discipline as 0.7: the checklist above is not moved to match what
+shipped.
+
+Landed in **0.8.0**:
+
+- a **persistent collector** — PostgreSQL with reversible migrations, a storage
+  choice the collector refuses to make for you, health and readiness as separate
+  endpoints;
+- **authenticated runner ingest** — scoped API keys, hashed at rest, shown once,
+  and a collector that refuses to start when it has nowhere to keep one.
+
+Still open in the company-ready remainder: **organization/project isolation**
+(without it one collector cannot serve two teams, which is why its maturity is
+still `experimental`), an **audit log**, **retention**, **restore-tested backup**,
+**official containers** for CLI and server, **CI beyond GitHub** (GitLab template,
+generic container pipeline, Jenkins and Azure DevOps examples), a **production
+deployment and upgrade guide**, **SBOM and provenance** on every release, and an
+**end-to-end installation test from a clean environment**.
 
 Then the application work:
 
