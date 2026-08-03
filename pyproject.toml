@@ -154,7 +154,7 @@ dev = [
     # dataclasses, so the shape is enforced by mypy on the way out.
     "jsonschema>=4.23",
     "types-jsonschema>=4.23",
-    "mypy>=2.2.0",
+    "mypy>=2.3.0",
     "pre-commit>=4.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
