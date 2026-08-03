@@ -203,10 +203,13 @@ checklist.
 - [x] supported-version policy
 - [x] published threat model
 - [ ] release SBOM and provenance
-- [ ] no known critical vulnerability *(all twelve open Dependabot alerts are
-      `examples/vulnerable-model/`, which exists to be vulnerable; none come from a
-      shipped dependency. They need dismissing with a reason — `dependabot.yml`
-      governs updates, not alerts)*
+- [x] no known critical vulnerability — nothing Guardana ships or installs has
+      one. The twelve alerts that stood here were all
+      `examples/vulnerable-model/`, which exists to be vulnerable and is never
+      installed; they are dismissed as `not_used` with that reason recorded. The
+      box is ticked because the criterion is met, not because the signal went
+      quiet: shipped runtime dependencies are `pyyaml`, `defusedxml`, and — for
+      the optional collector — `fastapi`, `pydantic` and `psycopg`.
 - [ ] end-to-end installation test from a clean environment
 
 ## v0.7 — Engine and CLI foundation *(released)*
