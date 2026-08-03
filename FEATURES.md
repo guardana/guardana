@@ -469,7 +469,9 @@ Any run forwards normalized findings with `--reporter server://…` (versioned
 JSON envelope). The collector (`guardana-server`) is strictly additive and
 separately deployed — the engine never depends on it, enforced by an
 import-linter contract and a test. It ships an **opt-in monitoring dashboard**
-(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default): a
+(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default, and
+**refused on a collector that requires API keys** — it is a browser page and a
+browser cannot present a bearer token, so every panel would load empty): a
 single self-contained page — no build step, works offline — showing severity and
 per-source/per-rule breakdowns, an activity-over-time trend, a prominent
 **unverified** counter, and a recent-findings list where each entry shows a

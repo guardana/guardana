@@ -76,6 +76,24 @@ way to enumerate valid prefixes. A key that *is* valid and lacks the scope gets
 `403` instead, because that is a different fact and a pipeline retrying its
 credentials forever is not the right outcome.
 
+### The dashboard needs the unauthenticated mode
+
+The dashboard is a browser page that fetches `/stats` and `/findings` from the
+browser, and a browser has nowhere to put a bearer token. On a collector that
+requires keys every panel would load empty, so **it refuses to mount there** and
+says why. Mounting it anyway would make an absent capability look like a broken
+one, which is the same lie as reporting a check that could not run as a check
+that passed. Browser sessions arrive with the minimal-UI work; until then read the
+collector through `/findings` and `/trend` with a read-scoped key.
+
+### A database outage is not a rejected key
+
+If the collector cannot reach its database while checking a key, it answers `503`,
+not `401`. A fleet told its credentials were rejected goes and rotates credentials
+that were fine — and the agent-side warning talks about matching schema versions,
+which is advice about the wrong thing entirely. Nothing is leaked by the
+distinction: `/readyz` already tells any caller whether the database is reachable.
+
 ### Running without any of it
 
 `GUARDANA_ALLOW_UNAUTHENTICATED=1` (or `allow_unauthenticated=True` when building

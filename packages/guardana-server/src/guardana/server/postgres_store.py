@@ -125,9 +125,9 @@ class PostgresStore:
                 ),
             )
 
-    def submissions(self, source: str | None = None) -> list[Submission]:
-        """Return every stored submission, oldest first, optionally filtered to one source."""
-        return [record.submission for record in self.records(source)]
+    def submissions(self, source: str | None = None, limit: int | None = None) -> list[Submission]:
+        """Return stored submissions, oldest first, optionally filtered and bounded."""
+        return [record.submission for record in self.records(source, limit)]
 
     def trend(self) -> dict[str, int]:
         """Return finding counts by severity, counted in the database rather than in Python."""
@@ -138,8 +138,16 @@ class PostgresStore:
             )
             return {str(severity): int(count) for severity, count in cursor.fetchall()}
 
-    def records(self, source: str | None = None) -> list[StoredSubmission]:
-        """Return every stored submission with the time it arrived, oldest first."""
+    def records(
+        self, source: str | None = None, limit: int | None = None
+    ) -> list[StoredSubmission]:
+        """Return stored submissions with the time they arrived, oldest first.
+
+        The bound is applied in SQL, not after the rows arrive. Fetching everything
+        and slicing in Python is what made a durable store a way to load an entire
+        finding history into memory on one request — the in-memory store was safe
+        from that only because it forgets.
+        """
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -147,11 +155,14 @@ class PostgresStore:
                        rules_executed, rules_skipped, max_severity, unverified, errors
                 from submissions
                 where (%s::text is null or source = %s)
-                order by received_at, id
+                order by received_at desc, id desc
+                limit %s
                 """,
-                (source, source),
+                (source, source, limit),
             )
-            rows = cursor.fetchall()
+            # Newest-first in SQL so `limit` keeps the newest; reversed here because
+            # every caller of this protocol reads oldest-first.
+            rows = list(reversed(cursor.fetchall()))
             by_submission = self._findings_for(cursor, [int(row[0]) for row in rows])
         return [_record(row, by_submission.get(int(row[0]), {})) for row in rows]
 

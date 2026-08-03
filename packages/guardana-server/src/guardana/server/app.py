@@ -1,6 +1,7 @@
 import os
 import sys
 from dataclasses import asdict
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -11,7 +12,11 @@ from guardana.server.db.settings import StorageChoice, migrate_on_start, resolve
 from guardana.server.envelope import SUPPORTED_SCHEMA_VERSIONS, Submission
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.rule_catalog import rule_catalog
-from guardana.server.security import guard, require_authentication
+from guardana.server.security import (
+    UnauthenticatedCollectorError,
+    guard,
+    require_authentication,
+)
 from guardana.server.stats import compute_stats
 from guardana.server.store import InMemoryStore, Store
 
@@ -84,13 +89,15 @@ def create_app(
     require_authentication(database_url, acknowledged=allow_unauthenticated)
     app = FastAPI(title="guardana-server")
     _mount_health(app, database_url)
-    ingesting = Depends(guard(database_url, Scope.INGEST))
-    reading = Depends(guard(database_url, Scope.READ))
+    # `Annotated`, not a `Depends` default: the parameter really is an identity at
+    # run time and really is a dependency marker at definition time, and only this
+    # form says both. Annotating the marker as the value it produces type-checks
+    # and reads as a lie to every human.
+    ingesting = Annotated[Authenticated | None, Depends(guard(database_url, Scope.INGEST))]
+    reading = Annotated[Authenticated | None, Depends(guard(database_url, Scope.READ))]
 
     @app.post("/findings")
-    def post_findings(
-        submission: Submission, identity: Authenticated | None = ingesting
-    ) -> dict[str, object]:
+    def post_findings(submission: Submission, identity: ingesting) -> dict[str, object]:
         if submission.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise HTTPException(
                 status_code=_UNPROCESSABLE,
@@ -110,19 +117,21 @@ def create_app(
 
     @app.get("/findings")
     def get_findings(
+        _identity: reading,
         source: str | None = Query(default=None),
         limit: int = Query(default=100, ge=1, le=1000),
-        _identity: Authenticated | None = reading,
     ) -> list[Submission]:
-        # Paginated: an unbounded list could return the entire store (tens of MB)
-        # in one response. Newest first, so `limit` returns the most recent.
-        return active_store.submissions(source)[-limit:][::-1]
+        # The bound goes to the store, not to a slice taken after everything has
+        # already been read: a durable store has no upper size, so slicing here
+        # would mean loading the whole finding history to return a hundred rows.
+        return active_store.submissions(source, limit)[::-1]
 
     @app.get("/trend")
-    def get_trend(_identity: Authenticated | None = reading) -> dict[str, int]:
+    def get_trend(_identity: reading) -> dict[str, int]:
         return active_store.trend()
 
     if _dashboard_enabled(dashboard):
+        _refuse_a_dashboard_that_cannot_load(database_url)
         _mount_dashboard(app, active_store, refresh_seconds, reading)
 
     return app
@@ -180,15 +189,37 @@ def _migration_state(database_url: str) -> MigrationState:
         return read_state(connection)
 
 
-def _mount_dashboard(
-    app: FastAPI, store: Store, refresh_seconds: int, reading: Authenticated | None
-) -> None:
+def _refuse_a_dashboard_that_cannot_load(database_url: str | None) -> None:
+    """Refuse to mount a dashboard whose data endpoints it cannot reach.
+
+    The page is a thin client: it fetches `/stats` and `/findings` from the
+    browser, and a browser has nowhere to put a bearer token. On an authenticated
+    collector every one of those fetches gets `401`, so the dashboard renders an
+    empty page and looks like a broken feature rather than an absent one.
+
+    Refused rather than mounted-and-empty, for the same reason a check that could
+    not run is never reported as a check that passed: a capability that cannot
+    work must not look present. Browser sessions are the minimal-UI item; until
+    then the dashboard is a local-evaluation feature and says so.
+    """
+    if database_url is None:
+        return
+    raise UnauthenticatedCollectorError(
+        "the dashboard cannot be mounted on a collector that requires API keys: it is a "
+        "browser page and a browser cannot present a bearer token, so every panel would "
+        "load empty. Run it against GUARDANA_STORAGE=memory for local evaluation, or read "
+        "the collector through /findings and /trend with a read-scoped key"
+    )
+
+
+def _mount_dashboard(app: FastAPI, store: Store, refresh_seconds: int, reading: object) -> None:
     """Add the read-only dashboard page and its aggregated `/stats` data endpoint.
 
     The page itself is static HTML and carries no findings; `/stats` carries all of
-    them, so that is where the key is required. A browser cannot send a bearer
-    header from an address bar, which is the honest reason the dashboard stays a
-    local-evaluation feature until there are user sessions.
+    them, so that is where the key is required. `reading` is FastAPI's `Depends`
+    marker rather than an identity — typed as such, because annotating a dependency
+    marker as the value it eventually produces reads as a lie to everybody except
+    the type checker.
     """
     page = render_dashboard(refresh_seconds)
 
@@ -197,7 +228,7 @@ def _mount_dashboard(
         return page
 
     @app.get("/stats")
-    def get_stats(_identity: Authenticated | None = reading) -> dict[str, object]:
+    def get_stats(_identity: reading) -> dict[str, object]:  # type: ignore[valid-type]
         return asdict(compute_stats(store.records()))
 
     @app.get("/catalog")

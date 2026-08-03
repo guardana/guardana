@@ -68,3 +68,33 @@ def test_the_builtin_list_is_matched_by_distribution_name() -> None:
     # anybody checked. The distribution name is what pip installed.
     assert "guardana-rules" in BUILTIN_DISTRIBUTIONS
     assert all("-" in name for name in BUILTIN_DISTRIBUTIONS)
+
+
+def test_a_refused_plugin_is_never_imported() -> None:
+    """The property `--no-plugins` exists for, and the one a refusal must not cost.
+
+    Recording what it refused means walking the entry-point table, and walking it
+    must not become loading it: `SECURITY.md` promises that this mode imports no
+    third-party code at all. `importlib.metadata.entry_points()` reads installed
+    metadata; only `EntryPoint.load()` imports, and the refusal happens first.
+    """
+    import sys  # noqa: PLC0415
+
+    for module in [name for name in sys.modules if name.startswith("guardana.rules")]:
+        del sys.modules[module]
+    before = set(sys.modules)
+
+    registry = Registry.discover(PluginTrust(mode=PluginMode.DISABLED))
+
+    assert registry.rules() == ()
+    assert not [name for name in set(sys.modules) - before if name.startswith("guardana.rules")]
+
+
+def test_refusing_everything_still_says_what_it_refused() -> None:
+    # A run with no rules whose report says nothing about why is a run whose
+    # silence means nothing — and this is the one mode where that silence would
+    # cover every check the tool has.
+    registry = Registry.discover(PluginTrust(mode=PluginMode.DISABLED))
+
+    assert registry.load_errors
+    assert all("disabled" in error.reason for error in registry.load_errors)

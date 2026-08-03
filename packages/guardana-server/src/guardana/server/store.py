@@ -28,16 +28,24 @@ class Store(Protocol):
         """Store one submission, stamping it with the receive time."""
         ...
 
-    def submissions(self, source: str | None = None) -> list[Submission]:
-        """Return every submission, optionally filtered to one source."""
+    def submissions(self, source: str | None = None, limit: int | None = None) -> list[Submission]:
+        """Return stored submissions, oldest first, optionally filtered and bounded.
+
+        `limit` keeps the **newest** N and is not a convenience. A durable store has
+        no upper bound on how much it holds, so a reader that fetches everything and
+        slices in Python turns one request into "load the entire finding history
+        into memory" — which the in-memory store made safe only by forgetting.
+        """
         ...
 
     def trend(self) -> dict[str, int]:
         """Return finding counts by severity, across everything stored."""
         ...
 
-    def records(self) -> list[StoredSubmission]:
-        """Return every stored submission with its receive time — raw data for stats."""
+    def records(
+        self, source: str | None = None, limit: int | None = None
+    ) -> list[StoredSubmission]:
+        """Return stored submissions with their receive time — raw data for stats."""
         ...
 
 
@@ -69,12 +77,9 @@ class InMemoryStore:
         with self._lock:
             self._records.append(record)
 
-    def submissions(self, source: str | None = None) -> list[Submission]:
-        """Return every submission held, optionally filtered to one source."""
-        held = [record.submission for record in self._snapshot()]
-        if source is None:
-            return held
-        return [s for s in held if s.source == source]
+    def submissions(self, source: str | None = None, limit: int | None = None) -> list[Submission]:
+        """Return submissions held, oldest first, optionally filtered and bounded."""
+        return [record.submission for record in self.records(source, limit)]
 
     def trend(self) -> dict[str, int]:
         """Return finding counts by severity, across everything held."""
@@ -84,9 +89,14 @@ class InMemoryStore:
                 counts[finding.severity] = counts.get(finding.severity, 0) + 1
         return counts
 
-    def records(self) -> list[StoredSubmission]:
-        """Return every stored submission with its receive time (oldest first)."""
-        return self._snapshot()
+    def records(
+        self, source: str | None = None, limit: int | None = None
+    ) -> list[StoredSubmission]:
+        """Return stored submissions with their receive time (oldest first)."""
+        held = self._snapshot()
+        if source is not None:
+            held = [record for record in held if record.submission.source == source]
+        return held if limit is None else held[-limit:]
 
     def _snapshot(self) -> list[StoredSubmission]:
         with self._lock:

@@ -18,6 +18,7 @@ UNAUTHENTICATED_VARIABLE = "GUARDANA_ALLOW_UNAUTHENTICATED"
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 _UNAUTHORIZED = 401
 _FORBIDDEN = 403
+_UNAVAILABLE = 503
 _BEARER = "bearer "
 
 
@@ -88,9 +89,16 @@ def guard(database_url: str | None, scope: Scope) -> Callable[[Request], Authent
                 headers={"WWW-Authenticate": "Bearer"},
             ) from exc
         except Exception as exc:
-            print(f"authentication failed to reach the database: {exc}", file=sys.stderr)  # noqa: T201
+            # `503`, not `401`. A database outage is not a rejected credential, and
+            # saying it is sends a whole fleet off to rotate keys that were fine —
+            # while `submit_safely` prints "the collector rejected this submission,
+            # check its schema version", which is advice about the wrong thing.
+            # Nothing is leaked by the distinction: `/readyz` already tells any
+            # caller whether the database is reachable.
+            print(f"authentication could not reach the database: {exc}", file=sys.stderr)  # noqa: T201
             raise HTTPException(
-                status_code=_UNAUTHORIZED, detail="that API key was not accepted"
+                status_code=_UNAVAILABLE,
+                detail="the collector cannot reach its database; this is not a credential problem",
             ) from exc
         if not identity.permits(scope):
             # A different code, because it is a different fact: the caller *is*

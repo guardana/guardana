@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — found by reviewing this release's own code
+
+Same pass applied to the fixes and the collector work above, before either was
+pushed. Reviewing a design and reviewing the code that came out of it find
+different things; so does reviewing code you wrote an hour ago.
+
+- **The redactor's output format was a smuggling envelope.** A second pass skips
+  spans the redactor already wrote — that is what makes redacting twice idempotent
+  — and it recognised `[redacted:` *anything* `]`. Evidence is the model's reply,
+  so anything able to make a model emit `[redacted:` around a credential carried
+  it through the redactor untouched. Only this redactor's own shape is skipped now:
+  a lower-case label and an optional twelve-hex digest, into which no secret,
+  address or IP fits.
+- **A durable store made an unbounded read possible.** `GET /findings` fetched
+  every submission and sliced in Python. The in-memory store was safe from that
+  only because it forgets; PostgreSQL has no upper size, so one request became
+  "load the entire finding history into memory". The bound is applied in SQL now,
+  and the `Store` protocol carries it.
+- **A database outage was reported as a rejected credential.** Checking a key
+  against an unreachable database answered `401`, which sends a fleet off to
+  rotate credentials that were fine while the agent-side warning talks about
+  schema versions. It answers `503` now; `/readyz` already tells any caller
+  whether the database is reachable, so the distinction leaks nothing.
+- **The dashboard now refuses to mount on an authenticated collector.** It is a
+  browser page that fetches its own data, and a browser cannot present a bearer
+  token — so every panel would have loaded empty and an absent capability would
+  have looked like a broken one.
+- `has_any_key` was removed: its docstring described a use that did not exist, and
+  an unused function in a security module is surface with no consumer.
+
 ### Added — a collector nobody can talk to anonymously
 
 Second item of the collector work. Every route that carries a finding now needs an

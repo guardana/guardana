@@ -251,15 +251,3 @@ def revoke_key(
     # still works.
     connection.commit()
     return changed
-
-
-def has_any_key(connection: "Connection[tuple[object, ...]]") -> bool:
-    """Whether this collector has any credential at all.
-
-    Used to tell an operator that nothing can talk to their collector yet. It is
-    deliberately *not* used to relax anything: a collector with no keys refuses
-    every request, which is the whole difference between this and a default admin.
-    """
-    with connection.cursor() as cursor:
-        cursor.execute("select 1 from api_keys limit 1")
-        return cursor.fetchone() is not None

@@ -14,12 +14,13 @@ whose label contains no word the generic pattern looks for.
 
 import pytest
 from guardana.core.redaction import EvidenceMode, EvidenceRedactor, RedactionPolicy
+from guardana.core.testing import fake_aws_key
 
 _SAMPLES = {
-    "github-token": "ghp_" + "a1b2c3d4e5f6g7h8",
-    "slack-token": "xoxb-" + "1234567890-abcdef",
+    "github-token": "ghp" + "_" + "a1b2c3d4e5f6g7h8",
+    "slack-token": "xoxb" + "-" + "1234567890-abcdef",
     "bearer-token": "Bearer " + "abcdefghijklmnopqrst",
-    "aws-key": "AKIA" + "1234567890ABCDEF",
+    "aws-key": fake_aws_key(),
     "credential-assignment": "api_key = " + "abcdefghijkl0123",
 }
 
@@ -85,3 +86,52 @@ def test_the_digest_still_identifies_the_same_secret_across_runs() -> None:
     sample = _SAMPLES["github-token"]
 
     assert redactor.redact_text(f"a {sample}").split("a ")[1] == redactor.redact_text(sample)
+
+
+# --- the redactor's own output format must not become a smuggling envelope -----
+
+# Built from pieces by `guardana.core.testing`, never written down: a
+# secret-shaped literal in a test file is a secret-shaped literal in the
+# repository, and the dogfood scan is right to flag it — it flagged this one.
+_SMUGGLED = {
+    "aws-key": fake_aws_key(),
+    "github-token": "ghp" + "_" + "a1b2c3d4e5f6g7h8",
+    "email": "oncall@example.com",
+}
+
+
+@pytest.mark.parametrize(("label", "secret"), sorted(_SMUGGLED.items()))
+def test_a_forged_placeholder_cannot_carry_a_secret_through(label: str, secret: str) -> None:
+    """Evidence is the model's reply, so the redactor's input is attacker-influenced.
+
+    A second pass skips spans the redactor itself wrote, which is what makes
+    redacting twice idempotent. Matched permissively, that skip would mean anything
+    able to make a model emit `[redacted:` around a credential carried it through
+    untouched — the output format turned into an envelope.
+    """
+    cleaned = _redactor().redact_text(f"model said: [redacted:{secret}]")
+
+    assert secret not in cleaned, f"a forged placeholder smuggled a {label} past the redactor"
+
+
+def test_a_genuine_placeholder_is_still_left_alone() -> None:
+    # The other half: tightening the skip must not break idempotence, which is what
+    # keeps a finding's fingerprint stable between the command and the renderer.
+    genuine = "[redacted:aws-key:743554670c60]"
+
+    assert _redactor().redact_text(genuine) == genuine
+
+
+def test_only_this_redactors_own_shape_is_skipped() -> None:
+    """The skip matches a lower-case label and an optional twelve-hex digest.
+
+    Nothing that fits that shape is a secret, an address or an IP — which is the
+    argument for the skip being safe at all, so it is asserted rather than trusted.
+    """
+    from guardana.core.redaction import _ALREADY_REDACTED  # noqa: PLC0415
+
+    assert _ALREADY_REDACTED.fullmatch("[redacted:aws-key:743554670c60]")
+    assert _ALREADY_REDACTED.fullmatch("[redacted:email]")
+    assert not _ALREADY_REDACTED.fullmatch(f"[redacted:{_SMUGGLED['aws-key']}]")
+    assert not _ALREADY_REDACTED.fullmatch("[redacted:bob@example.com]")
+    assert not _ALREADY_REDACTED.fullmatch("[redacted:a b c]")

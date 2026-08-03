@@ -22,7 +22,6 @@ from guardana.server.auth import (
     Scope,
     authenticate,
     generate_key,
-    has_any_key,
     list_keys,
     revoke_key,
     store_key,
@@ -34,6 +33,7 @@ from guardana.server.store import InMemoryStore
 _UNAUTHORIZED = 401
 _FORBIDDEN = 403
 _OK = 200
+_UNAVAILABLE = 503
 _SUBMISSION = {"source": "ci", "schema_version": 5, "findings": []}
 
 
@@ -52,7 +52,8 @@ def _issue(database_url: str, name: str, scopes: tuple[Scope, ...]) -> str:
 def _client(database_url: str, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
     monkeypatch.setenv("GUARDANA_MIGRATE_ON_START", "1")
-    return TestClient(create_app(dashboard=True))
+    # No dashboard: it refuses to mount here, and that refusal has its own test.
+    return TestClient(create_app())
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -137,7 +138,33 @@ def test_the_route_table_is_actually_covered(
     # Guards against the enumeration above quietly matching nothing.
     client = _client(database_url, monkeypatch)
 
-    assert set(_guarded_get_routes(client)) >= {"/findings", "/trend", "/stats"}
+    assert set(_guarded_get_routes(client)) >= {"/findings", "/trend"}
+
+
+def test_the_dashboard_refuses_to_mount_where_it_could_not_load(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A browser has nowhere to put a bearer token, so every panel would be empty.
+
+    Mounted anyway, the dashboard would look like a broken feature rather than an
+    absent one — which is the same lie as reporting a check that could not run as
+    a check that passed, moved into the UI.
+    """
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    monkeypatch.setenv("GUARDANA_MIGRATE_ON_START", "1")
+
+    with pytest.raises(UnauthenticatedCollectorError, match="browser cannot present"):
+        create_app(dashboard=True)
+
+
+def test_the_dashboard_still_mounts_for_local_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GUARDANA_DATABASE_URL", raising=False)
+    monkeypatch.setenv("GUARDANA_ALLOW_UNAUTHENTICATED", "1")
+
+    client = TestClient(create_app(store=InMemoryStore(), dashboard=True))
+
+    assert client.get("/").status_code == _OK
+    assert client.get("/stats").status_code == _OK
 
 
 # --- what a key can and cannot do --------------------------------------------
@@ -300,10 +327,12 @@ def test_using_a_key_records_that_it_was_used(connection: DbConnection) -> None:
     assert list_keys(connection)[0].last_used_at is not None
 
 
-def test_a_fresh_collector_has_no_keys_and_says_so(connection: DbConnection) -> None:
+def test_a_fresh_collector_holds_no_keys(connection: DbConnection) -> None:
+    # And therefore accepts nothing. `guardana-collector key list` is what says so
+    # to a person; the collector itself simply refuses.
     apply_pending(connection)
 
-    assert has_any_key(connection) is False
+    assert list_keys(connection) == ()
 
 
 def test_revoking_a_key_twice_reports_the_second_as_a_no_op(connection: DbConnection) -> None:
@@ -313,6 +342,25 @@ def test_revoking_a_key_twice_reports_the_second_as_a_no_op(connection: DbConnec
 
     assert revoke_key(connection, issued.prefix) is True
     assert revoke_key(connection, issued.prefix) is False
+
+
+def test_a_database_outage_is_not_reported_as_a_rejected_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`503`, not `401`, and the difference is operational rather than cosmetic.
+
+    A fleet told its credentials were rejected goes and rotates credentials that
+    were fine, while the agent-side warning talks about matching schema versions —
+    advice about the wrong thing entirely. Nothing is leaked by the distinction:
+    `/readyz` already tells any caller whether the database is reachable.
+    """
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", "postgresql://nobody@127.0.0.1:1/nothing")
+    client = TestClient(create_app())
+
+    response = client.post("/findings", json=_SUBMISSION, headers=_bearer("gdn_abc_secret"))
+
+    assert response.status_code == _UNAVAILABLE
+    assert "not a credential problem" in response.json()["detail"]
 
 
 def test_the_unauthenticated_mode_still_serves(monkeypatch: pytest.MonkeyPatch) -> None:

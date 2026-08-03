@@ -72,6 +72,15 @@ placeholder that had just replaced the secret and produced
 `[redacted:github-[redacted:credential-assignment:…]]`. Matches are now collected
 against the original text and spliced in once.
 
+**A placeholder is recognised narrowly, and that narrowness is load-bearing.** A
+second pass skips spans this redactor already wrote — that is what makes redacting
+twice idempotent — and the redactor's input is the model's reply, which is
+attacker-influenced by definition. Recognising `[redacted:` *anything* `]` would
+mean that anything able to make a model emit `[redacted:` around a credential
+carried it through untouched: the output format turned into a smuggling envelope.
+Only a lower-case label with an optional twelve-hex digest is skipped, and nothing
+that fits that shape is a secret, an address or an IP.
+
 ## One seam, and why that is the whole design
 
 ```

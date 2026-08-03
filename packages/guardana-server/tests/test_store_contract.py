@@ -204,3 +204,34 @@ def test_postgres_keeps_a_submission_across_process_restarts(database_url: str) 
     reopened = _persists_across_instances(database_url)()
 
     assert [s.source for s in reopened] == ["survives"]
+
+
+def test_a_limit_keeps_the_newest_and_is_applied_by_the_store(store: Store) -> None:
+    """The bound belongs to the store, not to a slice taken after the read.
+
+    The in-memory store was safe from an unbounded read only because it forgets;
+    a durable one has no upper size, so a reader that fetches everything and slices
+    turns one request into "load the entire finding history into memory".
+    """
+    for index in range(5):
+        store.add(_submission(source=f"run-{index}"))
+
+    held = store.submissions(limit=2)
+
+    assert [s.source for s in held] == ["run-3", "run-4"]
+
+
+def test_a_limit_and_a_source_filter_compose(store: Store) -> None:
+    store.add(_submission(source="a"))
+    store.add(_submission(source="b"))
+    store.add(_submission(source="a"))
+
+    assert [s.source for s in store.submissions("a", 1)] == ["a"]
+    assert len(store.records("a")) == 2
+
+
+def test_no_limit_still_returns_everything(store: Store) -> None:
+    for index in range(3):
+        store.add(_submission(source=f"run-{index}"))
+
+    assert len(store.submissions()) == 3
