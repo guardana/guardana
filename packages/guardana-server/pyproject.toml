@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["fastapi>=0.115", "pydantic>=2.7", "psycopg[binary]>=3.2"]
+dependencies = ["fastapi>=0.141.1", "pydantic>=2.7", "psycopg[binary]>=3.2"]
 
 [project.urls]
 Homepage = "https://guardana.dev"
