@@ -130,3 +130,9 @@ guardana scan .  --format json --output run.json
 
 Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
 on the other end cannot parse that.
+
+**`--format json` is not optional here.** `--output` on its own writes whatever
+`--format` says, and that defaults to human text — a file named like a saved run
+that `guardana diff` refuses. Since 0.7.1 saving any other format says so at the
+moment it is written, rather than leaving it to be discovered on the next run,
+which is the run you wanted compared.

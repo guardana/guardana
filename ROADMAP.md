@@ -248,6 +248,22 @@ constant in the code by a test.
 | streaming, seed, log-prob and rate-limit probes | `target inspect` covers the four capabilities rules actually depend on |
 | separate local and collector evidence policies | lands with the collector |
 | signature verification of plugin packs | needs a distribution story this project does not have yet |
+| `configuration.*_digest` populated | the manifest has the fields and records `null` in all of them. A digest of a profile is easy; a digest of a *system prompt*, *tool manifest* or *retriever* has to be taken from the thing actually in front of the model, which is the application-awareness work in v0.8 — and filling in only the easy one would make the block look complete |
+| token ceilings bounding the tool-calling path | `offer_tools` has no usage protocol, so the requests an agent probe spends most of its budget on report no tokens. They are counted in `requests_missing_token_counts`, and a request ceiling bounds them; a *token* ceiling does not, and saying so is better than a ceiling that silently covers half a run |
+
+### Reviewed after shipping (0.7.1)
+
+An adversarial review of the finished 0.7 code found fourteen defects under a
+green gate — a leak of unredacted evidence from `monitor`, a documented gate the
+profile loader refused to accept, a migration writing a document that fails its
+own schema, and eleven others. All are fixed and listed in
+[`CHANGELOG.md`](CHANGELOG.md).
+
+The method is the point and it is now standing practice: **reviewing a design and
+reviewing the code that came out of it find different defects, so both happen, and
+separately.** Three of the fourteen were things the documentation already
+described correctly while the code did something else, which is the failure mode a
+green gate is least able to see.
 
 ## Where this sits, and what the neighbours do better
 

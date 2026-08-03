@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+Fourteen defects found by an adversarial review of the *finished* 0.7 code, all
+under a green gate. Reviewing a design and reviewing the code that came out of it
+find different things; this is the second kind, and every fix below ships with a
+test that was verified by inverting the implementation and watching it fail.
+
+- **`guardana monitor` ignored the profile's `privacy:` block entirely.** It
+  printed alerts through a renderer built with no policy — which falls back to
+  `full` — and forwarded them to a collector without redacting at all. `scan` and
+  `probe` both redact before they emit; `monitor` is the one that runs unattended
+  for hours and ships every alert somewhere central, so it was the worst of the
+  three to have missed. It now builds its handler from the profile, and both exits
+  are tested separately, because only one of them is visible on screen.
+- **`privacy.redact_secrets: false` wrote live credentials to disk.** The switch
+  took effect only at `evidence_mode: full`, so its single reachable outcome was
+  the one [`docs/privacy.md`](docs/privacy.md) said was impossible. The field is
+  gone from `RedactionPolicy` and the value is refused at load time with a reason
+  — accepted as a key so that anyone who set it is told, rather than ignored.
+- **`fail_on.fail_on_skipped` could not be set.** The gate shipped in 0.7,
+  [`docs/usage-target.md`](docs/usage-target.md) showed the exact YAML, and the
+  profile loader rejected the key — so the documented example was a hard error and
+  the coverage-gap gate was unreachable from the only place it can be turned on. A
+  test now derives the expected keys from the `FailOn` dataclass, so a field
+  without a way to set it fails rather than shipping.
+- **Redaction destroyed its own labels.** Patterns were applied one at a time, each
+  reading the previous one's output, so the generic "token = value" pattern matched
+  the *label* of the placeholder that had just replaced a secret:
+  `[redacted:github-[redacted:credential-assignment:…]]`. The label is what tells
+  you which key to rotate. Matches are now collected against the original text and
+  spliced in once, and a placeholder claims its own span so redacting twice is
+  genuinely idempotent rather than accidentally stable.
+
+### Fixed
+
+- **`guardana run migrate` wrote a document that fails its own published schema.**
+  A version-1 run without a `target_kind` became the literal `"None"`, over the
+  original file, with exit `0` — the same class of defect as the one 0.7 fixed,
+  in a different field. The migration now refuses what it cannot carry and writes
+  nothing, and a test validates the *artifact* across every field a version-1 run
+  could be missing.
+- **An unreadable saved run exited `1` with a traceback.** `load_report` ran the
+  migration outside its own guard, so the manifest reader's exception escaped
+  through `run inspect`, `run migrate` and `diff` — reporting "a finding failed the
+  policy" for a file that could not be read. All three now exit `3`.
+- **The manifest never recorded the budgets in force.** `execution` describes
+  itself as the limits a run was given; it carried concurrency and the timeout and
+  dropped every ceiling, so a run that exited `6` said it stopped and never said
+  what it hit.
+- **`scan --write-baseline` exited `1` where `baseline create` exits `2`** for the
+  identical situation. Nothing failed a policy — a question was left unanswered.
+- **`baseline update` deleted waivers on the evidence of an incomplete scan.** The
+  command decides a finding is fixed by not seeing it, and a rule that errored
+  produces exactly that absence — so one broken rule removed the waiver, the reason
+  a person wrote and the name of whoever approved it, printed "is fixed" and exited
+  `0`. It now refuses to touch the file and exits `2`.
+- **A request budget overshot under concurrency.** `reserve` counted requests that
+  had come *back*, so every thread of a `--concurrency 4` probe passed the same
+  check at once. It now counts claims, taken and tested inside one lock: the
+  promise that a ceiling of 200 means 200 held only in the sequential case it was
+  written for.
+- **`guardana plan` priced rules the run would refuse.** It applied the kind, the
+  policy globs and the capability check, and skipped the safety ceiling the runner
+  applies. The selection is now the runner's own, called from one place.
+- **`--plugins disabled` recorded no refusal.** Every other mode reports what it
+  did not load; the one mode that loads no checks at all was the only one that said
+  nothing, and a run with no rules whose report is silent means nothing.
+
+### Added
+
+- `guardana monitor --plugins` / `--allow-plugin`, matching `scan` and `probe`. It
+  was the one command with no way to restrict what it imported.
+- `guardana plan probe --safety` / `--allow-destructive`, so a plan can describe
+  the run you are actually going to make.
+- `guardana scan --baseline` now names waivers that have lapsed and waivers still
+  carrying the generated placeholder. Both were reported only by `baseline verify`,
+  which is the command nobody runs in a pipeline — so a build went red with nothing
+  on screen explaining why, and the first guess is always that the model got worse.
+- Saving a run in a format `guardana diff` cannot read says so at the moment the
+  file is written. `--output` advertises itself as what `diff` needs and defaults
+  to human text, so the obvious command produced a file the comparison refuses and
+  the user found out on the next run — the run they wanted compared.
+
 ## [0.7.0] - 2026-08-02
 
 ### Breaking

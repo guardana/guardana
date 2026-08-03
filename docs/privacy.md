@@ -13,7 +13,7 @@ telemetry, no account, and the collector is opt-in in both directions.
 ```yaml
 privacy:
   evidence_mode: redacted     # metadata_only | redacted | full
-  redact_secrets: true
+  redact_secrets: true        # the only value; `false` is refused, see below
   redact_emails: true
   redact_ip_addresses: false  # an IP address is frequently the finding itself
   hash_identifiers: true
@@ -28,8 +28,14 @@ privacy:
 | `full` | the model's words — **still without credentials**. |
 
 **`full` does not mean "store a live key".** Secrets are removed at every mode,
-including this one. There is no useful reading of "keep the credential", and no
-flag offers one: the finding is that a secret appeared, not what it was.
+including this one. There is no useful reading of "keep the credential": the
+finding is that a secret appeared, not what it was.
+
+`redact_secrets: false` is **refused at load time**, with a message saying why.
+Until 0.7.1 the switch existed and took effect only at `full` — so its single
+reachable outcome was writing a working credential into a report, while this page
+said the opposite. The key is still accepted so that a profile stating the default
+keeps working, and so that anyone who set it gets told rather than ignored.
 
 ## Redaction is never silent
 
@@ -53,6 +59,19 @@ computed from its evidence summary, and a baseline waiver matches on that
 fingerprint. A placeholder that changed between runs would silently expire every
 waiver you had.
 
+The **label** is the other half, and it is what tells you which key to rotate:
+
+```text
+[redacted:github-token:1a2b3c4d5e6f]
+```
+
+Patterns are ordered most specific first so that a GitHub token is labelled as
+one. Until 0.7.1 they were applied one at a time, each reading the previous one's
+output, so the generic "token = value" pattern matched the *label* of the
+placeholder that had just replaced the secret and produced
+`[redacted:github-[redacted:credential-assignment:…]]`. Matches are now collected
+against the original text and spliced in once.
+
 ## One seam, and why that is the whole design
 
 ```
@@ -64,14 +83,23 @@ added next year is covered without its author knowing this document exists, and
 there is no way to obtain a renderer that skips it. A policy applied in thirty
 places has thirty exceptions, and the one that matters is the one somebody forgot.
 
-Commands also redact once, early — before a baseline is written or matched —
-because a fingerprint is computed from the evidence summary. Redaction is
-idempotent, so applying it twice changes nothing.
+`scan`, `probe` and `monitor` also redact once, early — before a baseline is
+written or matched — because a fingerprint is computed from the evidence summary.
+Redaction is idempotent: a placeholder claims its own span before any pattern is
+offered the text, so a second pass cannot read the first pass's label as content.
+
+**`monitor` was the exception until 0.7.1**, and it was the worst one to have: it
+printed through a renderer built with no policy — so the library default, `full` —
+and forwarded alerts to the collector without redacting at all. It is the mode
+that runs unattended and ships evidence off the machine continuously. It now
+builds its handler from the profile, and two tests assert both exits separately,
+because only one of them is visible to whoever is watching the terminal.
 
 A test enumerates every registered renderer from the registry and asserts that a
 crafted, obviously-fake credential cannot pass through any of them, plus the
 collector envelope and a baseline file. Per path, not once: asserted centrally, it
-would pass while one path quietly bypassed the seam.
+would pass while one path quietly bypassed the seam — which is exactly what
+happened, one layer above the renderers, where nothing was enumerating anything.
 
 ## The manifest records what was applied
 

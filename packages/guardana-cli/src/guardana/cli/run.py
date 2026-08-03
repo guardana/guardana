@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 from guardana.core.manifest import RunManifest
-from guardana.core.manifest.load import migrate_v1
+from guardana.core.manifest.load import ManifestLoadError, migrate_v1
 from guardana.core.manifest.serialize import manifest_to_dict
 from guardana.core.report import ReportLoadError, load_report
 from guardana.core.report.run import REPORT_SCHEMA_VERSION
@@ -115,8 +115,16 @@ def migrate(
             err=True,
         )
         raise typer.Exit(code=_INVALID_USAGE)
+    try:
+        migrated = migrate_v1(raw)
+    except ManifestLoadError as exc:
+        # Refused before anything is written. The default destination is the file
+        # itself, so a migration that half-succeeded would overwrite the only copy
+        # of the evidence with a document that cannot be read back.
+        typer.echo(f"error: {path} cannot be migrated: {exc}", err=True)
+        raise typer.Exit(code=_INVALID_USAGE) from exc
     destination = output if output is not None else path
-    destination.write_text(json.dumps(migrate_v1(raw), indent=2), encoding="utf-8")
+    destination.write_text(json.dumps(migrated, indent=2), encoding="utf-8")
     typer.echo(f"migrated {path} from schema {version} to {REPORT_SCHEMA_VERSION} → {destination}")
 
 

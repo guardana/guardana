@@ -19,11 +19,11 @@ from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import build_manifest
+from guardana.cli._safety_flags import parse_impact
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
-from guardana.core.safety import Impact
 from guardana.core.target import ChatTransport, EndpointError, HttpAdapterTransport, TargetKind
 from guardana.report import get_renderer
 
@@ -32,22 +32,6 @@ from guardana.report import get_renderer
 # are retried with backoff, so a busy endpoint slows the probe instead of
 # failing it. Raise it for a hosted endpoint you own the quota for.
 _DEFAULT_CONCURRENCY = 4
-
-
-def _impact(name: str) -> Impact:
-    """Read the `--safety` flag, refusing a level nobody defined.
-
-    Refused rather than defaulted: a typo that silently fell back to `active`
-    would run more than the user asked for, which is the one direction this flag
-    exists to prevent.
-    """
-    try:
-        return Impact(name.replace("-", "_"))
-    except ValueError as exc:
-        raise typer.BadParameter(
-            f"unknown safety level {name!r}; expected one of "
-            f"{[str(i).replace('_', '-') for i in Impact]}"
-        ) from exc
 
 
 def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
@@ -150,7 +134,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
     prof = resolve_profile(profile, preset)
     prof = replace(
         prof,
-        max_impact=_impact(safety),
+        max_impact=parse_impact(safety),
         allow_destructive=allow_destructive,
         budgets=override(
             prof.budgets,
@@ -188,7 +172,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
             started_at=started_at,
             concurrency=concurrency,
         )
-        emit(get_renderer(format.value, run=run).render(result), output)
+        emit(get_renderer(format.value, run=run).render(result), output, format.value)
         if reporter:
             submit_safely(reporter, result, source=mcp)
         exit_with(outcome, result)
@@ -230,7 +214,7 @@ def probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comma
         started_at=started_at,
         concurrency=concurrency,
     )
-    emit(get_renderer(format.value, run=run).render(result), output)
+    emit(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
         submit_safely(reporter, result, source=f"{url}#{model}")
     exit_with(outcome, result)

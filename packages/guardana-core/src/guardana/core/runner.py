@@ -91,7 +91,7 @@ class Runner:
             meta = rule.meta
             if meta.target_kind != target.kind or not self.profile.policy.matches(meta.id):
                 continue
-            refusal = self._safety_refusal(rule)
+            refusal = safety_refusal(self.profile, rule)
             if refusal is not None:
                 skipped.append(refusal)
                 continue
@@ -164,37 +164,6 @@ class Runner:
             usage=target.usage(),
             stopped_by=stopped_by,
         )
-
-    def _safety_refusal(self, rule: Rule) -> SkippedRule | None:
-        """Refuse a rule that reaches further than this run permits, and say so.
-
-        Reported as a skip rather than dropped: a check that did not happen is a
-        coverage gap whatever the reason, and the reason here points at a flag
-        rather than at the target — which is what somebody reading the log needs
-        to know.
-        """
-        meta = rule.meta
-        if meta.destructive and not self.profile.allow_destructive:
-            return SkippedRule(
-                rule_id=meta.id,
-                reason=SkipReason.UNSAFE_MODE,
-                missing=("allow_destructive",),
-                detail=(
-                    f"{meta.id} can destroy or alter something the target owns, and this "
-                    f"run does not permit that"
-                ),
-            )
-        if not permits(self.profile.max_impact, meta.impact):
-            return SkippedRule(
-                rule_id=meta.id,
-                reason=SkipReason.UNSAFE_MODE,
-                missing=(str(meta.impact),),
-                detail=(
-                    f"{meta.id} is {meta.impact}, and this run permits at most "
-                    f"{self.profile.max_impact}"
-                ),
-            )
-        return None
 
     def _execute(self, plan: Sequence[Rule], target: Target) -> Iterator[_RuleOutcome]:
         limit = self.concurrency_for(target.kind)
@@ -332,6 +301,41 @@ class Runner:
                 CheckError.from_exception(rule.meta.id, "run", exc),
             )
         return _RuleOutcome(rule.meta.id, tuple(findings), tuple(unverified))
+
+
+def safety_refusal(profile: Profile, rule: Rule) -> SkippedRule | None:
+    """Refuse a rule that reaches further than `profile` permits, and say so.
+
+    Reported as a skip rather than dropped: a check that did not happen is a
+    coverage gap whatever the reason, and the reason here points at a flag rather
+    than at the target — which is what somebody reading the log needs to know.
+
+    A free function rather than a `Runner` method because `guardana plan` has to
+    reach the same verdict. A plan that priced rules the run then refuses is a
+    plan describing a different run, and a second copy of this decision is a
+    second copy that drifts.
+    """
+    meta = rule.meta
+    if meta.destructive and not profile.allow_destructive:
+        return SkippedRule(
+            rule_id=meta.id,
+            reason=SkipReason.UNSAFE_MODE,
+            missing=("allow_destructive",),
+            detail=(
+                f"{meta.id} can destroy or alter something the target owns, and this "
+                f"run does not permit that"
+            ),
+        )
+    if not permits(profile.max_impact, meta.impact):
+        return SkippedRule(
+            rule_id=meta.id,
+            reason=SkipReason.UNSAFE_MODE,
+            missing=(str(meta.impact),),
+            detail=(
+                f"{meta.id} is {meta.impact}, and this run permits at most {profile.max_impact}"
+            ),
+        )
+    return None
 
 
 def _unread_sources(target: Target) -> tuple[UnreadSource, ...]:

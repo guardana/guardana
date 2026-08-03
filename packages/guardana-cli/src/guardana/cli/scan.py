@@ -17,9 +17,10 @@ from guardana.core.gate import gate_outcome
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import (
+    Baseline,
     BaselineError,
     apply_baseline,
-    load_baseline,
+    read_baseline,
     relativize,
     relativize_findings,
     serialize_baseline,
@@ -30,6 +31,30 @@ from guardana.report import get_renderer
 
 _BASELINE_ERROR_EXIT_CODE = ExitCode.INVALID_USAGE
 """A baseline file that cannot be read is bad input, not an indeterminate result."""
+
+
+def _announce_baseline_health(accepted: Baseline) -> None:
+    """Say which waivers lapsed and which nobody ever wrote a reason for.
+
+    An expired waiver stops waiving on its own, so the gate is already correct
+    without this — but the build then goes red for a reason nothing on screen
+    explains, and the first guess is always "the model got worse". A waiver still
+    carrying the generated placeholder is the opposite problem: it silences a
+    finding indefinitely and, until now, said so only to `baseline verify`, which
+    is the command nobody in a pipeline runs.
+    """
+    for waiver in accepted.expired():
+        typer.echo(
+            f"note: waiver {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) expired on "
+            f"{waiver.expires} and no longer waives anything",
+            err=True,
+        )
+    for waiver in accepted.unreviewed:
+        typer.echo(
+            f"warning: waiver {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) still has "
+            f"the generated placeholder text — an accepted risk needs a reason and an owner",
+            err=True,
+        )
 
 
 def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
@@ -125,14 +150,21 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
         # Only the errors gate here, never the findings: snapshotting today's
         # findings is the whole point of this flag, but a check that never ran
         # means the snapshot is missing whatever it would have found.
+        #
+        # `INDETERMINATE`, not `POLICY_FAILED`, and the same code `baseline create`
+        # uses for the same situation. Nothing failed a policy here — a question
+        # was left unanswered, and two commands answering it with different codes
+        # is an exit-code table only half the tool honours.
         blocked = bool(result.errors) and prof.policy.fail_on.fail_on_error
-        raise typer.Exit(code=ExitCode.POLICY_FAILED if blocked else ExitCode.OK)
+        raise typer.Exit(code=ExitCode.INDETERMINATE if blocked else ExitCode.OK)
     if baseline is not None:
         try:
-            result = apply_baseline(result, load_baseline(baseline))
+            accepted = read_baseline(baseline)
         except BaselineError as exc:
             typer.echo(f"error: {exc}", err=True)
             raise typer.Exit(code=_BASELINE_ERROR_EXIT_CODE) from exc
+        _announce_baseline_health(accepted)
+        result = apply_baseline(result, accepted.active())
 
     outcome = gate_outcome(result, prof.policy)
     target_ref = relativize(target.ref, Path.cwd())
@@ -146,7 +178,7 @@ def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the comman
         started_at=started_at,
         identity=target_identity(target, target_ref),
     )
-    emit(get_renderer(format.value, run=run).render(result), output)
+    emit(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
         submit_safely(reporter, result, source=str(path))
     exit_with(outcome, result)

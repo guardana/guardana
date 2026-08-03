@@ -42,12 +42,24 @@ expired: 705c2429 (guardana.supply_chain.insecure_transport) lapsed on
   2026-07-01 — it no longer waives anything
 ```
 
-## `update` only removes
+Since 0.7.1 `guardana scan --baseline` says the same thing, and names any waiver
+still carrying the generated placeholder. `verify` is the command nobody runs in a
+pipeline, so the two facts a red build most needs — *this lapsed* and *nobody ever
+wrote a reason for this* — were only ever available to somebody who already
+suspected them.
+
+## `update` only removes, and only on a complete scan
 
 It drops waivers for findings that no longer occur and **never adds new ones**.
 Accepting a risk is a decision somebody makes; `create` is where that happens.
 An update that quietly widened a baseline would be the same failure as a gate that
 weakens itself.
+
+It also **refuses to touch the file** when the scan behind it was incomplete — a
+rule that errored, or a run cut short — and exits `2`. The command decides a
+finding is fixed by not seeing it, and a check that did not run produces exactly
+that absence. Until 0.7.1 one broken rule deleted the waiver, the reason and the
+approver, printed "is fixed", and exited `0`.
 
 ## Versions
 

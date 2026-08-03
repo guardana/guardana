@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from guardana.core.evaluator.base import Evaluator, check_expectation
-from guardana.core.plugins import PluginMode, PluginTrust
+from guardana.core.plugins import PluginTrust
 from guardana.core.report.check_error import CheckError
 from guardana.core.rule.base import Rule
 from guardana.core.rule.errors import RuleLoadError
@@ -140,11 +140,14 @@ class Registry:
         `load_errors` and the rest still load. Without that isolation a single
         broken third-party package left the user with no rules at all, built-ins
         included, which is the most complete failure mode a scanner has.
+
+        Every refusal is recorded, `disabled` included. That mode used to return
+        before the loop and so reported nothing at all — the one setting that
+        loads no checks whatsoever was also the only one that did not say so, and
+        a run with no rules is a run whose silence means nothing.
         """
         policy = trust if trust is not None else PluginTrust()
         reg = cls()
-        if policy.mode is PluginMode.DISABLED:
-            return reg
         for group, expected, register in (
             # Taxonomies first: a rule can only name a framework that is already
             # registered, and a YAML rule pack resolves its `taxonomy:` ids while

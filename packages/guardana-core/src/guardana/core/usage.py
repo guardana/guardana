@@ -106,13 +106,14 @@ class UsageMeter:
         self._started_at = self._clock()
         self._lock = threading.Lock()
         self._requests = 0
+        self._reserved = 0
         self._input_tokens = 0
         self._output_tokens = 0
         self._missing_token_counts = 0
         self._any_tokens_reported = False
 
     def reserve(self) -> None:
-        """Check there is room for one more request, or raise `BudgetExhausted`.
+        """Claim room for one more request, or raise `BudgetExhausted`.
 
         Called *before* the request goes out, not after, so a ceiling of 200 means
         200 requests were sent and never 201. Token and duration ceilings can only
@@ -121,19 +122,22 @@ class UsageMeter:
         crossed the line. A single request of overshoot is the price of not being
         able to see the future; a whole extra rule of overshoot is not, which is
         why this is per request rather than per rule.
+
+        The request ceiling counts *claims*, taken and tested inside one lock,
+        rather than completed requests. Reading a counter that only moves when a
+        reply comes back let every thread in a `--concurrency 4` probe pass the
+        same check at once and send four more requests over the ceiling — a
+        promise of "never 201" that held only when nothing ran in parallel.
         """
         budgets = self._budgets
         if budgets.is_unbounded:
             return
         with self._lock:
-            requests, input_tokens, output_tokens = (
-                self._requests,
-                self._input_tokens,
-                self._output_tokens,
-            )
+            if budgets.max_requests is not None and self._reserved >= budgets.max_requests:
+                raise BudgetExhausted(f"request budget of {budgets.max_requests} is spent")
+            self._reserved += 1
+            input_tokens, output_tokens = self._input_tokens, self._output_tokens
         elapsed = self._clock() - self._started_at
-        if budgets.max_requests is not None and requests >= budgets.max_requests:
-            raise BudgetExhausted(f"request budget of {budgets.max_requests} is spent")
         if budgets.max_input_tokens is not None and input_tokens >= budgets.max_input_tokens:
             raise BudgetExhausted(f"budget of {budgets.max_input_tokens} input tokens is spent")
         if budgets.max_output_tokens is not None and output_tokens >= budgets.max_output_tokens:

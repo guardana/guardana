@@ -46,7 +46,10 @@ def _resolved(profile: Profile) -> dict[str, object]:
         },
         "privacy": {
             "evidence_mode": str(privacy.mode),
-            "redact_secrets": privacy.redact_secrets,
+            # Reported as a constant because it is one: a secret is removed at
+            # every mode, and a reader of this command is entitled to see that
+            # stated rather than to infer it from the absence of a switch.
+            "redact_secrets": True,
             "redact_emails": privacy.redact_emails,
             "redact_ip_addresses": privacy.redact_ip_addresses,
             "hash_identifiers": privacy.hash_identifiers,

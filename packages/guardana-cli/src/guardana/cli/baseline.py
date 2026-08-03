@@ -131,6 +131,23 @@ def update(
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
     result = _scan(path, profile, preset)
+    if result.errors or result.stopped_by is not None:
+        # Nothing is written. This command decides a finding is fixed by not
+        # seeing it, and a rule that could not run produces exactly that absence —
+        # so an incomplete scan would delete a waiver together with the reason and
+        # the approver a person wrote, and report it as "is fixed".
+        for error in result.errors:
+            typer.echo(
+                f"error: {error.source} did not run ({error.stage}): {error.reason}", err=True
+            )
+        if result.stopped_by is not None:
+            typer.echo(f"error: the scan stopped early ({result.stopped_by})", err=True)
+        typer.echo(
+            f"error: {file} was left unchanged — a waiver may only be removed on the evidence "
+            f"of a complete scan, and a check that did not run looks exactly like a fix",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.INDETERMINATE)
     current = {f.fingerprint for f in result.findings}
     kept = [w for w in baseline.waivers if w.fingerprint in current]
     dropped = [w for w in baseline.waivers if w.fingerprint not in current]

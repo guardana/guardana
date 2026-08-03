@@ -1,8 +1,11 @@
 from guardana.core.report._ref import split_ref
 from guardana.core.report.baseline import (
+    Baseline,
     BaselineError,
+    Waiver,
     apply_baseline,
     load_baseline,
+    read_baseline,
     serialize_baseline,
 )
 from guardana.core.report.check_error import CheckError
@@ -17,6 +20,7 @@ from guardana.core.report.stop import StopReason
 
 __all__ = [
     "REPORT_SCHEMA_VERSION",
+    "Baseline",
     "BaselineError",
     "CheckError",
     "Evidence",
@@ -27,11 +31,13 @@ __all__ = [
     "SkipReason",
     "SkippedRule",
     "StopReason",
+    "Waiver",
     "apply_baseline",
     "error_to_dict",
     "finding_to_dict",
     "load_baseline",
     "load_report",
+    "read_baseline",
     "relativize",
     "relativize_findings",
     "run_to_dict",

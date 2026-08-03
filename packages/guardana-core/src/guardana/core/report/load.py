@@ -55,9 +55,15 @@ def load_report(path: Path) -> RunReport:
     if not isinstance(raw, dict):
         raise ReportLoadError(f"{path} is not a Guardana run: the top level must be an object")
     migrated_from = _check_version(raw, path)
-    if migrated_from is not None:
-        raw = _MIGRATIONS[migrated_from](raw)
     try:
+        # The migration is inside the guard, not beside it. An older document
+        # missing a field the current schema requires used to raise
+        # `ManifestLoadError` straight through every caller: `diff` and
+        # `run inspect` printed a traceback and exited 1, which in this project's
+        # exit-code table means "a finding failed the policy" — the one thing an
+        # unreadable file is not.
+        if migrated_from is not None:
+            raw = _MIGRATIONS[migrated_from](raw)
         manifest = manifest_from_dict(raw.get("run"))
     except ManifestLoadError as exc:
         raise ReportLoadError(f"{path}: {exc}") from exc

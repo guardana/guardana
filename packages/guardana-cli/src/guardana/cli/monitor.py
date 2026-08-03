@@ -7,12 +7,14 @@ from typing import Annotated
 import typer
 from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
+from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.core.monitor import Alert, Monitor, MonitorConfig
 from guardana.core.profile import Profile
+from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY
 from guardana.report import get_renderer
@@ -24,21 +26,27 @@ _DEFAULT_INTERVAL_SECONDS = 60.0
 _DEFAULT_CONCURRENCY = 4
 
 
-def _print_alert(alert: Alert) -> None:
-    typer.echo(f"--- ALERT (cycle {alert.cycle}): {alert.reason} ---")
-    typer.echo(get_renderer("human").render(alert.result))
+def alert_handler(
+    redactor: EvidenceRedactor, reporter_url: str | None, source: str
+) -> Callable[[Alert], None]:
+    """Print each alert under the run's privacy policy, and forward it under the same one.
 
+    Built once with the redactor rather than reaching for a default inside, because
+    that default is `full`: `monitor` used to print and submit evidence the profile
+    said to strip, and it is the mode that runs unattended and ships evidence off
+    the machine continuously. `scan` and `probe` redact before they emit; this is
+    the third emitter and it now does the same thing at the same point.
 
-def _forwarding_alert_handler(reporter_url: str, source: str) -> Callable[[Alert], None]:
-    """Print each alert and also forward it to the collector.
-
-    Degrades to a warning if the collector is unreachable — a dead collector
-    must not stop the monitor.
+    Forwarding degrades to a warning if the collector is unreachable — a dead
+    collector must not stop the monitor.
     """
 
     def handle(alert: Alert) -> None:
-        _print_alert(alert)
-        submit_safely(reporter_url, alert.result, source=source)
+        result = redactor.redact_result(alert.result)
+        typer.echo(f"--- ALERT (cycle {alert.cycle}): {alert.reason} ---")
+        typer.echo(get_renderer("human", redactor=redactor).render(result))
+        if reporter_url:
+            submit_safely(reporter_url, result, source=source)
 
     return handle
 
@@ -55,7 +63,7 @@ def run_monitor(  # noqa: PLR0913 — the test seam needs every hook injectable
     interval_seconds: float = _DEFAULT_INTERVAL_SECONDS,
     max_cycles: int | None = None,
     concurrency: int = DEFAULT_ENDPOINT_CONCURRENCY,
-    on_alert: Callable[[Alert], None] = _print_alert,
+    on_alert: Callable[[Alert], None] | None = None,
     on_error: Callable[[int, Exception], None] = _warn_cycle_failed,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
@@ -63,13 +71,23 @@ def run_monitor(  # noqa: PLR0913 — the test seam needs every hook injectable
 
     A transient failure mid-run is logged and the loop continues; a never-reachable
     endpoint surfaces (via `run_against_endpoint`, exit 2) instead of spinning.
+
+    `on_alert` defaults to printing under *this profile's* privacy policy. It is
+    resolved here rather than in the signature, because a default argument would
+    have to name a redactor before the profile is known — which is how the
+    unredacted default got in.
     """
+    handler = (
+        on_alert
+        if on_alert is not None
+        else alert_handler(EvidenceRedactor(profile.privacy), None, connection.url)
+    )
     monitor = Monitor(
         scan=lambda: run_probe(registry, profile, connection, concurrency=concurrency),
         policy=profile.policy,
         config=MonitorConfig(interval_seconds=interval_seconds, max_cycles=max_cycles),
     )
-    monitor.run(on_alert, on_error=on_error, sleep=sleep)
+    monitor.run(handler, on_error=on_error, sleep=sleep)
 
 
 def monitor(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
@@ -105,10 +123,18 @@ def monitor(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the com
     reporter: Annotated[
         str | None, typer.Option(help="Collector URL to forward alerts to, e.g. server://URL")
     ] = None,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Continuously sample a live endpoint and alert on new findings."""
     prof = resolve_profile(profile, preset)
-    registry = Registry.discover()
+    registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
     wire_config_evaluators(registry, prof)
     load_custom_rules(registry, prof, rules)
 
@@ -121,9 +147,7 @@ def monitor(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the com
             system_prompt_file.read_text(encoding="utf-8") if system_prompt_file else None
         ),
     )
-    on_alert = (
-        _forwarding_alert_handler(reporter, source=f"{url}#{model}") if reporter else _print_alert
-    )
+    on_alert = alert_handler(EvidenceRedactor(prof.privacy), reporter, source=f"{url}#{model}")
 
     run_against_endpoint(
         url,

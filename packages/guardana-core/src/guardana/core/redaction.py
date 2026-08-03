@@ -68,6 +68,17 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
+_ALREADY_REDACTED = re.compile(r"\[redacted:[^\[\]]*\]")
+"""A placeholder this redactor already wrote, so a second pass leaves it alone.
+
+Redaction runs twice by design — once in the command, so a baseline is written
+from the same text a finding is fingerprinted on, and once at the renderer seam
+so no output path can skip it. Without this, the second pass reads the first
+pass's label as content: `[redacted:github-token:…]` contains `token:` followed
+by twelve hex characters, which is exactly what the generic credential pattern
+looks for.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class RedactionPolicy:
@@ -76,10 +87,15 @@ class RedactionPolicy:
     `FULL` is the default only because it is what this build did before the
     redactor existed, and changing behaviour silently would be worse than the
     delay. The CLI defaults to `REDACTED`; a library caller opts in.
+
+    There is deliberately no switch for secrets. One existed, it only took effect
+    at `FULL`, and it turned the most permissive mode into the only one that would
+    write a live credential to disk — a setting whose sole reachable effect was the
+    outcome the whole module exists to prevent. A field that cannot be set to the
+    unsafe value is better than a field documented as never being set to it.
     """
 
     mode: EvidenceMode = EvidenceMode.FULL
-    redact_secrets: bool = True
     redact_emails: bool = True
     redact_ip_addresses: bool = False
     """Off by default: an IP address is frequently the finding itself."""
@@ -99,7 +115,6 @@ class RedactionPolicy:
         """A digest of this policy, recorded in the manifest alongside the evidence."""
         return digest_of(
             str(self.mode),
-            str(self.redact_secrets),
             str(self.redact_emails),
             str(self.redact_ip_addresses),
             str(self.hash_identifiers),
@@ -135,21 +150,22 @@ class EvidenceRedactor:
         mode = self._policy.mode
         if mode is EvidenceMode.METADATA_ONLY:
             return ""
-        cleaned = text
-        if self._policy.redact_secrets or mode is not EvidenceMode.FULL:
-            # Secrets go at every mode, `full` included. `full` means "keep the
-            # model's words", never "store a live credential" — that is not a
-            # trade a user can usefully opt into, and the finding is that the
-            # secret appeared, not what it was.
-            cleaned = self._apply(cleaned, _SECRET_PATTERNS)
-        cleaned = self._apply(cleaned, self._custom)
-        if mode is EvidenceMode.FULL:
-            return self._bound(cleaned)
-        if self._policy.redact_emails:
-            cleaned = self._apply(cleaned, (("email", _EMAIL),))
-        if self._policy.redact_ip_addresses:
-            cleaned = self._apply(cleaned, (("ip", _IP),))
-        return self._bound(cleaned)
+        return self._bound(self._apply(text, self._patterns_for(mode)))
+
+    def _patterns_for(self, mode: EvidenceMode) -> tuple[tuple[str, re.Pattern[str]], ...]:
+        """Every pattern this mode removes, most specific first.
+
+        Secrets lead and are never conditional. `full` means "keep the model's
+        words", never "store a live credential": the finding is that the secret
+        appeared, not what it was, so there is nothing a reader loses.
+        """
+        patterns: list[tuple[str, re.Pattern[str]]] = [*_SECRET_PATTERNS, *self._custom]
+        if mode is not EvidenceMode.FULL:
+            if self._policy.redact_emails:
+                patterns.append(("email", _EMAIL))
+            if self._policy.redact_ip_addresses:
+                patterns.append(("ip", _IP))
+        return tuple(patterns)
 
     def redact(self, finding: "Finding") -> "Finding":
         """Return this finding with its evidence brought within the policy."""
@@ -173,9 +189,43 @@ class EvidenceRedactor:
         )
 
     def _apply(self, text: str, patterns: tuple[tuple[str, re.Pattern[str]], ...]) -> str:
+        """Replace every match in one pass, so no pattern ever rewrites another's placeholder.
+
+        Substituting pattern by pattern read the *output* of the previous pattern,
+        and the ordering that puts specific patterns first was defeated by it: a
+        GitHub token became `[redacted:github-[redacted:credential-assignment:…]]`,
+        because the generic "token = value" pattern matched the label of the
+        placeholder that had just replaced it. The label is the part a reader acts
+        on, so losing it costs the redaction most of its usefulness.
+
+        Matches are therefore collected against the original text and spliced in
+        once. An earlier pattern owns the span it claimed, which is what "ordered
+        most specific first" was always supposed to mean — and the placeholders
+        of a previous pass claim their spans first, which is what makes redacting
+        twice produce the same text as redacting once.
+        """
+        claimed: list[tuple[int, int, str]] = [
+            (m.start(), m.end(), m.group(0)) for m in _ALREADY_REDACTED.finditer(text)
+        ]
         for label, pattern in patterns:
-            text = pattern.sub(lambda m, label=label: self._placeholder(label, m.group(0)), text)  # type: ignore[misc]
-        return text
+            for match in pattern.finditer(text):
+                start, end = match.span()
+                if any(
+                    start < taken_end and taken_start < end for taken_start, taken_end, _ in claimed
+                ):
+                    continue
+                claimed.append((start, end, self._placeholder(label, match.group(0))))
+        if not claimed:
+            return text
+        claimed.sort()
+        pieces: list[str] = []
+        cursor = 0
+        for start, end, replacement in claimed:
+            pieces.append(text[cursor:start])
+            pieces.append(replacement)
+            cursor = end
+        pieces.append(text[cursor:])
+        return "".join(pieces)
 
     def _placeholder(self, label: str, value: str) -> str:
         if not self._policy.hash_identifiers:

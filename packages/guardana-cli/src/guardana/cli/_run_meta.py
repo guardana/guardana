@@ -143,8 +143,17 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
             else TargetIdentity(kind=target_kind, ref=target_ref, fingerprint_inputs=())
         ),
         configuration=ConfigurationRef(profile_name=profile.name),
+        # The ceilings are recorded whether or not the run hit them. Without them a
+        # run that exits `6` says it stopped and never says what it hit, which
+        # leaves the one number an operator needs — was the budget too small, or is
+        # the target now more expensive — unanswerable from the evidence.
         execution=ExecutionSettings(
-            concurrency=concurrency, timeout_seconds=REQUEST_TIMEOUT_SECONDS
+            concurrency=concurrency,
+            timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+            max_requests=profile.budgets.max_requests,
+            max_input_tokens=profile.budgets.max_input_tokens,
+            max_output_tokens=profile.budgets.max_output_tokens,
+            max_duration_seconds=profile.budgets.max_duration_seconds,
         ),
         usage=_run_usage(result.usage, started_at, now),
         rules=rules,

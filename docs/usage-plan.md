@@ -31,6 +31,19 @@ every shipped rule against a model that never refuses, counts the requests it
 actually sends, and fails if any rule spends more than it declared. So the
 ceiling is a claim somebody checks, not a promise.
 
+## Plan the run you are going to make
+
+`plan probe` takes `--safety` and `--allow-destructive`, with the same meaning
+they have on `probe`. They are not decoration: the runner refuses a rule that
+reaches further than the run permits, and until 0.7.1 the plan did not apply that
+check — so pricing a `--safety passive` probe listed every active rule that run
+would go on to refuse. The selection is now literally the runner's, called from
+one place, so a second copy cannot drift from the first.
+
+```bash
+guardana plan probe --url https://api.example.com --model m --safety passive
+```
+
 ## When the plan does not know
 
 A rule that declares no request count — anything third-party that has not

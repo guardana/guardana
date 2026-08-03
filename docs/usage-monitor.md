@@ -25,10 +25,22 @@ guardana monitor --url <base-url> --model <name> [OPTIONS]
 | `--preset [ci\|pre-training\|monitor]` | none | Named policy preset (mutually exclusive with `--profile`); `--preset monitor` fails on HIGH **and** on inconclusive — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--rules PATH` | none | Directory or file of custom YAML rules; repeatable. Combined with the profile's `rules.paths` — see [`writing-rules.md`](writing-rules.md). A malformed rule file is a warning, never an abort. |
 | `--reporter TEXT` | none | Forward each **alert's** findings to a collector, e.g. `server://https://collector.example.com` |
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe`. Added in 0.7.1; before that `monitor` was the one command with no way to restrict what it imported. |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
 
 Note: `monitor` has no `--format` flag — alerts are always printed as human
 text (findings inside an alert use the `human` renderer); forward to a
 collector for machine-readable persistence.
+
+## Evidence leaves this command twice, and both are redacted
+
+An alert is printed *and* — with `--reporter` — sent to a collector, so the
+profile's [`privacy:`](privacy.md) block governs both. **In 0.7.0 it governed
+neither**: the printed alert went through a renderer built with no policy, which
+falls back to `full`, and the forwarded result had passed through no redactor at
+all. Of the three commands that emit findings this is the one that runs unattended
+for hours and ships every alert somewhere central, so it is the worst of the three
+to have missed. Fixed in 0.7.1, with a test on each exit.
 
 ## What each cycle runs
 

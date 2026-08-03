@@ -332,14 +332,18 @@ rather than by each renderer, so a format added next year is covered without its
 author knowing the policy exists.
 
 Three things keep it honest. **Secrets go even at `full`** — that mode means "keep
-the model's words", not "store a live key". **Redaction is never silent**: a
-finding says its evidence was changed, and truncation says so too. **Placeholders
-are hashed**, so the same secret redacts identically across runs and a baseline
-waiver keeps matching — a placeholder that drifted would have expired every waiver
-you had.
+the model's words", not "store a live key", and since 0.7.1 no setting offers the
+other reading: `redact_secrets: false` is refused at load time. **Redaction is
+never silent**: a finding says its evidence was changed, and truncation says so
+too. **Placeholders are hashed and labelled**, so the same secret redacts
+identically across runs — which keeps a baseline waiver matching — and the label
+says which kind of key it was, which is what tells you what to rotate.
 
 A test enumerates every registered renderer from the registry and asserts a
 crafted credential cannot pass through any of them, per path rather than once.
+That enumeration is why `monitor` was the leak it was until 0.7.1: it emitted a
+layer *above* the renderers, where nothing was enumerating anything. All three
+emitting commands now redact from the profile before anything leaves them.
 
 ### Ask the target what it can actually do (`guardana target inspect`)
 

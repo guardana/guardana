@@ -81,6 +81,16 @@ guardana run migrate old-run.json          # in place
 
 This is a convenience, not a requirement. Nothing needs migrating to be compared.
 
+**A migration that cannot carry a field refuses, and writes nothing.** The
+default destination is the file itself, so a half-done migration would overwrite
+the only copy of the evidence. In 0.7.0 a version-1 run that never recorded its
+target kind was migrated into the literal string `"None"` — a document that fails
+this schema, written over the original, with exit `0`. Every unit test around
+migration passed, because they asserted on the objects the migration loaded and
+the objects were fine; what was published was the file. There is now a test that
+validates the *artifact*, parametrised over every field a version-1 run could be
+missing.
+
 ## The document
 
 The saved-run schema lives at

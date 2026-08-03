@@ -54,12 +54,16 @@ def build_plan(registry: Registry, profile: Profile, target: Target) -> RunPlan:
     """Work out what running `profile`'s rules against `target` would cost.
 
     Selects exactly the way `Runner` does — same kind, same policy globs, same
-    capability check — so the plan describes the run that would actually happen
-    rather than an idealised one. It differs in one way, and the difference is
-    stated rather than hidden: capabilities come from what the target *declares*
-    without being asked, so an endpoint that turns out not to support tool calls
-    will skip more rules than this predicted.
+    safety ceiling, same capability check — so the plan describes the run that
+    would actually happen rather than an idealised one. The safety check shares
+    the runner's implementation rather than repeating it, because a plan that
+    prices rules the run then refuses is a plan for a different run. It differs in
+    one way, and the difference is stated rather than hidden: capabilities come
+    from what the target *declares* without being asked, so an endpoint that turns
+    out not to support tool calls will skip more rules than this predicted.
     """
+    from guardana.core.runner import safety_refusal  # noqa: PLC0415 — runner is downstream
+
     capabilities = target.capabilities()
     selected: list[str] = []
     skipped: list[str] = []
@@ -68,6 +72,9 @@ def build_plan(registry: Registry, profile: Profile, target: Target) -> RunPlan:
     for rule in registry.rules():
         meta = rule.meta
         if meta.target_kind != target.kind or not profile.policy.matches(meta.id):
+            continue
+        if safety_refusal(profile, rule) is not None:
+            skipped.append(meta.id)
             continue
         if meta.required_capabilities - capabilities:
             skipped.append(meta.id)

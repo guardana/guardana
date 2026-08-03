@@ -7,6 +7,7 @@ something parses the JSON form its shape is a promise.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +16,7 @@ from guardana.cli._endpoint import build_endpoint
 from guardana.cli._formats import OutputFormat
 from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
+from guardana.cli._safety_flags import parse_impact
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.plan import RunPlan, build_plan
 from guardana.core.profile import Profile
@@ -129,6 +131,17 @@ def plan_probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the 
     rules: Annotated[
         list[Path], typer.Option("--rules", help="Directory or file of custom YAML rules.")
     ] = [],  # noqa: B006 — typer builds the option from a literal default
+    safety: Annotated[
+        str,
+        typer.Option(help="How far rules may reach: passive|active|side-effecting"),
+    ] = "active",
+    allow_destructive: Annotated[
+        bool,
+        typer.Option(
+            "--allow-destructive",
+            help="Permit rules that can destroy or alter something the target owns.",
+        ),
+    ] = False,
 ) -> None:
     """Report what probing this endpoint would cost, without contacting it.
 
@@ -137,8 +150,13 @@ def plan_probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the 
     predicts. Asking the endpoint would make this command cost money, which is
     the one thing it must not do; `guardana target inspect` is where that
     question belongs.
+
+    `--safety` and `--allow-destructive` mirror `guardana probe`, because a plan
+    is only a preview of the run it is a preview of: without them, pricing a
+    `--safety passive` probe listed every active rule it would have refused.
     """
     prof = resolve_profile(profile, preset)
+    prof = replace(prof, max_impact=parse_impact(safety), allow_destructive=allow_destructive)
     target = build_endpoint(
         url,
         model,

@@ -17,7 +17,7 @@ _ALLOWED_PROFILE_KEYS = frozenset(
 )
 _ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
 _ALLOWED_FAIL_ON_KEYS = frozenset(
-    {"severity", "min_confidence", "fail_on_inconclusive", "fail_on_error"}
+    {"severity", "min_confidence", "fail_on_inconclusive", "fail_on_error", "fail_on_skipped"}
 )
 _ALLOWED_BUDGET_KEYS = frozenset(
     {"max_requests", "max_input_tokens", "max_output_tokens", "max_duration"}
@@ -107,11 +107,15 @@ def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
     fail_on_error = raw.get("fail_on_error", True)
     if not isinstance(fail_on_error, bool):
         raise ProfileError(f"invalid profile {path}: fail_on_error must be true or false")
+    fail_on_skipped = raw.get("fail_on_skipped", False)
+    if not isinstance(fail_on_skipped, bool):
+        raise ProfileError(f"invalid profile {path}: fail_on_skipped must be true or false")
     return FailOn(
         severity=Severity[severity_name.upper()],
         min_confidence=min_confidence,
         fail_on_inconclusive=fail_on_inconclusive,
         fail_on_error=fail_on_error,
+        fail_on_skipped=fail_on_skipped,
     )
 
 
@@ -168,6 +172,15 @@ def _privacy(raw: dict[str, Any], path: Path) -> RedactionPolicy:
     stop checking the output.
     """
     _reject_unknown_keys(raw, _ALLOWED_PRIVACY_KEYS, "privacy", path)
+    if raw.get("redact_secrets") is False:
+        # Accepted as a key and refused as a value, rather than dropped from the
+        # schema: somebody who wrote it deserves to be told that secrets are
+        # always removed, not to be told the key does not exist.
+        raise ProfileError(
+            f"invalid profile {path}: privacy.redact_secrets cannot be false — a secret is "
+            f"removed at every evidence mode, because the finding is that it appeared and "
+            f"never what it was"
+        )
     mode_name = str(raw.get("evidence_mode", EvidenceMode.REDACTED))
     try:
         mode = EvidenceMode(mode_name)
@@ -192,7 +205,6 @@ def _privacy(raw: dict[str, Any], path: Path) -> RedactionPolicy:
         )
     return RedactionPolicy(
         mode=mode,
-        redact_secrets=_flag(raw, "redact_secrets", True, path),
         redact_emails=_flag(raw, "redact_emails", True, path),
         redact_ip_addresses=_flag(raw, "redact_ip_addresses", False, path),
         hash_identifiers=_flag(raw, "hash_identifiers", True, path),

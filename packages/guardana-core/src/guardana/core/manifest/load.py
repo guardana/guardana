@@ -330,6 +330,13 @@ def migrate_v1(document: Mapping[str, Any]) -> dict[str, Any]:
     """
     run = _mapping(document.get("run"), "run")
     target_ref = _text(run, "target_ref", "run")
+    # Resolved through the enum rather than stringified. `str(run.get("target_kind"))`
+    # turned an absent field into the literal `"None"`, which no reader can place
+    # and which `run-v2.schema.json` rejects — so `run migrate` exited 0 having
+    # written a document that fails the contract it claims to target, over the
+    # original file. Refusing here is what keeps the migration from destroying
+    # evidence it could not carry.
+    target_kind = _target_kind(run.get("target_kind"))
     started_at = run.get("started_at")
     rules = run.get("rules")
     findings = document.get("findings")
@@ -370,7 +377,7 @@ def migrate_v1(document: Mapping[str, Any]) -> dict[str, Any]:
                 "distribution_versions": {},
             },
             "target": {
-                "type": str(run.get("target_kind")),
+                "type": str(target_kind),
                 "ref": target_ref,
                 "fingerprint": None,
                 "fingerprint_inputs": [],

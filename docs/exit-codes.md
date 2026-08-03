@@ -52,9 +52,23 @@ says it is partial.
 `scan`, `probe` and `monitor` can produce any of them. `diff` has no target to be
 unavailable, so `4` never occurs there; it uses `2` both for "these runs cannot be
 compared" and for "one of them never finished". `run inspect`, `run migrate` and
-`plan` produce `0` or `3`.
+`plan` produce `0` or `3`. `baseline create`, `baseline update` and
+`scan --write-baseline` produce `2` when a check did not run, because a snapshot
+taken over a rule that never ran is missing whatever it would have found.
 
 An unused code is better than a second table.
+
+### Fixed in 0.7.1
+
+Two commands did not honour the table it took 0.7 to write.
+
+- **An unreadable saved run exited `1`.** `run inspect`, `run migrate` and `diff`
+  let the manifest reader's own exception escape, so the user got a traceback and
+  a code that says "a finding failed the policy" — the one thing a broken input
+  file is not. All three now report `3`.
+- **`scan --write-baseline` exited `1` where `baseline create` exited `2`** for
+  the identical situation. Codes are read by pipelines that never see the message
+  beside them, so a code meaning two things means nothing.
 
 ## Changed in 0.7 — breaking
 
