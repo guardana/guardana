@@ -69,7 +69,7 @@ def test_migrating_on_start_is_off_unless_asked() -> None:
 
 
 def test_health_answers_without_touching_a_database() -> None:
-    client = TestClient(create_app(store=InMemoryStore()))
+    client = TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
 
     response = client.get("/healthz")
 
@@ -80,7 +80,7 @@ def test_health_answers_without_touching_a_database() -> None:
 def test_readiness_reports_an_ephemeral_store_as_ephemeral() -> None:
     # Not a bare "ready": a fleet view that cannot tell durable from ephemeral
     # will read one as the other, and the ephemeral one is the one that forgets.
-    client = TestClient(create_app(store=InMemoryStore()))
+    client = TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
 
     body = client.get("/readyz").json()
 
@@ -153,14 +153,21 @@ def test_a_submission_survives_a_restart_of_the_app(
     database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The whole point of the item, asserted end to end through the HTTP surface."""
+    from guardana.server.auth import Scope, generate_key, store_key  # noqa: PLC0415
+
     monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
     monkeypatch.setenv("GUARDANA_MIGRATE_ON_START", "1")
+    with psycopg.connect(database_url) as connection:
+        apply_pending(connection)
+        issued, secret_hash = generate_key("ci", (Scope.INGEST, Scope.READ))
+        store_key(connection, issued, secret_hash)
+    headers = {"Authorization": f"Bearer {issued.token}"}
     submission = {"source": "ci", "schema_version": 5, "findings": []}
-    TestClient(create_app()).post("/findings", json=submission)
+    TestClient(create_app()).post("/findings", json=submission, headers=headers)
 
     reopened = TestClient(create_app())  # a new app object, as a restart would build
 
-    assert [s["source"] for s in reopened.get("/findings").json()] == ["ci"]
+    assert [s["source"] for s in reopened.get("/findings", headers=headers).json()] == ["ci"]
 
 
 def test_readiness_does_not_leak_the_database_it_could_not_reach(

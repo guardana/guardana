@@ -16,7 +16,7 @@ _UNPROCESSABLE = 422
 
 
 def _client() -> TestClient:
-    return TestClient(create_app(store=InMemoryStore()))
+    return TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
 
 
 def _real_envelope(source: str = "ci") -> dict[str, Any]:
@@ -61,7 +61,9 @@ def test_collector_accepts_the_envelope_the_reporter_actually_sends() -> None:
     response = _client().post("/findings", json=_real_envelope())
 
     assert response.status_code == _OK
-    assert response.json() == {"status": "ok", "stored": 2}
+    # `accepted_by` names the credential that wrote the run — None here because
+    # this app was built in the explicitly-unauthenticated evaluation mode.
+    assert response.json() == {"status": "ok", "stored": 2, "accepted_by": None}
 
 
 def test_collector_accepts_and_retains_the_unverified_channel() -> None:
@@ -162,7 +164,7 @@ def test_unknown_schema_version_is_rejected() -> None:
 
 def test_store_is_bounded_so_a_long_running_collector_cannot_grow_without_limit() -> None:
     store = InMemoryStore(max_submissions=2)
-    client = TestClient(create_app(store))
+    client = TestClient(create_app(store, allow_unauthenticated=True))
 
     for source in ("a", "b", "c"):
         client.post("/findings", json=_real_envelope(source=source))
@@ -207,7 +209,7 @@ def test_concurrent_reads_and_writes_do_not_500() -> None:
     # A full deque evicts on every append; iterating it in `trend()` while a
     # writer appends used to raise "deque mutated during iteration" and 500.
     store = InMemoryStore(max_submissions=50)
-    client = TestClient(create_app(store))
+    client = TestClient(create_app(store, allow_unauthenticated=True))
     payload = _real_envelope()
     errors: list[str] = []
     iterations = 150
@@ -236,7 +238,7 @@ def test_concurrent_reads_and_writes_do_not_500() -> None:
 def test_collector_accepts_a_v2_agent_that_cannot_report_errors() -> None:
     # A fleet upgrades one agent at a time. A v2 agent simply reports no errors —
     # honest, because a v2 agent could not observe them — and must not be rejected.
-    client = TestClient(create_app(store=InMemoryStore()))
+    client = TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
     response = client.post(
         "/findings",
         json={"source": "old-agent", "schema_version": 2, "findings": [], "unverified": []},
@@ -247,7 +249,7 @@ def test_collector_accepts_a_v2_agent_that_cannot_report_errors() -> None:
 def test_collector_retains_the_errors_channel() -> None:
     # An agent whose checks are crashing must not render as clean on a dashboard —
     # the same reason v2 had to carry `unverified`, one layer further out.
-    client = TestClient(create_app(store=InMemoryStore()))
+    client = TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
     payload = {
         "source": "ci",
         "schema_version": 3,
@@ -264,7 +266,7 @@ def test_collector_retains_the_errors_channel() -> None:
 
 
 def test_collector_still_rejects_a_version_it_does_not_speak() -> None:
-    client = TestClient(create_app(store=InMemoryStore()))
+    client = TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
     response = client.post(
         "/findings", json={"source": "future", "schema_version": 99, "findings": []}
     )
@@ -278,7 +280,7 @@ def test_collector_accepts_the_v4_envelope_and_keeps_which_rules_ran() -> None:
     "0 findings" a fully-covered agent does, and the dashboard shows both green.
     """
     store = InMemoryStore()
-    response = TestClient(create_app(store)).post(
+    response = TestClient(create_app(store, allow_unauthenticated=True)).post(
         "/findings",
         json={
             "source": "agent",

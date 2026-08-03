@@ -9,7 +9,7 @@ _NOT_FOUND = 404
 
 
 def test_dashboard_is_off_by_default() -> None:
-    client = TestClient(create_app(store=InMemoryStore()))
+    client = TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
     assert client.get("/").status_code == _NOT_FOUND
     assert client.get("/stats").status_code == _NOT_FOUND
     assert client.get("/catalog").status_code == _NOT_FOUND
@@ -18,7 +18,9 @@ def test_dashboard_is_off_by_default() -> None:
 
 
 def test_catalog_endpoint_serves_human_rule_descriptions() -> None:
-    client = TestClient(create_app(store=InMemoryStore(), dashboard=True))
+    client = TestClient(
+        create_app(store=InMemoryStore(), dashboard=True, allow_unauthenticated=True)
+    )
     catalog = client.get("/catalog").json()
     entry = catalog["guardana.supply_chain.pickle_opcode"]
     assert entry["name"]
@@ -32,7 +34,9 @@ def test_rule_catalog_loader_returns_entries_and_handles_unknown_language() -> N
 
 
 def test_dashboard_page_and_stats_mount_when_enabled() -> None:
-    client = TestClient(create_app(store=InMemoryStore(), dashboard=True))
+    client = TestClient(
+        create_app(store=InMemoryStore(), dashboard=True, allow_unauthenticated=True)
+    )
 
     page = client.get("/")
     assert page.status_code == _OK
@@ -48,13 +52,13 @@ def test_dashboard_page_and_stats_mount_when_enabled() -> None:
 
 def test_env_var_enables_the_dashboard(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GUARDANA_DASHBOARD", "1")
-    client = TestClient(create_app(store=InMemoryStore()))
+    client = TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
     assert client.get("/").status_code == _OK
 
 
 def test_stats_reflects_stored_findings() -> None:
     store = InMemoryStore(clock=lambda: 1.0)
-    client = TestClient(create_app(store, dashboard=True))
+    client = TestClient(create_app(store, dashboard=True, allow_unauthenticated=True))
     envelope = {
         "schema_version": 2,
         "source": "ci#model",

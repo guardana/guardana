@@ -215,3 +215,44 @@ def test_status_names_what_is_applied_and_what_is_pending(connection: DbConnecti
 
     assert "pending" in before[0]
     assert any("applied  0001" in line for line in after)
+
+
+def test_each_migration_is_committed_before_the_next_one_runs(database_url: str) -> None:
+    """The claim the runner makes about itself, from a second connection.
+
+    `connection.transaction()` inside an already-open transaction opens a
+    *savepoint*, so every migration used to sit uncommitted until the connection
+    closed — and a second runner waiting on the advisory lock could not see any of
+    it. Asserted from a separate connection, because that is the only vantage point
+    from which "committed" and "written" look different.
+    """
+    with psycopg.connect(database_url) as writer:
+        apply_pending(writer)
+        with psycopg.connect(database_url) as reader, reader.cursor() as cursor:
+            cursor.execute("select count(*) from schema_migrations")
+            row = cursor.fetchone()
+
+    assert row is not None
+    assert int(str(row[0])) == len(load_migrations())
+
+
+def test_a_failing_migration_leaves_the_ones_before_it_applied(
+    connection: DbConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Half a migration set is a state; half a migration is not.
+
+    Each migration commits with its own bookkeeping row, so a run that dies at
+    step three leaves one and two applied and recorded — which is what makes
+    `status` and `rollback` usable after a failure rather than guesswork.
+    """
+    broken = (
+        *load_shipped(),
+        Migration(version=97, name="broken", up="this is not sql", down="select 1"),
+    )
+    monkeypatch.setattr("guardana.server.db.migrations.load_migrations", lambda: broken)
+
+    with pytest.raises(MigrationError, match="could not apply migration 97"):
+        apply_pending(connection)
+
+    monkeypatch.undo()
+    assert read_state(connection).is_current, "the migrations before the failure were lost"

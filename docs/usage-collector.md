@@ -4,10 +4,11 @@ The collector (`guardana-server`) aggregates findings from many agents. It is
 **optional in every direction**: the engine never imports it, no feature needs it,
 and nothing is sent anywhere unless a run is given `--reporter`.
 
-> **Maturity: experimental.** It now keeps what it is given, which is what this
-> page is about. It still has **no authentication and no tenancy** — anyone who
-> can reach the port can read every finding in it. Do not expose it. Those land
-> with the next two items, and the label moves to `beta` when they do.
+> **Maturity: experimental.** It now keeps what it is given and **requires an API
+> key** for every route that carries a finding. It still has **no tenancy**: every
+> key sees everything in the collector, so pointing two teams at one instance is
+> not yet safe. Organization and project isolation is the next item, and the label
+> moves to `beta` when it lands.
 
 ## Choosing where submissions go
 
@@ -25,6 +26,63 @@ export GUARDANA_STORAGE=memory
 With neither set, the collector refuses to start and says which to set. This is
 the same rule as "no default credentials", one layer down: the unsafe
 configuration must not be the one you get by not deciding.
+
+## API keys
+
+Every route that carries a finding needs one. Keys live in the database, so a
+collector with no database cannot authenticate anybody — and refuses to be built
+rather than serving openly.
+
+```bash
+guardana-collector key create --name github-actions          # ingest only, the default
+guardana-collector key create --name dashboard --scope read
+guardana-collector key create --name ci --expires-in-days 90
+guardana-collector key list                                   # prefixes, never secrets
+guardana-collector key revoke <prefix>
+```
+
+```bash
+export GUARDANA_COLLECTOR_TOKEN=gdn_…                                # never a flag: see below
+guardana scan . --reporter server://https://collector.example.com
+curl -H "Authorization: Bearer gdn_…" https://collector.example.com/findings
+```
+
+**Two scopes, not one.** `ingest` writes runs; `read` browses them. A CI job needs
+to write and never to browse, and a single scope covering both would make every
+pipeline credential a full read of every finding the organisation has recorded.
+`key create` therefore defaults to `ingest` alone.
+
+**The agent reads its key from `GUARDANA_COLLECTOR_TOKEN`**, not from a flag. A
+credential on a command line lands in shell history, in `ps`, and in the echoed
+command of most CI logs — the same reason `probe` takes `--api-key-env` rather
+than `--api-key`. A collector that rejects a submission says so as a warning
+naming the status, because a whole fleet quietly failing to report while a
+dashboard shows stale data as current is the failure that matters.
+
+**Shown once.** There is no command and no endpoint that returns a key after it is
+created — a credential a system can re-read is a credential that leaks through
+every path that reads it. Only a digest is stored: a stolen backup of a collector
+database must not also be a set of working credentials for the thing that produced
+its contents.
+
+**Absence is refusal.** A fresh collector has no keys and accepts nothing. That is
+the behaviour, not an oversight: a system reading "no credentials configured" as
+"no credentials required" is the shape of every default-admin incident there has
+ever been. `key list` says so plainly on an empty collector.
+
+Every failure — unknown key, malformed key, revoked, expired — answers with the
+same `401` and the same sentence. Saying which one would turn the endpoint into a
+way to enumerate valid prefixes. A key that *is* valid and lacks the scope gets
+`403` instead, because that is a different fact and a pipeline retrying its
+credentials forever is not the right outcome.
+
+### Running without any of it
+
+`GUARDANA_ALLOW_UNAUTHENTICATED=1` (or `allow_unauthenticated=True` when building
+the app in code) accepts a collector anyone who can reach the port can read and
+write. It exists for evaluating Guardana on a laptop, and it has to be typed:
+combined with choosing the ephemeral store, that is two explicit switches for the
+toy configuration and none for the real one.
 
 ## Migrations
 
@@ -91,6 +149,7 @@ uv run uvicorn 'guardana.server:create_app' --factory
 Then point a run at it:
 
 ```bash
+guardana-collector key create --name local     # prints the key once
 guardana scan . --reporter server://http://127.0.0.1:8000
 ```
 

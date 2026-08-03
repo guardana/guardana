@@ -25,8 +25,8 @@ self-hosted collector.
 
 > **Status.** The CLI and engine are **beta** — used to gate real builds, with the
 > public API still moving between minor releases. The self-hosted collector is
-> **experimental**: in-memory storage and no authentication, suitable for local
-> evaluation, not yet for team production use. See
+> **experimental**: it persists to PostgreSQL and requires a scoped API key, but
+> has no tenancy yet, so one instance cannot serve two teams. See
 > [product status and known limitations](docs/product-status.md) before adopting.
 
 - No account, no telemetry, no phone-home. The only network traffic is to the target you point it at.
@@ -361,14 +361,14 @@ visibility, any run can forward its normalized findings to a collector with
 
 > **Maturity: experimental.** The collector now **keeps what it is given** —
 > PostgreSQL with reversible migrations, a storage choice it refuses to make for
-> you, and separate health and readiness endpoints. It still has **no
-> authentication and no tenancy**: anyone who can reach the port can read every
-> finding in it, so do not expose it. API keys, organization/project isolation, a
-> finding lifecycle, an audit log and backup/restore are the rest of the v0.8
-> milestone — see [`docs/usage-collector.md`](docs/usage-collector.md) and
+> you, separate health and readiness endpoints — and **requires a scoped API key**
+> on every route that carries a finding. It still has **no tenancy**: every key
+> sees everything in one instance, so it cannot yet serve two teams. Organization
+> and project isolation, a finding lifecycle, an audit log and backup/restore are
+> the rest of the v0.8 milestone — see
+> [`docs/usage-collector.md`](docs/usage-collector.md) and
 > [the collector design](docs/design/collector-domain-model.md). The label moves
-> to `beta` when authentication and tenancy ship, not before: a database does not
-> make a service safe to expose.
+> to `beta` when tenancy ships, not before.
 
 - **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
   agent — dev machines, CI, live monitors — in one place. Ingest/list/trend over

@@ -172,9 +172,13 @@ def _ensure_state_table(connection: "Connection[tuple[object, ...]]") -> None:
     Only on the paths that change the schema. A readiness probe must not need
     permission to create a table, and a role that can only read is a legitimate
     thing to serve traffic with.
+
+    Committed before anything else runs, for the same reason each migration is:
+    a second runner waiting on the advisory lock has to be able to *see* this.
     """
-    with connection.transaction(), connection.cursor() as cursor:
+    with connection.cursor() as cursor:
         cursor.execute(_STATE_TABLE)
+    connection.commit()
 
 
 def roll_back(
@@ -204,7 +208,7 @@ def _run(
     record: bool,
 ) -> None:
     try:
-        with connection.transaction(), connection.cursor() as cursor:
+        with connection.cursor() as cursor:
             cursor.execute(statement)
             if record:
                 cursor.execute(
@@ -215,7 +219,16 @@ def _run(
                 cursor.execute(
                     "delete from schema_migrations where version = %s", (migration.version,)
                 )
+        # Committed here, explicitly, and this line is the whole correctness of the
+        # runner. `connection.transaction()` inside an already-open transaction
+        # opens a *savepoint*, not a transaction — so every migration used to sit
+        # uncommitted until the connection closed. A second runner then took the
+        # advisory lock, could not see the first one's work, and tried to create
+        # the bookkeeping table a second time. The docstrings claimed per-migration
+        # commits; only a concurrency test could see that they did not happen.
+        connection.commit()
     except Exception as exc:  # psycopg raises a family of errors; all of them mean "stop"
+        connection.rollback()
         direction = "apply" if record else "roll back"
         raise MigrationError(
             f"could not {direction} migration {migration.version} ({migration.name}): {exc}"

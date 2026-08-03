@@ -2,14 +2,16 @@ import os
 import sys
 from dataclasses import asdict
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from guardana.server.auth import Authenticated, Scope
 from guardana.server.dashboard import render_dashboard
 from guardana.server.db.migrations import MigrationState, apply_pending, read_state
 from guardana.server.db.settings import StorageChoice, migrate_on_start, resolve_storage
 from guardana.server.envelope import SUPPORTED_SCHEMA_VERSIONS, Submission
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.rule_catalog import rule_catalog
+from guardana.server.security import guard, require_authentication
 from guardana.server.stats import compute_stats
 from guardana.server.store import InMemoryStore, Store
 
@@ -47,13 +49,26 @@ def _migrate_now(database_url: str) -> None:
 
 
 def create_app(
-    store: Store | None = None, *, dashboard: bool = False, refresh_seconds: int = 15
+    store: Store | None = None,
+    *,
+    dashboard: bool = False,
+    refresh_seconds: int = 15,
+    allow_unauthenticated: bool = False,
 ) -> FastAPI:
     """Build the collector FastAPI app. Ingest/list/trend always; dashboard opt-in.
 
     Storage is an explicit decision: an argument here, `GUARDANA_DATABASE_URL`, or
     `GUARDANA_STORAGE=memory`. Nothing else starts — see
     `guardana.server.db.settings` for why there is no default.
+
+    **Every route that carries a finding needs an API key**, and keys live in the
+    database — so a collector with no database cannot authenticate anybody, and
+    refuses to be built. `allow_unauthenticated=True` (or
+    `GUARDANA_ALLOW_UNAUTHENTICATED=1`) accepts that, which is a reasonable thing
+    to do on a laptop and nowhere else. The argument exists so that passing a store
+    object does not become the way around the check: an embedder acknowledges it in
+    code, a deployment acknowledges it in its environment, and neither gets it by
+    saying nothing.
 
     The dashboard (a read-only monitoring page plus its `/stats` data endpoint) is
     off by default; pass `dashboard=True` or set `GUARDANA_DASHBOARD=1` to mount it.
@@ -64,11 +79,18 @@ def create_app(
     else:
         active_store, choice = _store_from_environment()
         database_url = choice.database_url
+    # Before a single route is mounted: a collector nothing can authenticate
+    # against must not reach the point of serving one.
+    require_authentication(database_url, acknowledged=allow_unauthenticated)
     app = FastAPI(title="guardana-server")
     _mount_health(app, database_url)
+    ingesting = Depends(guard(database_url, Scope.INGEST))
+    reading = Depends(guard(database_url, Scope.READ))
 
     @app.post("/findings")
-    def post_findings(submission: Submission) -> dict[str, object]:
+    def post_findings(
+        submission: Submission, identity: Authenticated | None = ingesting
+    ) -> dict[str, object]:
         if submission.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise HTTPException(
                 status_code=_UNPROCESSABLE,
@@ -78,23 +100,30 @@ def create_app(
                 ),
             )
         active_store.add(submission)
-        return {"status": "ok", "stored": len(submission.findings)}
+        return {
+            "status": "ok",
+            "stored": len(submission.findings),
+            # Echoed so a pipeline's log records which credential wrote the run,
+            # which is the first thing anyone asks of an audit trail.
+            "accepted_by": identity.name if identity is not None else None,
+        }
 
     @app.get("/findings")
     def get_findings(
         source: str | None = Query(default=None),
         limit: int = Query(default=100, ge=1, le=1000),
+        _identity: Authenticated | None = reading,
     ) -> list[Submission]:
         # Paginated: an unbounded list could return the entire store (tens of MB)
         # in one response. Newest first, so `limit` returns the most recent.
         return active_store.submissions(source)[-limit:][::-1]
 
     @app.get("/trend")
-    def get_trend() -> dict[str, int]:
+    def get_trend(_identity: Authenticated | None = reading) -> dict[str, int]:
         return active_store.trend()
 
     if _dashboard_enabled(dashboard):
-        _mount_dashboard(app, active_store, refresh_seconds)
+        _mount_dashboard(app, active_store, refresh_seconds, reading)
 
     return app
 
@@ -151,8 +180,16 @@ def _migration_state(database_url: str) -> MigrationState:
         return read_state(connection)
 
 
-def _mount_dashboard(app: FastAPI, store: Store, refresh_seconds: int) -> None:
-    """Add the read-only dashboard page and its aggregated `/stats` data endpoint."""
+def _mount_dashboard(
+    app: FastAPI, store: Store, refresh_seconds: int, reading: Authenticated | None
+) -> None:
+    """Add the read-only dashboard page and its aggregated `/stats` data endpoint.
+
+    The page itself is static HTML and carries no findings; `/stats` carries all of
+    them, so that is where the key is required. A browser cannot send a bearer
+    header from an address bar, which is the honest reason the dashboard stays a
+    local-evaluation feature until there are user sessions.
+    """
     page = render_dashboard(refresh_seconds)
 
     @app.get("/", response_class=HTMLResponse)
@@ -160,9 +197,11 @@ def _mount_dashboard(app: FastAPI, store: Store, refresh_seconds: int) -> None:
         return page
 
     @app.get("/stats")
-    def get_stats() -> dict[str, object]:
+    def get_stats(_identity: Authenticated | None = reading) -> dict[str, object]:
         return asdict(compute_stats(store.records()))
 
     @app.get("/catalog")
     def get_catalog() -> dict[str, dict[str, str]]:
+        # The rule catalog is this build's own documentation — no finding, no
+        # target, nothing about anybody's deployment. Left open deliberately.
         return rule_catalog()

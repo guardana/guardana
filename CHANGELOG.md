@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a collector nobody can talk to anonymously
+
+Second item of the collector work. Every route that carries a finding now needs an
+API key. Tenancy is still absent, so every key sees everything in one collector
+and pointing two teams at one instance is not yet safe — that is the next item,
+and the maturity label stays **experimental** until it lands.
+
+- **API keys for runners**, hashed at rest and shown once. A collector database is
+  a list of every security finding an organisation has; a stolen backup must not
+  also be a set of working credentials for the thing that produced them. There is
+  no command and no endpoint that returns a key after `key create` prints it.
+- **Two scopes, not one.** `ingest` writes runs, `read` browses them, and
+  `key create` defaults to `ingest` alone — a CI job needs to write and never to
+  browse, and one scope covering both would make every pipeline credential a full
+  read of the finding history. A valid key without the scope gets `403`, not
+  `401`, because a pipeline retrying its credentials forever is the wrong outcome.
+- **Absence is refusal.** A collector with no keys accepts nothing, and one with no
+  database — which is where keys live — refuses to start at all. Reading "no
+  credentials configured" as "no credentials required" is the shape of every
+  default-admin incident there has ever been. `GUARDANA_ALLOW_UNAUTHENTICATED=1`
+  (or `allow_unauthenticated=True` in code) accepts an open collector, and has to
+  be typed: passing a store object in code must not become the way around the
+  check.
+- **One message for every rejected key** — unknown, malformed, revoked, expired.
+  Saying which would turn the endpoint into a way to enumerate valid prefixes.
+- **`guardana-collector key create | list | revoke`**, with optional expiry.
+  `last_used_at` is recorded on every accepted request, because "this key has not
+  been used in four months" is the question that gets an unused credential revoked.
+- **The agent carries its key** from `GUARDANA_COLLECTOR_TOKEN` — an environment
+  variable and deliberately not a flag, since a credential on a command line lands
+  in shell history, in `ps`, and in most CI logs. Without this the whole scheme
+  would have been a collector no runner could reach.
+- The guard is a per-route dependency, not path-matching middleware, and a test
+  enumerates the app's own route table rather than listing paths — so a route
+  added later is covered without anybody remembering the test exists.
+
 ### Added — the collector keeps what it is given
 
 First item of the collector work. The engine still never imports it, nothing is

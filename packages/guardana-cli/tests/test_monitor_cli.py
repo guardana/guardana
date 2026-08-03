@@ -121,7 +121,7 @@ def test_a_dead_collector_does_not_kill_the_monitor(monkeypatch: pytest.MonkeyPa
     # Forwarding an alert to a down collector must not exit 2 and blame the model
     # endpoint, which was perfectly healthy.
     class _DownReporter:
-        def __init__(self, url: str) -> None:
+        def __init__(self, url: str, *, api_key: str | None = None) -> None:
             pass
 
         def submit(self, result: object, *, source: str) -> None:
@@ -157,7 +157,7 @@ def test_monitor_command_forwards_alerts_to_reporter(monkeypatch: pytest.MonkeyP
     submitted: list[str] = []
 
     class _CapturingReporter:
-        def __init__(self, url: str) -> None:
+        def __init__(self, url: str, *, api_key: str | None = None) -> None:
             self.url = url
 
         def submit(self, result: object, *, source: str) -> None:

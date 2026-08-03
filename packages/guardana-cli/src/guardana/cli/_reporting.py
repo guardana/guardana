@@ -1,3 +1,4 @@
+import os
 from urllib.error import HTTPError, URLError
 
 import typer
@@ -6,6 +7,14 @@ from guardana.core.reporter import HttpReporter
 from guardana.core.target import EndpointError
 
 _SERVER_SCHEME = "server://"
+TOKEN_VARIABLE = "GUARDANA_COLLECTOR_TOKEN"  # noqa: S105 — the name of a variable, not a value
+"""Where the collector's API key is read from.
+
+An environment variable and deliberately not a flag. A credential on a command
+line lands in shell history, in `ps`, and in the echoed command of most CI logs —
+which is why `probe` takes `--api-key-env` rather than `--api-key`, and this
+follows the same rule one step further by naming the variable itself.
+"""
 
 # Only a collector being unreachable is a "degrade to a warning" event. A bad
 # URL (ValueError from HttpReporter) is a usage error, and a serialization bug
@@ -16,10 +25,14 @@ _COLLECTOR_UNREACHABLE = (OSError, URLError, EndpointError)
 def reporter_from_url(url: str) -> HttpReporter:
     """Build the `HttpReporter` for a `--reporter` CLI flag value.
 
-    Accepts either a bare collector URL or one prefixed with the `server://` scheme.
+    Accepts either a bare collector URL or one prefixed with the `server://` scheme,
+    and carries the API key from `GUARDANA_COLLECTOR_TOKEN` when one is set. A
+    collector that requires a key answers `401` without it, which `submit_safely`
+    reports as a rejection rather than as an outage — so a fleet that has not been
+    given its credential says so instead of going quiet.
     """
     target = url.removeprefix(_SERVER_SCHEME)
-    return HttpReporter(target)
+    return HttpReporter(target, api_key=os.environ.get(TOKEN_VARIABLE) or None)
 
 
 def submit_safely(url: str, result: ScanResult, *, source: str) -> None:

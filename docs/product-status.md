@@ -15,7 +15,7 @@ so this page is maintained as carefully as the code.
 | `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers. Verdict quality depends on the evaluator you configure. |
 | `guardana monitor` | **beta** | Scheduled **active** verification. Not passive traffic inspection, not inline. |
 | `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and will gain fields in 0.7. |
-| Collector (`guardana-server`) | **experimental** | Persists to PostgreSQL with reversible migrations. No authentication and no tenancy: anyone who reaches the port reads everything. Do not expose it. |
+| Collector (`guardana-server`) | **experimental** | Persists to PostgreSQL with reversible migrations, and every route carrying a finding needs a scoped API key. No tenancy: every key sees everything, so one instance cannot yet serve two teams. |
 | Extension API | **unstable by design** | Frozen at 1.0, and deliberately not before — see below. |
 
 ## Known limitations

@@ -59,7 +59,7 @@ already failed at its job:
 | Engine + built-in rules | **beta** | Stable enough to gate a build on; API still moves between minors |
 | `scan` / `probe` / `diff` | **beta** | Used in CI; exit codes and formats stable in practice, not yet contractually |
 | `monitor` | **beta** | Scheduled *active* verification. Not passive traffic inspection, not inline |
-| Collector (`guardana-server`) | **experimental** | Persistent since 0.8 (PostgreSQL, reversible migrations, explicit storage choice). Still no authentication and no tenancy, so still not exposable — those are the next two items |
+| Collector (`guardana-server`) | **experimental** | Persistent and authenticated since 0.8 (PostgreSQL, reversible migrations, scoped API keys). Still no tenancy, so one instance cannot yet serve two teams — that is the next item |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
 ## What ships today (0.7.0)
@@ -171,7 +171,7 @@ checklist.
 - [x] documented, tested exit codes
 - [x] privacy and redaction defaults
 - [x] persistent collector
-- [ ] authenticated runner ingest
+- [x] authenticated runner ingest
 - [ ] project/environment isolation
 - [ ] migrations, backup, restore, upgrade *(migrations and upgrade done; backup
       and restore need the retention work)*
