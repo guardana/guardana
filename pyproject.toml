@@ -16,6 +16,15 @@ target-version = "py311"
 extend-exclude = ["examples/vulnerable-model"]
 force-exclude = true
 
+[tool.ruff.format]
+# ruff 0.16 began formatting Python blocks inside Markdown. Declined, deliberately:
+# the formatter owns `.py`, and prose is written for a reader. Its proposals here
+# were to explode a compact illustrative import into thirteen lines and to insert
+# blank lines into three-line snippets — machine consistency bought with
+# readability, in the files whose whole job is to be read. A version bump must not
+# silently change what the gate means; that is why the rule list is curated too.
+exclude = ["*.md"]
+
 [tool.ruff.lint]
 # Curated, not `ALL`: every family here is one we have decided we want, so a ruff
 # upgrade never silently changes the gate. Rationale for the security-relevant ones:
@@ -154,11 +163,11 @@ dev = [
     # dataclasses, so the shape is enforced by mypy on the way out.
     "jsonschema>=4.23",
     "types-jsonschema>=4.23",
-    "mypy>=2.2.0",
-    "pre-commit>=4.0",
+    "mypy>=2.3.0",
+    "pre-commit>=4.6.1",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
-    "ruff>=0.15.21",
+    "ruff>=0.16.1",
 ]
 
 [tool.coverage.run]

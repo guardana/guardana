@@ -57,7 +57,7 @@ def _announce_baseline_health(accepted: Baseline) -> None:
         )
 
 
-def scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
+def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     path: Annotated[Path, typer.Argument(help="Directory to scan")],
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[

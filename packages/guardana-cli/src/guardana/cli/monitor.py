@@ -90,7 +90,7 @@ def run_monitor(  # noqa: PLR0913 — the test seam needs every hook injectable
     monitor.run(handler, on_error=on_error, sleep=sleep)
 
 
-def monitor(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
+def monitor(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     url: Annotated[str, typer.Option(help="Base URL of the OpenAI-compatible endpoint")],
     model: Annotated[str, typer.Option(help="Model name")],
     api_key_env: Annotated[

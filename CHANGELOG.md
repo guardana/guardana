@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Dependency upgrades. Development tools take a **floor** bump, because their
+  version decides what the gate says: ruff `0.16.1`, mypy `2.3.0`, pre-commit
+  `4.6.1`, types-pyyaml. The pre-commit ruff hook moves with it, so a local commit
+  and CI lint with the same ruff.
+- **Production floors are deliberately left where they are.** Dependabot proposed
+  raising `fastapi>=0.115` to `>=0.141.1`, `typer>=0.12` to `>=0.27.0` and
+  `psycopg[binary]>=3.2` to `>=3.3.4`. A floor should be the oldest version whose
+  API is actually used; raising it to whatever resolved today narrows what every
+  user may install and buys nothing. The lockfile takes the newest of all three —
+  we test against them, users are not forced onto them.
+- Actions: `actions/checkout` and `astral-sh/setup-uv` to v7 in CI *and* in the
+  shipped composite action, and `github/codeql-action/upload-sarif` to v4 — the
+  last one runs in **users'** pipelines, and v3 is on its way out.
+- `ruff format` no longer touches Markdown. Ruff 0.16 began formatting Python
+  blocks inside prose; its proposals here exploded a compact illustrative import
+  into thirteen lines and inserted blank lines into three-line snippets. The
+  formatter owns `.py`; documentation is written for a reader. A version bump must
+  not silently change what the gate means, which is the same reason the lint rule
+  list is curated rather than `ALL`.
+- Ruff 0.16's new `PLR0917` (too many *positional* arguments) is suppressed on the
+  six typer commands that already carry `PLR0913`, for the reason already written
+  there: every parameter is a CLI flag typer derives from its name, and none of
+  them is ever passed positionally.
+
 ## [0.8.0] - 2026-08-03
 
 ### Security — found by reviewing this release's own code

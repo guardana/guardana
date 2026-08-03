@@ -71,7 +71,7 @@ def _render_json(report: TargetReport, unrunnable: tuple[str, ...]) -> str:
     )
 
 
-def inspect_target(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
+def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     url: Annotated[str, typer.Option(help="Base URL of the OpenAI-compatible endpoint")],
     model: Annotated[str, typer.Option(help="Model name")],
     api_key_env: Annotated[

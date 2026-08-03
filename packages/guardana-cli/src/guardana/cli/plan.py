@@ -96,7 +96,7 @@ def _plan_for(profile: Profile, target: Target, rules: list[Path], *, plugins: b
     return build_plan(registry, profile, target)
 
 
-def plan_scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
+def plan_scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     path: Annotated[Path, typer.Argument(help="Directory that would be scanned")],
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[
@@ -114,7 +114,7 @@ def plan_scan(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the c
     _emit(_plan_for(prof, target, rules, plugins=not no_plugins), format)
 
 
-def plan_probe(  # noqa: PLR0913 — one typer.Option per CLI flag; this is the command's surface
+def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     url: Annotated[str, typer.Option(help="Base URL of the OpenAI-compatible endpoint")],
     model: Annotated[str, typer.Option(help="Model name")],
     provider: Annotated[
