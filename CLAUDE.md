@@ -399,10 +399,17 @@ you.
   marker one element above it. Automation covering the version and nothing else
   is what makes stale prose *look* maintained.
 
+  **A larger change gets a design document first**, under `docs/design/`, named
+  for its topic and never for its date, with a status line at the top —
+  `docs/design/README.md` is the convention. A date leading a filename tells a
+  reader the age of a document instead of its subject, and an accepted decision
+  does not expire on a schedule.
+
   **Prefer a test over a promise.** `test_features_doc.py` pins `FEATURES.md` to
-  the registry and `test_landing_page.py` pins the page's counts; a claim a test
-  can check is a claim that cannot rot. When you state a number anywhere, ask
-  what would notice if it changed.
+  the registry, `test_landing_page.py` pins the page's counts, and
+  `test_docs_consistency.py` fails on any local link pointing at a file that does
+  not exist; a claim a test can check is a claim that cannot rot. When you state a
+  number anywhere, ask what would notice if it changed.
 - Commit messages are **specific and conventional-commit style**
   (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`). Never `wip`,
   never `fixes`, never a message that doesn't say what changed and why.

@@ -56,13 +56,16 @@ detail below.
 
 ## Design documents
 
-Written before the code they describe, so the reasoning survives the review:
+Written before the code they describe, so the reasoning survives the review.
+[`design/README.md`](design/README.md) explains how they are named and what a
+status means:
 
 - [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
 - [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam
 - [`design/exit-codes.md`](design/exit-codes.md) — why the codes are what they are
-- [`design/2026-08-03-collector-persistence-design.md`](design/2026-08-03-collector-persistence-design.md) — collector persistence and migrations
+- [`design/collector-persistence.md`](design/collector-persistence.md) — collector persistence and migrations
+- [`design/collector-tenancy.md`](design/collector-tenancy.md) — organizations, projects, and the scope on every query
 
 ## Project direction
 

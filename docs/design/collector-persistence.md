@@ -1,6 +1,6 @@
 # Design: collector persistence and migrations
 
-**Status:** accepted · **Target:** v0.8 · **Phase C, item 19**
+**Status:** implemented in 0.8 · **Written:** 2026-08-03 · **Phase C, item 19**
 
 ## The problem
 

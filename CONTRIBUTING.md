@@ -224,6 +224,12 @@ while the release tooling dutifully rewrote the version number one element above
 it. Where you can, pin a claim with a test instead of a promise — `test_features_doc.py`
 and `test_landing_page.py` are the pattern.
 
+A larger change gets a design document first, under
+[`docs/design/`](docs/design/) — named for its topic, never for its date, with a
+status line at the top. [`docs/design/README.md`](docs/design/README.md) is the
+convention, and a test fails on any local link that points at a file which does
+not exist, so moving a document is never quietly half-done.
+
 ## Contribution lanes
 
 Different changes need different review, so say which lane you are in:

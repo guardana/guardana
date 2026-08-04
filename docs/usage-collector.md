@@ -197,6 +197,7 @@ locally is the one that behaves differently in production.
 ## See also
 
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — the model the next items build
-- [`design/2026-08-03-collector-persistence-design.md`](design/2026-08-03-collector-persistence-design.md) — why this item is shaped the way it is
+- [`design/collector-persistence.md`](design/collector-persistence.md) — why persistence is shaped the way it is
+- [`design/collector-tenancy.md`](design/collector-tenancy.md) — the organization/project boundary that is being built next
 - [`architecture.md`](architecture.md#the-coreserver-boundary) — why the engine never imports this
 - [`privacy.md`](privacy.md) — evidence is redacted by the agent before it is sent

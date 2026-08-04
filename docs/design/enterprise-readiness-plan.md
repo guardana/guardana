@@ -1,5 +1,12 @@
 # Guardana: Enterprise-Readiness Change Plan
 
+> **Historical input document, kept for the record.** Written 2026-08-02 against
+> 0.6, before any of it was built. Phases A and B shipped in 0.7, Phase C is
+> partly in 0.8, and parts of what follows were reconsidered on the way. It is
+> not a statement of current capability and not the roadmap — for what ships
+> today read [`FEATURES.md`](../../FEATURES.md), and for direction
+> [`ROADMAP.md`](../../ROADMAP.md).
+
 **Repository:** https://github.com/guardana/guardana  
 **Prepared against:** public `main` branch reviewed on 2026-08-02  
 **Primary objective:** make Guardana usable by real companies as quickly as possible, before broadening the engine into a larger AI-security platform.

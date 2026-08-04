@@ -14,10 +14,15 @@ derives from it or is checked against it here.
 import re
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from guardana.core import __version__
+
+_MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+_FENCED_BLOCK = re.compile(r"```.*?```", re.DOTALL)
+_EXTERNAL = ("http://", "https://", "mailto:", "#")
 
 
 def _repo() -> Path:
@@ -71,6 +76,43 @@ def test_documented_action_pins_track_the_released_minor() -> None:
     for relative in ("README.md", "docs/integrations.md", "site/index.html"):
         pins = set(re.findall(r"guardana/guardana@v\d+\.\d+", _read(relative)))
         assert pins == {expected}, f"{relative} pins {sorted(pins)}, expected {expected}"
+
+
+def _tracked_markdown() -> list[Path]:
+    listing = subprocess.run(
+        ["git", "ls-files", "*.md"],  # noqa: S607 — resolved from PATH, as everywhere else here
+        cwd=_repo(),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [_repo() / line for line in listing.stdout.splitlines() if line]
+
+
+def _local_link_targets(text: str) -> Iterator[str]:
+    """Yield the file each local markdown link points at, ignoring anchors and titles."""
+    for raw in _MARKDOWN_LINK.findall(_FENCED_BLOCK.sub("", text)):
+        target = raw.split()[0] if raw.split() else ""
+        if not target or target.startswith(_EXTERNAL):
+            continue
+        yield target.split("#", 1)[0]
+
+
+def test_every_local_documentation_link_points_at_a_file_that_exists() -> None:
+    """Renaming a document leaves dead links behind, and nothing else would notice.
+
+    Three design documents were renamed the day this test was written, and their
+    links lived in four files across two directories. A reader who follows one to
+    a 404 concludes the project is unmaintained, which is a cheap thing to be
+    wrong about and an expensive impression to correct.
+    """
+    broken = [
+        f"{path.relative_to(_repo())} → {target}"
+        for path in _tracked_markdown()
+        for target in _local_link_targets(path.read_text(encoding="utf-8"))
+        if not (path.parent / target).exists()
+    ]
+    assert not broken, "links pointing at files that do not exist:\n  " + "\n  ".join(broken)
 
 
 @pytest.mark.parametrize("script", ["generate_docs.py", "sync_site.py"])

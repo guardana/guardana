@@ -7,8 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A test fails the build on any **local documentation link pointing at a file
+  that does not exist**. It found one on the first run: `docs/usage-plan.md`
+  pointed at a `configuration.md` that has never existed, through the whole of
+  0.7 and 0.8. A reader who follows a link to nothing concludes the project is
+  unmaintained, which is a cheap thing to be wrong about and an expensive
+  impression to correct — and nothing else in the gate could see it.
+
 ### Changed
 
+- **Design documents are named for their topic, not for their date.**
+  `2026-08-03-collector-persistence-design.md` is now
+  [`collector-persistence.md`](docs/design/collector-persistence.md), and the
+  enterprise-readiness plan and the new tenancy design moved the same way. Four
+  of the seven documents already used topic names, so this is a return to the
+  convention rather than a new one. A filename that leads with a date tells a
+  reader the age of a document instead of its subject, and an accepted decision
+  does not expire on a schedule; the date now lives in the header beside the
+  status. [`docs/design/README.md`](docs/design/README.md) writes the convention
+  down, including what each status means and why an accepted decision is
+  superseded rather than rewritten.
+- The enterprise-readiness plan now opens by saying it is a **historical input
+  document** from 2026-08-02, largely delivered and partly reconsidered — so it
+  is not mistaken for the roadmap by anyone who finds it first.
 - Dependency upgrades. Development tools take a **floor** bump, because their
   version decides what the gate says: ruff `0.16.1`, mypy `2.3.0`, pre-commit
   `4.6.1`, types-pyyaml. The pre-commit ruff hook moves with it, so a local commit

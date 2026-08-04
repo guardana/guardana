@@ -84,6 +84,6 @@ before it is answered, and a guessed figure is one a team would budget against.
 
 ## See also
 
-- [`docs/configuration.md`](configuration.md) — the `budgets:` block
+- [`docs/profiles.md`](profiles.md) — the `budgets:` block in `guardana.yaml`
 - [`docs/exit-codes.md`](exit-codes.md) — what `3` and `6` mean
 - [`docs/usage-run.md`](usage-run.md) — what a finished run actually cost
