@@ -25,10 +25,10 @@ self-hosted collector.
 
 > **Status.** The CLI and engine are **beta** — used to gate real builds, with the
 > public API still moving between minor releases. The self-hosted collector is
-> **experimental**: it persists to PostgreSQL, requires a scoped API key, and
-> isolates one project from another, but has no environments or deployments yet.
-> See [product status and known limitations](docs/product-status.md) before
-> adopting.
+> **beta** too as of 0.9: PostgreSQL, scoped API keys, project isolation, and a
+> record of what each run verified and where. It has no finding lifecycle, audit
+> log or retention controls yet. See
+> [product status and known limitations](docs/product-status.md) before adopting.
 
 - No account, no telemetry, no phone-home. The only network traffic is to the target you point it at.
 - Offline static scanning; explicit `findings`, `unverified` and `errors` channels.
@@ -360,18 +360,18 @@ beyond the target itself, no account, no lock-in. When you want fleet-wide
 visibility, any run can forward its normalized findings to a collector with
 `--reporter server://…`:
 
-> **Maturity: experimental.** The collector **keeps what it is given** —
-> PostgreSQL with reversible migrations, a storage choice it refuses to make for
-> you, separate health and readiness endpoints — **requires a scoped API key** on
-> every route that carries a finding, and **isolates one project from another**: a
-> key reads and writes its own project and nothing else, proven per entity on both
-> stores and over HTTP. Standing one up is three commands, because
+> **Maturity: beta.** The collector **keeps what it is given** — PostgreSQL with
+> reversible migrations, a storage choice it refuses to make for you, separate
+> health and readiness endpoints — **requires a scoped API key** on every route
+> that carries a finding, **isolates one project from another**, and records **what
+> each run verified and where**: AI system, environment, deployment and the commit
+> behind it. A key may be **pinned to one environment**, and then it writes and
+> reads only that one. Standing one up is three commands, because
 > `guardana-collector bootstrap` creates the organization, the project and the
-> first key together. Still missing: environments and deployments, a finding
-> lifecycle, an audit log, retention and restore-tested backup — see
+> first key together. Still missing: a finding lifecycle, an audit log, retention
+> and restore-tested backup — see
 > [`docs/usage-collector.md`](docs/usage-collector.md) and
-> [the collector design](docs/design/collector-domain-model.md). The label moves
-> to `beta` when environments land beside projects, not before.
+> [the collector design](docs/design/collector-domain-model.md).
 
 - **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
   agent — dev machines, CI, live monitors — in one place. Ingest/list/trend over

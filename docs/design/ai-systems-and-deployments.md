@@ -1,6 +1,6 @@
 # Design: AI systems, environments and deployments
 
-**Status:** proposed · **Written:** 2026-08-05 · **Phase C, item 22**
+**Status:** implemented in 0.9.0 · **Written:** 2026-08-05 · **Phase C, item 22**
 
 ## The problem
 
@@ -174,73 +174,64 @@ So: declared by flag or `guardana.yaml`, detected never.
 
 ## Design
 
-### Schema, migration 0004
+### Schema, migration 0004 — labels on a submission, not three new tables
 
 ```sql
-create table ai_systems (
-    id          bigserial    primary key,
-    project_id  bigint       not null references projects (id) on delete restrict,
-    slug        text         not null,
-    name        text         not null,
-    created_at  timestamptz  not null default now(),
-    unique (project_id, slug)
-);
-
-create table environments (
-    id          bigserial    primary key,
-    project_id  bigint       not null references projects (id) on delete restrict,
-    slug        text         not null,
-    created_at  timestamptz  not null default now(),
-    unique (project_id, slug)
-);
-
-create table deployments (
-    id              bigserial    primary key,
-    ai_system_id    bigint       not null references ai_systems (id) on delete restrict,
-    environment_id  bigint       not null references environments (id) on delete restrict,
-    ref             text         not null,
-    commit_sha      text,
-    image_digest    text,
-    model_digest    text,
-    model_name      text,
-    model_revision  text,
-    first_seen_at   timestamptz  not null default now(),
-    last_seen_at    timestamptz  not null default now(),
-    unique (ai_system_id, environment_id, ref)
-);
-
 alter table submissions
-    add column ai_system_id   bigint references ai_systems (id)   on delete restrict,
-    add column environment_id bigint references environments (id) on delete restrict,
-    add column deployment_id  bigint references deployments (id)  on delete restrict;
+    add column ai_system       text,
+    add column environment     text,
+    add column deployment_ref  text,
+    add column commit_sha      text,
+    add column image_digest    text,
+    add column model_digest    text,
+    add column model_name      text,
+    add column model_revision  text;
 
-alter table api_keys
-    add column environment_id bigint references environments (id) on delete restrict;
+alter table api_keys add column environment text;
 
 create index submissions_project_environment_idx
-    on submissions (project_id, environment_id, received_at desc);
+    on submissions (project_id, environment, received_at desc);
 ```
 
-The existing `(project_id, received_at desc)` index **stays**. A composite index
-led by `project_id, environment_id` cannot order by `received_at` for a query that
+The existing `(project_id, received_at desc)` index **stays**. A composite index led
+by `project_id, environment` cannot order by `received_at` for a query that
 constrains only the project, so an unpinned read — still the common one — would lose
 its ordering. Two indexes, each for a shape of read that actually happens.
 
-**The three submission columns are nullable, and null means "the run did not say"**
-— never "applies to everything". A scoped read filters on them only when the scope
-names one, so an unlabelled run stays visible to an unpinned key and invisible to a
-pinned one. That asymmetry is the point: a pinned key must not see evidence that
-never claimed to be about its environment.
+**Every added column is nullable, and null means "the run did not say"** — never
+"applies to everything". A scoped read filters on the environment only when the
+scope names one, so an unlabelled run stays visible to an unpinned key and invisible
+to a pinned one. That asymmetry is the point: a pinned key must not see evidence
+that never claimed to be about its environment. Nothing needs adopting, because
+every existing submission *is* a run that did not say.
 
-`deployments.ref` is the run's `deployment_id` when it gave one, and otherwise the
-`commit_sha`. A deployment with neither is not recorded as a deployment at all —
-there is nothing to identify it by, and inventing a surrogate would produce one
-"deployment" per run.
+#### Why no `ai_systems`, `environments` or `deployments` tables
 
-**Migration 0004 adds only nullable columns and new tables**, so there is nothing
-to adopt: every existing submission is a run that did not say, which is exactly what
-null records. Its rollback drops what it added, and needs no refusal — dropping a
-label loses information but merges no tenants.
+The first draft of this document created all three. Reviewing it against the two
+defects this repository has already removed — `store_key`'s `created_by` and this
+document's own `unclaimed` flag — killed them, for the same reason both times: **a
+row whose only columns are the name it was created from is a table pretending to be
+an entity.**
+
+Today a run declares a *slug* and nothing else. An `ai_systems` row would hold that
+slug and a `name` column nothing sets; an `environments` row would hold a slug and
+nothing at all. Neither has an owner, a policy, a lifecycle or a retention rule —
+those are items 24 and 26, and that is when each becomes a thing rather than a
+label.
+
+So an environment is a **normalized name**, an AI system is a **normalized name**,
+and both are answered by an aggregate query over the submissions that used them.
+The pin on a key is text for the same reason and one more: it is an *assertion by a
+credential*, true whether or not any run has yet used that environment, so making it
+a foreign key would mean creating a row to hold a name nobody has reported against.
+
+`deployment_ref` is the run's `deployment_id` when it gave one, otherwise its
+`commit_sha`. A run with neither identifies no deployment, and inventing a surrogate
+would produce one "deployment" per run.
+
+When item 24 gives an AI system an owner and a lifecycle, the migration that
+promotes these labels to rows has **real data to build them from** — which is a
+better position than inventing empty rows now and backfilling meaning later.
 
 ### The scope grows a second, optional axis
 
@@ -248,12 +239,13 @@ label loses information but merges no tenants.
 @dataclass(frozen=True, slots=True)
 class TenantScope:
     project_id: int | None = None
-    environment_id: int | None = None
+    environment: str | None = None
 ```
 
-`Store` is untouched: the scope is already the first argument of every method, which
-is the property this change is about to collect on. `PostgresStore` adds
-`and (%s::bigint is null or environment_id = %s)` to each read.
+`Store`'s shape is untouched: the scope is already the first argument of every
+method, which is the property this change collects on. `PostgresStore` adds
+`and (%s::text is null or environment = %s)` to each read, and the in-memory store
+compares the label it was given. One axis added, no signature moved.
 
 `Authenticated.scope` carries the key's environment pin; `TenantScope.unauthenticated()`
 is unchanged.
@@ -269,10 +261,13 @@ guardana-collector environment list [--project acme/web]
 guardana-collector deployment list --system acme/web/support-agent
 ```
 
-`guardana.yaml` gains the same three keys under `deployment:`, so a repository
-declares them once rather than every pipeline step repeating them. `monitor` takes
-them too: a scheduled check of production is exactly the run whose environment
-matters most.
+There is **no `guardana.yaml` block**, and this is a change from the first draft.
+An environment varies per invocation — the dev job and the prod job are different
+runs of the same repository — so a repository-level constant would be wrong for the
+field that matters most. Environment *variables* cover what a config file would
+have: a pipeline exports `GUARDANA_AI_SYSTEM` once and one job still passes
+`--environment production`. `monitor` takes the flags too: a scheduled check of
+production is exactly the run whose environment matters most.
 
 `key list` shows the pin, because a credential whose reach is narrower than its
 neighbours' is a fact an operator has to be able to see without reading a database.
@@ -295,7 +290,7 @@ did not run as a pass.
 - a pinned key submitting a run that declares no environment stores it under the pin
 - `system list` and `environment list` show what runs created
 - `Production`, `production ` and `production` are one environment
-- migration 0004 up and down on a database with submissions
+- migration 0004 up and down on a database with submissions, with the rows intact
 - a deployment with neither `deployment_id` nor `commit_sha` records no deployment
 
 ## Acceptance criteria
@@ -310,6 +305,9 @@ did not run as a pass.
 
 ## What this item deliberately does not deliver
 
+- **`ai_systems` and `environments` as tables**, because today they would be rows
+  whose only column is the name they were created from — see above. They arrive with
+  the owner and the lifecycle that make them entities (item 24).
 - **Adopting or merging an inferred system**, because moving evidence between
   identities is the same class of operation as deleting it (item 26).
 - **Read-side roles** — who may see which environment beyond what their key pins

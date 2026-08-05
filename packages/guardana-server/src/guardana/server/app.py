@@ -9,6 +9,7 @@ from guardana.server.auth import Authenticated, Scope
 from guardana.server.dashboard import render_dashboard
 from guardana.server.db.migrations import MigrationState, apply_pending, read_state
 from guardana.server.db.settings import StorageChoice, migrate_on_start, resolve_storage
+from guardana.server.deployment import EnvironmentMismatchError, labelled_for
 from guardana.server.envelope import SUPPORTED_SCHEMA_VERSIONS, Submission
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.rule_catalog import rule_catalog
@@ -22,6 +23,7 @@ from guardana.server.store import InMemoryStore, Store
 from guardana.server.tenancy import TenantScope, UnscopedQueryError
 
 _UNPROCESSABLE = 422
+_FORBIDDEN = 403
 _UNAVAILABLE = 503
 _TRUTHY = {"1", "true", "yes", "on"}
 
@@ -110,7 +112,16 @@ def create_app(
                     f"this collector speaks {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
                 ),
             )
-        active_store.add(_scope_of(identity), submission)
+        scope = _scope_of(identity)
+        try:
+            stored = labelled_for(scope, submission)
+        except EnvironmentMismatchError as exc:
+            # `403`, like a missing scope: the caller *is* somebody, and that
+            # somebody may not write here. A `422` would read as "your envelope is
+            # malformed", which would send a pipeline off to fix a payload that is
+            # correct.
+            raise HTTPException(status_code=_FORBIDDEN, detail=str(exc)) from exc
+        active_store.add(scope, stored)
         return {
             "status": "ok",
             "stored": len(submission.findings),

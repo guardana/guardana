@@ -235,6 +235,16 @@ def test_each_migration_is_committed_before_the_next_one_runs(database_url: str)
     assert int(str(row[0])) == len(load_migrations())
 
 
+def _roll_back_through(connection: DbConnection, version: int) -> tuple[Migration, ...]:
+    """Undo everything down to and including `version`.
+
+    Counted from the shipped set rather than written as a literal, so a test about
+    migration three does not silently start being a test about migration four the
+    day a fifth one lands.
+    """
+    return roll_back(connection, steps=len(load_shipped()) - version + 1)
+
+
 def _apply_through(connection: DbConnection, version: int) -> None:
     """Apply migrations up to and including `version` — i.e. stage a pre-0003 database."""
     with _advisory_lock(connection):
@@ -333,7 +343,7 @@ def test_rolling_back_tenancy_with_one_project_succeeds(connection: DbConnection
         )
     connection.commit()
 
-    roll_back(connection, steps=1)
+    _roll_back_through(connection, 3)
 
     with connection.cursor() as cursor:
         cursor.execute("select to_regclass('projects')")
@@ -355,7 +365,7 @@ def test_rolling_back_tenancy_refuses_to_merge_two_tenants(connection: DbConnect
     connection.commit()
 
     with pytest.raises(MigrationError, match="more than one project"):
-        roll_back(connection, steps=1)
+        _roll_back_through(connection, 3)
 
 
 def test_a_tenant_split_across_the_two_tables_also_refuses(connection: DbConnection) -> None:
@@ -382,7 +392,7 @@ def test_a_tenant_split_across_the_two_tables_also_refuses(connection: DbConnect
     connection.commit()
 
     with pytest.raises(MigrationError, match="more than one project"):
-        roll_back(connection, steps=1)
+        _roll_back_through(connection, 3)
 
 
 def test_the_tenancy_rollback_restores_the_indexes_it_dropped(connection: DbConnection) -> None:
@@ -391,7 +401,7 @@ def test_the_tenancy_rollback_restores_the_indexes_it_dropped(connection: DbConn
     # plans nobody associates with a schema change.
     apply_pending(connection)
 
-    roll_back(connection, steps=1)
+    _roll_back_through(connection, 3)
 
     with connection.cursor() as cursor:
         cursor.execute("select indexname from pg_indexes where tablename = 'submissions'")
@@ -418,6 +428,31 @@ def test_tenancy_indexes_lead_with_the_project(connection: DbConnection) -> None
     assert "(project_id, received_at DESC)" in str(row[0])
 
 
+def _legacy_submission_in_a_project(connection: DbConnection) -> None:
+    """A pre-0004 submission: it has a tenant and no labels, because none existed."""
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id) "
+            "values (now(), 'legacy', 5, %s)",
+            (project.id,),
+        )
+    connection.commit()
+
+
+def _labelled_submission(connection: DbConnection) -> None:
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id, "
+            "ai_system, environment) values (now(), 'labelled', 6, %s, 'support', 'production')",
+            (project.id,),
+        )
+    connection.commit()
+
+
 def test_a_failing_migration_leaves_the_ones_before_it_applied(
     connection: DbConnection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -438,3 +473,81 @@ def test_a_failing_migration_leaves_the_ones_before_it_applied(
 
     monkeypatch.undo()
     assert read_state(connection).is_current, "the migrations before the failure were lost"
+
+
+_LABEL_COLUMNS_SET = frozenset(
+    {
+        "ai_system",
+        "environment",
+        "deployment_ref",
+        "commit_sha",
+        "image_digest",
+        "model_digest",
+        "model_name",
+        "model_revision",
+    }
+)
+
+
+def _columns(connection: DbConnection, table: str) -> set[str]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select column_name from information_schema.columns where table_name = %s", (table,)
+        )
+        return {str(row[0]) for row in cursor.fetchall()}
+
+
+def test_deployment_labels_arrive_nullable_so_nothing_needs_adopting(
+    connection: DbConnection,
+) -> None:
+    """Every existing submission *is* a run that did not say, which is what null records.
+
+    A not-null column would have needed a value invented for every row already
+    stored — and an invented environment is worse than an absent one, because a
+    reader cannot tell it apart from a declared one.
+    """
+    _apply_through(connection, 3)
+    _legacy_submission_in_a_project(connection)
+
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select source, ai_system, environment from submissions")
+        assert cursor.fetchall() == [("legacy", None, None)]
+
+
+def test_the_label_columns_are_all_there(connection: DbConnection) -> None:
+    apply_pending(connection)
+
+    assert _columns(connection, "submissions") >= _LABEL_COLUMNS_SET
+    assert "environment" in _columns(connection, "api_keys")
+
+
+def test_rolling_back_the_labels_keeps_the_submissions(connection: DbConnection) -> None:
+    # Dropping a label loses information and merges no tenants, so this rollback
+    # needs no refusal — but it must not take the evidence with it.
+    apply_pending(connection)
+    _labelled_submission(connection)
+
+    _roll_back_through(connection, 4)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select source from submissions")
+        assert cursor.fetchall() == [("labelled",)]
+    assert not (_LABEL_COLUMNS_SET & _columns(connection, "submissions"))
+
+
+def test_the_unpinned_read_index_survives_the_environment_one(connection: DbConnection) -> None:
+    """Both indexes, because both shapes of read happen.
+
+    A composite led by (project_id, environment) cannot order by received_at for a
+    query that constrains only the project, so the unpinned read — still the common
+    one — would lose its ordering.
+    """
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select indexname from pg_indexes where tablename = 'submissions'")
+        names = {str(row[0]) for row in cursor.fetchall()}
+    assert "submissions_project_received_idx" in names
+    assert "submissions_project_environment_idx" in names

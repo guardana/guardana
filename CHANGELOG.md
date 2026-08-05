@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A collector knows what a run verified, where it runs, and which version of
+  it.** `guardana scan|probe|monitor --ai-system support-agent --environment
+  production --deployment-id 2026-08-05.3`, or the same three as
+  `GUARDANA_AI_SYSTEM` / `GUARDANA_ENVIRONMENT` / `GUARDANA_DEPLOYMENT_ID` so a
+  pipeline sets the repository default once and one job still says it is
+  production. Until now a project's history was one undifferentiated stream in
+  which last night's production check sat beside a laptop experiment, and no
+  question about either could be answered. The engine has carried the vocabulary
+  since 0.7 and nothing had ever filled it in — that debt is closed.
+- **A key may be pinned to one environment**, and then it writes and reads only
+  that one: `guardana-collector key create --project acme/web --name prod-ci
+  --environment production`. A run declaring a different environment is **refused**
+  with `403`, never relabelled — "prefer the more specific one" would re-open
+  exactly the hole the tenant rule closes. A run declaring *nothing* is labelled
+  with the pin, because the credential asserted it and the run did not contradict
+  it; storing it unlabelled would let a pinned key write evidence into a place it
+  cannot itself read. The pin is optional on purpose: one pipeline that deploys to
+  three environments needs one credential, not three.
+- **`system list`, `environment list` and `deployment list`** on
+  `guardana-collector`, each narrowable to a project. Systems and environments are
+  *inferred from what a run names* rather than created in advance — requiring an
+  administrator first would put a human step between a pipeline and its first
+  report, and pipelines that fail on a missing prerequisite get commented out
+  rather than fixed. The cost is a typo creating a second system, and the listing
+  is what makes that mistake visible rather than silent.
+- **Envelope v6** carries the deployment block; the collector accepts 2–6, so a v5
+  agent keeps reporting and simply says less. Only the deployment block travels,
+  never the whole run manifest: the manifest is the engine's reproducibility record
+  and is versioned independently on purpose.
+- **The commit is read from whatever CI this is** (`GITHUB_SHA`, `CI_COMMIT_SHA`,
+  `GIT_COMMIT`, `BUILD_SOURCEVERSION`). The environment and the AI system are
+  **never** guessed: a branch is not an environment and a repository is not an AI
+  system, and a guessed value is one a team would build a dashboard on.
 - **One collector can serve two teams.** The tenant is a **project**, a project
   belongs to an **organization**, and every API key names exactly one project.
   Until now every key a collector issued could read every finding it held, so one
@@ -56,6 +89,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A refused submission repeats the collector's own reason** instead of always
+  advising a schema-version check. A key pinned to another environment answers
+  `403` and says so; telling that operator to check a schema version sends them
+  after the wrong thing entirely — the same mistake as reporting a database outage
+  as a rejected credential, which 0.8 fixed one layer down.
 - **The documented way to report into a collector had never worked.**
   `--reporter server://https://collector.example.com` POSTed to `/`, which no
   collector serves, so every submission came back `404`, the CLI printed a
@@ -96,6 +134,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Argparse exits `2`; the table the rest of the tool uses says `3` for a usage
   error, and a table the tool itself does not honour is a contract a pipeline
   cannot gate on. `--help` still exits `0`.
+- `store_key()` takes a `TenantScope` rather than a `project_id`: the reach of a
+  key *is* a tenant scope, so the project and the optional environment pin travel
+  together as one value that cannot disagree with itself.
+- Environment and AI-system names are **normalized at the door** — folded to lower
+  case and stripped — so `Production`, `production ` and `production` are one
+  environment. Normalized rather than rejected on ingest: a collector that refused
+  a submission because a label was untidy would trade a team's evidence for its
+  own tidiness. The strict check lives in the CLI, where a human typed it.
 - `store_key()` no longer takes `created_by`. The column exists, nothing has ever
   been able to fill it, and there are no human identities yet to fill it with — a
   parameter every caller passes `None` to is a promise the code does not keep. It

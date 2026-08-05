@@ -74,19 +74,28 @@ shared CI runners, third-party contribution checks, or any environment where
 
 ## Running the collector (`guardana-server`)
 
-The optional collector is a plain FastAPI service with **no authentication**
-and an in-memory store (bounded, and lost on restart). It validates every
-submission and rejects a malformed one with a 422 rather than storing it, but
-that is input hardening — not access control.
+The optional collector requires a **scoped API key** on every route that carries a
+finding, keeps keys hashed at rest, and shows a key exactly once. Keys live in the
+database, so a collector with nowhere to keep one refuses to serve rather than
+serving openly. Each key is bound to one **project** and optionally to one
+**environment**, and every storage query is scoped to it — a cross-tenant read
+returns nothing.
 
-**Do not expose it to an untrusted network.** Run it inside your own perimeter,
-behind whatever authentication your infrastructure already provides. Durable,
-authenticated storage is the seam a hosted backend replaces.
+Two switches, both of which have to be typed, produce a collector that
+authenticates nobody: `GUARDANA_STORAGE=memory` together with
+`GUARDANA_ALLOW_UNAUTHENTICATED=1`. That configuration exists for evaluating
+Guardana on a laptop. **Do not expose it to an untrusted network**, and note that
+its store is bounded and lost on restart.
 
-The optional dashboard (`GUARDANA_DASHBOARD=1`, off by default) is **read-only**
-— it adds no write endpoints — but it is equally unauthenticated and displays the
-collected findings, so the same rule applies: it belongs inside your perimeter,
-never on an untrusted network.
+The optional dashboard (`GUARDANA_DASHBOARD=1`, off by default) is **read-only**,
+and it **refuses to mount on a collector that requires keys**: it is a browser page
+and a browser has nowhere to put a bearer token, so every panel would load empty.
+A capability that cannot work must not look present. It therefore only runs in the
+unauthenticated evaluation mode, where the rule above applies to it too.
+
+Every submission is validated and a malformed one is rejected with a 422 rather
+than stored — input hardening, which is a different thing from access control and
+does not replace running the service inside your own perimeter.
 
 ## How we hold ourselves to this
 

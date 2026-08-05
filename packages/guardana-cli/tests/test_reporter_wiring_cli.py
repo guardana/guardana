@@ -5,6 +5,7 @@ import guardana.cli._endpoint as endpoint_module
 import guardana.cli._reporting as reporting_module
 import pytest
 from guardana.cli.main import app
+from guardana.core.manifest import DeploymentRef
 from guardana.core.report import ScanResult
 from guardana.core.testing import RefusingTransport
 from typer.testing import CliRunner
@@ -17,9 +18,12 @@ class _FakeReporter:
 
     instances: ClassVar[list["_FakeReporter"]] = []
 
-    def __init__(self, url: str, *, api_key: str | None = None) -> None:
+    def __init__(
+        self, url: str, *, api_key: str | None = None, deployment: DeploymentRef | None = None
+    ) -> None:
         self.url = url
         self.api_key = api_key
+        self.deployment = deployment
         self.calls: list[tuple[ScanResult, str]] = []
         _FakeReporter.instances.append(self)
 
@@ -30,7 +34,9 @@ class _FakeReporter:
 class _ExplodingReporter:
     """A collector that is down."""
 
-    def __init__(self, url: str, *, api_key: str | None = None) -> None:
+    def __init__(
+        self, url: str, *, api_key: str | None = None, deployment: DeploymentRef | None = None
+    ) -> None:
         pass
 
     def submit(self, result: ScanResult, *, source: str) -> None:

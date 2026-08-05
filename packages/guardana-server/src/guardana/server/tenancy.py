@@ -38,14 +38,23 @@ class TenantScope:
     store treats it as an ordinary tenant; `PostgresStore` refuses it — a scope that
     belongs to nobody must not be able to reach durable evidence, and making that
     structural beats making it a rule somebody has to remember.
+
+    `environment` is the second, **optional** axis: a key may pin one, and a pinned
+    key reads and writes only that environment. `None` means the whole project,
+    which is what an unpinned key gets — and it has to stay distinguishable from a
+    pin, because an unlabelled run belongs to the first and not to the second.
     """
 
     project_id: int | None = None
+    environment: str | None = None
 
     @classmethod
-    def for_project(cls, project_id: int) -> "TenantScope":
-        """Return the scope of one project."""
-        return cls(project_id=project_id)
+    def for_project(cls, project_id: int, environment: str | None = None) -> "TenantScope":
+        """Return the scope of one project, optionally narrowed to one environment."""
+        return cls(
+            project_id=project_id,
+            environment=None if environment is None else check_slug(environment, "environment"),
+        )
 
     @classmethod
     def unauthenticated(cls) -> "TenantScope":
@@ -96,8 +105,13 @@ class Project:
 
 
 def check_slug(value: str, what: str) -> str:
-    """Validate a slug at the door, because a slug is half of a tenant reference."""
-    candidate = value.strip()
+    """Validate and normalize a slug at the door.
+
+    A slug is half of a tenant reference and the whole of an environment name, and
+    `Production`, `production ` and `production` must be one thing rather than
+    three — otherwise how a dashboard groups depends on who typed what.
+    """
+    candidate = value.strip().lower()
     if not _SLUG.match(candidate):
         raise TenancyError(
             f"{what} {value!r} is not a slug: lower-case letters, digits, dot, dash and "

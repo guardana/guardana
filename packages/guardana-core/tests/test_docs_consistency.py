@@ -115,29 +115,53 @@ def test_every_local_documentation_link_points_at_a_file_that_exists() -> None:
     assert not broken, "links pointing at files that do not exist:\n  " + "\n  ".join(broken)
 
 
-_TENANCY_IS_GONE = ("no tenancy", "every key sees everything")
+_CAPABILITIES_THE_COLLECTOR_NOW_HAS = (
+    "no tenancy",
+    "every key sees everything",
+    "no persistence",
+    "no authentication",
+)
 
 
-@pytest.mark.parametrize("page", ["README.md", "FEATURES.md", "docs/usage-collector.md"])
-def test_no_page_still_says_the_collector_has_no_tenancy(page: str) -> None:
-    """Three pages said it, in three phrasings, and one of them was stale before that.
+def test_no_page_still_denies_a_capability_the_collector_now_has() -> None:
+    """A claim about an *absent* capability is the kind nobody re-reads once it lands.
 
-    `FEATURES.md` still described the collector as "in-memory storage, no
-    authentication" a whole release after it had both. A claim about an absent
-    capability is exactly the kind that nobody re-reads once the capability lands,
-    so it is pinned rather than promised.
+    Four pages carried one of these, in four phrasings, and two were stale by a
+    whole release: `FEATURES.md` described the collector as "in-memory storage, no
+    authentication" after it had both, and `docs/product-status.md` still said
+    "no persistence: restart and history is gone" two releases after it persisted.
+
+    Every tracked page is checked rather than a hand-written list, because the list
+    is what missed `product-status.md` the first time. `CHANGELOG.md` is exempt: it
+    is a record of the past, and the past is allowed to say the collector had none
+    of this. So is `docs/design/`: a design document states the problem it solved,
+    and an accepted decision is superseded rather than rewritten.
     """
-    prose = _read(page).lower()
+    offenders = [
+        f"{path.relative_to(_repo())}: {claim!r}"
+        for path in _tracked_markdown()
+        if path.name != "CHANGELOG.md" and "design" not in path.parts
+        for claim in _CAPABILITIES_THE_COLLECTOR_NOW_HAS
+        if claim in path.read_text(encoding="utf-8").lower()
+    ]
+    assert not offenders, "pages denying a capability the collector has:\n  " + "\n  ".join(
+        offenders
+    )
 
-    for claim in _TENANCY_IS_GONE:
-        assert claim not in prose, f"{page} still says the collector has no tenancy"
 
+def test_the_collector_page_does_not_overstate_the_environment_boundary() -> None:
+    """Environments isolate *when a key pins one*, and the page has to keep saying so.
 
-def test_the_collector_page_keeps_its_maturity_honest() -> None:
-    """Projects shipped; environments did not, and the label moves for both together."""
+    "project/environment isolation" invites a reader to assume environments are
+    separated by default. They are not: the pin is opt-in, because one pipeline
+    that deploys to three environments would otherwise need three credentials. A
+    security tool that overstates its own readiness has already failed at its job,
+    so the qualifier is pinned rather than trusted to survive an edit.
+    """
     page = _read("docs/usage-collector.md")
 
-    assert "**Maturity: experimental.**" in page
+    assert "It is **optional**" in page
+    assert "A pinned key **writes and reads only that environment**" in page
 
 
 @pytest.mark.parametrize("script", ["generate_docs.py", "sync_site.py"])

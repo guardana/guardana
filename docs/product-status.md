@@ -15,7 +15,7 @@ so this page is maintained as carefully as the code.
 | `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers. Verdict quality depends on the evaluator you configure. |
 | `guardana monitor` | **beta** | Scheduled **active** verification. Not passive traffic inspection, not inline. |
 | `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and will gain fields in 0.7. |
-| Collector (`guardana-server`) | **experimental** | Persists to PostgreSQL with reversible migrations, and every route carrying a finding needs a scoped API key. No tenancy: every key sees everything, so one instance cannot yet serve two teams. |
+| Collector (`guardana-server`) | **beta** | PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. No finding lifecycle, audit log or retention controls. |
 | Extension API | **unstable by design** | Frozen at 1.0, and deliberately not before — see below. |
 
 ## Known limitations
@@ -41,12 +41,18 @@ see what your real users are doing, and is not an inline control. A passive
 out-of-band tap is researched and deferred — the hard constraint is zero impact on
 model latency.
 
-### The collector is not ready for a team
+### The collector holds evidence, and does not yet manage it
 
-No persistence: restart and history is gone. No authentication: anyone who can
-reach the port can read every finding. Suitable for evaluating the ingest path
-locally. **v0.7** brings PostgreSQL, migrations, API keys, project isolation, an
-audit log and tested backup/restore.
+It persists, authenticates, and isolates one project from another — and one
+environment from another when a key is created with `--environment`. What it does
+not have is everything that happens *after* a finding arrives: no lifecycle
+(nothing is acknowledged, owned or resolved), no waivers, no audit log, no
+retention controls, and no restore-tested backup procedure. Its dashboard also
+only mounts on a collector that requires no key, because a browser has nowhere to
+put a bearer token.
+
+Read it as durable, safely shared storage for evidence. Do not yet read it as the
+place a team runs its triage.
 
 ### RAG coverage is a slice, not a story
 

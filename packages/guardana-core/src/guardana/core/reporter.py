@@ -4,18 +4,26 @@ from typing import Protocol
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+from guardana.core.manifest.identity import DeploymentRef
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.report.result import ScanResult
 from guardana.core.report.serialize import finding_to_dict
 
 _TIMEOUT_SECONDS = 30
 
-ENVELOPE_SCHEMA_VERSION = 5
+ENVELOPE_SCHEMA_VERSION = 6
 """Version of the JSON envelope POSTed to a collector.
 
 The collector is a separate service on its own release cadence, so the envelope
 is versioned: a collector that doesn't understand a version rejects it outright
 rather than silently misreading a renamed field.
+
+v6 says *what* the run verified and *where*: the AI system, the environment, the
+deployment and the digests behind it. Without it a collector holds one
+undifferentiated stream per project, in which last night's production check sits
+beside a laptop experiment and no question about either can be answered. Only the
+deployment block travels, never the whole run manifest — that is the engine's
+reproducibility record, versioned independently on purpose.
 
 v5 says *why* each rule was skipped, not just that it was: a collector that saw
 `rules_skipped: ["guardana.agent.tool_argument_scope"]` could not tell a rule
@@ -65,9 +73,33 @@ class Reporter(Protocol):
         ...
 
 
-def _serialize(result: ScanResult, *, source: str) -> bytes:
+def _deployment(deployment: DeploymentRef) -> dict[str, str] | None:
+    """Return the declared fields of a deployment, or `None` when it declared nothing.
+
+    Absent rather than eight nulls: "the run said nothing" and "the run said eight
+    unknowns" must not look different on the wire, or a listing shows a deployment
+    that nobody ever named.
+    """
+    declared = {
+        name: value
+        for name, value in (
+            ("ai_system", deployment.ai_system),
+            ("environment", deployment.environment),
+            ("deployment_id", deployment.deployment_id),
+            ("commit_sha", deployment.commit_sha),
+            ("image_digest", deployment.image_digest),
+            ("model_digest", deployment.model_digest),
+            ("model_name", deployment.model_name),
+            ("model_revision", deployment.model_revision),
+        )
+        if value is not None
+    }
+    return declared or None
+
+
+def _serialize(result: ScanResult, *, source: str, deployment: DeploymentRef | None) -> bytes:
     max_sev = result.max_severity()
-    payload = {
+    payload: dict[str, object] = {
         "schema_version": ENVELOPE_SCHEMA_VERSION,
         "source": source,
         "findings": [finding_to_dict(f) for f in result.findings],
@@ -90,6 +122,9 @@ def _serialize(result: ScanResult, *, source: str) -> bytes:
             "errors": len(result.errors),
         },
     }
+    declared = None if deployment is None else _deployment(deployment)
+    if declared is not None:
+        payload["deployment"] = declared
     return json.dumps(payload).encode("utf-8")
 
 
@@ -111,6 +146,7 @@ class HttpReporter:
         url: str,
         *,
         api_key: str | None = None,
+        deployment: DeploymentRef | None = None,
         transport: Callable[[str, bytes], None] | None = None,
         redactor: EvidenceRedactor | None = None,
     ) -> None:
@@ -121,6 +157,12 @@ class HttpReporter:
             )
         self._url = _ingest_url(parts)
         self._api_key = api_key
+        # Taken at construction rather than on `submit`, because `Reporter.submit`
+        # is a documented extension point and a third-party reporter should not
+        # stop satisfying the protocol over this. One reporter is built per run,
+        # and `monitor` reuses one across repeated runs of the *same* target, so
+        # the constructor is the honest home for it either way.
+        self._deployment = deployment
         self._transport = transport if transport is not None else self._default_transport
         # Applied here rather than by the caller: this is the path that leaves the
         # machine, and it must not depend on whoever wired the reporter up.
@@ -131,5 +173,7 @@ class HttpReporter:
 
     def submit(self, result: ScanResult, *, source: str) -> None:
         """POST the normalized envelope to the collector."""
-        payload = _serialize(self._redactor.redact_result(result), source=source)
+        payload = _serialize(
+            self._redactor.redact_result(result), source=source, deployment=self._deployment
+        )
         self._transport(self._url, payload)

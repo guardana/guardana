@@ -42,6 +42,32 @@ def test_two_scopes_for_the_same_project_are_equal() -> None:
     assert TenantScope.for_project(3) != TenantScope.for_project(4)
 
 
+def test_a_scope_may_narrow_to_one_environment() -> None:
+    scope = TenantScope.for_project(7, environment="production")
+
+    assert scope.require_project() == 7
+    assert scope.environment == "production"
+
+
+def test_a_project_scope_names_no_environment() -> None:
+    # Unpinned means the whole project, and it has to be distinguishable from
+    # "pinned to an environment that happens to be called nothing".
+    assert TenantScope.for_project(7).environment is None
+
+
+def test_an_environment_is_normalized_when_the_scope_is_built() -> None:
+    # `Production`, `production ` and `production` must be one environment, or the
+    # grouping in a dashboard depends on who typed what.
+    assert TenantScope.for_project(7, environment=" Production ").environment == "production"
+
+
+def test_a_scope_narrowed_to_a_different_environment_is_a_different_scope() -> None:
+    assert TenantScope.for_project(7, environment="dev") != TenantScope.for_project(
+        7, environment="production"
+    )
+    assert TenantScope.for_project(7, environment="dev") != TenantScope.for_project(7)
+
+
 # --- naming a tenant ----------------------------------------------------------
 
 
@@ -58,10 +84,20 @@ def test_a_reference_that_is_not_two_slugs_is_refused(reference: str) -> None:
         parse_project_reference(reference)
 
 
-@pytest.mark.parametrize("slug", ["Acme", "acme inc", "-acme", "acme;drop", "a" * 64, ""])
+@pytest.mark.parametrize("slug", ["acme inc", "-acme", "acme;drop", "a" * 64, ""])
 def test_a_slug_that_could_be_read_two_ways_is_refused(slug: str) -> None:
     with pytest.raises(TenancyError, match="is not a slug"):
         parse_project_reference(f"{slug}/web")
+
+
+@pytest.mark.parametrize(
+    ("written", "normalized"), [("Acme", "acme"), (" acme ", "acme"), ("ACME", "acme")]
+)
+def test_a_slug_is_normalized_rather_than_refused(written: str, normalized: str) -> None:
+    # Case and surrounding space are not two different tenants. Refusing them would
+    # be defensible; treating them as distinct would not, and that is the failure
+    # this normalization exists to prevent.
+    assert parse_project_reference(f"{written}/web")[0] == normalized
 
 
 # --- organizations and projects ----------------------------------------------

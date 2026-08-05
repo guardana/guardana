@@ -1,7 +1,9 @@
+import json
 import os
 from urllib.error import HTTPError, URLError
 
 import typer
+from guardana.core.manifest import DeploymentRef
 from guardana.core.report import ScanResult
 from guardana.core.reporter import HttpReporter
 from guardana.core.target import EndpointError
@@ -22,20 +24,36 @@ follows the same rule one step further by naming the variable itself.
 _COLLECTOR_UNREACHABLE = (OSError, URLError, EndpointError)
 
 
-def reporter_from_url(url: str) -> HttpReporter:
+def reporter_from_url(url: str, deployment: DeploymentRef | None = None) -> HttpReporter:
     """Build the `HttpReporter` for a `--reporter` CLI flag value.
 
     Accepts either a bare collector URL or one prefixed with the `server://` scheme,
-    and carries the API key from `GUARDANA_COLLECTOR_TOKEN` when one is set. A
+    and carries the API key from `GUARDANA_COLLECTOR_TOKEN` when one is set, plus
+    what the run says it verified and where. A
     collector that requires a key answers `401` without it, which `submit_safely`
     reports as a rejection rather than as an outage — so a fleet that has not been
     given its credential says so instead of going quiet.
     """
     target = url.removeprefix(_SERVER_SCHEME)
-    return HttpReporter(target, api_key=os.environ.get(TOKEN_VARIABLE) or None)
+    return HttpReporter(
+        target, api_key=os.environ.get(TOKEN_VARIABLE) or None, deployment=deployment
+    )
 
 
-def submit_safely(url: str, result: ScanResult, *, source: str) -> None:
+def _why(exc: HTTPError) -> str:
+    """Return the collector's own explanation, or a fallback that does not invent one."""
+    try:
+        detail = json.loads(exc.read()).get("detail")
+    except (ValueError, OSError):
+        detail = None
+    if isinstance(detail, str) and detail:
+        return detail
+    return f"{exc.reason} — check that its schema version matches this agent's"
+
+
+def submit_safely(
+    url: str, result: ScanResult, *, source: str, deployment: DeploymentRef | None = None
+) -> None:
     """Forward findings to a collector, degrading to a warning if it is unreachable.
 
     A collector outage must never change the gate's exit code — the scan already
@@ -44,15 +62,17 @@ def submit_safely(url: str, result: ScanResult, *, source: str) -> None:
     their findings are not being collected.
     """
     try:
-        reporter_from_url(url).submit(result, source=source)
+        reporter_from_url(url, deployment).submit(result, source=source)
     except HTTPError as exc:
-        # A rejected envelope is not an outage — most often a collector that has
-        # not been upgraded yet and does not speak this agent's schema version.
-        # Swallowing it as "unreachable" is how a whole fleet can stop reporting
-        # while the dashboard keeps showing stale data as current.
+        # A rejected envelope is not an outage — swallowing it as "unreachable" is
+        # how a whole fleet can stop reporting while the dashboard keeps showing
+        # stale data as current. The collector's own sentence is preferred over a
+        # guess at why: a key pinned to another environment answers `403` with the
+        # reason, and telling that operator to "check the schema version" sends
+        # them after the wrong thing entirely — the same mistake as reading a
+        # database outage as a rejected credential.
         typer.echo(
-            f"warning: the collector rejected this submission (HTTP {exc.code}): {exc.reason} "
-            "— check that its schema version matches this agent's",
+            f"warning: the collector rejected this submission (HTTP {exc.code}): {_why(exc)}",
             err=True,
         )
     except _COLLECTOR_UNREACHABLE as exc:

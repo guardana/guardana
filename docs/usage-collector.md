@@ -4,12 +4,11 @@ The collector (`guardana-server`) aggregates findings from many agents. It is
 **optional in every direction**: the engine never imports it, no feature needs it,
 and nothing is sent anywhere unless a run is given `--reporter`.
 
-> **Maturity: experimental.** It keeps what it is given, **requires an API key**
-> for every route that carries a finding, and isolates one **project** from
-> another — a key reads and writes its own project and nothing else. The label
-> moves to `beta` when environments and deployments land alongside it, because the
-> company-ready checklist entry reads "project/**environment** isolation" and a
-> checklist that moves to match what shipped is not a checklist.
+> **Maturity: beta.** It keeps what it is given, **requires an API key** for every
+> route that carries a finding, isolates one **project** from another, and records
+> what each run verified and where — with an optional **environment pin** that
+> makes a credential reach exactly one environment in both directions. Still ahead
+> of it: a finding lifecycle, an audit log, retention and restore-tested backup.
 
 ## Standing one up: three commands
 
@@ -31,6 +30,75 @@ Then point a run at it:
 export GUARDANA_COLLECTOR_TOKEN=gdn_…
 guardana scan . --reporter server://https://collector.example.com
 ```
+
+## What a run says it verified
+
+```bash
+guardana scan . --ai-system support-agent --environment production
+guardana probe … --ai-system support-agent --environment staging --deployment-id 2026-08-05.3
+```
+
+or, for a pipeline that would otherwise repeat itself on every step:
+
+```bash
+export GUARDANA_AI_SYSTEM=support-agent
+export GUARDANA_ENVIRONMENT=production      # a flag still wins over the variable
+```
+
+Without this a project's history is one undifferentiated stream, and "did
+production get worse since Tuesday" has no answer in it.
+
+**The commit is read from whatever CI this is** — `GITHUB_SHA`, `CI_COMMIT_SHA`,
+`GIT_COMMIT`, `BUILD_SOURCEVERSION` — because the answer that matters is the one
+nobody had to remember to pass. **The environment and the AI system are never
+guessed.** A branch is not an environment and a repository is not an AI system: a
+monorepo has several systems, and one repository deployed twice is one system in
+two environments. A guessed value is one a team would build a dashboard on.
+
+Nothing is created in advance. The collector records the names a run used, and
+
+```bash
+guardana-collector system list [--project acme/web]
+guardana-collector environment list [--project acme/web]
+guardana-collector deployment list [--ai-system support-agent]
+```
+
+read them back. Requiring an administrator to register a system first would put a
+human step between a pipeline and its first report, and a pipeline that fails on a
+missing prerequisite gets commented out rather than fixed. The cost is that a typo
+creates a second system — and the listing is what makes that mistake visible
+rather than silent. Correct it by running the pipeline with the right name; the
+wrong one stays as the empty system it is.
+
+`Production`, `production ` and `production` are one environment: names are folded
+and stripped at the door, so grouping does not depend on who typed what.
+
+## Pinning a key to one environment
+
+```bash
+guardana-collector key create --project acme/web --name prod-ci --environment production
+```
+
+A pinned key **writes and reads only that environment**. A run declaring a
+different one is refused with `403` — never "prefer the more specific one", never a
+silent relabel. A run declaring *nothing* is stored under the pin, because the
+credential asserted the environment and the run did not contradict it; storing it
+unlabelled would let a pinned key write evidence into a place it cannot itself
+read.
+
+Read *and* write, not write alone: a pin that bounded writes while letting the same
+key read every environment would be a half-boundary that reads as a whole one.
+
+It is **optional**, and that is the trade. One pipeline legitimately deploys to
+dev, staging and production, and sourcing the environment from the key would mean
+three credentials per project for every team — while the blast radius is already
+bounded, because the key names the project. Pin the credential that must not be
+able to write production evidence; leave the rest unpinned.
+
+An unpinned key sees the whole project, labelled runs and unlabelled ones alike. A
+*pinned* key does not see unlabelled runs: they belong to the project and to no
+environment, and folding them into every one would let a laptop run appear as
+production evidence.
 
 ## Organizations and projects
 
@@ -219,6 +287,9 @@ together cannot both apply the same version.
 | a migration numbered below the highest applied one | a rebase accident. Applying only what comes after would skip it on that database forever, while every other database has it |
 | a database holding a migration this build does not ship | it was written by a newer Guardana, and an older collector would write rows the newer schema does not describe |
 | rolling back `0003` on a database holding two tenants | dropping the tenant column would merge two teams' evidence into one undifferentiated pile. The only refusal tied to a single migration, because only this one can destroy an isolation boundary |
+
+Rolling back `0004` needs no refusal: it drops labels, which loses information and
+merges no tenants, and the submissions themselves stay.
 
 ## Health and readiness are two questions
 

@@ -15,11 +15,18 @@ rolled away, rejects everything. The alternative — treating "no credentials
 configured" as "no credentials required" — is the shape of every default-admin
 incident there has ever been.
 
-**Pinned to one project.** A key names the tenant it writes into and reads from,
+**Pinned to one project, and optionally to one environment.** A key names the tenant
+it writes into and reads from,
 and that is the only place the tenant comes from — never the envelope. If the
 envelope named the project, the runner would declare where it writes, and a
 credential that does not bound the write is not a boundary at all. The cost is
 accepted: a team with ten projects needs ten keys in CI.
+
+The *environment* pin is optional, because one pipeline legitimately deploys to
+dev, staging and production and the blast radius is already bounded by the project.
+A key that does pin one writes and reads only that environment — both directions,
+because a pin that bounded writes while letting the same key read everything would
+be a half-boundary that reads as a whole one.
 """
 
 import hmac
@@ -88,6 +95,9 @@ class KeyRecord:
     project_ref: str
     """The `organization/project` this key writes into and reads from."""
 
+    environment: str | None = None
+    """The one environment this key is pinned to, or `None` for the whole project."""
+
     last_used_at: datetime | None = None
     revoked_at: datetime | None = None
     expires_at: datetime | None = None
@@ -137,6 +147,7 @@ class Authenticated:
     scopes: frozenset[Scope]
     project_id: int
     project_ref: str
+    environment: str | None = None
 
     def permits(self, scope: Scope) -> bool:
         """Whether this key may do `scope`."""
@@ -145,12 +156,12 @@ class Authenticated:
     @property
     def scope(self) -> TenantScope:
         """The tenant every store call made for this request is scoped to."""
-        return TenantScope.for_project(self.project_id)
+        return TenantScope.for_project(self.project_id, self.environment)
 
 
 _KEY_COLUMNS = (
     "k.name, k.secret_hash, k.scopes, k.created_at, k.last_used_at, k.revoked_at, "
-    "k.expires_at, k.project_id, o.slug, p.slug"
+    "k.expires_at, k.project_id, o.slug, p.slug, k.environment"
 )
 _KEY_JOIN = (
     "from api_keys k "
@@ -195,6 +206,7 @@ def authenticate(
         scopes=frozenset(record.scopes),
         project_id=int(str(row[7])),
         project_ref=record.project_ref,
+        environment=record.environment,
     )
 
 
@@ -206,6 +218,7 @@ def _record(prefix: str, row: tuple[object, ...]) -> KeyRecord:
         scopes=_scopes(row[2]),
         created_at=row[3],  # type: ignore[arg-type]
         project_ref=f"{row[8]}/{row[9]}",
+        environment=None if row[10] is None else str(row[10]),
         last_used_at=row[4],  # type: ignore[arg-type]
         revoked_at=row[5],  # type: ignore[arg-type]
         expires_at=row[6],  # type: ignore[arg-type]
@@ -234,31 +247,36 @@ def store_key(
     issued: IssuedKey,
     secret_hash: str,
     *,
-    project_id: int,
+    scope: TenantScope,
     expires_at: datetime | None = None,
 ) -> None:
-    """Persist a newly issued key's record, pinned to one project.
+    """Persist a newly issued key's record, pinned to the tenant it may reach.
 
-    `project_id` is keyword-only and has no default. A positional argument with a
-    fallback would be exactly what this change exists to prevent: a credential that
-    came into existence without a tenant, because nobody passed one.
+    The reach of a key *is* a `TenantScope` — the same type every store call takes —
+    so the project and the optional environment pin travel together rather than as
+    two loose parameters that could disagree. Keyword-only and without a default: a
+    positional argument with a fallback would be exactly what this exists to
+    prevent, a credential that came into existence without a tenant because nobody
+    passed one. An unauthenticated scope is refused by `require_project`.
 
     There is no `created_by`: the column exists, nothing has ever been able to fill
     it, and there are no human identities yet to fill it with. It is written by the
     audit log, where "which identity issued this credential" is the question, rather
     than by a parameter every caller passes `None` to.
+
     """
     with connection.cursor() as cursor:
         cursor.execute(
-            "insert into api_keys (name, prefix, secret_hash, scopes, expires_at, project_id) "
-            "values (%s, %s, %s, %s, %s, %s)",
+            "insert into api_keys (name, prefix, secret_hash, scopes, expires_at, project_id, "
+            "environment) values (%s, %s, %s, %s, %s, %s, %s)",
             (
                 issued.name,
                 issued.prefix,
                 secret_hash,
                 [str(s) for s in issued.scopes],
                 expires_at,
-                project_id,
+                scope.require_project(),
+                scope.environment,
             ),
         )
     connection.commit()

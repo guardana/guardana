@@ -51,7 +51,9 @@ def _collect_submissions(monkeypatch: pytest.MonkeyPatch) -> list[ScanResult]:
     """Replace the collector call with a recorder, so nothing leaves the test."""
     submissions: list[ScanResult] = []
 
-    def record(_url: str, result: ScanResult, *, source: str) -> None:
+    def record(
+        _url: str, result: ScanResult, *, source: str, deployment: object | None = None
+    ) -> None:
         assert source
         submissions.append(result)
 

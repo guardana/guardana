@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from guardana.server.auth import Scope, generate_key, list_keys, revoke_key, store_key
 from guardana.server.cli.codes import EXIT_INVALID_USAGE, EXIT_OK
-from guardana.server.tenancy import resolve_project
+from guardana.server.tenancy import TenantScope, check_slug, resolve_project
 
 if TYPE_CHECKING:
     from psycopg import Connection
@@ -37,6 +37,14 @@ def add_arguments(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
         action="append",
         choices=[str(s) for s in Scope],
         help="Repeatable. Defaults to ingest only — a CI job writes and does not browse.",
+    )
+    create.add_argument(
+        "--environment",
+        help=(
+            "Pin the key to one environment. It then writes and reads only that one, "
+            "and a run declaring another is refused. Optional: one pipeline that "
+            "deploys to three environments needs one key, not three."
+        ),
     )
     create.add_argument("--expires-in-days", type=int, help="Optional lifetime, in days.")
 
@@ -65,9 +73,12 @@ def _list(arguments: argparse.Namespace, connection: "Connection[tuple[object, .
     for record in records:
         state = "revoked" if record.revoked_at else "active"
         used = record.last_used_at.date() if record.last_used_at else "never used"
+        # The pin is shown, because a credential whose reach is narrower than its
+        # neighbours' is a fact an operator has to see without reading a database.
+        where = record.project_ref + (f" [{record.environment}]" if record.environment else "")
         print(
             f"{record.prefix}  {state:8} {','.join(str(s) for s in record.scopes):13} "
-            f"{used}  {record.project_ref:20} {record.name}"
+            f"{used}  {where:32} {record.name}"
         )
     return EXIT_OK
 
@@ -82,6 +93,12 @@ def _revoke(arguments: argparse.Namespace, connection: "Connection[tuple[object,
 
 def _create(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
     project = resolve_project(connection, arguments.project)
+    # Checked and folded once, so the line printed to the operator names the same
+    # environment the pin actually holds. A human typed this one, so a name that is
+    # not a slug is refused here rather than quietly reshaped.
+    environment = (
+        None if arguments.environment is None else check_slug(arguments.environment, "environment")
+    )
     scopes = tuple(Scope(s) for s in (arguments.scope or [str(Scope.INGEST)]))
     expires_at = (
         datetime.now(UTC) + timedelta(days=arguments.expires_in_days)
@@ -89,12 +106,20 @@ def _create(arguments: argparse.Namespace, connection: "Connection[tuple[object,
         else None
     )
     issued, secret_hash = generate_key(arguments.name, scopes)
-    store_key(connection, issued, secret_hash, project_id=project.id, expires_at=expires_at)
-    print_issued(issued.token, project.reference, scopes)
+    store_key(
+        connection,
+        issued,
+        secret_hash,
+        scope=TenantScope.for_project(project.id, environment),
+        expires_at=expires_at,
+    )
+    print_issued(issued.token, project.reference, scopes, environment)
     return EXIT_OK
 
 
-def print_issued(token: str, project_ref: str, scopes: tuple[Scope, ...]) -> None:
+def print_issued(
+    token: str, project_ref: str, scopes: tuple[Scope, ...], environment: str | None = None
+) -> None:
     """Show a newly minted key once, and say what it can do and where.
 
     Shared with `bootstrap`, so the one moment a credential is readable looks the
@@ -103,4 +128,5 @@ def print_issued(token: str, project_ref: str, scopes: tuple[Scope, ...]) -> Non
     """
     print(f"{token}\n")
     print("Store it now — this is the only time it is shown.")
-    print(f"It can {' and '.join(str(s) for s in scopes)} in {project_ref}.")
+    where = project_ref if environment is None else f"{project_ref}, environment {environment}"
+    print(f"It can {' and '.join(str(s) for s in scopes)} in {where}.")

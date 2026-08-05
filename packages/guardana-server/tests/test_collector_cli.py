@@ -10,7 +10,14 @@ import pytest
 from guardana.server.auth import Scope, list_keys
 from guardana.server.cli import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK, main
 from guardana.server.db.migrations import read_state
-from guardana.server.tenancy import list_organizations, list_projects
+from guardana.server.envelope import DeploymentIn, Submission
+from guardana.server.postgres_store import PostgresStore
+from guardana.server.tenancy import (
+    TenantScope,
+    list_organizations,
+    list_projects,
+    resolve_project,
+)
 from test_migrations import _apply_through, _legacy_submission
 
 
@@ -454,3 +461,164 @@ def test_naming_no_command_at_all_is_a_usage_error() -> None:
         main([])
 
     assert raised.value.code == EXIT_INVALID_USAGE
+
+
+# --- what the runs reported ---------------------------------------------------
+
+
+def _report(database_url: str, ai_system: str, environment: str, commit: str = "abc1234") -> None:
+    """One submission with a deployment block, written the way ingest writes it."""
+    with psycopg.connect(database_url) as connection:
+        project = resolve_project(connection, "acme/web")
+    PostgresStore(database_url).add(
+        TenantScope.for_project(project.id),
+        Submission(
+            source="ci",
+            schema_version=6,
+            deployment=DeploymentIn(
+                ai_system=ai_system, environment=environment, commit_sha=commit
+            ),
+        ),
+    )
+
+
+def test_system_list_shows_what_runs_declared(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    _report(database_url, "support-agent", "production")
+    _report(database_url, "search-agent", "dev")
+    capsys.readouterr()
+
+    assert main(["system", "list"]) == EXIT_OK
+
+    listed = capsys.readouterr().out
+    assert "support-agent" in listed
+    assert "search-agent" in listed
+    assert "acme/web" in listed
+
+
+def test_a_typo_shows_up_as_a_second_system(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The cost of inferring rather than requiring, and the reason it is survivable.
+
+    A mistake that is visible is a different thing from a mistake that is not; the
+    listing is what makes this one the first kind.
+    """
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    _report(database_url, "support-agent", "production")
+    _report(database_url, "suport-agent", "production")
+    capsys.readouterr()
+
+    main(["system", "list"])
+
+    listed = capsys.readouterr().out
+    assert "support-agent" in listed
+    assert "suport-agent" in listed
+
+
+def test_environment_list_shows_what_runs_declared(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    _report(database_url, "support-agent", "production")
+    _report(database_url, "support-agent", "dev")
+    capsys.readouterr()
+
+    main(["environment", "list"])
+
+    listed = capsys.readouterr().out
+    assert "production" in listed
+    assert "dev" in listed
+
+
+def test_deployment_list_can_be_narrowed_to_one_system(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    _report(database_url, "support-agent", "production", commit="aaa1111")
+    _report(database_url, "search-agent", "production", commit="bbb2222")
+    capsys.readouterr()
+
+    main(["deployment", "list", "--ai-system", "support-agent"])
+
+    listed = capsys.readouterr().out
+    assert "aaa1111" in listed
+    assert "bbb2222" not in listed
+
+
+def test_an_inventory_listing_never_crosses_a_project(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # An aggregate is a query, and a query without a tenant filter is the same
+    # cross-tenant read as any other — reintroduced one level down.
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    main(["bootstrap", "--org", "globex", "--project", "web"])
+    _report(database_url, "support-agent", "production")
+    capsys.readouterr()
+
+    main(["system", "list", "--project", "globex/web"])
+
+    assert "support-agent" not in capsys.readouterr().out
+
+
+def test_a_listing_with_nothing_reported_says_how_one_gets_there(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    capsys.readouterr()
+
+    main(["system", "list"])
+
+    assert "--ai-system" in capsys.readouterr().out
+
+
+def test_key_create_can_pin_an_environment(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "key",
+                "create",
+                "--project",
+                "acme/web",
+                "--name",
+                "prod",
+                "--environment",
+                "Production",
+            ]
+        )
+        == EXIT_OK
+    )
+
+    assert "environment production" in capsys.readouterr().out
+    with psycopg.connect(database_url) as connection:
+        pinned = next(k for k in list_keys(connection) if k.name == "prod")
+    assert pinned.environment == "production"
+
+
+def test_key_list_shows_the_pin(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    main(
+        ["key", "create", "--project", "acme/web", "--name", "prod", "--environment", "production"]
+    )
+    capsys.readouterr()
+
+    main(["key", "list"])
+
+    assert "[production]" in capsys.readouterr().out

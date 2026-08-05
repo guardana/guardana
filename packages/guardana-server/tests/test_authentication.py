@@ -65,7 +65,7 @@ def _issue(
     issued, secret_hash = generate_key(name, scopes)
     with psycopg.connect(database_url) as connection:
         resolved = resolve_project(connection, project)
-        store_key(connection, issued, secret_hash, project_id=resolved.id)
+        store_key(connection, issued, secret_hash, scope=TenantScope.for_project(resolved.id))
     return issued.token
 
 
@@ -255,7 +255,7 @@ def test_an_expired_key_stops_working(connection: DbConnection) -> None:
         connection,
         issued,
         secret_hash,
-        project_id=project,
+        scope=TenantScope.for_project(project),
         expires_at=datetime.now(UTC) - timedelta(days=1),
     )
 
@@ -270,7 +270,7 @@ def test_a_key_expiring_in_the_future_still_works(connection: DbConnection) -> N
         connection,
         issued,
         secret_hash,
-        project_id=project,
+        scope=TenantScope.for_project(project),
         expires_at=datetime.now(UTC) + timedelta(days=1),
     )
 
@@ -294,7 +294,7 @@ def test_a_key_whose_prefix_is_real_and_secret_is_not_is_refused(
     """The case a naive lookup gets wrong: right prefix, wrong secret."""
     project = _tenanted(connection)
     issued, secret_hash = generate_key("real", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, project_id=project)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
 
     with pytest.raises(AuthError):
         authenticate(connection, f"gdn_{issued.prefix}_definitely-not-the-secret")
@@ -307,7 +307,7 @@ def test_the_secret_is_never_stored(connection: DbConnection) -> None:
     """A stolen backup must not also be a set of working credentials."""
     project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, project_id=project)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
     secret = issued.token.split("_", 2)[2]
 
     with connection.cursor() as cursor:
@@ -322,7 +322,7 @@ def test_the_secret_is_never_stored(connection: DbConnection) -> None:
 def test_listing_keys_never_returns_a_secret(connection: DbConnection) -> None:
     project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, project_id=project)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
 
     listed = list_keys(connection)
 
@@ -351,7 +351,7 @@ def test_using_a_key_records_that_it_was_used(connection: DbConnection) -> None:
     # unused credential revoked.
     project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, project_id=project)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
     assert list_keys(connection)[0].last_used_at is None
 
     authenticate(connection, issued.token)
@@ -370,7 +370,7 @@ def test_a_fresh_collector_holds_no_keys(connection: DbConnection) -> None:
 def test_revoking_a_key_twice_reports_the_second_as_a_no_op(connection: DbConnection) -> None:
     project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, project_id=project)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
 
     assert revoke_key(connection, issued.prefix) is True
     assert revoke_key(connection, issued.prefix) is False
@@ -412,7 +412,7 @@ def test_the_unauthenticated_mode_still_serves(monkeypatch: pytest.MonkeyPatch) 
 def test_an_authenticated_identity_carries_its_project(connection: DbConnection) -> None:
     project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, project_id=project)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
 
     identity = authenticate(connection, issued.token)
 
@@ -438,7 +438,7 @@ def test_listing_keys_of_one_project_excludes_the_others(connection: DbConnectio
     api = create_project(connection, "acme", "api", "API")
     for name, project in (("ci-web", web), ("ci-api", api)):
         issued, secret_hash = generate_key(name, (Scope.INGEST,))
-        store_key(connection, issued, secret_hash, project_id=project.id)
+        store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project.id))
 
     assert [record.name for record in list_keys(connection, project="acme/web")] == ["ci-web"]
     assert len(list_keys(connection)) == 2
@@ -447,7 +447,7 @@ def test_listing_keys_of_one_project_excludes_the_others(connection: DbConnectio
 def test_a_listed_key_says_which_project_it_writes_to(connection: DbConnection) -> None:
     project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, project_id=project)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
 
     assert list_keys(connection)[0].project_ref == "acme/web"
 

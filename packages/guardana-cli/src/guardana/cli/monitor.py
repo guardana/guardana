@@ -12,6 +12,8 @@ from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
+from guardana.cli._run_meta import detect_deployment
+from guardana.core.manifest import DeploymentRef
 from guardana.core.monitor import Alert, Monitor, MonitorConfig
 from guardana.core.profile import Profile
 from guardana.core.redaction import EvidenceRedactor
@@ -27,7 +29,10 @@ _DEFAULT_CONCURRENCY = 4
 
 
 def alert_handler(
-    redactor: EvidenceRedactor, reporter_url: str | None, source: str
+    redactor: EvidenceRedactor,
+    reporter_url: str | None,
+    source: str,
+    deployment: DeploymentRef | None = None,
 ) -> Callable[[Alert], None]:
     """Print each alert under the run's privacy policy, and forward it under the same one.
 
@@ -46,7 +51,7 @@ def alert_handler(
         typer.echo(f"--- ALERT (cycle {alert.cycle}): {alert.reason} ---")
         typer.echo(get_renderer("human", redactor=redactor).render(result))
         if reporter_url:
-            submit_safely(reporter_url, result, source=source)
+            submit_safely(reporter_url, result, source=source, deployment=deployment)
 
     return handle
 
@@ -123,6 +128,24 @@ def monitor(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this i
     reporter: Annotated[
         str | None, typer.Option(help="Collector URL to forward alerts to, e.g. server://URL")
     ] = None,
+    ai_system: Annotated[
+        str | None,
+        typer.Option(
+            "--ai-system",
+            help="Which AI system this run verifies, e.g. support-agent. Never guessed.",
+        ),
+    ] = None,
+    environment: Annotated[
+        str | None,
+        typer.Option(
+            "--environment",
+            help="Where it runs, e.g. production. Never guessed from a branch name.",
+        ),
+    ] = None,
+    deployment_id: Annotated[
+        str | None,
+        typer.Option("--deployment-id", help="Which version of it, if you have an identifier."),
+    ] = None,
     plugins: Annotated[
         str,
         typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
@@ -147,7 +170,12 @@ def monitor(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this i
             system_prompt_file.read_text(encoding="utf-8") if system_prompt_file else None
         ),
     )
-    on_alert = alert_handler(EvidenceRedactor(prof.privacy), reporter, source=f"{url}#{model}")
+    on_alert = alert_handler(
+        EvidenceRedactor(prof.privacy),
+        reporter,
+        source=f"{url}#{model}",
+        deployment=detect_deployment(ai_system, environment, deployment_id),
+    )
 
     run_against_endpoint(
         url,

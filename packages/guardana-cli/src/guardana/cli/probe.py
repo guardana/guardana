@@ -18,7 +18,7 @@ from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
-from guardana.cli._run_meta import build_manifest
+from guardana.cli._run_meta import build_manifest, detect_deployment
 from guardana.cli._safety_flags import parse_impact
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
@@ -71,6 +71,24 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
     ] = _DEFAULT_CONCURRENCY,
     reporter: Annotated[
         str | None, typer.Option(help="Collector URL to forward findings to, e.g. server://URL")
+    ] = None,
+    ai_system: Annotated[
+        str | None,
+        typer.Option(
+            "--ai-system",
+            help="Which AI system this run verifies, e.g. support-agent. Never guessed.",
+        ),
+    ] = None,
+    environment: Annotated[
+        str | None,
+        typer.Option(
+            "--environment",
+            help="Where it runs, e.g. production. Never guessed from a branch name.",
+        ),
+    ] = None,
+    deployment_id: Annotated[
+        str | None,
+        typer.Option("--deployment-id", help="Which version of it, if you have an identifier."),
     ] = None,
     mcp: Annotated[
         str | None,
@@ -131,6 +149,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
     started_at = datetime.now(UTC)
+    deployment = detect_deployment(ai_system, environment, deployment_id)
     prof = resolve_profile(profile, preset)
     prof = replace(
         prof,
@@ -171,10 +190,11 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
             gate=outcome,
             started_at=started_at,
             concurrency=concurrency,
+            deployment=deployment,
         )
         emit(get_renderer(format.value, run=run).render(result), output, format.value)
         if reporter:
-            submit_safely(reporter, result, source=mcp)
+            submit_safely(reporter, result, source=mcp, deployment=deployment)
         exit_with(outcome, result)
         return
 
@@ -213,8 +233,9 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
         gate=outcome,
         started_at=started_at,
         concurrency=concurrency,
+        deployment=deployment,
     )
     emit(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
-        submit_safely(reporter, result, source=f"{url}#{model}")
+        submit_safely(reporter, result, source=f"{url}#{model}", deployment=deployment)
     exit_with(outcome, result)

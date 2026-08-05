@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 from fastapi.testclient import TestClient
 from guardana.core.evaluator import Verdict
+from guardana.core.manifest import DeploymentRef
 from guardana.core.report import Evidence, Finding, ScanResult
 from guardana.core.reporter import HttpReporter
 from guardana.core.severity import Severity
@@ -347,3 +348,53 @@ def test_a_reporter_url_that_already_names_the_route_is_left_alone() -> None:
     ).submit(_result(), source="ci")
 
     assert reached == ["https://collector.example.com/guardana/findings"]
+
+
+def test_the_collector_accepts_the_deployment_block_the_reporter_actually_sends() -> None:
+    """v6, built by the engine's serializer rather than by hand.
+
+    A hand-written dict proves the collector accepts what the *test author* thinks
+    the agent sends. The only thing that proves the two agree is the real bytes —
+    which is the lesson the `/findings` path taught the expensive way.
+    """
+    reporter = HttpReporter(
+        "http://collector",
+        deployment=DeploymentRef(
+            ai_system="support-agent",
+            environment="production",
+            deployment_id="2026-08-05.3",
+            commit_sha="abc1234",
+            model_name="gpt-4o-mini",
+        ),
+        transport=lambda _url, _body: None,
+    )
+    captured: list[bytes] = []
+    reporter._transport = lambda _url, body: captured.append(body)
+
+    reporter.submit(_result(), source="ci")
+    envelope = json.loads(captured[0])
+
+    assert envelope["schema_version"] == 6
+    client = _client()
+    assert client.post("/findings", json=envelope).status_code == _OK
+    stored = client.get("/findings").json()[0]
+    assert stored["deployment"]["ai_system"] == "support-agent"
+    assert stored["deployment"]["environment"] == "production"
+    assert stored["deployment"]["commit_sha"] == "abc1234"
+
+
+def test_a_run_that_declares_nothing_sends_no_deployment_block() -> None:
+    # A block of eight nulls is noise on the wire and a lie in a listing: "declared
+    # nothing" and "declared eight unknowns" must not look different.
+    assert "deployment" not in _real_envelope()
+
+
+def test_a_v5_agent_still_reports_to_a_v6_collector() -> None:
+    """A fleet upgrades one agent at a time; the collector must not require the newest."""
+    envelope = _real_envelope()
+    envelope["schema_version"] = 5
+
+    client = _client()
+
+    assert client.post("/findings", json=envelope).status_code == _OK
+    assert client.get("/findings").json()[0]["deployment"] is None

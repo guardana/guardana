@@ -10,7 +10,7 @@ from guardana.cli._plugins import resolve_trust
 from guardana.cli._profile import resolve_profile
 from guardana.cli._reporting import submit_safely
 from guardana.cli._rules_loading import load_custom_rules
-from guardana.cli._run_meta import build_manifest, target_identity
+from guardana.cli._run_meta import build_manifest, detect_deployment, target_identity
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
@@ -95,6 +95,24 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
     reporter: Annotated[
         str | None, typer.Option(help="Collector URL to forward findings to, e.g. server://URL")
     ] = None,
+    ai_system: Annotated[
+        str | None,
+        typer.Option(
+            "--ai-system",
+            help="Which AI system this run verifies, e.g. support-agent. Never guessed.",
+        ),
+    ] = None,
+    environment: Annotated[
+        str | None,
+        typer.Option(
+            "--environment",
+            help="Where it runs, e.g. production. Never guessed from a branch name.",
+        ),
+    ] = None,
+    deployment_id: Annotated[
+        str | None,
+        typer.Option("--deployment-id", help="Which version of it, if you have an identifier."),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option(
@@ -168,6 +186,7 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
 
     outcome = gate_outcome(result, prof.policy)
     target_ref = relativize(target.ref, Path.cwd())
+    deployment = detect_deployment(ai_system, environment, deployment_id)
     run = build_manifest(
         registry,
         prof,
@@ -177,8 +196,9 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
         gate=outcome,
         started_at=started_at,
         identity=target_identity(target, target_ref),
+        deployment=deployment,
     )
     emit(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
-        submit_safely(reporter, result, source=str(path))
+        submit_safely(reporter, result, source=str(path), deployment=deployment)
     exit_with(outcome, result)

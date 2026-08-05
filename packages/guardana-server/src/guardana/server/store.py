@@ -14,6 +14,12 @@ from guardana.server.tenancy import TenantScope
 MAX_SUBMISSIONS = 10_000
 
 
+def _environment_of(record: "StoredSubmission") -> str | None:
+    """Return the environment a stored submission claimed, or `None` if it claimed none."""
+    deployment = record.submission.deployment
+    return None if deployment is None else deployment.environment
+
+
 @dataclass(frozen=True, slots=True)
 class StoredSubmission:
     """A submission plus when the collector received it — the time axis of the dashboard."""
@@ -120,4 +126,14 @@ class InMemoryStore:
 
     def _snapshot(self, scope: TenantScope) -> list[StoredSubmission]:
         with self._lock:
-            return [record for held_scope, record in self._records if held_scope == scope]
+            held = [
+                record
+                for held_scope, record in self._records
+                if held_scope.project_id == scope.project_id
+            ]
+        if scope.environment is None:
+            return held
+        # A pinned scope sees only what claimed to be about its environment. An
+        # unlabelled run belongs to the project and to no environment; folding it
+        # into every one would let a laptop run appear as production evidence.
+        return [record for record in held if _environment_of(record) == scope.environment]

@@ -59,7 +59,7 @@ already failed at its job:
 | Engine + built-in rules | **beta** | Stable enough to gate a build on; API still moves between minors |
 | `scan` / `probe` / `diff` | **beta** | Used in CI; exit codes and formats stable in practice, not yet contractually |
 | `monitor` | **beta** | Scheduled *active* verification. Not passive traffic inspection, not inline |
-| Collector (`guardana-server`) | **experimental** | Persistent, authenticated and tenant-isolated (PostgreSQL, reversible migrations, API keys pinned to a project). No environments or deployments yet, which is what the checklist entry "project/**environment** isolation" still waits on |
+| Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. No finding lifecycle, audit log or retention yet |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
 ## What ships today (0.8.0)
@@ -104,9 +104,10 @@ finding needs a **scoped API key**, hashed at rest and shown once, and a collect
 with nowhere to keep a key refuses to serve rather than serving openly.
 **Readiness is separate from health** and fails while a migration is pending.
 
-It is still marked **experimental**, and the reason is named rather than softened:
-there is no tenancy, so every key sees everything and one instance cannot serve two
-teams. The company-ready checklist above is not moved to match what shipped.
+It was still marked **experimental**, and the reason was named rather than
+softened: one key could read everything the collector held, so one instance could
+not serve two teams. That is what the release after it changed. The company-ready
+checklist above was not moved to match what shipped.
 
 0.8 also carries **nineteen defects an adversarial review found in released 0.7
 code and in this release's own** — among them `monitor` ignoring the privacy
@@ -195,9 +196,12 @@ checklist.
 - [x] privacy and redaction defaults
 - [x] persistent collector
 - [x] authenticated runner ingest
-- [ ] project/environment isolation *(projects done — a key reads and writes one
-      project and nothing else; environments and deployments are the next item, and
-      the box stays unticked until both are there)*
+- [x] project/environment isolation — a key reads and writes one **project** and
+      nothing else, always; and one **environment** and nothing else when it is
+      created with `--environment`. The environment pin is deliberately opt-in: one
+      pipeline that deploys to three environments would otherwise need three
+      credentials, and the blast radius is already bounded by the project. Proven
+      per entity, on both stores and over HTTP
 - [ ] migrations, backup, restore, upgrade *(migrations and upgrade done; backup
       and restore need the retention work)*
 - [ ] GitHub, GitLab and generic CI paths
@@ -357,14 +361,20 @@ Landed in **0.9.0**:
   returns nothing on both stores and over HTTP. `guardana-collector bootstrap`
   keeps standing a collector up to three commands, because a boundary that makes
   the first run longer is a boundary fewer people ever get behind;
+- **AI systems, environments and deployments** — a run says what it verified and
+  where, the commit is read from whatever CI it is, and a key may be pinned to one
+  environment and then reaches only that one. Systems and environments are inferred
+  from what runs name rather than registered in advance, because a pipeline that
+  fails on a missing prerequisite gets commented out rather than fixed
+  ([design](docs/design/ai-systems-and-deployments.md));
 - **the reporter reaches the collector at the URL a user writes**, which it had
   never done: aimed at a bare collector URL it POSTed to `/`, took a `404`, and
   the scan still exited `0`.
 
-Still open in the company-ready remainder: **environments and deployments**
-(designed in [`docs/design/ai-systems-and-deployments.md`](docs/design/ai-systems-and-deployments.md);
-the checklist entry reads "project/**environment** isolation", and the collector's
-maturity stays `experimental` until both are there), an **audit log**,
+With both, the collector's maturity moves to **beta** — the criterion stated before
+the work, not after it.
+
+Still open in the company-ready remainder: an **audit log**,
 **retention**, **restore-tested backup**, **official containers** for CLI and
 server, **CI beyond GitHub** (GitLab template, generic container pipeline, Jenkins
 and Azure DevOps examples), a **production deployment and upgrade guide**, **SBOM

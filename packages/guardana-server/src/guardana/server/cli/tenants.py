@@ -18,6 +18,7 @@ from guardana.server.auth import Scope, generate_key, store_key
 from guardana.server.cli.codes import EXIT_INVALID_USAGE, EXIT_OK
 from guardana.server.cli.keys import print_issued
 from guardana.server.tenancy import (
+    TenantScope,
     create_organization,
     create_project,
     find_organization,
@@ -128,7 +129,7 @@ def bootstrap(arguments: argparse.Namespace, connection: "Connection[tuple[objec
 
     scopes = tuple(Scope(s) for s in (arguments.scope or [str(Scope.INGEST)]))
     issued, secret_hash = generate_key(arguments.key_name, scopes)
-    store_key(connection, issued, secret_hash, project_id=project.id)
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project.id))
     print_issued(issued.token, project.reference, scopes)
     if Scope.READ not in scopes:
         # Ingest only, like `key create`: the first credential is the one that ends

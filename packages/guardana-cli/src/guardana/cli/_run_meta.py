@@ -15,6 +15,7 @@ from guardana.core import __version__
 from guardana.core.gate import GateOutcome
 from guardana.core.manifest import (
     ConfigurationRef,
+    DeploymentRef,
     ExecutionSettings,
     RunManifest,
     RunSource,
@@ -67,6 +68,53 @@ def _ci_run_url(provider: str) -> str | None:
     return os.environ.get("CI_PIPELINE_URL") or os.environ.get("BUILD_URL")
 
 
+AI_SYSTEM_VARIABLE = "GUARDANA_AI_SYSTEM"
+ENVIRONMENT_VARIABLE = "GUARDANA_ENVIRONMENT"
+DEPLOYMENT_ID_VARIABLE = "GUARDANA_DEPLOYMENT_ID"
+
+_COMMIT_VARIABLES = ("GITHUB_SHA", "CI_COMMIT_SHA", "GIT_COMMIT", "BUILD_SOURCEVERSION")
+_IMAGE_VARIABLES = ("GUARDANA_IMAGE_DIGEST",)
+
+
+def _first(*variables: str) -> str | None:
+    for variable in variables:
+        value = os.environ.get(variable, "").strip()
+        if value:
+            return value
+    return None
+
+
+def detect_deployment(
+    ai_system: str | None = None,
+    environment: str | None = None,
+    deployment_id: str | None = None,
+) -> DeploymentRef:
+    """Describe which deployment of which AI system this run verifies.
+
+    Two different kinds of fact, gathered two different ways.
+
+    **What CI states is read**, because the answer that matters is the one nobody
+    had to remember to pass — the same reasoning as `detect_source`. A commit is a
+    fact the pipeline already holds.
+
+    **What only a human knows is declared, never guessed.** A branch name is not an
+    environment and a repository name is not an AI system: a monorepo has several
+    systems, and one repository deployed twice is one system in two environments. A
+    guessed value is one a team would build a dashboard on, which is the same
+    mistake as an invented cost — and this project already refuses that one.
+
+    A flag wins over the environment variable, so a pipeline can set the repository
+    default once and one job can still say it is production.
+    """
+    return DeploymentRef(
+        ai_system=ai_system or _first(AI_SYSTEM_VARIABLE),
+        environment=environment or _first(ENVIRONMENT_VARIABLE),
+        deployment_id=deployment_id or _first(DEPLOYMENT_ID_VARIABLE),
+        commit_sha=_first(*_COMMIT_VARIABLES),
+        image_digest=_first(*_IMAGE_VARIABLES),
+    )
+
+
 def target_identity(target: Target, ref: str) -> TargetIdentity:
     """Describe what was examined, and say what the fingerprint was computed from.
 
@@ -117,6 +165,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
     started_at: datetime,
     identity: TargetIdentity | None = None,
     concurrency: int = 1,
+    deployment: DeploymentRef | None = None,
 ) -> RunManifest:
     """Describe the run that produced `result`, digesting the rules that actually ran.
 
@@ -136,6 +185,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         started_at=started_at,
         completed_at=now,
         source=detect_source(),
+        deployment=deployment if deployment is not None else DeploymentRef(),
         guardana=ToolInfo(version=__version__),
         target=(
             identity

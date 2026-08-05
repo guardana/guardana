@@ -14,6 +14,7 @@ from typing import Any
 
 from guardana.server.envelope import (
     CheckErrorIn,
+    DeploymentIn,
     EvidenceIn,
     FindingIn,
     Submission,
@@ -28,6 +29,66 @@ from psycopg.rows import tuple_row
 
 _FINDINGS = "findings"
 _UNVERIFIED = "unverified"
+
+_LABELS = (
+    "ai_system",
+    "environment",
+    "deployment_ref",
+    "commit_sha",
+    "image_digest",
+    "model_digest",
+    "model_name",
+    "model_revision",
+)
+"""What a run said it verified, where, and which version — v6's deployment block.
+
+Columns on the submission rather than rows in three tables: today a run declares a
+slug and nothing else, and a row whose only column is the name it was created from
+is a table pretending to be an entity. They become entities when they gain an
+owner and a lifecycle, and that migration will have real data to build them from.
+"""
+
+
+def _label_values(deployment: DeploymentIn | None) -> tuple[str | None, ...]:
+    """Return the eight label columns for one submission, all `None` when it declared nothing."""
+    if deployment is None:
+        return (None,) * len(_LABELS)
+    return (
+        deployment.ai_system,
+        deployment.environment,
+        deployment.reference,
+        deployment.commit_sha,
+        deployment.image_digest,
+        deployment.model_digest,
+        deployment.model_name,
+        deployment.model_revision,
+    )
+
+
+def _deployment(row: tuple[Any, ...]) -> DeploymentIn | None:
+    """Rebuild the deployment block, or `None` when every label is absent.
+
+    `None` rather than a block of eight nulls: "the run said nothing" and "the run
+    said eight unknowns" must not read the same, or a listing shows a deployment
+    nobody ever named.
+    """
+    ai_system, environment, reference, *digests = row
+    if not any((ai_system, environment, reference, *digests)):
+        return None
+    commit_sha, image_digest, model_digest, model_name, model_revision = digests
+    return DeploymentIn(
+        ai_system=ai_system,
+        environment=environment,
+        # `deployment_ref` is the id the run gave or the commit it fell back to, so
+        # it is only an id when it differs from the commit. Reconstructing it the
+        # other way round would invent a `deployment_id` the run never sent.
+        deployment_id=None if reference == commit_sha else reference,
+        commit_sha=commit_sha,
+        image_digest=image_digest,
+        model_digest=model_digest,
+        model_name=model_name,
+        model_revision=model_revision,
+    )
 
 
 class PostgresStore:
@@ -71,8 +132,11 @@ class PostgresStore:
                 """
                 insert into submissions (
                     project_id, received_at, source, schema_version, rules_run, rules_executed,
-                    rules_skipped, max_severity, unverified, error_count, errors
-                ) values (%s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    rules_skipped, max_severity, unverified, error_count, errors,
+                    ai_system, environment, deployment_ref, commit_sha, image_digest,
+                    model_digest, model_name, model_revision
+                ) values (%s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                          %s, %s, %s, %s, %s, %s, %s, %s)
                 returning id
                 """,
                 (
@@ -89,6 +153,7 @@ class PostgresStore:
                     summary.unverified if summary else 0,
                     len(submission.errors),
                     json.dumps([error.model_dump() for error in submission.errors]),
+                    *_label_values(submission.deployment),
                 ),
             )
             row = cursor.fetchone()
@@ -154,9 +219,10 @@ class PostgresStore:
                 from findings f
                 join submissions s on s.id = f.submission_id
                 where f.channel = %s and s.project_id = %s
+                      and (%s::text is null or s.environment = %s)
                 group by f.severity
                 """,
-                (_FINDINGS, project),
+                (_FINDINGS, project, scope.environment, scope.environment),
             )
             return {str(severity): int(count) for severity, count in cursor.fetchall()}
 
@@ -175,13 +241,17 @@ class PostgresStore:
             cursor.execute(
                 """
                 select id, extract(epoch from received_at), source, schema_version, rules_run,
-                       rules_executed, rules_skipped, max_severity, unverified, errors
+                       rules_executed, rules_skipped, max_severity, unverified, errors,
+                       ai_system, environment, deployment_ref, commit_sha, image_digest,
+                       model_digest, model_name, model_revision
                 from submissions
-                where project_id = %s and (%s::text is null or source = %s)
+                where project_id = %s
+                      and (%s::text is null or environment = %s)
+                      and (%s::text is null or source = %s)
                 order by received_at desc, id desc
                 limit %s
                 """,
-                (project, source, source, limit),
+                (project, scope.environment, scope.environment, source, source, limit),
             )
             # Newest-first in SQL so `limit` keeps the newest; reversed here because
             # every caller of this protocol reads oldest-first.
@@ -249,6 +319,7 @@ def _record(row: tuple[Any, ...], channels: dict[str, list[FindingIn]]) -> Store
         max_severity,
         unverified,
         errors,
+        *labels,
     ) = row
     return StoredSubmission(
         received_at=float(received_at),
@@ -266,6 +337,7 @@ def _record(row: tuple[Any, ...], channels: dict[str, list[FindingIn]]) -> Store
                 unverified=int(unverified),
                 errors=len(errors),
             ),
+            deployment=_deployment(tuple(labels)),
         ),
     )
 

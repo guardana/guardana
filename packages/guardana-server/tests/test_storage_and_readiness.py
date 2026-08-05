@@ -154,7 +154,11 @@ def test_a_submission_survives_a_restart_of_the_app(
 ) -> None:
     """The whole point of the item, asserted end to end through the HTTP surface."""
     from guardana.server.auth import Scope, generate_key, store_key  # noqa: PLC0415
-    from guardana.server.tenancy import create_organization, create_project  # noqa: PLC0415
+    from guardana.server.tenancy import (  # noqa: PLC0415
+        TenantScope,
+        create_organization,
+        create_project,
+    )
 
     monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
     monkeypatch.setenv("GUARDANA_MIGRATE_ON_START", "1")
@@ -163,7 +167,7 @@ def test_a_submission_survives_a_restart_of_the_app(
         create_organization(connection, "acme", "Acme")
         project = create_project(connection, "acme", "web", "Web")
         issued, secret_hash = generate_key("ci", (Scope.INGEST, Scope.READ))
-        store_key(connection, issued, secret_hash, project_id=project.id)
+        store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project.id))
     headers = {"Authorization": f"Bearer {issued.token}"}
     submission = {"source": "ci", "schema_version": 5, "findings": []}
     TestClient(create_app()).post("/findings", json=submission, headers=headers)

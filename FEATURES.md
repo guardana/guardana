@@ -15,7 +15,7 @@ live in [`ROADMAP.md`](ROADMAP.md).
 |---|---|
 | Engine + built-in rules | beta |
 | `scan` / `probe` / `monitor` / `diff` | beta |
-| Collector (`guardana-server`) | **experimental** — durable, authenticated and tenant-isolated (PostgreSQL, reversible migrations, scoped API keys pinned to a project); no environments or deployments yet |
+| Collector (`guardana-server`) | **beta** — durable, authenticated and tenant-isolated (PostgreSQL, reversible migrations, API keys pinned to a project and optionally to an environment), and it records what each run verified and where; no finding lifecycle, audit log or retention yet |
 | Extension API | unstable by design until 1.0 |
 
 Full detail, including what is deliberately not covered:
@@ -461,11 +461,11 @@ a multi-turn scenario's escalation is folded in, never dropped. Public API:
 
 ### Optional central collector + dashboard
 
-> **Maturity: experimental.** Durable (PostgreSQL, reversible migrations),
-> authenticated (scoped API keys, hashed, shown once) and **tenant-isolated**: the
-> tenant is a project, a key names exactly one, and a cross-tenant read returns
-> nothing. Environments, deployments, a finding lifecycle, an audit log and
-> retention are still ahead of it.
+> **Maturity: beta.** Durable (PostgreSQL, reversible migrations), authenticated
+> (scoped API keys, hashed, shown once), **tenant-isolated** — the tenant is a
+> project, a key names exactly one, and a cross-tenant read returns nothing — and
+> it records **what each run verified and where**. A finding lifecycle, an audit
+> log and retention are still ahead of it.
 
 **Organizations and projects.** `guardana-collector bootstrap --org acme --project
 web` creates the organization, the project and the first key in one command, so
@@ -479,8 +479,17 @@ adopts a database that already has data into an organization called `adopted`,
 created only when there is something to adopt, and refuses to roll back where that
 would merge two tenants.
 
-Any run forwards normalized findings with `--reporter server://…` (versioned
-JSON envelope, sent to the collector URL — the reporter appends the route). The collector (`guardana-server`) is strictly additive and
+**AI systems, environments and deployments.** `--ai-system`, `--environment` and
+`--deployment-id` on `scan`, `probe` and `monitor` (or the matching
+`GUARDANA_*` variables) say what a run verified and where; the commit is read from
+whatever CI this is, and the environment is never guessed from a branch name. The
+collector records the names runs use rather than requiring them in advance, and
+`system list` / `environment list` / `deployment list` read them back. A key may be
+**pinned to one environment** and then writes and reads only that one — a run
+declaring another is refused, a run declaring nothing is stored under the pin.
+
+Any run forwards normalized findings with `--reporter server://…` (envelope v6,
+sent to the collector URL — the reporter appends the route). The collector (`guardana-server`) is strictly additive and
 separately deployed — the engine never depends on it, enforced by an
 import-linter contract and a test. It ships an **opt-in monitoring dashboard**
 (`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default, and
