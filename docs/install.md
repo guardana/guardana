@@ -55,12 +55,13 @@ For a pipeline that runs containers rather than Python, both halves are publishe
 to the GitHub Container Registry on every release:
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.9 scan /work
-docker run --rm ghcr.io/guardana/guardana-collector:0.9 --help
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.10 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:0.10 --help
 ```
 
-Tags are the exact version (`0.9.1`), the moving minor (`0.9`) and `latest`; pin
-the moving minor in CI so fixes arrive and the rule set does not change under you.
+Three tags: the exact version, the moving minor (what the commands above pin),
+and `latest`. Pin the moving minor in CI so fixes arrive and the rule set does
+not change under you.
 Both images run as a non-root user, ship `linux/amd64` and `linux/arm64`, and
 carry an SBOM and a signed provenance attestation.
 [`deploy/docker/README.md`](../deploy/docker/README.md) covers mounts, exit codes,

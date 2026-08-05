@@ -17,7 +17,7 @@ GitHub Actions has a first-class action instead — see
 ## The generic container pipeline
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.9 \
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.10 \
   scan /work --format junit > guardana-junit.xml
 ```
 
@@ -45,6 +45,11 @@ as a pass is how a pipeline goes green over a check that never ran.
 it. A pipeline that keeps evidence only for green runs keeps the evidence nobody
 needs.
 
+**Run as yourself if your workspace is private.** The image runs as uid 10001, so
+a checkout only its owner can read produces `Path '/work' is not readable` — a
+refusal, deliberately, because a scanner that cannot see its target must not
+report "no findings". Add `--user "$(id -u):$(id -g)"`.
+
 **Override the entrypoint when the platform wraps your commands in a shell.**
 GitLab and Jenkins both do; the image's `ENTRYPOINT` is `guardana`, so without
 `entrypoint: [""]` / `--entrypoint=""` the runner tries to execute
@@ -58,7 +63,7 @@ line, where it lands in shell history and in most CI logs:
 ```bash
 docker run --rm -v "$PWD:/work" \
   -e GUARDANA_COLLECTOR_TOKEN \
-  ghcr.io/guardana/guardana:0.9 \
+  ghcr.io/guardana/guardana:0.10 \
   scan /work --ai-system support-agent --environment production \
     --reporter server://https://collector.example.com
 ```
@@ -74,7 +79,7 @@ view wants and not what a person reading a failed job wants. Add a second,
 non-gating pass if your team reads logs:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.9 scan /work || true
+docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.10 scan /work || true
 ```
 
 Static scans are cheap enough for this. Do **not** do it for `probe` or

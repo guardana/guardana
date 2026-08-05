@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-06 — company-ready
+
 ### Fixed
 
 - **A mistyped `--reporter` URL ended a run with a traceback and an exit code
@@ -95,7 +97,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Both are **built and run** in CI on every push (`scripts/image_smoke.py`), not
   first at the tag: among the checks is a scan of the deliberately malicious
   fixture that has to exit `1` from inside the image, because an image whose rule
-  catalog failed to ship reports "no findings" and exits `0` forever.
+  catalog failed to ship reports "no findings" and exits `0` forever. CI caught
+  what a Mac could not: a workspace only its owner can read is unreadable to the
+  image's non-root user, so a scan of it **refuses** rather than reporting an
+  empty directory — `--user "$(id -u):$(id -g)"` is the documented answer, and
+  the smoke test now proves that answer works.
 - **`guardana-collector serve`** — the collector starts with a command instead of
   an ASGI factory string. It binds **loopback** unless `--host 0.0.0.0` is typed,
   builds the app before the server starts (so a storage backend nobody chose and a

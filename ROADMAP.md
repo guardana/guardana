@@ -62,7 +62,7 @@ already failed at its job:
 | Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. No finding lifecycle, audit log or retention yet |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
-## What ships today (0.9.1)
+## What ships today (0.10.0)
 
 Counts come from the registry, not from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -92,8 +92,21 @@ presets, the build/runtime `Surface` split, a tool-calling endpoint target, thre
 endpoint providers plus a guarded-endpoint adapter, the plugin contract with test
 doubles and [public model-format readers](docs/model-formats.md), a GitHub Action
 and pre-commit hook, and the optional collector — whose own command
-(`guardana-collector`) covers migrations, tenants, credentials, and reading back
-what the runs reported.
+(`guardana-collector`) covers migrations, tenants, credentials, running the
+service, and reading back what the runs reported.
+
+0.10 is the first release this project calls **company-ready**, and it is the
+first one the checklist above allows. What it adds is not coverage: **official
+container images** for both halves, **`guardana-collector serve`** so starting a
+collector is a command rather than an ASGI factory string, **templates for
+GitLab, Jenkins and Azure DevOps** plus a generic container recipe, **an SBOM per
+distribution and signed provenance** on every release and every image, a
+**production deployment guide** with a Compose file that has no default
+credential anywhere, a **backup whose restore is exercised** rather than
+described, and a **clean install proven in CI, in the release gate, and inside
+the release workflow before anything is uploaded**. That last one exists because
+0.9.0 was tagged and cancelled: it crashed on every command in a fresh
+environment, and nothing but running it could have known.
 
 0.9 made the collector something **two teams can share, and something that can
 answer a question**. The tenant is a **project**: a key is bound to one, the scope
@@ -200,11 +213,19 @@ lane and does not gate the platform work.
 
 ## Definition of company-ready
 
-The milestone, and it is **not** complete. The engine and CLI half is done; the
-collector, containers and CI-beyond-GitHub half is not, and no amount of polish on
-the first half substitutes for the second. Kept as an unticked list rather than
-quietly rescoped, because a checklist that moves to match what shipped is not a
-checklist.
+**Complete as of 0.10.0.** This list stood unticked for three releases and was
+never rewritten to match what shipped — 0.7 and 0.8 were deliberately *not*
+called company-ready, because the checklist said they were not. It is ticked now
+because the boxes are met, and each one records what met it.
+
+What "complete" does and does not mean: a company can install, configure, secure,
+deploy, upgrade, back up and restore Guardana, run it in whatever CI it already
+has, and verify what it downloaded — all documented, and all exercised rather
+than described. It does **not** mean the collector is finished. Everything that
+happens *after* a finding arrives — lifecycle, waivers, audit log, retention,
+RBAC — is the team-platform milestone below, and
+[`docs/deployment.md`](docs/deployment.md) says so to the operator's face rather
+than leaving them to find out.
 
 - [x] official container images (CLI and server) — `ghcr.io/guardana/guardana`
       and `ghcr.io/guardana/guardana-collector`, two stages so no build tooling
@@ -403,8 +424,11 @@ reader the wrong thing about the thing it names.
 > **Outcome:** the checklist above is finished, and Guardana can verify an AI
 > *application*, not only an isolated model endpoint.
 
-**The milestone is not finished.** `0.8.0` and `0.9.0` are releases inside it, not
-the end of it, and the checklist above is not moved to match what shipped.
+**Half of this milestone is finished.** The company-ready checklist above is
+complete as of `0.10.0`; the application-awareness half — verifying an AI
+*application* rather than an isolated endpoint — has not started. `0.8.0`,
+`0.9.0` and `0.10.0` are releases inside this milestone, and the checklist was
+ticked because the boxes were met, not moved to match what shipped.
 
 Landed in **0.8.0**:
 
@@ -439,12 +463,38 @@ Landed in **0.9.0**:
 With both, the collector's maturity moves to **beta** — the criterion stated before
 the work, not after it.
 
-Still open in the company-ready remainder: an **audit log**,
-**retention**, **restore-tested backup**, **official containers** for CLI and
-server, **CI beyond GitHub** (GitLab template, generic container pipeline, Jenkins
-and Azure DevOps examples), a **production deployment and upgrade guide**, **SBOM
-and provenance** on every release, and an **end-to-end installation test from a
-clean environment**.
+Landed in **0.10.0**, which finishes the checklist:
+
+- **official container images** for the CLI and the collector — two stages, a
+  fixed non-root uid, `amd64` and `arm64`, built *and run* in CI on every push
+  rather than first at the tag. The image smoke test scans the deliberately
+  malicious fixture and requires a `1`, because an image whose rule catalog
+  failed to ship reports "no findings" and exits `0` forever;
+- **`guardana-collector serve`**, so starting a collector is a command rather
+  than an ASGI factory string, with the server itself an extra;
+- **CI beyond GitHub** — GitLab, Jenkins and Azure DevOps templates plus a
+  generic container recipe, with three properties held by tests: the exit code
+  reaches the platform, the report is published on the run that failed, and the
+  entrypoint is overridden where the platform wraps commands in a shell;
+- **an SBOM per distribution and provenance on every release**, generated by
+  `uv export` from the lock everything else resolves against, and verified
+  against each package's own metadata as it is written;
+- **a production deployment guide** and the Compose file it describes — no
+  default credential anywhere, no published database port, TLS termination as a
+  deliberate step, migrations as a command rather than a restart side effect;
+- **backup and restore, exercised** — restored into a database that never held
+  the data, read back through the tenant-scoped store, and written to afterwards.
+  Doing it found a trap worth the whole exercise: `pg_dump` 17 produces a dump
+  PostgreSQL 16 cannot restore, so a backup can look fine every day and fail on
+  the day it matters;
+- **a clean-install test in CI, in the release gate, and inside the release
+  workflow before the upload** — the defect that made 0.9.0 unshippable was found
+  by hand, and finding it by hand is not a control.
+
+Still open in the *collector*, and deliberately: the finding lifecycle, waivers,
+an audit log, retention and RBAC. Those are the team-platform milestone below,
+not company-readiness — a company can deploy, secure, upgrade and restore this
+today, and the deployment guide states plainly what it cannot yet do.
 
 Then the application work:
 

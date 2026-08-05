@@ -4,11 +4,11 @@ Two images, published to the GitHub Container Registry on every release:
 
 | Image | What it is | Entrypoint |
 |---|---|---|
-| `ghcr.io/guardana/guardana:0.9` | the CLI — `scan`, `probe`, `monitor`, `diff` and the rest | `guardana` |
-| `ghcr.io/guardana/guardana-collector:0.9` | the optional collector | `guardana-collector` |
+| `ghcr.io/guardana/guardana:0.10` | the CLI — `scan`, `probe`, `monitor`, `diff` and the rest | `guardana` |
+| `ghcr.io/guardana/guardana-collector:0.10` | the optional collector | `guardana-collector` |
 
-Tags: the exact version (`0.9.1`), the moving minor (`0.9`), and `latest`. Pin the
-**moving minor** in a pipeline — it picks up fixes without changing which rules
+Three tags: the exact version, the moving minor (what the table above pins), and
+`latest`. Pin the **moving minor** in a pipeline — it picks up fixes without changing which rules
 run. A pre-release never moves `latest` or the minor tag.
 
 Both are built from `python:3.13-slim-bookworm` in two stages, so the shipped
@@ -19,7 +19,7 @@ provenance attestation attached in the registry.
 ## The CLI
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.9 scan /work
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.10 scan /work
 ```
 
 `/work` is the working directory inside the image; mounting read-only is enough,
@@ -31,7 +31,7 @@ command.
 Writing a report out needs a writable mount:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.9 \
+docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.10 \
   scan /work --format sarif --output /work/guardana.sarif
 ```
 
@@ -39,16 +39,27 @@ The file is written as uid 10001. On a host where that matters, add
 `--user "$(id -u):$(id -g)"` — the image does not care which uid it runs as, it
 only refuses to run as root by default.
 
+**The same flag is the answer to `Path '/work' is not readable`.** A workspace
+only its owner can read (mode `0700`, which several CI systems produce) is
+unreadable to uid 10001, and the scan refuses rather than reporting an empty
+directory — a scanner that cannot see its target must never answer "no findings".
+Run it as yourself and it reads what you can read:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" \
+  ghcr.io/guardana/guardana:0.10 scan /work
+```
+
 ## The collector
 
 ```bash
 docker run --rm \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:...@db:5432/guardana" \
-  ghcr.io/guardana/guardana-collector:0.9 migrate
+  ghcr.io/guardana/guardana-collector:0.10 migrate
 
 docker run -d --name guardana-collector -p 8000:8000 \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:...@db:5432/guardana" \
-  ghcr.io/guardana/guardana-collector:0.9
+  ghcr.io/guardana/guardana-collector:0.10
 ```
 
 The default command is `serve --host 0.0.0.0 --port 8000`. Binding every

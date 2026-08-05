@@ -18,6 +18,7 @@ Needs Docker. CI runs it on every push.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -84,9 +85,10 @@ def _build(dockerfile: str, tag: str, version: str) -> None:
         raise SystemExit(f"docker build failed for {tag}")
 
 
-def _checks(version: str, clean: Path) -> list[Check]:
+def _checks(version: str, clean: Path, private: Path) -> list[Check]:
     fixture = str(_ROOT / "examples" / "vulnerable-model")
     cli = ["docker", "run", "--rm"]
+    as_caller = [*cli, "--user", f"{os.getuid()}:{os.getgid()}"]
     return [
         Check("cli: version", [*cli, _CLI_IMAGE, "--version"], 0, expect=(version,)),
         Check("cli: rules are discovered", [*cli, _CLI_IMAGE, "rules"], 0, expect=("guardana.",)),
@@ -108,6 +110,16 @@ def _checks(version: str, clean: Path) -> list[Check]:
             [*cli, "--entrypoint", "id", _CLI_IMAGE, "-u"],
             0,
             expect=("10001",),
+        ),
+        # The documented workaround, made testable. A workspace only its owner can
+        # read — `mkdtemp`'s 0700, and plenty of CI checkouts — is unreadable to
+        # the image's uid 10001, and `--user` is the answer the docs give. CI found
+        # this before a user did: on a Linux runner the plain mount above failed,
+        # while a Mac's virtualised bind mounts had hidden it entirely.
+        Check(
+            "cli: a private workspace scans with --user",
+            [*as_caller, "-v", f"{private}:/work:ro", _CLI_IMAGE, "scan", "/work"],
+            0,
         ),
         Check("collector: help", [*cli, _COLLECTOR_IMAGE, "--help"], 0),
         Check(
@@ -188,9 +200,18 @@ def main() -> int:
 
     failures = 0
     with tempfile.TemporaryDirectory(prefix="guardana-image-smoke-") as workspace:
-        clean = Path(workspace)
+        clean = Path(workspace) / "clean"
+        clean.mkdir()
         (clean / "app.py").write_text("print('hello')\n", encoding="utf-8")
-        for check in _checks(version, clean):
+        # A repository checkout is world-readable and a mounted volume usually is
+        # too; `mkdtemp` is 0700, which is the one case the image cannot read. The
+        # private directory below covers that case deliberately.
+        clean.chmod(0o755)
+        (clean / "app.py").chmod(0o644)
+        private = Path(workspace) / "private"
+        private.mkdir(mode=0o700)
+        (private / "app.py").write_text("print('hello')\n", encoding="utf-8")
+        for check in _checks(version, clean, private):
             result = _run(check.argv)
             output = result.stdout + result.stderr
             problems = []
