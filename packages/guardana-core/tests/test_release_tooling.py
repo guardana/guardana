@@ -20,10 +20,8 @@ def _repo_root() -> Path:
     raise AssertionError("could not locate the repo root")
 
 
-def _load_bump_version() -> types.ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        "bump_version", _repo_root() / "scripts" / "bump_version.py"
-    )
+def _load_script(name: str) -> types.ModuleType:
+    spec = importlib.util.spec_from_file_location(name, _repo_root() / "scripts" / f"{name}.py")
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -31,7 +29,7 @@ def _load_bump_version() -> types.ModuleType:
     return module
 
 
-_BUMP = _load_bump_version()
+_BUMP = _load_script("bump_version")
 
 
 def test_release_notes_exclude_the_real_dependabot_login() -> None:
@@ -90,6 +88,67 @@ def test_rewrite_action_pin_leaves_a_prerelease_alone() -> None:
     # does not exist yet.
     text = "- uses: guardana/guardana@v0.3\n"
     assert _BUMP._rewrite_action_pin(text, "1.0.0rc1") == text
+
+
+def _workflow(name: str) -> dict[str, object]:
+    path = _repo_root() / ".github" / "workflows" / name
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(loaded, dict)
+    return loaded
+
+
+def _steps(workflow: dict[str, object], job: str) -> list[dict[str, object]]:
+    jobs = workflow["jobs"]
+    assert isinstance(jobs, dict)
+    assert job in jobs, f"no {job!r} job"
+    steps = jobs[job]["steps"]
+    assert isinstance(steps, list)
+    return steps
+
+
+def _index_of(steps: list[dict[str, object]], needle: str) -> int:
+    for position, step in enumerate(steps):
+        if needle in str(step.get("run", "")) or needle in str(step.get("uses", "")):
+            return position
+    raise AssertionError(f"no step running {needle!r}")
+
+
+def test_the_release_gate_runs_the_clean_install_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A promise in a runbook is a promise; a step in the gate is a gate.
+
+    0.9.0 was tagged from a green tree and had to be cancelled: `guardana` crashed
+    on every command in a fresh environment. Nothing else in the gate can see that
+    class of defect, because everything else runs where the missing module happens
+    to be installed.
+    """
+    release = _load_script("release")
+    commands: list[list[str]] = []
+
+    def record(cmd: list[str], *, capture: bool = False) -> str:
+        commands.append(cmd)
+        return ""
+
+    monkeypatch.setattr(release, "_run", record)
+
+    release._gate()
+
+    assert any("scripts/clean_install_check.py" in cmd for cmd in commands), (
+        f"the release gate does not run the clean-install check: {commands}"
+    )
+
+
+def test_ci_runs_the_clean_install_check_on_every_push() -> None:
+    steps = _steps(_workflow("ci.yml"), "clean-install")
+    _index_of(steps, "scripts/clean_install_check.py")
+
+
+def test_the_release_workflow_checks_a_clean_install_before_publishing() -> None:
+    """Order is the whole point: a gate after the upload is a report, not a gate."""
+    steps = _steps(_workflow("release.yml"), "publish")
+    check = _index_of(steps, "scripts/clean_install_check.py")
+    publish = _index_of(steps, "pypa/gh-action-pypi-publish")
+
+    assert check < publish, "the clean-install check runs after the publish step"
 
 
 def test_every_documented_action_pin_file_actually_carries_a_pin() -> None:

@@ -234,7 +234,14 @@ checklist.
       box is ticked because the criterion is met, not because the signal went
       quiet: shipped runtime dependencies are `pyyaml`, `defusedxml`, and — for
       the optional collector — `fastapi`, `pydantic` and `psycopg`.
-- [ ] end-to-end installation test from a clean environment
+- [x] end-to-end installation test from a clean environment — the five
+      distributions in an empty virtualenv, then the documented commands, with
+      their exit codes asserted rather than merely "it did not crash": a rule
+      catalog that failed to load prints "no findings" and exits `0`, which is
+      the fail-open this whole project is against. It runs in CI on every push,
+      in `release.py`'s gate, and again inside the release workflow before the
+      upload — three places, because the defect it exists to catch was found
+      *after* a tag was pushed
 
 ## Milestone: engine and CLI foundation *(complete, shipped as 0.7.0)*
 

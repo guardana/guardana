@@ -52,6 +52,19 @@ uv run pytest --cov            # tests + the 90% branch-coverage gate
 uv run guardana scan packages  # dogfood: Guardana scans its own source
 ```
 
+One more runs in CI on every push, and you want it locally whenever you touch a
+dependency, an import or an entry point:
+
+```bash
+uv run python scripts/clean_install_check.py   # ~40s: five packages, empty venv
+```
+
+It installs the five distributions into an empty environment and runs the
+commands the documentation tells people to type. Everything above it passes in an
+environment where an undeclared module happens to be installed for some other
+reason — which is how a release was once tagged with a `guardana` that crashed on
+**every** command.
+
 Fix formatting with `uv run ruff format .` rather than hand-editing whitespace.
 
 While iterating, plain `uv run pytest` (or a single file) is what you want —

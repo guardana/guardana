@@ -76,6 +76,28 @@ jobs:
       - name: Dogfood (Guardana scans its own source)
         run: uv run guardana scan packages
 
+  clean-install:
+    # Every other job runs where everything is installed — including modules
+    # nothing declares. This one runs where nothing is: the five distributions in
+    # an empty environment, then the commands the documentation tells people to
+    # type. It is the only job that could have caught the defect that made 0.9.0
+    # unshippable (`ModuleNotFoundError: click` on every command), and the
+    # release workflow runs the same script before it publishes anything.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      # --no-project on purpose: this must not depend on the development
+      # environment resolving, because a user's install does not.
+      - name: Install into an empty environment and run the documented commands
+        run: uv run --no-project python scripts/clean_install_check.py
+
   example-plugin:
     # Proves the third-party extension story end-to-end: a package outside the
     # workspace registers rules through the `guardana.rules` entry point and is

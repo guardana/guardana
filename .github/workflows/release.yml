@@ -39,6 +39,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The last gate, and the only one that runs where a user runs: an empty
+      # environment, the five distributions, the documented commands. 0.9.0 was
+      # tagged without it and had to be cancelled mid-flight, because every other
+      # gate passes in an environment where the missing module is installed for
+      # some other reason.
+      - name: A clean install works
+        run: uv run --no-project python scripts/clean_install_check.py
+
       - name: Build all packages
         run: |
           mkdir -p dist

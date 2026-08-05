@@ -92,6 +92,7 @@ uv run mypy --strict .
 uv run lint-imports
 uv run pytest --cov
 uv run guardana scan packages          # dogfood: must be 0 findings
+uv run python scripts/clean_install_check.py   # the five packages in an EMPTY venv
 
 # 2. Bump all five packages + pins + lock (see the table above for which part).
 python scripts/bump_version.py minor --dry-run   # eyeball it
@@ -121,6 +122,20 @@ which builds all five wheels/sdists and publishes them to PyPI via OIDC trusted
 publishing. With a required reviewer on the `pypi` environment (see
 [`docs/maintainers/github-setup.md`](docs/maintainers/github-setup.md)), that
 publish pauses for one human click — so a stray tag can't ship unattended.
+
+### The clean-install check, and why it is in the gate
+
+`0.9.0` was tagged from a green tree and had to be cancelled while it waited for
+that click: `guardana` crashed on **every** command in a fresh environment with
+`ModuleNotFoundError: click`, because Typer 0.26 vendored Click and stopped
+requiring it while the CLI still imported it. No lint, type check, test or
+dogfood scan can see that class of defect — they all run in an environment where
+the module is installed for some other reason.
+
+So `scripts/clean_install_check.py` is now part of `release.py`'s gate, runs in
+CI on every push, and runs again inside `release.yml` *before* the upload step.
+Three places, because the one thing that must never happen again is publishing a
+build that does not start.
 
 ## Tags
 

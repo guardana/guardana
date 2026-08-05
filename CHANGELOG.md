@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A clean install is now a gate, not a ritual.**
+  `scripts/clean_install_check.py` builds an empty virtualenv, installs the five
+  distributions into it and runs the commands the documentation tells people to
+  type — asserting the **exit code** of each, not just that nothing crashed. A
+  scanner whose rule catalog failed to load prints "no findings" and exits `0`,
+  so the check scans a deliberately malicious fixture and requires a `1` as well
+  as scanning clean input and requiring a `0`. It runs in CI on every push, in
+  `release.py`'s gate, and inside the release workflow *before* the upload step.
+  This is the defect class that got `0.9.0` tagged and cancelled; it was found by
+  hand, and finding it by hand is not a control.
+- **The declared-dependency check now covers all five packages, and the
+  namespace.** It was written for `guardana-cli` and only ever asked about that
+  one. It now asks about every distribution, and asks a second question the
+  first cannot: `packages_distributions()` maps top-level module names, so all
+  five packages answer to `guardana` and a package importing a sibling it never
+  declared is invisible to it.
+
 ## [0.9.1] - 2026-08-05
 
 ### Fixed — a clean install did not start

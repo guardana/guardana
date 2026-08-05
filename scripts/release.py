@@ -70,7 +70,7 @@ def _preflight() -> None:
 
 
 def _gate() -> None:
-    print("running the gate (ruff, format, mypy, lint-imports, pytest, dogfood)…")
+    print("running the gate (ruff, format, mypy, lint-imports, pytest, dogfood, clean install)…")
     for cmd in (
         ["uv", "run", "ruff", "check", "."],
         ["uv", "run", "ruff", "format", "--check", "."],
@@ -78,6 +78,11 @@ def _gate() -> None:
         ["uv", "run", "lint-imports"],
         ["uv", "run", "pytest", "-q"],
         ["uv", "run", "guardana", "scan", "packages"],
+        # Last, because it is the only one that runs where a user runs. Every
+        # gate above passes in an environment where an undeclared module is
+        # installed for some other reason; that is how 0.9.0 was tagged with a
+        # `guardana` that crashed on every command.
+        ["uv", "run", "--no-project", "python", "scripts/clean_install_check.py"],
     ):
         _run(cmd)
 
