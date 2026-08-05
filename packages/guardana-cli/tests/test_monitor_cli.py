@@ -122,7 +122,12 @@ def test_a_dead_collector_does_not_kill_the_monitor(monkeypatch: pytest.MonkeyPa
     # endpoint, which was perfectly healthy.
     class _DownReporter:
         def __init__(
-            self, url: str, *, api_key: str | None = None, deployment: object | None = None
+            self,
+            url: str,
+            *,
+            api_key: str | None = None,
+            deployment: object | None = None,
+            run: object | None = None,
         ) -> None:
             pass
 
@@ -160,7 +165,12 @@ def test_monitor_command_forwards_alerts_to_reporter(monkeypatch: pytest.MonkeyP
 
     class _CapturingReporter:
         def __init__(
-            self, url: str, *, api_key: str | None = None, deployment: object | None = None
+            self,
+            url: str,
+            *,
+            api_key: str | None = None,
+            deployment: object | None = None,
+            run: object | None = None,
         ) -> None:
             self.url = url
 

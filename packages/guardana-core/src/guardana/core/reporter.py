@@ -1,23 +1,34 @@
 import json
 from collections.abc import Callable
+from datetime import datetime
 from typing import Protocol
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+from guardana.core.diff.compare import finding_identity
+from guardana.core.fingerprint import digest_of
 from guardana.core.manifest.identity import DeploymentRef
+from guardana.core.manifest.model import RunManifest
 from guardana.core.redaction import EvidenceRedactor
+from guardana.core.report import Finding
 from guardana.core.report.result import ScanResult
 from guardana.core.report.serialize import finding_to_dict
 
 _TIMEOUT_SECONDS = 30
 
-ENVELOPE_SCHEMA_VERSION = 6
+ENVELOPE_SCHEMA_VERSION = 7
 """Version of the JSON envelope POSTed to a collector.
 
 The collector is a separate service on its own release cadence, so the envelope
 is versioned: a collector that doesn't understand a version rejects it outright
 rather than silently misreading a renamed field.
 
+v7 says what the *run* was: its id, when it ran, which build produced it, what it
+cost, what redaction was applied — and, above all, its **gate**. A collector
+holding findings and no verdicts cannot tell a failing run from one whose findings
+a baseline waived. Each finding also carries the identity that links it to the same
+finding in another run, computed here because `guardana.core.diff` has owned that
+definition since 0.6 and a second one would diverge.
 v6 says *what* the run verified and *where*: the AI system, the environment, the
 deployment and the digests behind it. Without it a collector holds one
 undifferentiated stream per project, in which last night's production check sits
@@ -97,16 +108,48 @@ def _deployment(deployment: DeploymentRef) -> dict[str, str] | None:
     return declared or None
 
 
-def _serialize(result: ScanResult, *, source: str, deployment: DeploymentRef | None) -> bytes:
+def _run(manifest: RunManifest) -> dict[str, object]:
+    """Return the run's identity, verdict and cost — what a collector cannot derive."""
+    return {
+        "run_id": manifest.run_id,
+        "started_at": _moment(manifest.started_at),
+        "completed_at": _moment(manifest.completed_at),
+        "tool_version": manifest.guardana.version,
+        "gate": str(manifest.result_summary.gate),
+        "evidence_mode": str(manifest.privacy.evidence_mode),
+        "requests": manifest.usage.requests,
+        "input_tokens": manifest.usage.input_tokens,
+        "output_tokens": manifest.usage.output_tokens,
+        "wall_time_seconds": manifest.usage.wall_time_seconds,
+    }
+
+
+def _moment(value: datetime | None) -> str | None:
+    return None if value is None else value.isoformat()
+
+
+def _identified(finding: Finding, source: str) -> dict[str, object]:
+    """Serialize a finding, carrying the key that links it across runs."""
+    rule_id, location = finding_identity(finding, source)
+    return {**finding_to_dict(finding), "identity": digest_of(rule_id, location)}
+
+
+def _serialize(
+    result: ScanResult,
+    *,
+    source: str,
+    deployment: DeploymentRef | None,
+    run: RunManifest | None,
+) -> bytes:
     max_sev = result.max_severity()
     payload: dict[str, object] = {
         "schema_version": ENVELOPE_SCHEMA_VERSION,
         "source": source,
-        "findings": [finding_to_dict(f) for f in result.findings],
+        "findings": [_identified(f, source) for f in result.findings],
         # Never dropped: a check that ran but could not grade is not a pass. The
         # collector must see it, or a dashboard renders a false all-clear on a
         # model whose CRITICAL checks silently failed to run.
-        "unverified": [finding_to_dict(f) for f in result.unverified],
+        "unverified": [_identified(f, source) for f in result.unverified],
         "errors": [
             {"source": e.source, "stage": e.stage, "reason": e.reason} for e in result.errors
         ],
@@ -125,6 +168,8 @@ def _serialize(result: ScanResult, *, source: str, deployment: DeploymentRef | N
     declared = None if deployment is None else _deployment(deployment)
     if declared is not None:
         payload["deployment"] = declared
+    if run is not None:
+        payload["run"] = _run(run)
     return json.dumps(payload).encode("utf-8")
 
 
@@ -141,12 +186,13 @@ def _urllib_transport(url: str, payload: bytes, *, api_key: str | None) -> None:
 class HttpReporter:
     """Forwards findings to a `guardana-server` collector. Core never imports the server."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 — a destination, a credential, a run, and two seams
         self,
         url: str,
         *,
         api_key: str | None = None,
         deployment: DeploymentRef | None = None,
+        run: RunManifest | None = None,
         transport: Callable[[str, bytes], None] | None = None,
         redactor: EvidenceRedactor | None = None,
     ) -> None:
@@ -162,7 +208,12 @@ class HttpReporter:
         # stop satisfying the protocol over this. One reporter is built per run,
         # and `monitor` reuses one across repeated runs of the *same* target, so
         # the constructor is the honest home for it either way.
-        self._deployment = deployment
+        # Taken from the manifest when there is one, so the block on the wire cannot
+        # disagree with the run record it came from. `monitor` has a deployment and
+        # no manifest — its cycles are not saved runs — which is the only reason
+        # both are accepted.
+        self._deployment = run.deployment if run is not None else deployment
+        self._run = run
         self._transport = transport if transport is not None else self._default_transport
         # Applied here rather than by the caller: this is the path that leaves the
         # machine, and it must not depend on whoever wired the reporter up.
@@ -174,6 +225,9 @@ class HttpReporter:
     def submit(self, result: ScanResult, *, source: str) -> None:
         """POST the normalized envelope to the collector."""
         payload = _serialize(
-            self._redactor.redact_result(result), source=source, deployment=self._deployment
+            self._redactor.redact_result(result),
+            source=source,
+            deployment=self._deployment,
+            run=self._run,
         )
         self._transport(self._url, payload)

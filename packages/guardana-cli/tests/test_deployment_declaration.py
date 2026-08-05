@@ -136,7 +136,12 @@ def test_scan_forwards_the_declaration_to_the_collector(
 
     class _Recording:
         def __init__(
-            self, url: str, *, api_key: str | None = None, deployment: object = None
+            self,
+            url: str,
+            *,
+            api_key: str | None = None,
+            deployment: object = None,
+            run: object | None = None,
         ) -> None:
             self.deployment = deployment
 
@@ -176,7 +181,12 @@ def test_a_refused_submission_repeats_the_collectors_own_reason(
 
     class _Refusing:
         def __init__(
-            self, url: str, *, api_key: str | None = None, deployment: object = None
+            self,
+            url: str,
+            *,
+            api_key: str | None = None,
+            deployment: object = None,
+            run: object | None = None,
         ) -> None:
             pass
 

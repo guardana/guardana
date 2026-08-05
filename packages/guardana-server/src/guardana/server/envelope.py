@@ -8,14 +8,14 @@ and a version the collector does not understand is rejected, never guessed at.
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, field_validator
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 # A fleet upgrades one agent at a time, so the collector accepts the previous
 # envelopes too. An older agent simply reports less — which is honest, because it
 # could not observe more: a v2 agent had no `errors` channel, and a v3 agent
 # counted its rules without naming them.
-SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4, 5, 6})
+SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4, 5, 6, 7})
 
 # Ingest is untrusted input: an unbounded body would let one POST exhaust the
 # collector's memory (the store bounds submission *count*, not bytes). These caps
@@ -51,6 +51,16 @@ class VerdictIn(BaseModel):
 
 class FindingIn(BaseModel):
     """One finding, as serialized by `guardana.core.report.serialize`."""
+
+    identity: _Str | None = None
+    """What links this sighting to the same finding in another run (v7).
+
+    Computed by the engine, never here: `guardana.core.diff.finding_identity` has
+    decided since 0.6 what makes two sightings the same finding, and the collector
+    does not depend on `guardana-core`. Recomputing it would be a second definition
+    of "the same finding" in one product, in a package that cannot import the
+    first — and two of those are guaranteed to diverge.
+    """
 
     rule_id: _Str
     severity: _Str
@@ -150,6 +160,42 @@ class DeploymentIn(BaseModel):
         return self.deployment_id or self.commit_sha
 
 
+class RunIn(BaseModel):
+    """What the run itself was: its identity, its verdict, its cost (v7).
+
+    Not the whole run manifest. That is the engine's reproducibility record and is
+    versioned independently on purpose; folding it onto the wire would tie two
+    schemas that were separated deliberately and hand a collector rule digests it
+    has no question to ask of. What travels is what a collector cannot derive.
+    """
+
+    run_id: _Str | None = None
+    started_at: AwareDatetime | None = None
+    completed_at: AwareDatetime | None = None
+    """When the run actually ran, with a timezone or not at all.
+
+    `AwareDatetime`, so a naive timestamp is refused rather than stored as junk a
+    reader would silently interpret in whatever zone the collector happens to be
+    in. The manifest holds the same line for the same reason; a time nobody can
+    place is not a time.
+    """
+
+    tool_version: _Str | None = None
+    gate: _Str | None = None
+    """`pass`, `fail`, `indeterminate` — or absent, which is *not* a pass.
+
+    A collector holding findings and no verdicts cannot tell a failing run from one
+    whose findings a baseline waived. Absent means the agent could not say, and a
+    fleet with one old agent must not read as green because of it.
+    """
+
+    evidence_mode: _Str | None = None
+    requests: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    wall_time_seconds: float | None = None
+
+
 class Submission(BaseModel):
     """One agent's scan result, as POSTed to `/findings`."""
 
@@ -171,3 +217,7 @@ class Submission(BaseModel):
     # submits and simply reports less — which is honest, because it could not
     # observe more.
     deployment: DeploymentIn | None = None
+    # What the run was, as opposed to what it found (v7). Defaulted, so a v2-to-v6
+    # agent still submits and is stored as a run that did not say — never as one
+    # that passed.
+    run: RunIn | None = None

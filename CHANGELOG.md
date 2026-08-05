@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The collector knows whether a run passed.** A submission said which rules ran
+  and what they found, and nothing about the run itself — so "is production
+  failing" had no answer in it, because findings without a verdict cannot
+  distinguish a failing run from one whose findings a baseline waived. Envelope v7
+  carries the run's **gate**, its id, when it actually ran, which build produced
+  it, what redaction was applied and what it cost. **An absent gate is recorded as
+  unknown and never as a pass**: a fleet with one old agent must not read as green
+  because the old agent could not speak.
+- **A finding is followed across runs.** Each finding carries the identity
+  `guardana.core.diff.finding_identity` has computed since 0.6 — the rule and where
+  it was found, never the evaluator's rationale. Computed by the engine and only
+  there: the collector does not depend on `guardana-core`, so recomputing it would
+  put a second definition of "the same finding" in a package that cannot import the
+  first. `guardana-collector finding list` groups by it and says how many runs saw
+  each and when, which is the "has this been there since Tuesday" question.
+- **A retried pipeline job is stored once.** The same run id in the same project is
+  accepted with `200` and `"duplicate": true` rather than stored again — a retry is
+  not a failure and must not turn a pipeline red, and storing it twice would make
+  "production got worse" answer from a duplicate. A pre-v7 agent sends no run id,
+  identifies nothing, and is still stored every time.
+- **`guardana-collector run list`** — the time axis, with the gate, the system and
+  the environment. A run that did not say prints `unknown`, never blank.
 - **A collector knows what a run verified, where it runs, and which version of
   it.** `guardana scan|probe|monitor --ai-system support-agent --environment
   production --deployment-id 2026-08-05.3`, or the same three as
@@ -89,6 +111,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed — found by reviewing this release's own code
 
+- **`guardana scan` on a path that does not exist printed "✓ No findings" and
+  exited `0`.** A typo'd path in a pipeline gated a build on nothing at all —
+  the worst shape of false green this project has, reached with one keystroke.
+  It is now a usage error (`3`), the same code `plan`, `target inspect` and
+  `baseline` already used for it. An *empty* directory is still a clean pass:
+  nothing to find is not nothing to look at.
+- **`finding list` reported the alphabetically-largest severity, not the worst.**
+  `MEDIUM` sorts above `HIGH` and `CRITICAL`, so a finding seen at both would have
+  been shown as the lower one — a security tool understating its own severity,
+  which is the direction that matters because nobody re-checks a finding the tool
+  already called minor.
 - **The environment pin is enforced by the store, not by the endpoint.** It lived
   in `POST /findings`, so any other caller of `Store.add` could have written a row
   labelled with an environment its credential may not reach — and the next caller

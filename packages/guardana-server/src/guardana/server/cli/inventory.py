@@ -10,7 +10,16 @@ import argparse
 from typing import TYPE_CHECKING
 
 from guardana.server.cli.codes import EXIT_OK
-from guardana.server.inventory import InventoryEntry, ai_systems, deployments, environments
+from guardana.server.inventory import (
+    FindingEntry,
+    InventoryEntry,
+    RunEntry,
+    ai_systems,
+    deployments,
+    environments,
+    findings,
+    runs,
+)
 
 if TYPE_CHECKING:
     from psycopg import Connection
@@ -22,11 +31,13 @@ _NOTHING_YET = (
 
 
 def add_arguments(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
-    """Register the `system`, `environment` and `deployment` command groups."""
+    """Register the five read-only listing command groups."""
     for command, help_text in (
         ("system", "List the AI systems runs have reported against."),
         ("environment", "List the environments runs have reported against."),
         ("deployment", "List the deployments runs have identified."),
+        ("run", "List the runs this collector holds, newest first."),
+        ("finding", "List distinct findings, with how many runs saw each."),
     ):
         parser = commands.add_parser(command, help=help_text)
         parser.set_defaults(handler=run)
@@ -35,6 +46,9 @@ def add_arguments(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
         listing.add_argument("--project", metavar="ORG/PROJECT", help="Only this project.")
         if command == "deployment":
             listing.add_argument("--ai-system", help="Only this AI system's deployments.")
+        if command in {"run", "finding"}:
+            listing.add_argument("--environment", help="Only this environment.")
+            listing.add_argument("--limit", type=int, default=50, help="How many (default 50).")
 
 
 def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
@@ -43,8 +57,49 @@ def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...
         return _print(ai_systems(connection, arguments.project), "AI systems", "ai-system")
     if arguments.command == "environment":
         return _print(environments(connection, arguments.project), "environments", "environment")
+    if arguments.command == "run":
+        return _print_runs(
+            runs(connection, arguments.project, arguments.environment, arguments.limit)
+        )
+    if arguments.command == "finding":
+        return _print_findings(
+            findings(connection, arguments.project, arguments.environment, arguments.limit)
+        )
     found = deployments(connection, arguments.project, arguments.ai_system)
     return _print(found, "deployments", "deployment-id")
+
+
+def _print_runs(entries: tuple[RunEntry, ...]) -> int:
+    if not entries:
+        print("no runs yet — point one at this collector with `--reporter server://…`")
+        return EXIT_OK
+    for entry in entries:
+        # A run that did not say is printed as unknown, never blank and never as a
+        # pass: a fleet with one old agent must not read as green.
+        gate = entry.gate or "unknown"
+        where = "/".join(part for part in (entry.ai_system, entry.environment) if part)
+        print(
+            f"{entry.received_at}  {gate:13} {entry.project_ref:20} "
+            f"{where or '-':28} {entry.source}"
+        )
+    return EXIT_OK
+
+
+def _print_findings(entries: tuple[FindingEntry, ...]) -> int:
+    if not entries:
+        print(
+            "no findings with an identity yet — an agent older than 0.9 sends none, "
+            "and sightings that cannot be linked are not grouped"
+        )
+        return EXIT_OK
+    for entry in entries:
+        print(
+            f"{entry.severity:9} {entry.rule_id:48} "
+            f"{entry.occurrences:4} runs  "
+            f"{entry.first_seen} → {entry.last_seen}  "
+            f"{entry.target_ref}"
+        )
+    return EXIT_OK
 
 
 def _print(entries: tuple[InventoryEntry, ...], plural: str, flag: str) -> int:

@@ -113,7 +113,7 @@ def create_app(
                 ),
             )
         try:
-            active_store.add(_scope_of(identity), submission)
+            stored = active_store.add(_scope_of(identity), submission)
         except EnvironmentMismatchError as exc:
             # `403`, like a missing scope: the caller *is* somebody, and that
             # somebody may not write here. A `422` would read as "your envelope is
@@ -123,7 +123,11 @@ def create_app(
             raise HTTPException(status_code=_FORBIDDEN, detail=str(exc)) from exc
         return {
             "status": "ok",
-            "stored": len(submission.findings),
+            # `False` when this run was already held: a retried job is not a
+            # failure, and a log that says "stored 12" about a run it stored
+            # nothing for is a log that double-counts.
+            "duplicate": not stored,
+            "stored": len(submission.findings) if stored else 0,
             # Echoed so a pipeline's log records which credential wrote the run and
             # into which tenant — the first thing anyone asks of an audit trail.
             "accepted_by": identity.name if identity is not None else None,

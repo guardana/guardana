@@ -14,10 +14,24 @@ environment that must never skip them is the one that cannot.
 import os
 import uuid
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, NamedTuple
 
 import psycopg
 import pytest
+from guardana.server.db.migrations import apply_pending
+from guardana.server.envelope import (
+    CheckErrorIn,
+    EvidenceIn,
+    FindingIn,
+    SkippedIn,
+    Submission,
+    SummaryIn,
+    TaxonomyRefIn,
+    VerdictIn,
+)
+from guardana.server.postgres_store import PostgresStore
+from guardana.server.store import InMemoryStore, Store
+from guardana.server.tenancy import TenantScope, create_organization, create_project
 
 DbConnection = psycopg.Connection[tuple[Any, ...]]
 """What the `connection` fixture yields. Named so tests annotate it rather than `Any`."""
@@ -75,3 +89,76 @@ def connection(database_url: str) -> Iterator[DbConnection]:
     """An open connection to this test's own database."""
     with psycopg.connect(database_url) as open_connection:
         yield open_connection
+
+
+_TICK = iter(range(1_000_000))
+
+
+def _clock() -> float:
+    """A monotonic fake clock, so `received_at` orders deterministically in both stores."""
+    return float(next(_TICK))
+
+
+class Scoped(NamedTuple):
+    """A store and a tenant to use it as. Every store call needs both."""
+
+    store: Store
+    scope: TenantScope
+
+
+@pytest.fixture(params=["memory", "postgres"])
+def scoped(request: pytest.FixtureRequest) -> Iterator[Scoped]:
+    if request.param == "memory":
+        yield Scoped(InMemoryStore(clock=_clock), TenantScope.for_project(1))
+        return
+    url = request.getfixturevalue("database_url")
+    with psycopg.connect(url) as connection:
+        apply_pending(connection)
+        create_organization(connection, "acme", "Acme")
+        project = create_project(connection, "acme", "web", "Web")
+    yield Scoped(PostgresStore(url, clock=_clock), TenantScope.for_project(project.id))
+
+
+def _submission(source: str = "app", **overrides: object) -> Submission:
+    defaults: dict[str, Any] = {
+        "source": source,
+        "schema_version": 5,
+        "findings": [
+            FindingIn(
+                rule_id="guardana.supply_chain.hardcoded_secret",
+                severity="HIGH",
+                title="Hardcoded secret",
+                target_ref="app/settings.py",
+                evidence=EvidenceIn(summary="[redacted:aws-key:abc]", detail="line 1"),
+                taxonomy=[TaxonomyRefIn(framework="OWASP-LLM", id="LLM02")],
+            )
+        ],
+        "unverified": [
+            FindingIn(
+                rule_id="guardana.prompt.injection.ignore_previous",
+                severity="MEDIUM",
+                title="Could not grade",
+                target_ref="http://x#m",
+                evidence=EvidenceIn(summary="the judge did not answer"),
+                verdict=VerdictIn(
+                    outcome="inconclusive",
+                    confidence=0.0,
+                    rationale="no reply",
+                    evaluator_id="llm_judge",
+                ),
+            )
+        ],
+        "errors": [CheckErrorIn(source="acme.rule", stage="run", reason="boom")],
+        "summary": SummaryIn(
+            rules_run=19,
+            rules_executed=["guardana.supply_chain.hardcoded_secret"],
+            rules_skipped=[
+                SkippedIn(rule_id="guardana.agent.tool_use", reason="missing_capability")
+            ],
+            max_severity="HIGH",
+            unverified=1,
+            errors=1,
+        ),
+    }
+    defaults.update(overrides)
+    return Submission(**defaults)

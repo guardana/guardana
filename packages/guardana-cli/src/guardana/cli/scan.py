@@ -57,6 +57,23 @@ def _announce_baseline_health(accepted: Baseline) -> None:
         )
 
 
+def _refuse_a_target_that_is_not_there(path: Path) -> None:
+    """Refuse to "scan" something that does not exist.
+
+    A missing directory yields no files, so the run reported "no findings" and
+    exited `0` — a typo in a CI path gating a build on nothing at all. That is the
+    worst shape of false green this project has: an excluded scanner is an
+    organisation-level fail-open, and a scanner pointed at nothing is the same
+    thing reached with one keystroke.
+
+    An *empty* directory is a different answer and stays a pass: nothing to find is
+    not nothing to look at.
+    """
+    if not path.exists():
+        typer.echo(f"error: {path} does not exist, so there is nothing to scan", err=True)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
+
+
 def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     path: Annotated[Path, typer.Argument(help="Directory to scan")],
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
@@ -124,6 +141,7 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
     """Statically scan a path for AI supply-chain risk (no model needed)."""
     if baseline is not None and write_baseline is not None:
         raise typer.BadParameter("pass either --baseline or --write-baseline, not both")
+    _refuse_a_target_that_is_not_there(path)
     prof = resolve_profile(profile, preset)
     # --no-plugins builds a bare Registry, so no entry-point code is imported or
     # run (see SECURITY.md). Custom YAML rules still load, but one whose evaluator
@@ -200,5 +218,5 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
     )
     emit(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
-        submit_safely(reporter, result, source=str(path), deployment=deployment)
+        submit_safely(reporter, result, source=str(path), deployment=deployment, run=run)
     exit_with(outcome, result)

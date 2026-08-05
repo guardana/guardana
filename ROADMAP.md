@@ -280,8 +280,8 @@ constant in the code by a test.
 | `--resume` for an interrupted run | needs a checkpoint format; exit `7` already says a run was partial |
 | cost in money (`estimated_cost` stays null) | needs a price table, which must be profile data — an invented cost is worse than none |
 | token and duration prediction in `plan` | nothing can know a request's cost before it is answered, and a guessed figure is one a team would budget against |
-| the collector envelope carrying the manifest | belongs with the collector work, not ahead of it |
-| deployment identifiers populated from CI | recorded but not yet filled in; needs the CI-integration work |
+| the collector envelope carrying the manifest | *(done in 0.9: v7 carries the run's verdict, cost and identity — deliberately not the whole manifest)* |
+| deployment identifiers populated from CI | *(done in 0.9: the commit is read from whatever CI it is; the system and the environment are declared, never guessed)* |
 | streaming, seed, log-prob and rate-limit probes | `target inspect` covers the four capabilities rules actually depend on |
 | separate local and collector evidence policies | lands with the collector |
 | signature verification of plugin packs | needs a distribution story this project does not have yet |
@@ -367,6 +367,11 @@ Landed in **0.9.0**:
   from what runs name rather than registered in advance, because a pipeline that
   fails on a missing prerequisite gets commented out rather than fixed
   ([design](docs/design/ai-systems-and-deployments.md));
+- **runs and findings, not just submissions** — the run's gate, cost, build and
+  timing reach the collector, an absent gate is unknown rather than a pass, a
+  retried job is stored once, and each finding carries the identity `diff` has used
+  since 0.6 so `finding list` can say how many runs have seen it
+  ([design](docs/design/collector-runs-and-findings.md));
 - **the reporter reaches the collector at the URL a user writes**, which it had
   never done: aimed at a bare collector URL it POSTed to `/`, took a `404`, and
   the scan still exited `0`.

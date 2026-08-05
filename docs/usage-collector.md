@@ -100,6 +100,30 @@ An unpinned key sees the whole project, labelled runs and unlabelled ones alike.
 environment, and folding them into every one would let a laptop run appear as
 production evidence.
 
+## Reading back what the collector holds
+
+```bash
+guardana-collector run list [--project acme/web] [--environment production]
+guardana-collector finding list [--project acme/web] [--environment production]
+```
+
+`run list` is the time axis: when a run arrived, which system and environment it
+was about, its **gate**, and where it came from. The gate is the fact a collector
+without it cannot supply — findings alone cannot tell a failing run from one whose
+findings a baseline waived. A run whose agent did not say prints `unknown`, never
+blank and never `pass`.
+
+`finding list` groups every sighting by the identity the engine computes — the rule
+and where it was found, never the evaluator's rationale, which moves on every
+re-run — and shows how many runs saw it, first and last. That is the "has this been
+there since Tuesday, or is it new" question.
+
+**A retried job is stored once.** The same run id in the same project is accepted
+with `200` and `"duplicate": true` instead of being stored again: a retry is not a
+failure and must not turn a pipeline red, and counting it twice would make a
+regression answer from a duplicate. An agent older than 0.9 sends no run id,
+identifies nothing, and is stored every time — which is honest, not clever.
+
 ## Organizations and projects
 
 **The tenant is the project.** An organization is what a project belongs to and

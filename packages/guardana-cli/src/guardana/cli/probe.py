@@ -194,7 +194,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
         )
         emit(get_renderer(format.value, run=run).render(result), output, format.value)
         if reporter:
-            submit_safely(reporter, result, source=mcp, deployment=deployment)
+            submit_safely(reporter, result, source=mcp, deployment=deployment, run=run)
         exit_with(outcome, result)
         return
 
@@ -237,5 +237,5 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
     )
     emit(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
-        submit_safely(reporter, result, source=f"{url}#{model}", deployment=deployment)
+        submit_safely(reporter, result, source=f"{url}#{model}", deployment=deployment, run=run)
     exit_with(outcome, result)

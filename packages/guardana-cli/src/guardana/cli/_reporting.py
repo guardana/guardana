@@ -3,7 +3,7 @@ import os
 from urllib.error import HTTPError, URLError
 
 import typer
-from guardana.core.manifest import DeploymentRef
+from guardana.core.manifest import DeploymentRef, RunManifest
 from guardana.core.report import ScanResult
 from guardana.core.reporter import HttpReporter
 from guardana.core.target import EndpointError
@@ -24,7 +24,9 @@ follows the same rule one step further by naming the variable itself.
 _COLLECTOR_UNREACHABLE = (OSError, URLError, EndpointError)
 
 
-def reporter_from_url(url: str, deployment: DeploymentRef | None = None) -> HttpReporter:
+def reporter_from_url(
+    url: str, deployment: DeploymentRef | None = None, run: RunManifest | None = None
+) -> HttpReporter:
     """Build the `HttpReporter` for a `--reporter` CLI flag value.
 
     Accepts either a bare collector URL or one prefixed with the `server://` scheme,
@@ -36,7 +38,10 @@ def reporter_from_url(url: str, deployment: DeploymentRef | None = None) -> Http
     """
     target = url.removeprefix(_SERVER_SCHEME)
     return HttpReporter(
-        target, api_key=os.environ.get(TOKEN_VARIABLE) or None, deployment=deployment
+        target,
+        api_key=os.environ.get(TOKEN_VARIABLE) or None,
+        deployment=deployment,
+        run=run,
     )
 
 
@@ -52,7 +57,12 @@ def _why(exc: HTTPError) -> str:
 
 
 def submit_safely(
-    url: str, result: ScanResult, *, source: str, deployment: DeploymentRef | None = None
+    url: str,
+    result: ScanResult,
+    *,
+    source: str,
+    deployment: DeploymentRef | None = None,
+    run: RunManifest | None = None,
 ) -> None:
     """Forward findings to a collector, degrading to a warning if it is unreachable.
 
@@ -62,7 +72,7 @@ def submit_safely(
     their findings are not being collected.
     """
     try:
-        reporter_from_url(url, deployment).submit(result, source=source)
+        reporter_from_url(url, deployment, run).submit(result, source=source)
     except HTTPError as exc:
         # A rejected envelope is not an outage — swallowing it as "unreachable" is
         # how a whole fleet can stop reporting while the dashboard keeps showing

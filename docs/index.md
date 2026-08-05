@@ -67,6 +67,7 @@ status means:
 - [`design/collector-persistence.md`](design/collector-persistence.md) — collector persistence and migrations
 - [`design/collector-tenancy.md`](design/collector-tenancy.md) — organizations, projects, and the scope on every query
 - [`design/ai-systems-and-deployments.md`](design/ai-systems-and-deployments.md) — what was verified, where it runs, and which version of it
+- [`design/collector-runs-and-findings.md`](design/collector-runs-and-findings.md) — the run's verdict, and following one finding across runs
 
 ## Project direction
 

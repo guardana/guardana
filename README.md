@@ -366,10 +366,11 @@ visibility, any run can forward its normalized findings to a collector with
 > that carries a finding, **isolates one project from another**, and records **what
 > each run verified and where**: AI system, environment, deployment and the commit
 > behind it. A key may be **pinned to one environment**, and then it writes and
-> reads only that one. Standing one up is three commands, because
-> `guardana-collector bootstrap` creates the organization, the project and the
-> first key together. Still missing: a finding lifecycle, an audit log, retention
-> and restore-tested backup — see
+> reads only that one. It records **whether each run passed its gate**, what it
+> cost, and the identity that links a finding to the same finding next week.
+> Standing one up is three commands, because `guardana-collector bootstrap` creates
+> the organization, the project and the first key together. Still missing: a finding
+> lifecycle, an audit log, retention and restore-tested backup — see
 > [`docs/usage-collector.md`](docs/usage-collector.md) and
 > [the collector design](docs/design/collector-domain-model.md).
 

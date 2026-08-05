@@ -551,3 +551,122 @@ def test_the_unpinned_read_index_survives_the_environment_one(connection: DbConn
         names = {str(row[0]) for row in cursor.fetchall()}
     assert "submissions_project_received_idx" in names
     assert "submissions_project_environment_idx" in names
+
+
+_RUN_COLUMNS = frozenset(
+    {
+        "run_id",
+        "started_at",
+        "completed_at",
+        "tool_version",
+        "gate",
+        "evidence_mode",
+        "requests",
+        "input_tokens",
+        "output_tokens",
+        "wall_time_seconds",
+    }
+)
+
+
+def test_the_run_columns_and_the_finding_identity_arrive(connection: DbConnection) -> None:
+    apply_pending(connection)
+
+    assert _columns(connection, "submissions") >= _RUN_COLUMNS
+    assert "identity" in _columns(connection, "findings")
+
+
+def test_the_run_columns_arrive_nullable_so_nothing_needs_adopting(
+    connection: DbConnection,
+) -> None:
+    """A submission already stored is a run that did not say what its gate was.
+
+    Backfilling one would mean inventing a verdict for a run nobody can re-examine,
+    and an invented pass is the worst possible default.
+    """
+    _apply_through(connection, 4)
+    _legacy_submission_in_a_project(connection)
+
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select source, gate, run_id from submissions")
+        assert cursor.fetchall() == [("legacy", None, None)]
+
+
+def test_one_run_id_cannot_be_stored_twice_in_one_project(connection: DbConnection) -> None:
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id, run_id) "
+            "values (now(), 'ci', 7, %s, 'run-1')",
+            (project.id,),
+        )
+        connection.commit()
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            cursor.execute(
+                "insert into submissions (received_at, source, schema_version, project_id, "
+                "run_id) values (now(), 'ci', 7, %s, 'run-1')",
+                (project.id,),
+            )
+    connection.rollback()
+
+
+def test_the_same_run_id_in_two_projects_is_two_runs(connection: DbConnection) -> None:
+    # The index is scoped like everything else: two teams whose pipelines happen to
+    # mint the same identifier are not one run.
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    one = create_project(connection, "acme", "web", "Web")
+    two = create_project(connection, "acme", "api", "API")
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            "insert into submissions (received_at, source, schema_version, project_id, run_id) "
+            "values (now(), 'ci', 7, %s, 'run-1')",
+            [(one.id,), (two.id,)],
+        )
+    connection.commit()
+
+    with connection.cursor() as cursor:
+        cursor.execute("select count(*) from submissions where run_id = 'run-1'")
+        assert cursor.fetchone() == (2,)
+
+
+def test_runs_without_an_id_are_all_stored(connection: DbConnection) -> None:
+    """A pre-v7 agent identifies nothing, so nothing may be treated as a duplicate."""
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            "insert into submissions (received_at, source, schema_version, project_id) "
+            "values (now(), 'ci', 6, %s)",
+            [(project.id,), (project.id,)],
+        )
+    connection.commit()
+
+    with connection.cursor() as cursor:
+        cursor.execute("select count(*) from submissions")
+        assert cursor.fetchone() == (2,)
+
+
+def test_rolling_back_the_run_columns_keeps_the_submissions(connection: DbConnection) -> None:
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id, gate) "
+            "values (now(), 'kept', 7, %s, 'fail')",
+            (project.id,),
+        )
+    connection.commit()
+
+    _roll_back_through(connection, 5)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select source from submissions")
+        assert cursor.fetchall() == [("kept",)]
+    assert not (_RUN_COLUMNS & _columns(connection, "submissions"))

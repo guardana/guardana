@@ -18,6 +18,7 @@ from guardana.server.envelope import (
     DeploymentIn,
     EvidenceIn,
     FindingIn,
+    RunIn,
     Submission,
     SummaryIn,
     TaxonomyRefIn,
@@ -64,6 +65,51 @@ def _label_values(deployment: DeploymentIn | None) -> tuple[str | None, ...]:
         deployment.model_name,
         deployment.model_revision,
     )
+
+
+_RUN = (
+    "run_id",
+    "started_at",
+    "completed_at",
+    "tool_version",
+    "gate",
+    "evidence_mode",
+    "requests",
+    "input_tokens",
+    "output_tokens",
+    "wall_time_seconds",
+)
+"""What the run itself was — its identity, its verdict, its cost.
+
+`gate` is the one this exists for: findings without verdicts cannot distinguish a
+failing run from one whose findings a baseline waived. Null means the agent did not
+say, and is never read as a pass.
+"""
+
+
+def _run_values(run: RunIn | None) -> tuple[object, ...]:
+    """Return the ten run columns for one submission, all `None` when the agent did not say."""
+    if run is None:
+        return (None,) * len(_RUN)
+    return (
+        run.run_id,
+        run.started_at,
+        run.completed_at,
+        run.tool_version,
+        run.gate,
+        run.evidence_mode,
+        run.requests,
+        run.input_tokens,
+        run.output_tokens,
+        run.wall_time_seconds,
+    )
+
+
+def _run(row: tuple[Any, ...]) -> RunIn | None:
+    """Rebuild the run block, or `None` when the agent said nothing about itself."""
+    if not any(value is not None for value in row):
+        return None
+    return RunIn(**dict(zip(_RUN, row, strict=True)))
 
 
 def _deployment(row: tuple[Any, ...]) -> DeploymentIn | None:
@@ -115,7 +161,7 @@ class PostgresStore:
         with connect(self._url, row_factory=tuple_row) as connection:
             yield connection
 
-    def add(self, scope: TenantScope, submission: Submission) -> None:
+    def add(self, scope: TenantScope, submission: Submission) -> bool:
         """Store one submission and every finding it carries, in one transaction.
 
         One transaction because a submission whose findings were half written is a
@@ -140,9 +186,13 @@ class PostgresStore:
                     project_id, received_at, source, schema_version, rules_run, rules_executed,
                     rules_skipped, max_severity, unverified, error_count, errors,
                     ai_system, environment, deployment_ref, commit_sha, image_digest,
-                    model_digest, model_name, model_revision
+                    model_digest, model_name, model_revision,
+                    run_id, started_at, completed_at, tool_version, gate, evidence_mode,
+                    requests, input_tokens, output_tokens, wall_time_seconds
                 ) values (%s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                          %s, %s, %s, %s, %s, %s, %s, %s)
+                          %s, %s, %s, %s, %s, %s, %s, %s,
+                          %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                on conflict (project_id, run_id) where run_id is not null do nothing
                 returning id
                 """,
                 (
@@ -160,14 +210,19 @@ class PostgresStore:
                     len(submission.errors),
                     json.dumps([error.model_dump() for error in submission.errors]),
                     *_label_values(submission.deployment),
+                    *_run_values(submission.run),
                 ),
             )
             row = cursor.fetchone()
-            if row is None:  # pragma: no cover — `returning id` always returns a row
-                raise RuntimeError("the submission insert returned no id")
+            if row is None:
+                # The run is already stored. A retried pipeline job is not a failure
+                # and must not become one, and storing it twice would make
+                # "production got worse" answer from a duplicate.
+                return False
             submission_id = int(row[0])
             self._insert_findings(cursor, submission_id, _FINDINGS, submission.findings)
             self._insert_findings(cursor, submission_id, _UNVERIFIED, submission.unverified)
+        return True
 
     @staticmethod
     def _insert_findings(
@@ -183,8 +238,9 @@ class PostgresStore:
                 insert into findings (
                     submission_id, channel, position, rule_id, severity, title, target_ref,
                     evidence_summary, evidence_detail, taxonomy,
-                    verdict_outcome, verdict_confidence, verdict_rationale, verdict_evaluator
-                ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    verdict_outcome, verdict_confidence, verdict_rationale, verdict_evaluator,
+                    identity
+                ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     submission_id,
@@ -201,6 +257,7 @@ class PostgresStore:
                     verdict.confidence if verdict else None,
                     verdict.rationale if verdict else None,
                     verdict.evaluator_id if verdict else None,
+                    finding.identity,
                 ),
             )
 
@@ -249,7 +306,9 @@ class PostgresStore:
                 select id, extract(epoch from received_at), source, schema_version, rules_run,
                        rules_executed, rules_skipped, max_severity, unverified, errors,
                        ai_system, environment, deployment_ref, commit_sha, image_digest,
-                       model_digest, model_name, model_revision
+                       model_digest, model_name, model_revision,
+                       run_id, started_at, completed_at, tool_version, gate, evidence_mode,
+                       requests, input_tokens, output_tokens, wall_time_seconds
                 from submissions
                 where project_id = %s
                       and (%s::text is null or environment = %s)
@@ -276,7 +335,8 @@ class PostgresStore:
             """
             select submission_id, channel, rule_id, severity, title, target_ref,
                    evidence_summary, evidence_detail, taxonomy,
-                   verdict_outcome, verdict_confidence, verdict_rationale, verdict_evaluator
+                   verdict_outcome, verdict_confidence, verdict_rationale, verdict_evaluator,
+                   identity
             from findings
             where submission_id = any(%s)
             order by submission_id, channel, position
@@ -291,9 +351,10 @@ class PostgresStore:
 
 
 def _finding(row: tuple[Any, ...]) -> FindingIn:
-    (_, _, rule_id, severity, title, target_ref, summary, detail, taxonomy, *verdict) = row
-    outcome, confidence, rationale, evaluator = verdict
+    (_, _, rule_id, severity, title, target_ref, summary, detail, taxonomy, *rest) = row
+    outcome, confidence, rationale, evaluator, identity = rest
     return FindingIn(
+        identity=identity,
         rule_id=rule_id,
         severity=severity,
         title=title,
@@ -325,8 +386,9 @@ def _record(row: tuple[Any, ...], channels: dict[str, list[FindingIn]]) -> Store
         max_severity,
         unverified,
         errors,
-        *labels,
+        *tail,
     ) = row
+    labels, run = tail[: len(_LABELS)], tail[len(_LABELS) :]
     return StoredSubmission(
         received_at=float(received_at),
         submission=Submission(
@@ -344,6 +406,7 @@ def _record(row: tuple[Any, ...], channels: dict[str, list[FindingIn]]) -> Store
                 errors=len(errors),
             ),
             deployment=_deployment(tuple(labels)),
+            run=_run(tuple(run)),
         ),
     )
 

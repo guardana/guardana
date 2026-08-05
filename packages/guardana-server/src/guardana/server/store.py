@@ -42,8 +42,14 @@ class Store(Protocol):
     without one sees red.
     """
 
-    def add(self, scope: TenantScope, submission: Submission) -> None:
-        """Store one submission for one tenant, stamping it with the receive time."""
+    def add(self, scope: TenantScope, submission: Submission) -> bool:
+        """Store one submission for one tenant, and say whether it was new.
+
+        `False` means this run is already held: a retried pipeline job re-sends its
+        run, and storing it twice would make "production got worse" answer from a
+        duplicate. Reported rather than silent, so the pipeline's own log does not
+        say "stored 12 findings" about a run it stored nothing for.
+        """
         ...
 
     def submissions(
@@ -96,13 +102,26 @@ class InMemoryStore:
         self._lock = threading.Lock()
         self._clock = clock
 
-    def add(self, scope: TenantScope, submission: Submission) -> None:
-        """Store one submission (stamped with the receive time), evicting the oldest when full."""
+    def add(self, scope: TenantScope, submission: Submission) -> bool:
+        """Store one submission unless this run is already held; evict the oldest when full."""
         record = StoredSubmission(
             received_at=self._clock(), submission=labelled_for(scope, submission)
         )
+        run_id = submission.run.run_id if submission.run else None
         with self._lock:
+            if run_id is not None and self._holds(scope, run_id):
+                return False
             self._records.append((scope, record))
+        return True
+
+    def _holds(self, scope: TenantScope, run_id: str) -> bool:
+        """Whether this tenant already has that run. Called under the lock."""
+        return any(
+            held_scope.project_id == scope.project_id
+            and held.submission.run is not None
+            and held.submission.run.run_id == run_id
+            for held_scope, held in self._records
+        )
 
     def submissions(
         self, scope: TenantScope, source: str | None = None, limit: int | None = None

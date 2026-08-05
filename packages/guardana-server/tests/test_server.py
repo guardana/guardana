@@ -11,6 +11,7 @@ from guardana.core.reporter import HttpReporter
 from guardana.core.severity import Severity
 from guardana.core.taxonomy import OWASP_LLM01
 from guardana.server import create_app
+from guardana.server.envelope import SCHEMA_VERSION
 from guardana.server.store import InMemoryStore
 from guardana.server.tenancy import TenantScope
 
@@ -73,6 +74,7 @@ def test_collector_accepts_the_envelope_the_reporter_actually_sends() -> None:
     # explicitly-unauthenticated evaluation mode where there is neither.
     assert response.json() == {
         "status": "ok",
+        "duplicate": False,
         "stored": 2,
         "accepted_by": None,
         "project": None,
@@ -374,7 +376,7 @@ def test_the_collector_accepts_the_deployment_block_the_reporter_actually_sends(
     reporter.submit(_result(), source="ci")
     envelope = json.loads(captured[0])
 
-    assert envelope["schema_version"] == 6
+    assert envelope["schema_version"] == SCHEMA_VERSION
     client = _client()
     assert client.post("/findings", json=envelope).status_code == _OK
     stored = client.get("/findings").json()[0]

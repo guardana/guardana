@@ -11,6 +11,7 @@ from collections.abc import Callable
 
 import psycopg
 import pytest
+from conftest import _clock, _submission
 from fastapi.testclient import TestClient
 from guardana.server import create_app
 from guardana.server.auth import Scope, generate_key, store_key
@@ -26,7 +27,6 @@ from guardana.server.tenancy import (
     create_project,
     resolve_project,
 )
-from test_store_contract import _clock, _submission
 
 _OK = 200
 _SUBMISSION = {
@@ -532,3 +532,21 @@ def test_an_environment_that_is_only_whitespace_is_no_environment(
 
     stored = client.get("/findings", headers=_bearer(open_key)).json()[0]
     assert stored["deployment"]["environment"] is None
+
+
+def test_a_retried_submission_answers_ok_and_says_it_was_a_duplicate(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A retry is not a failure, so it must not turn a pipeline red — and must not
+    make the pipeline's own log claim it stored findings it did not."""
+    client, _, open_key = _pinned_collector(database_url, monkeypatch)
+    body = {**_envelope("dev"), "schema_version": 7, "run": {"run_id": "retried", "gate": "fail"}}
+
+    first = client.post("/findings", json=body, headers=_bearer(open_key))
+    second = client.post("/findings", json=body, headers=_bearer(open_key))
+
+    assert (first.status_code, second.status_code) == (_OK, _OK)
+    assert first.json()["duplicate"] is False
+    assert second.json()["duplicate"] is True
+    assert second.json()["stored"] == 0
+    assert len(client.get("/findings", headers=_bearer(open_key)).json()) == 1

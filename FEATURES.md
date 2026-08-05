@@ -488,7 +488,14 @@ collector records the names runs use rather than requiring them in advance, and
 **pinned to one environment** and then writes and reads only that one — a run
 declaring another is refused, a run declaring nothing is stored under the pin.
 
-Any run forwards normalized findings with `--reporter server://…` (envelope v6,
+**Runs and findings, not just submissions.** Envelope v7 carries the run's **gate**,
+its id, when it ran, which build produced it, what redaction was applied and what it
+cost — and each finding carries the identity `guardana diff` has used since 0.6, so
+`finding list` can say how many runs have seen it. An absent gate is `unknown`,
+never a pass. The same run id twice is stored once and answered `duplicate`, so a
+retried pipeline job does not double-count.
+
+Any run forwards normalized findings with `--reporter server://…` (envelope v7,
 sent to the collector URL — the reporter appends the route). The collector (`guardana-server`) is strictly additive and
 separately deployed — the engine never depends on it, enforced by an
 import-linter contract and a test. It ships an **opt-in monitoring dashboard**

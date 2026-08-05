@@ -150,3 +150,39 @@ def test_scan_with_custom_rules_dir_runs_clean(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "warning: could not load rule" not in result.output
+
+
+def test_scanning_a_path_that_does_not_exist_is_a_usage_error(tmp_path: Path) -> None:
+    """The worst false green there is: a typo'd path in CI, reported as a clean scan.
+
+    `guardana scan /srv/mdoels` printed "✓ No findings", exited 0, and gated a
+    build on nothing at all. An excluded scanner is an organisation-level
+    fail-open, and a scanner pointed at nothing is the same thing reached by a
+    keystroke.
+    """
+    missing = tmp_path / "not-here"
+
+    result = runner.invoke(app, ["scan", str(missing)])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE
+    assert "does not exist" in result.output
+
+
+def test_scanning_an_empty_directory_is_still_a_clean_pass(tmp_path: Path) -> None:
+    # The distinction that makes the test above meaningful: nothing to find is a
+    # pass, nothing to look at is not.
+    (tmp_path / "empty").mkdir()
+
+    result = runner.invoke(app, ["scan", str(tmp_path / "empty")])
+
+    assert result.exit_code == ExitCode.OK
+    assert "No findings" in result.output
+
+
+def test_scanning_a_single_file_still_works(tmp_path: Path) -> None:
+    target = tmp_path / "app.py"
+    target.write_text("print('hello')\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["scan", str(target)])
+
+    assert result.exit_code == ExitCode.OK

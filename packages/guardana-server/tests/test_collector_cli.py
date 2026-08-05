@@ -11,7 +11,7 @@ from conftest import DbConnection
 from guardana.server.auth import Scope, list_keys
 from guardana.server.cli import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK, main
 from guardana.server.db.migrations import apply_pending, read_state
-from guardana.server.envelope import DeploymentIn, Submission
+from guardana.server.envelope import DeploymentIn, EvidenceIn, FindingIn, RunIn, Submission
 from guardana.server.inventory import _query
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.tenancy import (
@@ -648,3 +648,157 @@ def test_project_list_names_what_exists(
     listed = capsys.readouterr().out
     assert "acme/web" in listed
     assert "acme/api" in listed
+
+
+def _run_report(database_url: str, gate: str | None, run_id: str, environment: str) -> None:
+    with psycopg.connect(database_url) as connection:
+        project = resolve_project(connection, "acme/web")
+    PostgresStore(database_url).add(
+        TenantScope.for_project(project.id),
+        Submission(
+            source="ci",
+            schema_version=7,
+            findings=[
+                FindingIn(
+                    identity="sha256:abc",
+                    rule_id="guardana.prompt.injection",
+                    severity="HIGH",
+                    title="Prompt injection",
+                    target_ref="http://model#m",
+                    evidence=EvidenceIn(summary="complied"),
+                )
+            ],
+            deployment=DeploymentIn(ai_system="support", environment=environment),
+            run=RunIn(run_id=run_id, gate=gate, tool_version="0.9.0"),
+        ),
+    )
+
+
+def test_run_list_shows_the_gate(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The question a collector could not answer before: did this run hold?"""
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    _run_report(database_url, "fail", "r1", "production")
+    capsys.readouterr()
+
+    assert main(["run", "list"]) == EXIT_OK
+
+    listed = capsys.readouterr().out
+    assert "fail" in listed
+    assert "support/production" in listed
+
+
+def test_a_run_that_did_not_say_prints_unknown_not_blank(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Never a pass, and never an empty column somebody reads as "fine".
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    _run_report(database_url, None, "r2", "dev")
+    capsys.readouterr()
+
+    main(["run", "list"])
+
+    listed = capsys.readouterr().out
+    assert "unknown" in listed
+    assert "pass" not in listed
+
+
+def test_finding_list_counts_the_runs_that_saw_one(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """ "Has this been there since Tuesday" — answered by grouping on the identity."""
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    for index in range(3):
+        _run_report(database_url, "fail", f"run-{index}", "production")
+    capsys.readouterr()
+
+    main(["finding", "list"])
+
+    listed = capsys.readouterr().out
+    assert "guardana.prompt.injection" in listed
+    assert "3 runs" in listed
+
+
+def test_a_run_listing_honours_the_environment_filter(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    _run_report(database_url, "fail", "prod-run", "production")
+    _run_report(database_url, "pass", "dev-run", "dev")
+    capsys.readouterr()
+
+    main(["run", "list", "--environment", "production"])
+
+    listed = capsys.readouterr().out
+    assert "fail" in listed
+    assert "pass" not in listed
+
+
+def test_a_run_listing_never_crosses_a_project(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    main(["bootstrap", "--org", "globex", "--project", "web"])
+    _run_report(database_url, "fail", "acme-run", "production")
+    capsys.readouterr()
+
+    main(["run", "list", "--project", "globex/web"])
+
+    assert "acme/web" not in capsys.readouterr().out
+
+
+def test_an_empty_run_listing_says_how_one_gets_there(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    capsys.readouterr()
+
+    main(["run", "list"])
+
+    assert "--reporter" in capsys.readouterr().out
+
+
+def test_finding_list_reports_the_worst_severity_not_the_alphabetical_one(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Alphabetically `MEDIUM` beats `HIGH` and `CRITICAL`, which understates.
+
+    A security tool that reports a CRITICAL as a MEDIUM has produced a false green
+    from a `max()` — the direction that matters, because nobody re-checks a finding
+    the tool already called minor.
+    """
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    with psycopg.connect(database_url) as connection:
+        project = resolve_project(connection, "acme/web")
+    for severity in ("MEDIUM", "CRITICAL", "LOW"):
+        PostgresStore(database_url).add(
+            TenantScope.for_project(project.id),
+            Submission(
+                source="ci",
+                schema_version=7,
+                findings=[
+                    FindingIn(
+                        identity="sha256:same",
+                        rule_id="guardana.rule",
+                        severity=severity,
+                        title="t",
+                        target_ref="ref",
+                        evidence=EvidenceIn(summary="s"),
+                    )
+                ],
+                run=RunIn(run_id=f"run-{severity}"),
+            ),
+        )
+    capsys.readouterr()
+
+    main(["finding", "list"])
+
+    assert "CRITICAL" in capsys.readouterr().out

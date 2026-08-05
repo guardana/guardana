@@ -19,7 +19,12 @@ class _FakeReporter:
     instances: ClassVar[list["_FakeReporter"]] = []
 
     def __init__(
-        self, url: str, *, api_key: str | None = None, deployment: DeploymentRef | None = None
+        self,
+        url: str,
+        *,
+        api_key: str | None = None,
+        deployment: DeploymentRef | None = None,
+        run: object | None = None,
     ) -> None:
         self.url = url
         self.api_key = api_key
@@ -35,7 +40,12 @@ class _ExplodingReporter:
     """A collector that is down."""
 
     def __init__(
-        self, url: str, *, api_key: str | None = None, deployment: DeploymentRef | None = None
+        self,
+        url: str,
+        *,
+        api_key: str | None = None,
+        deployment: DeploymentRef | None = None,
+        run: object | None = None,
     ) -> None:
         pass
 
