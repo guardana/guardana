@@ -54,6 +54,7 @@ _IMAGE_PIN_FILES = (
     Path("deploy/docker/README.md"),
     Path("docs/install.md"),
     Path("docs/usage-collector.md"),
+    Path("SECURITY.md"),
 )
 _IMAGE_PIN_RE = re.compile(r"(ghcr\.io/guardana/guardana(?:-collector)?:)\d+\.\d+")
 # The other places a release version is written down in prose. All three sat on

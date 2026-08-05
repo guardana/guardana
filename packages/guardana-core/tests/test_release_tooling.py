@@ -151,6 +151,37 @@ def test_the_release_workflow_checks_a_clean_install_before_publishing() -> None
     assert check < publish, "the clean-install check runs after the publish step"
 
 
+def test_the_release_writes_an_sbom_and_attests_the_distributions() -> None:
+    """A published artifact is a supply-chain artifact or it is a mystery binary.
+
+    Order matters here too: the SBOM and the provenance describe what is about to
+    be uploaded, so both are produced from the built `dist/` before the upload —
+    an attestation taken after the fact attests whatever is lying around.
+    """
+    steps = _steps(_workflow("release.yml"), "publish")
+    build = _index_of(steps, "uv build")
+    sbom = _index_of(steps, "scripts/generate_sbom.py")
+    attest = _index_of(steps, "actions/attest-build-provenance")
+    publish = _index_of(steps, "pypa/gh-action-pypi-publish")
+
+    assert build < sbom < publish, "the SBOM is not written from the built distributions"
+    assert build < attest < publish, "the provenance does not cover what is published"
+
+
+def test_the_sboms_are_attached_to_the_release() -> None:
+    """An SBOM nobody can download is a file on a runner that no longer exists."""
+    steps = _steps(_workflow("release.yml"), "publish")
+    release_step = steps[_index_of(steps, "gh release create")]
+
+    assert "sbom/" in str(release_step["run"]), "the release carries no SBOM assets"
+
+
+def test_ci_writes_the_sboms_on_every_push() -> None:
+    """The tag must not be the first time a release artifact is produced."""
+    steps = _steps(_workflow("ci.yml"), "clean-install")
+    _index_of(steps, "scripts/generate_sbom.py")
+
+
 def test_ci_builds_and_runs_both_images_on_every_push() -> None:
     """An image first built at the tag is an image first tested at the worst moment."""
     steps = _steps(_workflow("ci.yml"), "images")

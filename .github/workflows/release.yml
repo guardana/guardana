@@ -27,8 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write   # OIDC trusted publishing
-      contents: write   # create the GitHub Release
+      id-token: write      # OIDC trusted publishing, and signing the provenance
+      contents: write      # create the GitHub Release
+      attestations: write  # store the build provenance for the distributions
 
     steps:
       - name: Check out repository
@@ -54,6 +55,23 @@ jobs:
             uv build "$pkg" --out-dir dist/
           done
 
+      # One SBOM per distribution, written to `sbom/` rather than `dist/` — the
+      # publish step uploads everything in `dist/`, and PyPI takes wheels and
+      # sdists, not JSON. Verified against each package's own metadata as it is
+      # written, because the artifact is what ships.
+      - name: Write an SBOM for each distribution
+        run: uv run python scripts/generate_sbom.py
+
+      # Signed, keyless, and verifiable with `gh attestation verify` — the answer
+      # to "was this wheel built from that source, by that workflow". PyPI gets its
+      # own PEP 740 attestation from the publish step below; this one is for the
+      # artifacts attached to the GitHub Release and for anyone re-checking a wheel
+      # they already have.
+      - name: Attest what built these distributions
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: "dist/*"
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -64,7 +82,8 @@ jobs:
 
       # After a successful publish, create the GitHub Release from the tag's
       # CHANGELOG section — so the Releases page (and the Marketplace listing) never
-      # lags PyPI. Idempotent: skipped if the release already exists.
+      # lags PyPI. Idempotent: the release is created if missing, and the SBOMs are
+      # uploaded either way, so a re-run repairs a release whose assets are absent.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,10 +96,11 @@ jobs:
             f { print }
           ' CHANGELOG.md > notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "release $TAG already exists — leaving it as is"
+            echo "release $TAG already exists — leaving its notes as they are"
           else
             gh release create "$TAG" --title "Guardana $TAG" --notes-file notes.md --verify-tag
           fi
+          gh release upload "$TAG" sbom/*.cdx.json --clobber
 
   # The two official images, published to the GitHub Container Registry after the
   # packages and behind the same single approval: an image tagged 0.10.0 that PyPI

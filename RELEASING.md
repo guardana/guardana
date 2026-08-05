@@ -123,6 +123,22 @@ publishing. With a required reviewer on the `pypi` environment (see
 [`docs/maintainers/github-setup.md`](docs/maintainers/github-setup.md)), that
 publish pauses for one human click — so a stray tag can't ship unattended.
 
+### What else the release publishes
+
+Beyond the five wheels and sdists, `release.yml` produces:
+
+- **one CycloneDX SBOM per distribution** (`scripts/generate_sbom.py`, written
+  from the same `uv.lock` everything else resolves against), attached to the
+  GitHub Release;
+- **build provenance** for `dist/*`, signed through Sigstore and verifiable with
+  `gh attestation verify`, on top of PyPI's own PEP 740 attestation;
+- **both container images**, `amd64` and `arm64`, each with its own SBOM and
+  provenance attestation pushed into the registry.
+
+CI generates and verifies the SBOMs on every push (`--check`), so a tag is never
+the first time a release artifact is produced. `SECURITY.md` documents how a user
+verifies all of it.
+
 ### The clean-install check, and why it is in the gate
 
 `0.9.0` was tagged from a green tree and had to be cancelled while it waited for

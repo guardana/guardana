@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 .uv/
 dist/
+# Written by scripts/generate_sbom.py; published as release assets, never committed.
+sbom/
 build/
 *.egg-info/
 **/*.egg-info/
