@@ -62,7 +62,7 @@ already failed at its job:
 | Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. No finding lifecycle, audit log or retention yet |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
-## What ships today (0.8.0)
+## What ships today (0.9.0)
 
 Counts come from the registry, not from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -91,10 +91,32 @@ them safe to gate on (`plan`, `target inspect`, `run inspect|migrate`,
 presets, the build/runtime `Surface` split, a tool-calling endpoint target, three
 endpoint providers plus a guarded-endpoint adapter, the plugin contract with test
 doubles and [public model-format readers](docs/model-formats.md), a GitHub Action
-and pre-commit hook, and the optional collector.
+and pre-commit hook, and the optional collector — whose own command
+(`guardana-collector`) covers migrations, tenants, credentials, and reading back
+what the runs reported.
 
-0.8 made the collector something a team can keep, and 0.9 made it something two
-teams can share. It persists to **PostgreSQL**
+0.9 made the collector something **two teams can share, and something that can
+answer a question**. The tenant is a **project**: a key is bound to one, the scope
+is the first argument of every storage call, and a cross-tenant read returns
+nothing — proven per entity, on both storage backends and over HTTP. A run now
+says **what it verified and where** (AI system, environment, deployment, and the
+commit read from whatever CI it is), and a key may be **pinned to an environment**,
+after which it writes and reads only that one and a run declaring another is
+refused. The collector records **whether a run passed its gate**, what it cost and
+which build produced it — an absent gate is `unknown`, never a pass — and every
+finding carries the identity `guardana diff` has used since 0.6, so the collector
+can say how many runs have seen it and since when. A retried pipeline job is
+stored once. Standing one up is still **three commands**, because
+`guardana-collector bootstrap` creates the organization, the project and the first
+key together: a boundary that lengthens the first run is a boundary fewer people
+ever get behind.
+
+Its maturity moves to **beta** on the criterion stated before the work rather than
+after it. What it still does not have is everything that happens *after* a finding
+arrives: no lifecycle, no waivers, no audit log, no retention, no restore-tested
+backup.
+
+0.8 made the collector something a team can keep. It persists to **PostgreSQL**
 with **reversible migrations** — every change ships a rollback, each runs in its
 own committed transaction under an advisory lock, and the runner refuses a
 migration edited after it was applied, one numbered below the highest applied, or
@@ -104,11 +126,6 @@ store that is the default is one that reaches production. Every route carrying a
 finding needs a **scoped API key**, hashed at rest and shown once, and a collector
 with nowhere to keep a key refuses to serve rather than serving openly.
 **Readiness is separate from health** and fails while a migration is pending.
-
-It was still marked **experimental**, and the reason was named rather than
-softened: one key could read everything the collector held, so one instance could
-not serve two teams. That is what the release after it changed. The company-ready
-checklist above was not moved to match what shipped.
 
 0.8 also carries **nineteen defects an adversarial review found in released 0.7
 code and in this release's own** — among them `monitor` ignoring the privacy
