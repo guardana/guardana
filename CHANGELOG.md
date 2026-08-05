@@ -41,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `release.py`'s gate, and inside the release workflow *before* the upload step.
   This is the defect class that got `0.9.0` tagged and cancelled; it was found by
   hand, and finding it by hand is not a control.
+- **Backup and restore, exercised rather than described.** The documented
+  `pg_dump`/`pg_restore` procedure is run by the test suite: it restores into a
+  database that never held the data — restoring over the live one passes even
+  when the dump is half-written — reads the result back through the same
+  tenant-scoped store the server uses, checks the restored database reports the
+  same applied migrations, and then writes to it, because a restore you cannot
+  write to afterwards is half a restore. Running it for the first time found a
+  real trap, now documented and refused by the test: **`pg_dump` 17 produces a
+  dump that cannot be restored into PostgreSQL 16**, so a backup can look fine
+  every day and fail on the one day it matters. Take the dump inside the database
+  container, where client and server cannot drift apart.
 - **A production deployment guide, and the Compose file it describes.**
   [`docs/deployment.md`](docs/deployment.md) covers standing a collector up,
   putting TLS in front of it, upgrading it in the right order, what to watch, and

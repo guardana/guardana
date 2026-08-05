@@ -133,6 +133,63 @@ stop, and they will stop it.
 **Pin the image to a minor tag** (`:0.9`) rather than `latest`. You want fixes
 without a schema you did not plan for; `latest` gives you both.
 
+## Backups, and restoring one
+
+The `guardana-data` volume is the only state that matters, and the only backup
+that counts is one you have restored. This procedure is **exercised by the test
+suite** (`packages/guardana-server/tests/test_backup_restore.py`) — the same
+programs with the same flags, restored into a database that never held the data,
+and then read back through the same scoped store the server uses.
+
+Take one:
+
+```bash
+set -a; . deploy/.env; set +a
+docker compose -f deploy/docker-compose.yml exec -T db \
+  pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom \
+  > "guardana-$(date -u +%Y-%m-%d).dump"
+```
+
+Restore it — into an **empty** database, which is what a rebuild on a new machine
+actually looks like:
+
+```bash
+docker compose -f deploy/docker-compose.yml stop collector     # nothing writes mid-restore
+
+docker compose -f deploy/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres \
+  -c "drop database if exists \"$POSTGRES_DB\" with (force)" \
+  -c "create database \"$POSTGRES_DB\""
+
+docker compose -f deploy/docker-compose.yml exec -T db \
+  pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists \
+  < guardana-2026-08-05.dump
+
+docker compose -f deploy/docker-compose.yml start collector
+curl -fsS http://127.0.0.1:8000/readyz     # storage reachable, schema current
+```
+
+Three things this procedure is deliberate about:
+
+**Run `pg_dump` inside the database container.** Not because it is tidier —
+because the client tools and the server then cannot drift apart. `pg_dump` 17
+against PostgreSQL 16 produces a dump that `pg_restore` cannot load back into 16:
+it carries `SET transaction_timeout`, a parameter 16 has never heard of, and the
+restore ends with "errors ignored" and a non-zero exit. That is a backup that
+looks fine every day and fails on the one day it matters. If you do run the tools
+on the host, install the client matching your server's major version.
+
+**Restore into an empty database.** Restoring over the live one passes even when
+the dump is half-written, because the data was already there. The test does the
+same thing for the same reason.
+
+**Check `/readyz`, not `/healthz`.** A restore that dropped the migration history
+leaves a collector that answers requests and cannot be upgraded — `/readyz` is the
+endpoint that reads storage and schema state, and the test asserts the restored
+database reports the same applied migrations as the original.
+
+Keep the dump somewhere your `deploy/.env` is not. A backup stored beside the
+credentials for the system it came from is one theft, not two.
+
 ## What to watch
 
 | Signal | Why |

@@ -65,6 +65,20 @@ environment where an undeclared module happens to be installed for some other
 reason — which is how a release was once tagged with a `guardana` that crashed on
 **every** command.
 
+Two of the collector's test groups need something the rest do not, and both skip
+without it rather than making a rule change require a database:
+
+```bash
+docker compose -f deploy/docker-compose.dev.yml up -d   # the collector's tests
+sudo apt-get install postgresql-client-16               # the backup/restore test
+```
+
+The client tools must match the server's **major** version — a dump taken by a
+newer `pg_dump` does not restore into an older server. CI sets
+`GUARDANA_REQUIRE_POSTGRES=1` and `GUARDANA_REQUIRE_PG_TOOLS=1`, which turn both
+skips into failures there: "the restore test did not run" must never read as a
+green build.
+
 Fix formatting with `uv run ruff format .` rather than hand-editing whitespace.
 
 While iterating, plain `uv run pytest` (or a single file) is what you want —

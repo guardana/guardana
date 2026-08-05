@@ -226,8 +226,17 @@ checklist.
       pipeline that deploys to three environments would otherwise need three
       credentials, and the blast radius is already bounded by the project. Proven
       per entity, on both stores and over HTTP
-- [ ] migrations, backup, restore, upgrade *(migrations and upgrade done; backup
-      and restore need the retention work)*
+- [x] migrations, backup, restore, upgrade — the backup procedure is
+      **exercised, not described**: a test takes the documented dump, restores it
+      into a database that never held the data, and reads it back through the
+      same tenant-scoped store the server uses, then writes to it again because a
+      restore you cannot write to afterwards is half a restore. Running it found
+      a real trap and the guide now names it — `pg_dump` 17 against PostgreSQL 16
+      produces a dump that cannot be restored into 16, so a backup can look fine
+      every day and fail on the one day it matters. *(This item said backup and
+      restore "need the retention work"; they do not. Retention is deleting data
+      the collector holds, which is its own item on the milestone below; a backup
+      is a database procedure and can be exercised without it.)*
 - [x] GitHub, GitLab and generic CI paths — the Action for GitHub, copyable
       templates for GitLab, Jenkins and Azure DevOps, and a one-line container
       recipe for everything else, all pinned to a published image tag. Three

@@ -37,10 +37,20 @@ jobs:
     env:
       GUARDANA_TEST_DATABASE_URL: postgresql://guardana:guardana@127.0.0.1:55439/guardana_test
       GUARDANA_REQUIRE_POSTGRES: "1"
+      # Same asymmetry, for the backup/restore test's other prerequisite: without
+      # the client tools it skips locally, and here it must not.
+      GUARDANA_REQUIRE_PG_TOOLS: "1"
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      # Version 16 on purpose: it has to match the service container above. A dump
+      # taken by newer client tools does not restore into an older server — it
+      # carries settings the server has never heard of — which is how a backup
+      # passes every day and fails on the one day somebody needs it.
+      - name: PostgreSQL client tools, matching the server
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client-16
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
