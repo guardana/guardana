@@ -16,7 +16,7 @@ from guardana.cli._output import emit
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
-from guardana.cli._reporting import submit_safely
+from guardana.cli._reporting import check_reporter_url, submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import build_manifest, detect_deployment
 from guardana.cli._safety_flags import parse_impact
@@ -148,6 +148,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
     ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
+    check_reporter_url(reporter)
     started_at = datetime.now(UTC)
     deployment = detect_deployment(ai_system, environment, deployment_id)
     prof = resolve_profile(profile, preset)

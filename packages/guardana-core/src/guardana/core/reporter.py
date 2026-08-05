@@ -76,6 +76,27 @@ def _ingest_url(parts: SplitResult) -> str:
     return urlunsplit((parts.scheme, parts.netloc, INGEST_PATH, parts.query, parts.fragment))
 
 
+def check_collector_url(url: str) -> None:
+    """Raise `ValueError` unless `url` names a collector findings can be posted to.
+
+    Separate from the constructor so a caller can ask the question without
+    building anything: the CLI checks the `--reporter` value before a run starts,
+    and validating by constructing would mean a reporter exists whether or not one
+    is ever used.
+    """
+    scheme = urlsplit(url).scheme
+    if scheme not in ("http", "https"):
+        # Never report the parsed scheme back: `collector.example.com:8000` parses
+        # as a *scheme* of `collector.example.com`, so saying so told people their
+        # own hostname was an unsupported scheme and sent them after the wrong
+        # thing entirely.
+        raise ValueError(
+            f"reporter URL {url!r} does not name a collector: it needs a scheme, "
+            f"http:// or https:// — for example https://collector.example.com or "
+            f"http://127.0.0.1:8000. Without one, a bare host:port reads as a scheme."
+        )
+
+
 class Reporter(Protocol):
     """Where findings go after a scan. The seam the optional collector plugs into."""
 
@@ -196,11 +217,8 @@ class HttpReporter:
         transport: Callable[[str, bytes], None] | None = None,
         redactor: EvidenceRedactor | None = None,
     ) -> None:
+        check_collector_url(url)
         parts = urlsplit(url)
-        if parts.scheme not in ("http", "https"):
-            raise ValueError(
-                f"unsupported reporter URL scheme {parts.scheme!r}: expected http or https"
-            )
         self._url = _ingest_url(parts)
         self._api_key = api_key
         # Taken at construction rather than on `submit`, because `Reporter.submit`

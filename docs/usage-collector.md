@@ -264,6 +264,13 @@ ingest path itself, so `server://https://collector.example.com` is the whole thi
 a pipeline needs to know. A URL that already carries a path is left alone, for a
 deployment behind a reverse proxy that maps one.
 
+**The URL keeps its own scheme**, `http://` or `https://` — `server://` says
+"send this to a collector" and does not decide how. A bare `host:port` is
+refused before the run starts, with a `3` and a message naming both forms,
+because guessing would mean either sending evidence over plaintext to a remote
+host or breaking every local evaluation, and neither is a guess worth making on
+somebody's behalf.
+
 **Shown once.** There is no command and no endpoint that returns a key after it is
 created — a credential a system can re-read is a credential that leaks through
 every path that reads it. Only a digest is stored: a stolen backup of a collector

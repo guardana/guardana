@@ -8,7 +8,7 @@ from guardana.cli._formats import OutputFormat
 from guardana.cli._output import emit
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._profile import resolve_profile
-from guardana.cli._reporting import submit_safely
+from guardana.cli._reporting import check_reporter_url, submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import build_manifest, detect_deployment, target_identity
 from guardana.cli.exit_codes import ExitCode
@@ -142,6 +142,7 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
     if baseline is not None and write_baseline is not None:
         raise typer.BadParameter("pass either --baseline or --write-baseline, not both")
     _refuse_a_target_that_is_not_there(path)
+    check_reporter_url(reporter)
     prof = resolve_profile(profile, preset)
     # --no-plugins builds a bare Registry, so no entry-point code is imported or
     # run (see SECURITY.md). Custom YAML rules still load, but one whose evaluator

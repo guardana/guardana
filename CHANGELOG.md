@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A mistyped `--reporter` URL ended a run with a traceback and an exit code
+  outside the documented table.** It is a usage error, so it now exits `3` — and
+  it is checked *before* the run starts rather than at submission time, because
+  the submission is the last thing a run does: a probe that spends its whole
+  budget and only then finds out the URL was a typo has verified something and
+  told nobody.
+- **The message told people their hostname was an unsupported scheme.**
+  `server://collector.example.com:8000` reaches `urlsplit` as a bare `host:port`,
+  which parses as a *scheme* of `collector.example.com` — so the tool reported
+  exactly that, and sent the reader after entirely the wrong thing. It now names
+  the URL it was given and both forms that work. The scheme stays required: a
+  guessed `http://` would ship evidence in plaintext to a remote host, and a
+  guessed `https://` would break every local evaluation.
+
 ### Added
 
 - **The development Compose file now creates the database it documents.** Its own

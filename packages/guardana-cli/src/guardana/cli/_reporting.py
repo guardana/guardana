@@ -5,7 +5,7 @@ from urllib.error import HTTPError, URLError
 import typer
 from guardana.core.manifest import DeploymentRef, RunManifest
 from guardana.core.report import ScanResult
-from guardana.core.reporter import HttpReporter
+from guardana.core.reporter import HttpReporter, check_collector_url
 from guardana.core.target import EndpointError
 
 _SERVER_SCHEME = "server://"
@@ -43,6 +43,23 @@ def reporter_from_url(
         deployment=deployment,
         run=run,
     )
+
+
+def check_reporter_url(url: str | None) -> None:
+    """Refuse a `--reporter` value that cannot name a collector, before the run starts.
+
+    Up front rather than at submission time, because the submission is the last
+    thing a run does: a probe that spends its whole budget and only then discovers
+    the URL was a typo has verified something and told nobody. Raised as a usage
+    error, so it exits `3` like every other bad flag instead of ending the run with
+    a rendered traceback and a code outside the documented table.
+    """
+    if url is None:
+        return
+    try:
+        check_collector_url(url.removeprefix(_SERVER_SCHEME))
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--reporter") from exc
 
 
 def _why(exc: HTTPError) -> str:

@@ -10,7 +10,7 @@ from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe
 from guardana.cli._profile import resolve_profile
-from guardana.cli._reporting import submit_safely
+from guardana.cli._reporting import check_reporter_url, submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import detect_deployment
 from guardana.core.manifest import DeploymentRef
@@ -156,6 +156,7 @@ def monitor(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this i
     ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Continuously sample a live endpoint and alert on new findings."""
+    check_reporter_url(reporter)
     prof = resolve_profile(profile, preset)
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
     wire_config_evaluators(registry, prof)
