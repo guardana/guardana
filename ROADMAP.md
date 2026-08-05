@@ -62,7 +62,7 @@ already failed at its job:
 | Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. No finding lifecycle, audit log or retention yet |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
-## What ships today (0.9.0)
+## What ships today (0.9.1)
 
 Counts come from the registry, not from memory:
 [rule summary](docs/generated/rule-summary.md) ·
