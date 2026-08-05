@@ -130,7 +130,7 @@ jobs:
       # release's supply-chain artifacts are produced. --check writes them to a
       # temporary directory and throws them away; the release keeps them.
       - name: The SBOMs generate and describe what they claim to
-        run: uv run python scripts/generate_sbom.py --check
+        run: uv run --no-project python scripts/generate_sbom.py --check
 
   example-plugin:
     # Proves the third-party extension story end-to-end: a package outside the

@@ -38,6 +38,7 @@ _PACKAGES = [
 ]
 _VERSION_RE = re.compile(r'^version = "(?P<v>[^"]+)"', re.MULTILINE)
 _TRACEBACK = "Traceback (most recent call last)"
+_BIN = "Scripts" if sys.platform == "win32" else "bin"
 
 
 @dataclass(frozen=True)
@@ -72,9 +73,6 @@ def _clean_environment(venv: Path) -> dict[str, str]:
     environment["PATH"] = f"{venv / _BIN}{os.pathsep}{environment.get('PATH', '')}"
     environment.pop("PYTHONPATH", None)
     return environment
-
-
-_BIN = "Scripts" if sys.platform == "win32" else "bin"
 
 
 def _run(argv: list[str], environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
