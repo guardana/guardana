@@ -40,6 +40,7 @@ detail below.
 - [`../deploy/ci/README.md`](../deploy/ci/README.md) — GitLab, Jenkins, Azure DevOps and the generic container pipeline
 - [`../deploy/docker/README.md`](../deploy/docker/README.md) — the official container images: tags, mounts, exit codes, and what the collector image deliberately does not do on start
 - [`usage-diff.md`](usage-diff.md) — the baseline-and-compare workflow
+- [`deployment.md`](deployment.md) — running the collector in production: Compose, TLS, upgrades, what to watch, and what it does not give you yet
 - [`usage-collector.md`](usage-collector.md) — the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness
 
 ## For security teams

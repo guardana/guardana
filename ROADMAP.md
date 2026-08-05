@@ -235,7 +235,14 @@ checklist.
       three a copied pipeline gets wrong: the exit code reaches the platform, the
       report is published on the run that *failed*, and the entrypoint is
       overridden where the platform wraps commands in a shell
-- [ ] production deployment guide
+- [x] production deployment guide — [`docs/deployment.md`](docs/deployment.md)
+      and a Compose file where every credential is `${VAR:?}` (Compose refuses
+      rather than invents), the database publishes no port, the collector
+      publishes on loopback so TLS termination is a deliberate step, and
+      migrating is a one-shot command rather than something a restart does to
+      you. Written by running it end to end — `up`, `migrate`, `bootstrap`, a
+      scan reporting into it, `run list` reading it back — and it says plainly
+      what this deployment still does not give you
 - [x] supported-version policy
 - [x] published threat model
 - [x] release SBOM and provenance — a CycloneDX SBOM **per distribution**

@@ -498,6 +498,12 @@ images on every release —
 `arm64`, non-root, with an SBOM and a signed provenance attestation, and the
 collector image deliberately does **not** migrate on start.
 
+**A deployment you can keep.** A production Compose file with no default
+credential anywhere, an unpublished database, a collector on loopback for your own
+TLS terminator, and migrations as a command rather than a restart side effect —
+plus [the guide](docs/deployment.md) for upgrades, probes and the limitations it
+still has.
+
 **Runs and findings, not just submissions.** Envelope v7 carries the run's **gate**,
 its id, when it ran, which build produced it, what redaction was applied and what it
 cost — and each finding carries the identity `guardana diff` has used since 0.6, so

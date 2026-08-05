@@ -41,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `release.py`'s gate, and inside the release workflow *before* the upload step.
   This is the defect class that got `0.9.0` tagged and cancelled; it was found by
   hand, and finding it by hand is not a control.
+- **A production deployment guide, and the Compose file it describes.**
+  [`docs/deployment.md`](docs/deployment.md) covers standing a collector up,
+  putting TLS in front of it, upgrading it in the right order, what to watch, and
+  what this deployment still does not give you. Every credential in
+  `deploy/docker-compose.yml` is `${VAR:?}` — Compose refuses to start rather
+  than fall back to something guessable — the database publishes no port, the
+  collector publishes on loopback so terminating TLS is a deliberate act, and
+  migrating is a one-shot command rather than something a restart does to you.
+  Written by running it: `migrate`, `up`, `bootstrap`, a scan reporting into it,
+  and `run list` reading the run back.
 - **CI beyond GitHub.** Copyable templates for **GitLab** (includable from a
   remote URL), **Jenkins** and **Azure DevOps**, plus a one-line generic
   container pipeline for anything else — all running the published image, so the

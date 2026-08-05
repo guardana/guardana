@@ -1,0 +1,74 @@
+# A production deployment of the Guardana collector: a database, the collector,
+# and a migration you run deliberately.
+#
+#   cp deploy/env.example deploy/.env      # then fill it in — it has no defaults
+#   docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
+#   docker compose -f deploy/docker-compose.yml up -d
+#   docker compose -f deploy/docker-compose.yml run --rm collector \
+#     bootstrap --org acme --project web
+#
+# The full guide, including TLS, upgrades and backups, is docs/deployment.md.
+#
+# Two decisions worth understanding before you change them:
+#
+#   * Every credential is required and none is defaulted. `${VAR:?}` makes Compose
+#     refuse to start rather than fall back to something guessable — the same rule
+#     the collector applies to its storage backend, one layer down.
+#   * The collector publishes on **loopback**. Put your own TLS terminator in
+#     front of it; an ingest endpoint on a public interface without TLS carries
+#     API keys and evidence in clear text.
+
+name: guardana
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in deploy/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in deploy/.env}
+    volumes:
+      - guardana-data:/var/lib/postgresql/data
+    # Deliberately no `ports`. The collector reaches the database over the
+    # Compose network; nothing else needs to, and a published 5432 is the most
+    # common way a self-hosted database ends up on the internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  collector:
+    image: ghcr.io/guardana/guardana-collector:0.9
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # One connection string, assembled from the three secrets above. A password
+      # containing `@`, `/`, `:` or `#` must be percent-encoded here — or simply
+      # generated without them, which `deploy/env.example` shows how to do.
+      GUARDANA_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:${GUARDANA_PORT:-8000}:8000"
+
+  # Not a running service: a one-shot command, so an upgrade is something you do
+  # rather than something a restart does to you. Running migrations on start
+  # means a rolling deploy briefly runs two versions of the code against one
+  # schema, and the operator undoing that at three in the morning wants one
+  # instruction — `rollback` — not a restart with a different variable.
+  #
+  #   docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
+  migrate:
+    profiles: ["migrate"]
+    image: ghcr.io/guardana/guardana-collector:0.9
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GUARDANA_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    command: ["migrate"]
+
+volumes:
+  guardana-data:

@@ -65,8 +65,10 @@ half-upgraded collector never quietly serves traffic.
 reachable, schema current). The image's own `HEALTHCHECK` uses `/healthz`; point
 an orchestrator's readiness probe at `/readyz`.
 
-What the collector does, what it deliberately does not, and how to stand one up
-is [`docs/usage-collector.md`](../../docs/usage-collector.md).
+What the collector does and deliberately does not is
+[`docs/usage-collector.md`](../../docs/usage-collector.md); a full deployment —
+Compose file, TLS, upgrades — is
+[`docs/deployment.md`](../../docs/deployment.md).
 
 ## Building them yourself
 

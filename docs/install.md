@@ -80,7 +80,8 @@ guardana-collector migrate             # then: guardana-collector serve
 
 The `[serve]` extra is an extra rather than a dependency because a deployment
 already running gunicorn or hypercorn should not be made to install a second
-server. [`usage-collector.md`](usage-collector.md) is the full guide.
+server. [`usage-collector.md`](usage-collector.md) is the full guide, and
+[`deployment.md`](deployment.md) is how you run it in production.
 
 ## Installing a third-party rule package
 
