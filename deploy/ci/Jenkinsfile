@@ -1,0 +1,44 @@
+// Guardana on Jenkins — a declarative pipeline you can copy.
+//
+// Runs the published image directly, which is the same command the generic
+// container pipeline runs. `--entrypoint=""` is required: the image's ENTRYPOINT
+// is `guardana`, and Jenkins runs its own shell inside the container.
+
+pipeline {
+  agent {
+    docker {
+      image 'ghcr.io/guardana/guardana:0.9'
+      args '--entrypoint=""'
+    }
+  }
+
+  environment {
+    GUARDANA_PATH = '.'
+    GUARDANA_ARGS = ''
+    // If you forward to a collector, keep the key in Jenkins credentials:
+    // GUARDANA_COLLECTOR_TOKEN = credentials('guardana-collector-token')
+  }
+
+  stages {
+    stage('Guardana scan') {
+      steps {
+        // No `catchError`, no `|| true`. The exit code is the gate:
+        //   0 clean · 1 policy failed · 2 indeterminate · 3 bad usage
+        //   4 target unavailable · 5 internal error · 6 budget exhausted
+        //   7 interrupted
+        // Treat 2 exactly like 1 until you have read the reason: "I could not
+        // check this" is not "this is fine".
+        sh 'guardana scan "$GUARDANA_PATH" $GUARDANA_ARGS --format junit --output guardana-junit.xml'
+      }
+    }
+  }
+
+  post {
+    // `always`, because the run worth reading is the one that failed — publishing
+    // only on success throws away the evidence for every red build.
+    always {
+      junit allowEmptyResults: true, testResults: 'guardana-junit.xml'
+      archiveArtifacts artifacts: 'guardana-junit.xml', allowEmptyArchive: true
+    }
+  }
+}

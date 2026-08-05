@@ -1,0 +1,59 @@
+# Guardana on Azure DevOps.
+#
+# Uses the container directly rather than a `container:` job resource, so this is
+# the same command the generic container pipeline runs — one recipe to keep
+# correct, and it works on any agent that has Docker.
+#
+# Copy into your repository and adjust `guardanaPath` / `guardanaArgs`.
+
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  guardanaImage: ghcr.io/guardana/guardana:0.9
+  guardanaPath: "."
+  guardanaArgs: ""
+
+steps:
+  - checkout: self
+
+  - script: |
+      set -euo pipefail
+      # The redirect runs on the agent, so the report is written with the agent's
+      # ownership and the workspace can be mounted read-only. Writing it inside
+      # the container instead would leave a file owned by uid 10001 in a
+      # directory Azure owns.
+      docker run --rm \
+        -v "$(Build.SourcesDirectory):/work:ro" \
+        -e GUARDANA_COLLECTOR_TOKEN \
+        "$(guardanaImage)" \
+        scan "/work/$(guardanaPath)" $(guardanaArgs) \
+          --format junit > "$(Build.SourcesDirectory)/guardana-junit.xml"
+    displayName: "Guardana scan"
+    # No `continueOnError`. The exit code is the gate: 0 clean, 1 policy failed,
+    # 2 indeterminate, 3 bad usage, 4 target unavailable, 5 internal error,
+    # 6 budget exhausted, 7 interrupted. Treat 2 like 1 until you have read why —
+    # "I could not check this" is not "this is fine".
+    env:
+      # Set this as a *secret* pipeline variable if you forward to a collector.
+      GUARDANA_COLLECTOR_TOKEN: $(GUARDANA_COLLECTOR_TOKEN)
+
+  - task: PublishTestResults@2
+    # `always()`, because the run worth reading is the one that failed. Without
+    # it, every red pipeline discards its own evidence.
+    condition: always()
+    displayName: "Publish Guardana findings"
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: guardana-junit.xml
+      searchFolder: $(Build.SourcesDirectory)
+      testRunTitle: "Guardana"
+      failTaskOnFailedTests: false # the scan's own exit code already decided
+
+  - publish: $(Build.SourcesDirectory)/guardana-junit.xml
+    condition: always()
+    artifact: guardana-report
+    displayName: "Keep the report"

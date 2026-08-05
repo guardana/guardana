@@ -228,7 +228,13 @@ checklist.
       per entity, on both stores and over HTTP
 - [ ] migrations, backup, restore, upgrade *(migrations and upgrade done; backup
       and restore need the retention work)*
-- [ ] GitHub, GitLab and generic CI paths
+- [x] GitHub, GitLab and generic CI paths — the Action for GitHub, copyable
+      templates for GitLab, Jenkins and Azure DevOps, and a one-line container
+      recipe for everything else, all pinned to a published image tag. Three
+      properties are held by tests rather than by review, because they are the
+      three a copied pipeline gets wrong: the exit code reaches the platform, the
+      report is published on the run that *failed*, and the entrypoint is
+      overridden where the platform wraps commands in a shell
 - [ ] production deployment guide
 - [x] supported-version policy
 - [x] published threat model

@@ -41,6 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `release.py`'s gate, and inside the release workflow *before* the upload step.
   This is the defect class that got `0.9.0` tagged and cancelled; it was found by
   hand, and finding it by hand is not a control.
+- **CI beyond GitHub.** Copyable templates for **GitLab** (includable from a
+  remote URL), **Jenkins** and **Azure DevOps**, plus a one-line generic
+  container pipeline for anything else — all running the published image, so the
+  version of Guardana in a pipeline is a tag somebody pinned. Three properties
+  are held by tests rather than by review, because they are the three a copied
+  pipeline gets wrong: the exit code reaches the platform (no `allow_failure`, no
+  `continueOnError`, no `|| true`), the report is published on the run that
+  *failed* rather than only on the green ones, and the entrypoint is overridden
+  where the platform wraps commands in its own shell. The generic recipe
+  redirects on the host rather than writing inside the container, so the
+  workspace can be mounted read-only and no file arrives owned by a uid the CI
+  does not have.
 - **An SBOM and provenance on every release.** One CycloneDX document per
   distribution — `guardana-cli`'s bill of materials is not `guardana-server`'s,
   and a merged one would tell a collector operator they had installed Typer —

@@ -1,0 +1,57 @@
+# Guardana on GitLab CI — a job you can include as-is.
+#
+#   include:
+#     - remote: "https://raw.githubusercontent.com/guardana/guardana/v0.9/deploy/ci/gitlab-ci.yml"
+#
+# Then either take the defaults or override the variables in your own file:
+#
+#   guardana:
+#     variables:
+#       GUARDANA_PATH: "models/"
+#       GUARDANA_ARGS: "--preset ci --baseline guardana-baseline.yaml"
+#
+# Copying this file into your repository is equally fine — pin the image tag and
+# it will not change under you.
+
+guardana:
+  stage: test
+  image:
+    name: ghcr.io/guardana/guardana:0.9
+    # Required. The image's ENTRYPOINT is `guardana`, and GitLab prepends its own
+    # shell to every `script`, so without this the runner tries to execute
+    # `guardana sh -c …` and the job dies with a usage error that looks like ours.
+    entrypoint: [""]
+  variables:
+    GUARDANA_PATH: "."
+    GUARDANA_ARGS: ""
+    # A key belongs in a masked CI variable, never here:
+    # GUARDANA_COLLECTOR_TOKEN: (Settings → CI/CD → Variables, masked + protected)
+  script:
+    - guardana scan "$GUARDANA_PATH" $GUARDANA_ARGS --format junit --output guardana-junit.xml
+  artifacts:
+    # `always`, because the run you most want to read is the one that failed.
+    # `on_success` here would throw away the evidence for every red pipeline.
+    when: always
+    expire_in: 30 days
+    paths:
+      - guardana-junit.xml
+    reports:
+      junit: guardana-junit.xml
+  # Deliberately no `allow_failure`. The exit code is the gate:
+  #   0 clean · 1 policy failed · 2 indeterminate · 3 bad usage · 4 target
+  #   unavailable · 5 internal error · 6 budget exhausted · 7 interrupted.
+  # `2` in particular must not be waved through: "I could not check this" is not
+  # "this is fine". https://github.com/guardana/guardana/blob/main/docs/exit-codes.md
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Forwarding to a collector: add the flags to GUARDANA_ARGS and set
+# GUARDANA_COLLECTOR_TOKEN as a masked variable. The commit is read from
+# CI_COMMIT_SHA automatically; the system and the environment are never guessed.
+#
+#   variables:
+#     GUARDANA_ARGS: >-
+#       --ai-system support-agent
+#       --environment production
+#       --reporter server://https://collector.example.com

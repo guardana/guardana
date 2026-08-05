@@ -1,7 +1,25 @@
 # Integrations — CI and pre-commit
 
-Guardana ships two ready-made ways to gate on AI/LLM supply-chain risk without
-wiring anything by hand.
+Guardana ships ready-made ways to gate on AI/LLM risk without wiring anything by
+hand: a GitHub Action, copyable pipelines for GitLab, Jenkins and Azure DevOps, a
+one-line recipe for any CI that can run a container, and a pre-commit hook.
+
+| Platform | What to use |
+|---|---|
+| GitHub Actions | the composite action below — SARIF lands in code scanning |
+| GitLab CI | [`deploy/ci/gitlab-ci.yml`](../deploy/ci/gitlab-ci.yml), includable from a remote URL |
+| Jenkins | [`deploy/ci/Jenkinsfile`](../deploy/ci/Jenkinsfile) |
+| Azure DevOps | [`deploy/ci/azure-pipelines.yml`](../deploy/ci/azure-pipelines.yml) |
+| anything else | [the generic container pipeline](../deploy/ci/README.md#the-generic-container-pipeline) |
+| before the push | [pre-commit](#pre-commit) |
+
+Everything except the Action and the hook runs the published image, so the
+version of Guardana in a pipeline is a tag somebody pinned rather than whatever
+`pip install` resolved this morning.
+[`deploy/ci/README.md`](../deploy/ci/README.md) explains the three things a
+copied pipeline gets wrong — swallowing the exit code, publishing the report only
+on success, and forgetting that the platform wraps commands in a shell — and each
+of those is held by a test.
 
 ## GitHub Action
 
@@ -59,6 +77,35 @@ refresh it when you deliberately accept a change. `guardana diff` exits `1` on a
 regression and `2` when the two runs cannot honestly be compared — treat `2`
 exactly like `1` until you have read the reason, because "I could not compare
 these" is not "nothing got worse". See [`usage-diff.md`](usage-diff.md).
+
+## GitLab, Jenkins, Azure DevOps, and anything that runs a container
+
+The templates live in [`deploy/ci/`](../deploy/ci/README.md) and are meant to be
+copied. The shortest form, which is also what the Jenkins and Azure templates
+run:
+
+```bash
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.9 \
+  scan /work --format junit > guardana-junit.xml
+```
+
+The redirect is deliberate: the file is written by your shell, with your user's
+ownership, so the workspace can be mounted read-only and the image's non-root
+user never writes into a directory your CI owns. Publish `guardana-junit.xml` as
+the job's test report — GitLab, Jenkins and Azure all read JUnit natively — and
+let the exit code fail the build.
+
+GitLab can include the job rather than copy it:
+
+```yaml
+include:
+  - remote: "https://raw.githubusercontent.com/guardana/guardana/v0.9/deploy/ci/gitlab-ci.yml"
+
+guardana:
+  variables:
+    GUARDANA_PATH: "models/"
+    GUARDANA_ARGS: "--preset ci --baseline guardana-baseline.yaml"
+```
 
 ## pre-commit
 

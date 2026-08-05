@@ -257,7 +257,10 @@ def test_documented_action_pins_match_the_current_release() -> None:
     for relative in _BUMP._ACTION_PIN_FILES:
         text = (_repo_root() / relative).read_text(encoding="utf-8")
         for found in _BUMP._ACTION_PIN_RE.finditer(text):
-            assert found.group(0).endswith(f"@v{major}.{minor}"), (
+            # Either separator: `guardana/guardana@vX.Y` is the Action pin, and
+            # `guardana/guardana/vX.Y` is the raw URL the GitLab template is
+            # included from. Both are the same moving tag and both go stale alike.
+            assert found.group(0).endswith(f"v{major}.{minor}"), (
                 f"{relative} pins {found.group(0)}, but the released series is {major}.{minor}"
             )
 

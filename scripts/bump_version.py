@@ -44,14 +44,21 @@ _ACTION_PIN_FILES = (
     Path("README.md"),
     Path("docs/integrations.md"),
     Path("site/index.html"),
+    # The GitLab template is `include:`-ed from a raw URL that carries the same
+    # moving tag, in the `guardana/guardana/vX.Y` form rather than the `@vX.Y` one.
+    Path("deploy/ci/gitlab-ci.yml"),
 )
-_ACTION_PIN_RE = re.compile(r"(guardana/guardana@v)\d+\.\d+")
+_ACTION_PIN_RE = re.compile(r"(guardana/guardana[@/]v)\d+\.\d+")
 # The same failure mode, one artifact over: the docs tell users to run
 # `ghcr.io/guardana/guardana:MAJOR.MINOR`, a moving tag the release workflow
 # repoints. Left behind by a bump, a pipeline keeps pulling last series' image and
 # the build still goes green — with the rules of an older release.
 _IMAGE_PIN_FILES = (
     Path("deploy/docker/README.md"),
+    Path("deploy/ci/README.md"),
+    Path("deploy/ci/gitlab-ci.yml"),
+    Path("deploy/ci/Jenkinsfile"),
+    Path("deploy/ci/azure-pipelines.yml"),
     Path("docs/install.md"),
     Path("docs/usage-collector.md"),
     Path("SECURITY.md"),
