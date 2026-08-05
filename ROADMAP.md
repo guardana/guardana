@@ -93,7 +93,8 @@ endpoint providers plus a guarded-endpoint adapter, the plugin contract with tes
 doubles and [public model-format readers](docs/model-formats.md), a GitHub Action
 and pre-commit hook, and the optional collector.
 
-0.8 made the collector something a team can keep. It persists to **PostgreSQL**
+0.8 made the collector something a team can keep, and 0.9 made it something two
+teams can share. It persists to **PostgreSQL**
 with **reversible migrations** — every change ships a rollback, each runs in its
 own committed transaction under an advisory lock, and the runner refuses a
 migration edited after it was applied, one numbered below the highest applied, or

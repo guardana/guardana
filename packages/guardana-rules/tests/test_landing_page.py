@@ -66,3 +66,27 @@ def test_the_page_only_shows_rules_that_exist() -> None:
     unknown = {name for name in shown if not any(name in rule for rule in shipped)}
 
     assert not unknown, f"site/index.html advertises rule(s) that do not ship: {sorted(unknown)}"
+
+
+def test_the_page_labels_the_collector_beta_rather_than_implying_it_is_finished() -> None:
+    """The page's one maturity claim, pinned because it is the one that ages.
+
+    The collector gained tenancy, environments and run history across three
+    releases; it still has no finding lifecycle, audit log or retention. A landing
+    page that dropped the label would be claiming the second half too — and this
+    project's own history is a page advertising 25 rules through three releases
+    that took the number to 32.
+    """
+    page = _page()
+
+    assert "beta" in page
+    assert "optional in every direction" in page
+
+
+def test_the_page_does_not_promise_a_hosted_collector() -> None:
+    # There isn't one. A "managed cloud" line on the page would be a capability
+    # claim with nothing behind it.
+    page = _page().lower()
+
+    assert "managed cloud" not in page
+    assert "hosted for you" not in page

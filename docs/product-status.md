@@ -32,7 +32,7 @@ test of *your* agent, with your framework, your prompts and your tool
 implementations.
 
 Grading a trace exported from your running agent is a different input, which
-`Trajectory` was shaped to accept. It is designed for, not built. **v0.8.**
+`Trajectory` was shaped to accept. It is designed for, not built. **Application-awareness milestone.**
 
 ### `monitor` is scheduled, not passive
 
@@ -59,7 +59,7 @@ place a team runs its triage.
 `scenario.indirect_injection` tests the shape of retrieval-time injection through
 a scripted context. There is no live retriever target, so cross-tenant retrieval,
 document poisoning and tenant-filter bypass are **not** tested against your actual
-vector store. **v0.8.**
+vector store. **Application-awareness milestone.**
 
 ### Text only
 
