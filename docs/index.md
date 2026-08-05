@@ -38,7 +38,7 @@ detail below.
 
 - [`integrations.md`](integrations.md) — GitHub Action, pre-commit, and gating on deterioration
 - [`usage-diff.md`](usage-diff.md) — the baseline-and-compare workflow
-- [`usage-collector.md`](usage-collector.md) — the optional collector: persistence, migrations, health and readiness
+- [`usage-collector.md`](usage-collector.md) — the optional collector: organizations and projects, persistence, migrations, health and readiness
 
 ## For security teams
 

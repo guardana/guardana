@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **One collector can serve two teams.** The tenant is a **project**, a project
+  belongs to an **organization**, and every API key names exactly one project.
+  Until now every key a collector issued could read every finding it held, so one
+  instance served one team — which is why its maturity label said `experimental`
+  and why "project/environment isolation" is still unticked on the company-ready
+  checklist. A cross-tenant read now returns nothing: at the store, over HTTP, per
+  entity, between two organizations and between two projects of one organization,
+  on **both** the in-memory and the PostgreSQL store. Those tests were written
+  with the feature rather than after it, and they take the database fixture — so
+  "the isolation test did not run" cannot be a green build.
+- **`guardana-collector bootstrap --org acme --project web`** creates the
+  organization, the project and the first key in one command, and prints the key
+  once. It exists because tenancy would otherwise have taken the first run of a
+  real collector from two commands to five: a security boundary added carelessly
+  is how a tool anybody could run becomes a tool only its authors run. It refuses
+  when that project already exists, naming `key create` instead — a command that
+  quietly succeeds the second time is one somebody runs twice in a script and
+  never notices issued two credentials. The granular `org create`,
+  `project create`, `org rename`, `project rename` and the `--project` filter on
+  `key list` are for the second team, not for the first run.
+- **Migration `0003` adopts a database that already has data** rather than
+  refusing to run. Pre-tenancy submissions and keys land in one organization
+  called `adopted` — named for what happened, not `default`, which is a name
+  nobody chose — created **only when there is something to adopt**, so a fresh
+  install gets no tenant it never asked for. `org list` marks it and says it came
+  from migration 0003, so an administrator who upgraded without reading a
+  changelog still finds out where their history went, and `org rename` exists
+  because a name a migration invented must not be permanent. Pre-existing keys
+  keep working: adoption must not be a silent invalidation of a fleet of
+  credentials.
+- **`0003`'s rollback refuses when it would merge two tenants.** Dropping the
+  tenant column on a database serving two teams would fold their evidence into
+  one undifferentiated pile. It is the fourth thing the migration runner refuses
+  and the only one tied to a single migration, because only this one can destroy
+  an isolation boundary. The check counts the union of the submissions and the
+  keys: one project in one table and another in the other is still two tenants,
+  and a per-table count would see "one and one" and let the merge through. The
+  down file also restores the two indexes the forward migration dropped.
 - A test fails the build on any **local documentation link pointing at a file
   that does not exist**. It found one on the first run: `docs/usage-plan.md`
   pointed at a `configuration.md` that has never existed, through the whole of
@@ -16,8 +54,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unmaintained, which is a cheap thing to be wrong about and an expensive
   impression to correct — and nothing else in the gate could see it.
 
+### Fixed
+
+- **The documented way to report into a collector had never worked.**
+  `--reporter server://https://collector.example.com` POSTed to `/`, which no
+  collector serves, so every submission came back `404`, the CLI printed a
+  warning, and the scan still exited `0` — a whole fleet could report nothing
+  while a dashboard showed stale data as current, which is precisely the failure
+  this project says matters most. The reporter now appends the collector's ingest
+  route to a bare URL and leaves a URL that already names a path alone. The gate
+  could not see this: the one test pairing the two captured the reporter's bytes
+  with a fake transport and then posted them to `/findings` by hand, proving the
+  two agreed on the *body* and nothing at all about the *path*. There is now a
+  test that drives the real reporter into the real app.
+
 ### Changed
 
+- **`Store`'s four methods take a `TenantScope` first** (`add`, `submissions`,
+  `trend`, `records`). The scope lives in the signature rather than in a
+  per-request repository handed out by `store.for_project(id)`: that shape makes
+  it impossible to add a method without a scope, and equally possible to park an
+  object holding a tenant in a module global where the next request reuses it. The
+  property the shape would have bought is bought with a test instead —
+  `test_no_store_method_is_unscoped` walks the protocol and fails on a fifth
+  method without one. `PostgresStore` raises `UnscopedQueryError` on
+  `TenantScope.unauthenticated()`, on read and on write alike, so a scope that
+  belongs to nobody cannot reach durable evidence.
+- **The project comes from the key, never from the envelope.** If the envelope
+  named it, the runner would declare where it writes, and a credential that does
+  not bound the write is not a boundary. The envelope therefore **stays at v5**
+  and `guardana-core` is unchanged by the tenancy work: an agent and a collector
+  still upgrade independently, and no fleet has to move in step with a collector.
+  The cost is accepted and real: a team with ten projects needs ten keys in CI.
+  If the envelope ever carries a project identifier, a mismatch with the key must
+  be a refusal and never "prefer the more specific one".
+- `guardana-collector key create` **requires `--project`** and does not guess even
+  when exactly one project exists: issuing a credential against a tenant nobody
+  named has the same shape as a default credential. `POST /findings` echoes the
+  project it wrote into alongside the credential that wrote it.
+- `guardana-collector` **honours the product's exit-code table on bad flags.**
+  Argparse exits `2`; the table the rest of the tool uses says `3` for a usage
+  error, and a table the tool itself does not honour is a contract a pipeline
+  cannot gate on. `--help` still exits `0`.
+- `store_key()` no longer takes `created_by`. The column exists, nothing has ever
+  been able to fill it, and there are no human identities yet to fill it with — a
+  parameter every caller passes `None` to is a promise the code does not keep. It
+  is written by the audit log, where "which identity issued this credential" is
+  the question being asked.
+- The collector command is a package (`guardana.server.cli`) rather than one
+  module. Migrations, tenants and keys are three responsibilities, and a file that
+  grows a fourth stops being readable in review. The console entry point is
+  unchanged.
 - **Design documents are named for their topic, not for their date.**
   `2026-08-03-collector-persistence-design.md` is now
   [`collector-persistence.md`](docs/design/collector-persistence.md), and the

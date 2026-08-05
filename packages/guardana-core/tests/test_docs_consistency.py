@@ -115,6 +115,31 @@ def test_every_local_documentation_link_points_at_a_file_that_exists() -> None:
     assert not broken, "links pointing at files that do not exist:\n  " + "\n  ".join(broken)
 
 
+_TENANCY_IS_GONE = ("no tenancy", "every key sees everything")
+
+
+@pytest.mark.parametrize("page", ["README.md", "FEATURES.md", "docs/usage-collector.md"])
+def test_no_page_still_says_the_collector_has_no_tenancy(page: str) -> None:
+    """Three pages said it, in three phrasings, and one of them was stale before that.
+
+    `FEATURES.md` still described the collector as "in-memory storage, no
+    authentication" a whole release after it had both. A claim about an absent
+    capability is exactly the kind that nobody re-reads once the capability lands,
+    so it is pinned rather than promised.
+    """
+    prose = _read(page).lower()
+
+    for claim in _TENANCY_IS_GONE:
+        assert claim not in prose, f"{page} still says the collector has no tenancy"
+
+
+def test_the_collector_page_keeps_its_maturity_honest() -> None:
+    """Projects shipped; environments did not, and the label moves for both together."""
+    page = _read("docs/usage-collector.md")
+
+    assert "**Maturity: experimental.**" in page
+
+
 @pytest.mark.parametrize("script", ["generate_docs.py", "sync_site.py"])
 def test_generated_truth_is_current(script: str) -> None:
     """The generated fragments and the landing page's counts match the registry.

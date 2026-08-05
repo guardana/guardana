@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from guardana.server.envelope import Submission
+from guardana.server.tenancy import TenantScope
 
 # The default store is a process-lifetime buffer, so it is bounded: a collector
 # left running must not grow without limit. Durable storage is the seam a cloud
@@ -22,14 +23,26 @@ class StoredSubmission:
 
 
 class Store(Protocol):
-    """Persists reporter submissions. The seam a paid cloud backend replaces."""
+    """Persists reporter submissions. The seam a paid cloud backend replaces.
 
-    def add(self, submission: Submission) -> None:
-        """Store one submission, stamping it with the receive time."""
+    **The tenant scope is the first argument of every method**, rather than living
+    in a per-request repository handed out by `store.for_project(id)`. That shape
+    has one genuine advantage — a method cannot be added without a scope, because
+    the scope is in the constructor — and one failure mode this does not have: an
+    object holding a tenant can be parked in a module global and reused by the next
+    request. So the scope goes in the signature, and the missing property is bought
+    with `test_no_store_method_is_unscoped` instead: whoever adds a fifth method
+    without one sees red.
+    """
+
+    def add(self, scope: TenantScope, submission: Submission) -> None:
+        """Store one submission for one tenant, stamping it with the receive time."""
         ...
 
-    def submissions(self, source: str | None = None, limit: int | None = None) -> list[Submission]:
-        """Return stored submissions, oldest first, optionally filtered and bounded.
+    def submissions(
+        self, scope: TenantScope, source: str | None = None, limit: int | None = None
+    ) -> list[Submission]:
+        """Return this tenant's submissions, oldest first, optionally filtered and bounded.
 
         `limit` keeps the **newest** N and is not a convenience. A durable store has
         no upper bound on how much it holds, so a reader that fetches everything and
@@ -38,14 +51,14 @@ class Store(Protocol):
         """
         ...
 
-    def trend(self) -> dict[str, int]:
-        """Return finding counts by severity, across everything stored."""
+    def trend(self, scope: TenantScope) -> dict[str, int]:
+        """Return finding counts by severity, across everything this tenant stored."""
         ...
 
     def records(
-        self, source: str | None = None, limit: int | None = None
+        self, scope: TenantScope, source: str | None = None, limit: int | None = None
     ) -> list[StoredSubmission]:
-        """Return stored submissions with their receive time — raw data for stats."""
+        """Return this tenant's submissions with their receive time — raw data for stats."""
         ...
 
 
@@ -59,6 +72,11 @@ class InMemoryStore:
 
     `clock` is injectable so tests get deterministic `received_at` timestamps (the
     same pattern the monitor uses for `sleep`).
+
+    The bound is shared across tenants, so in principle one noisy tenant could evict
+    another's. It cannot happen today: the only collector that runs this store is
+    the unauthenticated one, which has exactly one scope. If that ever changes, the
+    bound has to become per-scope.
     """
 
     def __init__(
@@ -67,37 +85,39 @@ class InMemoryStore:
         *,
         clock: Callable[[], float] = time.time,
     ) -> None:
-        self._records: deque[StoredSubmission] = deque(maxlen=max_submissions)
+        self._records: deque[tuple[TenantScope, StoredSubmission]] = deque(maxlen=max_submissions)
         self._lock = threading.Lock()
         self._clock = clock
 
-    def add(self, submission: Submission) -> None:
+    def add(self, scope: TenantScope, submission: Submission) -> None:
         """Store one submission (stamped with the receive time), evicting the oldest when full."""
         record = StoredSubmission(received_at=self._clock(), submission=submission)
         with self._lock:
-            self._records.append(record)
+            self._records.append((scope, record))
 
-    def submissions(self, source: str | None = None, limit: int | None = None) -> list[Submission]:
-        """Return submissions held, oldest first, optionally filtered and bounded."""
-        return [record.submission for record in self.records(source, limit)]
+    def submissions(
+        self, scope: TenantScope, source: str | None = None, limit: int | None = None
+    ) -> list[Submission]:
+        """Return this tenant's submissions, oldest first, optionally filtered and bounded."""
+        return [record.submission for record in self.records(scope, source, limit)]
 
-    def trend(self) -> dict[str, int]:
-        """Return finding counts by severity, across everything held."""
+    def trend(self, scope: TenantScope) -> dict[str, int]:
+        """Return finding counts by severity, across everything this tenant holds."""
         counts: dict[str, int] = {}
-        for record in self._snapshot():
+        for record in self._snapshot(scope):
             for finding in record.submission.findings:
                 counts[finding.severity] = counts.get(finding.severity, 0) + 1
         return counts
 
     def records(
-        self, source: str | None = None, limit: int | None = None
+        self, scope: TenantScope, source: str | None = None, limit: int | None = None
     ) -> list[StoredSubmission]:
-        """Return stored submissions with their receive time (oldest first)."""
-        held = self._snapshot()
+        """Return this tenant's submissions with their receive time (oldest first)."""
+        held = self._snapshot(scope)
         if source is not None:
             held = [record for record in held if record.submission.source == source]
         return held if limit is None else held[-limit:]
 
-    def _snapshot(self) -> list[StoredSubmission]:
+    def _snapshot(self, scope: TenantScope) -> list[StoredSubmission]:
         with self._lock:
-            return list(self._records)
+            return [record for held_scope, record in self._records if held_scope == scope]

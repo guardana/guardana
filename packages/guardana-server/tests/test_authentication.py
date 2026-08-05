@@ -29,6 +29,13 @@ from guardana.server.auth import (
 from guardana.server.db.migrations import apply_pending
 from guardana.server.security import UnauthenticatedCollectorError, require_authentication
 from guardana.server.store import InMemoryStore
+from guardana.server.tenancy import (
+    TenantScope,
+    create_organization,
+    create_project,
+    resolve_project,
+)
+from test_migrations import _apply_through
 
 _UNAUTHORIZED = 401
 _FORBIDDEN = 403
@@ -38,14 +45,27 @@ _SUBMISSION = {"source": "ci", "schema_version": 5, "findings": []}
 
 
 def _migrated(database_url: str) -> None:
+    """A migrated database with one tenant — the smallest collector a key can exist in."""
     with psycopg.connect(database_url) as connection:
         apply_pending(connection)
+        create_organization(connection, "acme", "Acme")
+        create_project(connection, "acme", "web", "Web")
 
 
-def _issue(database_url: str, name: str, scopes: tuple[Scope, ...]) -> str:
+def _tenanted(connection: DbConnection) -> int:
+    """Migrate this connection's database and return the project keys are issued into."""
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    return create_project(connection, "acme", "web", "Web").id
+
+
+def _issue(
+    database_url: str, name: str, scopes: tuple[Scope, ...], project: str = "acme/web"
+) -> str:
     issued, secret_hash = generate_key(name, scopes)
     with psycopg.connect(database_url) as connection:
-        store_key(connection, issued, secret_hash)
+        resolved = resolve_project(connection, project)
+        store_key(connection, issued, secret_hash, project_id=resolved.id)
     return issued.token
 
 
@@ -229,18 +249,30 @@ def test_a_revoked_key_stops_working(database_url: str, monkeypatch: pytest.Monk
 
 
 def test_an_expired_key_stops_working(connection: DbConnection) -> None:
-    apply_pending(connection)
+    project = _tenanted(connection)
     issued, secret_hash = generate_key("short-lived", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, expires_at=datetime.now(UTC) - timedelta(days=1))
+    store_key(
+        connection,
+        issued,
+        secret_hash,
+        project_id=project,
+        expires_at=datetime.now(UTC) - timedelta(days=1),
+    )
 
     with pytest.raises(AuthError, match="revoked or expired"):
         authenticate(connection, issued.token)
 
 
 def test_a_key_expiring_in_the_future_still_works(connection: DbConnection) -> None:
-    apply_pending(connection)
+    project = _tenanted(connection)
     issued, secret_hash = generate_key("annual", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash, expires_at=datetime.now(UTC) + timedelta(days=1))
+    store_key(
+        connection,
+        issued,
+        secret_hash,
+        project_id=project,
+        expires_at=datetime.now(UTC) + timedelta(days=1),
+    )
 
     assert authenticate(connection, issued.token).name == "annual"
 
@@ -260,9 +292,9 @@ def test_a_key_whose_prefix_is_real_and_secret_is_not_is_refused(
     connection: DbConnection,
 ) -> None:
     """The case a naive lookup gets wrong: right prefix, wrong secret."""
-    apply_pending(connection)
+    project = _tenanted(connection)
     issued, secret_hash = generate_key("real", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash)
+    store_key(connection, issued, secret_hash, project_id=project)
 
     with pytest.raises(AuthError):
         authenticate(connection, f"gdn_{issued.prefix}_definitely-not-the-secret")
@@ -273,9 +305,9 @@ def test_a_key_whose_prefix_is_real_and_secret_is_not_is_refused(
 
 def test_the_secret_is_never_stored(connection: DbConnection) -> None:
     """A stolen backup must not also be a set of working credentials."""
-    apply_pending(connection)
+    project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash)
+    store_key(connection, issued, secret_hash, project_id=project)
     secret = issued.token.split("_", 2)[2]
 
     with connection.cursor() as cursor:
@@ -288,9 +320,9 @@ def test_the_secret_is_never_stored(connection: DbConnection) -> None:
 
 
 def test_listing_keys_never_returns_a_secret(connection: DbConnection) -> None:
-    apply_pending(connection)
+    project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash)
+    store_key(connection, issued, secret_hash, project_id=project)
 
     listed = list_keys(connection)
 
@@ -317,9 +349,9 @@ def test_a_key_with_no_scopes_is_refused() -> None:
 def test_using_a_key_records_that_it_was_used(connection: DbConnection) -> None:
     # "This key has not been used in four months" is the question that gets an
     # unused credential revoked.
-    apply_pending(connection)
+    project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash)
+    store_key(connection, issued, secret_hash, project_id=project)
     assert list_keys(connection)[0].last_used_at is None
 
     authenticate(connection, issued.token)
@@ -336,9 +368,9 @@ def test_a_fresh_collector_holds_no_keys(connection: DbConnection) -> None:
 
 
 def test_revoking_a_key_twice_reports_the_second_as_a_no_op(connection: DbConnection) -> None:
-    apply_pending(connection)
+    project = _tenanted(connection)
     issued, secret_hash = generate_key("ci", (Scope.INGEST,))
-    store_key(connection, issued, secret_hash)
+    store_key(connection, issued, secret_hash, project_id=project)
 
     assert revoke_key(connection, issued.prefix) is True
     assert revoke_key(connection, issued.prefix) is False
@@ -372,3 +404,68 @@ def test_the_unauthenticated_mode_still_serves(monkeypatch: pytest.MonkeyPatch) 
 
     assert client.post("/findings", json=_SUBMISSION).status_code == _OK
     assert client.get("/findings").status_code == _OK
+
+
+# --- a key names the tenant it belongs to -------------------------------------
+
+
+def test_an_authenticated_identity_carries_its_project(connection: DbConnection) -> None:
+    project = _tenanted(connection)
+    issued, secret_hash = generate_key("ci", (Scope.INGEST,))
+    store_key(connection, issued, secret_hash, project_id=project)
+
+    identity = authenticate(connection, issued.token)
+
+    assert identity.project_id == project
+    assert identity.project_ref == "acme/web"
+    assert identity.scope == TenantScope.for_project(project)
+
+
+def test_a_key_cannot_be_stored_without_a_project(connection: DbConnection) -> None:
+    # A credential that does not bound the write is not a boundary at all, so the
+    # tenant is not a parameter anybody can leave out.
+    _tenanted(connection)
+    issued, secret_hash = generate_key("ci", (Scope.INGEST,))
+
+    with pytest.raises(TypeError):
+        store_key(connection, issued, secret_hash)  # type: ignore[call-arg]
+
+
+def test_listing_keys_of_one_project_excludes_the_others(connection: DbConnection) -> None:
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    web = create_project(connection, "acme", "web", "Web")
+    api = create_project(connection, "acme", "api", "API")
+    for name, project in (("ci-web", web), ("ci-api", api)):
+        issued, secret_hash = generate_key(name, (Scope.INGEST,))
+        store_key(connection, issued, secret_hash, project_id=project.id)
+
+    assert [record.name for record in list_keys(connection, project="acme/web")] == ["ci-web"]
+    assert len(list_keys(connection)) == 2
+
+
+def test_a_listed_key_says_which_project_it_writes_to(connection: DbConnection) -> None:
+    project = _tenanted(connection)
+    issued, secret_hash = generate_key("ci", (Scope.INGEST,))
+    store_key(connection, issued, secret_hash, project_id=project)
+
+    assert list_keys(connection)[0].project_ref == "acme/web"
+
+
+def test_an_adopted_key_still_authenticates_after_the_migration(
+    connection: DbConnection,
+) -> None:
+    """Adoption must not be a silent invalidation of a fleet of credentials."""
+    _apply_through(connection, 2)
+    issued, secret_hash = generate_key("legacy-ci", (Scope.INGEST,))
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into api_keys (name, prefix, secret_hash, scopes) values (%s, %s, %s, %s)",
+            (issued.name, issued.prefix, secret_hash, ["ingest"]),
+        )
+    connection.commit()
+
+    apply_pending(connection)
+
+    identity = authenticate(connection, issued.token)
+    assert identity.project_ref == "adopted/adopted"

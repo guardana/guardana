@@ -22,6 +22,7 @@ from guardana.server.envelope import (
     VerdictIn,
 )
 from guardana.server.store import StoredSubmission
+from guardana.server.tenancy import TenantScope
 from psycopg import Connection, Cursor, connect
 from psycopg.rows import tuple_row
 
@@ -36,6 +37,11 @@ class PostgresStore:
     path is one insert per scan and its read path is a dashboard refresh, so a pool
     would be complexity bought against a load nobody has; when ingest volume argues
     otherwise, this is the one place that changes.
+
+    **Every method starts by demanding a project**, so `TenantScope.unauthenticated()`
+    raises here on read and on write alike. A scope that belongs to nobody must not
+    be able to reach durable evidence, and making that structural beats making it a
+    rule somebody has to remember.
     """
 
     def __init__(self, database_url: str, *, clock: Callable[[], float] = time) -> None:
@@ -47,13 +53,14 @@ class PostgresStore:
         with connect(self._url, row_factory=tuple_row) as connection:
             yield connection
 
-    def add(self, submission: Submission) -> None:
+    def add(self, scope: TenantScope, submission: Submission) -> None:
         """Store one submission and every finding it carries, in one transaction.
 
         One transaction because a submission whose findings were half written is a
         run that looks cleaner than it was — the failure mode this whole project is
         about, reached through a database rather than through a rule.
         """
+        project = scope.require_project()
         summary = submission.summary
         with (
             self._connection() as connection,
@@ -63,12 +70,13 @@ class PostgresStore:
             cursor.execute(
                 """
                 insert into submissions (
-                    received_at, source, schema_version, rules_run, rules_executed,
+                    project_id, received_at, source, schema_version, rules_run, rules_executed,
                     rules_skipped, max_severity, unverified, error_count, errors
-                ) values (to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) values (%s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 returning id
                 """,
                 (
+                    project,
                     self._clock(),
                     submission.source,
                     submission.schema_version,
@@ -125,40 +133,55 @@ class PostgresStore:
                 ),
             )
 
-    def submissions(self, source: str | None = None, limit: int | None = None) -> list[Submission]:
-        """Return stored submissions, oldest first, optionally filtered and bounded."""
-        return [record.submission for record in self.records(source, limit)]
+    def submissions(
+        self, scope: TenantScope, source: str | None = None, limit: int | None = None
+    ) -> list[Submission]:
+        """Return this tenant's submissions, oldest first, optionally filtered and bounded."""
+        return [record.submission for record in self.records(scope, source, limit)]
 
-    def trend(self) -> dict[str, int]:
-        """Return finding counts by severity, counted in the database rather than in Python."""
+    def trend(self, scope: TenantScope) -> dict[str, int]:
+        """Return finding counts by severity, counted in the database rather than in Python.
+
+        Joined to `submissions` because the tenant lives there and not on a finding.
+        `submissions_project_received_idx` is what keeps this driven from the
+        submission side rather than scanning every finding the collector holds.
+        """
+        project = scope.require_project()
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute(
-                "select severity, count(*) from findings where channel = %s group by severity",
-                (_FINDINGS,),
+                """
+                select f.severity, count(*)
+                from findings f
+                join submissions s on s.id = f.submission_id
+                where f.channel = %s and s.project_id = %s
+                group by f.severity
+                """,
+                (_FINDINGS, project),
             )
             return {str(severity): int(count) for severity, count in cursor.fetchall()}
 
     def records(
-        self, source: str | None = None, limit: int | None = None
+        self, scope: TenantScope, source: str | None = None, limit: int | None = None
     ) -> list[StoredSubmission]:
-        """Return stored submissions with the time they arrived, oldest first.
+        """Return this tenant's submissions with the time they arrived, oldest first.
 
         The bound is applied in SQL, not after the rows arrive. Fetching everything
         and slicing in Python is what made a durable store a way to load an entire
         finding history into memory on one request — the in-memory store was safe
         from that only because it forgets.
         """
+        project = scope.require_project()
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
                 select id, extract(epoch from received_at), source, schema_version, rules_run,
                        rules_executed, rules_skipped, max_severity, unverified, errors
                 from submissions
-                where (%s::text is null or source = %s)
+                where project_id = %s and (%s::text is null or source = %s)
                 order by received_at desc, id desc
                 limit %s
                 """,
-                (source, source, limit),
+                (project, source, source, limit),
             )
             # Newest-first in SQL so `limit` keeps the newest; reversed here because
             # every caller of this protocol reads oldest-first.

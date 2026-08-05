@@ -1,7 +1,7 @@
 import json
 from collections.abc import Callable
 from typing import Protocol
-from urllib.parse import urlsplit
+from urllib.parse import SplitResult, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 from guardana.core.redaction import EvidenceRedactor
@@ -32,6 +32,29 @@ v2 added the `unverified` channel (checks that ran but could not reach a
 verdict). v1 dropped them, so a model whose CRITICAL checks could not be graded
 was forwarded as `findings: []` — a false all-clear at the collector boundary.
 """
+
+
+INGEST_PATH = "/findings"
+"""Where a collector accepts an envelope.
+
+Appended when the reporter is given a bare collector URL, which is what every
+documented example writes: `--reporter server://https://collector.example.com`
+names a *collector*, not a route, and making a user know the route would leak the
+collector's shape into every pipeline that talks to it.
+
+Aimed at the bare URL, the reporter used to POST to `/`, which no collector serves.
+The submission came back `404`, the CLI printed a warning, and the scan still
+exited `0` — so a whole fleet could report nothing while a dashboard showed stale
+data as current. A URL that already carries a path is left alone, because somebody
+behind a reverse proxy may legitimately point at one.
+"""
+
+
+def _ingest_url(parts: SplitResult) -> str:
+    """Resolve a reporter URL to the route a collector actually accepts."""
+    if parts.path not in ("", "/"):
+        return parts.geturl()
+    return urlunsplit((parts.scheme, parts.netloc, INGEST_PATH, parts.query, parts.fragment))
 
 
 class Reporter(Protocol):
@@ -91,10 +114,12 @@ class HttpReporter:
         transport: Callable[[str, bytes], None] | None = None,
         redactor: EvidenceRedactor | None = None,
     ) -> None:
-        scheme = urlsplit(url).scheme
-        if scheme not in ("http", "https"):
-            raise ValueError(f"unsupported reporter URL scheme {scheme!r}: expected http or https")
-        self._url = url
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https"):
+            raise ValueError(
+                f"unsupported reporter URL scheme {parts.scheme!r}: expected http or https"
+            )
+        self._url = _ingest_url(parts)
         self._api_key = api_key
         self._transport = transport if transport is not None else self._default_transport
         # Applied here rather than by the caller: this is the path that leaves the

@@ -46,8 +46,8 @@ experimental and the baseline workflow is thin.*
 **An enterprise platform or security team** registers multiple AI systems and
 environments, uses service accounts and central policy, retains evidence and audit
 history, integrates with the CI system it already has, and keeps prompts, traces
-and credentials inside its own environment. *Not yet — this is what v0.7 through
-v0.9 are for.*
+and credentials inside its own environment. *Not yet — this is what the
+company-ready and team-platform milestones are for.*
 
 ## Current product maturity
 
@@ -59,7 +59,7 @@ already failed at its job:
 | Engine + built-in rules | **beta** | Stable enough to gate a build on; API still moves between minors |
 | `scan` / `probe` / `diff` | **beta** | Used in CI; exit codes and formats stable in practice, not yet contractually |
 | `monitor` | **beta** | Scheduled *active* verification. Not passive traffic inspection, not inline |
-| Collector (`guardana-server`) | **experimental** | Persistent and authenticated since 0.8 (PostgreSQL, reversible migrations, scoped API keys). Still no tenancy, so one instance cannot yet serve two teams — that is the next item |
+| Collector (`guardana-server`) | **experimental** | Persistent, authenticated and tenant-isolated (PostgreSQL, reversible migrations, API keys pinned to a project). No environments or deployments yet, which is what the checklist entry "project/**environment** isolation" still waits on |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
 ## What ships today (0.8.0)
@@ -147,10 +147,10 @@ uncomfortable to read.
 | LLM02 Sensitive Info Disclosure | **Good** | hardcoded secrets, output-secret leakage |
 | LLM03 Supply Chain | **Very strong** | the static front door |
 | LLM04 Data & Model Poisoning | **Started** | `training.dataset_integrity` (hygiene leads); statistical/backdoor detection is research-gated |
-| LLM05 Improper Output Handling | **Partial** | tagged on several rules; sink-aware handling is v0.8 |
+| LLM05 Improper Output Handling | **Partial** | tagged on several rules; sink-aware handling is the application-awareness milestone |
 | LLM06 Excessive Agency | **Good** | trajectory grading, tool-argument scope, excessive tool use |
 | LLM07 System Prompt Leakage | **Strong** | canary-proven leak |
-| LLM08 Vector & Embedding | **Started (slice)** | `scenario.indirect_injection`; live retriever targets are v0.8 |
+| LLM08 Vector & Embedding | **Started (slice)** | `scenario.indirect_injection`; live retriever targets are the application-awareness milestone |
 | LLM09 Misinformation | **Gap → deferred** | needs ground truth or a calibrated judge; narrow scope only |
 | LLM10 Unbounded Consumption | **Started (lead)** | `prompt.unbounded_consumption`; `finish_reason`/latency on `Exchange` sharpens it |
 
@@ -160,11 +160,11 @@ uncomfortable to read.
 |---|---|---|
 | ASI01 Agent Goal Hijack | **Good** | `agent.tool_result_injection` proves a hijack deterministically; `agent.goal_hijack` judges the semantic case and is opt-in until a judge is configured and measured |
 | ASI02 Tool Misuse | **Good** | excessive tool use, over-broad arguments, whole-run result injection |
-| ASI03 Identity & Privilege Abuse | **Started** | credential exfiltration proven; delegated credentials and scope need an identity model (v1.2) |
+| ASI03 Identity & Privilege Abuse | **Started** | credential exfiltration proven; delegated credentials and scope need an identity model (agent-and-protocol milestone) |
 | ASI04 Agentic Supply Chain | **Good** | MCP manifest on a live server plus rug-pull detection against a pin; registries and agent cards open |
 | ASI05 Unexpected Code Execution | **Strong (build side)** | the static rules are exactly this at artifact level; agent-generated code paths at runtime are open |
-| ASI06 Memory & Context Poisoning | **Good** | write in one session, grade the next; a customer's own vector store needs v0.8 |
-| ASI07 Insecure Inter-Agent Communication | **Gap** | multi-agent protocols are v1.2 |
+| ASI06 Memory & Context Poisoning | **Good** | write in one session, grade the next; a customer's own vector store needs the application-awareness milestone |
+| ASI07 Insecure Inter-Agent Communication | **Gap** | multi-agent protocols are the agent-and-protocol milestone |
 | ASI08 Cascading Failures | **Started** | the trajectory is observable; no rule grades cascade depth yet |
 | ASI09 Human-Agent Trust Exploitation | **Gap** | judged behaviour; unblocked by `calibrate`, not yet written |
 | ASI10 Rogue Agents | **Started** | `diff` names deterioration between runs and `monitor` alerts on it continuously; no rule grades drift as such |
@@ -195,7 +195,9 @@ checklist.
 - [x] privacy and redaction defaults
 - [x] persistent collector
 - [x] authenticated runner ingest
-- [ ] project/environment isolation
+- [ ] project/environment isolation *(projects done — a key reads and writes one
+      project and nothing else; environments and deployments are the next item, and
+      the box stays unticked until both are there)*
 - [ ] migrations, backup, restore, upgrade *(migrations and upgrade done; backup
       and restore need the retention work)*
 - [ ] GitHub, GitLab and generic CI paths
@@ -212,14 +214,15 @@ checklist.
       the optional collector — `fastapi`, `pydantic` and `psycopg`.
 - [ ] end-to-end installation test from a clean environment
 
-## v0.7 — Engine and CLI foundation *(released)*
+## Milestone: engine and CLI foundation *(complete, shipped as 0.7.0)*
 
 > **Outcome:** the engine and the command line are ready to be gated on: a run
 > knows its own cost, says what it verified, refuses to call an unanswered
 > question a pass, and can be compared against last week's.
 
 **This is half of the company-ready milestone, and the checklist above says which
-half.** The collector, containers and CI-beyond-GitHub work is v0.8; calling this
+half.** The collector, containers and CI-beyond-GitHub work is the milestone below;
+calling this
 release company-ready would have meant moving the checklist to match what shipped.
 
 **Run Manifest v2.** A saved run is a reproducibility and deployment-evidence
@@ -278,7 +281,7 @@ constant in the code by a test.
 | streaming, seed, log-prob and rate-limit probes | `target inspect` covers the four capabilities rules actually depend on |
 | separate local and collector evidence policies | lands with the collector |
 | signature verification of plugin packs | needs a distribution story this project does not have yet |
-| `configuration.*_digest` populated | the manifest has the fields and records `null` in all of them. A digest of a profile is easy; a digest of a *system prompt*, *tool manifest* or *retriever* has to be taken from the thing actually in front of the model, which is the application-awareness work in v0.8 — and filling in only the easy one would make the block look complete |
+| `configuration.*_digest` populated | the manifest has the fields and records `null` in all of them. A digest of a profile is easy; a digest of a *system prompt*, *tool manifest* or *retriever* has to be taken from the thing actually in front of the model, which is the application-awareness work in the milestone below — and filling in only the easy one would make the block look complete |
 | token ceilings bounding the tool-calling path | `offer_tools` has no usage protocol, so the requests an agent probe spends most of its budget on report no tokens. They are counted in `requests_missing_token_counts`, and a request ceiling bounds them; a *token* ceiling does not, and saying so is better than a ceiling that silently covers half a run |
 
 ### Reviewed after shipping (0.7.1)
@@ -311,20 +314,33 @@ budget, a saved run, or a regression comparison. That is where this project
 competes, and the ordering of this roadmap reflects it.
 
 Three things worth taking from them, each recorded below where it belongs: a
-pytest-facing assertion API (v0.8), named adapters for LangChain / LlamaIndex /
-CrewAI (v0.8), and attack *technique* as a dimension separate from the rule, so
+pytest-facing assertion API and named adapters for LangChain / LlamaIndex /
+CrewAI (both in the application-awareness milestone), and attack *technique* as a dimension separate from the rule, so
 coverage can grow without rules growing with it (content lane).
 
 Full notes: `docs/superpowers/research/2026-08-02-evaluation-landscape.md`.
 
-## v0.8 — The other half of company-ready, and application awareness *(in progress)*
+## A note on milestone names and version numbers
+
+Milestones below are named for their **outcome**, not for a version number. They
+used to carry one — "v0.8" — and the strain was already visible in the sentence
+"0.8.0 is a release inside it, not the end of it". Tenancy made it a contradiction:
+it belongs to the company-ready milestone and is a breaking change, so it has to
+ship as **0.9.0**, which under the old scheme would have taken the name of a
+milestone it is not.
+
+So version numbers now mean only what SemVer says they mean, and each milestone
+records which releases landed inside it. This is the same reasoning that took dates
+out of design-document filenames: a name that encodes a moving number tells the
+reader the wrong thing about the thing it names.
+
+## Milestone: the other half of company-ready, and application awareness *(in progress)*
 
 > **Outcome:** the checklist above is finished, and Guardana can verify an AI
 > *application*, not only an isolated model endpoint.
 
-**The milestone is not finished, and 0.8.0 is a release inside it, not the end of
-it.** Same discipline as 0.7: the checklist above is not moved to match what
-shipped.
+**The milestone is not finished.** `0.8.0` and `0.9.0` are releases inside it, not
+the end of it, and the checklist above is not moved to match what shipped.
 
 Landed in **0.8.0**:
 
@@ -334,13 +350,25 @@ Landed in **0.8.0**:
 - **authenticated runner ingest** — scoped API keys, hashed at rest, shown once,
   and a collector that refuses to start when it has nowhere to keep one.
 
-Still open in the company-ready remainder: **organization/project isolation**
-(without it one collector cannot serve two teams, which is why its maturity is
-still `experimental`), an **audit log**, **retention**, **restore-tested backup**,
-**official containers** for CLI and server, **CI beyond GitHub** (GitLab template,
-generic container pipeline, Jenkins and Azure DevOps examples), a **production
-deployment and upgrade guide**, **SBOM and provenance** on every release, and an
-**end-to-end installation test from a clean environment**.
+Landed in **0.9.0**:
+
+- **project isolation** — the tenant is a project, a key names exactly one, the
+  scope is the first argument of every storage call, and a cross-tenant read
+  returns nothing on both stores and over HTTP. `guardana-collector bootstrap`
+  keeps standing a collector up to three commands, because a boundary that makes
+  the first run longer is a boundary fewer people ever get behind;
+- **the reporter reaches the collector at the URL a user writes**, which it had
+  never done: aimed at a bare collector URL it POSTed to `/`, took a `404`, and
+  the scan still exited `0`.
+
+Still open in the company-ready remainder: **environments and deployments** (the
+checklist entry reads "project/**environment** isolation", and the collector's
+maturity stays `experimental` until both are there), an **audit log**,
+**retention**, **restore-tested backup**, **official containers** for CLI and
+server, **CI beyond GitHub** (GitLab template, generic container pipeline, Jenkins
+and Azure DevOps examples), a **production deployment and upgrade guide**, **SBOM
+and provenance** on every release, and an **end-to-end installation test from a
+clean environment**.
 
 Then the application work:
 
@@ -370,7 +398,7 @@ Then the application work:
 - **Utility regression.** Security improvements must be weighed against legitimate
   task success, or "safer" just means "refuses more".
 
-## v0.9 — Team security platform
+## Milestone: team security platform
 
 > **Outcome:** teams manage AI systems, deployments, policies, findings and
 > evidence centrally.
@@ -380,33 +408,34 @@ service accounts; finding lifecycle with ownership; waivers with expiry; audit
 log; central policy distribution; deployment history; webhooks and Slack/Teams;
 Jira/GitHub/GitLab issue integration; Kubernetes deployment; retention controls.
 
-## v1.0 — Stable extension platform
+## Milestone: stable extension platform *(this one is 1.0)*
 
 > **Outcome:** a third party can invest in a Guardana extension against a
 > compatibility contract.
 
-**Deliberately not before v0.9.** Freezing `Rule`, `Evaluator` and `Target` while
+**Deliberately not before the team-platform milestone.** Freezing `Rule`,
+`Evaluator` and `Target` while
 `Trace`, `AISystem`, `Deployment`, identity, retrieval events and side effects are
 still being designed would freeze the wrong shape. Includes: stable interfaces, a
 deprecation policy, a compatibility matrix, an extension manifest with declared
 permissions, a conformance suite, signed package metadata, and a declarative
 extension path that does not execute arbitrary Python.
 
-## v1.1 — Continuous production verification
+## Milestone: continuous production verification
 
 OTLP receiver; scheduled synthetic checks with maintenance windows and jitter;
 trace replay; repeated runs with confidence intervals and sequential stopping;
 drift and regression root cause; fleet history; a private-runner pattern for
 teams that cannot let a hosted service reach their endpoints.
 
-## v1.2 — Agent and protocol security
+## Milestone: agent and protocol security
 
 Deep MCP security (OAuth audience validation, token passthrough, confused deputy,
 scope and consent enforcement, schema drift, sampling misuse, multi-user
 isolation); A2A and multi-agent identity, delegation and trust boundaries;
 delegated credentials; approval bypass; cascading failure; action-boundary policy.
 
-## v1.3 — Multimodal and advanced assurance
+## Milestone: multimodal and advanced assurance
 
 Images, PDFs and document carriers, OCR injection, audio, QR, multimodal tool
 results; adaptive attackers on the scenario engine; deeper poisoning and backdoor
@@ -464,9 +493,10 @@ SavedModel checks; a dedicated LLM05 rule.
 
 ## Collector, cloud, and the commercial boundary
 
-The self-hosted collector becomes a real product in v0.7 (persistence, auth,
-tenancy) and grows team features in v0.9. A managed cloud is the hosted version of
-the same, adding what only makes sense hosted.
+The self-hosted collector became a real product across 0.8.0 and 0.9.0
+(persistence, authentication, project isolation) and grows team features in the
+team-platform milestone. A managed cloud is the hosted version of the same, adding
+what only makes sense hosted.
 
 **The boundary is fixed and stated so it cannot drift:**
 
@@ -496,8 +526,8 @@ Parked with reasons:
   impact on model latency. Until then `monitor` stays a scheduled active prober,
   and says so.
 - **Repeated runs to smooth sampling noise** — multiplies the cost of every probe;
-  needs the budget model first, which is why it follows v0.7 rather than preceding
-  it.
+  needs the budget model first, which is why it follows the budget work rather than
+  preceding it.
 - **Comparing inventories between runs** — an inventory question, not a gate.
 - **Gherkin scenario syntax** — structured YAML won.
 

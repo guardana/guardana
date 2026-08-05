@@ -25,9 +25,10 @@ self-hosted collector.
 
 > **Status.** The CLI and engine are **beta** — used to gate real builds, with the
 > public API still moving between minor releases. The self-hosted collector is
-> **experimental**: it persists to PostgreSQL and requires a scoped API key, but
-> has no tenancy yet, so one instance cannot serve two teams. See
-> [product status and known limitations](docs/product-status.md) before adopting.
+> **experimental**: it persists to PostgreSQL, requires a scoped API key, and
+> isolates one project from another, but has no environments or deployments yet.
+> See [product status and known limitations](docs/product-status.md) before
+> adopting.
 
 - No account, no telemetry, no phone-home. The only network traffic is to the target you point it at.
 - Offline static scanning; explicit `findings`, `unverified` and `errors` channels.
@@ -359,16 +360,18 @@ beyond the target itself, no account, no lock-in. When you want fleet-wide
 visibility, any run can forward its normalized findings to a collector with
 `--reporter server://…`:
 
-> **Maturity: experimental.** The collector now **keeps what it is given** —
+> **Maturity: experimental.** The collector **keeps what it is given** —
 > PostgreSQL with reversible migrations, a storage choice it refuses to make for
-> you, separate health and readiness endpoints — and **requires a scoped API key**
-> on every route that carries a finding. It still has **no tenancy**: every key
-> sees everything in one instance, so it cannot yet serve two teams. Organization
-> and project isolation, a finding lifecycle, an audit log and backup/restore are
-> the rest of the v0.8 milestone — see
+> you, separate health and readiness endpoints — **requires a scoped API key** on
+> every route that carries a finding, and **isolates one project from another**: a
+> key reads and writes its own project and nothing else, proven per entity on both
+> stores and over HTTP. Standing one up is three commands, because
+> `guardana-collector bootstrap` creates the organization, the project and the
+> first key together. Still missing: environments and deployments, a finding
+> lifecycle, an audit log, retention and restore-tested backup — see
 > [`docs/usage-collector.md`](docs/usage-collector.md) and
 > [the collector design](docs/design/collector-domain-model.md). The label moves
-> to `beta` when tenancy ships, not before.
+> to `beta` when environments land beside projects, not before.
 
 - **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
   agent — dev machines, CI, live monitors — in one place. Ingest/list/trend over
@@ -418,12 +421,16 @@ why platform work comes before coverage volume.
 |---|---|
 | **0.6** | Regression between runs — `guardana diff`, saved runs, one definition of "worse" |
 | **0.7** | Engine and CLI foundation — run manifest, usage accounting, budgets and `plan`, capability inspection, evidence redaction, safety modes, plugin trust, baseline lifecycle, stable exit codes |
-| **0.8** *(current)* | The company-ready remainder and application-aware verification. **Shipped so far:** a persistent, authenticated collector — PostgreSQL, reversible migrations, scoped API keys. **Still open:** project isolation, containers, CI beyond GitHub, SBOM, and the application work — a common trace model, imported real agent traces, sink-aware output handling, live retrieval targets |
-| **0.9** | Team security platform — AI systems, deployments, RBAC, finding lifecycle, integrations |
+| **0.8** *(current)* | A collector a team can keep — PostgreSQL with reversible migrations, scoped API keys hashed at rest, health and readiness as separate questions |
+| **0.9** *(next)* | A collector two teams can share — projects as tenants, keys pinned to one, a cross-tenant read that returns nothing, and `bootstrap` keeping the first run at three commands |
 | **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
-| **1.1** | Continuous production verification — OTLP, replay, repeated runs with confidence intervals |
-| **1.2** | Agent and protocol security — deep MCP, multi-agent identity and delegation |
-| **1.3** | Multimodal and advanced assurance — images, documents, OCR, audio, adaptive attackers |
+
+Beyond that, the plan is kept as **milestones rather than version numbers** —
+environments and deployments, the team platform, continuous production
+verification, agent and protocol security, multimodal assurance. A milestone name
+that encodes a version tells a reader the wrong thing the moment a breaking change
+moves the number, which is exactly what tenancy did. See
+[`ROADMAP.md`](ROADMAP.md).
 
 Language and industry corpora grow in a **parallel content lane** that does not
 gate the platform work — corpus size is not the metric this project competes on.

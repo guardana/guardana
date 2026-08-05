@@ -112,7 +112,7 @@ convention = "pep257"
 "scripts/*.py" = ["T201"]
 # Same reason: `guardana-collector` is a console entry point, and stdout is what it
 # is for. The rule stays on everywhere else, which is where a stray print is a bug.
-"packages/guardana-server/src/guardana/server/cli.py" = ["T201"]
+"packages/guardana-server/src/guardana/server/cli/*.py" = ["T201"]
 # The collector has no logging framework yet; stderr is where an operator looks.
 "packages/guardana-server/src/guardana/server/app.py" = ["T201"]
 

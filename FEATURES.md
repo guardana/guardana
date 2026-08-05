@@ -15,7 +15,7 @@ live in [`ROADMAP.md`](ROADMAP.md).
 |---|---|
 | Engine + built-in rules | beta |
 | `scan` / `probe` / `monitor` / `diff` | beta |
-| Collector (`guardana-server`) | **experimental** — durable and authenticated (PostgreSQL, reversible migrations, scoped API keys); no tenancy yet, so one instance cannot serve two teams |
+| Collector (`guardana-server`) | **experimental** — durable, authenticated and tenant-isolated (PostgreSQL, reversible migrations, scoped API keys pinned to a project); no environments or deployments yet |
 | Extension API | unstable by design until 1.0 |
 
 Full detail, including what is deliberately not covered:
@@ -461,12 +461,26 @@ a multi-turn scenario's escalation is folded in, never dropped. Public API:
 
 ### Optional central collector + dashboard
 
-> **Maturity: experimental.** In-memory storage, no authentication — local
-> evaluation only. Persistence, API keys, project isolation, finding lifecycle and
-> audit log are the v0.7 milestone.
+> **Maturity: experimental.** Durable (PostgreSQL, reversible migrations),
+> authenticated (scoped API keys, hashed, shown once) and **tenant-isolated**: the
+> tenant is a project, a key names exactly one, and a cross-tenant read returns
+> nothing. Environments, deployments, a finding lifecycle, an audit log and
+> retention are still ahead of it.
+
+**Organizations and projects.** `guardana-collector bootstrap --org acme --project
+web` creates the organization, the project and the first key in one command, so
+adding the boundary did not add four commands to the first run; `org` and
+`project` cover the second team. The tenant of a request is taken from the
+authenticated key and never from the envelope — a credential that does not bound
+the write is not a boundary — which is also why the envelope stays at v5 and an
+agent and a collector still upgrade independently. `Store`'s every method takes the
+scope first, and a test walks the protocol to keep it that way. Migration `0003`
+adopts a database that already has data into an organization called `adopted`,
+created only when there is something to adopt, and refuses to roll back where that
+would merge two tenants.
 
 Any run forwards normalized findings with `--reporter server://…` (versioned
-JSON envelope). The collector (`guardana-server`) is strictly additive and
+JSON envelope, sent to the collector URL — the reporter appends the route). The collector (`guardana-server`) is strictly additive and
 separately deployed — the engine never depends on it, enforced by an
 import-linter contract and a test. It ships an **opt-in monitoring dashboard**
 (`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default, and

@@ -15,12 +15,16 @@ from conftest import DbConnection
 from guardana.server.db.migrations import (
     Migration,
     MigrationError,
+    _advisory_lock,
+    _ensure_state_table,
+    _run,
     apply_pending,
     describe,
     load_migrations,
     read_state,
     roll_back,
 )
+from guardana.server.tenancy import create_organization, create_project
 
 _SHIPPED = load_migrations()
 
@@ -96,23 +100,18 @@ def test_rows_written_before_a_migration_survive_it(connection: DbConnection) ->
     A migration path only proven against a fresh database is a migration path
     proven in the one case where every migration works.
     """
+    _apply_through(connection, 2)
+    _legacy_submission(connection, "before-the-upgrade")
+
+    # The real thing rather than a stand-in: 0003 adds a not-null tenant column to
+    # a table that already has rows, which is the shape that goes wrong in a place
+    # nobody can undo it.
     apply_pending(connection)
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "insert into submissions (received_at, source, schema_version) "
-            "values (now(), 'before-the-upgrade', 5)"
-        )
-    connection.commit()
-
-    # Stands in for the migrations items 20-22 will add on top of a live database.
-    with connection.cursor() as cursor:
-        cursor.execute("alter table submissions add column organization_id bigint")
-    connection.commit()
 
     with connection.cursor() as cursor:
-        cursor.execute("select source, organization_id from submissions")
+        cursor.execute("select source, project_id is not null from submissions")
         rows = cursor.fetchall()
-    assert rows == [("before-the-upgrade", None)]
+    assert rows == [("before-the-upgrade", True)]
 
 
 def test_a_migration_edited_after_it_was_applied_is_refused(
@@ -234,6 +233,189 @@ def test_each_migration_is_committed_before_the_next_one_runs(database_url: str)
 
     assert row is not None
     assert int(str(row[0])) == len(load_migrations())
+
+
+def _apply_through(connection: DbConnection, version: int) -> None:
+    """Apply migrations up to and including `version` — i.e. stage a pre-0003 database."""
+    with _advisory_lock(connection):
+        _ensure_state_table(connection)
+        for migration in load_shipped():
+            if migration.version > version:
+                break
+            _run(connection, migration, migration.up, record=True)
+
+
+def _legacy_submission(connection: DbConnection, source: str = "legacy") -> None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version) values (now(), %s, 5)",
+            (source,),
+        )
+    connection.commit()
+
+
+def _legacy_key(connection: DbConnection, prefix: str = "abc123") -> None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into api_keys (name, prefix, secret_hash, scopes) "
+            "values ('ci', %s, 'sha256:x', '{ingest}')",
+            (prefix,),
+        )
+    connection.commit()
+
+
+def test_a_database_with_submissions_is_adopted_not_refused(connection: DbConnection) -> None:
+    """Refusing would stop an upgrade half-way, which is the pressure that makes workarounds.
+
+    Adoption creates no leak, and that is what settles it: every pre-tenancy row
+    lands in the same project, which is where they already were together.
+    """
+    _apply_through(connection, 2)
+    _legacy_submission(connection)
+
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select o.slug, o.adopted, p.slug from submissions s "
+            "join projects p on p.id = s.project_id "
+            "join organizations o on o.id = p.organization_id"
+        )
+        assert cursor.fetchall() == [("adopted", True, "adopted")]
+
+
+def test_a_database_with_only_keys_is_adopted_too(connection: DbConnection) -> None:
+    # A collector that has issued keys and received no runs is a real state, and
+    # `api_keys.project_id` becomes `not null` — so an adoption condition counted
+    # off submissions alone would fail the migration on exactly that database.
+    _apply_through(connection, 2)
+    _legacy_key(connection)
+
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select count(*) from api_keys where project_id is not null")
+        assert cursor.fetchone() == (1,)
+
+
+def test_an_empty_database_gets_no_organization_it_never_asked_for(
+    connection: DbConnection,
+) -> None:
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select count(*) from organizations")
+        assert cursor.fetchone() == (0,)
+
+
+def test_the_adopted_organization_is_named_for_what_happened(connection: DbConnection) -> None:
+    # `adopted`, not `default`. A thing called `default` is a thing nobody chose,
+    # and this one is where migration 0003 put the rows that predate tenancy.
+    _apply_through(connection, 2)
+    _legacy_submission(connection)
+
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select slug from organizations")
+        assert cursor.fetchall() == [("adopted",)]
+
+
+def test_rolling_back_tenancy_with_one_project_succeeds(connection: DbConnection) -> None:
+    apply_pending(connection)
+    organization = create_organization(connection, "acme", "Acme")
+    project = create_project(connection, organization.slug, "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id) "
+            "values (now(), 'ci', 5, %s)",
+            (project.id,),
+        )
+    connection.commit()
+
+    roll_back(connection, steps=1)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select to_regclass('projects')")
+        assert cursor.fetchone() == (None,)
+
+
+def test_rolling_back_tenancy_refuses_to_merge_two_tenants(connection: DbConnection) -> None:
+    """Dropping the tenant column on a database serving two teams merges their evidence."""
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    one = create_project(connection, "acme", "web", "Web")
+    two = create_project(connection, "acme", "api", "API")
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            "insert into submissions (received_at, source, schema_version, project_id) "
+            "values (now(), 'ci', 5, %s)",
+            [(one.id,), (two.id,)],
+        )
+    connection.commit()
+
+    with pytest.raises(MigrationError, match="more than one project"):
+        roll_back(connection, steps=1)
+
+
+def test_a_tenant_split_across_the_two_tables_also_refuses(connection: DbConnection) -> None:
+    """One project in the submissions, another in the keys — still two tenants.
+
+    A condition counted per table would see "one and one" here and let through a
+    rollback that merges two teams.
+    """
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    one = create_project(connection, "acme", "web", "Web")
+    two = create_project(connection, "acme", "api", "API")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id) "
+            "values (now(), 'ci', 5, %s)",
+            (one.id,),
+        )
+        cursor.execute(
+            "insert into api_keys (name, prefix, secret_hash, scopes, project_id) "
+            "values ('ci', 'deadbeef', 'sha256:x', '{ingest}', %s)",
+            (two.id,),
+        )
+    connection.commit()
+
+    with pytest.raises(MigrationError, match="more than one project"):
+        roll_back(connection, steps=1)
+
+
+def test_the_tenancy_rollback_restores_the_indexes_it_dropped(connection: DbConnection) -> None:
+    # A rollback that leaves the database missing what the previous migration
+    # created only half went backwards, and the next reader pays for it in query
+    # plans nobody associates with a schema change.
+    apply_pending(connection)
+
+    roll_back(connection, steps=1)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select indexname from pg_indexes where tablename = 'submissions'")
+        names = {str(row[0]) for row in cursor.fetchall()}
+    assert "submissions_received_at_idx" in names
+    assert "submissions_source_idx" in names
+
+
+def test_tenancy_indexes_lead_with_the_project(connection: DbConnection) -> None:
+    """Every read filters on the tenant first, so the tenant leads the index.
+
+    Cost grows with the target, not with the rule count — which applies to the
+    collector's queries as much as to a scan.
+    """
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select indexdef from pg_indexes where tablename = 'submissions' "
+            "and indexname = 'submissions_project_received_idx'"
+        )
+        row = cursor.fetchone()
+    assert row is not None
+    assert "(project_id, received_at DESC)" in str(row[0])
 
 
 def test_a_failing_migration_leaves_the_ones_before_it_applied(

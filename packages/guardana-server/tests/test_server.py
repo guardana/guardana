@@ -1,6 +1,7 @@
 import json
 import threading
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi.testclient import TestClient
 from guardana.core.evaluator import Verdict
@@ -10,6 +11,7 @@ from guardana.core.severity import Severity
 from guardana.core.taxonomy import OWASP_LLM01
 from guardana.server import create_app
 from guardana.server.store import InMemoryStore
+from guardana.server.tenancy import TenantScope
 
 _OK = 200
 _UNPROCESSABLE = 422
@@ -19,14 +21,9 @@ def _client() -> TestClient:
     return TestClient(create_app(store=InMemoryStore(), allow_unauthenticated=True))
 
 
-def _real_envelope(source: str = "ci") -> dict[str, Any]:
-    """The exact bytes a Guardana agent would POST — built by the real reporter.
-
-    This is the contract test between engine and collector: the two are
-    deliberately decoupled, so nothing but a test like this proves they agree.
-    """
-    captured: list[bytes] = []
-    result = ScanResult(
+def _result() -> ScanResult:
+    """One run with two findings — the input every envelope below is built from."""
+    return ScanResult(
         findings=(
             Finding(
                 rule_id="guardana.prompt.injection.ignore_previous",
@@ -51,8 +48,17 @@ def _real_envelope(source: str = "ci") -> dict[str, Any]:
         rules_run=("r0", "r1"),
         rules_skipped=(),
     )
+
+
+def _real_envelope(source: str = "ci") -> dict[str, Any]:
+    """The exact bytes a Guardana agent would POST — built by the real reporter.
+
+    This is the contract test between engine and collector: the two are
+    deliberately decoupled, so nothing but a test like this proves they agree.
+    """
+    captured: list[bytes] = []
     reporter = HttpReporter("http://collector", transport=lambda _url, body: captured.append(body))
-    reporter.submit(result, source=source)
+    reporter.submit(_result(), source=source)
     payload: dict[str, Any] = json.loads(captured[0])
     return payload
 
@@ -61,9 +67,15 @@ def test_collector_accepts_the_envelope_the_reporter_actually_sends() -> None:
     response = _client().post("/findings", json=_real_envelope())
 
     assert response.status_code == _OK
-    # `accepted_by` names the credential that wrote the run — None here because
-    # this app was built in the explicitly-unauthenticated evaluation mode.
-    assert response.json() == {"status": "ok", "stored": 2, "accepted_by": None}
+    # `accepted_by` names the credential that wrote the run and `project` the tenant
+    # it wrote into — both None here, because this app was built in the
+    # explicitly-unauthenticated evaluation mode where there is neither.
+    assert response.json() == {
+        "status": "ok",
+        "stored": 2,
+        "accepted_by": None,
+        "project": None,
+    }
 
 
 def test_collector_accepts_and_retains_the_unverified_channel() -> None:
@@ -169,7 +181,7 @@ def test_store_is_bounded_so_a_long_running_collector_cannot_grow_without_limit(
     for source in ("a", "b", "c"):
         client.post("/findings", json=_real_envelope(source=source))
 
-    assert [s.source for s in store.submissions()] == ["b", "c"]
+    assert [s.source for s in store.submissions(TenantScope.unauthenticated())] == ["b", "c"]
 
 
 def test_omitted_schema_version_is_rejected_not_assumed() -> None:
@@ -291,6 +303,47 @@ def test_collector_accepts_the_v4_envelope_and_keeps_which_rules_ran() -> None:
     )
 
     assert response.status_code == _OK
-    summary = store.submissions()[0].summary
+    summary = store.submissions(TenantScope.unauthenticated())[0].summary
     assert summary is not None
     assert summary.rules_executed == ["guardana.a", "guardana.b"]
+
+
+def test_the_reporter_reaches_the_collector_at_the_url_a_user_writes() -> None:
+    """The documented command end to end: `--reporter server://http://host:port`.
+
+    The envelope contract above posts the reporter's bytes to `/findings` by hand,
+    which proves the two agree on the *body* and nothing at all about the *path*.
+    Aimed at the bare collector URL every doc shows, the reporter POSTed to `/`,
+    which no collector serves — so the submission came back `404`, the CLI printed a
+    warning, and the scan still exited `0`. A whole fleet reporting nothing while a
+    dashboard shows stale data as current is the failure this project says matters
+    most, and only a test that goes through the real app can see it.
+    """
+    client = _client()
+    reached: list[str] = []
+
+    def through_the_running_app(url: str, payload: bytes) -> None:
+        reached.append(url)
+        client.post(
+            urlsplit(url).path, content=payload, headers={"Content-Type": "application/json"}
+        ).raise_for_status()
+
+    HttpReporter("http://collector", transport=through_the_running_app).submit(
+        _result(), source="ci"
+    )
+
+    assert reached == ["http://collector/findings"]
+    assert len(client.get("/findings").json()) == 1
+
+
+def test_a_reporter_url_that_already_names_the_route_is_left_alone() -> None:
+    # Somebody behind a reverse proxy may well point at the full path; appending a
+    # second `/findings` to it would break a configuration that works today.
+    reached: list[str] = []
+
+    HttpReporter(
+        "https://collector.example.com/guardana/findings",
+        transport=lambda url, _payload: reached.append(url),
+    ).submit(_result(), source="ci")
+
+    assert reached == ["https://collector.example.com/guardana/findings"]

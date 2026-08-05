@@ -7,8 +7,9 @@ the in-memory store and against PostgreSQL, and a difference between them is a
 failure rather than a discovery.
 """
 
+import inspect
 from collections.abc import Callable, Iterator
-from typing import Any
+from typing import Any, NamedTuple
 
 import psycopg
 import pytest
@@ -25,6 +26,7 @@ from guardana.server.envelope import (
 )
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.store import InMemoryStore, Store
+from guardana.server.tenancy import TenantScope, create_organization, create_project
 
 _TICK = iter(range(1_000_000))
 
@@ -34,15 +36,24 @@ def _clock() -> float:
     return float(next(_TICK))
 
 
+class Scoped(NamedTuple):
+    """A store and a tenant to use it as. Every store call needs both."""
+
+    store: Store
+    scope: TenantScope
+
+
 @pytest.fixture(params=["memory", "postgres"])
-def store(request: pytest.FixtureRequest) -> Iterator[Store]:
+def scoped(request: pytest.FixtureRequest) -> Iterator[Scoped]:
     if request.param == "memory":
-        yield InMemoryStore(clock=_clock)
+        yield Scoped(InMemoryStore(clock=_clock), TenantScope.for_project(1))
         return
     url = request.getfixturevalue("database_url")
     with psycopg.connect(url) as connection:
         apply_pending(connection)
-    yield PostgresStore(url, clock=_clock)
+        create_organization(connection, "acme", "Acme")
+        project = create_project(connection, "acme", "web", "Web")
+    yield Scoped(PostgresStore(url, clock=_clock), TenantScope.for_project(project.id))
 
 
 def _submission(source: str = "app", **overrides: object) -> Submission:
@@ -90,19 +101,59 @@ def _submission(source: str = "app", **overrides: object) -> Submission:
     return Submission(**defaults)
 
 
-def test_a_stored_submission_comes_back(store: Store) -> None:
-    store.add(_submission())
+# --- no query without a tenant, enforced rather than promised -----------------
 
-    held = store.submissions()
+_STORE_METHODS = frozenset({"add", "submissions", "trend", "records"})
+
+
+def test_no_store_method_is_unscoped() -> None:
+    """The property the shape does not buy, this test buys instead.
+
+    Putting the scope in the signature rather than in a per-request repository's
+    constructor has exactly one real weakness: a method can be added without one.
+    Whoever adds it sees red here.
+    """
+    methods = {
+        name: member
+        for name, member in vars(Store).items()
+        if inspect.isfunction(member) and not name.startswith("_")
+    }
+
+    assert set(methods) == _STORE_METHODS, "the protocol grew or lost a method"
+    for name, member in methods.items():
+        parameters = list(inspect.signature(member).parameters.values())
+        assert parameters[1].name == "scope", f"{name} takes no tenant scope"
+        assert parameters[1].annotation is TenantScope, f"{name}'s scope is not a TenantScope"
+
+
+@pytest.mark.parametrize("implementation", [InMemoryStore, PostgresStore])
+def test_both_implementations_take_the_scope_the_protocol_declares(
+    implementation: type[object],
+) -> None:
+    for name in sorted(_STORE_METHODS):
+        parameters = list(inspect.signature(getattr(implementation, name)).parameters.values())
+        assert parameters[1].name == "scope", f"{implementation.__name__}.{name}"
+        assert parameters[1].annotation is TenantScope, f"{implementation.__name__}.{name}"
+
+
+# --- what a store keeps -------------------------------------------------------
+
+
+def test_a_stored_submission_comes_back(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission())
+
+    held = store.submissions(scope)
 
     assert len(held) == 1
     assert held[0].source == "app"
 
 
-def test_findings_survive_the_round_trip_intact(store: Store) -> None:
-    store.add(_submission())
+def test_findings_survive_the_round_trip_intact(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission())
 
-    finding = store.submissions()[0].findings[0]
+    finding = store.submissions(scope)[0].findings[0]
 
     assert finding.rule_id == "guardana.supply_chain.hardcoded_secret"
     assert finding.severity == "HIGH"
@@ -111,12 +162,13 @@ def test_findings_survive_the_round_trip_intact(store: Store) -> None:
     assert [ref.id for ref in finding.taxonomy] == ["LLM02"]
 
 
-def test_the_unverified_channel_is_never_folded_into_findings(store: Store) -> None:
+def test_the_unverified_channel_is_never_folded_into_findings(scoped: Scoped) -> None:
     # A check that ran and could not grade is not a pass, and storage must not be
     # where that distinction is lost.
-    store.add(_submission())
+    store, scope = scoped
+    store.add(scope, _submission())
 
-    held = store.submissions()[0]
+    held = store.submissions(scope)[0]
 
     assert len(held.findings) == 1
     assert len(held.unverified) == 1
@@ -124,21 +176,23 @@ def test_the_unverified_channel_is_never_folded_into_findings(store: Store) -> N
     assert held.unverified[0].verdict.outcome == "inconclusive"
 
 
-def test_a_check_that_could_not_run_is_stored(store: Store) -> None:
-    store.add(_submission())
+def test_a_check_that_could_not_run_is_stored(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission())
 
-    errors = store.submissions()[0].errors
+    errors = store.submissions(scope)[0].errors
 
     assert [error.source for error in errors] == ["acme.rule"]
 
 
-def test_a_skip_keeps_its_reason(store: Store) -> None:
+def test_a_skip_keeps_its_reason(scoped: Scoped) -> None:
     # v5 carries why a rule did not run. Flattening it back to an id in storage
     # would leave a fleet view unable to tell "never applied" from "this provider
     # cannot do it" — the whole reason the envelope moved to v5.
-    store.add(_submission())
+    store, scope = scoped
+    store.add(scope, _submission())
 
-    summary = store.submissions()[0].summary
+    summary = store.submissions(scope)[0].summary
 
     assert summary is not None
     assert summary.rules_skipped
@@ -148,90 +202,103 @@ def test_a_skip_keeps_its_reason(store: Store) -> None:
     )
 
 
-def test_filtering_by_source_returns_only_that_source(store: Store) -> None:
-    store.add(_submission(source="one"))
-    store.add(_submission(source="two"))
+def test_filtering_by_source_returns_only_that_source(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission(source="one"))
+    store.add(scope, _submission(source="two"))
 
-    assert [s.source for s in store.submissions("one")] == ["one"]
-
-
-def test_submissions_come_back_oldest_first(store: Store) -> None:
-    store.add(_submission(source="first"))
-    store.add(_submission(source="second"))
-
-    assert [s.source for s in store.submissions()] == ["first", "second"]
+    assert [s.source for s in store.submissions(scope, "one")] == ["one"]
 
 
-def test_the_trend_counts_findings_by_severity(store: Store) -> None:
-    store.add(_submission())
-    store.add(_submission())
+def test_submissions_come_back_oldest_first(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission(source="first"))
+    store.add(scope, _submission(source="second"))
 
-    assert store.trend() == {"HIGH": 2}
+    assert [s.source for s in store.submissions(scope)] == ["first", "second"]
 
 
-def test_records_carry_the_time_the_submission_arrived(store: Store) -> None:
-    store.add(_submission())
+def test_the_trend_counts_findings_by_severity(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission())
+    store.add(scope, _submission())
 
-    records = store.records()
+    assert store.trend(scope) == {"HIGH": 2}
+
+
+def test_records_carry_the_time_the_submission_arrived(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission())
+
+    records = store.records(scope)
 
     assert len(records) == 1
     assert records[0].received_at >= 0
 
 
-def test_an_empty_store_answers_without_inventing_anything(store: Store) -> None:
-    assert store.submissions() == []
-    assert store.trend() == {}
-    assert store.records() == []
+def test_an_empty_store_answers_without_inventing_anything(scoped: Scoped) -> None:
+    store, scope = scoped
+
+    assert store.submissions(scope) == []
+    assert store.trend(scope) == {}
+    assert store.records(scope) == []
 
 
-def test_a_submission_with_no_summary_is_accepted(store: Store) -> None:
+def test_a_submission_with_no_summary_is_accepted(scoped: Scoped) -> None:
     # A v2 agent sends none, and the collector still has to hold what it was given.
-    store.add(_submission(summary=None, findings=[], unverified=[], errors=[]))
+    store, scope = scoped
+    store.add(scope, _submission(summary=None, findings=[], unverified=[], errors=[]))
 
-    assert len(store.submissions()) == 1
+    assert len(store.submissions(scope)) == 1
 
 
-def _persists_across_instances(url: str) -> Callable[[], list[Submission]]:
-    return lambda: PostgresStore(url).submissions()
+def _persists_across_instances(url: str, scope: TenantScope) -> Callable[[], list[Submission]]:
+    return lambda: PostgresStore(url).submissions(scope)
 
 
 def test_postgres_keeps_a_submission_across_process_restarts(database_url: str) -> None:
     """The reason this item exists. Asserted with a second store object, not a second store."""
     with psycopg.connect(database_url) as connection:
         apply_pending(connection)
-    PostgresStore(database_url, clock=_clock).add(_submission(source="survives"))
+        create_organization(connection, "acme", "Acme")
+        project = create_project(connection, "acme", "web", "Web")
+    scope = TenantScope.for_project(project.id)
+    PostgresStore(database_url, clock=_clock).add(scope, _submission(source="survives"))
 
-    reopened = _persists_across_instances(database_url)()
+    reopened = _persists_across_instances(database_url, scope)()
 
     assert [s.source for s in reopened] == ["survives"]
 
 
-def test_a_limit_keeps_the_newest_and_is_applied_by_the_store(store: Store) -> None:
+def test_a_limit_keeps_the_newest_and_is_applied_by_the_store(scoped: Scoped) -> None:
     """The bound belongs to the store, not to a slice taken after the read.
 
     The in-memory store was safe from an unbounded read only because it forgets;
     a durable one has no upper size, so a reader that fetches everything and slices
     turns one request into "load the entire finding history into memory".
     """
+    store, scope = scoped
     for index in range(5):
-        store.add(_submission(source=f"run-{index}"))
+        store.add(scope, _submission(source=f"run-{index}"))
 
-    held = store.submissions(limit=2)
+    held = store.submissions(scope, limit=2)
 
     assert [s.source for s in held] == ["run-3", "run-4"]
 
 
-def test_a_limit_and_a_source_filter_compose(store: Store) -> None:
-    store.add(_submission(source="a"))
-    store.add(_submission(source="b"))
-    store.add(_submission(source="a"))
+def test_a_limit_and_a_source_filter_compose(scoped: Scoped) -> None:
+    store, scope = scoped
+    store.add(scope, _submission(source="a"))
+    store.add(scope, _submission(source="b"))
+    store.add(scope, _submission(source="a"))
 
-    assert [s.source for s in store.submissions("a", 1)] == ["a"]
-    assert len(store.records("a")) == 2
+    assert [s.source for s in store.submissions(scope, "a", 1)] == ["a"]
+    assert len(store.records(scope, "a")) == 2
 
 
-def test_no_limit_still_returns_everything(store: Store) -> None:
+def test_no_limit_still_returns_everything(scoped: Scoped) -> None:
+    store, scope = scoped
     for index in range(3):
-        store.add(_submission(source=f"run-{index}"))
+        store.add(scope, _submission(source=f"run-{index}"))
 
-    assert len(store.submissions()) == 3
+    assert len(store.submissions(scope)) == 3

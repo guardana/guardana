@@ -19,6 +19,7 @@ from guardana.server.security import (
 )
 from guardana.server.stats import compute_stats
 from guardana.server.store import InMemoryStore, Store
+from guardana.server.tenancy import TenantScope, UnscopedQueryError
 
 _UNPROCESSABLE = 422
 _UNAVAILABLE = 503
@@ -85,8 +86,11 @@ def create_app(
         active_store, choice = _store_from_environment()
         database_url = choice.database_url
     # Before a single route is mounted: a collector nothing can authenticate
-    # against must not reach the point of serving one.
+    # against must not reach the point of serving one — and neither must one whose
+    # store no unauthenticated caller could ever reach.
     require_authentication(database_url, acknowledged=allow_unauthenticated)
+    if database_url is None:
+        _refuse_a_store_no_unauthenticated_caller_can_reach(active_store)
     app = FastAPI(title="guardana-server")
     _mount_health(app, database_url)
     # `Annotated`, not a `Depends` default: the parameter really is an identity at
@@ -106,35 +110,73 @@ def create_app(
                     f"this collector speaks {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
                 ),
             )
-        active_store.add(submission)
+        active_store.add(_scope_of(identity), submission)
         return {
             "status": "ok",
             "stored": len(submission.findings),
-            # Echoed so a pipeline's log records which credential wrote the run,
-            # which is the first thing anyone asks of an audit trail.
+            # Echoed so a pipeline's log records which credential wrote the run and
+            # into which tenant — the first thing anyone asks of an audit trail.
             "accepted_by": identity.name if identity is not None else None,
+            "project": identity.project_ref if identity is not None else None,
         }
 
     @app.get("/findings")
     def get_findings(
-        _identity: reading,
+        identity: reading,
         source: str | None = Query(default=None),
         limit: int = Query(default=100, ge=1, le=1000),
     ) -> list[Submission]:
         # The bound goes to the store, not to a slice taken after everything has
         # already been read: a durable store has no upper size, so slicing here
         # would mean loading the whole finding history to return a hundred rows.
-        return active_store.submissions(source, limit)[::-1]
+        return active_store.submissions(_scope_of(identity), source, limit)[::-1]
 
     @app.get("/trend")
-    def get_trend(_identity: reading) -> dict[str, int]:
-        return active_store.trend()
+    def get_trend(identity: reading) -> dict[str, int]:
+        return active_store.trend(_scope_of(identity))
 
     if _dashboard_enabled(dashboard):
         _refuse_a_dashboard_that_cannot_load(database_url)
         _mount_dashboard(app, active_store, refresh_seconds, reading)
 
     return app
+
+
+def _refuse_a_store_no_unauthenticated_caller_can_reach(store: Store) -> None:
+    """Refuse to serve a durable store from a collector that authenticates nobody.
+
+    Without a database there is nothing to keep a key in, so every request runs
+    under `TenantScope.unauthenticated()` — which a durable store rightly refuses,
+    on every call. Left alone, the collector would start, report healthy, and fail
+    everything: a capability that cannot work must not look present, which is the
+    same lie as reporting a check that could not run as a check that passed.
+
+    Asked of the store rather than decided from its class, so a third-party durable
+    store is held to the same rule. It costs nothing: a store that refuses the scope
+    raises before it opens a connection.
+    """
+    try:
+        store.records(TenantScope.unauthenticated(), limit=1)
+    except UnscopedQueryError as exc:
+        raise UnauthenticatedCollectorError(
+            "this collector has no database, so every request would run with no tenant — and "
+            "this store cannot be reached without a tenant. Set GUARDANA_DATABASE_URL so keys "
+            "carry a project, or use the in-memory store for local evaluation"
+        ) from exc
+
+
+def _scope_of(identity: Authenticated | None) -> TenantScope:
+    """Derive the tenant of a request from its credential, and from nowhere else.
+
+    If the envelope named the project, the runner would declare where it writes,
+    and a credential that does not bound the write is not a boundary at all. It is
+    also why the envelope stays at v5: nothing in it mentions a tenant, so an agent
+    and a collector still upgrade independently.
+
+    `None` is only reachable in the explicitly-unauthenticated mode, which has no
+    database — and `PostgresStore` refuses the scope it produces.
+    """
+    return identity.scope if identity is not None else TenantScope.unauthenticated()
 
 
 def _mount_health(app: FastAPI, database_url: str | None) -> None:
@@ -228,8 +270,8 @@ def _mount_dashboard(app: FastAPI, store: Store, refresh_seconds: int, reading: 
         return page
 
     @app.get("/stats")
-    def get_stats(_identity: reading) -> dict[str, object]:  # type: ignore[valid-type]
-        return asdict(compute_stats(store.records()))
+    def get_stats(identity: reading) -> dict[str, object]:  # type: ignore[valid-type]
+        return asdict(compute_stats(store.records(_scope_of(identity))))
 
     @app.get("/catalog")
     def get_catalog() -> dict[str, dict[str, str]]:

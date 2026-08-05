@@ -1,6 +1,6 @@
 # Design: collector tenancy — organizations and projects
 
-**Status:** accepted, not yet implemented · **Written:** 2026-08-04 · **Phase C, item 21**
+**Status:** implemented in 0.9.0 · **Written:** 2026-08-04 · **Phase C, item 21**
 
 ## The problem
 
@@ -316,6 +316,22 @@ checklist that moves to match what shipped is not a checklist.
 Also out of scope, each with its own item: human roles and browser sessions (the
 dashboard still refuses to mount on an authenticated collector), the audit log
 (25), deletion and retention (26), environments and deployments (22).
+
+## Two things the code changed about this design
+
+Recorded rather than edited into the argument above, because a document that only
+ever describes what happened teaches nobody what was reconsidered.
+
+**`organizations.adopted` is a column.** The design promises `org list` marks the
+adopted organization, and recognising it by the slug `adopted` stops working the
+second somebody runs `org rename` — which this same document introduces, for
+exactly the reason that a name a migration invented must not be permanent. So the
+fact is recorded as a fact.
+
+**The rollback counts tenants across the union of both tables.** The SQL sketched
+above counts `submissions` and `api_keys` separately, which sees "one and one" on a
+database whose runs are in one project and whose key belongs to another — two
+tenants, merged by a rollback that thought it was safe.
 
 ## Open questions
 

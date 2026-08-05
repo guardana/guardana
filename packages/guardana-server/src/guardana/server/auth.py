@@ -14,6 +14,12 @@ every path that reads it.
 rolled away, rejects everything. The alternative — treating "no credentials
 configured" as "no credentials required" — is the shape of every default-admin
 incident there has ever been.
+
+**Pinned to one project.** A key names the tenant it writes into and reads from,
+and that is the only place the tenant comes from — never the envelope. If the
+envelope named the project, the runner would declare where it writes, and a
+credential that does not bound the write is not a boundary at all. The cost is
+accepted: a team with ten projects needs ten keys in CI.
 """
 
 import hmac
@@ -23,6 +29,8 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
 from typing import TYPE_CHECKING
+
+from guardana.server.tenancy import TenantScope, parse_project_reference
 
 if TYPE_CHECKING:
     from psycopg import Connection
@@ -77,6 +85,9 @@ class KeyRecord:
     name: str
     scopes: tuple[Scope, ...]
     created_at: datetime
+    project_ref: str
+    """The `organization/project` this key writes into and reads from."""
+
     last_used_at: datetime | None = None
     revoked_at: datetime | None = None
     expires_at: datetime | None = None
@@ -119,15 +130,33 @@ def split_token(token: str) -> tuple[str, str]:
 
 @dataclass(frozen=True, slots=True)
 class Authenticated:
-    """The identity behind an accepted request."""
+    """The identity behind an accepted request, including the tenant it belongs to."""
 
     prefix: str
     name: str
     scopes: frozenset[Scope]
+    project_id: int
+    project_ref: str
 
     def permits(self, scope: Scope) -> bool:
         """Whether this key may do `scope`."""
         return scope in self.scopes
+
+    @property
+    def scope(self) -> TenantScope:
+        """The tenant every store call made for this request is scoped to."""
+        return TenantScope.for_project(self.project_id)
+
+
+_KEY_COLUMNS = (
+    "k.name, k.secret_hash, k.scopes, k.created_at, k.last_used_at, k.revoked_at, "
+    "k.expires_at, k.project_id, o.slug, p.slug"
+)
+_KEY_JOIN = (
+    "from api_keys k "
+    "join projects p on p.id = k.project_id "
+    "join organizations o on o.id = p.organization_id"
+)
 
 
 def authenticate(
@@ -141,33 +170,46 @@ def authenticate(
 
     `last_used_at` is written on success, because "this key has not been used in
     four months" is the question that gets an unused credential revoked.
+
+    The project is read here rather than derived later, because this is the only
+    place a request's tenant is decided. Joining for the *name* as well as the id
+    costs two primary-key lookups and buys an ingest response that says which
+    tenant accepted the run — the first thing anybody asks of an audit trail.
     """
     moment = now if now is not None else datetime.now(UTC)
     prefix, secret = split_token(token)
     with connection.cursor() as cursor:
-        cursor.execute(
-            "select name, secret_hash, scopes, created_at, last_used_at, revoked_at, expires_at "
-            "from api_keys where prefix = %s",
-            (prefix,),
-        )
+        cursor.execute(f"select {_KEY_COLUMNS} {_KEY_JOIN} where k.prefix = %s", (prefix,))
         row = cursor.fetchone()
     if row is None:
         raise AuthError("unknown API key")
-    record = KeyRecord(
-        prefix=prefix,
-        name=str(row[0]),
-        scopes=_scopes(row[2]),
-        created_at=row[3],  # type: ignore[arg-type]
-        last_used_at=row[4],  # type: ignore[arg-type]
-        revoked_at=row[5],  # type: ignore[arg-type]
-        expires_at=row[6],  # type: ignore[arg-type]
-    )
+    record = _record(prefix, row)
     if not hmac.compare_digest(str(row[1]), hash_secret(secret)):
         raise AuthError("unknown API key")
     if not record.is_usable(moment):
         raise AuthError("this API key is revoked or expired")
     _touch(connection, prefix, moment)
-    return Authenticated(prefix=prefix, name=record.name, scopes=frozenset(record.scopes))
+    return Authenticated(
+        prefix=prefix,
+        name=record.name,
+        scopes=frozenset(record.scopes),
+        project_id=int(str(row[7])),
+        project_ref=record.project_ref,
+    )
+
+
+def _record(prefix: str, row: tuple[object, ...]) -> KeyRecord:
+    """Build the stored record from a row selected with `_KEY_COLUMNS`."""
+    return KeyRecord(
+        prefix=prefix,
+        name=str(row[0]),
+        scopes=_scopes(row[2]),
+        created_at=row[3],  # type: ignore[arg-type]
+        project_ref=f"{row[8]}/{row[9]}",
+        last_used_at=row[4],  # type: ignore[arg-type]
+        revoked_at=row[5],  # type: ignore[arg-type]
+        expires_at=row[6],  # type: ignore[arg-type]
+    )
 
 
 def _scopes(raw: object) -> tuple[Scope, ...]:
@@ -192,46 +234,54 @@ def store_key(
     issued: IssuedKey,
     secret_hash: str,
     *,
-    created_by: str | None = None,
+    project_id: int,
     expires_at: datetime | None = None,
 ) -> None:
-    """Persist a newly issued key's record."""
+    """Persist a newly issued key's record, pinned to one project.
+
+    `project_id` is keyword-only and has no default. A positional argument with a
+    fallback would be exactly what this change exists to prevent: a credential that
+    came into existence without a tenant, because nobody passed one.
+
+    There is no `created_by`: the column exists, nothing has ever been able to fill
+    it, and there are no human identities yet to fill it with. It is written by the
+    audit log, where "which identity issued this credential" is the question, rather
+    than by a parameter every caller passes `None` to.
+    """
     with connection.cursor() as cursor:
         cursor.execute(
-            "insert into api_keys (name, prefix, secret_hash, scopes, created_by, expires_at) "
+            "insert into api_keys (name, prefix, secret_hash, scopes, expires_at, project_id) "
             "values (%s, %s, %s, %s, %s, %s)",
             (
                 issued.name,
                 issued.prefix,
                 secret_hash,
                 [str(s) for s in issued.scopes],
-                created_by,
                 expires_at,
+                project_id,
             ),
         )
     connection.commit()
 
 
-def list_keys(connection: "Connection[tuple[object, ...]]") -> tuple[KeyRecord, ...]:
-    """Every key this collector knows about, usable or not. Never the secrets."""
+def list_keys(
+    connection: "Connection[tuple[object, ...]]", *, project: str | None = None
+) -> tuple[KeyRecord, ...]:
+    """Every key this collector knows about, or one project's, usable or not.
+
+    Never the secrets: there is no command and no endpoint that returns a key after
+    it is created.
+    """
+    reference = None if project is None else "/".join(parse_project_reference(project))
     with connection.cursor() as cursor:
         cursor.execute(
-            "select prefix, name, scopes, created_at, last_used_at, revoked_at, expires_at "
-            "from api_keys order by created_at"
+            f"select k.prefix, {_KEY_COLUMNS} {_KEY_JOIN} "
+            f"where (%s::text is null or o.slug || '/' || p.slug = %s) "
+            f"order by k.created_at",
+            (reference, reference),
         )
         rows = cursor.fetchall()
-    return tuple(
-        KeyRecord(
-            prefix=str(row[0]),
-            name=str(row[1]),
-            scopes=_scopes(row[2]),
-            created_at=row[3],  # type: ignore[arg-type]
-            last_used_at=row[4],  # type: ignore[arg-type]
-            revoked_at=row[5],  # type: ignore[arg-type]
-            expires_at=row[6],  # type: ignore[arg-type]
-        )
-        for row in rows
-    )
+    return tuple(_record(str(row[0]), row[1:]) for row in rows)
 
 
 def revoke_key(

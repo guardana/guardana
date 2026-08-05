@@ -1,14 +1,90 @@
-# The collector — persistence, migrations, and what a database does not fix
+# The collector — tenants, persistence, migrations, and what a database does not fix
 
 The collector (`guardana-server`) aggregates findings from many agents. It is
 **optional in every direction**: the engine never imports it, no feature needs it,
 and nothing is sent anywhere unless a run is given `--reporter`.
 
-> **Maturity: experimental.** It now keeps what it is given and **requires an API
-> key** for every route that carries a finding. It still has **no tenancy**: every
-> key sees everything in the collector, so pointing two teams at one instance is
-> not yet safe. Organization and project isolation is the next item, and the label
-> moves to `beta` when it lands.
+> **Maturity: experimental.** It keeps what it is given, **requires an API key**
+> for every route that carries a finding, and isolates one **project** from
+> another — a key reads and writes its own project and nothing else. The label
+> moves to `beta` when environments and deployments land alongside it, because the
+> company-ready checklist entry reads "project/**environment** isolation" and a
+> checklist that moves to match what shipped is not a checklist.
+
+## Standing one up: three commands
+
+```bash
+export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
+guardana-collector migrate
+guardana-collector bootstrap --org acme --project web   # prints the key, once
+uvicorn 'guardana.server:create_app' --factory
+```
+
+`bootstrap` creates the organization, the project and the first key together,
+because a security boundary that adds four commands to the first run is a boundary
+that makes a tool nobody starts. The granular commands below exist for the second
+team, not for the first one.
+
+Then point a run at it:
+
+```bash
+export GUARDANA_COLLECTOR_TOKEN=gdn_…
+guardana scan . --reporter server://https://collector.example.com
+```
+
+## Organizations and projects
+
+**The tenant is the project.** An organization is what a project belongs to and
+what gets named; isolation runs along the project, because that is the line a team
+draws for itself — `web` and `api` are not the same body of evidence even when one
+department pays for both.
+
+```bash
+guardana-collector org create --slug acme --name "Acme Inc"
+guardana-collector org list                             # marks the adopted one
+guardana-collector org rename --slug adopted --to acme
+guardana-collector project create --org acme --slug web --name "Web app"
+guardana-collector project list [--org acme]
+guardana-collector project rename --project acme/web --to api
+```
+
+**The project comes from the key, never from the envelope.** If the envelope named
+it, the runner would declare where it writes — and a credential that does not bound
+the write is not a boundary at all. It is also why the envelope stays at v5 and why
+nothing in the engine changed: an agent and a collector upgrade independently, and
+no fleet has to move in step with a collector. The cost is real and accepted: a
+team with ten projects needs ten keys in CI.
+
+**There is no command that deletes an organization or a project**, and the foreign
+keys are `on delete restrict`. Removing tenant data is retention, and it deserves
+to be designed there rather than smuggled in here.
+
+**Renaming is safe.** A key hangs off a project's identity, not its name, so
+`project rename` does not invalidate anything.
+
+### What migration `0003` did to a collector that already had data
+
+It **adopted** it rather than refusing to run. Refusing is the most faithful to "a
+decision, never a default", but it stops an upgrade half-way, and that is exactly
+the pressure that produces workarounds.
+
+Every pre-tenancy submission and every pre-tenancy key landed in one organization
+called `adopted` — named for what happened, because a thing called `default` is a
+thing nobody chose. Three conditions make that honest rather than convenient:
+
+- it is created **only when there is something to adopt**, so a fresh install gets
+  no tenant it never asked for;
+- **old keys keep working**, because adoption must not be a silent invalidation of
+  a fleet of credentials;
+- **it can be renamed**, because a name a migration invented must not be permanent.
+
+`org list` marks it and says where it came from, so an administrator who upgraded
+without reading a changelog still finds out where their history went.
+
+**Rolling `0003` back refuses when two tenants would be merged.** Dropping the
+tenant column on a database serving two teams folds their evidence into one
+undifferentiated pile, so the down migration counts the tenants across the
+submissions *and* the keys first and raises rather than doing it.
 
 ## Choosing where submissions go
 
@@ -34,12 +110,17 @@ collector with no database cannot authenticate anybody — and refuses to be bui
 rather than serving openly.
 
 ```bash
-guardana-collector key create --name github-actions          # ingest only, the default
-guardana-collector key create --name dashboard --scope read
-guardana-collector key create --name ci --expires-in-days 90
-guardana-collector key list                                   # prefixes, never secrets
+guardana-collector key create --project acme/web --name github-actions   # ingest only
+guardana-collector key create --project acme/web --name dashboard --scope read
+guardana-collector key create --project acme/web --name ci --expires-in-days 90
+guardana-collector key list [--project acme/web]              # prefixes, never secrets
 guardana-collector key revoke <prefix>
 ```
+
+**`--project` is required, and this command does not guess** even when exactly one
+project exists. Issuing a credential against a tenant nobody named has the same
+shape as a default credential, and `bootstrap` already covers the case where there
+is only one.
 
 ```bash
 export GUARDANA_COLLECTOR_TOKEN=gdn_…                                # never a flag: see below
@@ -58,6 +139,11 @@ command of most CI logs — the same reason `probe` takes `--api-key-env` rather
 than `--api-key`. A collector that rejects a submission says so as a warning
 naming the status, because a whole fleet quietly failing to report while a
 dashboard shows stale data as current is the failure that matters.
+
+**`--reporter` takes the collector's URL, not a route.** The reporter appends the
+ingest path itself, so `server://https://collector.example.com` is the whole thing
+a pipeline needs to know. A URL that already carries a path is left alone, for a
+deployment behind a reverse proxy that maps one.
 
 **Shown once.** There is no command and no endpoint that returns a key after it is
 created — a credential a system can re-read is a credential that leaks through
@@ -132,6 +218,7 @@ together cannot both apply the same version.
 | a migration edited after it was applied | two databases now disagree about what version four *is*, and nothing else would ever notice. The checksum is recorded when it is applied and checked every time after. Add a new migration instead |
 | a migration numbered below the highest applied one | a rebase accident. Applying only what comes after would skip it on that database forever, while every other database has it |
 | a database holding a migration this build does not ship | it was written by a newer Guardana, and an older collector would write rows the newer schema does not describe |
+| rolling back `0003` on a database holding two tenants | dropping the tenant column would merge two teams' evidence into one undifferentiated pile. The only refusal tied to a single migration, because only this one can destroy an isolation boundary |
 
 ## Health and readiness are two questions
 
@@ -161,15 +248,20 @@ two versions of the code briefly run against one schema.
 docker compose -f deploy/docker-compose.dev.yml up -d
 export GUARDANA_DATABASE_URL=postgresql://guardana:guardana@127.0.0.1:55439/guardana_test
 uv run guardana-collector migrate
+uv run guardana-collector bootstrap --org acme --project web    # prints the key once
 uv run uvicorn 'guardana.server:create_app' --factory
 ```
 
 Then point a run at it:
 
 ```bash
-guardana-collector key create --name local     # prints the key once
+export GUARDANA_COLLECTOR_TOKEN=gdn_…
 guardana scan . --reporter server://http://127.0.0.1:8000
 ```
+
+To look at nothing but the dashboard, skip all of it — `GUARDANA_STORAGE=memory`
+with `GUARDANA_ALLOW_UNAUTHENTICATED=1` still starts a collector with a working
+page, no database, no organization and no key.
 
 A collector that is unreachable never changes a gate's exit code — the scan
 already ran and its verdict stands on its own. A collector that *rejects* a
@@ -192,7 +284,9 @@ uv run pytest packages/guardana-server
 Every assertion about storage runs against **both** the in-memory store and
 PostgreSQL, from one parametrised contract test. Two implementations tested apart
 become two implementations that behave differently, and the one nobody runs
-locally is the one that behaves differently in production.
+locally is the one that behaves differently in production. The cross-tenant tests
+run against both for the same reason, and a further test walks the `Store`
+protocol and fails on any method that does not take a tenant scope first.
 
 ## See also
 
