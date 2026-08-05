@@ -361,8 +361,9 @@ Landed in **0.9.0**:
   never done: aimed at a bare collector URL it POSTed to `/`, took a `404`, and
   the scan still exited `0`.
 
-Still open in the company-ready remainder: **environments and deployments** (the
-checklist entry reads "project/**environment** isolation", and the collector's
+Still open in the company-ready remainder: **environments and deployments**
+(designed in [`docs/design/ai-systems-and-deployments.md`](docs/design/ai-systems-and-deployments.md);
+the checklist entry reads "project/**environment** isolation", and the collector's
 maturity stays `experimental` until both are there), an **audit log**,
 **retention**, **restore-tested backup**, **official containers** for CLI and
 server, **CI beyond GitHub** (GitLab template, generic container pipeline, Jenkins
