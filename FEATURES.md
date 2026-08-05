@@ -488,6 +488,16 @@ collector records the names runs use rather than requiring them in advance, and
 **pinned to one environment** and then writes and reads only that one — a run
 declaring another is refused, a run declaring nothing is stored under the pin.
 
+**One command starts it, and there is an image.** `guardana-collector serve` binds
+loopback unless `--host 0.0.0.0` is typed, so nobody has to remember an ASGI
+factory string to run a collector — and the ASGI server itself stays an *extra*
+(`pip install "guardana-server[serve]"`), because a deployment already running
+gunicorn should not be made to carry a second one. Both halves ship as official
+images on every release —
+`ghcr.io/guardana/guardana` and `ghcr.io/guardana/guardana-collector`, `amd64` and
+`arm64`, non-root, with an SBOM and a signed provenance attestation, and the
+collector image deliberately does **not** migrate on start.
+
 **Runs and findings, not just submissions.** Envelope v7 carries the run's **gate**,
 its id, when it ran, which build produced it, what redaction was applied and what it
 cost — and each finding carries the identity `guardana diff` has used since 0.6, so

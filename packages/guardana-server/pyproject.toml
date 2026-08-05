@@ -25,6 +25,14 @@ classifiers = [
 ]
 dependencies = ["fastapi>=0.115", "pydantic>=2.7", "psycopg[binary]>=3.2"]
 
+# The ASGI server is an extra, not a dependency: FastAPI builds the application,
+# and which server runs it is the deployment's decision — a site already running
+# gunicorn or hypercorn should not be made to install a second one. The floor is
+# the API `guardana-collector serve` actually uses, `run(app, host=, port=)`,
+# which has been stable for far longer than this.
+[project.optional-dependencies]
+serve = ["uvicorn>=0.23"]
+
 [project.urls]
 Homepage = "https://guardana.dev"
 Repository = "https://github.com/guardana/guardana"

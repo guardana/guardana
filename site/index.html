@@ -301,12 +301,16 @@
       <pre class="yml"><code><span class="c">// three commands to a real collector</span>
 <span class="k">$</span> <span class="s">guardana-collector migrate</span>
 <span class="k">$</span> <span class="s">guardana-collector bootstrap --org acme --project web</span>
+<span class="k">$</span> <span class="s">guardana-collector serve</span>
+
+<span class="c">// then any run can report to it</span>
 <span class="k">$</span> <span class="s">guardana scan . --ai-system support-agent --environment production \</span>
 <span class="s">      --reporter server://https://collector.internal</span></code></pre>
       <ul class="checks">
         <li><strong>One instance, many teams.</strong> A key is bound to one project and reads nothing outside it — proven per entity, on both storage backends and over HTTP. Pin a key to an environment and it reaches only that one, in both directions.</li>
         <li><strong>A run, not a pile of findings.</strong> Whether it passed its gate, when it ran, what it cost, which build produced it. A gate the agent didn't send is <em>unknown</em>, never a pass, and a retried job is stored once.</li>
         <li><strong>One finding, followed.</strong> Every finding carries the identity <code>guardana diff</code> uses, so the collector can say how many runs have seen it and since when.</li>
+        <li><strong>Or run it from an image.</strong> Both halves ship as official containers on every release — non-root, <code>amd64</code> and <code>arm64</code>, with an SBOM and a signed provenance attestation.</li>
       </ul>
       <p class="sec-lede">No account, no telemetry, no phone-home — the only network traffic is to the target you point it at, and to a collector you chose to run.</p>
     </div>

@@ -37,6 +37,7 @@ detail below.
 ## For platform and CI teams
 
 - [`integrations.md`](integrations.md) — GitHub Action, pre-commit, and gating on deterioration
+- [`../deploy/docker/README.md`](../deploy/docker/README.md) — the official container images: tags, mounts, exit codes, and what the collector image deliberately does not do on start
 - [`usage-diff.md`](usage-diff.md) — the baseline-and-compare workflow
 - [`usage-collector.md`](usage-collector.md) — the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness
 

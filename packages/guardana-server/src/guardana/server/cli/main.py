@@ -8,10 +8,12 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from guardana.server.cli import inventory, keys, schema, tenants
+from guardana.server.cli import inventory, keys, schema, serve, tenants
 from guardana.server.cli.codes import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK
+from guardana.server.cli.serve import ServerNotInstalledError
 from guardana.server.db.migrations import MigrationError
 from guardana.server.db.settings import StorageNotConfiguredError, resolve_storage
+from guardana.server.security import UnauthenticatedCollectorError
 from guardana.server.tenancy import TenancyError
 
 _DESCRIPTION = (
@@ -34,11 +36,16 @@ def _connection_url() -> str:
 def build_parser() -> argparse.ArgumentParser:
     """Assemble the whole command surface from the three command groups."""
     parser = argparse.ArgumentParser(prog="guardana-collector", description=_DESCRIPTION)
+    # Every command runs one statement against the database and exits — except
+    # `serve`, which sets this to False, because a server manages its own
+    # connections and must start while the database is still coming up.
+    parser.set_defaults(needs_connection=True)
     commands = parser.add_subparsers(dest="command", required=True)
     schema.add_arguments(commands)
     tenants.add_arguments(commands)
     keys.add_arguments(commands)
     inventory.add_arguments(commands)
+    serve.add_arguments(commands)
     return parser
 
 
@@ -58,9 +65,27 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
         raise
 
 
+def _without_connection(arguments: argparse.Namespace) -> int:
+    """Run the one command that opens no connection of its own, reporting refusals.
+
+    A missing ASGI server, a storage backend nobody chose and a collector that
+    could authenticate nobody all mean the same thing: this installation or this
+    configuration cannot do what was asked. Said in words, with a code from the
+    table — never as a traceback out of a start-up sequence.
+    """
+    try:
+        return int(arguments.handler(arguments))
+    except (StorageNotConfiguredError, ServerNotInstalledError, UnauthenticatedCollectorError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_INVALID_USAGE
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run a collector command. Returns the exit code rather than raising."""
     arguments = _parse(argv)
+
+    if not arguments.needs_connection:
+        return _without_connection(arguments)
 
     try:
         url = _connection_url()

@@ -1,0 +1,14 @@
+-- The development Compose file documents two databases and only ever created one.
+--
+-- `guardana_test` is what the test suite connects to (it creates a private
+-- database per test from that connection), and `guardana` is what the docs tell
+-- you to point a locally-running collector at. Following that instruction used to
+-- fail with `database "guardana" does not exist` — found by running the
+-- documented command rather than by reading it.
+--
+-- PostgreSQL runs this only when the data directory is first initialized. On a
+-- volume that already exists, either recreate it (`docker compose -f
+-- deploy/docker-compose.dev.yml down -v`) or create the database by hand:
+--   docker compose -f deploy/docker-compose.dev.yml exec postgres \
+--     psql -U guardana -d guardana_test -c 'create database guardana'
+CREATE DATABASE guardana;

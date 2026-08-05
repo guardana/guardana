@@ -11,13 +11,21 @@ a served model.
 ## Run it
 
 ```bash
-# API only (POST/GET /findings, GET /trend):
-uvicorn --factory guardana.server:create_app
+pip install "guardana-server[serve]"      # `[serve]` adds the ASGI server
 
-# With the opt-in dashboard (adds GET / and GET /stats):
-GUARDANA_DASHBOARD=1 uvicorn --factory guardana.server:create_app
-# or, from your own code: create_app(dashboard=True, refresh_seconds=15)
+export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
+guardana-collector migrate                # never on start: see the docs for why
+guardana-collector bootstrap --org acme --project web    # prints the key, once
+guardana-collector serve                  # http://127.0.0.1:8000
 ```
+
+`serve` binds loopback unless you pass `--host 0.0.0.0`. The ASGI server is an
+extra rather than a dependency, so a deployment that already runs gunicorn or
+hypercorn can point it at the app instead:
+`gunicorn -k uvicorn.workers.UvicornWorker 'guardana.server:create_app()'`.
+
+There is an official image too:
+`docker run -p 8000:8000 -e GUARDANA_DATABASE_URL=… ghcr.io/guardana/guardana-collector:0.9`.
 
 The dashboard is a single self-contained page (no build step, works offline)
 showing severity, per-source/per-rule breakdowns, an activity-over-time trend,

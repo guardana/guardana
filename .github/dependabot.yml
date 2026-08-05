@@ -9,6 +9,16 @@ updates:
     commit-message:
       prefix: "chore(deps):"
 
+  # The images' base layer is a dependency like any other, and it is the one
+  # nobody remembers: a `python:3.13-slim-bookworm` pinned once ages quietly while
+  # every Python dependency around it stays current.
+  - package-ecosystem: "docker"
+    directory: "/deploy/docker"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps):"
+
   # Dependabot supports uv workspaces natively (resolves the root
   # pyproject.toml + uv.lock across all packages/* members). If a Dependabot
   # run ever reports uv as unsupported on your GitHub instance, fall back to

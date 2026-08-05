@@ -16,13 +16,40 @@ and nothing is sent anywhere unless a run is given `--reporter`.
 export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
 guardana-collector migrate
 guardana-collector bootstrap --org acme --project web   # prints the key, once
-uvicorn 'guardana.server:create_app' --factory
+guardana-collector serve                                # http://127.0.0.1:8000
 ```
 
 `bootstrap` creates the organization, the project and the first key together,
 because a security boundary that adds four commands to the first run is a boundary
 that makes a tool nobody starts. The granular commands below exist for the second
 team, not for the first one.
+
+`serve` binds **loopback** unless told otherwise: `--host 0.0.0.0` is a decision,
+so it is one you type. It needs an ASGI server, which is an extra
+(`pip install "guardana-server[serve]"`) rather than a dependency — a deployment
+already running gunicorn or hypercorn should not be made to carry a second one,
+and any of them can run the app directly:
+
+```bash
+gunicorn -k uvicorn.workers.UvicornWorker 'guardana.server:create_app()'
+uvicorn 'guardana.server:create_app' --factory        # what serve does for you
+```
+
+Or as a container, where the same three commands are three `docker run`s:
+
+```bash
+docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
+  ghcr.io/guardana/guardana-collector:0.9 migrate
+docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
+  ghcr.io/guardana/guardana-collector:0.9 bootstrap --org acme --project web
+docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
+  ghcr.io/guardana/guardana-collector:0.9
+```
+
+The image's default command is `serve --host 0.0.0.0 --port 8000`, and it does
+**not** migrate on start — see
+[`deploy/docker/README.md`](../deploy/docker/README.md) for why, and for the
+health and readiness endpoints an orchestrator should use.
 
 Then point a run at it:
 
@@ -344,8 +371,11 @@ docker compose -f deploy/docker-compose.dev.yml up -d
 export GUARDANA_DATABASE_URL=postgresql://guardana:guardana@127.0.0.1:55439/guardana_test
 uv run guardana-collector migrate
 uv run guardana-collector bootstrap --org acme --project web    # prints the key once
-uv run uvicorn 'guardana.server:create_app' --factory
+uv run --with uvicorn guardana-collector serve
 ```
+
+(`--with uvicorn` because the ASGI server is an extra and this repository does not
+carry it as a development dependency.)
 
 Then point a run at it:
 

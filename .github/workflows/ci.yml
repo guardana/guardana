@@ -76,6 +76,24 @@ jobs:
       - name: Dogfood (Guardana scans its own source)
         run: uv run guardana scan packages
 
+  images:
+    # The images are built on every push, not first at the tag. An entrypoint, a
+    # missing extra or a non-root user that cannot read the mounted volume are
+    # failure modes no Python test can see, and finding them while cutting a
+    # release is finding them at the worst possible moment.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Build both images and run them
+        run: uv run --no-project python scripts/image_smoke.py
+
   clean-install:
     # Every other job runs where everything is installed — including modules
     # nothing declares. This one runs where nothing is: the five distributions in

@@ -1,0 +1,20 @@
+# The build context is the repository root (both Dockerfiles COPY only the
+# `packages/` subtrees they need), so everything expensive or irrelevant is
+# excluded here rather than being uploaded to the daemon on every build.
+.git
+.github
+.venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.import_linter_cache
+.coverage
+**/__pycache__
+**/*.pyc
+dist
+site
+docs
+examples
+schemas
+scripts
+uv.lock

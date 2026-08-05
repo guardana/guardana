@@ -49,12 +49,38 @@ To run an unreleased revision with zero install, point `uvx` at the git repo:
 uvx --from git+https://github.com/guardana/guardana#subdirectory=packages/guardana-cli guardana scan .
 ```
 
+## Run it as a container
+
+For a pipeline that runs containers rather than Python, both halves are published
+to the GitHub Container Registry on every release:
+
+```bash
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.9 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:0.9 --help
+```
+
+Tags are the exact version (`0.9.1`), the moving minor (`0.9`) and `latest`; pin
+the moving minor in CI so fixes arrive and the rule set does not change under you.
+Both images run as a non-root user, ship `linux/amd64` and `linux/arm64`, and
+carry an SBOM and a signed provenance attestation.
+[`deploy/docker/README.md`](../deploy/docker/README.md) covers mounts, exit codes,
+writing reports out, and building the images yourself.
+
 ## The optional collector
 
 `guardana-server` (the collector) is a separate, optionally-deployed
 service — it is never required to use `scan`/`probe`/`monitor`. Install and
 run it only if you want a central place to receive findings from many
 agents; see [`architecture.md`](architecture.md#the-coreserver-boundary).
+
+```bash
+pip install "guardana-server[serve]"   # `[serve]` adds the ASGI server
+guardana-collector migrate             # then: guardana-collector serve
+```
+
+The `[serve]` extra is an extra rather than a dependency because a deployment
+already running gunicorn or hypercorn should not be made to install a second
+server. [`usage-collector.md`](usage-collector.md) is the full guide.
 
 ## Installing a third-party rule package
 

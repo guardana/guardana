@@ -151,6 +151,67 @@ def test_the_release_workflow_checks_a_clean_install_before_publishing() -> None
     assert check < publish, "the clean-install check runs after the publish step"
 
 
+def test_ci_builds_and_runs_both_images_on_every_push() -> None:
+    """An image first built at the tag is an image first tested at the worst moment."""
+    steps = _steps(_workflow("ci.yml"), "images")
+    _index_of(steps, "scripts/image_smoke.py")
+
+
+def test_the_release_publishes_both_images_with_an_sbom_and_provenance() -> None:
+    """A published image is a supply-chain artifact or it is a mystery binary."""
+    steps = _steps(_workflow("release.yml"), "images")
+    builds = [step for step in steps if "docker/build-push-action" in str(step.get("uses", ""))]
+
+    assert len(builds) == 2, f"expected the CLI and the collector image, got {len(builds)}"
+    for build in builds:
+        options = build["with"]
+        assert isinstance(options, dict)
+        assert options["sbom"] is True, f"{build.get('name')} publishes no SBOM"
+        assert str(options["provenance"]).startswith("mode="), (
+            f"{build.get('name')} publishes no provenance attestation"
+        )
+        assert options["push"] is True
+
+
+def test_the_images_are_published_only_after_the_packages() -> None:
+    """One approval, one release: an image PyPI never got is a version in one place."""
+    jobs = _workflow("release.yml")["jobs"]
+    assert isinstance(jobs, dict)
+
+    assert jobs["images"]["needs"] == "publish"
+    assert jobs["publish"]["environment"] == "pypi"
+
+
+def test_every_documented_image_tag_file_actually_carries_one() -> None:
+    # Same guard as the Action pins: a file that lost its tag has been reworded,
+    # and dropping it from the rewrite is how documentation comes to advertise an
+    # image from a series that no longer gets fixes.
+    for relative in _BUMP._IMAGE_PIN_FILES:
+        text = (_repo_root() / relative).read_text(encoding="utf-8")
+        assert _BUMP._IMAGE_PIN_RE.search(text) is not None, f"no image tag in {relative}"
+
+
+def test_documented_image_tags_match_the_current_release() -> None:
+    major, minor, _ = _BUMP._core(_BUMP._current_version())
+    for relative in _BUMP._IMAGE_PIN_FILES:
+        text = (_repo_root() / relative).read_text(encoding="utf-8")
+        for found in _BUMP._IMAGE_PIN_RE.finditer(text):
+            assert found.group(0).endswith(f":{major}.{minor}"), (
+                f"{relative} pulls {found.group(0)}, but the released series is {major}.{minor}"
+            )
+
+
+def test_a_prerelease_does_not_move_the_documented_image_tag() -> None:
+    """`latest` and the moving tag are not pushed for a prerelease, so nor is the doc."""
+    text = "docker run ghcr.io/guardana/guardana:0.9 scan ."
+
+    assert _BUMP._rewrite_image_pin(text, "1.0.0rc1") == text
+    assert (
+        _BUMP._rewrite_image_pin(text, "0.10.0")
+        == "docker run ghcr.io/guardana/guardana:0.10 scan ."
+    )
+
+
 def test_every_documented_action_pin_file_actually_carries_a_pin() -> None:
     # The list is what the bump rewrites. A file that stopped carrying a pin (a
     # reworded snippet, a renamed tag form) must fail loudly here rather than

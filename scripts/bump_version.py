@@ -46,6 +46,16 @@ _ACTION_PIN_FILES = (
     Path("site/index.html"),
 )
 _ACTION_PIN_RE = re.compile(r"(guardana/guardana@v)\d+\.\d+")
+# The same failure mode, one artifact over: the docs tell users to run
+# `ghcr.io/guardana/guardana:MAJOR.MINOR`, a moving tag the release workflow
+# repoints. Left behind by a bump, a pipeline keeps pulling last series' image and
+# the build still goes green — with the rules of an older release.
+_IMAGE_PIN_FILES = (
+    Path("deploy/docker/README.md"),
+    Path("docs/install.md"),
+    Path("docs/usage-collector.md"),
+)
+_IMAGE_PIN_RE = re.compile(r"(ghcr\.io/guardana/guardana(?:-collector)?:)\d+\.\d+")
 # The other places a release version is written down in prose. All three sat on
 # 0.3 through the 0.4.0 release, because only the Action pins were automated —
 # the same staleness one file over. Each is `(pattern, replacement template)`,
@@ -159,6 +169,7 @@ def _check_documented_markers() -> None:
         f"{relative} (no {label})"
         for relative, pattern, label in (
             *((path, _ACTION_PIN_RE, "`guardana/guardana@vX.Y` pin") for path in _ACTION_PIN_FILES),
+            *((path, _IMAGE_PIN_RE, "`ghcr.io/guardana/…:X.Y` tag") for path in _IMAGE_PIN_FILES),
             *((path, pattern, "version marker") for path, pattern in _VERSION_MARKERS),
         )
         if pattern.search((_REPO / relative).read_text(encoding="utf-8")) is None
@@ -177,6 +188,19 @@ def _rewrite_action_pin(text: str, new: str) -> str:
         return text
     major, minor, _ = _core(new)
     return _ACTION_PIN_RE.sub(rf"\g<1>{major}.{minor}", text)
+
+
+def _rewrite_image_pin(text: str, new: str) -> str:
+    """Point every documented image tag at this release's moving `X.Y` tag.
+
+    A pre-release is left alone for the same reason as the Action pin: the release
+    workflow does not move `latest` or the `X.Y` tag for one, so rewriting the docs
+    would advertise an image that was never pushed.
+    """
+    if Version(new).is_prerelease:
+        return text
+    major, minor, _ = _core(new)
+    return _IMAGE_PIN_RE.sub(rf"\g<1>{major}.{minor}", text)
 
 
 def _apply(path: Path, updated: str, *, dry_run: bool) -> None:
@@ -224,6 +248,11 @@ def main() -> int:
         path = _REPO / relative
         pinned = _rewrite_action_pin(path.read_text(encoding="utf-8"), new)
         _apply(path, pinned, dry_run=args.dry_run)
+
+    for relative in _IMAGE_PIN_FILES:
+        path = _REPO / relative
+        tagged = _rewrite_image_pin(path.read_text(encoding="utf-8"), new)
+        _apply(path, tagged, dry_run=args.dry_run)
 
     for relative, pattern, replacement in _documented_versions(new):
         path = _REPO / relative

@@ -206,7 +206,13 @@ the first half substitutes for the second. Kept as an unticked list rather than
 quietly rescoped, because a checklist that moves to match what shipped is not a
 checklist.
 
-- [ ] official container images (CLI and server)
+- [x] official container images (CLI and server) — `ghcr.io/guardana/guardana`
+      and `ghcr.io/guardana/guardana-collector`, two stages so no build tooling
+      ships, non-root, `amd64` and `arm64`, with an SBOM and a signed provenance
+      attestation pushed alongside each one. Built **and run** in CI on every
+      push, not first at the tag: a scan of the deliberately malicious fixture
+      has to exit `1` from inside the image, because an image whose catalog
+      failed to ship reports "no findings" and exits `0`
 - [x] stable, versioned result schema
 - [x] reproducible run manifest
 - [x] budgets and a pre-flight `plan`

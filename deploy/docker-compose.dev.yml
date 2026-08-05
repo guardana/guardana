@@ -24,6 +24,11 @@ services:
       - "55439:5432"
     volumes:
       - guardana-pgdata:/var/lib/postgresql/data
+      # Creates the `guardana` database this file's own instructions point at.
+      # It used not to exist, and following the two lines above produced
+      # `database "guardana" does not exist` — the kind of thing only running the
+      # documented command finds. Runs on first initialization of the volume only.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U guardana"]
       interval: 5s

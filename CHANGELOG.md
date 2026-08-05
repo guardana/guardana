@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The development Compose file now creates the database it documents.** Its own
+  instructions told you to point a collector at `guardana`, and it only ever
+  created `guardana_test` — so following them produced `database "guardana" does
+  not exist`. Found by running the documented command, not by reading it. On a
+  volume that already exists, recreate it or create the database by hand; the
+  init script says how.
 - **A clean install is now a gate, not a ritual.**
   `scripts/clean_install_check.py` builds an empty virtualenv, installs the five
   distributions into it and runs the commands the documentation tells people to
@@ -19,6 +25,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `release.py`'s gate, and inside the release workflow *before* the upload step.
   This is the defect class that got `0.9.0` tagged and cancelled; it was found by
   hand, and finding it by hand is not a control.
+- **Official container images for both halves.**
+  `ghcr.io/guardana/guardana` (the CLI) and `ghcr.io/guardana/guardana-collector`,
+  published on every release for `linux/amd64` and `linux/arm64`, with an SBOM and
+  a signed provenance attestation pushed alongside each. Two-stage builds, so no
+  build tooling ships; a fixed non-root uid, so a deployment can pin `runAsUser`
+  and a mounted volume's permissions are predictable. Tags are the exact version,
+  the moving minor, and `latest` — and a prerelease moves neither of the last two.
+  Both are **built and run** in CI on every push (`scripts/image_smoke.py`), not
+  first at the tag: among the checks is a scan of the deliberately malicious
+  fixture that has to exit `1` from inside the image, because an image whose rule
+  catalog failed to ship reports "no findings" and exits `0` forever.
+- **`guardana-collector serve`** — the collector starts with a command instead of
+  an ASGI factory string. It binds **loopback** unless `--host 0.0.0.0` is typed,
+  builds the app before the server starts (so a storage backend nobody chose and a
+  collector that could authenticate nobody are refused in words, with an exit code
+  from the table, rather than as a traceback out of a worker), and is the one
+  command dispatched without opening a database connection of its own — a
+  collector must be able to start while its database is still coming up and then
+  say so on `/readyz`. The ASGI server is a new **extra**,
+  `pip install "guardana-server[serve]"`, deliberately not a dependency.
 - **The declared-dependency check now covers all five packages, and the
   namespace.** It was written for `guardana-cli` and only ever asked about that
   one. It now asks about every distribution, and asks a second question the
