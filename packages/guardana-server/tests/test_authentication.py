@@ -469,3 +469,39 @@ def test_an_adopted_key_still_authenticates_after_the_migration(
 
     identity = authenticate(connection, issued.token)
     assert identity.project_ref == "adopted/adopted"
+
+
+def test_a_well_formed_key_this_collector_never_issued_is_refused(
+    connection: DbConnection,
+) -> None:
+    """The commonest rejection there is, and it had no test.
+
+    Every other refusal path was covered — malformed, wrong secret, revoked,
+    expired — while the one a fabricated or deleted credential actually takes was
+    only ever reached by accident. A lookup that returned nothing must refuse, not
+    fall through to whatever comes next.
+    """
+    _tenanted(connection)
+
+    with pytest.raises(AuthError, match="unknown API key"):
+        authenticate(connection, "gdn_deadbeefcafe_not-a-key-this-collector-issued")
+
+
+def test_a_key_whose_scopes_cannot_be_read_is_refused(connection: DbConnection) -> None:
+    """A scope nobody can interpret cannot be checked against.
+
+    Treating it as "some permission" would be the fail-open, so the row is refused
+    rather than read leniently — the same closed-vocabulary rule as everywhere else.
+    """
+    project = _tenanted(connection)
+    issued, secret_hash = generate_key("ci", (Scope.INGEST,))
+    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project))
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "update api_keys set scopes = %s where prefix = %s",
+            (["ingest", "from-a-newer-build"], issued.prefix),
+        )
+    connection.commit()
+
+    with pytest.raises(ValueError, match="from-a-newer-build"):
+        authenticate(connection, issued.token)

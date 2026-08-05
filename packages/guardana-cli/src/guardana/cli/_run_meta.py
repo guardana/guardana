@@ -84,6 +84,20 @@ def _first(*variables: str) -> str | None:
     return None
 
 
+def _folded(value: str | None) -> str | None:
+    """Fold a *name* the way the collector will, so both records of a run agree.
+
+    The collector normalizes the AI system and the environment so `Production` and
+    `production` group as one. If the saved run kept the raw spelling, one run would
+    be filed under two names in two places — and `guardana diff` compares saved
+    runs, so the disagreement would surface as a change nobody made.
+    """
+    if value is None:
+        return None
+    folded = value.strip().lower()
+    return folded or None
+
+
 def detect_deployment(
     ai_system: str | None = None,
     environment: str | None = None,
@@ -104,11 +118,13 @@ def detect_deployment(
     mistake as an invented cost — and this project already refuses that one.
 
     A flag wins over the environment variable, so a pipeline can set the repository
-    default once and one job can still say it is production.
+    default once and one job can still say it is production. The two *names* are
+    folded exactly as the collector folds them, so the saved run and the collector
+    never disagree about which environment a run was.
     """
     return DeploymentRef(
-        ai_system=ai_system or _first(AI_SYSTEM_VARIABLE),
-        environment=environment or _first(ENVIRONMENT_VARIABLE),
+        ai_system=_folded(ai_system or _first(AI_SYSTEM_VARIABLE)),
+        environment=_folded(environment or _first(ENVIRONMENT_VARIABLE)),
         deployment_id=deployment_id or _first(DEPLOYMENT_ID_VARIABLE),
         commit_sha=_first(*_COMMIT_VARIABLES),
         image_digest=_first(*_IMAGE_VARIABLES),

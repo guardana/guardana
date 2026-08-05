@@ -130,8 +130,10 @@ class DeploymentIn(BaseModel):
 
         Normalized rather than validated: a collector that rejected a submission
         because an environment name was not a tidy slug would trade a team's
-        evidence for the collector's tidiness. The strict check lives in the CLI,
-        where a human typed it and can be told.
+        evidence for the collector's tidiness. The agent folds these two names the
+        same way, so a saved run and the collector never disagree about which
+        environment a run was; the *strict* check is on `key create --environment`,
+        where a human typed a boundary and can be told it is not a slug.
         """
         if value is None:
             return None

@@ -14,7 +14,10 @@ from guardana.server.db.migrations import MigrationError
 from guardana.server.db.settings import StorageNotConfiguredError, resolve_storage
 from guardana.server.tenancy import TenancyError
 
-_DESCRIPTION = "Apply, inspect and undo the collector's schema, tenants and credentials."
+_DESCRIPTION = (
+    "Apply, inspect and undo the collector's schema; manage its tenants and "
+    "credentials; read back what runs have reported."
+)
 _ARGPARSE_USAGE_EXIT = 2
 
 

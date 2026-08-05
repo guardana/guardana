@@ -122,6 +122,24 @@ happened, one layer above the renderers, where nothing was enumerating anything.
 So a reader knows what was applied to the evidence in front of them, rather than
 assuming the defaults of whichever build they happen to run.
 
+## What a run declares about itself is not evidence, and is not redacted
+
+Since 0.9 a run may say **what it verified and where**: the AI system, the
+environment, a deployment identifier, and the commit, image, model name and model
+digests behind it. All of it travels to a collector as declared, and none of it
+passes through the redactor.
+
+That is deliberate, and stating it is the point. Redaction exists for **evidence** —
+model output, retrieved documents, prompts — which is attacker-influenced text and
+the most sensitive thing Guardana handles. These eight fields are the opposite: an
+operator typed them or a pipeline stated them, and redacting a commit or an
+environment name would destroy exactly the identity that makes a collector's
+history answerable while protecting nothing.
+
+If any of those names is itself sensitive in your organisation, do not pass it.
+Every field is optional and absent means "not known" — a run that declares nothing
+still reports its findings.
+
 ## What is not solved yet
 
 The redactor is not an extension point, and that is deliberate: a pluggable

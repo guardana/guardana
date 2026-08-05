@@ -7,10 +7,12 @@ whose exit status means nothing. `0` did what was asked, `1` the database said n
 
 import psycopg
 import pytest
+from conftest import DbConnection
 from guardana.server.auth import Scope, list_keys
 from guardana.server.cli import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK, main
-from guardana.server.db.migrations import read_state
+from guardana.server.db.migrations import apply_pending, read_state
 from guardana.server.envelope import DeploymentIn, Submission
+from guardana.server.inventory import _query
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.tenancy import (
     TenantScope,
@@ -622,3 +624,27 @@ def test_key_list_shows_the_pin(
     main(["key", "list"])
 
     assert "[production]" in capsys.readouterr().out
+
+
+def test_an_inventory_query_refuses_a_column_it_does_not_own(connection: DbConnection) -> None:
+    """Interpolation that is safe because of *who calls it* stops being safe when
+    somebody else calls it. Checked rather than trusted."""
+    apply_pending(connection)
+
+    with pytest.raises(ValueError, match="not an inventory column"):
+        _query(connection, "secret_hash", None)
+
+
+def test_project_list_names_what_exists(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    main(["project", "create", "--org", "acme", "--slug", "api", "--name", "API"])
+    capsys.readouterr()
+
+    main(["project", "list", "--org", "acme"])
+
+    listed = capsys.readouterr().out
+    assert "acme/web" in listed
+    assert "acme/api" in listed

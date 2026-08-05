@@ -14,8 +14,10 @@ from typing import Any, NamedTuple
 import psycopg
 import pytest
 from guardana.server.db.migrations import apply_pending
+from guardana.server.deployment import EnvironmentMismatchError
 from guardana.server.envelope import (
     CheckErrorIn,
+    DeploymentIn,
     EvidenceIn,
     FindingIn,
     SkippedIn,
@@ -302,3 +304,48 @@ def test_no_limit_still_returns_everything(scoped: Scoped) -> None:
         store.add(scope, _submission(source=f"run-{index}"))
 
     assert len(store.submissions(scope)) == 3
+
+
+# --- the environment pin is enforced by the store, not by its caller ----------
+
+
+def _declaring(environment: str | None) -> Submission:
+    return _submission(deployment=DeploymentIn(ai_system="support", environment=environment))
+
+
+def test_a_store_refuses_a_submission_that_contradicts_the_scopes_pin(scoped: Scoped) -> None:
+    """Enforced where it cannot be bypassed, not only at the HTTP door.
+
+    A pinned scope writing a row labelled with another environment is a credential
+    reaching past its own boundary. Leaving that to the endpoint would make the
+    boundary a convention every future caller has to remember — and the next caller
+    is item 23's run persistence, not a person reading this file.
+    """
+    store, scope = scoped
+    pinned = TenantScope.for_project(scope.require_project(), environment="production")
+
+    with pytest.raises(EnvironmentMismatchError, match="production"):
+        store.add(pinned, _declaring("dev"))
+
+    assert store.submissions(pinned) == []
+
+
+def test_a_store_labels_an_unlabelled_submission_with_the_scopes_pin(scoped: Scoped) -> None:
+    store, scope = scoped
+    pinned = TenantScope.for_project(scope.require_project(), environment="production")
+
+    store.add(pinned, _declaring(None))
+
+    held = store.submissions(pinned)[0].deployment
+    assert held is not None
+    assert held.environment == "production"
+
+
+def test_an_unpinned_scope_stores_whatever_the_run_declared(scoped: Scoped) -> None:
+    store, scope = scoped
+
+    store.add(scope, _declaring("dev"))
+
+    held = store.submissions(scope)[0].deployment
+    assert held is not None
+    assert held.environment == "dev"

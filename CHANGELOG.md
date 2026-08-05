@@ -87,6 +87,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unmaintained, which is a cheap thing to be wrong about and an expensive
   impression to correct — and nothing else in the gate could see it.
 
+### Fixed — found by reviewing this release's own code
+
+- **The environment pin is enforced by the store, not by the endpoint.** It lived
+  in `POST /findings`, so any other caller of `Store.add` could have written a row
+  labelled with an environment its credential may not reach — and the next caller
+  is item 23's run persistence, not a person reading the file. Both stores now
+  reconcile the scope's pin themselves, which is the same move as `PostgresStore`
+  refusing an unscoped query: a boundary nobody can route around beats one
+  everybody has to remember.
+- **A saved run and the collector disagreed about which environment a run was.**
+  The collector folds `Production` and `production` into one name; the agent kept
+  the raw spelling, so the same run was filed under two names in two places — and
+  `guardana diff` compares saved runs, so it would have surfaced as a change nobody
+  made. Found by reading the artifact the command actually wrote, not the object in
+  memory.
+- **A well-formed key this collector never issued had no test.** Every other
+  refusal did — malformed, wrong secret, revoked, expired — while the path a
+  fabricated or deleted credential actually takes was only ever reached by
+  accident. It now has one, verified by making an unknown key succeed. The same for
+  a key whose scopes this build cannot read.
+- The inventory query interpolates a column name, which was safe because of *who
+  called it* — a property the next caller silently removes. It is now checked
+  against the three columns it owns.
+- [`docs/privacy.md`](docs/privacy.md) now states that what a run declares about
+  itself — system, environment, deployment, commit and model digests — travels
+  **unredacted**, and why: redaction is for attacker-influenced evidence, and
+  redacting a commit would destroy the identity that makes a history answerable
+  while protecting nothing. A new category of data leaving the machine has to be
+  written down where a reader looks for that.
+
 ### Fixed
 
 - **A refused submission repeats the collector's own reason** instead of always

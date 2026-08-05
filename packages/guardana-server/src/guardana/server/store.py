@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from guardana.server.deployment import labelled_for
 from guardana.server.envelope import Submission
 from guardana.server.tenancy import TenantScope
 
@@ -97,7 +98,9 @@ class InMemoryStore:
 
     def add(self, scope: TenantScope, submission: Submission) -> None:
         """Store one submission (stamped with the receive time), evicting the oldest when full."""
-        record = StoredSubmission(received_at=self._clock(), submission=submission)
+        record = StoredSubmission(
+            received_at=self._clock(), submission=labelled_for(scope, submission)
+        )
         with self._lock:
             self._records.append((scope, record))
 

@@ -200,3 +200,31 @@ def test_a_refused_submission_repeats_the_collectors_own_reason(
     assert result.exit_code == 0, "a rejected submission never changes the gate"
     assert "pinned to the 'production' environment" in result.output
     assert "schema version" not in result.output
+
+
+@pytest.mark.parametrize(
+    ("written", "recorded"),
+    [("Production", "production"), (" production ", "production"), ("PROD", "prod")],
+)
+def test_the_manifest_records_the_same_name_the_collector_will(
+    monkeypatch: pytest.MonkeyPatch, written: str, recorded: str
+) -> None:
+    """Two records of one run must not disagree about which environment it was.
+
+    The collector folds these names so that `Production` and `production` group as
+    one. If the saved run kept the raw spelling, the same run would be filed under
+    two different environments in two different places — and `guardana diff`
+    compares saved runs, so the disagreement would surface as a change nobody made.
+    """
+    _clear(monkeypatch)
+
+    assert detect_deployment(environment=written).environment == recorded
+
+
+def test_a_name_that_is_only_whitespace_is_no_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Better to record that the run said nothing than an AI system called "".
+    _clear(monkeypatch)
+
+    declared = detect_deployment(ai_system="   ")
+
+    assert declared.ai_system is None

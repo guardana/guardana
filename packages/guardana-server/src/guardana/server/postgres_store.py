@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from time import time
 from typing import Any
 
+from guardana.server.deployment import labelled_for
 from guardana.server.envelope import (
     CheckErrorIn,
     DeploymentIn,
@@ -120,8 +121,13 @@ class PostgresStore:
         One transaction because a submission whose findings were half written is a
         run that looks cleaner than it was — the failure mode this whole project is
         about, reached through a database rather than through a rule.
+
+        The scope's environment pin is reconciled here rather than by the caller, so
+        a credential cannot write a row labelled with an environment it may not
+        reach — whichever caller is next.
         """
         project = scope.require_project()
+        submission = labelled_for(scope, submission)
         summary = submission.summary
         with (
             self._connection() as connection,

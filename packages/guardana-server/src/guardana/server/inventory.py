@@ -14,6 +14,14 @@ from guardana.server.tenancy import parse_project_reference
 if TYPE_CHECKING:
     from psycopg import Connection
 
+_COLUMNS = frozenset({"ai_system", "environment", "deployment_ref"})
+"""The only columns this module will interpolate into a query.
+
+The caller is always this module, so the interpolation is safe today — and "safe
+because of who calls it" is a property the next caller silently removes. Checked
+rather than trusted, which costs one lookup and takes the question off the table.
+"""
+
 _PROJECT_FILTER = (
     "where (%s::text is null or o.slug || '/' || p.slug = %s)"
     " and (%s::text is null or s.ai_system = %s)"
@@ -45,10 +53,12 @@ def _query(
     project: str | None,
     ai_system: str | None = None,
 ) -> tuple[InventoryEntry, ...]:
+    if column not in _COLUMNS:
+        raise ValueError(f"{column!r} is not an inventory column")
     reference = _reference(project)
     with connection.cursor() as cursor:
-        # The column is chosen from this module's own literals, never from a caller —
-        # the tenant reference and the system name are parameters, as everywhere else.
+        # `column` is checked against `_COLUMNS` above; the tenant reference and the
+        # system name are parameters, as everywhere else.
         cursor.execute(
             f"select o.slug || '/' || p.slug, s.{column}, count(*), "
             f"       to_char(max(s.received_at), 'YYYY-MM-DD') "
