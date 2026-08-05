@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — a clean install did not start
+
+- **`guardana` crashed on every command in a fresh environment**, with
+  `ModuleNotFoundError: No module named 'click'`. `guardana.cli.main` imported
+  `click` to make usage errors exit `3`; Typer used to bring it, and **Typer 0.26
+  vendored Click and dropped the dependency**. Nothing in the gate could see it —
+  the gate runs where click is installed for other reasons — and it was found by
+  installing the released packages into an empty virtualenv and running them.
+  Whichever Click a given Typer raises from is now patched, neither is required,
+  and finding *none* of them raises rather than silently letting a usage error
+  exit `2` against a documented table a pipeline gates on.
+- **`guardana-cli` imported `yaml` without declaring `pyyaml`.** It worked because
+  `guardana-core` brings it, and a dependency that is only there transitively is
+  one a dependant can drop without anybody noticing until a clean install fails.
+  Found by the test written for the defect above, on its first run.
+- Two tests now hold that line: one resolves every declared distribution to the
+  modules it actually provides (`pyyaml` provides `yaml`, and guessing from the
+  name would have passed while the hole stayed open) and fails on any third-party
+  import nothing declares; the other simulates the clean-install condition and
+  asserts a usage error still exits `3`.
+
 ## [0.9.0] - 2026-08-05
 
 ### Added

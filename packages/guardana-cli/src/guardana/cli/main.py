@@ -40,17 +40,37 @@ def _use_guardana_exit_code_for_usage_errors() -> None:
     documented table untrue for the one class of error every command shares and
     nobody writes by hand.
 
-    Applied to Typer's vendored copy of Click as well as to Click itself, because
-    they are different modules and Typer raises from its own. Reaching into a
-    private module is not something to do lightly; it is pinned by a test that
-    asserts the behaviour rather than the mechanism, so a Typer release that
-    rearranges this fails loudly instead of quietly restoring `2`.
-    """
-    import click  # noqa: PLC0415
-    from typer import _click as vendored_click  # noqa: PLC0415
+    Applied to whichever Click a given Typer actually raises from, because that
+    moved: Typer **0.26** vendored Click as `typer._click` and dropped the
+    standalone dependency, so importing `click` unconditionally crashes every
+    command on a clean install of a current Typer — while importing only the
+    vendored one crashes on anything older. Both are patched when both are there,
+    and neither is required to be.
 
-    for module in (click, vendored_click):
+    Reaching into a private module is not something to do lightly; it is pinned by
+    a test that asserts the behaviour rather than the mechanism, so a Typer release
+    that rearranges this fails loudly instead of quietly restoring `2`.
+
+    Finding none of them **raises**. The exit-code table is a contract a pipeline
+    gates on, and a table the tool silently stops honouring is worse than one it
+    never promised.
+    """
+    import importlib  # noqa: PLC0415
+
+    patched = 0
+    for name in ("typer._click", "click"):
+        try:
+            module = importlib.import_module(name)
+        except ImportError:
+            continue
         module.exceptions.UsageError.exit_code = int(ExitCode.INVALID_USAGE)
+        patched += 1
+    if not patched:
+        raise RuntimeError(
+            "neither typer._click nor click could be imported, so a usage error would "
+            f"exit 2 instead of {int(ExitCode.INVALID_USAGE)} and the documented exit-code "
+            "table would be untrue"
+        )
 
 
 _use_guardana_exit_code_for_usage_errors()

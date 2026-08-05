@@ -375,6 +375,7 @@ dependencies = [
     { name = "guardana-core" },
     { name = "guardana-report" },
     { name = "guardana-rules" },
+    { name = "pyyaml" },
     { name = "typer" },
 ]
 
@@ -383,6 +384,7 @@ requires-dist = [
     { name = "guardana-core", editable = "packages/guardana-core" },
     { name = "guardana-report", editable = "packages/guardana-report" },
     { name = "guardana-rules", editable = "packages/guardana-rules" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "typer", specifier = ">=0.12" },
 ]
 
