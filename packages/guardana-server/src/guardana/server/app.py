@@ -1,19 +1,24 @@
 import os
 import sys
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict
+from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse
-from guardana.server.auth import Authenticated, Scope
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse
+from guardana.server.auth import Authenticated, AuthError, Scope, authenticate
 from guardana.server.dashboard import render_dashboard
 from guardana.server.db.migrations import MigrationState, apply_pending, read_state
 from guardana.server.db.settings import StorageChoice, migrate_on_start, resolve_storage
 from guardana.server.deployment import EnvironmentMismatchError
 from guardana.server.envelope import SUPPORTED_SCHEMA_VERSIONS, Submission
+from guardana.server.limits import Limits, RateLimiter
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.rule_catalog import rule_catalog
 from guardana.server.security import (
+    SESSION_COOKIE,
     UnauthenticatedCollectorError,
     guard,
     require_authentication,
@@ -21,8 +26,14 @@ from guardana.server.security import (
 from guardana.server.stats import compute_stats
 from guardana.server.store import InMemoryStore, Store
 from guardana.server.tenancy import TenantScope, UnscopedQueryError
+from pydantic import BaseModel
 
 _UNPROCESSABLE = 422
+_TOO_LARGE = 413
+_TOO_MANY_REQUESTS = 429
+_BODYLESS = frozenset({"GET", "HEAD", "OPTIONS"})
+_NO_CONTENT = 204
+_UNAUTHORIZED = 401
 _FORBIDDEN = 403
 _UNAVAILABLE = 503
 _TRUTHY = {"1", "true", "yes", "on"}
@@ -94,6 +105,7 @@ def create_app(
     if database_url is None:
         _refuse_a_store_no_unauthenticated_caller_can_reach(active_store)
     app = FastAPI(title="guardana-server")
+    _mount_limits(app)
     _mount_health(app, database_url)
     # `Annotated`, not a `Depends` default: the parameter really is an identity at
     # run time and really is a dependency marker at definition time, and only this
@@ -150,7 +162,9 @@ def create_app(
         return active_store.trend(_scope_of(identity))
 
     if _dashboard_enabled(dashboard):
-        _refuse_a_dashboard_that_cannot_load(database_url)
+        # No longer refused on an authenticated collector: a browser signs in with
+        # a read key and the session cookie carries it. See docs/design/panel-sessions.md.
+        _mount_sessions(app, database_url)
         _mount_dashboard(app, active_store, refresh_seconds, reading)
 
     return app
@@ -292,3 +306,120 @@ def _mount_dashboard(app: FastAPI, store: Store, refresh_seconds: int, reading: 
         # The rule catalog is this build's own documentation — no finding, no
         # target, nothing about anybody's deployment. Left open deliberately.
         return rule_catalog()
+
+
+def _mount_limits(app: FastAPI) -> None:
+    """Bound what one caller may send and how often, before any route sees it.
+
+    Both bounds are read at start-up, so a typo in either is a refusal to start
+    rather than a limit that silently is not there. The size check counts bytes
+    off the wire: `Content-Length` is a claim, and a chunked request need not make
+    one.
+    """
+    limits = Limits.from_environment()
+    limiter = RateLimiter(limits)
+
+    @app.middleware("http")
+    async def _bounded(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        caller = _caller(request)
+        if not limiter.allows(caller, path=request.url.path):
+            return JSONResponse(
+                status_code=_TOO_MANY_REQUESTS,
+                content={"detail": "too many requests; slow down and retry"},
+                headers={"Retry-After": str(limiter.retry_after(caller))},
+            )
+        oversized = await _reject_oversized(request, limits.max_body_bytes)
+        if oversized is not None:
+            return oversized
+        return await call_next(request)
+
+
+async def _reject_oversized(request: Request, ceiling: int) -> JSONResponse | None:
+    """Read the body once, refusing past the ceiling, and hand it to the route.
+
+    Starlette caches the body it has read, so consuming it here does not starve the
+    handler — and reading it here is what makes the limit real rather than a
+    header check somebody can simply not send.
+    """
+    if ceiling == 0 or request.method in _BODYLESS:
+        return None
+    body = await request.body()
+    if len(body) <= ceiling:
+        return None
+    return JSONResponse(
+        status_code=_TOO_LARGE,
+        content={"detail": f"request body too large; this collector accepts {ceiling} bytes"},
+    )
+
+
+def _caller(request: Request) -> str:
+    """Who to charge this request to: the credential if there is one, else the peer.
+
+    The bearer token rather than the resolved key, because the limiter runs before
+    authentication — and a limiter that only bounds *authenticated* callers leaves
+    the unauthenticated path, which is the one an attacker reaches first.
+    """
+    authorization = request.headers.get("Authorization", "")
+    if authorization:
+        return f"token:{sha256(authorization.encode()).hexdigest()[:16]}"
+    client = request.client
+    return f"peer:{client.host if client else 'unknown'}"
+
+
+def _mount_sessions(app: FastAPI, database_url: str | None) -> None:
+    """Let a browser present a **read** key once and keep it in an httpOnly cookie.
+
+    There are no users here, and inventing them would mean a password store, a
+    reset flow and a session table before anything renders. A read-scoped key
+    already names one project, is revocable and can expire — so the session is the
+    key, and `key revoke` ends it.
+    """
+
+    @app.post("/session", status_code=_NO_CONTENT)
+    def open_session(credentials: SessionRequest, request: Request, response: Response) -> None:
+        if database_url is None:
+            # Nothing to authenticate against: this collector is in the explicitly
+            # unauthenticated evaluation mode, where the panel needs no session.
+            return
+        identity = _authenticate_for_session(database_url, credentials.token)
+        if not identity.permits(Scope.READ):
+            # A CI credential is not a browsing credential. `403`, because the
+            # caller *is* somebody — they just may not read.
+            raise HTTPException(status_code=_FORBIDDEN, detail="this key is not scoped for read")
+        response.set_cookie(
+            SESSION_COOKIE,
+            credentials.token,
+            httponly=True,
+            samesite="strict",
+            # Only over TLS when the request arrived over TLS: forcing it on plain
+            # HTTP would set a cookie the browser then refuses to send back, which
+            # looks exactly like a broken sign-in on a laptop.
+            secure=request.url.scheme == "https",
+        )
+
+    @app.delete("/session", status_code=_NO_CONTENT)
+    def close_session(response: Response) -> None:
+        response.delete_cookie(SESSION_COOKIE, httponly=True, samesite="strict")
+
+
+def _authenticate_for_session(database_url: str, token: str) -> Authenticated:
+    """Check a key presented for a browser session, refusing without saying which way it failed."""
+    from psycopg import connect  # noqa: PLC0415 — the engine never imports a driver
+
+    try:
+        with connect(database_url) as connection:
+            return authenticate(connection, token, now=datetime.now(UTC))
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=_UNAUTHORIZED,
+            detail="that API key was not accepted",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+class SessionRequest(BaseModel):
+    """The one field a sign-in carries."""
+
+    token: str

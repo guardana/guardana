@@ -55,6 +55,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   typo's runs onto the real system — the one operation here that edits the past,
   and the reason an inventory stays trustworthy.
 
+- **The panel works on a collector that requires keys.** It used to refuse to
+  mount there, correctly — a browser has nowhere to put a bearer token, so every
+  panel would have loaded empty. Now the browser **signs in with a read-scoped
+  key**, kept in an `HttpOnly`, `SameSite=Strict` cookie the page cannot read;
+  `key revoke` ends the session and there are no user accounts to invent. The rule
+  the design rests on is enforced in the guard, not left to a browser flag: **the
+  cookie authenticates reads and nothing else**, so a page on another origin
+  cannot make a signed-in operator's browser submit findings.
+- **Limits on ingest.** A request-body ceiling (`GUARDANA_MAX_BODY_BYTES`, 8 MiB,
+  `413`) counted in **bytes off the wire** rather than from `Content-Length` — a
+  header is a claim, and a chunked request need not make one — and a per-caller
+  rate limit (`GUARDANA_RATE_LIMIT_PER_MINUTE`, 120, `429` with `Retry-After`).
+  A value that is not a number is refused at start-up instead of quietly becoming
+  "no limit"; `0` turns a limit off and is something somebody typed. Liveness and
+  readiness are never limited, because a readiness probe answered `429` is a
+  rolling deploy that stalls. The limiter is per worker process and says so.
+
 ### Fixed
 
 - **A usage error from the collector CLI reported itself as a database outage.**

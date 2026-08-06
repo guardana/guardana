@@ -73,6 +73,7 @@ status means:
 - [`design/collector-runs-and-findings.md`](design/collector-runs-and-findings.md) — the run's verdict, and following one finding across runs
 - [`design/finding-lifecycle-and-waivers.md`](design/finding-lifecycle-and-waivers.md) — statuses, waivers that expire, and why this is not a second `baseline`
 - [`design/audit-retention-and-deletion.md`](design/audit-retention-and-deletion.md) — who did what, how long evidence is kept, and deleting on purpose
+- [`design/panel-sessions.md`](design/panel-sessions.md) — signing in to the panel with a read key, and why the cookie cannot write
 
 ## Project direction
 

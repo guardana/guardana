@@ -192,6 +192,12 @@ credentials for the system it came from is one theft, not two.
 
 ## What to watch
 
+Two limits are on by default and worth knowing before a fleet meets them:
+`GUARDANA_MAX_BODY_BYTES` (8 MiB, answering `413`) and
+`GUARDANA_RATE_LIMIT_PER_MINUTE` (120 per caller, answering `429` with
+`Retry-After`). The rate limiter counts **per worker process** — for a global
+limit, rate-limit at the proxy that already terminates TLS.
+
 | Signal | Why |
 |---|---|
 | `/readyz` | the only endpoint that knows about storage and pending migrations |
@@ -210,9 +216,9 @@ Being explicit, because a deployment guide that oversells is worse than none:
   in `guardana baseline` next to the code, which is the right place for it today;
 - **no audit log** — who created a key, who read what, is not recorded;
 - **no retention or deletion** — nothing removes old submissions;
-- **no dashboard on an authenticated collector** — the read-only page refuses to
-  mount when API keys are required, because a browser cannot present a bearer
-  token and every panel would load empty;
+- **no user accounts** — the read-only panel signs in with a read-scoped API key
+  rather than with a person's identity, so "who looked at this" is answerable only
+  down to the credential;
 - **no Kubernetes manifests** — the image, the environment variables and the two
   probes are all a Deployment needs, but we do not ship one we have not exercised.
 

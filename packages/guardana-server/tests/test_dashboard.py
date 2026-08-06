@@ -42,7 +42,10 @@ def test_dashboard_page_and_stats_mount_when_enabled() -> None:
     assert page.status_code == _OK
     assert "text/html" in page.headers["content-type"]
     assert "Guardana" in page.text
-    assert 'fetch("stats")' in page.text  # the page fetches the aggregation endpoint
+    # The page reads the aggregation endpoint through one helper, so a 401 can be
+    # told from an outage: "sign in" and "the collector is down" are different
+    # things to put in front of a person.
+    assert 'readJson("stats")' in page.text
 
     stats = client.get("/stats")
     assert stats.status_code == _OK

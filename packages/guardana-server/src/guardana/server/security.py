@@ -52,15 +52,36 @@ def require_authentication(database_url: str | None, *, acknowledged: bool = Fal
     )
 
 
-def _presented_token(request: Request) -> str:
+SESSION_COOKIE = "guardana_session"
+"""Where a signed-in browser keeps its read key.
+
+The token itself rather than a session id: an id needs a table, an expiry sweeper
+and a revocation path, and the token already has all three — `key revoke` ends the
+session, and an expired key ends it on its own.
+"""
+
+
+def _presented_token(request: Request, *, accept_cookie: bool = False) -> str:
+    """Return the credential this request presented: the header, or — for reads — a cookie.
+
+    `accept_cookie` is false everywhere except the read-scoped guard, and that is
+    the rule the panel's whole design rests on: a browser sends a cookie whether or
+    not the page asking for it is ours, so a cookie must never be able to write.
+    Leaving that to `SameSite=Strict` alone would be one browser flag away from a
+    cross-site submission.
+    """
     header = request.headers.get("authorization", "")
-    if not header.lower().startswith(_BEARER):
-        raise HTTPException(
-            status_code=_UNAUTHORIZED,
-            detail="this collector needs an API key: Authorization: Bearer gdn_…",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return header[len(_BEARER) :].strip()
+    if header.lower().startswith(_BEARER):
+        return header[len(_BEARER) :].strip()
+    if accept_cookie:
+        cookie = request.cookies.get(SESSION_COOKIE, "").strip()
+        if cookie:
+            return cookie
+    raise HTTPException(
+        status_code=_UNAUTHORIZED,
+        detail="this collector needs an API key: Authorization: Bearer gdn_…",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def guard(database_url: str | None, scope: Scope) -> Callable[[Request], Authenticated | None]:
@@ -73,7 +94,7 @@ def guard(database_url: str | None, scope: Scope) -> Callable[[Request], Authent
     def admit(request: Request) -> Authenticated | None:
         if database_url is None:
             return None
-        token = _presented_token(request)
+        token = _presented_token(request, accept_cookie=scope is Scope.READ)
         from psycopg import connect  # noqa: PLC0415 — the engine never imports a driver
 
         try:

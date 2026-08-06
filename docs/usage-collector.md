@@ -338,6 +338,31 @@ tenant column on a database serving two teams folds their evidence into one
 undifferentiated pile, so the down migration counts the tenants across the
 submissions *and* the keys first and raises rather than doing it.
 
+## Limits: how much one caller may send, and how often
+
+| Variable | Default | What it bounds |
+|---|---|---|
+| `GUARDANA_MAX_BODY_BYTES` | `8388608` (8 MiB) | one request body; over it answers `413` |
+| `GUARDANA_RATE_LIMIT_PER_MINUTE` | `120` | requests per caller per rolling minute; over it answers `429` with `Retry-After` |
+
+`0` turns a limit off and is something somebody types. A value that is not a
+number is refused **at start-up** rather than treated as "no limit": a typo must
+not silently remove a control.
+
+The size check counts bytes off the wire rather than trusting `Content-Length` — a
+header is a claim, and a chunked request need not make one. Liveness and readiness
+are never rate limited: a readiness probe answered `429` is a rolling deploy that
+stalls, which is a self-inflicted outage caused by a control meant to prevent one.
+
+**The rate limiter lives in the process.** A deployment running four workers has
+four times the limit, and there is no shared counter. That is stated rather than
+implied, because a limit somebody believes is global and is not is worse than one
+they know to put a reverse proxy in front of. For a real global limit, rate-limit
+at the proxy that already terminates your TLS.
+
+An unauthenticated caller is charged by peer address, an authenticated one by its
+credential — so one noisy agent cannot spend a whole fleet's allowance.
+
 ## Choosing where submissions go
 
 There is no default, on purpose. A store nobody chose is a store somebody
@@ -421,15 +446,30 @@ way to enumerate valid prefixes. A key that *is* valid and lacks the scope gets
 `403` instead, because that is a different fact and a pipeline retrying its
 credentials forever is not the right outcome.
 
-### The dashboard needs the unauthenticated mode
+### The dashboard signs in with a read key
 
-The dashboard is a browser page that fetches `/stats` and `/findings` from the
-browser, and a browser has nowhere to put a bearer token. On a collector that
-requires keys every panel would load empty, so **it refuses to mount there** and
-says why. Mounting it anyway would make an absent capability look like a broken
-one, which is the same lie as reporting a check that could not run as a check
-that passed. Browser sessions arrive with the minimal-UI work; until then read the
-collector through `/findings` and `/trend` with a read-scoped key.
+`GUARDANA_DASHBOARD=1` mounts a read-only page. It used to refuse to mount on a
+collector that requires keys — correctly, because a browser has nowhere to put a
+bearer token and every panel would have loaded empty. Now the browser signs in:
+
+```bash
+guardana-collector key create --project acme/web --name panel --scope read
+# then open the collector and paste the key once
+```
+
+The key goes into an `HttpOnly`, `SameSite=Strict` cookie the page itself cannot
+read; `key revoke` ends the session, and an expiring key ends it on its own. There
+are no user accounts — those arrive with RBAC and replace this.
+
+**The cookie authenticates reads and nothing else.** Ingest takes a bearer header
+only, so a page on another origin cannot make a signed-in browser submit findings.
+That is enforced in the guard rather than left to `SameSite`, because a control
+that rests on one browser flag fails the day somebody adds an exception for a
+proxy ([design](design/panel-sessions.md)).
+
+A signed-in browser sees exactly what the key sees: one project, and one
+environment when the key is pinned to one. It cannot reach further than a `curl`
+with the same key.
 
 ### A database outage is not a rejected key
 

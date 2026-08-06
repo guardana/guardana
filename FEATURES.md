@@ -500,6 +500,10 @@ behind `--yes`, with an organization refusing while it still holds projects; and
 `system merge` to move a typo's runs onto the real system. Retention never prunes
 the audit log and never deletes triage.
 
+**Bounded ingest.** A request-body ceiling and a per-caller rate limit, both on by
+default, both refusing a value that is not a number at start-up rather than
+treating a typo as "no limit", and both honest about being per worker process.
+
 **Triage, and waivers that expire.** A finding in the collector is an entity, not
 a pile of sightings: `finding status` records who is looking at it, `finding waive`
 accepts a risk with an approver, a reason and a date it lapses, and a **`resolved`
@@ -534,9 +538,10 @@ Any run forwards normalized findings with `--reporter server://…` (envelope v7
 sent to the collector URL — the reporter appends the route). The collector (`guardana-server`) is strictly additive and
 separately deployed — the engine never depends on it, enforced by an
 import-linter contract and a test. It ships an **opt-in monitoring dashboard**
-(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default, and
-**refused on a collector that requires API keys** — it is a browser page and a
-browser cannot present a bearer token, so every panel would load empty): a
+(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default) that
+**signs in with a read-scoped API key** kept in an `HttpOnly`, `SameSite=Strict`
+cookie — and that cookie authenticates **reads only**, so a page on another origin
+cannot make a signed-in browser submit findings: a
 single self-contained page — no build step, works offline — showing severity and
 per-source/per-rule breakdowns, an activity-over-time trend, a prominent
 **unverified** counter, and a recent-findings list where each entry shows a

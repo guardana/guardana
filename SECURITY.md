@@ -87,11 +87,19 @@ authenticates nobody: `GUARDANA_STORAGE=memory` together with
 Guardana on a laptop. **Do not expose it to an untrusted network**, and note that
 its store is bounded and lost on restart.
 
-The optional dashboard (`GUARDANA_DASHBOARD=1`, off by default) is **read-only**,
-and it **refuses to mount on a collector that requires keys**: it is a browser page
-and a browser has nowhere to put a bearer token, so every panel would load empty.
-A capability that cannot work must not look present. It therefore only runs in the
-unauthenticated evaluation mode, where the rule above applies to it too.
+The optional dashboard (`GUARDANA_DASHBOARD=1`, off by default) is **read-only**
+and signs in with a **read-scoped API key**, kept in an `HttpOnly`,
+`SameSite=Strict` cookie the page cannot read. `key revoke` ends the session.
+**The cookie authenticates reads and nothing else**: ingest accepts a bearer
+header only, so a page on another origin cannot make a signed-in browser submit
+findings — enforced in the guard rather than left to one browser flag.
+
+Two limits bound what one caller can do: a request-body ceiling
+(`GUARDANA_MAX_BODY_BYTES`, 8 MiB, `413` over it) and a per-caller rate limit
+(`GUARDANA_RATE_LIMIT_PER_MINUTE`, 120, `429` with `Retry-After`). Both refuse a
+value that is not a number at start-up rather than treating a typo as "no limit",
+and the rate limiter is **per worker process** — put a proxy in front for a global
+one.
 
 Every submission is validated and a malformed one is rejected with a 422 rather
 than stored — input hardening, which is a different thing from access control and

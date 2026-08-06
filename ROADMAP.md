@@ -491,7 +491,9 @@ Landed in **0.10.0**, which finishes the checklist:
   workflow before the upload** — the defect that made 0.9.0 unshippable was found
   by hand, and finding it by hand is not a control.
 
-Still open in the *collector*, and deliberately: RBAC and human identities. The
+Still open in the *collector*, and deliberately: RBAC and human identities — the
+panel signs in with a read key rather than as a person
+([design](docs/design/panel-sessions.md)). The
 **finding lifecycle, waivers, the audit log, retention and deletion landed in
 0.11.0** ([lifecycle](docs/design/finding-lifecycle-and-waivers.md) ·
 [audit and retention](docs/design/audit-retention-and-deletion.md)). Those are the team-platform milestone below,

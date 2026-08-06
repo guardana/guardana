@@ -3,6 +3,7 @@ import threading
 from typing import Any
 from urllib.parse import urlsplit
 
+import pytest
 from fastapi.testclient import TestClient
 from guardana.core.evaluator import Verdict
 from guardana.core.manifest import DeploymentRef
@@ -220,9 +221,14 @@ def test_get_findings_rejects_an_absurd_limit() -> None:
     assert _client().get("/findings", params={"limit": 100_000}).status_code == _UNPROCESSABLE
 
 
-def test_concurrent_reads_and_writes_do_not_500() -> None:
+def test_concurrent_reads_and_writes_do_not_500(monkeypatch: pytest.MonkeyPatch) -> None:
     # A full deque evicts on every append; iterating it in `trend()` while a
     # writer appends used to raise "deque mutated during iteration" and 500.
+    #
+    # The rate limit is turned off here on purpose: 1200 requests from one caller
+    # in a few seconds is exactly what it exists to refuse, and this test is about
+    # the store rather than about the limiter.
+    monkeypatch.setenv("GUARDANA_RATE_LIMIT_PER_MINUTE", "0")
     store = InMemoryStore(max_submissions=50)
     client = TestClient(create_app(store, allow_unauthenticated=True))
     payload = _real_envelope()

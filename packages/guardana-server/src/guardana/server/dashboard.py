@@ -110,6 +110,22 @@ _PAGE = """<!doctype html>
     <span id="updated">loading…</span></div>
 </header>
 <main>
+  <!-- Shown when /stats answers 401: this browser has not signed in. A read-scoped
+       API key is pasted once and kept in an httpOnly cookie the page cannot read. -->
+  <div class="card" id="signin" style="display:none">
+    <h2>Sign in</h2>
+    <p class="muted">This collector requires an API key. Paste one with the
+      <code>read</code> scope — it is stored in a cookie this page cannot read, and
+      revoking the key ends the session.</p>
+    <form id="signin-form">
+      <input id="token" type="password" placeholder="gdn_…" autocomplete="off"
+             style="width:min(420px,100%);padding:8px;font-family:inherit">
+      <button type="submit">Sign in</button>
+      <span id="signin-error" class="muted"></span>
+    </form>
+  </div>
+
+  <div id="panels">
   <div class="grid tiles" id="tiles"></div>
 
   <div class="card mt">
@@ -145,6 +161,8 @@ _PAGE = """<!doctype html>
       </label>
     </div>
     <div id="findings" class="mt"></div>
+  </div>
+  <p class="muted"><button id="signout" type="button">Sign out</button></p>
   </div>
 </main>
 <footer>
@@ -258,14 +276,14 @@ function populateSourceFilter(rows) {
 }
 
 async function loadCatalog() {
-  try { CATALOG = await (await fetch("catalog")).json(); } catch (e) { CATALOG = {}; }
+  try { CATALOG = await readJson("catalog"); } catch (e) { CATALOG = {}; }
 }
 
 async function loadFindings() {
   const src = el("source-filter").value;
   const url = "findings?limit=100" + (src ? "&source=" + encodeURIComponent(src) : "");
   const box = el("findings"), innerScroll = box.scrollTop;
-  const items = (await (await fetch(url)).json())
+  const items = (await readJson(url))
     
       .flatMap(sub => (sub.findings || []).concat(
         sub.unverified || [],
@@ -278,21 +296,64 @@ async function loadFindings() {
   box.scrollTop = innerScroll;  // keep the reader's place across refresh
 }
 
+class NeedsSignIn extends Error {}
+
+async function readJson(path) {
+  const response = await fetch(path);
+  // 401 is not "the collector is down": it is "this browser has not signed in".
+  // Telling a person to check the server when they need to paste a key is how a
+  // panel earns a support ticket.
+  if (response.status === 401) { throw new NeedsSignIn(); }
+  return await response.json();
+}
+
 async function loadStats() {
-  const s = await (await fetch("stats")).json();
+  const s = await readJson("stats");
   renderTiles(s.totals); renderSeverity(s.by_severity);
   renderSources(s.by_source); renderRules(s.by_rule); renderSeries(s.series);
   populateSourceFilter(s.by_source);
   el("updated").textContent = "updated " + new Date().toLocaleTimeString();
 }
 
+function showSignIn(show) {
+  el("signin").style.display = show ? "block" : "none";
+  el("panels").style.display = show ? "none" : "block";
+}
+
+async function signIn(event) {
+  event.preventDefault();
+  const token = el("token").value.trim();
+  const response = await fetch("session", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({token: token}),
+  });
+  if (response.ok) { el("token").value = ""; showSignIn(false); await refresh(); return; }
+  el("signin-error").textContent = response.status === 403
+    ? "that key is not scoped for read — create one with --scope read"
+    : "that key was not accepted";
+}
+
+async function signOut() {
+  await fetch("session", {method: "DELETE"});
+  showSignIn(true);
+}
+
 async function refresh() {
   const pageScroll = window.scrollY;
-  try { await loadStats(); await loadFindings(); window.scrollTo(0, pageScroll); }
-  catch (e) { el("updated").textContent = "collector unreachable"; }
+  try {
+    await loadStats(); await loadFindings(); showSignIn(false);
+    window.scrollTo(0, pageScroll);
+  }
+  catch (e) {
+    if (e instanceof NeedsSignIn) { showSignIn(true); return; }
+    el("updated").textContent = "collector unreachable";
+  }
 }
 
 el("source-filter").addEventListener("change", loadFindings);
+el("signin-form").addEventListener("submit", signIn);
+el("signout").addEventListener("click", signOut);
 loadCatalog().then(refresh);
 setInterval(refresh, __REFRESH_MS__);
 </script>

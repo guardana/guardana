@@ -161,20 +161,25 @@ def test_the_route_table_is_actually_covered(
     assert set(_guarded_get_routes(client)) >= {"/findings", "/trend"}
 
 
-def test_the_dashboard_refuses_to_mount_where_it_could_not_load(
+def test_the_dashboard_now_mounts_on_an_authenticated_collector(
     database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A browser has nowhere to put a bearer token, so every panel would be empty.
+    """It used to refuse, and refusing was right until a browser could authenticate.
 
-    Mounted anyway, the dashboard would look like a broken feature rather than an
-    absent one — which is the same lie as reporting a check that could not run as
-    a check that passed, moved into the UI.
+    A page whose panels would all load empty is a broken feature pretending to be
+    a present one — the same lie as reporting a check that could not run as a check
+    that passed, moved into the UI. The answer was not to mount it anyway: it was
+    to give the browser a way to present a **read** key, which `/session` does.
     """
     monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
     monkeypatch.setenv("GUARDANA_MIGRATE_ON_START", "1")
 
-    with pytest.raises(UnauthenticatedCollectorError, match="browser cannot present"):
-        create_app(dashboard=True)
+    client = TestClient(create_app(dashboard=True))
+
+    assert client.get("/").status_code == _OK
+    # And still refuses the data until somebody signs in, rather than rendering
+    # empty panels that look like "nothing found".
+    assert client.get("/stats").status_code == _UNAUTHORIZED
 
 
 def test_the_dashboard_still_mounts_for_local_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:
