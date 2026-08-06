@@ -14,7 +14,7 @@ from guardana.server.tenancy import parse_project_reference
 if TYPE_CHECKING:
     from psycopg import Connection
 
-_SEVERITY_LADDER = "array['INFO','LOW','MEDIUM','HIGH','CRITICAL']"
+SEVERITY_LADDER = "array['INFO','LOW','MEDIUM','HIGH','CRITICAL']"
 """Severity is ordinal, and `max()` on its *name* is alphabetical.
 
 `MEDIUM` sorts above `HIGH` and `CRITICAL`, so a finding seen at both would be
@@ -24,29 +24,18 @@ minor. Ranked explicitly, with the raw maximum as a fallback so a severity this
 build does not know still prints instead of vanishing.
 """
 
-_WORST_SEVERITY = (
-    f"coalesce(({_SEVERITY_LADDER})[max(array_position({_SEVERITY_LADDER}, f.severity))], "
-    f"max(f.severity))"
-)
 
-_FINDINGS_QUERY = (
-    f"select o.slug || '/' || p.slug, min(f.rule_id), {_WORST_SEVERITY}, "  # noqa: S608
-    "       min(f.target_ref), count(*), "
-    "       to_char(min(s.received_at), 'YYYY-MM-DD'), "
-    "       to_char(max(s.received_at), 'YYYY-MM-DD') "
-    "from findings f join submissions s on s.id = f.submission_id "
-    "join projects p on p.id = s.project_id "
-    "join organizations o on o.id = p.organization_id "
-    "where f.channel = 'findings' and f.identity is not null "
-    "  and (%s::text is null or o.slug || '/' || p.slug = %s) "
-    "  and (%s::text is null or s.environment = %s) "
-    "group by 1, f.identity order by 7 desc limit %s"
-)
-"""Findings grouped by the identity the engine computed.
+def worst_severity(over: str = "") -> str:
+    """Return the SQL that ranks severity properly, optionally over a subset of rows.
 
-Every value is a parameter; the one interpolation is `_WORST_SEVERITY`, built from
-this module's own literals.
-"""
+    A function rather than a constant so the one place that knows severity is
+    ordinal stays the only place. `over` is an aggregate `filter (…)` clause and is
+    always this package's own literal — it has to go inside each aggregate, because
+    the expression as a whole is a `coalesce`, and `filter` attaches to aggregates.
+    """
+    ranked = f"max(array_position({SEVERITY_LADDER}, f.severity)) {over}"
+    return f"coalesce(({SEVERITY_LADDER})[{ranked}], max(f.severity) {over})"
+
 
 _COLUMNS = frozenset({"ai_system", "environment", "deployment_ref"})
 """The only columns this module will interpolate into a query.
@@ -135,19 +124,6 @@ class RunEntry:
     source: str
 
 
-@dataclass(frozen=True, slots=True)
-class FindingEntry:
-    """One finding, followed across every run that saw it."""
-
-    project_ref: str
-    rule_id: str
-    severity: str
-    target_ref: str
-    occurrences: int
-    first_seen: str
-    last_seen: str
-
-
 def runs(
     connection: "Connection[tuple[object, ...]]",
     project: str | None = None,
@@ -177,40 +153,6 @@ def runs(
             gate=None if row[3] is None else str(row[3]),
             received_at=str(row[4]),
             source=str(row[5]),
-        )
-        for row in rows
-    )
-
-
-def findings(
-    connection: "Connection[tuple[object, ...]]",
-    project: str | None = None,
-    environment: str | None = None,
-    limit: int = 50,
-) -> tuple[FindingEntry, ...]:
-    """Every distinct finding, with how many runs saw it and when.
-
-    Grouped by the identity the engine computed, which is what answers "has this
-    been there since Tuesday". A finding from a pre-v7 agent carries no identity
-    and is not grouped — it appears once per sighting, because nothing says those
-    sightings are the same thing, and pretending otherwise would invent history.
-    """
-    reference = _reference(project)
-    with connection.cursor() as cursor:
-        cursor.execute(
-            _FINDINGS_QUERY,
-            (reference, reference, environment, environment, limit),
-        )
-        rows = cursor.fetchall()
-    return tuple(
-        FindingEntry(
-            project_ref=str(row[0]),
-            rule_id=str(row[1]),
-            severity=str(row[2]),
-            target_ref=str(row[3]),
-            occurrences=int(str(row[4])),
-            first_seen=str(row[5]),
-            last_seen=str(row[6]),
         )
         for row in rows
     )

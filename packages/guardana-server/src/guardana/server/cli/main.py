@@ -13,6 +13,7 @@ from guardana.server.cli.codes import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK
 from guardana.server.cli.serve import ServerNotInstalledError
 from guardana.server.db.migrations import MigrationError
 from guardana.server.db.settings import StorageNotConfiguredError, resolve_storage
+from guardana.server.lifecycle import LifecycleError
 from guardana.server.security import UnauthenticatedCollectorError
 from guardana.server.tenancy import TenancyError
 
@@ -98,9 +99,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         with connect(url) as connection:
             return int(arguments.handler(arguments, connection))
-    except TenancyError as exc:
-        # Naming a tenant that does not exist, or a slug that is not one, is a usage
-        # error: the command was pointed at nothing.
+    except (TenancyError, LifecycleError) as exc:
+        # Naming a tenant that does not exist, a slug that is not one, or an identity
+        # prefix that matches nine findings: the command was pointed at nothing, or
+        # at too much. All of them are usage errors — and reporting them through the
+        # catch-all below would tell an operator the database is unreachable, which
+        # sends them after entirely the wrong thing.
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_INVALID_USAGE
     except MigrationError as exc:

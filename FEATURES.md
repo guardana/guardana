@@ -15,7 +15,7 @@ live in [`ROADMAP.md`](ROADMAP.md).
 |---|---|
 | Engine + built-in rules | beta |
 | `scan` / `probe` / `monitor` / `diff` | beta |
-| Collector (`guardana-server`) | **beta** — durable, authenticated and tenant-isolated (PostgreSQL, reversible migrations, API keys pinned to a project and optionally to an environment), and it records what each run verified and where; no finding lifecycle, audit log or retention yet |
+| Collector (`guardana-server`) | **beta** — durable, authenticated and tenant-isolated (PostgreSQL, reversible migrations, API keys pinned to a project and optionally to an environment), it records what each run verified and where, and findings carry a lifecycle with expiring waivers; no audit log or retention yet |
 | Extension API | unstable by design until 1.0 |
 
 Full detail, including what is deliberately not covered:
@@ -487,6 +487,13 @@ collector records the names runs use rather than requiring them in advance, and
 `system list` / `environment list` / `deployment list` read them back. A key may be
 **pinned to one environment** and then writes and reads only that one — a run
 declaring another is refused, a run declaring nothing is stored under the pin.
+
+**Triage, and waivers that expire.** A finding in the collector is an entity, not
+a pile of sightings: `finding status` records who is looking at it, `finding waive`
+accepts a risk with an approver, a reason and a date it lapses, and a **`resolved`
+finding reopens the moment it is seen again**. Expiry is applied on read, so a
+lapsed waiver stops waiving without anything having to run. It never changes a
+build's exit code — that is `guardana baseline`, next to the code — and both say so.
 
 **One command starts it, and there is an image.** `guardana-collector serve` binds
 loopback unless `--host 0.0.0.0` is typed, so nobody has to remember an ASGI

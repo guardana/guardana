@@ -71,6 +71,7 @@ status means:
 - [`design/collector-tenancy.md`](design/collector-tenancy.md) — organizations, projects, and the scope on every query
 - [`design/ai-systems-and-deployments.md`](design/ai-systems-and-deployments.md) — what was verified, where it runs, and which version of it
 - [`design/collector-runs-and-findings.md`](design/collector-runs-and-findings.md) — the run's verdict, and following one finding across runs
+- [`design/finding-lifecycle-and-waivers.md`](design/finding-lifecycle-and-waivers.md) — statuses, waivers that expire, and why this is not a second `baseline`
 
 ## Project direction
 

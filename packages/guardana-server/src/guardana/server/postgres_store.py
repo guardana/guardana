@@ -9,6 +9,7 @@ locally is the one that behaves differently in production.
 import json
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from time import time
 from typing import Any
 
@@ -24,6 +25,7 @@ from guardana.server.envelope import (
     TaxonomyRefIn,
     VerdictIn,
 )
+from guardana.server.lifecycle import record_sighting
 from guardana.server.store import StoredSubmission
 from guardana.server.tenancy import TenantScope
 from psycopg import Connection, Cursor, connect
@@ -222,7 +224,26 @@ class PostgresStore:
             submission_id = int(row[0])
             self._insert_findings(cursor, submission_id, _FINDINGS, submission.findings)
             self._insert_findings(cursor, submission_id, _UNVERIFIED, submission.unverified)
+            # In the same transaction as the occurrences, because a sighting that
+            # was stored while its lifecycle entry was not would leave a finding
+            # nobody can triage — and one whose `resolved` never reopened.
+            self._track(connection, project, submission.findings)
         return True
+
+    @staticmethod
+    def _track(
+        connection: "Connection[tuple[Any, ...]]", project: int, findings: list[FindingIn]
+    ) -> None:
+        """Open or reopen the tracked finding behind each occurrence that carries an identity.
+
+        Only the `findings` channel: an `unverified` sighting is a check that could
+        not grade, and giving it a lifecycle would let somebody resolve a question
+        that was never answered.
+        """
+        seen_at = datetime.now(tz=UTC)
+        for finding in findings:
+            if finding.identity:
+                record_sighting(connection, project, finding.identity, seen_at)
 
     @staticmethod
     def _insert_findings(

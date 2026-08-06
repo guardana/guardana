@@ -7,8 +7,8 @@ and nothing is sent anywhere unless a run is given `--reporter`.
 > **Maturity: beta.** It keeps what it is given, **requires an API key** for every
 > route that carries a finding, isolates one **project** from another, and records
 > what each run verified and where — with an optional **environment pin** that
-> makes a credential reach exactly one environment in both directions. Still ahead
-> of it: a finding lifecycle, an audit log, retention and restore-tested backup.
+> makes a credential reach exactly one environment in both directions. Findings carry a **lifecycle** and waivers
+> that expire. Still ahead of it: an audit log and retention.
 
 ## Standing one up: three commands
 
@@ -150,6 +150,59 @@ with `200` and `"duplicate": true` instead of being stored again: a retry is not
 failure and must not turn a pipeline red, and counting it twice would make a
 regression answer from a duplicate. An agent older than 0.9 sends no run id,
 identifies nothing, and is stored every time — which is honest, not clever.
+
+## Triage: what somebody decided about a finding
+
+A finding is an entity, not just a pile of sightings. It carries a status, an
+owner, and — when a team accepts the risk — a waiver with a name, a reason and a
+date it lapses.
+
+```bash
+guardana-collector finding list --project acme/web [--status open]
+guardana-collector finding status 1854bc20 --project acme/web --status acknowledged --owner konrad
+guardana-collector finding waive  1854bc20 --project acme/web \
+  --approver konrad --reason "vendor fix due in September" --expires 2026-09-30
+```
+
+Identities are `sha256:…`, so every command takes a **unique prefix**, like git.
+An ambiguous one is refused with the candidates listed and nothing is changed:
+acting on the wrong finding is worse than being asked to type four more
+characters.
+
+| Status | Means |
+|---|---|
+| `open` | seen; nobody has said anything, or a waiver lapsed |
+| `acknowledged` | a human has read it |
+| `in_progress` | somebody is fixing it |
+| `resolved` | believed fixed |
+| `false_positive` | the rule is wrong here |
+| `accepted_risk` | waived, with an approver, a reason and a date |
+
+**A `resolved` finding reopens when it is seen again.** This is the transition
+the whole model exists for: a fix that did not hold must not stay green because
+somebody once ticked a box. A `false_positive` stays one — the identity *is* the
+rule plus the location, so it really is the same judgement — and an
+`accepted_risk` stays accepted until its date.
+
+**A waiver expires, and the expiry is applied when you read it.** The collector
+runs no scheduler, so nothing has to happen for a lapsed waiver to stop waiving:
+the finding lists as `open` again and says which waiver ran out. Backdating is
+allowed and announced, because recording a decision that has already run out is a
+legitimate thing to do and a surprise is not.
+
+### This is not `guardana baseline`, and does not replace it
+
+|  | `guardana baseline` | collector waiver |
+|---|---|---|
+| Changes the build's exit code | **yes** | **no** |
+| Lives | next to the code, in git | in the collector, shared by the team |
+| Answers | "should this pipeline fail today" | "did anybody decide anything about this" |
+
+The collector never tells an agent what to do. A gate that asked a server whether
+to fail would be a gate that fails open when the network does — so if you want a
+build to stop failing, that is still `guardana baseline`
+([usage-baseline.md](usage-baseline.md)). Exporting a project's collector waivers
+*as* a baseline file is a natural next step and is deliberately not here yet.
 
 ## Organizations and projects
 

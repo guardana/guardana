@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A finding is an entity, with a lifecycle and waivers that expire.** The
+  collector recorded every sighting and nothing anybody decided, so triage lived
+  in a spreadsheet while the one place with the history knew nothing about it.
+  `finding status` records `acknowledged` / `in_progress` / `resolved` /
+  `false_positive` with an owner; `finding waive` accepts a risk with an
+  approver, a reason and a date it lapses — all three required, because a waiver
+  that never comes back is a permanently disabled check with better manners.
+  Migration `0006` builds the entity from what is already stored, so a collector
+  that has been running for months arrives with its history rather than an empty
+  list.
+  - **A `resolved` finding reopens when it is seen again.** The transition the
+    model exists for: a fix that did not hold must not stay green because
+    somebody once ticked a box. `false_positive` stays — the identity *is* the
+    rule plus the location — and `accepted_risk` is undone by its date, not by a
+    sighting.
+  - **Expiry is applied when you read.** The collector runs no scheduler, so a
+    status that only became correct when a job ran would be quietly wrong in
+    between; a lapsed waiver lists as `open` and says which waiver ran out.
+  - **It is not a second definition of accepted risk.** A collector waiver never
+    changes a build's exit code — that is `guardana baseline`, next to the code —
+    and both docs say so, with the same three fields and the same expiry rule.
+  - Identities are addressed by unique prefix, like git; an ambiguous one is
+    refused with the candidates and nothing is changed.
+
+### Fixed
+
+- **A usage error from the collector CLI reported itself as a database outage.**
+  An ambiguous identity prefix came back as "could not reach the database", which
+  sends an operator to look at PostgreSQL while PostgreSQL is fine — the same
+  mistake as reading a database outage as a rejected credential. Found by running
+  the command, and now exits `3` with the candidates listed.
+
 ## [0.10.0] - 2026-08-06 — company-ready
 
 ### Fixed
