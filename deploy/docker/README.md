@@ -81,6 +81,14 @@ What the collector does and deliberately does not is
 Compose file, TLS, upgrades — is
 [`docs/deployment.md`](../../docs/deployment.md).
 
+## If a pull says `unauthorized`
+
+The images are public. If a fresh machine cannot pull one, the package's
+visibility was never flipped after the first release — a package created by a
+workflow starts private whatever the repository is. That is a maintainer setting,
+not something to work around with a token:
+[`docs/maintainers/github-setup.md`](../../docs/maintainers/github-setup.md).
+
 ## Building them yourself
 
 From the repository root, because both Dockerfiles copy from `packages/`:

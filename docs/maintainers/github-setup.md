@@ -102,6 +102,36 @@ reaches PyPI — a deliberate gate so an accidental or malicious tag can't publi
 unattended. Configure a **PyPI Trusted Publisher** for each of the five packages
 first (see `RELEASING.md` → first-time PyPI setup).
 
+## 6a. Make the container packages public — once, after the first release
+
+The release workflow pushes two images to `ghcr.io`. **A package created by a
+workflow is private, whatever the repository's visibility is**, so the very
+command the documentation tells users to run —
+
+```bash
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.11 scan /work
+```
+
+— answers `unauthorized` until somebody changes it. There is no REST API for
+this; it is a one-time click per package:
+
+1. Organization → **Packages** → `guardana` → **Package settings**
+2. **Danger Zone → Change visibility → Public**
+3. Repeat for `guardana-collector`
+4. While there, **Manage Actions access** → add the `guardana/guardana`
+   repository with **Write**, so later releases keep pushing to the same package
+
+Check it from a machine with no credentials, because "it works for me" here means
+"I am logged in":
+
+```bash
+docker logout ghcr.io
+docker run --rm ghcr.io/guardana/guardana:0.11 --version
+```
+
+This is the failure mode this project keeps meeting from a different direction: a
+green release workflow, a documented command, and a user who cannot run it.
+
 ## 7. Discussions — set up categories
 
 The bug/feature templates deliberately route questions away from Issues and into

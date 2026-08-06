@@ -139,6 +139,14 @@ CI generates and verifies the SBOMs on every push (`--check`), so a tag is never
 the first time a release artifact is produced. `SECURITY.md` documents how a user
 verifies all of it.
 
+**After the first release that pushes images, make the two `ghcr.io` packages
+public** — a package created by a workflow is private regardless of the
+repository's visibility, so the documented `docker run` answers `unauthorized`
+until somebody flips it. One click per package, once, and
+[`docs/maintainers/github-setup.md`](docs/maintainers/github-setup.md#6a-make-the-container-packages-public--once-after-the-first-release)
+has the path. Verify it with `docker logout ghcr.io` first: "it works for me"
+here means "I am logged in".
+
 ### The clean-install check, and why it is in the gate
 
 `0.9.0` was tagged from a green tree and had to be cancelled while it waited for

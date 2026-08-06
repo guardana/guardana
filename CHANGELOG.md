@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **The maintainer runbook now says to make the container packages public.** A
+  package created by a workflow is private whatever the repository's visibility
+  is, so the first release pushed two images that the very command the
+  documentation tells users to run could not pull. Found by pulling one with no
+  credentials, which is the only way to find it: logged in, it works.
+
 ## [0.11.0] - 2026-08-06 — life after a finding arrives
 
 ### Added
