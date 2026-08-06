@@ -47,13 +47,21 @@ class TenantScope:
 
     project_id: int | None = None
     environment: str | None = None
+    # Which credential this scope came from, when it came from one. Carried so a
+    # stored submission can say which key wrote it — the open question the tenancy
+    # design left. `None` on an unauthenticated evaluation collector, where there
+    # is no key and inventing one would be worse than the null.
+    api_key_id: int | None = None
 
     @classmethod
-    def for_project(cls, project_id: int, environment: str | None = None) -> "TenantScope":
+    def for_project(
+        cls, project_id: int, environment: str | None = None, api_key_id: int | None = None
+    ) -> "TenantScope":
         """Return the scope of one project, optionally narrowed to one environment."""
         return cls(
             project_id=project_id,
             environment=None if environment is None else check_slug(environment, "environment"),
+            api_key_id=api_key_id,
         )
 
     @classmethod

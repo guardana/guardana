@@ -72,6 +72,7 @@ status means:
 - [`design/ai-systems-and-deployments.md`](design/ai-systems-and-deployments.md) — what was verified, where it runs, and which version of it
 - [`design/collector-runs-and-findings.md`](design/collector-runs-and-findings.md) — the run's verdict, and following one finding across runs
 - [`design/finding-lifecycle-and-waivers.md`](design/finding-lifecycle-and-waivers.md) — statuses, waivers that expire, and why this is not a second `baseline`
+- [`design/audit-retention-and-deletion.md`](design/audit-retention-and-deletion.md) — who did what, how long evidence is kept, and deleting on purpose
 
 ## Project direction
 

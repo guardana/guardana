@@ -10,6 +10,8 @@ import sys
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from guardana.server.audit import actor_from_environment, add_actor_argument
+from guardana.server.audit import record as record_event
 from guardana.server.auth import Scope, generate_key, list_keys, revoke_key, store_key
 from guardana.server.cli.codes import EXIT_INVALID_USAGE, EXIT_OK
 from guardana.server.tenancy import TenantScope, check_slug, resolve_project
@@ -47,12 +49,14 @@ def add_arguments(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
         ),
     )
     create.add_argument("--expires-in-days", type=int, help="Optional lifetime, in days.")
+    add_actor_argument(create)
 
     listing = group.add_parser("list", help="Every key, with its prefix. Never the secrets.")
     listing.add_argument("--project", metavar="ORG/PROJECT", help="Only this project's keys.")
 
     revoke = group.add_parser("revoke", help="Revoke one key by its prefix.")
     revoke.add_argument("prefix", help="The prefix shown by `key list`.")
+    add_actor_argument(revoke)
 
 
 def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
@@ -85,6 +89,16 @@ def _list(arguments: argparse.Namespace, connection: "Connection[tuple[object, .
 
 def _revoke(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
     if revoke_key(connection, arguments.prefix):
+        # Recorded before the message, in the same transaction as the revocation:
+        # a credential withdrawn and not written down is the one somebody asks
+        # about later.
+        record_event(
+            connection,
+            actor=actor_from_environment(arguments.actor),
+            action="key.revoke",
+            subject=arguments.prefix,
+        )
+        connection.commit()
         print(f"revoked {arguments.prefix}")
         return EXIT_OK
     print(f"error: no active key with prefix {arguments.prefix}", file=sys.stderr)
@@ -112,6 +126,7 @@ def _create(arguments: argparse.Namespace, connection: "Connection[tuple[object,
         secret_hash,
         scope=TenantScope.for_project(project.id, environment),
         expires_at=expires_at,
+        created_by=actor_from_environment(arguments.actor),
     )
     print_issued(issued.token, project.reference, scopes, environment)
     return EXIT_OK

@@ -418,7 +418,12 @@ def test_an_authenticated_identity_carries_its_project(connection: DbConnection)
 
     assert identity.project_id == project
     assert identity.project_ref == "acme/web"
-    assert identity.scope == TenantScope.for_project(project)
+    assert identity.scope.project_id == project
+    assert identity.scope.environment is None
+    # And which credential this is, so a stored submission can say what wrote it.
+    # `None` here would put the answer back out of reach the moment a row is
+    # written, which is the question the audit work exists to close.
+    assert identity.scope.api_key_id is not None
 
 
 def test_a_key_cannot_be_stored_without_a_project(connection: DbConnection) -> None:

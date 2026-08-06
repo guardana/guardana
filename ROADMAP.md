@@ -59,7 +59,7 @@ already failed at its job:
 | Engine + built-in rules | **beta** | Stable enough to gate a build on; API still moves between minors |
 | `scan` / `probe` / `diff` | **beta** | Used in CI; exit codes and formats stable in practice, not yet contractually |
 | `monitor` | **beta** | Scheduled *active* verification. Not passive traffic inspection, not inline |
-| Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. Findings carry a lifecycle and waivers that expire; no audit log or retention yet |
+| Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. Findings carry a lifecycle and waivers that expire, every state change is audited, and retention is a policy an operator applies; no RBAC or human identities yet |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
 ## What ships today (0.10.0)
@@ -491,9 +491,10 @@ Landed in **0.10.0**, which finishes the checklist:
   workflow before the upload** — the defect that made 0.9.0 unshippable was found
   by hand, and finding it by hand is not a control.
 
-Still open in the *collector*, and deliberately: an audit log, retention and
-RBAC. The **finding lifecycle and waivers landed in 0.11.0**
-([design](docs/design/finding-lifecycle-and-waivers.md)). Those are the team-platform milestone below,
+Still open in the *collector*, and deliberately: RBAC and human identities. The
+**finding lifecycle, waivers, the audit log, retention and deletion landed in
+0.11.0** ([lifecycle](docs/design/finding-lifecycle-and-waivers.md) ·
+[audit and retention](docs/design/audit-retention-and-deletion.md)). Those are the team-platform milestone below,
 not company-readiness — a company can deploy, secure, upgrade and restore this
 today, and the deployment guide states plainly what it cannot yet do.
 
@@ -532,8 +533,8 @@ Then the application work:
 
 Organization/project/AI-system/environment/deployment model end to end; RBAC and
 service accounts; ~~finding lifecycle with ownership; waivers with expiry~~
-*(landed in 0.11.0)*; audit log; central policy distribution; deployment history; webhooks and Slack/Teams;
-Jira/GitHub/GitLab issue integration; Kubernetes deployment; retention controls.
+*(landed in 0.11.0)*; ~~audit log~~ *(landed in 0.11.0)*; central policy distribution; deployment history; webhooks and Slack/Teams;
+Jira/GitHub/GitLab issue integration; Kubernetes deployment; ~~retention controls~~ *(landed in 0.11.0)*.
 
 ## Milestone: stable extension platform *(this one is 1.0)*
 

@@ -33,6 +33,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Identities are addressed by unique prefix, like git; an ambiguous one is
     refused with the candidates and nothing is changed.
 
+- **An audit log, and the column it fills.** Every state change — keys created and
+  revoked, tenants created, renamed and deleted, findings triaged, schema migrated
+  and rolled back — is recorded with its actor, and **every row says what kind of
+  actor it was**: a `key` was presented and matched, a `cli` name was asserted by
+  somebody who can already reach the database. Calling the second one
+  authentication would be the same false green this project refuses in a verdict.
+  `api_keys.created_by`, which has existed since 0.8 with nothing filling it, is
+  now filled by the same actor, and a stored submission records **which key wrote
+  it** — the open question the tenancy design left. Reads are not logged: a log
+  that grows with every dashboard refresh is a log nobody reads.
+- **Retention, and deleting things on purpose.** `retention set|show|apply` per
+  project, with `--dry-run` first and a **refusal when no policy is set** —
+  deleting on a default is a collector that removes evidence because nobody said
+  not to. Applying is a command, never a background job, so "what deleted my
+  evidence" is answerable from the audit log rather than from source. Retention
+  never prunes the audit log, and a tracked finding **outlives its occurrences**,
+  so a finding that reappears after a prune is not re-triaged from scratch.
+  `project delete` and `org delete` both demand `--yes`, and deleting an
+  organization refuses while it still holds projects. `system merge` moves a
+  typo's runs onto the real system — the one operation here that edits the past,
+  and the reason an inventory stays trustworthy.
+
 ### Fixed
 
 - **A usage error from the collector CLI reported itself as a database outage.**

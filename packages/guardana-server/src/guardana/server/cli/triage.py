@@ -14,6 +14,7 @@ import argparse
 import datetime
 from typing import TYPE_CHECKING
 
+from guardana.server.audit import actor_from_environment, add_actor_argument
 from guardana.server.cli.codes import EXIT_OK
 from guardana.server.lifecycle import STATUSES, WaiverError, set_status, waive
 
@@ -30,6 +31,7 @@ def add_arguments(group: "argparse._SubParsersAction[argparse.ArgumentParser]") 
     status.add_argument("--project", required=True, metavar="ORG/PROJECT")
     status.add_argument("--status", required=True, choices=_SETTABLE)
     status.add_argument("--owner", help="Who is looking after it.")
+    add_actor_argument(status)
 
     waiver = group.add_parser("waive", help="Accept a risk until a date, on the record.")
     waiver.add_argument("identity", help="The finding's identity, or a unique prefix of it.")
@@ -44,6 +46,7 @@ def add_arguments(group: "argparse._SubParsersAction[argparse.ArgumentParser]") 
         metavar="YYYY-MM-DD",
         help="The last day it waives. There is no indefinite waiver.",
     )
+    add_actor_argument(waiver)
 
 
 def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
@@ -55,6 +58,7 @@ def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...
             arguments.identity,
             status=arguments.status,
             owner=arguments.owner,
+            actor=actor_from_environment(arguments.actor),
         )
         connection.commit()
         owner = f" (owner: {arguments.owner})" if arguments.owner else ""
@@ -69,6 +73,7 @@ def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...
         approver=arguments.approver,
         reason=arguments.reason,
         expires=expires,
+        actor=actor_from_environment(arguments.actor),
     )
     connection.commit()
     print(

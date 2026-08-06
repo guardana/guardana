@@ -8,7 +8,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from guardana.server.cli import inventory, keys, schema, serve, tenants
+from guardana.server.cli import audit, inventory, keys, retention, schema, serve, tenants
 from guardana.server.cli.codes import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK
 from guardana.server.cli.serve import ServerNotInstalledError
 from guardana.server.db.migrations import MigrationError
@@ -46,6 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     tenants.add_arguments(commands)
     keys.add_arguments(commands)
     inventory.add_arguments(commands)
+    audit.add_arguments(commands)
+    retention.add_arguments(commands)
     serve.add_arguments(commands)
     return parser
 

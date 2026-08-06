@@ -14,9 +14,12 @@ import argparse
 import sys
 from typing import TYPE_CHECKING
 
+from guardana.server.audit import actor_from_environment, add_actor_argument
+from guardana.server.audit import record as record_event
 from guardana.server.auth import Scope, generate_key, store_key
 from guardana.server.cli.codes import EXIT_INVALID_USAGE, EXIT_OK
 from guardana.server.cli.keys import print_issued
+from guardana.server.retention import delete_organization, delete_project
 from guardana.server.tenancy import (
     TenantScope,
     create_organization,
@@ -60,6 +63,7 @@ def _add_bootstrap(commands: "argparse._SubParsersAction[argparse.ArgumentParser
         choices=[str(s) for s in Scope],
         help="Repeatable. Defaults to ingest only, exactly like `key create`.",
     )
+    add_actor_argument(parser)
     parser.set_defaults(handler=bootstrap)
 
 
@@ -71,6 +75,7 @@ def _add_organizations(commands: "argparse._SubParsersAction[argparse.ArgumentPa
     create = group.add_parser("create", help="Create an organization.")
     create.add_argument("--slug", required=True, help="Short name used in references, e.g. acme.")
     create.add_argument("--name", help="Display name (defaults to the slug).")
+    add_actor_argument(create)
 
     group.add_parser("list", help="Every organization this collector holds.")
 
@@ -78,6 +83,14 @@ def _add_organizations(commands: "argparse._SubParsersAction[argparse.ArgumentPa
     rename.add_argument("--slug", required=True, help="The organization to rename.")
     rename.add_argument("--to", required=True, dest="to_slug", help="Its new slug.")
     rename.add_argument("--name", help="Its new display name (left alone when omitted).")
+    add_actor_argument(rename)
+
+    removing = group.add_parser("delete", help="Delete an empty organization.")
+    removing.add_argument("--slug", required=True, help="The organization to delete.")
+    removing.add_argument(
+        "--yes", action="store_true", required=True, help="Required. This is not undoable."
+    )
+    add_actor_argument(removing)
 
 
 def _add_projects(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
@@ -89,6 +102,7 @@ def _add_projects(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
     create.add_argument("--org", required=True, help="The organization it belongs to.")
     create.add_argument("--slug", required=True, help="Short name, e.g. web.")
     create.add_argument("--name", help="Display name (defaults to the slug).")
+    add_actor_argument(create)
 
     listing = group.add_parser("list", help="Every project, or one organization's.")
     listing.add_argument("--org", help="Only this organization's projects.")
@@ -97,6 +111,14 @@ def _add_projects(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
     rename.add_argument("--project", required=True, metavar="ORG/PROJECT", help="The project.")
     rename.add_argument("--to", required=True, dest="to_slug", help="Its new slug.")
     rename.add_argument("--name", help="Its new display name (left alone when omitted).")
+    add_actor_argument(rename)
+
+    removing = group.add_parser("delete", help="Delete a project and every run it holds.")
+    removing.add_argument("--project", required=True, metavar="ORG/PROJECT")
+    removing.add_argument(
+        "--yes", action="store_true", required=True, help="Required. This is not undoable."
+    )
+    add_actor_argument(removing)
 
 
 def bootstrap(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
@@ -127,9 +149,24 @@ def bootstrap(arguments: argparse.Namespace, connection: "Connection[tuple[objec
     )
     print(f"created project {project.reference}\n")
 
+    actor = actor_from_environment(arguments.actor)
+    record_event(
+        connection,
+        actor=actor,
+        action="tenant.bootstrap",
+        subject=project.reference,
+        project_id=project.id,
+        organization_id=organization.id,
+    )
     scopes = tuple(Scope(s) for s in (arguments.scope or [str(Scope.INGEST)]))
     issued, secret_hash = generate_key(arguments.key_name, scopes)
-    store_key(connection, issued, secret_hash, scope=TenantScope.for_project(project.id))
+    store_key(
+        connection,
+        issued,
+        secret_hash,
+        scope=TenantScope.for_project(project.id),
+        created_by=actor,
+    )
     print_issued(issued.token, project.reference, scopes)
     if Scope.READ not in scopes:
         # Ingest only, like `key create`: the first credential is the one that ends
@@ -149,12 +186,35 @@ def run_organization(
     """Create, list or rename an organization."""
     if arguments.org_command == "create":
         organization = create_organization(connection, arguments.slug, arguments.name or "")
+        record_event(
+            connection,
+            actor=actor_from_environment(arguments.actor),
+            action="org.create",
+            subject=organization.slug,
+            organization_id=organization.id,
+        )
+        connection.commit()
         print(f"created organization {organization.slug}")
+        return EXIT_OK
+    if arguments.org_command == "delete":
+        delete_organization(
+            connection, arguments.slug, actor=actor_from_environment(arguments.actor)
+        )
+        connection.commit()
+        print(f"deleted organization {arguments.slug}")
         return EXIT_OK
     if arguments.org_command == "rename":
         renamed = rename_organization(
             connection, arguments.slug, new_slug=arguments.to_slug, new_name=arguments.name
         )
+        record_event(
+            connection,
+            actor=actor_from_environment(arguments.actor),
+            action="org.rename",
+            subject=f"{arguments.slug} → {renamed.slug}",
+            organization_id=renamed.id,
+        )
+        connection.commit()
         print(f"renamed {arguments.slug} to {renamed.slug}")
         return EXIT_OK
     organizations = list_organizations(connection)
@@ -173,12 +233,35 @@ def run_project(arguments: argparse.Namespace, connection: "Connection[tuple[obj
     """Create, list or rename a project."""
     if arguments.project_command == "create":
         project = create_project(connection, arguments.org, arguments.slug, arguments.name or "")
+        record_event(
+            connection,
+            actor=actor_from_environment(arguments.actor),
+            action="project.create",
+            subject=project.reference,
+            project_id=project.id,
+        )
+        connection.commit()
         print(f"created project {project.reference}")
+        return EXIT_OK
+    if arguments.project_command == "delete":
+        removed = delete_project(
+            connection, arguments.project, actor=actor_from_environment(arguments.actor)
+        )
+        connection.commit()
+        print(f"deleted {arguments.project} and {removed} submission(s)")
         return EXIT_OK
     if arguments.project_command == "rename":
         renamed = rename_project(
             connection, arguments.project, new_slug=arguments.to_slug, new_name=arguments.name
         )
+        record_event(
+            connection,
+            actor=actor_from_environment(arguments.actor),
+            action="project.rename",
+            subject=f"{arguments.project} → {renamed.reference}",
+            project_id=renamed.id,
+        )
+        connection.commit()
         print(f"renamed {arguments.project} to {renamed.reference}")
         return EXIT_OK
     projects = list_projects(connection, arguments.org)

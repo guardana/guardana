@@ -17,6 +17,7 @@ import datetime
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from guardana.server.audit import Actor, record
 from guardana.server.inventory import worst_severity
 from guardana.server.tenancy import parse_project_reference
 
@@ -106,7 +107,7 @@ def record_sighting(
 
 def _resolve(
     connection: "Connection[tuple[object, ...]]", project: str, prefix: str
-) -> tuple[int, str]:
+) -> tuple[int, str, int]:
     """Turn a unique identity prefix into one finding, or refuse to guess.
 
     Both forms are accepted: the full `sha256:…` and the short hex the listing
@@ -118,7 +119,7 @@ def _resolve(
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            select t.id, t.identity
+            select t.id, t.identity, t.project_id
             from tracked_findings t
             join projects p on p.id = t.project_id
             join organizations o on o.id = p.organization_id
@@ -138,18 +139,23 @@ def _resolve(
             f"{prefix!r} matches {len(matches)} findings in {organization}/{name} "
             f"({candidates}…) — nothing was changed; use more characters"
         )
-    return int(str(matches[0][0])), str(matches[0][1])
+    return int(str(matches[0][0])), str(matches[0][1]), int(str(matches[0][2]))
 
 
-def set_status(
+def set_status(  # noqa: PLR0913 — a connection, a tenant, a finding, a status, an owner, an actor
     connection: "Connection[tuple[object, ...]]",
     project: str,
     prefix: str,
     *,
     status: str,
     owner: str | None = None,
+    actor: Actor | None = None,
 ) -> str:
-    """Move a finding to one of the settable statuses. Returns its full identity."""
+    """Move a finding to one of the settable statuses. Returns its full identity.
+
+    The audit row is written in the same transaction as the change, so a decision
+    that was applied and not recorded is not a state this collector can reach.
+    """
     if status == ACCEPTED_RISK:
         raise ValueError(
             "accepted_risk is set by `finding waive`, which takes an approver, a reason "
@@ -157,7 +163,7 @@ def set_status(
         )
     if status not in _SETTABLE:
         raise ValueError(f"{status!r} is not a status; expected one of {', '.join(_SETTABLE)}")
-    tracked_id, identity = _resolve(connection, project, prefix)
+    tracked_id, identity, project_id = _resolve(connection, project, prefix)
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -170,10 +176,19 @@ def set_status(
             """,
             (status, owner, tracked_id),
         )
+    if actor is not None:
+        record(
+            connection,
+            actor=actor,
+            action="finding.status",
+            subject=identity,
+            project_id=project_id,
+            detail={"status": status, "owner": owner},
+        )
     return identity
 
 
-def waive(  # noqa: PLR0913 — a connection, a tenant, a finding, and the three a waiver needs
+def waive(  # noqa: PLR0913 — a connection, a tenant, a finding, a waiver's three, an actor
     connection: "Connection[tuple[object, ...]]",
     project: str,
     prefix: str,
@@ -181,6 +196,7 @@ def waive(  # noqa: PLR0913 — a connection, a tenant, a finding, and the three
     approver: str,
     reason: str,
     expires: datetime.date,
+    actor: Actor | None = None,
 ) -> str:
     """Accept a risk until a date, recording who accepted it and why.
 
@@ -192,7 +208,7 @@ def waive(  # noqa: PLR0913 — a connection, a tenant, a finding, and the three
         raise WaiverError("a waiver needs an approver: who accepted this risk")
     if not reason.strip():
         raise WaiverError("a waiver needs a reason: why this risk is accepted")
-    tracked_id, identity = _resolve(connection, project, prefix)
+    tracked_id, identity, project_id = _resolve(connection, project, prefix)
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -202,6 +218,15 @@ def waive(  # noqa: PLR0913 — a connection, a tenant, a finding, and the three
             where id = %s
             """,
             (ACCEPTED_RISK, approver.strip(), reason.strip(), expires, tracked_id),
+        )
+    if actor is not None:
+        record(
+            connection,
+            actor=actor,
+            action="finding.waive",
+            subject=identity,
+            project_id=project_id,
+            detail={"approver": approver.strip(), "expires": expires.isoformat()},
         )
     return identity
 

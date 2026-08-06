@@ -37,6 +37,7 @@ from enum import StrEnum
 from hashlib import sha256
 from typing import TYPE_CHECKING
 
+from guardana.server.audit import Actor, record
 from guardana.server.tenancy import TenantScope, parse_project_reference
 
 if TYPE_CHECKING:
@@ -148,6 +149,10 @@ class Authenticated:
     project_id: int
     project_ref: str
     environment: str | None = None
+    # The row id of the key itself, so a stored submission can say which credential
+    # wrote it. `key list` and the audit log speak in prefixes and names; the id is
+    # what a foreign key can point at.
+    key_id: int | None = None
 
     def permits(self, scope: Scope) -> bool:
         """Whether this key may do `scope`."""
@@ -156,12 +161,12 @@ class Authenticated:
     @property
     def scope(self) -> TenantScope:
         """The tenant every store call made for this request is scoped to."""
-        return TenantScope.for_project(self.project_id, self.environment)
+        return TenantScope.for_project(self.project_id, self.environment, self.key_id)
 
 
 _KEY_COLUMNS = (
     "k.name, k.secret_hash, k.scopes, k.created_at, k.last_used_at, k.revoked_at, "
-    "k.expires_at, k.project_id, o.slug, p.slug, k.environment"
+    "k.expires_at, k.project_id, o.slug, p.slug, k.environment, k.id"
 )
 _KEY_JOIN = (
     "from api_keys k "
@@ -207,6 +212,7 @@ def authenticate(
         project_id=int(str(row[7])),
         project_ref=record.project_ref,
         environment=record.environment,
+        key_id=int(str(row[11])),
     )
 
 
@@ -242,13 +248,14 @@ def _touch(connection: "Connection[tuple[object, ...]]", prefix: str, moment: da
     connection.commit()
 
 
-def store_key(
+def store_key(  # noqa: PLR0913 — a key, its hash, its tenant, its lifetime, and who issued it
     connection: "Connection[tuple[object, ...]]",
     issued: IssuedKey,
     secret_hash: str,
     *,
     scope: TenantScope,
     expires_at: datetime | None = None,
+    created_by: Actor | None = None,
 ) -> None:
     """Persist a newly issued key's record, pinned to the tenant it may reach.
 
@@ -259,16 +266,16 @@ def store_key(
     prevent, a credential that came into existence without a tenant because nobody
     passed one. An unauthenticated scope is refused by `require_project`.
 
-    There is no `created_by`: the column exists, nothing has ever been able to fill
-    it, and there are no human identities yet to fill it with. It is written by the
-    audit log, where "which identity issued this credential" is the question, rather
-    than by a parameter every caller passes `None` to.
+    `created_by` records who issued it. The column has existed since 0.8 with
+    nothing filling it, which is a promise the code did not keep; it now carries
+    the same actor the audit log records, and carries its *kind* with it — a name
+    from a shell is asserted, not authenticated, and the string says so.
 
     """
     with connection.cursor() as cursor:
         cursor.execute(
             "insert into api_keys (name, prefix, secret_hash, scopes, expires_at, project_id, "
-            "environment) values (%s, %s, %s, %s, %s, %s, %s)",
+            "environment, created_by) values (%s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 issued.name,
                 issued.prefix,
@@ -277,7 +284,17 @@ def store_key(
                 expires_at,
                 scope.require_project(),
                 scope.environment,
+                None if created_by is None else f"{created_by.kind}:{created_by.name}",
             ),
+        )
+    if created_by is not None:
+        record(
+            connection,
+            actor=created_by,
+            action="key.create",
+            subject=f"{issued.name} ({issued.prefix})",
+            project_id=scope.require_project(),
+            detail={"scopes": [str(s) for s in issued.scopes], "environment": scope.environment},
         )
     connection.commit()
 

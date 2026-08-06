@@ -8,7 +8,8 @@ and nothing is sent anywhere unless a run is given `--reporter`.
 > route that carries a finding, isolates one **project** from another, and records
 > what each run verified and where — with an optional **environment pin** that
 > makes a credential reach exactly one environment in both directions. Findings carry a **lifecycle** and waivers
-> that expire. Still ahead of it: an audit log and retention.
+> that expire, every state change is **audited**, and **retention** is a policy an
+> operator applies. Still ahead of it: RBAC and human identities.
 
 ## Standing one up: three commands
 
@@ -203,6 +204,85 @@ to fail would be a gate that fails open when the network does — so if you want
 build to stop failing, that is still `guardana baseline`
 ([usage-baseline.md](usage-baseline.md)). Exporting a project's collector waivers
 *as* a baseline file is a natural next step and is deliberately not here yet.
+
+## The audit log
+
+```bash
+guardana-collector audit list [--project acme/web] [--limit 50]
+```
+
+State changes only: keys created and revoked, tenants created and renamed,
+findings triaged, schema migrated and rolled back, anything deleted. Reads are not
+recorded — a log that grows with every dashboard refresh is a log nobody reads.
+
+**Every row says what kind of actor it was, and the difference matters:**
+
+| Kind | Example | Worth |
+|---|---|---|
+| `key` | `key:prod-ci (id 4)` | **verified** — the credential was presented and matched |
+| `cli` | `cli:konrad@ops-1` | **asserted** — an operator with database access said so |
+
+A CLI actor is the operating-system user, taken from the environment rather than
+typed, and `--actor` overrides it for a shared operations account. It is not
+authentication: anybody who can reach the database can write any name. It is
+recorded anyway, because "what happened, roughly when, by which route" is the
+question a log usually answers — and labelling an assertion as proof would be the
+same false green this tool refuses in a verdict. Real identities arrive with users
+and RBAC.
+
+`api_keys.created_by` is filled by the same actor, and a stored submission now
+records **which key wrote it**.
+
+One event can never be recorded: rolling back the migration that created the log
+removes the log. The command says so on stderr rather than failing after the fact.
+
+## Retention: keeping less, on purpose
+
+```bash
+guardana-collector retention set   --project acme/web --keep-days 90
+guardana-collector retention show  --project acme/web
+guardana-collector retention apply --project acme/web --dry-run
+guardana-collector retention apply --project acme/web
+```
+
+Per **project**, because the tenant is the project everywhere else here and a
+policy at a different granularity is one that eventually deletes somebody else's
+evidence. A project nobody has told keeps everything, and `apply` **refuses**
+without a policy rather than falling back to a default — deleting on a default is
+a collector that removes evidence because nobody said not to.
+
+**Applying is a command, never a background job.** There is no scheduler in the
+collector, so "what deleted my evidence" is answerable from the audit log rather
+than from source. Run it yourself, or from a cron you wrote.
+
+Two things retention deliberately does not touch:
+
+- **The audit log.** A log pruned by the policy it describes cannot answer
+  questions about the pruning.
+- **Triage.** A tracked finding outlives its occurrences: its status and waiver
+  stay, and the sighting count falls to zero. Otherwise a finding that reappears
+  after a prune arrives as new and somebody re-decides what they already decided.
+
+## Deleting a project, an organization, or a typo
+
+```bash
+guardana-collector project delete --project acme/web --yes
+guardana-collector org delete --slug acme --yes
+guardana-collector system merge --project acme/web --from suport-agent --into support-agent
+```
+
+`--yes` is required on both deletions, and deleting an organization **refuses
+while it still holds projects**: cascading two levels of tenancy from one word is
+exactly the command somebody runs at three in the morning in a shell they thought
+was pointed elsewhere. Delete the projects first, one at a time.
+
+The record of a deletion is filed under the *organization*, because audit events
+cascade from a project — an event about a deleted project, filed under that
+project, would be deleted by the deletion it describes.
+
+`system merge` is the one operation here that edits the past rather than removing
+it. It exists because the alternative is a permanent second AI system created by
+one keystroke, which is what makes people stop trusting an inventory.
 
 ## Organizations and projects
 

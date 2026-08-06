@@ -190,10 +190,12 @@ class PostgresStore:
                     ai_system, environment, deployment_ref, commit_sha, image_digest,
                     model_digest, model_name, model_revision,
                     run_id, started_at, completed_at, tool_version, gate, evidence_mode,
-                    requests, input_tokens, output_tokens, wall_time_seconds
+                    requests, input_tokens, output_tokens, wall_time_seconds,
+                    api_key_id
                 ) values (%s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s,
                           %s, %s, %s, %s, %s, %s, %s, %s,
-                          %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                          %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                          %s)
                 on conflict (project_id, run_id) where run_id is not null do nothing
                 returning id
                 """,
@@ -213,6 +215,7 @@ class PostgresStore:
                     json.dumps([error.model_dump() for error in submission.errors]),
                     *_label_values(submission.deployment),
                     *_run_values(submission.run),
+                    scope.api_key_id,
                 ),
             )
             row = cursor.fetchone()

@@ -15,7 +15,7 @@ live in [`ROADMAP.md`](ROADMAP.md).
 |---|---|
 | Engine + built-in rules | beta |
 | `scan` / `probe` / `monitor` / `diff` | beta |
-| Collector (`guardana-server`) | **beta** — durable, authenticated and tenant-isolated (PostgreSQL, reversible migrations, API keys pinned to a project and optionally to an environment), it records what each run verified and where, and findings carry a lifecycle with expiring waivers; no audit log or retention yet |
+| Collector (`guardana-server`) | **beta** — durable, authenticated and tenant-isolated (PostgreSQL, reversible migrations, API keys pinned to a project and optionally to an environment), it records what each run verified and where, findings carry a lifecycle with expiring waivers, every state change is audited and retention is a policy you apply; no RBAC or human identities yet |
 | Extension API | unstable by design until 1.0 |
 
 Full detail, including what is deliberately not covered:
@@ -487,6 +487,18 @@ collector records the names runs use rather than requiring them in advance, and
 `system list` / `environment list` / `deployment list` read them back. A key may be
 **pinned to one environment** and then writes and reads only that one — a run
 declaring another is refused, a run declaring nothing is stored under the pin.
+
+**An audit log that says what it is worth.** Every state change is recorded with
+its actor and the *kind* of actor — a presented credential is verified, a name from
+a shell is asserted — because a log that presents an assertion as authentication is
+worse than no log. It fills `api_keys.created_by` and records which key wrote each
+submission.
+
+**Retention and deletion, both deliberate.** `retention set|apply` per project with
+a dry run first and a refusal when no policy is set; `project delete` / `org delete`
+behind `--yes`, with an organization refusing while it still holds projects; and
+`system merge` to move a typo's runs onto the real system. Retention never prunes
+the audit log and never deletes triage.
 
 **Triage, and waivers that expire.** A finding in the collector is an entity, not
 a pile of sightings: `finding status` records who is looking at it, `finding waive`

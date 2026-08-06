@@ -9,6 +9,7 @@ deleting it and belongs with retention.
 import argparse
 from typing import TYPE_CHECKING
 
+from guardana.server.audit import actor_from_environment, add_actor_argument
 from guardana.server.cli import triage
 from guardana.server.cli.codes import EXIT_OK
 from guardana.server.inventory import (
@@ -20,6 +21,7 @@ from guardana.server.inventory import (
     runs,
 )
 from guardana.server.lifecycle import STATUSES, TrackedFinding, list_tracked
+from guardana.server.retention import merge_systems
 
 if TYPE_CHECKING:
     from psycopg import Connection
@@ -49,6 +51,14 @@ def add_arguments(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
         if command in {"run", "finding"}:
             listing.add_argument("--environment", help="Only this environment.")
             listing.add_argument("--limit", type=int, default=50, help="How many (default 50).")
+        if command == "system":
+            merging = group.add_parser(
+                "merge", help="Move one system's runs onto another, after a typo."
+            )
+            merging.add_argument("--project", required=True, metavar="ORG/PROJECT")
+            merging.add_argument("--from", required=True, dest="source", help="The wrong name.")
+            merging.add_argument("--into", required=True, dest="target", help="The right one.")
+            add_actor_argument(merging)
         if command == "finding":
             listing.add_argument("--status", choices=list(STATUSES), help="Only this status.")
             # Triage lives beside the listing it acts on, so `finding --help` shows
@@ -59,16 +69,16 @@ def add_arguments(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
 def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
     """Print one inventory listing."""
     if arguments.command == "system":
-        return _print(ai_systems(connection, arguments.project), "AI systems", "ai-system")
+        return _system(arguments, connection)
     if arguments.command == "environment":
         return _print(environments(connection, arguments.project), "environments", "environment")
     if arguments.command == "run":
         return _print_runs(
             runs(connection, arguments.project, arguments.environment, arguments.limit)
         )
+    if arguments.command == "finding" and arguments.finding_command != "list":
+        return triage.run(arguments, connection)
     if arguments.command == "finding":
-        if arguments.finding_command != "list":
-            return triage.run(arguments, connection)
         return _print_findings(
             list_tracked(
                 connection,
@@ -80,6 +90,27 @@ def run(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...
         )
     found = deployments(connection, arguments.project, arguments.ai_system)
     return _print(found, "deployments", "deployment-id")
+
+
+def _system(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
+    """List the AI systems runs have named, or merge one onto another."""
+    if arguments.system_command == "merge":
+        return _merge(arguments, connection)
+    return _print(ai_systems(connection, arguments.project), "AI systems", "ai-system")
+
+
+def _merge(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
+    """Move one system's runs onto another after a typo — the one edit-the-past command."""
+    moved = merge_systems(
+        connection,
+        arguments.project,
+        source=arguments.source,
+        target=arguments.target,
+        actor=actor_from_environment(arguments.actor),
+    )
+    connection.commit()
+    print(f"moved {moved} run(s) from {arguments.source} to {arguments.target}")
+    return EXIT_OK
 
 
 def _print_runs(entries: tuple[RunEntry, ...]) -> int:
