@@ -252,6 +252,13 @@ left join findings f on f.identity = t.identity and f.channel = 'findings'
 left join submissions s on s.id = f.submission_id and s.project_id = t.project_id
                        and (%s::text is null or s.environment = %s)
 where (%s::text is null or o.slug || '/' || p.slug = %s)
+  and (
+    %s::text is null
+    or (%s = 'open' and (t.status = 'open'
+                         or (t.status = 'accepted_risk' and t.waiver_expires < %s)))
+    or (%s = 'accepted_risk' and t.status = 'accepted_risk' and t.waiver_expires >= %s)
+    or (%s not in ('open', 'accepted_risk') and t.status = %s)
+  )
 group by t.id, t.identity, t.status, t.owner, t.waived_by, t.waiver_reason,
          t.waiver_expires, t.first_seen_at, t.last_seen_at
 order by t.last_seen_at desc
@@ -272,19 +279,35 @@ def list_tracked(  # noqa: PLR0913 — one connection and four independent filte
 
     A waiver whose date has passed reports the finding as `open` and says the
     waiver lapsed. Nothing had to run for that to be true, which is the point: a
-    lapse that waits for a scheduled job is a lapse that is wrong in between —
-    which is also why `status` filters the *effective* status rather than the
-    column, or asking for open findings would hide the lapsed ones.
+    lapse that waits for a scheduled job is a lapse that is wrong in between.
+
+    `status` filters the **effective** status, and it does so in SQL rather than
+    afterwards: filtering a limited page in Python returns fewer rows than asked
+    for while more exist, which is a listing that quietly lies about how much there
+    is. A lapsed waiver therefore matches `open`, and never `accepted_risk`.
     """
     day = today or datetime.datetime.now(tz=datetime.UTC).date()
     reference = None if project is None else "/".join(parse_project_reference(project))
     with connection.cursor() as cursor:
-        cursor.execute(_LIST_QUERY, (environment, environment, reference, reference, limit))
+        cursor.execute(
+            _LIST_QUERY,
+            (
+                environment,
+                environment,
+                reference,
+                reference,
+                status,
+                status,
+                day,
+                status,
+                day,
+                status,
+                status,
+                limit,
+            ),
+        )
         rows = cursor.fetchall()
-    entries = tuple(_entry(row, day) for row in rows)
-    if status is None:
-        return entries
-    return tuple(entry for entry in entries if entry.status == status)
+    return tuple(_entry(row, day) for row in rows)
 
 
 def _entry(row: tuple[object, ...], today: datetime.date) -> TrackedFinding:

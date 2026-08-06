@@ -74,6 +74,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`finding list --status` returned a short page.** The filter ran after the
+  limit, so asking for five open findings could return three while more existed —
+  a listing that understates how much there is, which for findings is the wrong
+  direction to be wrong in. It now filters in SQL, expiry included, so a lapsed
+  waiver is found by asking for `open` and never by asking for `accepted_risk`.
+- **The body-size check buffered the whole request before refusing it.** It now
+  turns away a declared oversize before reading a byte, and cuts off a chunked
+  request as it arrives rather than measuring it afterwards.
+- **The rate limiter kept one entry per caller forever.** An unauthenticated
+  collector keys on the peer address, so a long-running process facing the
+  internet grew a dictionary that nothing emptied.
 - **A usage error from the collector CLI reported itself as a database outage.**
   An ambiguous identity prefix came back as "could not reach the database", which
   sends an operator to look at PostgreSQL while PostgreSQL is fine — the same

@@ -309,3 +309,42 @@ def test_the_short_form_the_listing_prints_addresses_the_finding(
     connection.commit()
 
     assert _only(connection).status == "acknowledged"
+
+
+def test_filtering_by_status_does_not_return_a_short_page(
+    connection: DbConnection, project: int
+) -> None:
+    """The filter runs in SQL, so a limited page holds what was asked for.
+
+    Filtering a limited page afterwards returns fewer rows than requested while
+    more exist — a listing that quietly understates how much there is, which for a
+    finding list is the wrong direction to be wrong in.
+    """
+    for index in range(6):
+        _seen(connection, project, f"sha256:{index:064d}")
+    set_status(connection, _PROJECT, "sha256:" + "0" * 64, status="resolved")
+    connection.commit()
+
+    page = list_tracked(connection, _PROJECT, status="open", today=_TODAY, limit=5)
+
+    assert len(page) == 5
+    assert {entry.status for entry in page} == {"open"}
+
+
+def test_a_lapsed_waiver_is_found_by_filtering_for_open(
+    connection: DbConnection, project: int
+) -> None:
+    """And never by filtering for accepted risk, which it no longer is."""
+    _seen(connection, project)
+    waive(
+        connection,
+        _PROJECT,
+        _IDENTITY,
+        approver="k",
+        reason="r",
+        expires=datetime.date(2026, 1, 1),
+    )
+    connection.commit()
+
+    assert len(list_tracked(connection, _PROJECT, status="open", today=_TODAY)) == 1
+    assert list_tracked(connection, _PROJECT, status="accepted_risk", today=_TODAY) == ()

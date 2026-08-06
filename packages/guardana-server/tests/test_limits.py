@@ -20,6 +20,7 @@ from guardana.server.store import InMemoryStore
 
 _TOO_MANY = 429
 _TOO_LARGE = 413
+_OK = 200
 
 
 @pytest.fixture
@@ -150,3 +151,50 @@ def test_a_nonsense_limit_is_refused_at_startup(monkeypatch: pytest.MonkeyPatch)
 
     with pytest.raises(ValueError, match="GUARDANA_MAX_BODY_BYTES"):
         Limits.from_environment()
+
+
+def test_a_declared_oversize_is_refused_before_the_body_is_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An honest client is turned away without a byte of its body being buffered."""
+    monkeypatch.setenv("GUARDANA_MAX_BODY_BYTES", "16")
+    client = TestClient(create_app(InMemoryStore(), allow_unauthenticated=True))
+
+    response = client.post(
+        "/findings",
+        content=b"x" * 64,
+        headers={"Content-Type": "application/json", "Content-Length": "64"},
+    )
+
+    assert response.status_code == _TOO_LARGE
+
+
+def test_a_body_that_passed_the_check_still_reaches_the_handler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The middleware consumes the stream, so it has to hand the body on.
+
+    Without that the route awaits a stream that has already ended, sees an empty
+    body, and every submission fails validation — a limiter that breaks the thing
+    it was protecting.
+    """
+    monkeypatch.setenv("GUARDANA_MAX_BODY_BYTES", "65536")
+    client = TestClient(create_app(InMemoryStore(), allow_unauthenticated=True))
+
+    response = client.post("/findings", json={"source": "app", "schema_version": 7})
+
+    assert response.status_code == _OK
+    assert response.json()["status"] == "ok"
+
+
+def test_the_limiter_forgets_callers_that_went_quiet() -> None:
+    """One entry per caller, keyed on a peer address, would otherwise grow forever."""
+    now = 0.0
+    limiter = RateLimiter(Limits(max_body_bytes=1024, requests_per_minute=5), clock=lambda: now)
+    for caller in range(10_100):
+        limiter.allows(f"peer:{caller}", path="/findings")
+
+    now = 200.0
+    limiter.allows("peer:new", path="/findings")
+
+    assert len(limiter._seen) < 10_100

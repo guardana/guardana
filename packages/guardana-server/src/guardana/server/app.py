@@ -345,9 +345,27 @@ async def _reject_oversized(request: Request, ceiling: int) -> JSONResponse | No
     """
     if ceiling == 0 or request.method in _BODYLESS:
         return None
-    body = await request.body()
-    if len(body) <= ceiling:
-        return None
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > ceiling:
+        # The cheap refusal: an honest client is turned away before a byte of its
+        # body is read.
+        return _too_large(ceiling)
+    collected = bytearray()
+    async for chunk in request.stream():
+        collected.extend(chunk)
+        if len(collected) > ceiling:
+            # And the one that matters: a request that declares nothing — which is
+            # what chunked encoding does — is cut off as it arrives rather than
+            # buffered in full and measured afterwards.
+            return _too_large(ceiling)
+    # Hand the route the body this consumed, which is what `Request.body()` caches
+    # when it reads one itself. Without this the handler would await a stream that
+    # has already ended and see an empty body.
+    request._body = bytes(collected)  # noqa: SLF001
+    return None
+
+
+def _too_large(ceiling: int) -> JSONResponse:
     return JSONResponse(
         status_code=_TOO_LARGE,
         content={"detail": f"request body too large; this collector accepts {ceiling} bytes"},

@@ -23,6 +23,7 @@ RATE_VARIABLE = "GUARDANA_RATE_LIMIT_PER_MINUTE"
 _DEFAULT_MAX_BODY = 8 * 1024 * 1024
 _DEFAULT_RATE = 120
 _MINUTE = 60.0
+_MAX_TRACKED_CALLERS = 10_000
 _UNLIMITED = 0
 _NEVER_LIMITED = frozenset({"/healthz", "/readyz"})
 """Liveness and readiness.
@@ -80,6 +81,8 @@ class RateLimiter:
         if self.limits.requests_per_minute == _UNLIMITED or path in _NEVER_LIMITED:
             return True
         now = self.clock()
+        if len(self._seen) > _MAX_TRACKED_CALLERS:
+            self._forget_the_quiet(now)
         window = self._seen.setdefault(caller, deque())
         while window and now - window[0] >= _MINUTE:
             window.popleft()
@@ -87,6 +90,20 @@ class RateLimiter:
             return False
         window.append(now)
         return True
+
+    def _forget_the_quiet(self, now: float) -> None:
+        """Drop callers whose window has emptied.
+
+        One entry per distinct caller, and an unauthenticated collector keys on the
+        peer address — so a long-running process facing the internet would grow a
+        dictionary forever. Sweeping only when the map is already large keeps the
+        common path free of it.
+        """
+        self._seen = {
+            caller: window
+            for caller, window in self._seen.items()
+            if window and now - window[-1] < _MINUTE
+        }
 
     def retry_after(self, caller: str) -> int:
         """Seconds until this caller's oldest request leaves the window."""
