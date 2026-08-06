@@ -158,7 +158,7 @@
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5 4 5.6v6.1c0 4.6 3.2 8.4 8 9.8 4.8-1.4 8-5.2 8-9.8V5.6L12 2.5Z" stroke="#5B3DF5" stroke-width="1.9" stroke-linejoin="round"/></svg>
       Guardana
     </a>
-    <span class="ver mono">v0.10.0</span>
+    <span class="ver mono">v0.11.0</span>
     <nav>
       <a href="https://github.com/guardana/guardana#readme" class="hide-sm">Docs</a>
       <a href="https://pypi.org/project/guardana-cli/" class="hide-sm">PyPI</a>
@@ -265,7 +265,7 @@
       <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every finding maps to OWASP LLM Top 10, MITRE ATLAS, and NIST.</p>
       <pre class="yml"><code><span class="c">// .github/workflows/ai-security.yml</span>
 <span class="k">- uses:</span> <span class="s">actions/checkout@v4</span>
-<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.10</span>
+<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.11</span>
   <span class="k">with:</span>
     <span class="k">args:</span> <span class="s">--preset ci</span></code></pre>
       <p class="ci-note">Turning a gate on for an existing repo? <code>guardana baseline create</code> accepts today's findings with a reason, an owner and an expiry date — and an expired waiver stops waiving. There's a pre-commit hook too.</p>
@@ -310,6 +310,8 @@
         <li><strong>One instance, many teams.</strong> A key is bound to one project and reads nothing outside it — proven per entity, on both storage backends and over HTTP. Pin a key to an environment and it reaches only that one, in both directions.</li>
         <li><strong>A run, not a pile of findings.</strong> Whether it passed its gate, when it ran, what it cost, which build produced it. A gate the agent didn't send is <em>unknown</em>, never a pass, and a retried job is stored once.</li>
         <li><strong>One finding, followed.</strong> Every finding carries the identity <code>guardana diff</code> uses, so the collector can say how many runs have seen it and since when.</li>
+        <li><strong>Triage that does not restart every run.</strong> A finding carries a status, an owner and — when a team accepts the risk — a waiver with a name and a date. A fix that did not hold reopens itself; an expired waiver stops waiving without anything having to run.</li>
+        <li><strong>Every change is on the record.</strong> Keys, tenants, triage, migrations, deletions — with the actor and whether it was a presented credential or a name somebody asserted. Retention and deletion are commands you run, never a job that runs itself.</li>
         <li><strong>Or run it from an image.</strong> Both halves ship as official containers on every release — non-root, <code>amd64</code> and <code>arm64</code>, with an SBOM and a signed provenance attestation.</li>
       </ul>
       <p class="sec-lede">No account, no telemetry, no phone-home — the only network traffic is to the target you point it at, and to a collector you chose to run.</p>

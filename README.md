@@ -246,7 +246,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.10   # moving tag → latest 0.10.x
+      - uses: guardana/guardana@v0.11   # moving tag → latest 0.11.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -424,7 +424,8 @@ why platform work comes before coverage volume.
 | **0.7** | Engine and CLI foundation — run manifest, usage accounting, budgets and `plan`, capability inspection, evidence redaction, safety modes, plugin trust, baseline lifecycle, stable exit codes |
 | **0.8** | A collector a team can keep — PostgreSQL with reversible migrations, scoped API keys hashed at rest, health and readiness as separate questions |
 | **0.9** | A collector two teams can share, and one that answers a question — projects and environments as tenants, a run's gate and cost, a finding followed across runs, and `bootstrap` keeping the first run at three commands |
-| **0.10** *(current)* | Company-ready — official container images, CI beyond GitHub, an SBOM and provenance on every release, a production deployment guide, a restore that has been exercised, and a clean install proven before every tag |
+| **0.10** | Company-ready — official container images, CI beyond GitHub, an SBOM and provenance on every release, a production deployment guide, a restore that has been exercised, and a clean install proven before every tag |
+| **0.11** *(current)* | Life after a finding arrives — triage with waivers that expire, an audit log that says what it is worth, retention and deletion you run on purpose, bounded ingest, and a panel that signs in |
 | **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
 
 Beyond that, the plan is kept as **milestones rather than version numbers** —

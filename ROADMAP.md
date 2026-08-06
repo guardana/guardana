@@ -62,7 +62,7 @@ already failed at its job:
 | Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. Findings carry a lifecycle and waivers that expire, every state change is audited, and retention is a policy an operator applies; no RBAC or human identities yet |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
 
-## What ships today (0.10.0)
+## What ships today (0.11.0)
 
 Counts come from the registry, not from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -94,6 +94,19 @@ doubles and [public model-format readers](docs/model-formats.md), a GitHub Actio
 and pre-commit hook, and the optional collector — whose own command
 (`guardana-collector`) covers migrations, tenants, credentials, running the
 service, and reading back what the runs reported.
+
+0.11 is about everything that happens **after a finding arrives**. A finding is an
+entity with a status, an owner and a waiver that expires — and a `resolved` finding
+**reopens the moment it is seen again**, because a fix that did not hold must not
+stay green. Every state change is written to an **audit log** that says whether the
+actor was a presented credential or a name somebody asserted, which also fills the
+`created_by` column that had sat empty since 0.8. **Retention and deletion** are
+commands an operator runs, never a job that runs itself, and neither touches the
+audit log or the triage. Ingest is **bounded** by a body ceiling and a per-caller
+rate limit, both refusing a nonsense value at start-up rather than treating it as
+"no limit". And the **panel works where API keys are required**: a browser signs in
+with a read-scoped key kept in an `HttpOnly` cookie that authenticates reads and
+nothing else.
 
 0.10 is the first release this project calls **company-ready**, and it is the
 first one the checklist above allows. What it adds is not coverage: **official
