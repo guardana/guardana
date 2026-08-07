@@ -25,10 +25,12 @@ self-hosted collector.
 
 > **Status.** The CLI and engine are **beta** — used to gate real builds, with the
 > public API still moving between minor releases. The self-hosted collector is
-> **beta** too as of 0.9: PostgreSQL, scoped API keys, project isolation, and a
-> record of what each run verified and where. It has no finding lifecycle, audit
-> log or retention controls yet. See
-> [product status and known limitations](docs/product-status.md) before adopting.
+> **beta** too as of 0.9: PostgreSQL, scoped API keys, project isolation, a record
+> of what each run verified and where, and — since 0.11 — a finding lifecycle with
+> waivers that expire, an audit log and retention you apply on purpose. It has no
+> RBAC and no human identities yet: the panel signs in with a read key, not as a
+> person. See [product status and known limitations](docs/product-status.md)
+> before adopting.
 
 - No account, no telemetry, no phone-home. The only network traffic is to the target you point it at.
 - Offline static scanning; explicit `findings`, `unverified` and `errors` channels.
@@ -265,7 +267,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.11   # moving tag → latest 0.11.x
+      - uses: guardana/guardana@v0.12   # moving tag → latest 0.12.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -444,7 +446,8 @@ why platform work comes before coverage volume.
 | **0.8** | A collector a team can keep — PostgreSQL with reversible migrations, scoped API keys hashed at rest, health and readiness as separate questions |
 | **0.9** | A collector two teams can share, and one that answers a question — projects and environments as tenants, a run's gate and cost, a finding followed across runs, and `bootstrap` keeping the first run at three commands |
 | **0.10** | Company-ready — official container images, CI beyond GitHub, an SBOM and provenance on every release, a production deployment guide, a restore that has been exercised, and a clean install proven before every tag |
-| **0.11** *(current)* | Life after a finding arrives — triage with waivers that expire, an audit log that says what it is worth, retention and deletion you run on purpose, bounded ingest, and a panel that signs in |
+| **0.11** | Life after a finding arrives — triage with waivers that expire, an audit log that says what it is worth, retention and deletion you run on purpose, bounded ingest, and a panel that signs in |
+| **0.12** *(current)* | Verification where the developers already are — `assert_secure` as a `pytest` assertion, the first framework adapter, and six defects an adversarial review found in released 0.11 code |
 | **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
 
 Beyond that, the plan is kept as **milestones rather than version numbers** —
