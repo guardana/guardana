@@ -274,6 +274,25 @@
 
   <section>
     <div class="wrap">
+      <p class="eyebrow">No new pipeline to own</p>
+      <h2 class="disp">Or write it as a test.</h2>
+      <p class="sec-lede">A security check that needs its own command, its own stage and its own report is a check somebody runs on Tuesdays. Your team already runs <code>pytest</code>.</p>
+      <pre class="yml"><code><span class="c"># test_ai_security.py</span>
+<span class="k">from</span> <span class="s">guardana.testing</span> <span class="k">import</span> <span class="s">assert_secure</span>
+<span class="k">from</span> <span class="s">guardana.adapters.langchain</span> <span class="k">import</span> <span class="s">langchain_target</span>
+
+<span class="k">def</span> <span class="s">test_the_agent_keeps_its_instructions_to_itself</span>(chat_model):
+    <span class="s">assert_secure</span>(<span class="s">langchain_target</span>(chat_model, system_prompt=SYSTEM), preset=<span class="s">"ci"</span>)</code></pre>
+      <ul class="checks">
+        <li><strong>The same engine, not a second one.</strong> Same rules, same policy, same redaction, same three-state gate as the CLI — a check that passes here and fails in CI is a fact about the target, not a disagreement between two implementations.</li>
+        <li><strong>"Couldn't check" fails too.</strong> An empty registry, an endpoint that was down, a check that couldn't grade — each raises, and says which it was. That distinction is exactly what goes quiet in a test suite.</li>
+        <li><strong>The model your app actually calls.</strong> The LangChain adapter probes that object, with its client and its configuration — and never imports <code>langchain</code>, so Guardana takes no dependency on your agent stack.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
       <p class="eyebrow">Built to be gated on</p>
       <h2 class="disp">Know the cost. Know what ran. Know what changed.</h2>
       <p class="sec-lede">Evaluation frameworks measure quality; red-teaming tools generate attacks. Guardana is built to be the thing a pipeline blocks on, which needs three properties those don't have to provide.</p>

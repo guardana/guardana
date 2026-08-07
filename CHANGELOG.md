@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`guardana.testing.assert_secure` — Guardana as an ordinary `pytest`
+  assertion.** A security check that needs its own command, its own pipeline stage
+  and its own report is a check somebody runs on Tuesdays; a team already runs
+  `pytest`. `assert_secure(target, preset="ci")` takes a path or any `Target`,
+  runs the same rules through the same `Runner`, applies the same redactor and
+  asks the same three-state gate as `scan` and `probe`, and raises
+  `SecurityAssertionError` (an `AssertionError`) with a readable report. On a pass
+  it returns the `ScanResult`, so a test can go on to assert something narrower.
+  Deliberately **not** a second engine: a check that passes here and fails in CI is
+  a fact about the target, never a disagreement between two implementations of
+  "secure". [`docs/usage-testing.md`](docs/usage-testing.md).
+  - **A run that could not reach a verdict raises too**, and says which it was.
+    An empty registry, an over-narrow profile, an endpoint that was down, a check
+    that could not grade — every one of those is indistinguishable from a clean
+    result until somebody makes it not be, and a test suite is where that goes
+    quiet. `.outcome` carries `FAIL` or `INDETERMINATE`; `.result` carries the
+    channels.
+  - **The failure message is redacted** by the profile's privacy policy before it
+    is raised. The message goes into a CI log, which is a file on somebody's build
+    server, and a security tool that writes the credential it just found into one
+    has made a second incident out of the first.
+  - **A path that does not exist refuses**, rather than scanning nothing and
+    passing — the same refusal `guardana scan` makes, for the same reason.
+- **`guardana.adapters.langchain` — verify the model your application actually
+  calls.** `langchain_target(chat_model)` wraps any LangChain chat model as a
+  Guardana target, so a probe goes through the client, credentials and
+  configuration that object carries instead of an endpoint underneath it that
+  nobody deployed. `langchain` is **never imported**: the adapter is duck-typed
+  against `invoke`, so `guardana-core` gains no dependency and no release of the
+  framework can break the tool that checks it. An object that is not a chat model
+  is refused when the target is built, not on the first prompt of a paid probe; a
+  reply with no text is an error rather than an empty string, because an empty
+  reply grades exactly like a well-behaved model. Reported token usage is counted,
+  and an absent count is recorded as unknown rather than zero. Tool calling is
+  deliberately not wired up — the agentic rules skip and say so.
+
 ### Fixed
 
 - **Evidence redaction covered two channels out of three: `errors` went out

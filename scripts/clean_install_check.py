@@ -127,6 +127,39 @@ def _checks(venv: Path, clean_directory: Path) -> list[Check]:
             expect=("not told where to keep",),
         ),
         Check("server package imports", [python, "-c", "import guardana.server"], 0),
+        # The two subpackages `guardana-core` ships beside `guardana.core`. A wheel
+        # that failed to carry one imports fine here, in a checkout, and fails for
+        # everybody who installed it — which is the exact shape of the defect that
+        # made 0.9.0 unshippable, one namespace along.
+        Check(
+            "the pytest assertion API imports and refuses a target that is not there",
+            [
+                python,
+                "-c",
+                "from guardana.testing import assert_secure\n"
+                "try:\n"
+                "    assert_secure('/no/such/path')\n"
+                "except ValueError as exc:\n"
+                "    print('refused:', exc)\n"
+                "else:\n"
+                "    raise SystemExit('a path that does not exist passed')",
+            ],
+            0,
+            expect=("refused:",),
+        ),
+        Check(
+            "the framework adapter imports without its framework",
+            [
+                python,
+                "-c",
+                "import sys\n"
+                "from guardana.adapters.langchain import langchain_target\n"
+                "assert not [m for m in sys.modules if m.split('.')[0] == 'langchain']\n"
+                "print('adapter ready')",
+            ],
+            0,
+            expect=("adapter ready",),
+        ),
     ]
 
 

@@ -19,6 +19,7 @@ detail below.
 
 ## For developers
 
+- [`usage-testing.md`](usage-testing.md) — `guardana.testing.assert_secure`: verification as an ordinary `pytest` assertion, plus the LangChain adapter
 - [`usage-scan.md`](usage-scan.md) — `guardana scan`: static, offline, CI-friendly
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live endpoint, agent or MCP server
 - [`usage-doctor.md`](usage-doctor.md) — `guardana doctor`, `config validate|explain`

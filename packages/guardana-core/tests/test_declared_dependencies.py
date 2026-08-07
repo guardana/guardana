@@ -77,6 +77,20 @@ def _declared_modules(package: Path) -> set[str]:
     return provided | declared
 
 
+def _own_subpackages(package: Path) -> set[str]:
+    """Which `guardana.*` subpackages this distribution actually ships.
+
+    Read from the tree rather than derived from the distribution name: guardana-core
+    ships `guardana.core`, `guardana.testing` and `guardana.adapters`, and a rule that
+    assumed one subpackage per distribution would report a package importing *itself*
+    as an undeclared dependency.
+    """
+    root = package / "src" / _NAMESPACE
+    return {
+        child.name for child in root.iterdir() if child.is_dir() and not child.name.startswith("__")
+    }
+
+
 def _imports(package: Path) -> set[str]:
     """Every module named by an import in the package's shipped source."""
     imported: set[str] = set()
@@ -123,7 +137,7 @@ def test_every_sibling_package_import_is_a_declared_dependency(package: Path) ->
     never declared installs fine here and fails for a user who installed only what
     the metadata asked for.
     """
-    own = package.name.removeprefix(f"{_NAMESPACE}-")
+    own = _own_subpackages(package)
     declared = _declared_distributions(package)
     undeclared = sorted(
         {
@@ -131,7 +145,7 @@ def test_every_sibling_package_import_is_a_declared_dependency(package: Path) ->
             for module in _imports(package)
             if module.split(".")[0] == _NAMESPACE
             and len(module.split(".")) > 1
-            and module.split(".")[1] != own
+            and module.split(".")[1] not in own
             and _normalized(f"{_NAMESPACE}-{module.split('.')[1]}") not in declared
         }
     )

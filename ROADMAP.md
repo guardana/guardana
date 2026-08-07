@@ -83,6 +83,11 @@ and five agentic checks — tool-result injection, credential exfiltration throu
 a tool argument, over-broad tool arguments, memory poisoning across a session
 boundary, and a live MCP server's tool manifest).
 
+Plus **verification as an ordinary `pytest` assertion**
+(`guardana.testing.assert_secure`) and the first **framework adapter**
+(`guardana.adapters.langchain`), so a check can live in the test file a team
+already runs, against the model their application actually calls.
+
 Plus fourteen commands — `scan`/`probe`/`monitor`/`diff` and the ten that make
 them safe to gate on (`plan`, `target inspect`, `run inspect|migrate`,
 `baseline create|verify|update`, `doctor`, `config validate|explain`, `rules`,
@@ -94,6 +99,18 @@ doubles and [public model-format readers](docs/model-formats.md), a GitHub Actio
 and pre-commit hook, and the optional collector — whose own command
 (`guardana-collector`) covers migrations, tenants, credentials, running the
 service, and reading back what the runs reported.
+
+0.12 turns back to the single developer, after four releases spent on the
+collector. Verification stops needing a pipeline: `assert_secure(target,
+preset="ci")` is an assertion in an ordinary test file, running the same rules
+through the same gate and the same redactor as the commands — and a run that could
+not reach a verdict raises just as loudly as one that found something, because a
+test suite is exactly where that distinction goes quiet. The first **framework
+adapter** verifies a LangChain chat model *as the application calls it*, through
+that object's own client and configuration, without Guardana importing `langchain`
+at all. It also carries **six defects an adversarial review found in released 0.11
+code** — among them evidence redaction covering two channels out of three, and
+`--preset ci` silently turning redaction off.
 
 0.11 is about everything that happens **after a finding arrives**. A finding is an
 entity with a status, an owner and a waiver that expires — and a `resolved` finding
@@ -411,10 +428,11 @@ not ship — and promptfoo does not document — is any of: an exit-code contrac
 budget, a saved run, or a regression comparison. That is where this project
 competes, and the ordering of this roadmap reflects it.
 
-Three things worth taking from them, each recorded below where it belongs: a
-pytest-facing assertion API and named adapters for LangChain / LlamaIndex /
-CrewAI (both in the application-awareness milestone), and attack *technique* as a dimension separate from the rule, so
-coverage can grow without rules growing with it (content lane).
+Three things worth taking from them, each recorded below where it belongs. The
+**pytest-facing assertion API** and the **first named adapter** (LangChain) shipped
+in `0.12.0`; LlamaIndex, CrewAI and PydanticAI stay in the application-awareness
+milestone. Attack *technique* as a dimension separate from the rule — so coverage
+can grow without rules growing with it — stays in the content lane.
 
 Full notes: `docs/superpowers/research/2026-08-02-evaluation-landscape.md`.
 
@@ -513,16 +531,22 @@ panel signs in with a read key rather than as a person
 not company-readiness — a company can deploy, secure, upgrade and restore this
 today, and the deployment guide states plainly what it cannot yet do.
 
-Then the application work:
+Landed in **0.12.0**:
 
-- **A pytest-facing assertion API** — `guardana.testing.assert_secure(target,
-  profile=...)`, raising `AssertionError` with the finding report. DeepEval's
-  strongest property is that a check lives in an ordinary test file run by an
-  ordinary pytest; Guardana has no way for a team to put verification where their
-  developers already are.
-- **Named adapters for the frameworks people search for**: LangChain, LlamaIndex,
-  CrewAI, PydanticAI. The `Trace` model below is what makes them possible; the
-  names matter because that is how the need is expressed.
+- **A pytest-facing assertion API** — `guardana.testing.assert_secure`, raising an
+  `AssertionError` with the finding report, and raising just as loudly when the run
+  could not reach a verdict. DeepEval's strongest property is that a check lives in
+  an ordinary test file run by an ordinary pytest, and Guardana had no way for a
+  team to put verification where their developers already are;
+- **the first named adapter** — `guardana.adapters.langchain`, duck-typed so
+  `langchain` is never imported and `guardana-core` gains no dependency.
+
+Then the rest of the application work:
+
+- **The remaining named adapters**: LlamaIndex, CrewAI, PydanticAI — and
+  **tool-calling through an adapter**, which LangChain's `bind_tools` makes
+  possible and which the five agentic rules need. Until it lands they skip and say
+  so, which `fail_on_skipped` turns into an indeterminate result rather than a pass.
 - **A common `Trace` model**: model calls, messages, tool offers, calls and
   results, retrieval queries and retrieved documents, identity and scopes,
   approvals, policy decisions, memory reads and writes, external side effects,

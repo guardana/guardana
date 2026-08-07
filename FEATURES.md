@@ -406,6 +406,47 @@ exercises your gateway and guardrails, not just the bare model. Fail-closed (no
 a multi-turn scenario's escalation is folded in, never dropped. Public API:
 `HttpAdapterTransport` / `AdapterConfig`.
 
+### Verification as a `pytest` assertion (`guardana.testing.assert_secure`)
+
+A security check that needs its own command, its own pipeline stage and its own
+report is a check somebody runs on Tuesdays. This one is a test:
+
+```python
+from guardana.testing import assert_secure
+
+def test_the_repository_ships_no_dangerous_artifact():
+    assert_secure("models", preset="ci")
+```
+
+Same rules, same policy, same redaction and the same three-state gate as `scan`
+and `probe` — not a second engine, so a check that passes here and fails in CI is
+a fact about the target rather than a disagreement between two implementations.
+It takes a path or any `Target`, a `preset=` or a `profile=`, and returns the
+`ScanResult` on a pass so a test can assert something narrower.
+
+Three properties it does not leave to the reader. **A run that could not reach a
+verdict raises too**, and says which it was — an empty registry, an endpoint that
+was down, a check that could not grade; `SecurityAssertionError.outcome` carries
+`FAIL` or `INDETERMINATE` and `.result` carries the channels. **The message is
+redacted** by the profile's privacy policy before it is raised, because it goes
+into a CI log and a tool that writes the credential it just found into one has made
+a second incident out of the first. **A path that does not exist refuses**, rather
+than scanning nothing and passing. See
+[`docs/usage-testing.md`](docs/usage-testing.md).
+
+### Framework adapters (`guardana.adapters`)
+
+**LangChain** (`langchain_target`): verify a chat model *as the application calls
+it* — through whatever client, credentials and configuration that object carries —
+instead of an endpoint underneath it that nobody deployed. Works with any LangChain
+chat model (`ChatOpenAI`, `ChatAnthropic`, `ChatOllama`, …) and **never imports
+`langchain`**, so Guardana gains no dependency and no release of it can break the
+tool that checks it; an object that is not a chat model is refused when the target
+is built rather than on the first prompt of a paid probe. Reported token usage is
+counted and an absent count is recorded as unknown, never as zero. Tool calling is
+deliberately not wired up yet: the agentic rules skip and say so, which
+`fail_on_skipped` turns into an indeterminate result rather than a pass.
+
 ### A framework, not just a CLI
 
 - **Declarative YAML rules** — single-turn `prompts:` or multi-turn `steps:`

@@ -143,6 +143,25 @@ guardana probe --url http://localhost:11434 --model llama3 \
   --preset ci --format json --output run.json
 ```
 
+### Or write it as a test
+
+```python
+from guardana.adapters.langchain import langchain_target
+from guardana.testing import assert_secure
+
+
+def test_the_repository_ships_no_dangerous_artifact():
+    assert_secure("models", preset="ci")
+
+
+def test_the_agent_keeps_its_instructions_to_itself(chat_model):
+    assert_secure(langchain_target(chat_model, system_prompt=SYSTEM), preset="ci")
+```
+
+Same rules, same policy, same redaction and the same three-state gate as the
+commands — and a run that could not reach a verdict raises just as loudly as one
+that found something. See [`docs/usage-testing.md`](docs/usage-testing.md).
+
 ### Compare a release against the last accepted one
 
 ```bash

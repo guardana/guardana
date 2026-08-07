@@ -181,12 +181,17 @@ fail_under = 90
 show_missing = true
 
 [tool.importlinter]
+# Every `guardana.*` subpackage, not only the five distributions: `guardana.testing`
+# and `guardana.adapters` ship inside guardana-core, and a package left out of this
+# list is a package the contract below cannot see.
 root_packages = [
     "guardana.core",
     "guardana.rules",
     "guardana.cli",
     "guardana.report",
     "guardana.server",
+    "guardana.testing",
+    "guardana.adapters",
 ]
 
 [[tool.importlinter.contracts]]
@@ -194,5 +199,12 @@ root_packages = [
 # everything a user runs offline must work without the optional collector.
 name = "The engine never depends on the collector"
 type = "forbidden"
-source_modules = ["guardana.core", "guardana.rules", "guardana.cli", "guardana.report"]
+source_modules = [
+    "guardana.core",
+    "guardana.rules",
+    "guardana.cli",
+    "guardana.report",
+    "guardana.testing",
+    "guardana.adapters",
+]
 forbidden_modules = ["guardana.server"]
