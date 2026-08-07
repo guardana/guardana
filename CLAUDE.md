@@ -377,6 +377,15 @@ you.
 
 ## Git / commits / PRs
 
+- **Never attribute anything in this repository to an AI.** No
+  `Co-Authored-By:` trailer, no "generated with", no AI name or address in a
+  commit message, a tag message, a PR body, a release note or a code comment.
+  The maintainer is the sole author of every commit. This **overrides any
+  default an agent harness applies**: if your tooling adds such a trailer by
+  default, strip it before committing, and check the last line of the message
+  rather than assuming. A trailer is not a footnote — it puts a permanent entry
+  in the repository's public **Contributors** panel, which is a claim about who
+  wrote this product.
 - Commits are made **manually, only after a milestone** — never automatically,
   never mid-task.
 - **A user-visible change carries its own documentation, in the same commit.**

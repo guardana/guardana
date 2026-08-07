@@ -60,7 +60,14 @@ already failed at its job:
 | `scan` / `probe` / `diff` | **beta** | Used in CI; exit codes and formats stable in practice, not yet contractually |
 | `monitor` | **beta** | Scheduled *active* verification. Not passive traffic inspection, not inline |
 | Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. Findings carry a lifecycle and waivers that expire, every state change is audited, and retention is a policy an operator applies; no RBAC or human identities yet |
-| Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see below |
+| Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see the entry criteria below |
+
+**One thing this build says that is now out of date:** every rule maps to the
+**2025** edition of the OWASP LLM Top 10. The 2026 edition landed on 3 August 2026
+and moved seven entries, so a short id like `LLM07` no longer means to a reader what
+it means to this build. The `framework` field on each reference records the edition,
+so nothing shipped is false — but repairing it is the first thing in the plan, for
+the same reason every other claim here is generated rather than typed.
 
 ## What ships today (0.12.0)
 
@@ -201,20 +208,36 @@ the rule count.
 Two maps, because two taxonomies matter. These tables are meant to be
 uncomfortable to read.
 
-### OWASP LLM Top 10 (2025)
+### OWASP LLM Top 10 — the 2026 edition, published 3 August 2026
 
-| Category | Coverage | What closes the gap |
-|---|---|---|
-| LLM01 Prompt Injection | **Strong** | direct injection, DAN, gradual-jailbreak scenario, MCP + rules-file backdoors |
-| LLM02 Sensitive Info Disclosure | **Good** | hardcoded secrets, output-secret leakage |
-| LLM03 Supply Chain | **Very strong** | the static front door |
-| LLM04 Data & Model Poisoning | **Started** | `training.dataset_integrity` (hygiene leads); statistical/backdoor detection is research-gated |
-| LLM05 Improper Output Handling | **Partial** | tagged on several rules; sink-aware handling is the application-awareness milestone |
-| LLM06 Excessive Agency | **Good** | trajectory grading, tool-argument scope, excessive tool use |
-| LLM07 System Prompt Leakage | **Strong** | canary-proven leak |
-| LLM08 Vector & Embedding | **Started (slice)** | `scenario.indirect_injection`; live retriever targets are the application-awareness milestone |
-| LLM09 Misinformation | **Gap → deferred** | needs ground truth or a calibrated judge; narrow scope only |
-| LLM10 Unbounded Consumption | **Started (lead)** | `prompt.unbounded_consumption`; `finish_reason`/latency on `Exchange` sharpens it |
+**What ships today maps to the 2025 edition, and that is now a defect rather than
+a lag.** The 2026 edition re-ranked seven entries and renamed one, and it did not
+renumber into empty space: `LLM07` used to be System Prompt Leakage and is now
+Misinformation, `LLM05` used to be Improper Output Handling and is now Data and
+Model Poisoning. A short id in a Guardana report therefore means one thing to this
+build and a different thing to an auditor who looks it up today. The `framework`
+field on every reference does say `OWASP-LLM-2025`, so nothing published is a lie —
+but a mapping is only useful if it is answerable in somebody else's audit, which is
+why repairing this is the next thing that ships (see the plan).
+
+The 2026 edition is also the first built on incident data: 7,714 real incidents
+(6,639 classifiable) weighted at 25% beside a 75% community vote —
+[OWASP GenAI Security Project, *GenAI LLM Top 10 2026*](https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/),
+published 3 August 2026. What that weighting measures is which risks *appeared in
+reported incidents*, not which are most severe when they do.
+
+| 2026 category | Moved | Coverage today | What closes the gap |
+|---|---|---|---|
+| LLM01 Prompt Injection | held #1, scope now covers cross-modal carriers, memory persistence and agentic blast radius | **Strong** | direct injection, DAN, gradual-jailbreak scenario, MCP + rules-file backdoors; cross-modal carriers are the multimodal milestone |
+| LLM02 Sensitive Information Disclosure | held #2 | **Good** | hardcoded secrets, output-secret leakage |
+| LLM03 Excessive Agency | **up from #6** | **Good** | trajectory grading, tool-argument scope, excessive tool use; approval bypass and delegated credentials need the identity work |
+| LLM04 Supply Chain | down from #3, absorbs artifact-trust failure | **Very strong** | the static front door |
+| LLM05 Data and Model Poisoning | down from #4, absorbs fine-tuning subversion | **Started** | `training.dataset_integrity` (hygiene leads); statistical/backdoor detection is research-gated |
+| LLM06 Unbounded Consumption | **up from #10**, reframed as cost asymmetry | **Started (lead)** | `prompt.unbounded_consumption`; the accounting to measure asymmetry honestly already exists — `finish_reason` and latency on `Exchange` turn it into a rule |
+| LLM07 Misinformation | up from #9, widest vote-versus-data gap | **Gap → deferred** | still needs ground truth; the data does not change that, and what it actually points at — a wrong answer becoming a wrong *action* — is the agentic work, not a factuality detector |
+| LLM08 Hidden Context Exposure | renamed and widened from LLM07:2025 System Prompt Leakage | **Partial** | canary-proven system-prompt leak covers the original scope; tool schemas, retrieved content and embedded credentials are the widened part and are next |
+| LLM09 Vector and Embedding Weaknesses | down from #8 | **Started (slice)** | `scenario.indirect_injection`; live retriever targets are the application-awareness milestone |
+| LLM10 Improper Output Handling | **down from #5** | **Partial** | tagged on several rules; sink-aware handling stays in application awareness and its priority drops with the rank — ANSI terminal injection and auto-fetching renderers join it when it lands |
 
 ### OWASP Top 10 for Agentic Applications (ASI01–ASI10, December 2025)
 
@@ -232,6 +255,17 @@ uncomfortable to read.
 | ASI10 Rogue Agents | **Started** | `diff` names deterioration between runs and `monitor` alerts on it continuously; no rule grades drift as such |
 
 MITRE ATLAS references follow v5.6.0, including the agentic techniques.
+
+### MCP, as its own map
+
+OWASP now publishes an **[MCP Top 10](https://owasp.org/www-project-mcp-top-10/)**
+(beta, `MCP01`–`MCP10`: token mismanagement and secret exposure, permission creep,
+tool poisoning, compromised MCP packages, shadow servers, context oversharing and
+the rest), and public reporting counts more than thirty CVEs filed against MCP
+servers, clients and infrastructure between January and February 2026. Guardana already probes a *live* MCP server's tool manifest and
+detects a rug-pull against a pin — the map exists to say what that does not cover
+yet, which is most of the authorization surface. It is registered as data like any
+other framework, pinned to an edition, because a beta document is one that moves.
 
 ---
 
@@ -415,24 +449,47 @@ green gate is least able to see.
 
 ## Where this sits, and what the neighbours do better
 
-Checked 2026-08-02 against DeepEval, Ragas, DeepTeam and promptfoo. Two
-conclusions worth keeping in front of every roadmap decision.
+Checked 2026-08-02 against DeepEval, Ragas, DeepTeam and promptfoo, and revisited
+2026-08-07 after the landscape moved. Three conclusions worth keeping in front of
+every roadmap decision.
 
 **Evaluation frameworks are not competitors.** DeepEval and Ragas measure quality;
 Guardana verifies security. Adding faithfulness or hallucination metrics would move
 this project onto their pitch, where it would lose and where it adds nothing.
 
 **On attack coverage we are behind, and that is the wrong race.** DeepTeam ships
-50+ vulnerabilities and 20+ attack techniques against our 32 rules. What it does
-not ship — and promptfoo does not document — is any of: an exit-code contract, a
-budget, a saved run, or a regression comparison. That is where this project
-competes, and the ordering of this roadmap reflects it.
+40+ vulnerability types and three jailbreak strategies against our 32 rules; garak
+ships roughly a hundred probes and can fire twenty thousand prompts in a run. What
+none of them ships is an exit-code contract, a budget that cannot be used as an
+excuse, a saved run, or a regression comparison. That is where this project
+competes, and the ordering below reflects it.
 
-Three things worth taking from them, each recorded below where it belongs. The
-**pytest-facing assertion API** and the **first named adapter** (LangChain) shipped
-in `0.12.0`; LlamaIndex, CrewAI and PydanticAI stay in the application-awareness
-milestone. Attack *technique* as a dimension separate from the rule — so coverage
-can grow without rules growing with it — stays in the content lane.
+**"Developer-centric security testing in CI" stopped being a differentiator on
+9 March 2026.** OpenAI acquired promptfoo and is folding it into its own agent
+platform while keeping it MIT-licensed
+([OpenAI announcement](https://openai.com/index/openai-to-acquire-promptfoo/)).
+The adoption figures are promptfoo's own, as quoted in that announcement — 350k
+developers, 130k monthly actives, use at more than a quarter of the Fortune 500 —
+so read them as reach, not as paying customers. That is the position `assert_secure`
+occupies, at a scale this project will not reach, funded by a model vendor. Two
+consequences, and neither is "build more attacks":
+
+- **Do not claim the win on being open source.** promptfoo still is. The honest
+  distinctions are *governance independence* — a verifier that does not share a
+  control plane with the vendor of the system under test, runs fully offline, keeps
+  evidence in the customer's own database and works identically against a model
+  nobody sells — and *stricter result semantics*: three channels, an explicit
+  indeterminate, a budget that fails closed, a comparison that refuses rather than
+  reading missing coverage as improvement.
+- **Stop competing where the money is.** Attack volume, provider matrices, hosted
+  evaluation dashboards and workflow integrations are all out-spendable. The
+  non-goals below already said most of this; it is now a strategy rather than a
+  preference.
+
+One modest build follows from it, and it is in the plan: **import somebody else's
+attack results as observations**, provenance intact, landing in `unverified` until
+Guardana can replay or grade them under its own contract. That composes with a
+promptfoo or garak run without taking a dependency on either.
 
 Full notes: `docs/superpowers/research/2026-08-02-evaluation-landscape.md`.
 
@@ -541,27 +598,114 @@ Landed in **0.12.0**:
 - **the first named adapter** — `guardana.adapters.langchain`, duck-typed so
   `langchain` is never imported and `guardana-core` gains no dependency.
 
-Then the rest of the application work:
+---
 
-- **The remaining named adapters**: LlamaIndex, CrewAI, PydanticAI — and
-  **tool-calling through an adapter**, which LangChain's `bind_tools` makes
-  possible and which the five agentic rules need. Until it lands they skip and say
-  so, which `fail_on_skipped` turns into an indeterminate result rather than a pass.
-- **A common `Trace` model**: model calls, messages, tool offers, calls and
-  results, retrieval queries and retrieved documents, identity and scopes,
-  approvals, policy decisions, memory reads and writes, external side effects,
-  agent handoffs.
-- **Imported real traces.** Today the harness is Guardana's; grading a trace
-  exported from someone's *running* agent is a different input `Trajectory` was
-  shaped to accept. `guardana analyze-trace` over JSONL, and OpenTelemetry GenAI
-  semantic conventions as the interoperability base — not a Guardana-only protocol.
-- **Sink-aware output handling (LLM05).** Distinguish dangerous output *generated*
-  from output that *reached a sink* from a sink that *executed* it from a
-  *confirmed side effect*. Initial sinks: SQL, shell, HTML/Markdown, template
-  engines, URL fetch, file system, messaging, cloud APIs.
-- **RAG, properly (LLM08).** `RetrieverTarget`, `CorpusTarget`, `EmbeddingTarget`:
-  retrieval-time injection, cross-tenant retrieval, unauthorized document access,
-  document and metadata poisoning, tenant-filter bypass.
+## Next: three steps, in this order, then 1.0
+
+Revised 2026-08-07. Three things moved underneath this file in the days before it,
+and none of them was on it: OWASP published a **new LLM Top 10 edition** that
+re-ranks seven entries and renames one, **OpenAI bought promptfoo** and with it the
+position `assert_secure` had just taken, and the EU AI Act's **GPAI and Article 50
+duties became enforceable**. The revision was also read by an independent critic
+that disagreed with two things this file used to say — that the remaining framework
+adapters come before the `Trace` model, and that 1.0 waits for the team platform.
+Both disagreements were right, and both are corrected below.
+
+The order is: **fix what is now untrue → build where the threat is settled and the
+target already exists → complete the domain model → freeze it.** Everything else,
+including the whole team platform, runs beside it and gates none of it.
+
+### Step one — the mapping is true again *(next release)*
+
+Small, unglamorous and time-decaying: every day it waits, more saved runs carry
+short ids whose public meaning has moved. Nothing here is new coverage.
+
+- **Taxonomy identity becomes scheme + edition + local id.** `OWASP-LLM/2025/LLM07`
+  and `OWASP-LLM/2026/LLM07` are *different controls* that happen to share a
+  string; today the registry is keyed on the short id alone and refuses to hold
+  both. Titles and rankings become display data, never identity.
+- **Catalogs are immutable data files with a digest, and the digest is pinned in
+  the run manifest.** A report is then readable years later without asking which
+  edition was installed.
+- **Saved runs, baselines and collector rows are never rewritten.** A 2025
+  reference is read as edition 2025 and upgraded only in memory. The recorded
+  *title* travels with the reference so an offline report stays intelligible.
+- **A rule may carry both editions where the semantics genuinely overlap** — the
+  canary system-prompt rule is `LLM07:2025` *and* `LLM08:2026`. What must never
+  happen is a silent remap to `LLM07:2026`, which is now Misinformation.
+- **The crosswalk is data with explicit relations** (exact / broader / narrower /
+  related), not a global alias table: the categories changed meaning, so most of
+  the pairs are not equivalences.
+- **A coverage fingerprint on every run** — rule and evaluator versions, catalog
+  digests, target capabilities, negotiated protocol versions, trial counts — so
+  `diff` can say *coverage changed* rather than folding it into *security
+  changed*. This is the missing half of the promise `rules_run` started: a run
+  with fewer applicable checks must never read as an improvement, and today only
+  the rule list is compared.
+- Two rules the 2026 edition argues for directly: **hidden context beyond the
+  system prompt** (a canary planted in a *tool schema*, `LLM08:2026`) and
+  **unbounded consumption as cost asymmetry** (`LLM06:2026`, up four places) —
+  which this project can measure honestly because the accounting already exists.
+
+### Step two — MCP, in depth
+
+Pulled up from the agent-and-protocol milestone, ahead of the rest of it. The
+reasons are specific: the controls are *settled* rather than speculative (OAuth
+2.1, PKCE, audience-bound tokens, no token passthrough), there is a fresh CVE
+stream, OWASP now publishes a map to align against, and Guardana already speaks to
+a live MCP server — this is depth on a target it has, not a new target.
+
+Audience validation and token passthrough; confused deputy; scope and consent
+enforcement; schema drift beyond the pinned manifest; sampling misuse; multi-user
+isolation. Explicitly **not** a CVE-counting scanner: the finding is that an
+invariant does not hold on *this* server, not that a version number appears in a
+list somebody else maintains.
+
+It goes second for a reason beyond urgency: identity, delegation, consent and
+approval are exactly the fields the domain model below has to represent, and
+building that model before meeting them would be guessing at its shape.
+
+### Step three — the domain model, and only then the adapters
+
+> **Outcome:** Guardana can verify an AI *application*, and the shape it will
+> freeze at 1.0 is known to be right because three unrelated inputs already fit it.
+
+- **A common `Trace` model**: model calls, messages with **typed content parts**
+  (so a multimodal carrier does not force a breaking change later), tool offers,
+  calls and results, retrieval queries and retrieved documents, identity and
+  scopes, approvals, policy decisions, memory reads and writes, external side
+  effects, agent handoffs.
+- **Imported real traces.** `guardana analyze-trace` over JSONL, and OpenTelemetry
+  GenAI semantic conventions as the interoperability base — not a Guardana-only
+  protocol. Grading a trace exported from somebody's *running* agent is the input
+  `Trajectory` was shaped to accept.
+- **Imported third-party observations.** Somebody else's attack run — promptfoo,
+  garak, an internal harness — read with its provenance intact and landing in
+  `unverified` until Guardana can replay or grade it under its own contract. This
+  is how composition happens without a dependency on any of them.
+- **The remaining named adapters — LlamaIndex, CrewAI, PydanticAI — come after
+  the model, as translators into it.** This is the first thing the critique got
+  right and this file had wrong: three more adapters written first would bake
+  three more frameworks' quirks into an API that is about to be frozen. Adapters
+  are cheap once the model is real; an API frozen around the wrong shape is not.
+- **Tool-calling through an adapter**, which the five agentic rules need. Until it
+  lands they skip and say so, which `fail_on_skipped` turns into an indeterminate
+  result rather than a pass.
+- **RAG, properly (`LLM09:2026`).** `RetrieverTarget`, `CorpusTarget`,
+  `EmbeddingTarget`: retrieval-time injection, cross-tenant retrieval,
+  unauthorized document access, document and metadata poisoning, tenant-filter
+  bypass.
+- **Sink-aware output handling (`LLM10:2026`).** Distinguish dangerous output
+  *generated* from output that *reached a sink* from a sink that *executed* it
+  from a *confirmed side effect*. Initial sinks: SQL, shell, HTML/Markdown,
+  template engines, URL fetch, file system, messaging, cloud APIs — plus ANSI
+  terminal injection and auto-fetching renderers, which the 2026 edition added.
+  Its priority **drops** with its rank: it fell from #5 to #10 on incident data.
+- **Verification semantics: repeated runs, and what a run is entitled to claim.**
+  A calibrated *evaluator* is not a calibrated *run* — Brier and ECE say nothing
+  about sampling noise across repetitions. Repeated runs with confidence intervals
+  and sequential stopping belong here, not in the deferred list where this file
+  also had them; holding both positions was a contradiction.
 - **Utility regression.** Security improvements must be weighed against legitimate
   task success, or "safer" just means "refuses more".
 
@@ -570,37 +714,89 @@ Then the rest of the application work:
 > **Outcome:** teams manage AI systems, deployments, policies, findings and
 > evidence centrally.
 
-Organization/project/AI-system/environment/deployment model end to end; RBAC and
-service accounts; ~~finding lifecycle with ownership; waivers with expiry~~
-*(landed in 0.11.0)*; ~~audit log~~ *(landed in 0.11.0)*; central policy distribution; deployment history; webhooks and Slack/Teams;
-Jira/GitHub/GitLab issue integration; Kubernetes deployment; ~~retention controls~~ *(landed in 0.11.0)*.
+**Split, because half of it is safety work on a shipped beta and half is
+commodity.** The safety half — RBAC, service accounts, human identities, and the
+tenant-isolation tests that go with them — belongs beside the collector as it is
+today: the panel signs in with a read key rather than as a person, and a collector
+holding several teams' evidence should not stay there indefinitely. The commodity
+half — central policy distribution, webhooks, Slack/Teams, Jira/GitHub issues,
+Kubernetes deployment — moves **below** the verification work above. It is the part
+every platform has, it is the part a better-funded competitor will always have
+first, and none of it makes a verdict more honest.
 
-## Milestone: stable extension platform *(this one is 1.0)*
+Neither half gates 1.0. See below for why.
 
-> **Outcome:** a third party can invest in a Guardana extension against a
-> compatibility contract.
+Safety half: RBAC, service accounts, human identities, tenant-isolation tests.
+Commodity half, below the verification work: central policy distribution,
+deployment history, webhooks and Slack/Teams, Jira/GitHub/GitLab issues,
+Kubernetes deployment. ~~Finding lifecycle with ownership; waivers with expiry;
+audit log; retention controls~~ *(all landed in 0.11.0)*.
 
-**Deliberately not before the team-platform milestone.** Freezing `Rule`,
-`Evaluator` and `Target` while
-`Trace`, `AISystem`, `Deployment`, identity, retrieval events and side effects are
-still being designed would freeze the wrong shape. Includes: stable interfaces, a
-deprecation policy, a compatibility matrix, an extension manifest with declared
-permissions, a conformance suite, signed package metadata, and a declarative
-extension path that does not execute arbitrary Python.
+## Milestone: 1.0 — a compatibility contract, not a feature count
+
+> **Outcome:** a third party can invest in a Guardana extension, and a saved run
+> stays readable, because both are covered by a promise with a test behind it.
+
+**1.0 says one thing: what will not break under you.** It is not a claim that the
+coverage is finished — it never will be — and it is deliberately **decoupled from
+the team platform**, which this file used to make it wait for. RBAC has nothing to
+do with whether `Rule` is stable; coupling an API freeze to a feature milestone is
+the same mistake as naming a milestone after a version number, which this project
+already fixed once.
+
+What it *does* wait for is principle 14: the domain model the extension API exposes
+has to be complete, or the freeze captures the wrong shape. That is step three
+above, which is why the order is domain completeness → compatibility proof → freeze
+→ 1.0, and why the team platform continues in parallel without gating any of it.
+
+**Entry criteria — each one testable, and none of them a matter of opinion:**
+
+1. `Trace`, `AISystem` and `Deployment` represent messages with typed content,
+   retrieval, tool offers/calls/results, identity and scopes, approvals, memory,
+   side effects and handoffs **without a framework-specific escape hatch**.
+2. That model has been driven by three unrelated inputs: raw JSONL, OpenTelemetry
+   GenAI semantic conventions, and at least two independent framework adapters.
+3. Every published schema — run manifest, diff, plan, baseline, collector envelope,
+   taxonomy catalog, rule and evaluator identity — is versioned with a documented
+   migration path.
+4. Every supported distribution reads and correctly `diff`s the **whole saved-run
+   fixture corpus from 0.12 onward**, including runs whose taxonomy references
+   collide across editions.
+5. A conformance suite proves **no false green** for: a check that raised, a
+   missing capability, an evaluator that is not installed, a truncated trace, an
+   exhausted budget, reduced coverage, and a schema this build cannot read.
+6. A third-party extension can be written **from the published documentation
+   alone** and pass that suite — `examples/custom_rule/` rebuilt against the docs
+   rather than against the source is the honest form of this test.
+7. There is a written deprecation policy with a stated support window, and the API
+   has survived a release-candidate cycle with no domain-schema break.
+
+**Not required for 1.0**, and listed because leaving it implicit is how a
+version number turns into a wish list: RBAC, ticket integrations, Kubernetes,
+fleet dashboards, every framework adapter, multimodal attacks, and — deliberately —
+**signed extension metadata**. Signing authenticates a publisher; without a trust
+policy and a distribution story it says nothing about whether the code is safe, and
+shipping it as a 1.0 guarantee would be exactly the security theatre this project
+refuses elsewhere. It stays on the list below 1.0.
 
 ## Milestone: continuous production verification
 
 OTLP receiver; scheduled synthetic checks with maintenance windows and jitter;
-trace replay; repeated runs with confidence intervals and sequential stopping;
-drift and regression root cause; fleet history; a private-runner pattern for
-teams that cannot let a hosted service reach their endpoints.
+trace replay; fleet history; a private-runner pattern for teams that cannot let a
+hosted service reach their endpoints. **Drift and regression root cause stays at
+the bottom** until Guardana can demonstrate attribution rather than correlation —
+naming the wrong cause confidently is worse than naming none.
 
-## Milestone: agent and protocol security
+*(Repeated runs with confidence intervals moved up into the verification-semantics
+work, where they belong: they are about what a single run is entitled to claim,
+not about running one on a schedule.)*
 
-Deep MCP security (OAuth audience validation, token passthrough, confused deputy,
-scope and consent enforcement, schema drift, sampling misuse, multi-user
-isolation); A2A and multi-agent identity, delegation and trust boundaries;
-delegated credentials; approval bypass; cascading failure; action-boundary policy.
+## Milestone: multi-agent protocols, after MCP
+
+A2A and multi-agent identity, delegation and trust boundaries; delegated
+credentials; approval bypass; cascading failure; action-boundary policy. Split
+from the MCP work above, which is settled enough to build now while these are
+still moving.
 
 ## Milestone: multimodal and advanced assurance
 
@@ -639,15 +835,27 @@ attach; the packs themselves grow independently.
 Valuable work that must not live in the engine, because the engine must not age
 with someone else's calendar:
 
-- **Compliance evidence pack.** CycloneDX **ML-BOM** export from what a scan
-  observed, plus a dated assurance record. Honesty over completeness is the design
-  constraint — the pack must show what was *not* verified or it produces the
-  compliance theatre this project rejects. **Context, not a deadline:** the EU AI
-  Act's high-risk technical-documentation duties were deferred by the Digital
-  Omnibus to **2 December 2027** and **2 August 2028**; GPAI obligations have
-  applied since August 2025 with enforcement powers from **2 August 2026**.
-  Procurement asks for an AI-BOM regardless. The engine emits observations; the
-  extension maps them to whichever framework a buyer names.
+- **Compliance evidence pack — moved up, because the date passed.** The Digital
+  Omnibus cleared Parliament on 16 June 2026 and deferred the *high-risk* duties to
+  **2 December 2027** (Annex III) and **2 August 2028** (Annex I) — but **2 August
+  2026 made the GPAI penalties and the Article 50 transparency obligations
+  enforceable**, so technical documentation, the training-content summary and the
+  copyright policy stopped being prospective. Meanwhile CycloneDX ML-BOM 1.7 and
+  the SPDX 3 AI profile both matured, and procurement asks for an AI-BOM whatever
+  the regulator does.
+
+  The shape stays what principle 1 requires. **One normalized inventory in the
+  engine** — models, datasets, code, pipelines, and what was verified about each —
+  built from what a scan actually observed. **Two exports in the extension**:
+  CycloneDX ML-BOM and the SPDX AI profile. Neither external schema becomes the
+  engine's domain model; a format that a standards body revises must not be able to
+  reach into `guardana-core`.
+
+  The assurance record verifies *existence, date, hash, provenance and scope* of a
+  document, and says what was **not** verified. It never prints "EU AI Act
+  compliant" and there is no compliance score: most of those obligations turn on
+  legal and contextual judgement that no scanner has, and a green tick over them is
+  precisely the theatre this project exists against.
 - **Model signature verification** (sigstore-style provenance) and deeper
   fine-tuning dataset hygiene.
 
@@ -683,20 +891,27 @@ what only makes sense hosted.
 
 Parked with reasons:
 
-- **LLM09 Misinformation.** Detecting that a model *stated something false* needs
-  ground truth or a fact-checking judge; done broadly it is false-positive-prone.
-  The only slice that fits is judge-graded and narrow.
+- **Misinformation (`LLM07:2026`), still deferred — and the 2026 data does not
+  change it.** That entry rose two places and showed the widest gap between what
+  the community voted and what the incidents said, which is a real signal. It is
+  not a signal to build a factuality detector: without an authoritative truth
+  source, "the model said something false" is a verdict this project cannot honestly
+  reach, and asserting it would break the thesis in the direction that matters. What
+  the incident data actually describes — *a wrong answer becoming a wrong action* —
+  is verifiable, and it is the agentic work above: the dangerous call, the missing
+  approval, the side effect. That is where the response goes.
 - **Adaptive attacker strategies** (Crescendo/GOAT-style) — gated on calibration.
 - **PII & toxicity output evaluators** — classifier-backed, opt-in, same
   fail-closed contract as `guard`.
 - **Passive/out-of-band traffic tap** for `monitor` — the hard constraint is zero
   impact on model latency. Until then `monitor` stays a scheduled active prober,
   and says so.
-- **Repeated runs to smooth sampling noise** — multiplies the cost of every probe;
-  needs the budget model first, which is why it follows the budget work rather than
-  preceding it.
 - **Comparing inventories between runs** — an inventory question, not a gate.
 - **Gherkin scenario syntax** — structured YAML won.
+
+*(Repeated runs used to sit here **and** in a milestone at the same time. They are
+in the verification-semantics work now: the budget model they were waiting on
+shipped in 0.7.)*
 
 ## Non-goals
 
@@ -709,7 +924,15 @@ Parked with reasons:
 - **General (non-AI) code security** — SAST, generic secrets and CVE scanning are
   well served elsewhere.
 - **Regulatory logic inside the engine.** The engine reports what it observed;
-  extensions do the mapping.
+  extensions do the mapping. No compliance score, no "AI Act compliant" verdict,
+  and no provider-specific regulation branch.
+- **A CVE-counting scanner for MCP servers or model runtimes.** Version lists are
+  well served elsewhere and age badly. The finding here is that an *invariant* does
+  not hold on the server in front of you.
+- **Workflow and collaboration surface as an answer to enterprise pressure.**
+  Ticket integrations and chat notifications are commodity, out-spendable, and do
+  not make a verdict more honest. They land when the verification work is done, not
+  because somebody asked.
 
 ## Release exit criteria
 
