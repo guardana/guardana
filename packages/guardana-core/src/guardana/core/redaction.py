@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from guardana.core.fingerprint import digest_of
 
 if TYPE_CHECKING:  # everything downstream builds on this module; the arrow runs one way
+    from guardana.core.report.check_error import CheckError
     from guardana.core.report.finding import Finding
     from guardana.core.report.result import ScanResult
 
@@ -44,6 +45,8 @@ locally, and a 64 MiB model reply in a report helps nobody."""
 
 _REDACTED = "[redacted:{label}]"
 _TRUNCATED = "… [truncated: evidence exceeded {limit} bytes]"
+_WITHHELD_EVIDENCE = "[evidence withheld: metadata_only]"
+_WITHHELD_REASON = "[reason withheld: metadata_only]"
 
 # Ordered most specific first: a key that also matches a generic high-entropy
 # pattern should be labelled as the key it is.
@@ -184,16 +187,44 @@ class EvidenceRedactor:
         detail = self.redact_text(evidence.detail)
         if summary == evidence.summary and detail == evidence.detail:
             return finding
-        note = "" if summary else "[evidence withheld: metadata_only]"
-        return replace(finding, evidence=Evidence(summary=summary or note, detail=detail))
+        return replace(
+            finding, evidence=Evidence(summary=summary or _WITHHELD_EVIDENCE, detail=detail)
+        )
+
+    def redact_error(self, error: "CheckError") -> "CheckError":
+        """Return this recorded failure with its reason brought within the policy.
+
+        The reason is an exception message, and an exception message is written by
+        whoever raised it — a third-party rule, a provider, a parser handed the
+        model's own reply. `post_json` puts 120 bytes of an unparseable response in
+        it; a rule may put anything at all. That is the same untrusted, target-shaped
+        text `Evidence` carries, so it goes through the same policy: bounding its
+        *length* (which this already did) is not the half that keeps a credential
+        out of a report.
+
+        Never emptied. Under `metadata_only` the reason is replaced by a note, because
+        an error with a blank reason reads as a check that failed for no reason rather
+        than one whose reason this run declined to keep.
+        """
+        reason = self.redact_text(error.reason)
+        if reason == error.reason:
+            return error
+        return replace(error, reason=reason or _WITHHELD_REASON)
 
     def redact_result(self, result: "ScanResult") -> "ScanResult":
-        """Apply the policy to every finding channel of a result."""
+        """Apply the policy to every channel of a result — errors included.
+
+        All four, because "nothing to report" has more than one meaning and the
+        redactor's promise is about the seam, not about the channel: a run that kept
+        a secret out of its findings and posted it to a collector inside
+        `errors[].reason` has leaked it exactly as far.
+        """
         return replace(
             result,
             findings=tuple(self.redact(f) for f in result.findings),
             unverified=tuple(self.redact(f) for f in result.unverified),
             waived=tuple(self.redact(f) for f in result.waived),
+            errors=tuple(self.redact_error(e) for e in result.errors),
         )
 
     def _apply(self, text: str, patterns: tuple[tuple[str, re.Pattern[str]], ...]) -> str:

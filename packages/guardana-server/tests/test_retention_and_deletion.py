@@ -169,6 +169,26 @@ def test_deleting_a_project_leaves_a_record_that_survives_it(
     assert [(event.action, event.subject) for event in events] == [("project.delete", _PROJECT)]
 
 
+def test_deleting_an_organization_leaves_the_record_that_says_so(
+    connection: DbConnection, project: int
+) -> None:
+    """Filed under no tenant, because audit events cascade from an organization too.
+
+    An `org.delete` recorded *against* that organization is deleted by the deletion
+    it describes, and then nothing anywhere says the tenant ever existed. Everything
+    else about the tenant goes — including the `project.delete` rows filed under it,
+    which is the honest outcome of removing a tenant — and this one row remains as
+    the trace of the whole thing.
+    """
+    delete_project(connection, _PROJECT, actor=_ACTOR)
+    delete_organization(connection, "acme", actor=_ACTOR)
+    connection.commit()
+
+    events = recent(connection)
+
+    assert [(event.action, event.subject) for event in events] == [("org.delete", "acme")]
+
+
 def test_deleting_an_organization_refuses_while_it_holds_projects(
     connection: DbConnection, project: int
 ) -> None:

@@ -12,6 +12,7 @@ import datetime
 import pytest
 from conftest import DbConnection, _submission
 from guardana.server.audit import CLI, KEY, actor_from_environment, recent, record
+from guardana.server.auth import Scope, generate_key, revoke_key, store_key
 from guardana.server.cli.main import build_parser
 from guardana.server.cli.main import main as collector
 from guardana.server.db.migrations import apply_pending
@@ -110,6 +111,40 @@ def test_the_log_is_scoped_to_a_project_when_it_has_one(
 
     assert [e.action for e in recent(connection, project="acme/web")] == ["finding.status"]
     assert recent(connection, project="acme/other") == ()
+
+
+def test_revoking_a_key_is_recorded_under_the_project_it_reached(
+    connection: DbConnection, project: int
+) -> None:
+    """Creation was filed under a tenant and revocation under nothing.
+
+    So the project-scoped log showed every credential a team was *given* and none
+    that were *taken away* — and the withdrawal is the half somebody investigating
+    came for. Asserted through the project-filtered read, because that is the query
+    an operator actually runs; an event filed under no tenant simply does not appear
+    in it.
+    """
+    issued, secret_hash = generate_key("prod-ci", (Scope.INGEST,))
+    store_key(
+        connection,
+        issued,
+        secret_hash,
+        scope=TenantScope.for_project(project),
+        created_by=CLI("konrad@ops-1"),
+    )
+
+    assert revoke_key(connection, issued.prefix, actor=CLI("konrad@ops-1")) is True
+
+    assert [e.action for e in recent(connection, project=_PROJECT)] == ["key.revoke", "key.create"]
+
+
+def test_revoking_a_key_that_is_not_there_records_nothing(
+    connection: DbConnection, project: int
+) -> None:
+    """A log that records attempts as if they were changes is a log that overstates itself."""
+    assert revoke_key(connection, "not-a-prefix", actor=CLI("konrad@ops-1")) is False
+
+    assert recent(connection) == ()
 
 
 def test_a_submission_records_which_key_wrote_it(

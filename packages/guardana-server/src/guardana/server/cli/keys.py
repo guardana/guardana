@@ -11,7 +11,6 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from guardana.server.audit import actor_from_environment, add_actor_argument
-from guardana.server.audit import record as record_event
 from guardana.server.auth import Scope, generate_key, list_keys, revoke_key, store_key
 from guardana.server.cli.codes import EXIT_INVALID_USAGE, EXIT_OK
 from guardana.server.tenancy import TenantScope, check_slug, resolve_project
@@ -88,17 +87,11 @@ def _list(arguments: argparse.Namespace, connection: "Connection[tuple[object, .
 
 
 def _revoke(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
-    if revoke_key(connection, arguments.prefix):
-        # Recorded before the message, in the same transaction as the revocation:
-        # a credential withdrawn and not written down is the one somebody asks
-        # about later.
-        record_event(
-            connection,
-            actor=actor_from_environment(arguments.actor),
-            action="key.revoke",
-            subject=arguments.prefix,
-        )
-        connection.commit()
+    # The audit row is written by `revoke_key`, under the project the key reached
+    # and in the same transaction — for the same reason `store_key` writes its own.
+    # A caller that has to remember to file the event is a caller that eventually
+    # does not.
+    if revoke_key(connection, arguments.prefix, actor=actor_from_environment(arguments.actor)):
         print(f"revoked {arguments.prefix}")
         return EXIT_OK
     print(f"error: no active key with prefix {arguments.prefix}", file=sys.stderr)

@@ -11,8 +11,8 @@ ever been in this repository and this is not where that starts.
 """
 
 import pytest
-from guardana.core.redaction import EvidenceRedactor, RedactionPolicy
-from guardana.core.report import Evidence, Finding, ScanResult, serialize_baseline
+from guardana.core.redaction import EvidenceMode, EvidenceRedactor, RedactionPolicy
+from guardana.core.report import CheckError, Evidence, Finding, ScanResult, serialize_baseline
 from guardana.core.reporter import HttpReporter
 from guardana.core.severity import Severity
 from guardana.core.testing import fake_aws_key, fake_jwt, fake_llm_key, fake_secrets, manifest_for
@@ -41,6 +41,22 @@ def _leaky_finding() -> Finding:
     )
 
 
+def _leaky_error() -> CheckError:
+    """What a check that could not run can hand the engine.
+
+    Not hypothetical: `post_json` puts 120 bytes of an unparseable response into the
+    message, and a gateway that refuses a request routinely quotes the credential it
+    refused. The reason was bounded in *length* from the start and never passed
+    through the policy, so the one channel that carries somebody else's exception
+    text was the one channel nothing cleaned.
+    """
+    return CheckError(
+        source="acme.leaky.rule",
+        stage="run",
+        reason=f"EndpointError: non-JSON response from http://x#m: 'key {_FAKE_OPENAI} rejected'",
+    )
+
+
 def _leaky_result() -> ScanResult:
     finding = _leaky_finding()
     return ScanResult(
@@ -49,6 +65,7 @@ def _leaky_result() -> ScanResult:
         rules_skipped=(),
         unverified=(finding,),
         waived=(finding,),
+        errors=(_leaky_error(),),
     )
 
 
@@ -88,6 +105,34 @@ def test_the_collector_envelope_cannot_carry_a_credential() -> None:
     reporter.submit(_leaky_result(), source="test")
 
     assert not _contains_any_secret(sent[0].decode("utf-8"))
+
+
+def test_a_check_that_could_not_run_cannot_carry_a_credential_either() -> None:
+    """Three channels leave this process, and the policy has to cover all three.
+
+    A run that kept a secret out of its findings and posted it to a collector inside
+    `errors[].reason` has leaked it exactly as far. The reason is written by whoever
+    raised the exception — a third-party rule, a provider, a parser handed the
+    model's own reply — which is the same untrusted, target-shaped text `Evidence`
+    carries.
+    """
+    cleaned = EvidenceRedactor().redact_error(_leaky_error())
+
+    assert not _contains_any_secret(cleaned.reason)
+    assert "[redacted:" in cleaned.reason
+    # Redaction is not suppression here either: which check broke, and where, is the
+    # part somebody acts on.
+    assert cleaned.source == "acme.leaky.rule"
+    assert "non-JSON response" in cleaned.reason
+
+
+def test_a_withheld_reason_says_it_was_withheld() -> None:
+    """An error with a blank reason reads as a check that failed for no reason."""
+    redactor = EvidenceRedactor(RedactionPolicy(mode=EvidenceMode.METADATA_ONLY))
+
+    cleaned = redactor.redact_error(_leaky_error())
+
+    assert cleaned.reason == "[reason withheld: metadata_only]"
 
 
 def test_a_baseline_cannot_carry_a_credential() -> None:

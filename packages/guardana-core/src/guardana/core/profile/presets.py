@@ -5,25 +5,40 @@ layer actually runs is already decided by the command — `scan` runs the
 build-time (static) rules, `probe`/`monitor` the runtime (dynamic) ones — so a
 preset does not need to filter by surface, only to say how strict the gate is for
 that moment.
+
+Which is why every one of them carries the same privacy policy `default_profile()`
+does. A `Profile` built in code defaults to `full` evidence — the right default for
+a library caller who already owns the objects it is handed, and the wrong one for a
+preset, because a preset is what a *command* is given. Left unset, `--preset ci`
+was the most CI-shaped way to run this tool and also the only one that stopped
+redacting; the failure bar was tuned and the privacy policy moved with it.
 """
 
 from guardana.core.profile.errors import ProfileError
 from guardana.core.profile.model import FailOn, Policy, Profile
+from guardana.core.redaction import EvidenceMode, RedactionPolicy
 from guardana.core.severity import Severity
+
+_PRIVACY = RedactionPolicy(mode=EvidenceMode.REDACTED)
 
 _PRESETS: dict[str, Profile] = {
     # CI / local dev gate: fail on HIGH, the standard bar.
-    "ci": Profile(name="ci", policy=Policy(fail_on=FailOn(severity=Severity.HIGH))),
+    "ci": Profile(
+        name="ci", policy=Policy(fail_on=FailOn(severity=Severity.HIGH)), privacy=_PRIVACY
+    ),
     # The training server, before a run consumes data/weights: stricter, so
     # MEDIUM leads (unpinned datasets, provenance gaps) block too.
     "pre-training": Profile(
-        name="pre-training", policy=Policy(fail_on=FailOn(severity=Severity.MEDIUM))
+        name="pre-training",
+        policy=Policy(fail_on=FailOn(severity=Severity.MEDIUM)),
+        privacy=_PRIVACY,
     ),
     # A live monitor must not tolerate its own checks going dark: an inconclusive
     # verdict fails the gate alongside a HIGH finding.
     "monitor": Profile(
         name="monitor",
         policy=Policy(fail_on=FailOn(severity=Severity.HIGH, fail_on_inconclusive=True)),
+        privacy=_PRIVACY,
     ),
 }
 

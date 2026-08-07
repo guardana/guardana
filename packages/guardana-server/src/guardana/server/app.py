@@ -259,29 +259,6 @@ def _migration_state(database_url: str) -> MigrationState:
         return read_state(connection)
 
 
-def _refuse_a_dashboard_that_cannot_load(database_url: str | None) -> None:
-    """Refuse to mount a dashboard whose data endpoints it cannot reach.
-
-    The page is a thin client: it fetches `/stats` and `/findings` from the
-    browser, and a browser has nowhere to put a bearer token. On an authenticated
-    collector every one of those fetches gets `401`, so the dashboard renders an
-    empty page and looks like a broken feature rather than an absent one.
-
-    Refused rather than mounted-and-empty, for the same reason a check that could
-    not run is never reported as a check that passed: a capability that cannot
-    work must not look present. Browser sessions are the minimal-UI item; until
-    then the dashboard is a local-evaluation feature and says so.
-    """
-    if database_url is None:
-        return
-    raise UnauthenticatedCollectorError(
-        "the dashboard cannot be mounted on a collector that requires API keys: it is a "
-        "browser page and a browser cannot present a bearer token, so every panel would "
-        "load empty. Run it against GUARDANA_STORAGE=memory for local evaluation, or read "
-        "the collector through /findings and /trend with a read-scoped key"
-    )
-
-
 def _mount_dashboard(app: FastAPI, store: Store, refresh_seconds: int, reading: object) -> None:
     """Add the read-only dashboard page and its aggregated `/stats` data endpoint.
 

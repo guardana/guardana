@@ -245,6 +245,34 @@ def test_ingest_records_the_sighting(connection: DbConnection, database_url: str
     assert entries[0].status == "open"
 
 
+def test_a_sighting_is_dated_by_the_same_clock_as_the_run_that_saw_it(
+    connection: DbConnection, database_url: str
+) -> None:
+    """One write, one clock.
+
+    `received_at` came from the store's injectable clock and the sighting from a
+    second reading of the wall, so a finding's `first_seen` could disagree with the
+    run that first saw it — and migration 0006 built those dates from `received_at`,
+    which would make backfilled rows and new rows mean different things.
+    """
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    created = create_project(connection, "acme", "web", "Web")
+    connection.commit()
+    submission = _submission()
+    for finding in submission.findings:
+        finding.identity = _IDENTITY
+
+    # 2023-11-14, and deliberately not today: a wall-clock read is indistinguishable
+    # from an injected one on the day the test runs.
+    PostgresStore(database_url, clock=lambda: 1_699_920_000.0).add(
+        TenantScope.for_project(created.id), submission
+    )
+
+    entry = list_tracked(connection, _PROJECT, today=_TODAY)[0]
+    assert (entry.first_seen, entry.last_seen) == ("2023-11-14", "2023-11-14")
+
+
 def test_a_finding_that_cannot_be_linked_is_not_tracked(
     connection: DbConnection, database_url: str
 ) -> None:

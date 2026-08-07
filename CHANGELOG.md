@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Evidence redaction covered two channels out of three: `errors` went out
+  untouched.** A `CheckError.reason` is an exception message, and an exception
+  message is written by whoever raised it — a third-party rule, a provider, a
+  parser handed the model's own reply. `post_json` puts 120 bytes of an
+  unparseable response into one, and a gateway refusing a request routinely quotes
+  the credential it refused. That text reached the JSON report, the SARIF file and
+  the collector envelope through the one seam that exists to stop it, on the very
+  path whose comment says it "must not depend on whoever wired the reporter up".
+  Its *length* had been bounded from the start, which is the half that does not
+  keep a secret out of a report. `redact_result` now redacts all four channels, and
+  the renderer-seam test carries an error whose reason contains a fake credential,
+  so every renderer is held to it.
+- **`--preset ci` silently turned redaction off.** A preset "tunes only the
+  failure bar" by its own docstring, and inherited `Profile`'s library default of
+  `full` evidence — so the most CI-shaped way to run this tool was also the only
+  one that stopped redacting what the target said. Secrets were still removed at
+  every mode; email addresses were not. Every preset now carries the same privacy
+  policy `default_profile()` does.
+- **`key revoke` was recorded in the audit log under no tenant.** `key.create` was
+  filed against a project and `key.revoke` against nothing, so `audit list
+  --project acme/web` showed every credential a team was given and none that were
+  taken away — the half somebody investigating actually came for. `revoke_key` now
+  writes its own audit row, in the same transaction and under the project the key
+  reached, exactly as `store_key` does.
+- **A tracked finding's dates came from a second clock.** `received_at` came from
+  the store's injectable clock and the sighting from a wall-clock read, so a
+  finding's `first_seen` could disagree with the run that first saw it — and
+  migration `0006` built those dates from `received_at`, which would make
+  backfilled rows and new rows mean different things.
+- **Dead code in the collector, with a docstring contradicting what ships.**
+  `_refuse_a_dashboard_that_cannot_load` explained at length why the panel is
+  refused on an authenticated collector, which 0.11 deliberately stopped doing when
+  the panel gained sessions. Removed.
+- **A comment in `delete_organization` described a cascade that does not happen.**
+  The `org.delete` event is filed under no tenant on purpose, so it outlives the
+  organization it describes; the comment claimed the opposite, and a comment that
+  misdescribes its own code is the same defect as documentation that does.
+
 ### Documentation
 
 - **The maintainer runbook now says to make the container packages public.** A

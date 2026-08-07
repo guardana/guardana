@@ -37,6 +37,21 @@ reachable outcome was writing a working credential into a report, while this pag
 said the opposite. The key is still accepted so that a profile stating the default
 keeps working, and so that anyone who set it gets told rather than ignored.
 
+## Every channel, not just the findings
+
+A result has four channels, and the policy covers all of them: `findings`,
+`unverified`, `waived` — and **`errors`**, where a check that could not run records
+why. That last one carries an exception message, and an exception message is
+written by whoever raised it: a third-party rule, a provider, a parser handed the
+model's own reply. An unparseable response puts 120 bytes of it in there, and a
+gateway refusing a request routinely quotes the credential it refused.
+
+Until 0.12.0 the reason was bounded in *length* and never passed through the
+policy, so it reached the JSON report, the SARIF file and the collector envelope
+untouched. Under `metadata_only` the reason is replaced by a note rather than
+emptied, because an error with a blank reason reads as a check that failed for no
+reason instead of one whose reason this run declined to keep.
+
 ## Redaction is never silent
 
 A finding whose evidence was changed says so, in the text a reader sees:

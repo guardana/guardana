@@ -320,19 +320,41 @@ def list_keys(
 
 
 def revoke_key(
-    connection: "Connection[tuple[object, ...]]", prefix: str, *, now: datetime | None = None
+    connection: "Connection[tuple[object, ...]]",
+    prefix: str,
+    *,
+    now: datetime | None = None,
+    actor: Actor | None = None,
 ) -> bool:
-    """Revoke one key by its prefix. Returns whether it existed and was not already revoked."""
+    """Revoke one key by its prefix. Returns whether it existed and was not already revoked.
+
+    Writes its own audit row, exactly as `store_key` does, and **under the project
+    the key reached**. Recording a creation against a tenant and a revocation against
+    nothing left `audit list --project acme/web` showing every credential that team
+    was given and none that were taken away — which is the half somebody
+    investigating actually came for. The project is read back from the row being
+    revoked, so it cannot disagree with the key it describes.
+    """
     moment = now if now is not None else datetime.now(UTC)
     with connection.cursor() as cursor:
         cursor.execute(
-            "update api_keys set revoked_at = %s where prefix = %s and revoked_at is null",
+            "update api_keys set revoked_at = %s where prefix = %s and revoked_at is null "
+            "returning project_id",
             (moment, prefix),
         )
-        changed = cursor.rowcount > 0
+        row = cursor.fetchone()
+    if row is not None and actor is not None:
+        record(
+            connection,
+            actor=actor,
+            action="key.revoke",
+            subject=prefix,
+            project_id=int(str(row[0])),
+        )
     # Committed rather than left to the connection's exit, for the same reason the
     # migration runner commits per step: `connection.transaction()` inside an open
     # transaction is a savepoint, and a revocation nobody committed is a key that
-    # still works.
+    # still works. The audit row goes with it: a credential withdrawn and not
+    # written down is the one somebody asks about later.
     connection.commit()
-    return changed
+    return row is not None

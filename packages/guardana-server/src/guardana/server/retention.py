@@ -185,10 +185,11 @@ def delete_organization(
                 f"cascading two levels of tenancy from one command is not something "
                 f"this tool will do for you"
             )
-        # Recorded before the delete: `audit_events` cascades from the organization,
-        # so this row is about to go with it. It is written anyway, because the
-        # transaction may yet fail and a log that only records successes is a log
-        # that hides the interesting half.
+        # Filed under no tenant, deliberately: `audit_events.organization_id`
+        # cascades, so an event about a deleted organization recorded *against* that
+        # organization would be deleted by the deletion it describes — which is the
+        # one row anybody would come looking for. The slug is in `subject`, where
+        # nothing can cascade it away.
         record(connection, actor=actor, action="org.delete", subject=slug)
         cursor.execute("delete from organizations where id = %s", (organization_id,))
 

@@ -230,12 +230,26 @@ class PostgresStore:
             # In the same transaction as the occurrences, because a sighting that
             # was stored while its lifecycle entry was not would leave a finding
             # nobody can triage — and one whose `resolved` never reopened.
-            self._track(connection, project, submission.findings)
+            #
+            # From the same clock as `received_at` above, not from a second reading
+            # of the wall: a finding whose `first_seen` disagrees with the run that
+            # first saw it is a triage list that cannot be lined up against the
+            # history — and migration 0006 built those dates from `received_at`, so
+            # a second source of time here makes old rows and new rows mean
+            # different things.
+            self._track(connection, project, submission.findings, self._seen_at())
         return True
+
+    def _seen_at(self) -> datetime:
+        """When this submission arrived, as a moment rather than an epoch."""
+        return datetime.fromtimestamp(self._clock(), tz=UTC)
 
     @staticmethod
     def _track(
-        connection: "Connection[tuple[Any, ...]]", project: int, findings: list[FindingIn]
+        connection: "Connection[tuple[Any, ...]]",
+        project: int,
+        findings: list[FindingIn],
+        seen_at: datetime,
     ) -> None:
         """Open or reopen the tracked finding behind each occurrence that carries an identity.
 
@@ -243,7 +257,6 @@ class PostgresStore:
         not grade, and giving it a lifecycle would let somebody resolve a question
         that was never answered.
         """
-        seen_at = datetime.now(tz=UTC)
         for finding in findings:
             if finding.identity:
                 record_sighting(connection, project, finding.identity, seen_at)
