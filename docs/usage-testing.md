@@ -186,10 +186,13 @@ Three things to know:
 ## Choosing what is loaded
 
 ```python
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 
-def test_with_no_third_party_rules():
-    assert_secure("models", preset="ci", registry=Registry.discover(PluginTrust(...)))
+
+def test_with_only_guardanas_own_rules():
+    trusted = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
+    assert_secure("models", preset="ci", registry=trusted)
 ```
 
 Left out, `assert_secure` discovers entry-point rules and loads the rule
