@@ -2,7 +2,7 @@ id: guardana.agent.memory_poisoning
 title: Poisoned memory steers the agent in a later session
 severity: critical
 target_kind: endpoint
-taxonomy: [LLM01, ASI06, AML.T0080, AML.T0080.000]
+taxonomy: [LLM01:2025, LLM01:2026, ASI06:2026, AML.T0080, AML.T0080.000]
 evaluator: tool_call
 requires: [chat, call_tools]
 task: >

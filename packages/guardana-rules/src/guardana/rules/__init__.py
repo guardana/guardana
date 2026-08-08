@@ -3,6 +3,7 @@
 import importlib.resources
 
 from guardana.core.evaluator import (
+    AmplificationEvaluator,
     CanaryEvaluator,
     Evaluator,
     KeywordEvaluator,
@@ -84,4 +85,10 @@ def provide_evaluators() -> list[Evaluator]:
     `evaluator: llm_judge` resolves to nothing and is skipped visibly — never a
     silent pass.
     """
-    return [KeywordEvaluator(), CanaryEvaluator(), LengthEvaluator(), ToolCallEvaluator()]
+    return [
+        AmplificationEvaluator(),
+        CanaryEvaluator(),
+        KeywordEvaluator(),
+        LengthEvaluator(),
+        ToolCallEvaluator(),
+    ]

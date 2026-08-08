@@ -9,7 +9,10 @@ id: {id}
 title: "TODO: one-line description of what this checks"
 severity: high
 target_kind: endpoint
-taxonomy: [LLM01]
+# A reference names its edition where the framework publishes them: a bare `LLM01`
+# means one control in the 2025 edition and another in the 2026 one, so it is a
+# load-time error rather than a guess. `guardana taxonomy` lists what is installed.
+taxonomy: [LLM01:2025, LLM01:2026]
 evaluator: {evaluator}
 requires: [{requires}]
 prompts:

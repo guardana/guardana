@@ -1,0 +1,646 @@
+{
+  "schema_version": 2,
+  "$schema": "https://guardana.dev/schemas/run/v2.schema.json",
+  "run": {
+    "run_id": "120abe0e-3c87-4b89-9df5-40b9a5c54ae8",
+    "created_at": "2026-08-08T12:49:31.894357Z",
+    "started_at": "2026-08-08T12:49:31.858474Z",
+    "completed_at": "2026-08-08T12:49:31.894357Z",
+    "migrated_from": null,
+    "source": {
+      "kind": "local",
+      "provider": "local",
+      "run_url": null
+    },
+    "guardana": {
+      "version": "0.12.0",
+      "commit": null,
+      "distribution_versions": {}
+    },
+    "target": {
+      "type": "artifact",
+      "ref": "examples/vulnerable-model",
+      "fingerprint": "sha256:db9f5053041d55d0c87e349f00294f02936ce39f320b5fdb052181941144c7e8",
+      "fingerprint_inputs": [
+        "kind",
+        "ref"
+      ],
+      "capabilities": [
+        "read_files"
+      ]
+    },
+    "deployment": {
+      "ai_system": null,
+      "environment": null,
+      "deployment_id": null,
+      "commit_sha": null,
+      "image_digest": null,
+      "model_digest": null,
+      "model_name": null,
+      "model_revision": null
+    },
+    "configuration": {
+      "profile_name": "default",
+      "profile_digest": null,
+      "system_prompt_digest": null,
+      "tool_manifest_digest": null,
+      "retriever_digest": null,
+      "dataset_digest": null,
+      "adapter_digest": null
+    },
+    "execution": {
+      "concurrency": 1,
+      "timeout_seconds": 30,
+      "seed": null,
+      "temperature": null,
+      "max_requests": null,
+      "max_input_tokens": null,
+      "max_output_tokens": null,
+      "max_duration_seconds": null
+    },
+    "usage": {
+      "requests": 0,
+      "input_tokens": null,
+      "output_tokens": null,
+      "requests_missing_token_counts": 0,
+      "estimated_cost": null,
+      "wall_time_seconds": 0.035883
+    },
+    "rules": [
+      {
+        "id": "guardana.supply_chain.pickle_opcode",
+        "digest": "4cce7cc8b5045bde",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.dependency_risk",
+        "digest": "dee1724bc40dd6af",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.remote_code",
+        "digest": "cebd31381682c870",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.remote_code_config",
+        "digest": "234243eb9fca874b",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.code_execution",
+        "digest": "92f6cd71725e0dcd",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.insecure_transport",
+        "digest": "edac142b3a102d04",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.keras_lambda",
+        "digest": "001e1af9a9ac77df",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.saved_model_ops",
+        "digest": "bf42202f1e37397c",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.malicious_dependency",
+        "digest": "fde62633dcca8af4",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.hallucinated_package",
+        "digest": "8ffdd7e005f67861",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.hardcoded_secret",
+        "digest": "2bf864470fd6e142",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.model_format",
+        "digest": "ace6cbcc5855f5da",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.chat_template",
+        "digest": "cd3152568201d8c5",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.onnx_graph",
+        "digest": "b474288bbb1a0292",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.notebook_payload",
+        "digest": "8cfde6a512b21350",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.provenance",
+        "digest": "be61cb0adb97efe8",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.prompt.mcp_tool_poisoning",
+        "digest": "6c8162e0b6c6e071",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.prompt.hidden_instructions",
+        "digest": "df94948061ac7fd7",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.training.dataset_integrity",
+        "digest": "34a8a95209d981d8",
+        "version": null,
+        "maturity": null
+      }
+    ],
+    "evaluators": [],
+    "result_summary": {
+      "findings": 12,
+      "unverified": 0,
+      "waived": 0,
+      "errors": 0,
+      "observations": 5,
+      "rules_run": [
+        "guardana.supply_chain.pickle_opcode",
+        "guardana.supply_chain.dependency_risk",
+        "guardana.supply_chain.remote_code",
+        "guardana.supply_chain.remote_code_config",
+        "guardana.supply_chain.code_execution",
+        "guardana.supply_chain.insecure_transport",
+        "guardana.supply_chain.keras_lambda",
+        "guardana.supply_chain.saved_model_ops",
+        "guardana.supply_chain.malicious_dependency",
+        "guardana.supply_chain.hallucinated_package",
+        "guardana.supply_chain.hardcoded_secret",
+        "guardana.supply_chain.model_format",
+        "guardana.supply_chain.chat_template",
+        "guardana.supply_chain.onnx_graph",
+        "guardana.supply_chain.notebook_payload",
+        "guardana.supply_chain.provenance",
+        "guardana.prompt.mcp_tool_poisoning",
+        "guardana.prompt.hidden_instructions",
+        "guardana.training.dataset_integrity"
+      ],
+      "rules_skipped": [],
+      "max_severity": "CRITICAL",
+      "gate": "fail",
+      "stopped_by": null
+    },
+    "privacy": {
+      "evidence_mode": "redacted",
+      "redaction_policy_digest": "sha256:abbe3d5542a6556472c6a72d16d05bfd8f64831d829070925cd2ef55e3fd89c8"
+    }
+  },
+  "findings": [
+    {
+      "rule_id": "guardana.supply_chain.pickle_opcode",
+      "severity": "CRITICAL",
+      "title": "Dangerous pickle opcode (arbitrary code on load)",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/model.pt",
+      "evidence": {
+        "summary": "unpickling imports non-allowlisted callable: posix.system",
+        "detail": "file=model.pt"
+      },
+      "verdict": null
+    },
+    {
+      "rule_id": "guardana.supply_chain.dependency_risk",
+      "severity": "HIGH",
+      "title": "Unsafe model/deserialization loader call",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/load_model.py:3",
+      "evidence": {
+        "summary": "torch.load without weights_only=True",
+        "detail": "load_model.py:3"
+      },
+      "verdict": null
+    },
+    {
+      "rule_id": "guardana.supply_chain.remote_code_config",
+      "severity": "CRITICAL",
+      "title": "Model config requests custom-code execution on load",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/config.json",
+      "evidence": {
+        "summary": "'_attn_implementation_internal' names the Hub kernel repository 'attacker/kernel-repo', which transformers downloads and imports on load \u2014 a private field, so trust_remote_code=False does not stop it (CVE-2026-4372)",
+        "detail": "file=config.json; kernel=attacker/kernel-repo; fixed in transformers 5.3.0"
+      },
+      "verdict": null
+    },
+    {
+      "rule_id": "guardana.supply_chain.malicious_dependency",
+      "severity": "HIGH",
+      "title": "Known-malicious dependency or install-time payload",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-ML-2023",
+          "id": "ML06"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/requirements.txt",
+      "evidence": {
+        "summary": "ultralytics==8.3.41: compromised build pipeline shipped a cryptominer downloader; 8.3.43 is the clean release",
+        "detail": "file=requirements.txt; advisory=GUARDANA-ADV-2024-ULTRALYTICS; see https://blog.pypi.org/posts/2024-12-11-ultralytics-attack-analysis/"
+      },
+      "verdict": null
+    },
+    {
+      "rule_id": "guardana.supply_chain.malicious_dependency",
+      "severity": "MEDIUM",
+      "title": "Known-malicious dependency or install-time payload",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-ML-2023",
+          "id": "ML06"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/requirements.txt",
+      "evidence": {
+        "summary": "transformers==4.57.0 is a loader that would execute what a poisoned artifact carries \u2014 CVE-2026-4372: a config.json field can name a Hub kernel repository that is downloaded and imported on load, outside the reach of trust_remote_code=False (requires the 'kernels' extra)",
+        "detail": "file=requirements.txt; advisory=GUARDANA-ADV-2026-4372-TRANSFORMERS; see https://github.com/huggingface/transformers/security/advisories"
+      },
+      "verdict": {
+        "outcome": "fail",
+        "confidence": 0.4,
+        "rationale": "transformers==4.57.0 is a loader that would execute what a poisoned artifact carries \u2014 CVE-2026-4372: a config.json field can name a Hub kernel repository that is downloaded and imported on load, outside the reach of trust_remote_code=False (requires the 'kernels' extra)",
+        "evaluator_id": "heuristic.lead"
+      }
+    },
+    {
+      "rule_id": "guardana.supply_chain.malicious_dependency",
+      "severity": "MEDIUM",
+      "title": "Known-malicious dependency or install-time payload",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-ML-2023",
+          "id": "ML06"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/requirements.txt",
+      "evidence": {
+        "summary": "torch==2.2.0 is a loader that would execute what a poisoned artifact carries \u2014 CVE-2025-32434: torch.load reaches code execution even with weights_only=True, so the documented safe path is not one",
+        "detail": "file=requirements.txt; advisory=GUARDANA-ADV-2025-32434-TORCH; see https://github.com/pytorch/pytorch/security/advisories/GHSA-53q9-r3pm-6pq6"
+      },
+      "verdict": {
+        "outcome": "fail",
+        "confidence": 0.4,
+        "rationale": "torch==2.2.0 is a loader that would execute what a poisoned artifact carries \u2014 CVE-2025-32434: torch.load reaches code execution even with weights_only=True, so the documented safe path is not one",
+        "evaluator_id": "heuristic.lead"
+      }
+    },
+    {
+      "rule_id": "guardana.supply_chain.hallucinated_package",
+      "severity": "MEDIUM",
+      "title": "Import of unknown package (possible slopsquat lead)",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/train.py:1",
+      "evidence": {
+        "summary": "import 'torchutilz' isn't a known package or a declared dependency \u2014 declare it in requirements/pyproject, or verify it exists on PyPI",
+        "detail": "train.py:1"
+      },
+      "verdict": {
+        "outcome": "fail",
+        "confidence": 0.4,
+        "rationale": "import 'torchutilz' is not in Guardana's known packages nor the repo's declared dependencies; an undeclared-or-slopsquat lead, not a certainty",
+        "evaluator_id": "heuristic.lead"
+      }
+    },
+    {
+      "rule_id": "guardana.supply_chain.chat_template",
+      "severity": "CRITICAL",
+      "title": "Chat template carries a code-execution gadget",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/model.gguf",
+      "evidence": {
+        "summary": "chat template carries a Jinja gadget (dunder-chain, jinja-global, code-sink) \u2014 code runs when the template renders",
+        "detail": "file=model.gguf source=tokenizer.chat_template offset=8290 match=\"{ message['content'] }} {%- endfor %} {{ lipsum.__globals__['os'].popen('id').read() }}\""
+      },
+      "verdict": null
+    },
+    {
+      "rule_id": "guardana.supply_chain.chat_template",
+      "severity": "CRITICAL",
+      "title": "Chat template carries a code-execution gadget",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/chat_template.jinja",
+      "evidence": {
+        "summary": "chat template carries a Jinja gadget (dunder-chain, jinja-global, code-sink) \u2014 code runs when the template renders",
+        "detail": "file=chat_template.jinja source=chat_template.jinja offset=141 match=\"'] + '<|im_end|>\\\\n' }} {%- endfor %} {{- lipsum.__globals__['os'].popen('id').read() }}\""
+      },
+      "verdict": null
+    },
+    {
+      "rule_id": "guardana.supply_chain.onnx_graph",
+      "severity": "MEDIUM",
+      "title": "Risky construct in an ONNX model graph",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/model.onnx",
+      "evidence": {
+        "summary": "model declares operator domain(s) com.evil.ops outside the standard set; running it requires registering a native operator library",
+        "detail": "file=model.onnx"
+      },
+      "verdict": {
+        "outcome": "fail",
+        "confidence": 0.4,
+        "rationale": "model declares operator domain(s) com.evil.ops outside the standard set; running it requires registering a native operator library",
+        "evaluator_id": "heuristic.lead"
+      }
+    },
+    {
+      "rule_id": "guardana.supply_chain.onnx_graph",
+      "severity": "HIGH",
+      "title": "Risky construct in an ONNX model graph",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/model.onnx",
+      "evidence": {
+        "summary": "external_data points outside the model directory: '../../../etc/passwd'",
+        "detail": "file=model.onnx"
+      },
+      "verdict": null
+    },
+    {
+      "rule_id": "guardana.prompt.hidden_instructions",
+      "severity": "HIGH",
+      "title": "Hidden instruction smuggled into a file an agent reads as context",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM01"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0051"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI01"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0080"
+        }
+      ],
+      "target_ref": "examples/vulnerable-model/model.safetensors",
+      "evidence": {
+        "summary": "invisible instruction-smuggling character in the safetensors __metadata__ block",
+        "detail": "file=model.safetensors; entries='description'"
+      },
+      "verdict": null
+    }
+  ],
+  "unverified": [],
+  "waived": [],
+  "errors": [],
+  "observations": [
+    {
+      "kind": "model",
+      "name": "model.gguf",
+      "ref": "examples/vulnerable-model/model.gguf",
+      "attributes": {
+        "format": "gguf",
+        "size_bytes": "8490"
+      }
+    },
+    {
+      "kind": "model",
+      "name": "model.onnx",
+      "ref": "examples/vulnerable-model/model.onnx",
+      "attributes": {
+        "format": "onnx",
+        "size_bytes": "97"
+      }
+    },
+    {
+      "kind": "model",
+      "name": "model.pt",
+      "ref": "examples/vulnerable-model/model.pt",
+      "attributes": {
+        "format": "pytorch",
+        "size_bytes": "48"
+      }
+    },
+    {
+      "kind": "model",
+      "name": "model.safetensors",
+      "ref": "examples/vulnerable-model/model.safetensors",
+      "attributes": {
+        "format": "safetensors",
+        "size_bytes": "423"
+      }
+    },
+    {
+      "kind": "dependency-manifest",
+      "name": "requirements.txt",
+      "ref": "examples/vulnerable-model/requirements.txt",
+      "attributes": {
+        "size_bytes": "54"
+      }
+    }
+  ]
+}

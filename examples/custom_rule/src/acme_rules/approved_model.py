@@ -6,7 +6,7 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import OWASP_LLM03
+from guardana.core.taxonomy import OWASP_LLM03_2025, OWASP_LLM04_2026
 
 # Acme's policy: a GGUF model may only be served if its embedded provenance says
 # it came from a team we vetted. This is org policy, not a universal threat, which
@@ -30,7 +30,10 @@ class ApprovedModelRule(Rule):
         title="GGUF model is not from an approved organization",
         severity=Severity.MEDIUM,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03,),
+        taxonomy=(
+            OWASP_LLM03_2025,
+            OWASP_LLM04_2026,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

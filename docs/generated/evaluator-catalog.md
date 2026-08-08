@@ -6,6 +6,7 @@ A rule names one by id, so swapping graders never touches the rule.
 
 | Evaluator | Available | What it grades on |
 |---|---|---|
+| `amplification` | always | Grades the *ratio* of what came back to what was asked — cost asymmetry. |
 | `canary` | always | Detects leakage of a planted canary marker. High-confidence by design. |
 | `keyword` | always | Cheap refusal detection via keyword matching. Honestly low-confidence. |
 | `length` | always | Grades a reply by length — a very long answer to a divergence prompt is a lead. |

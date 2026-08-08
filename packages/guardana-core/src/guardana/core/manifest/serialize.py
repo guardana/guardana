@@ -2,13 +2,14 @@
 
 from datetime import UTC, datetime
 
+from guardana.core.manifest.coverage import CoverageRecord
 from guardana.core.manifest.identity import DeploymentRef, RunSource, TargetIdentity, ToolInfo
 from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleRecord
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-SCHEMA_URL = "https://guardana.dev/schemas/run/v2.schema.json"
+SCHEMA_URL = "https://guardana.dev/schemas/run/v3.schema.json"
 """Identifier of the saved-run document, carrying its major version in the path.
 
 The practice in-toto and SLSA settled on, for the reason they settled on it: a
@@ -111,6 +112,23 @@ def _rule(rule: RuleRecord) -> dict[str, object]:
         "digest": rule.digest,
         "version": rule.version,
         "maturity": rule.maturity,
+        "trials": rule.trials,
+    }
+
+
+def _coverage(coverage: CoverageRecord) -> dict[str, object]:
+    return {
+        "digest": coverage.digest,
+        "taxonomies": [
+            {
+                "framework": catalog.framework,
+                "digest": catalog.digest,
+                "entries": catalog.entries,
+                "version": catalog.version,
+            }
+            for catalog in coverage.taxonomies
+        ],
+        "protocols": dict(coverage.protocols),
     }
 
 
@@ -188,6 +206,7 @@ def manifest_to_dict(manifest: RunManifest) -> dict[str, object]:
         "usage": _usage(manifest.usage),
         "rules": [_rule(r) for r in manifest.rules],
         "evaluators": [_evaluator(e) for e in manifest.evaluators],
+        "coverage": _coverage(manifest.coverage),
         "result_summary": _result_summary(manifest.result_summary),
         "privacy": _privacy(manifest.privacy),
     }

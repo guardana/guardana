@@ -1,5 +1,5 @@
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 
 from guardana.core.observation import Observation
 from guardana.core.report.check_error import CheckError
@@ -53,6 +53,17 @@ class ScanResult:
     here.
     """
 
+    protocols: Mapping[str, str] = field(default_factory=dict)
+    """Protocol versions the target negotiated, by protocol name; see `Target.protocols`.
+
+    Carried here for the same reason as `usage`: only the target knows, only the
+    runner holds the target, and a fact that has to be fetched separately by every
+    caller is a fact some caller will forget. It lands in the manifest's coverage
+    fingerprint, so a server that answered with an older revision — and therefore
+    supported fewer methods — is visible as reduced reach rather than as a system
+    that improved.
+    """
+
     @classmethod
     def merged(cls, results: Sequence["ScanResult"]) -> "ScanResult":
         """Combine several results into one, carrying every channel.
@@ -86,6 +97,11 @@ class ScanResult:
             # the run's bill is all of them. One unmetered pass makes the total
             # unknown rather than partial — see `total`.
             usage=total([r.usage for r in results]),
+            # Merged rather than taken from the last pass: probe builds one target
+            # per planted canary against one server, so every pass negotiated the
+            # same protocol, and reading it off whichever finished last would lose
+            # it entirely whenever that pass happened not to open a session.
+            protocols={name: v for r in results for name, v in r.protocols.items()},
         )
 
     @property

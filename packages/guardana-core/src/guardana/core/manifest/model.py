@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from guardana.core.manifest.coverage import CoverageRecord
 from guardana.core.manifest.identity import DeploymentRef, RunSource, TargetIdentity, ToolInfo
 from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleRecord
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-MANIFEST_SCHEMA_VERSION = 2
+MANIFEST_SCHEMA_VERSION = 3
 """Version of the run document, moved independently of the CLI.
 
 A run written by 0.7.3 and one written by 0.9.0 are the same document if the
@@ -51,6 +52,7 @@ class RunManifest:
     source: RunSource = field(default_factory=RunSource)
     deployment: DeploymentRef = field(default_factory=DeploymentRef)
     privacy: PrivacyRecord = field(default_factory=PrivacyRecord)
+    coverage: CoverageRecord = field(default_factory=CoverageRecord)
     schema_version: int = MANIFEST_SCHEMA_VERSION
     migrated_from: int | None = None
     """Which older schema this document was migrated from, if any.

@@ -84,6 +84,7 @@ def test_the_agent_rules_are_registered() -> None:
         "guardana.agent.credential_exfiltration",
         "guardana.agent.tool_argument_scope",
         "guardana.agent.memory_poisoning",
+        "guardana.agent.hidden_context.tool_schema",
     }
 
 

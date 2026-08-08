@@ -9,6 +9,7 @@ environment variable.
 
 import os
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
 from guardana.core import __version__
@@ -25,13 +26,20 @@ from guardana.core.manifest import (
     ToolInfo,
     digest_of,
 )
-from guardana.core.manifest.records import RuleRecord
+from guardana.core.manifest.coverage import (
+    CoverageRecord,
+    TaxonomyCatalogRecord,
+    coverage_digest,
+)
+from guardana.core.manifest.records import EvaluatorRecord, RuleRecord
 from guardana.core.manifest.settings import PrivacyRecord
 from guardana.core.manifest.summary import summarize
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
+from guardana.core.rule import Rule
 from guardana.core.target import REQUEST_TIMEOUT_SECONDS, Target, TargetKind
+from guardana.core.taxonomy import catalogs
 from guardana.core.usage import TargetUsage
 
 _CI_PROVIDERS = (
@@ -170,6 +178,50 @@ def _run_usage(spent: TargetUsage | None, started_at: datetime, completed_at: da
     )
 
 
+def _evaluator_records(rules: Sequence[Rule]) -> tuple[EvaluatorRecord, ...]:
+    """Record the evaluators the rules that ran declared they would grade with.
+
+    Declared, not "every evaluator installed": an evaluator nobody used graded
+    nothing, and listing it would pad the coverage fingerprint with checking that
+    never happened. A rule grading entirely in Python declares none, and that is
+    the honest answer for it.
+
+    No digest. An `Evaluator` has no declaration to hash — it is Python — and
+    inventing one from its class name would claim to detect a change it cannot see.
+    The tool version recorded beside it is what covers the code.
+    """
+    declared = {
+        evaluator_id
+        for rule in rules
+        for evaluator_id, _expectation in rule.declared_expectations()
+        if evaluator_id
+    }
+    return tuple(EvaluatorRecord(id=evaluator_id) for evaluator_id in sorted(declared))
+
+
+def _coverage(
+    rules: Sequence[RuleRecord],
+    evaluators: Sequence[EvaluatorRecord],
+    capabilities: Sequence[str],
+    protocols: Mapping[str, str],
+) -> CoverageRecord:
+    """Describe what this run was able to check, and pin the catalogues it mapped against."""
+    taxonomies = tuple(
+        TaxonomyCatalogRecord(
+            framework=catalog.framework,
+            digest=catalog.digest,
+            entries=len(catalog.refs),
+            version=catalog.version,
+        )
+        for catalog in catalogs()
+    )
+    return CoverageRecord(
+        digest=coverage_digest(rules, evaluators, capabilities, taxonomies, protocols),
+        taxonomies=taxonomies,
+        protocols=dict(protocols),
+    )
+
+
 def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independent facts
     registry: Registry,
     profile: Profile,
@@ -190,10 +242,21 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
     comparison treat a check that never happened as coverage it had.
     """
     now = datetime.now(UTC)
+    ran = tuple(rule for rule in registry.rules() if rule.meta.id in result.rules_run)
     rules = tuple(
-        RuleRecord(id=rule.meta.id, digest=rule.digest())
-        for rule in registry.rules()
-        if rule.meta.id in result.rules_run
+        RuleRecord(
+            id=rule.meta.id,
+            digest=rule.digest(),
+            maturity=str(rule.meta.maturity),
+            trials=rule.estimated_requests,
+        )
+        for rule in ran
+    )
+    evaluators = _evaluator_records(ran)
+    target = (
+        identity
+        if identity is not None
+        else TargetIdentity(kind=target_kind, ref=target_ref, fingerprint_inputs=())
     )
     return RunManifest(
         run_id=str(uuid.uuid4()),
@@ -203,11 +266,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         source=detect_source(),
         deployment=deployment if deployment is not None else DeploymentRef(),
         guardana=ToolInfo(version=__version__),
-        target=(
-            identity
-            if identity is not None
-            else TargetIdentity(kind=target_kind, ref=target_ref, fingerprint_inputs=())
-        ),
+        target=target,
         configuration=ConfigurationRef(profile_name=profile.name),
         # The ceilings are recorded whether or not the run hit them. Without them a
         # run that exits `6` says it stopped and never says what it hit, which
@@ -223,6 +282,8 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         ),
         usage=_run_usage(result.usage, started_at, now),
         rules=rules,
+        evaluators=evaluators,
+        coverage=_coverage(rules, evaluators, target.capabilities, result.protocols),
         result_summary=summarize(result, gate),
         # Recorded, so a reader knows what was applied to the evidence they are
         # looking at rather than assuming the default of whatever build they run.

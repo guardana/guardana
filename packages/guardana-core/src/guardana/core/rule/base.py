@@ -131,6 +131,13 @@ class Rule(ABC):
         per run, so a digest covering its value would differ on every run and
         report "this rule changed" every single time — which is the same as
         reporting nothing at all.
+
+        **The framework mapping is not in here either**, for the same reason: a rule
+        remapped to a renamed standard sends the same prompts and grades them the
+        same way, so it is not a different test. Including it made `diff` report
+        that every rule "changed definition" in the release an OWASP edition landed,
+        which buries the one rule whose corpus really moved. Which editions were
+        installed is recorded once per run, in the manifest's coverage fingerprint.
         """
         return digest_parts(
             (
@@ -139,7 +146,6 @@ class Rule(ABC):
                 self.meta.severity.name,
                 self.meta.target_kind,
                 self.meta.evaluator or "",
-                ",".join(f"{t.framework}:{t.id}" for t in self.meta.taxonomy),
                 ",".join(sorted(self.meta.required_capabilities)),
                 str(self.meta.impact),
                 str(self.meta.destructive),

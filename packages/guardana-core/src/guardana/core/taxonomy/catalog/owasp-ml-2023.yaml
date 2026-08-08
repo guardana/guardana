@@ -1,0 +1,23 @@
+# The entries Guardana's rules actually map to, transcribed as they were reviewed
+# when each mapping was added. A catalogue is allowed to be a subset of a published
+# document; what it may never do is invent an entry, so the gaps stay gaps rather
+# than being filled in from memory.
+scheme: OWASP-ML
+edition: "2023"
+title: OWASP Machine Learning Security Top 10
+entries:
+  - id: ML01
+    rank: 1
+    title: Input Manipulation Attack
+  - id: ML02
+    rank: 2
+    title: Data Poisoning Attack
+  - id: ML05
+    rank: 5
+    title: Model Theft
+  - id: ML06
+    rank: 6
+    title: AI Supply Chain Attacks
+  - id: ML10
+    rank: 10
+    title: Model Poisoning

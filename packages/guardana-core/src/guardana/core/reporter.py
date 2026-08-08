@@ -16,13 +16,19 @@ from guardana.core.report.serialize import finding_to_dict
 
 _TIMEOUT_SECONDS = 30
 
-ENVELOPE_SCHEMA_VERSION = 7
+ENVELOPE_SCHEMA_VERSION = 8
 """Version of the JSON envelope POSTed to a collector.
 
 The collector is a separate service on its own release cadence, so the envelope
 is versioned: a collector that doesn't understand a version rejects it outright
 rather than silently misreading a renamed field.
 
+v8 carries the *title* of each framework reference beside its id. A short id is not
+self-explanatory once a framework publishes a second edition — `LLM07` names System
+Prompt Leakage in OWASP-LLM-2025 and Misinformation in OWASP-LLM-2026 — and the
+collector deliberately does not depend on the engine, so it holds no catalogue to
+look one up in. The identity stays `framework` + `id`; the title is what makes a
+dashboard chip readable to the person looking at it.
 v7 says what the *run* was: its id, when it ran, which build produced it, what it
 cost, what redaction was applied — and, above all, its **gate**. A collector
 holding findings and no verdicts cannot tell a failing run from one whose findings

@@ -302,7 +302,7 @@ URL you give it — it doesn't know or care whether the receiving end is
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 8,
   "source": "<path or url#model>",
   "findings": [ ... serialized Findings ... ],
   "unverified": [ ... checks that ran but could not reach a verdict ... ],
@@ -311,7 +311,7 @@ URL you give it — it doesn't know or care whether the receiving end is
 ```
 
 `schema_version` (`guardana.core.reporter.ENVELOPE_SCHEMA_VERSION`, currently
-`2`) is what lets an agent and a collector be upgraded independently: a
+`8`) is what lets an agent and a collector be upgraded independently: a
 collector that doesn't understand a version rejects it outright rather than
 silently misreading a renamed field. The `unverified` channel is carried over
 the wire for the same reason it is surfaced locally — a check that could not be

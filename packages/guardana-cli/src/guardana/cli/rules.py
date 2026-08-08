@@ -66,7 +66,10 @@ def rules(
             continue
         typer.echo(f"\n{_SURFACE_HEADING[layer]}")
         for r in group:
-            tags = ", ".join(t.id for t in r.meta.taxonomy)
+            # The reference, not the bare id: `LLM07` names two different
+            # controls once a framework publishes a second edition, and a
+            # listing that hid the edition would be unanswerable in an audit.
+            tags = ", ".join(t.reference for t in r.meta.taxonomy)
             typer.echo(f"  {r.meta.severity.name:9} {r.meta.id}  [{tags}]")
 
 
@@ -79,5 +82,8 @@ def _as_dict(rule: Rule) -> dict[str, object]:
         "id": rule.meta.id,
         "severity": rule.meta.severity.name,
         "surface": rule.meta.surface.value,
-        "taxonomy": [t.id for t in rule.meta.taxonomy],
+        "taxonomy": [
+            {"reference": t.reference, "framework": t.framework, "id": t.id, "title": t.title}
+            for t in rule.meta.taxonomy
+        ],
     }

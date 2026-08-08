@@ -1,0 +1,15 @@
+# Attack classes from NIST's adversarial-machine-learning taxonomy, referenced by the
+# class name it uses rather than by a number, because the document numbers sections
+# and not attacks. No edition: these class names are what a reader looks up, and they
+# have survived the document's revisions.
+scheme: NIST-AI-100-2
+title: NIST AI 100-2 Adversarial Machine Learning
+entries:
+  - id: supply-chain
+    title: GenAI Supply Chain Attack
+  - id: evasion
+    title: Evasion Attack
+  - id: poisoning
+    title: Poisoning Attack
+  - id: privacy
+    title: Privacy Attack

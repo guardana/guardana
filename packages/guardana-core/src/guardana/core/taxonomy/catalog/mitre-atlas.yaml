@@ -1,0 +1,48 @@
+# No edition, and that is a statement rather than an omission: an ATLAS technique id
+# keeps its meaning across ATLAS releases, so the release a catalogue was transcribed
+# from is provenance and lands in `version`, not in the reference an auditor looks up.
+# If ATLAS ever renumbers, this file gains an `edition` and every bare `AML.*`
+# reference stops resolving — loudly, at load time.
+#
+# Sub-technique titles carry their parent so a finding reads the way ATLAS presents it.
+scheme: MITRE-ATLAS
+version: 5.6.0
+title: MITRE ATLAS
+source: https://atlas.mitre.org/
+entries:
+  - id: AML.T0010.005
+    title: "AI Supply Chain Compromise: AI Agent Tool"
+  - id: AML.T0011.002
+    title: "User Execution: Poisoned AI Agent Tool"
+  - id: AML.T0018
+    title: Manipulate AI Model
+  - id: AML.T0034.002
+    title: "Cost Harvesting: Agentic Resource Consumption"
+  - id: AML.T0051
+    title: LLM Prompt Injection
+  - id: AML.T0053
+    title: AI Agent Tool Invocation
+  - id: AML.T0056
+    title: Extract LLM System Prompt
+  - id: AML.T0057
+    title: LLM Data Leakage
+  - id: AML.T0080
+    title: AI Agent Context Poisoning
+  - id: AML.T0080.000
+    title: "AI Agent Context Poisoning: Memory"
+  - id: AML.T0084.001
+    title: "Discover AI Agent Configuration: Tool Definitions"
+  - id: AML.T0084.003
+    title: "Discover AI Agent Configuration: Call Chains"
+  - id: AML.T0086
+    title: Exfiltration via AI Agent Tool Invocation
+  - id: AML.T0098
+    title: AI Agent Tool Credential Harvesting
+  - id: AML.T0101
+    title: Data Destruction via AI Agent Tool Invocation
+  - id: AML.T0104
+    title: Publish Poisoned AI Agent Tool
+  - id: AML.T0109
+    title: AI Supply Chain Rug Pull
+  - id: AML.T0110
+    title: AI Agent Tool Poisoning

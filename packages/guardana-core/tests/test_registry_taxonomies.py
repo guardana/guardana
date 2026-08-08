@@ -15,7 +15,7 @@ from guardana.core.registry import Registry
 from guardana.core.rule import load_yaml_rules
 from guardana.core.rule.errors import RuleLoadError
 from guardana.core.taxonomy import TaxonomyError, TaxonomyRef, register, resolve
-from guardana.core.taxonomy import _registry as _taxonomy_registry
+from guardana.core.taxonomy._builtin import index as _taxonomy_registry
 
 _ACME = TaxonomyRef("ACME-CONTROLS-1", "ACME-14", "Model change control")
 
@@ -34,7 +34,7 @@ prompts: ["hello"]
 @pytest.fixture
 def forget_acme() -> Iterator[None]:
     yield
-    _taxonomy_registry.pop("ACME-14", None)
+    _taxonomy_registry.forget("ACME-14")
 
 
 def test_a_registered_framework_can_be_named_by_a_yaml_rule(
@@ -81,10 +81,14 @@ def test_a_provider_redefining_a_builtin_id_is_recorded_not_crashed(
     registry = Registry.discover()
     assert any("LLM01" in error.reason for error in registry.load_errors)
     # The built-in meaning survives: a report's mapping cannot be rewritten by an
-    # installed package.
-    builtin = resolve("LLM01")
+    # installed package. Asked by reference and not by bare id, because a bare
+    # `LLM01` is now itself refused — had the clash been registered, it would have
+    # answered that bare lookup and quietly become what `LLM01` means.
+    builtin = resolve("LLM01:2025")
     assert builtin is not None
     assert builtin.title == "Prompt Injection"
+    with pytest.raises(TaxonomyError, match="which edition"):
+        resolve("LLM01")
 
 
 def _with_taxonomy_provider(

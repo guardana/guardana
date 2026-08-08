@@ -277,47 +277,51 @@ in [`docs/integrations.md`](docs/integrations.md).
 
 ## What's in the box
 
-Thirty-two built-in rules, every finding tagged into the frameworks your compliance
-process already speaks — OWASP LLM Top 10, the OWASP Top 10 for Agentic
-Applications (ASI), OWASP ML Top 10, MITRE ATLAS and NIST:
+34 built-in rules, every finding tagged into the frameworks your compliance
+process already speaks — **both editions** of the OWASP LLM Top 10, the OWASP Top 10
+for Agentic Applications (ASI), OWASP ML Top 10, MITRE ATLAS and NIST. A reference
+names its edition, because `LLM07` is System Prompt Leakage in the 2025 edition and
+Misinformation in the 2026 one:
 
-| Rule id | Severity | Kind | Standards |
+| Rule id | Severity | Surface | Maps to |
 |---|---|---|---|
-| `guardana.supply_chain.pickle_opcode` | CRITICAL | artifact | OWASP LLM03/LLM05 · ATLAS T0018 · NIST supply-chain |
-| `guardana.supply_chain.dependency_risk` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
-| `guardana.supply_chain.remote_code` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
-| `guardana.supply_chain.remote_code_config` | CRITICAL/HIGH | artifact | OWASP LLM03 · ATLAS T0018 · NIST supply-chain |
-| `guardana.supply_chain.chat_template` | CRITICAL/HIGH | artifact | OWASP LLM03/LLM05 · ATLAS T0018 · NIST supply-chain |
-| `guardana.supply_chain.onnx_graph` | HIGH/MEDIUM | artifact | OWASP LLM03/LLM05 · ATLAS T0018 · NIST supply-chain |
-| `guardana.supply_chain.notebook_payload` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
-| `guardana.training.dataset_integrity` | MEDIUM | artifact | OWASP LLM04 · ML02 · NIST poisoning |
-| `guardana.supply_chain.code_execution` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
-| `guardana.supply_chain.insecure_transport` | HIGH | artifact | OWASP LLM03 · NIST supply-chain |
-| `guardana.supply_chain.keras_lambda` | HIGH | artifact | OWASP LLM05 · ML06 · ATLAS T0018 |
-| `guardana.supply_chain.saved_model_ops` | MEDIUM | artifact | OWASP LLM05 · ML06 · ATLAS T0018 |
-| `guardana.supply_chain.malicious_dependency` | HIGH | artifact | OWASP LLM03 · ML06 · ATLAS T0018 |
-| `guardana.supply_chain.model_format` | HIGH | artifact | OWASP LLM03/LLM05 · NIST supply-chain |
-| `guardana.supply_chain.hallucinated_package` | MEDIUM | artifact | OWASP LLM03 |
-| `guardana.supply_chain.provenance` | MEDIUM | artifact | OWASP LLM03 · NIST supply-chain |
-| `guardana.supply_chain.hardcoded_secret` | HIGH | artifact | OWASP LLM02 |
-| `guardana.output.secrets` | HIGH | endpoint | OWASP LLM02 |
-| `guardana.prompt.injection.ignore_previous` | HIGH | endpoint | OWASP LLM01 · ATLAS T0051 |
-| `guardana.prompt.mcp_tool_poisoning` | HIGH | artifact | OWASP LLM01/LLM05 · ATLAS T0051 |
-| `guardana.prompt.hidden_instructions` | HIGH | artifact | OWASP LLM01/LLM05 · ATLAS T0051 |
-| `guardana.prompt.jailbreak.dan_style` | HIGH | endpoint | OWASP LLM01 |
-| `guardana.scenario.gradual_jailbreak` | HIGH | endpoint | OWASP LLM01 · ATLAS T0051 |
-| `guardana.scenario.indirect_injection` | HIGH | endpoint | OWASP LLM01/LLM08 · ATLAS T0051 |
-| `guardana.agent.excessive_tool_use` | HIGH | endpoint | OWASP LLM06 · ASI02 · ATLAS T0053 |
-| `guardana.agent.tool_result_injection` | CRITICAL | endpoint | OWASP LLM01 · ASI01/ASI02 · ATLAS T0053/T0086 |
-| `guardana.agent.credential_exfiltration` | CRITICAL | endpoint | OWASP LLM02 · ASI03 · ATLAS T0086/T0098 |
-| `guardana.agent.tool_argument_scope` | HIGH | endpoint | OWASP LLM06 · ASI02 · ATLAS T0053/T0101 |
-| `guardana.agent.memory_poisoning` | CRITICAL | endpoint | OWASP LLM01 · ASI06 · ATLAS T0080 |
-| `guardana.agent.mcp_server_manifest` | CRITICAL/HIGH | endpoint | OWASP LLM01/LLM03 · ASI04 · ATLAS T0110/T0109 |
-| `guardana.prompt.unbounded_consumption` | MEDIUM | endpoint | OWASP LLM10 |
-| `guardana.prompt.system_prompt_leak.canary` | CRITICAL | endpoint | OWASP LLM07 · ATLAS T0056 |
+| `guardana.prompt.hidden_instructions` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI01:2026 · AML.T0080 |
+| `guardana.prompt.mcp_tool_poisoning` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI04:2026 · AML.T0110 · AML.T0011.002 |
+| `guardana.supply_chain.chat_template` | CRITICAL | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.code_execution` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.dependency_risk` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain |
+| `guardana.supply_chain.hallucinated_package` | MEDIUM | build | LLM03:2025 · LLM04:2026 |
+| `guardana.supply_chain.hardcoded_secret` | HIGH | build | LLM02:2025 · LLM02:2026 |
+| `guardana.supply_chain.insecure_transport` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain |
+| `guardana.supply_chain.keras_lambda` | HIGH | build | LLM05:2025 · LLM10:2026 · ML06:2023 · AML.T0018 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.malicious_dependency` | HIGH | build | LLM03:2025 · LLM04:2026 · ML06:2023 · AML.T0018 · supply-chain |
+| `guardana.supply_chain.model_format` | HIGH | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · supply-chain |
+| `guardana.supply_chain.notebook_payload` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.onnx_graph` | HIGH | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.pickle_opcode` | CRITICAL | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.provenance` | MEDIUM | build | LLM03:2025 · LLM04:2026 · supply-chain |
+| `guardana.supply_chain.remote_code` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.remote_code_config` | HIGH | build | LLM03:2025 · LLM04:2026 · AML.T0018 · supply-chain · ASI05:2026 |
+| `guardana.supply_chain.saved_model_ops` | MEDIUM | build | LLM05:2025 · LLM10:2026 · ML06:2023 · AML.T0018 · supply-chain · ASI05:2026 |
+| `guardana.training.dataset_integrity` | MEDIUM | build | LLM04:2025 · LLM05:2026 · ML02:2023 · poisoning |
+| `guardana.agent.credential_exfiltration` | CRITICAL | runtime | LLM02:2025 · LLM02:2026 · ASI03:2026 · AML.T0086 · AML.T0098 |
+| `guardana.agent.excessive_tool_use` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 |
+| `guardana.agent.hidden_context.tool_schema` | HIGH | runtime | LLM02:2025 · LLM02:2026 · LLM08:2026 · AML.T0084.001 |
+| `guardana.agent.mcp_server_manifest` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM03:2025 · LLM04:2026 · ASI04:2026 · AML.T0110 · AML.T0109 · AML.T0084.001 |
+| `guardana.agent.memory_poisoning` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI06:2026 · AML.T0080 · AML.T0080.000 |
+| `guardana.agent.tool_argument_scope` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 · AML.T0101 |
+| `guardana.agent.tool_result_injection` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI01:2026 · ASI02:2026 · AML.T0053 · AML.T0086 |
+| `guardana.output.secrets` | HIGH | runtime | LLM02:2025 · LLM02:2026 |
+| `guardana.prompt.cost_asymmetry` | MEDIUM | runtime | LLM10:2025 · LLM06:2026 · AML.T0034.002 |
+| `guardana.prompt.injection.ignore_previous` | HIGH | runtime | LLM01:2025 · LLM01:2026 · AML.T0051 |
+| `guardana.prompt.jailbreak.dan_style` | HIGH | runtime | LLM01:2025 · LLM01:2026 |
+| `guardana.prompt.system_prompt_leak.canary` | CRITICAL | runtime | LLM07:2025 · LLM08:2026 · AML.T0056 |
+| `guardana.prompt.unbounded_consumption` | MEDIUM | runtime | LLM10:2025 · LLM06:2026 |
+| `guardana.scenario.gradual_jailbreak` | HIGH | runtime | LLM01:2025 · LLM01:2026 · AML.T0051 |
+| `guardana.scenario.indirect_injection` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM08:2025 · LLM09:2026 · ASI01:2026 · AML.T0051 · AML.T0080 |
 
-The static seventeen (`artifact` kind) need no model and no network — they're the
-CI front door. The dynamic eight (`endpoint` kind) probe a live model and grade
+The static 19 (`artifact` surface) need no model and no network — they're the
+CI front door. The dynamic 15 (`endpoint` surface) probe a live model and grade
 the result through an Evaluator; two of them (`scenario.gradual_jailbreak` and
 `scenario.indirect_injection`) are **multi-turn scenarios** — declarative YAML
 conversations graded per step and as a whole. `guardana rules` prints this list generated from what's actually
@@ -333,7 +337,7 @@ build on it — is [`FEATURES.md`](FEATURES.md).
 
 ## Standards and architecture
 
-Every finding carries typed references into **OWASP LLM Top 10 (2025)**, the
+Every finding carries typed references into **OWASP LLM Top 10 (2025 and 2026)**, the
 **OWASP Top 10 for Agentic Applications (ASI01–ASI10)**, **OWASP ML Top 10
 (2023)**, **MITRE ATLAS v5.6.0**, and **NIST AI 100-2e2025** attack classes — so
 results are filterable and reportable by whichever framework your audit already

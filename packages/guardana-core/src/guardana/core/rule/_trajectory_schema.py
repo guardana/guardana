@@ -8,6 +8,7 @@ nothing, watch it call nothing, and report every model clean.
 from pathlib import Path
 from typing import Any
 
+from guardana.core.evaluator.base import Expectation
 from guardana.core.rule._digest import declaration_digest
 from guardana.core.rule._yaml_schema import (
     check_evaluator_expectations,
@@ -71,7 +72,9 @@ def parse_trajectory(raw: dict[str, Any], path: Path) -> TrajectoryRule:
             f"session can only repeat the first"
         )
     expectation = parse_expectation(raw.get("expect"), path)
-    check_evaluator_expectations(meta, expectation, path)
+    check_evaluator_expectations(
+        meta, expectation, path, planted_in_declaration=_plants_its_own_canary(expectation, tools)
+    )
     return TrajectoryRule(
         meta=meta,
         task=task,
@@ -80,6 +83,25 @@ def parse_trajectory(raw: dict[str, Any], path: Path) -> TrajectoryRule:
         expectation=expectation,
         then_task=then_task,
         source_digest=declaration_digest(raw),
+    )
+
+
+def _plants_its_own_canary(expectation: Expectation, tools: tuple[ToolOffer, ...]) -> bool:
+    """Report whether the declared marker actually appears somewhere the model is handed.
+
+    Two places an agent run can carry it: a tool's advertised **description**, which
+    is hidden context the model reads as trusted instruction, and a canned tool
+    **result**, which is attacker-controlled ground. `TrajectoryRule.with_canary`
+    substitutes the fresh per-run token into both; this is what refuses the rule
+    whose marker is in neither and would therefore be hunted for and never found.
+    """
+    marker = expectation.canary
+    if marker is None:
+        return False
+    return any(
+        marker in offer.spec.description
+        or (isinstance(offer.double, StaticToolDouble) and marker in offer.double.text)
+        for offer in tools
     )
 
 

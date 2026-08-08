@@ -62,12 +62,11 @@ already failed at its job:
 | Collector (`guardana-server`) | **beta** | Persistent, authenticated, tenant-isolated, and it records what each run verified and where. A key is pinned to a project always, and to an environment when you ask. Findings carry a lifecycle and waivers that expire, every state change is audited, and retention is a policy an operator applies; no RBAC or human identities yet |
 | Extension API | **unstable by design** | Frozen at 1.0, deliberately not before — see the entry criteria below |
 
-**One thing this build says that is now out of date:** every rule maps to the
-**2025** edition of the OWASP LLM Top 10. The 2026 edition landed on 3 August 2026
-and moved seven entries, so a short id like `LLM07` no longer means to a reader what
-it means to this build. The `framework` field on each reference records the edition,
-so nothing shipped is false — but repairing it is the first thing in the plan, for
-the same reason every other claim here is generated rather than typed.
+**Both OWASP LLM editions are installed, and a rule names the one it means.** A
+reference is scheme + edition + local id (`LLM07:2025`), the catalogues are data
+files pinned by digest in every run, and a rule carries both editions where the
+semantics genuinely overlap — never a silent remap onto the matching number, since
+`LLM07:2026` is Misinformation. `guardana taxonomy` shows what is installed.
 
 ## What ships today (0.12.0)
 
@@ -85,20 +84,22 @@ hallucinated dependencies, insecure transport, hardcoded secrets, MCP tool
 poisoning, hidden-instruction rules-file backdoors, training-data integrity) and
 **runtime** (dynamic, endpoint: prompt injection, DAN jailbreak,
 gradual-jailbreak scenario, indirect/RAG injection, excessive tool-use agency,
-unbounded consumption, output-secret leakage, canary-proven system-prompt leak,
-and five agentic checks — tool-result injection, credential exfiltration through
-a tool argument, over-broad tool arguments, memory poisoning across a session
-boundary, and a live MCP server's tool manifest).
+unbounded consumption and cost asymmetry, output-secret leakage, canary-proven
+system-prompt leak, and six agentic checks — tool-result injection, credential
+exfiltration through a tool argument, over-broad tool arguments, memory poisoning
+across a session boundary, hidden context recited out of a tool schema, and a live
+MCP server's tool manifest).
 
 Plus **verification as an ordinary `pytest` assertion**
 (`guardana.testing.assert_secure`) and the first **framework adapter**
 (`guardana.adapters.langchain`), so a check can live in the test file a team
 already runs, against the model their application actually calls.
 
-Plus fourteen commands — `scan`/`probe`/`monitor`/`diff` and the ten that make
+Plus fifteen commands — `scan`/`probe`/`monitor`/`diff` and the eleven that make
 them safe to gate on (`plan`, `target inspect`, `run inspect|migrate`,
 `baseline create|verify|update`, `doctor`, `config validate|explain`, `rules`,
-`init`, `new-rule`, `calibrate`) — six evaluators with measured calibration
+`taxonomy`, `init`, `new-rule`, `calibrate`) — seven evaluators with measured
+calibration
 (Brier + ECE), the three-channel result, four report formats, profiles/gates/
 presets, the build/runtime `Surface` split, a tool-calling endpoint target, three
 endpoint providers plus a guarded-endpoint adapter, the plugin contract with test
@@ -210,15 +211,14 @@ uncomfortable to read.
 
 ### OWASP LLM Top 10 — the 2026 edition, published 3 August 2026
 
-**What ships today maps to the 2025 edition, and that is now a defect rather than
-a lag.** The 2026 edition re-ranked seven entries and renamed one, and it did not
-renumber into empty space: `LLM07` used to be System Prompt Leakage and is now
-Misinformation, `LLM05` used to be Improper Output Handling and is now Data and
-Model Poisoning. A short id in a Guardana report therefore means one thing to this
-build and a different thing to an auditor who looks it up today. The `framework`
-field on every reference does say `OWASP-LLM-2025`, so nothing published is a lie —
-but a mapping is only useful if it is answerable in somebody else's audit, which is
-why repairing this is the next thing that ships (see the plan).
+**Both editions are installed, and every rule names the one it means.** The 2026
+edition re-ranked seven entries and renamed one, and it did not renumber into empty
+space: `LLM07` used to be System Prompt Leakage and is now Misinformation, `LLM05`
+used to be Improper Output Handling and is now Data and Model Poisoning. A short id
+alone therefore cannot identify a control, so a reference is scheme + edition +
+local id and a rule carries both editions where the semantics genuinely overlap.
+The column below reads in 2026 categories; `guardana taxonomy LLM07:2025` prints
+what a 2025 reference in an older saved run corresponds to today.
 
 The 2026 edition is also the first built on incident data: 7,714 real incidents
 (6,639 classifiable) weighted at 25% beside a 75% community vote —
@@ -233,9 +233,9 @@ reported incidents*, not which are most severe when they do.
 | LLM03 Excessive Agency | **up from #6** | **Good** | trajectory grading, tool-argument scope, excessive tool use; approval bypass and delegated credentials need the identity work |
 | LLM04 Supply Chain | down from #3, absorbs artifact-trust failure | **Very strong** | the static front door |
 | LLM05 Data and Model Poisoning | down from #4, absorbs fine-tuning subversion | **Started** | `training.dataset_integrity` (hygiene leads); statistical/backdoor detection is research-gated |
-| LLM06 Unbounded Consumption | **up from #10**, reframed as cost asymmetry | **Started (lead)** | `prompt.unbounded_consumption`; the accounting to measure asymmetry honestly already exists — `finish_reason` and latency on `Exchange` turn it into a rule |
+| LLM06 Unbounded Consumption | **up from #10**, reframed as cost asymmetry | **Good** | `prompt.unbounded_consumption` for raw output, plus `prompt.cost_asymmetry` for the reframing: the ratio of reply to prompt, measured on characters so it needs nothing from the provider. `finish_reason` would separate "the model stopped" from "our ceiling stopped it" and is deferred with the transport-contract work |
 | LLM07 Misinformation | up from #9, widest vote-versus-data gap | **Gap → deferred** | still needs ground truth; the data does not change that, and what it actually points at — a wrong answer becoming a wrong *action* — is the agentic work, not a factuality detector |
-| LLM08 Hidden Context Exposure | renamed and widened from LLM07:2025 System Prompt Leakage | **Partial** | canary-proven system-prompt leak covers the original scope; tool schemas, retrieved content and embedded credentials are the widened part and are next |
+| LLM08 Hidden Context Exposure | renamed and widened from LLM07:2025 System Prompt Leakage | **Good** | canary-proven system-prompt leak covers the original scope; `agent.hidden_context.tool_schema` covers tool schemas with a marker planted in the description. Retrieved content and embedded credentials need the retriever and identity work |
 | LLM09 Vector and Embedding Weaknesses | down from #8 | **Started (slice)** | `scenario.indirect_injection`; live retriever targets are the application-awareness milestone |
 | LLM10 Improper Output Handling | **down from #5** | **Partial** | tagged on several rules; sink-aware handling stays in application awareness and its priority drops with the rank — ANSI terminal injection and auto-fetching renderers join it when it lands |
 
@@ -616,37 +616,39 @@ The order is: **fix what is now untrue → build where the threat is settled and
 target already exists → complete the domain model → freeze it.** Everything else,
 including the whole team platform, runs beside it and gates none of it.
 
-### Step one — the mapping is true again *(next release)*
+### Step one — the mapping is true again ~~*(next release)*~~ *(shipped, unreleased)*
 
-Small, unglamorous and time-decaying: every day it waits, more saved runs carry
-short ids whose public meaning has moved. Nothing here is new coverage.
+Done. Identity is scheme + edition + local id; the catalogues are six immutable data
+files with digests every run pins; a rule carries both editions where the semantics
+overlap and the crosswalk carries an explicit relation on every pair; saved runs and
+collector rows are never rewritten, and the recorded title travels with the
+reference. `guardana taxonomy` shows what is installed and what a reference
+corresponds to. The coverage fingerprint landed with it, and `diff` reports a
+differing reach as its own statement rather than folding it into what was found.
 
-- **Taxonomy identity becomes scheme + edition + local id.** `OWASP-LLM/2025/LLM07`
-  and `OWASP-LLM/2026/LLM07` are *different controls* that happen to share a
-  string; today the registry is keyed on the short id alone and refuses to hold
-  both. Titles and rankings become display data, never identity.
-- **Catalogs are immutable data files with a digest, and the digest is pinned in
-  the run manifest.** A report is then readable years later without asking which
-  edition was installed.
-- **Saved runs, baselines and collector rows are never rewritten.** A 2025
-  reference is read as edition 2025 and upgraded only in memory. The recorded
-  *title* travels with the reference so an offline report stays intelligible.
-- **A rule may carry both editions where the semantics genuinely overlap** — the
-  canary system-prompt rule is `LLM07:2025` *and* `LLM08:2026`. What must never
-  happen is a silent remap to `LLM07:2026`, which is now Misinformation.
-- **The crosswalk is data with explicit relations** (exact / broader / narrower /
-  related), not a global alias table: the categories changed meaning, so most of
-  the pairs are not equivalences.
-- **A coverage fingerprint on every run** — rule and evaluator versions, catalog
-  digests, target capabilities, negotiated protocol versions, trial counts — so
-  `diff` can say *coverage changed* rather than folding it into *security
-  changed*. This is the missing half of the promise `rules_run` started: a run
-  with fewer applicable checks must never read as an improvement, and today only
-  the rule list is compared.
-- Two rules the 2026 edition argues for directly: **hidden context beyond the
-  system prompt** (a canary planted in a *tool schema*, `LLM08:2026`) and
-  **unbounded consumption as cost asymmetry** (`LLM06:2026`, up four places) —
-  which this project can measure honestly because the accounting already exists.
+Both rules the 2026 edition argued for shipped: a canary planted in a **tool schema**
+(`LLM08:2026`) and **cost asymmetry** (`LLM06:2026`), the latter measured on
+characters so it works against a provider that reports no token counts.
+
+**Deliberately deferred out of it, with the reason:**
+
+- **`finish_reason` and latency on `Exchange`.** The cost-asymmetry rule was
+  supposed to read them; it does not need them. A ratio of reply to prompt is
+  measurable from the exchange, needs no cooperation from the provider, and works
+  against an endpoint that reports nothing — while carrying a provider's finish
+  reason honestly means adding it to the transport protocol *third parties
+  implement*. That is a contract change worth doing on its own, alongside the trace
+  work, not as a passenger on a taxonomy release. What it would add is the
+  difference between "the model stopped" and "our ceiling stopped it", which
+  sharpens the finding without being load-bearing for it.
+- **A catalogue is still a subset where the mapping is.** `OWASP-ML-2023` holds the
+  five entries Guardana's rules map to, not all ten. A catalogue is allowed to be a
+  subset; what it may never do is invent an entry, so the gaps stay gaps rather than
+  being filled in from memory.
+- **Third-party catalogues have no digest to pin.** A pack registers *references*
+  through the entry point, not a catalogue file, so a run records its refs and not a
+  provenance nobody can produce. Giving them a digest means a catalogue-file entry
+  point, which is a bigger surface than this release needed.
 
 ### Step two — MCP, in depth
 

@@ -7,7 +7,7 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule.base import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.target import Target
-from guardana.core.target.endpoint import EndpointTarget
+from guardana.core.target.endpoint import EndpointTarget, ToolSpec
 from guardana.core.trajectory import (
     AgentMemory,
     StaticToolDouble,
@@ -83,16 +83,28 @@ class TrajectoryRule(Rule):
         return ((self.meta.evaluator or "", self.expectation),)
 
     def with_canary(self, canary: str) -> "Rule | None":
-        """Swap the declared canary — in the expectation *and* in every tool result.
+        """Swap the declared canary — in the expectation, every tool result, and every schema.
 
-        Both, because the marker a run leaks is the one a tool handed the model.
-        Planting it only in the expectation would leave the evaluator hunting for
-        a token that was never put anywhere it could be found.
+        All three, because the marker a run leaks is the one the model was actually
+        handed. Planting it only in the expectation would leave the evaluator
+        hunting for a token that was never put anywhere it could be found, and the
+        rule would report a confident pass for a fully disclosing model.
+
+        The **tool description** is the third place, and it is not decoration: a
+        tool schema is hidden context an agent is given as trusted instruction, and
+        it routinely carries internal endpoints and identifiers. A rule that plants
+        its marker there is checking `LLM08:2026 Hidden Context Exposure`, which
+        widened the old system-prompt scope to exactly this.
         """
         if self.expectation.canary is None:
             return None
+        declared = self.expectation.canary
         tools = tuple(
-            ToolOffer(spec=offer.spec, double=_repointed(offer, self.expectation.canary, canary))
+            ToolOffer(
+                spec=_respecified(offer.spec, declared, canary),
+                double=_repointed(offer, declared, canary),
+                memory=offer.memory,
+            )
             for offer in self.tools
         )
         return replace(self, tools=tools, expectation=replace(self.expectation, canary=canary))
@@ -168,6 +180,13 @@ def _repointed(offer: ToolOffer, old: str, new: str) -> ToolDouble:
     if isinstance(double, StaticToolDouble) and old in double.text:
         return StaticToolDouble(double.text.replace(old, new))
     return double
+
+
+def _respecified(spec: ToolSpec, old: str, new: str) -> ToolSpec:
+    """Point a tool's advertised description at the freshly planted marker."""
+    if old not in spec.description:
+        return spec
+    return ToolSpec(name=spec.name, description=spec.description.replace(old, new))
 
 
 def _strings(value: object) -> tuple[str, ...]:

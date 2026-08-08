@@ -132,7 +132,7 @@ class UnapprovedOperatorRule(Rule):
         title="ONNX model uses an operator domain we have not vetted",
         severity=Severity.MEDIUM,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03,),
+        taxonomy=(OWASP_LLM03_2025,),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

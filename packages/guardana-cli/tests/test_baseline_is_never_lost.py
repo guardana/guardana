@@ -28,7 +28,7 @@ id: acme.broken.rule
 title: A rule whose evaluator nobody configured
 severity: high
 target_kind: endpoint
-taxonomy: [LLM01]
+taxonomy: [LLM01:2025]
 evaluator: no_such_evaluator
 prompts:
   - "hello"

@@ -14,7 +14,7 @@ from guardana.cli._mcp_run import McpConnection, run_mcp_probe, write_pin
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.target import McpError, McpServerTarget
-from guardana.core.target._mcp_client import HttpMcpTransport, _result, list_tools
+from guardana.core.target._mcp_client import HttpMcpTransport, _result, open_session
 
 _TOOLS = {"tools": [{"name": "read_file", "description": "Read a file."}]}
 
@@ -61,17 +61,17 @@ def test_a_non_json_reply_is_refused() -> None:
 
 def test_a_missing_tool_list_is_refused_rather_than_read_as_no_tools() -> None:
     with pytest.raises(McpError, match="did not return a tool list"):
-        list_tools(_Fake("not a list"))  # type: ignore[arg-type]
+        open_session(_Fake("not a list"))  # type: ignore[arg-type]
 
 
 def test_malformed_tool_entries_are_dropped_and_the_rest_survive() -> None:
-    tools = list_tools(_Fake(["junk", {"no_name": 1}, {"name": "ok", "description": "d"}]))  # type: ignore[arg-type]
+    session = open_session(_Fake(["junk", {"no_name": 1}, {"name": "ok", "description": "d"}]))  # type: ignore[arg-type]
 
-    assert [t.name for t in tools] == ["ok"]
+    assert [t.name for t in session.tools] == ["ok"]
 
 
 def test_a_tool_without_a_description_reads_as_empty_not_missing() -> None:
-    (tool,) = list_tools(_Fake([{"name": "bare"}]))  # type: ignore[arg-type]
+    (tool,) = open_session(_Fake([{"name": "bare"}])).tools  # type: ignore[arg-type]
 
     assert tool.description == ""
 

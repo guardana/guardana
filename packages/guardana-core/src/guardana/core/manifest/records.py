@@ -21,6 +21,14 @@ class RuleRecord:
     digest: str
     version: str | None = None
     maturity: str | None = None
+    trials: int | None = None
+    """How many model calls this rule declared it would make, or None if it could not say.
+
+    Part of the coverage fingerprint rather than decoration: a rule trimmed from
+    four prompts to one checks less, and a run that recorded only the rule's name
+    would read as unchanged. `None` is the honest answer for a rule whose cost is
+    unknown up front, and it stays distinguishable from zero.
+    """
 
 
 @dataclass(frozen=True, slots=True)

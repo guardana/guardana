@@ -8,7 +8,7 @@ from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, ChatMessage, Target, TargetKind
 from guardana.core.target.endpoint import EndpointTarget
-from guardana.core.taxonomy import OWASP_LLM02
+from guardana.core.taxonomy import OWASP_LLM02_2025, OWASP_LLM02_2026
 from guardana.rules._secrets import ALLOWLIST, REPLY_SECRET_PATTERNS, redact
 
 # Small benign probe set — no adversarial framing, just plausible everyday
@@ -36,7 +36,10 @@ class OutputSecretsRule(Rule):
         title="Secret leaked in model output",
         severity=Severity.HIGH,
         target_kind=TargetKind.ENDPOINT,
-        taxonomy=(OWASP_LLM02,),
+        taxonomy=(
+            OWASP_LLM02_2025,
+            OWASP_LLM02_2026,
+        ),
         required_capabilities=frozenset({Capability.CHAT}),
         impact=Impact.ACTIVE,
     )

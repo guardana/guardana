@@ -1,6 +1,6 @@
 from guardana.core.report import Evidence, Finding, ScanResult
 from guardana.core.severity import Severity
-from guardana.core.taxonomy import OWASP_LLM05
+from guardana.core.taxonomy import OWASP_LLM05_2025
 
 
 def _finding(sev: Severity) -> Finding:
@@ -8,7 +8,7 @@ def _finding(sev: Severity) -> Finding:
         rule_id="guardana.demo",
         severity=sev,
         title="demo",
-        taxonomy=(OWASP_LLM05,),
+        taxonomy=(OWASP_LLM05_2025,),
         target_ref="models/demo.pkl",
         evidence=Evidence(summary="found something"),
     )

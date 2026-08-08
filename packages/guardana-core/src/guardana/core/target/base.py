@@ -49,6 +49,21 @@ class Target(ABC):
     def ref(self) -> str:
         """Stable identifier used in findings and reports."""
 
+    def protocols(self) -> dict[str, str]:
+        """Protocol versions this target actually negotiated, by protocol name.
+
+        Empty by default, and empty means "none were negotiated" — a plain HTTP chat
+        endpoint negotiates nothing. A target that speaks a versioned protocol
+        overrides this and reports what the *server* answered, not what the client
+        offered: a server that came back with an older revision supports fewer
+        methods, so the run verified less, and the handshake is the only place that
+        is knowable.
+
+        Recorded in the run's coverage fingerprint, so a comparison can say the
+        reach of the two runs differed instead of reading it as the system changing.
+        """
+        return {}
+
     def usage(self) -> "TargetUsage | None":
         """Return what this target has spent, or None when it does not meter itself.
 

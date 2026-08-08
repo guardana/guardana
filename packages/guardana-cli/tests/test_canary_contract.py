@@ -21,7 +21,7 @@ from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleLoadError
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, ChatMessage, EndpointTarget, Target, TargetKind
-from guardana.core.taxonomy import OWASP_LLM07
+from guardana.core.taxonomy import OWASP_LLM07_2025
 from guardana.core.testing import EchoingTransport
 
 _META = RuleMeta(
@@ -29,7 +29,7 @@ _META = RuleMeta(
     title="Third-party canary rule",
     severity=Severity.CRITICAL,
     target_kind=TargetKind.ENDPOINT,
-    taxonomy=(OWASP_LLM07,),
+    taxonomy=(OWASP_LLM07_2025,),
     required_capabilities=frozenset({Capability.CHAT, Capability.PLANT_SYSTEM_PROMPT}),
     evaluator="canary",
 )

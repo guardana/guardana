@@ -14,7 +14,7 @@ _SCENARIO_YAML = (
     "title: demo scenario\n"
     "severity: high\n"
     "target_kind: endpoint\n"
-    "taxonomy: [LLM01]\n"
+    "taxonomy: [LLM01:2025]\n"
     "requires: [chat]\n"
     "stateful: false\n"
     "steps:\n"

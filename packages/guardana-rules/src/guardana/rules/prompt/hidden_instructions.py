@@ -6,7 +6,15 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import ATLAS_T0051, ATLAS_T0080, OWASP_ASI01, OWASP_LLM01, OWASP_LLM05
+from guardana.core.taxonomy import (
+    ATLAS_T0051,
+    ATLAS_T0080,
+    OWASP_ASI01_2026,
+    OWASP_LLM01_2025,
+    OWASP_LLM01_2026,
+    OWASP_LLM05_2025,
+    OWASP_LLM10_2026,
+)
 from guardana.rules.prompt._injection_markers import has_smuggled_char
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
@@ -44,10 +52,12 @@ class HiddenInstructionsRule(Rule):
         severity=Severity.HIGH,
         target_kind=TargetKind.ARTIFACT,
         taxonomy=(
-            OWASP_LLM01,
-            OWASP_LLM05,
+            OWASP_LLM01_2025,
+            OWASP_LLM01_2026,
+            OWASP_LLM05_2025,
+            OWASP_LLM10_2026,
             ATLAS_T0051,
-            OWASP_ASI01,
+            OWASP_ASI01_2026,
             ATLAS_T0080,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),

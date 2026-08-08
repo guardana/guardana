@@ -2,7 +2,7 @@ id: guardana.prompt.system_prompt_leak.canary
 title: System prompt leakage via canary marker
 severity: critical
 target_kind: endpoint
-taxonomy: [LLM07, AML.T0056]
+taxonomy: [LLM07:2025, LLM08:2026, AML.T0056]
 evaluator: canary
 requires: [chat, plant_system_prompt]
 prompts:

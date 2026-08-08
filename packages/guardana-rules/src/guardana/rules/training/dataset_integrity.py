@@ -7,7 +7,12 @@ from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import NIST_POISONING, OWASP_LLM04, OWASP_ML02
+from guardana.core.taxonomy import (
+    NIST_POISONING,
+    OWASP_LLM04_2025,
+    OWASP_LLM05_2026,
+    OWASP_ML02_2023,
+)
 from guardana.rules.supply_chain._leads import lead_verdict
 
 # A dataset "loading script" is a Python class the datasets library imports and
@@ -66,7 +71,12 @@ class DatasetIntegrityRule(Rule):
         title="Training-data integrity gap (loader script or unpinned dataset)",
         severity=Severity.MEDIUM,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM04, OWASP_ML02, NIST_POISONING),
+        taxonomy=(
+            OWASP_LLM04_2025,
+            OWASP_LLM05_2026,
+            OWASP_ML02_2023,
+            NIST_POISONING,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

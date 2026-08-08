@@ -12,7 +12,12 @@ from pathlib import Path
 from typing import Any, cast
 
 from guardana.core.evaluator.base import Outcome, Verdict
-from guardana.core.manifest.load import ManifestLoadError, manifest_from_dict, migrate_v1
+from guardana.core.manifest.load import (
+    ManifestLoadError,
+    manifest_from_dict,
+    migrate_v1,
+    migrate_v2,
+)
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Evidence, Finding
@@ -21,17 +26,41 @@ from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunReport
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
-from guardana.core.taxonomy import TaxonomyRef, resolve
+from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
-_MIGRATIONS = {1: migrate_v1}
-"""Older document versions this build can carry forward, by the version they are.
+_MIGRATIONS = {1: migrate_v1, 2: migrate_v2}
+"""One step forward per version, keyed by the version the document *is*.
+
+Chained rather than jumped: a schema-1 run goes through 2 on its way to 3, so a
+field introduced at 2 is present in the result and nobody has to write — or
+remember to update — a direct 1-to-3 migration for every future version.
 
 Migration happens in memory, at load: a team that upgrades Guardana on Wednesday
 must still be able to compare last week's run on Thursday. `guardana run migrate`
 uses the same functions to rewrite a file on disk for anyone who wants the richer
 document without re-running.
 """
+
+
+MIGRATABLE_VERSIONS = frozenset(_MIGRATIONS)
+"""Which declared versions this build can carry forward. Named so `run migrate`
+does not restate the list and drift from it."""
+
+
+def migrate_forward(document: dict[str, Any], version: int) -> dict[str, Any]:
+    """Carry a document from `version` up to the current one, one step at a time.
+
+    Shared with `guardana run migrate`, so a file rewritten on disk and a run read
+    into memory go through exactly the same steps. Two implementations of "bring
+    this forward" would eventually disagree, and the disagreement would be an
+    evidence file that loads differently than it was written.
+    """
+    raw = document
+    while version < REPORT_SCHEMA_VERSION:
+        raw = _MIGRATIONS[version](raw)
+        version += 1
+    return raw
 
 
 class ReportLoadError(Exception):
@@ -63,7 +92,7 @@ def load_report(path: Path) -> RunReport:
         # exit-code table means "a finding failed the policy" — the one thing an
         # unreadable file is not.
         if migrated_from is not None:
-            raw = _MIGRATIONS[migrated_from](raw)
+            raw = migrate_forward(raw, migrated_from)
         manifest = manifest_from_dict(raw.get("run"))
     except ManifestLoadError as exc:
         raise ReportLoadError(f"{path}: {exc}") from exc
@@ -182,19 +211,26 @@ def _taxonomy_ref(raw: object, path: Path) -> TaxonomyRef:
 
     The taxonomy dictionary is deliberately open — a third party registers their
     own through the `guardana.taxonomies` entry point — so a run produced with
-    someone's rule pack installed must still load on a machine without it. The
-    title is recovered from the registry when the id is known and left empty when
-    it is not; refusing instead would punish exactly the extensibility the entry
-    point exists for.
+    someone's rule pack installed must still load on a machine without it.
+    Refusing instead would punish exactly the extensibility the entry point
+    exists for.
+
+    **A recorded reference is read as the edition it names, never upgraded.** The
+    lookup is on the `(framework, id)` pair the document carries, so a `LLM07` from
+    `OWASP-LLM-2025` stays System Prompt Leakage in a build that also ships the 2026
+    edition, where the same short id means Misinformation. Where this build has no
+    catalogue for the pair, the recorded title travels with the reference (schema 3
+    onwards) so an offline report stays intelligible; a document written before that
+    field existed leaves it empty, which is what it knew.
     """
     if not isinstance(raw, dict):
         raise ReportLoadError(f"{path}: every taxonomy entry must be an object")
     framework = _str(raw, "framework", path)
     ref_id = _str(raw, "id", path)
-    known = resolve(ref_id)
-    if known is not None and known.framework == framework:
+    known = resolve_recorded(framework, ref_id)
+    if known is not None:
         return known
-    return TaxonomyRef(framework=framework, id=ref_id, title="")
+    return TaxonomyRef.recorded(framework, ref_id, str(raw.get("title") or ""))
 
 
 def _errors(raw: object, path: Path) -> tuple[CheckError, ...]:

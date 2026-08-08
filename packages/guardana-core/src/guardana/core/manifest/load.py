@@ -11,16 +11,19 @@ from datetime import UTC, datetime
 from typing import Any
 
 from guardana.core.gate import GateOutcome
+from guardana.core.manifest.coverage import CoverageRecord, TaxonomyCatalogRecord
 from guardana.core.manifest.fingerprint import digest_of
 from guardana.core.manifest.identity import RunSource, SourceKind, TargetIdentity, ToolInfo
-from guardana.core.manifest.model import MANIFEST_SCHEMA_VERSION, RunManifest
+from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleRecord
+from guardana.core.manifest.serialize import SCHEMA_URL
 from guardana.core.manifest.settings import ConfigurationRef, EvidenceMode, ExecutionSettings
 from guardana.core.manifest.settings import PrivacyRecord as _PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.report.stop import StopReason
 from guardana.core.target import TargetKind
+from guardana.core.taxonomy import resolve_recorded
 
 
 class ManifestLoadError(Exception):
@@ -189,6 +192,42 @@ def _rules(raw: object) -> tuple[RuleRecord, ...]:
                 digest=_text(block, "digest", "run.rules[]"),
                 version=_optional_text(block, "version"),
                 maturity=_optional_text(block, "maturity"),
+                trials=_optional_int(block, "trials"),
+            )
+        )
+    return tuple(records)
+
+
+def _coverage(raw: object) -> CoverageRecord:
+    """Read the coverage fingerprint, leaving it unknown when the document has none.
+
+    An absent block is `None` rather than an empty one: a document written before
+    coverage was recorded did not measure the same coverage, it measured none, and
+    `diff` has to be able to tell those apart before it says "coverage is unchanged".
+    """
+    block = raw if isinstance(raw, dict) else {}
+    protocols = block.get("protocols")
+    return CoverageRecord(
+        digest=_optional_text(block, "digest"),
+        taxonomies=_taxonomy_catalogs(block.get("taxonomies")),
+        protocols=(
+            {str(k): str(v) for k, v in protocols.items()} if isinstance(protocols, dict) else {}
+        ),
+    )
+
+
+def _taxonomy_catalogs(raw: object) -> tuple[TaxonomyCatalogRecord, ...]:
+    if not isinstance(raw, list):
+        return ()
+    records = []
+    for entry in raw:
+        block = _mapping(entry, "run.coverage.taxonomies[]")
+        records.append(
+            TaxonomyCatalogRecord(
+                framework=_text(block, "framework", "run.coverage.taxonomies[]"),
+                digest=_text(block, "digest", "run.coverage.taxonomies[]"),
+                entries=_optional_int(block, "entries") or 0,
+                version=_optional_text(block, "version"),
             )
         )
     return tuple(records)
@@ -281,6 +320,7 @@ def manifest_from_dict(raw: object, *, migrated_from: int | None = None) -> RunM
         usage=_usage(block.get("usage")),
         rules=_rules(block.get("rules")),
         evaluators=_evaluators(block.get("evaluators")),
+        coverage=_coverage(block.get("coverage")),
         result_summary=_result_summary(block.get("result_summary")),
         privacy=_privacy(block.get("privacy")),
         migrated_from=(
@@ -309,6 +349,89 @@ def _as_utc_text(raw: object) -> str | None:
             f"run.started_at has no timezone ({raw!r}), so the instant it names is unknowable"
         )
     return parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def migrate_v2(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-2 saved run as a schema-3 one, inventing nothing.
+
+    Three additions, and only one of them can carry information forward:
+
+    - **A title on every taxonomy reference.** Recovered from the installed
+      catalogue when the recorded `(framework, id)` pair is one this build holds,
+      and left empty when it is not. That is recovery rather than invention: the
+      pair names one control whatever else is installed, which is exactly why the
+      reference is stored as a pair. A reference from somebody's rule pack stays
+      titleless, because nothing here knows what it was called.
+    - **`trials` on each rule** — null. Version 2 recorded which rules ran, not how
+      many calls each declared, and a zero would say the run sent none.
+    - **A coverage block** — digest null, no catalogues, no protocols. Computing a
+      fingerprint now would hash *this* build's catalogues into *that* run's
+      evidence, which is the re-derivation the stored-field convention exists to
+      prevent.
+
+    The reference itself is never rewritten. A `LLM07` recorded under
+    `OWASP-LLM-2025` stays System Prompt Leakage, and this build's 2026 edition —
+    where the same short id is Misinformation — does not touch it.
+    """
+    run = _mapping(document.get("run"), "run")
+    rules = run.get("rules")
+    return {
+        **document,
+        "schema_version": 3,
+        # Restated, not carried: version 2's `$schema` names the v2 contract, and a
+        # migrated document that still pointed at it would tell a consumer it is
+        # holding a document it is not. `run migrate` writes this file to disk, so
+        # the wrong identifier travels.
+        "$schema": SCHEMA_URL,
+        "findings": _titled(document.get("findings")),
+        "unverified": _titled(document.get("unverified")),
+        "waived": _titled(document.get("waived")),
+        "run": {
+            **run,
+            "rules": [
+                {**_mapping(rule, "run.rules[]"), "trials": None}
+                for rule in (rules if isinstance(rules, list) else [])
+            ],
+            "coverage": {"digest": None, "taxonomies": [], "protocols": {}},
+        },
+    }
+
+
+def _titled(findings: object) -> list[dict[str, Any]]:
+    """Add the recorded title to every taxonomy reference in one finding channel.
+
+    Refuses a malformed channel rather than dropping it. The reader
+    (`guardana.core.report.load`) raises on a taxonomy that is not a list; a
+    migration that quietly rewrote one to `[]` would slip past the reader's check by
+    fixing the document first, and the evidence would come back with its mapping
+    silently gone.
+    """
+    if findings is None:
+        return []
+    if not isinstance(findings, list):
+        raise ManifestLoadError("a finding channel must be a list")
+    out = []
+    for finding in findings:
+        block = _mapping(finding, "findings[]")
+        taxonomy = block.get("taxonomy")
+        if taxonomy is not None and not isinstance(taxonomy, list):
+            raise ManifestLoadError("a finding's 'taxonomy' must be a list")
+        out.append(
+            {
+                **block,
+                "taxonomy": [
+                    _titled_ref(_mapping(ref, "findings[].taxonomy[]")) for ref in (taxonomy or [])
+                ],
+            }
+        )
+    return out
+
+
+def _titled_ref(ref: dict[str, Any]) -> dict[str, Any]:
+    framework = _text(ref, "framework", "findings[].taxonomy[]")
+    local_id = _text(ref, "id", "findings[].taxonomy[]")
+    known = resolve_recorded(framework, local_id)
+    return {**ref, "title": known.title if known is not None else ""}
 
 
 def migrate_v1(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -353,7 +476,12 @@ def migrate_v1(document: Mapping[str, Any]) -> dict[str, Any]:
         # which `additionalProperties: false` rejects — so `run migrate` wrote a
         # document that failed the very schema it claims to target, and every
         # unit test passed because they asserted on the loaded objects.
-        "schema_version": MANIFEST_SCHEMA_VERSION,
+        # Version 2, not the current version: each migration takes one step, and the
+        # loader chains them. A single hop that claimed the newest version would
+        # write a document missing every field the versions in between introduced —
+        # and it would keep claiming to be current after the next schema change,
+        # with nothing to notice.
+        "schema_version": 2,
         "findings": document.get("findings", []),
         "unverified": document.get("unverified", []),
         "waived": document.get("waived", []),

@@ -10,12 +10,12 @@ from typing import Annotated
 
 from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, field_validator
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 # A fleet upgrades one agent at a time, so the collector accepts the previous
 # envelopes too. An older agent simply reports less — which is honest, because it
 # could not observe more: a v2 agent had no `errors` channel, and a v3 agent
 # counted its rules without naming them.
-SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4, 5, 6, 7})
+SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4, 5, 6, 7, 8})
 
 # Ingest is untrusted input: an unbounded body would let one POST exhaust the
 # collector's memory (the store bounds submission *count*, not bytes). These caps
@@ -27,10 +27,22 @@ _Text = Annotated[str, StringConstraints(max_length=65_536)]
 
 
 class TaxonomyRefIn(BaseModel):
-    """A standards reference (OWASP/ATLAS/NIST) carried by a finding."""
+    """A standards reference (OWASP/ATLAS/NIST) carried by a finding.
+
+    `framework` and `id` together are the identity: a short id names different
+    controls in different editions of one framework, so neither is enough alone.
+    """
 
     framework: _Str
     id: _Str
+    title: _Str | None = None
+    """What the entry is called, as the agent recorded it (v8).
+
+    Optional, because a v2-to-v7 agent sends none and an absent title is honest:
+    that agent could not observe one. The collector never fills it in — it holds no
+    catalogue, by design, and inventing a title for `LLM07` would mean guessing at
+    an edition.
+    """
 
 
 class EvidenceIn(BaseModel):

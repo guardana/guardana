@@ -6,9 +6,10 @@ from typing import Annotated
 
 import typer
 from guardana.core.manifest import RunManifest
-from guardana.core.manifest.load import ManifestLoadError, migrate_v1
+from guardana.core.manifest.load import ManifestLoadError
 from guardana.core.manifest.serialize import manifest_to_dict
 from guardana.core.report import ReportLoadError, load_report
+from guardana.core.report.load import MIGRATABLE_VERSIONS, migrate_forward
 from guardana.core.report.run import REPORT_SCHEMA_VERSION
 
 _INVALID_USAGE = 3
@@ -109,14 +110,15 @@ def migrate(
     if version == REPORT_SCHEMA_VERSION:
         typer.echo(f"{path} is already at schema {REPORT_SCHEMA_VERSION}; nothing to do")
         return
-    if version != 1:
+    if version not in MIGRATABLE_VERSIONS:
         typer.echo(
-            f"error: {path} has schema_version {version!r}, which this build cannot migrate",
+            f"error: {path} has schema_version {version!r}, which this build cannot migrate "
+            f"(it can migrate {sorted(MIGRATABLE_VERSIONS)})",
             err=True,
         )
         raise typer.Exit(code=_INVALID_USAGE)
     try:
-        migrated = migrate_v1(raw)
+        migrated = migrate_forward(raw, version)
     except ManifestLoadError as exc:
         # Refused before anything is written. The default destination is the file
         # itself, so a migration that half-succeeded would overwrite the only copy

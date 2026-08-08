@@ -37,7 +37,7 @@ from guardana.core.report.load import ReportLoadError, load_report
 from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
-from guardana.core.taxonomy import OWASP_LLM01
+from guardana.core.taxonomy import OWASP_LLM01_2025
 from guardana.report import get_renderer
 
 _STARTED = datetime(2026, 7, 31, 9, 12, 44, tzinfo=UTC)
@@ -64,7 +64,7 @@ def _finding(rule_id: str, *, outcome: str = "fail") -> Finding:
         rule_id=rule_id,
         severity=Severity.HIGH,
         title="demo",
-        taxonomy=(OWASP_LLM01,),
+        taxonomy=(OWASP_LLM01_2025,),
         target_ref="http://localhost:11434#llama3",
         evidence=Evidence(summary="model complied", detail="…redacted…"),
         verdict=Verdict(outcome, 0.8, "2/2 judge samples agreed", "llm_judge"),  # type: ignore[arg-type]

@@ -11,9 +11,11 @@ from guardana.core.taxonomy import (
     ATLAS_T0011_002,
     ATLAS_T0051,
     ATLAS_T0110,
-    OWASP_ASI04,
-    OWASP_LLM01,
-    OWASP_LLM05,
+    OWASP_ASI04_2026,
+    OWASP_LLM01_2025,
+    OWASP_LLM01_2026,
+    OWASP_LLM05_2025,
+    OWASP_LLM10_2026,
 )
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_hidden_char
 from guardana.rules.supply_chain._leads import lead_verdict
@@ -57,10 +59,12 @@ class McpToolPoisoningRule(Rule):
         severity=Severity.HIGH,
         target_kind=TargetKind.ARTIFACT,
         taxonomy=(
-            OWASP_LLM01,
-            OWASP_LLM05,
+            OWASP_LLM01_2025,
+            OWASP_LLM01_2026,
+            OWASP_LLM05_2025,
+            OWASP_LLM10_2026,
             ATLAS_T0051,
-            OWASP_ASI04,
+            OWASP_ASI04_2026,
             ATLAS_T0110,
             ATLAS_T0011_002,
         ),

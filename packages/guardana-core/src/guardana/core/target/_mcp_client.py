@@ -36,6 +36,20 @@ class McpTool:
     description: str
 
 
+@dataclass(frozen=True, slots=True)
+class McpSession:
+    """What one handshake established: the agreed protocol version, and the tools offered.
+
+    `protocol_version` is what the *server* answered. None means it stated none,
+    which is not the same as agreeing to what the client offered — and a run whose
+    server speaks an older revision reached fewer methods, which is a coverage fact
+    rather than a detail.
+    """
+
+    protocol_version: str | None
+    tools: tuple[McpTool, ...]
+
+
 class HttpMcpTransport:
     """Talks JSON-RPC to a streamable-HTTP MCP server. Starts nothing."""
 
@@ -115,12 +129,26 @@ class StdioMcpTransport:
             self._process.kill()
 
 
-def list_tools(transport: HttpMcpTransport | StdioMcpTransport) -> tuple[McpTool, ...]:
-    """Initialise the session and return every tool the server advertises."""
-    transport.request(
+def open_session(transport: HttpMcpTransport | StdioMcpTransport) -> McpSession:
+    """Initialise the session and return the negotiated version with every tool offered.
+
+    Both from one handshake, because there is only one: asking for the protocol
+    version separately would double the initialize calls for a fact the first one
+    already returned, and a scan's cost has to grow with the target rather than with
+    how many questions the code asks about it.
+    """
+    result = transport.request(
         "initialize",
         {"protocolVersion": _PROTOCOL_VERSION, "capabilities": {}, "clientInfo": _CLIENT},
     )
+    agreed = result.get("protocolVersion")
+    return McpSession(
+        protocol_version=agreed if isinstance(agreed, str) else None,
+        tools=_tools(transport),
+    )
+
+
+def _tools(transport: HttpMcpTransport | StdioMcpTransport) -> tuple[McpTool, ...]:
     result = transport.request("tools/list", {})
     raw = result.get("tools")
     if not isinstance(raw, list):

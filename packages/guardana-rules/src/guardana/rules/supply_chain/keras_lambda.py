@@ -11,9 +11,10 @@ from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import (
     ATLAS_T0018,
     NIST_SUPPLY_CHAIN,
-    OWASP_ASI05,
-    OWASP_LLM05,
-    OWASP_ML06,
+    OWASP_ASI05_2026,
+    OWASP_LLM05_2025,
+    OWASP_LLM10_2026,
+    OWASP_ML06_2023,
 )
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded
@@ -65,11 +66,12 @@ class KerasLambdaRule(Rule):
         severity=Severity.HIGH,
         target_kind=TargetKind.ARTIFACT,
         taxonomy=(
-            OWASP_LLM05,
-            OWASP_ML06,
+            OWASP_LLM05_2025,
+            OWASP_LLM10_2026,
+            OWASP_ML06_2023,
             ATLAS_T0018,
             NIST_SUPPLY_CHAIN,
-            OWASP_ASI05,
+            OWASP_ASI05_2026,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )

@@ -2,7 +2,7 @@ id: guardana.scenario.gradual_jailbreak
 title: Gradual multi-turn jailbreak
 severity: high
 target_kind: endpoint
-taxonomy: [LLM01, AML.T0051]
+taxonomy: [LLM01:2025, LLM01:2026, AML.T0051]
 requires: [chat]
 stateful: false
 steps:

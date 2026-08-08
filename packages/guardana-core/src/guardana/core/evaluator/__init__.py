@@ -1,3 +1,4 @@
+from guardana.core.evaluator.amplification import AmplificationEvaluator
 from guardana.core.evaluator.base import (
     Evaluator,
     Expectation,
@@ -12,6 +13,7 @@ from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
 from guardana.core.evaluator.tool_call import ToolCallEvaluator
 
 __all__ = [
+    "AmplificationEvaluator",
     "CanaryEvaluator",
     "Evaluator",
     "Expectation",

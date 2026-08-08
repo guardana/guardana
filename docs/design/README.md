@@ -29,6 +29,7 @@ Statuses in use:
 |---|---|
 | `proposed` | written, not agreed |
 | `accepted, not yet implemented` | agreed; the code is not there yet |
+| `accepted, implemented — ships in the next release` | agreed and built; no release carries it yet |
 | `implemented in X` | shipped in that release |
 | `superseded by <file>` | a later document replaces it |
 

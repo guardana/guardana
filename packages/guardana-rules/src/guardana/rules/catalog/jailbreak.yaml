@@ -2,7 +2,7 @@ id: guardana.prompt.jailbreak.dan_style
 title: Jailbreak via persona override and encoding smuggling
 severity: high
 target_kind: endpoint
-taxonomy: [LLM01]
+taxonomy: [LLM01:2025, LLM01:2026]
 evaluator: keyword
 requires: [chat]
 prompts:

@@ -77,6 +77,14 @@ class RunContext:
     compares two cycles of one process, where the rules are the same objects by
     construction and there is nothing to tell apart."""
 
+    tool_version: str = ""
+    """Which build produced this run, or empty when the caller does not know.
+
+    Read only to qualify what a changed digest means. Across a version boundary a
+    digest can move because the rule changed *or* because what a digest covers
+    changed, and a note that asserted the first would be confidently wrong every
+    time the second happened."""
+
 
 _NO_CONTEXT = RunContext()
 """What the monitor gets: two cycles of one process, one target, one rule set."""
@@ -131,7 +139,7 @@ def compare(
     return RunDiff(
         changes=tuple(changes),
         unchanged=unchanged,
-        notes=_notes(ran_before & ran_after, digests_before, digests_after),
+        notes=_notes(ran_before & ran_after, before_context, after_context),
         incomplete=_incomplete(before, after),
     )
 
@@ -314,13 +322,32 @@ def _rule_changed(rule_id: str, before: Mapping[str, str], after: Mapping[str, s
 
 
 def _notes(
-    shared: frozenset[str], before: Mapping[str, str], after: Mapping[str, str]
+    shared: frozenset[str],
+    before: RunContext,
+    after: RunContext,
 ) -> tuple[str, ...]:
-    changed = sorted(r for r in shared if _rule_changed(r, before, after))
+    """Say which rules were not the same test in both runs, and how sure that is.
+
+    Across two runs of one build, a changed digest means a changed rule. Across a
+    version boundary it means one of two things — the rule changed, or what a
+    digest covers changed — and the note says so rather than asserting the first.
+    Removing the framework mapping from the digest was such a change, and it moved
+    every digest in the release it shipped in: a note reading "19 rules changed
+    definition" there would have buried the one rule whose corpus actually moved.
+    """
+    changed = sorted(r for r in shared if _rule_changed(r, before.rules, after.rules))
     if not changed:
         return ()
+    named = f"{', '.join(changed[:3])}{'…' if len(changed) > 3 else ''}"  # noqa: PLR2004
+    if before.tool_version and after.tool_version and before.tool_version != after.tool_version:
+        return (
+            f"{len(changed)} rule(s) have a different digest ({named}), and the runs came "
+            f"from different Guardana versions ({before.tool_version} and "
+            f"{after.tool_version}) — across a version boundary a digest moves when the "
+            f"rule changes and also when what a digest covers changes, so this alone says "
+            f"nothing about either system",
+        )
     return (
-        f"{len(changed)} rule(s) changed definition between these runs "
-        f"({', '.join(changed[:3])}{'…' if len(changed) > 3 else ''}) — a different "  # noqa: PLR2004
-        f"result there may be the sharper test rather than a worse system",
+        f"{len(changed)} rule(s) changed definition between these runs ({named}) — a "
+        f"different result there may be the sharper test rather than a worse system",
     )

@@ -3,9 +3,10 @@ from collections.abc import Sequence
 from guardana.core.target._mcp_client import (
     HttpMcpTransport,
     McpError,
+    McpSession,
     McpTool,
     StdioMcpTransport,
-    list_tools,
+    open_session,
 )
 from guardana.core.target.base import Capability, Target, TargetKind
 from guardana.core.usage import TargetUsage, UsageMeter
@@ -55,7 +56,7 @@ class McpServerTarget(Target):
             self._ref = url
         else:
             raise McpError("an MCP target needs a URL or a command")
-        self._tools: tuple[McpTool, ...] | None = None
+        self._session: McpSession | None = None
         self._meter = UsageMeter()
 
     def capabilities(self) -> set[Capability]:
@@ -76,16 +77,26 @@ class McpServerTarget(Target):
         """
         return self._meter.snapshot()
 
+    def protocols(self) -> dict[str, str]:
+        """Report the MCP revision this server agreed to, once a session has been opened.
+
+        Empty until then, and empty when the server stated none — never the version
+        Guardana offered. Recording our own offer would put a coverage claim in the
+        manifest that no server ever confirmed.
+        """
+        agreed = self._session.protocol_version if self._session is not None else None
+        return {"mcp": agreed} if agreed else {}
+
     def list_tools(self) -> tuple[McpTool, ...]:
         """Every tool the server advertises, fetched once per run and cached.
 
         Cached because several rules read the same manifest and a scan's cost must
         grow with the target rather than with how many rules look at it.
         """
-        if self._tools is None:
-            self._tools = list_tools(self._transport)
+        if self._session is None:
+            self._session = open_session(self._transport)
             self._meter.record(None)
-        return self._tools
+        return self._session.tools
 
     def close(self) -> None:
         """Release the connection, stopping a process if we started one."""

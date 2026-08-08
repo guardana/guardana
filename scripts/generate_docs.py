@@ -77,7 +77,7 @@ def _catalog(rules: list[Rule]) -> str:
     ]
     for rule in rules:
         meta = rule.meta
-        taxonomy = ", ".join(f"`{t.id}`" for t in meta.taxonomy) or "—"
+        taxonomy = ", ".join(f"`{t.reference}`" for t in meta.taxonomy) or "—"
         lines.append(f"| `{meta.id}` | {meta.severity.name} | {meta.surface.value} | {taxonomy} |")
     return "\n".join(lines) + "\n"
 

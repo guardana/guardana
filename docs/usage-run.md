@@ -60,17 +60,42 @@ requests are different facts; only one of them lets you budget the next run. The
 same distinction runs through the whole document: `null` is always "not known",
 never "not applicable" and never zero.
 
+## What a run could check
+
+`coverage` is the other half of the promise `rules_run` started. A run whose corpus
+was trimmed, whose evaluator stopped being installed, whose target lost a capability
+or whose MCP server answered an older protocol revision reports fewer findings — and
+subtracting two lists reads every one of those as an improvement.
+
+So the manifest carries one fingerprint over all of it, plus the framework
+catalogues that were installed, each pinned by digest. That is what lets a report be
+read years later without asking which edition of a framework was in use: `LLM07`
+means System Prompt Leakage in `OWASP-LLM-2025` and Misinformation in
+`OWASP-LLM-2026`, and the run says which one it held. `guardana diff` compares the
+fingerprint and reports a difference as *the reach changed*, separately from what
+was found. A run that recorded none is reported as **unknown reach**, never as equal
+reach.
+
 ## Older runs still load
 
-A run written by 0.6 uses schema version 1. `guardana diff` and `guardana run
-inspect` **migrate it forward in memory** as they read it, so upgrading Guardana
-does not strand the evidence you already have.
+A run written by 0.6 uses schema version 1, and one written by 0.12 uses version 2.
+`guardana diff` and `guardana run inspect` **migrate them forward in memory** as they
+read them, one step at a time, so upgrading Guardana does not strand the evidence you
+already have.
 
-What version 1 never recorded arrives as an explicit unknown rather than as a
-default — no usage, no execution settings, and **no gate verdict**. Recomputing
-the verdict during migration would apply today's thresholds to another build's
-run, which is exactly what storing the gate as a field exists to prevent.
-`inspect` says so at the bottom of its output, and `diff` adds a note.
+What an older version never recorded arrives as an explicit unknown rather than as a
+default — version 1 has no usage, no execution settings and **no gate verdict**;
+version 2 has no coverage fingerprint and no declared trial counts. Recomputing any
+of them during migration would apply today's build to another build's run, which is
+exactly what storing them as fields exists to prevent. `inspect` says so at the
+bottom of its output, and `diff` adds a note.
+
+One thing *is* recovered: the **title** of a framework reference, which version 3
+records beside its framework and id. It is looked up from the installed catalogue for
+the exact `(framework, id)` pair the document already carries, so nothing is guessed
+and no reference is remapped — a `LLM07` recorded under `OWASP-LLM-2025` stays System
+Prompt Leakage. A reference from a rule pack this build does not have stays
+titleless, because nothing here knows what it was called.
 
 To rewrite an old file on disk at the current schema:
 
@@ -94,8 +119,8 @@ missing.
 ## The document
 
 The saved-run schema lives at
-[`schemas/run-v2.schema.json`](../schemas/run-v2.schema.json), identified by
-`https://guardana.dev/schemas/run/v2.schema.json`. The version is in the
+[`schemas/run-v3.schema.json`](../schemas/run-v3.schema.json), identified by
+`https://guardana.dev/schemas/run/v3.schema.json`. The version is in the
 identifier, so a consumer can tell which contract it is holding before parsing
 anything; it changes whenever the change is not backwards-compatible. A test
 validates what Guardana writes against that file, so the schema cannot drift
@@ -105,7 +130,7 @@ Top level:
 
 | Key | What it is |
 |---|---|
-| `schema_version` | `2`. Stated once, for the whole document. |
+| `schema_version` | `3`. Stated once, for the whole document. |
 | `run` | the manifest — everything below |
 | `findings` / `unverified` / `waived` / `errors` / `observations` | the channels |
 
@@ -122,7 +147,8 @@ Inside `run`:
 | `configuration` | which settings produced it, **by digest** |
 | `execution` | what limits it ran under |
 | `usage` | what it actually consumed |
-| `rules` / `evaluators` | what did the checking, with digests and calibration |
+| `rules` / `evaluators` | what did the checking, with digests, declared trial counts and calibration |
+| `coverage` | what the run was *able* to check: one fingerprint, the framework catalogues it mapped against by digest, and any protocol versions the target negotiated |
 | `result_summary` | the counts, the gate, and whether the run was cut short |
 | `privacy` | which evidence policy was in force |
 

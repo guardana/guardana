@@ -264,7 +264,7 @@ Different changes need different review, so say which lane you are in:
 | Lane | What it touches | What review focuses on |
 |---|---|---|
 | **engine** | `guardana-core` | fail-closed behaviour, cost, API shape |
-| **rule / scenario** | `guardana-rules` | positive *and* negative fixture, taxonomy mapping, false-positive discussion |
+| **rule / scenario** | `guardana-rules` | positive *and* negative fixture, taxonomy mapping (a reference names its edition — `LLM07:2025`; run `guardana taxonomy` for what is installed), false-positive discussion |
 | **target / provider** | `guardana-core/target` | capability declaration, bounded reads, no credential in findings |
 | **evaluator** | `guardana-core/evaluator` | honest confidence, `inconclusive` never rendered as pass |
 | **reporter** | `guardana-report` | evidence redaction, schema version |

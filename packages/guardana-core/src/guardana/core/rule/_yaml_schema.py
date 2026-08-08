@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from guardana.core.evaluator.amplification import AmplificationEvaluator
 from guardana.core.evaluator.base import Expectation, check_expectation
 from guardana.core.evaluator.canary import CanaryEvaluator
 from guardana.core.evaluator.guard import GuardEvaluator
@@ -22,7 +23,7 @@ from guardana.core.rule.errors import RuleLoadError
 from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
-from guardana.core.taxonomy import TaxonomyRef, resolve
+from guardana.core.taxonomy import TaxonomyError, TaxonomyRef, resolve
 
 _ALLOWED_RULE_KEYS = frozenset(
     {
@@ -45,7 +46,14 @@ _TYPED_EXPECT_KEYS = frozenset({"canary", "goal"})
 # naming a third-party evaluator is checked by `Runner`, once discovery has
 # actually loaded the package that defines it.
 _BUILTIN_EXPECTS: dict[str, Mapping[str, bool]] = {
-    e.id: e.expects for e in (CanaryEvaluator, GuardEvaluator, KeywordEvaluator, LengthEvaluator)
+    e.id: e.expects
+    for e in (
+        AmplificationEvaluator,
+        CanaryEvaluator,
+        GuardEvaluator,
+        KeywordEvaluator,
+        LengthEvaluator,
+    )
 }
 _BUILTIN_EXPECTS[LlmJudgeEvaluator.id] = LlmJudgeEvaluator.expects
 
@@ -88,9 +96,20 @@ def str_list(value: object, what: str, path: Path) -> tuple[str, ...]:
 
 
 def _parse_taxonomy(value: object, path: Path) -> tuple[TaxonomyRef, ...]:
+    """Resolve every declared reference, refusing an unknown or under-specified one.
+
+    Two distinct failures, and conflating them would hide a real one. An id nobody
+    registered is a typo — the gate that has always been here. An id that names only
+    an edition's worth of controls (`LLM01`, held by both the 2025 and 2026 editions)
+    is *under-specified*: answering with either edition would silently decide what
+    this rule claims to an auditor.
+    """
     refs = []
     for ref_id in str_list(value, "taxonomy", path):
-        ref = resolve(ref_id)
+        try:
+            ref = resolve(ref_id)
+        except TaxonomyError as exc:
+            raise RuleLoadError(f"invalid rule in {path}: {exc}") from exc
         if ref is None:
             raise RuleLoadError(f"invalid rule in {path}: unknown taxonomy id {ref_id!r}")
         refs.append(ref)
@@ -193,14 +212,30 @@ def parse_expectation(raw: object, path: Path) -> Expectation:
     )
 
 
-def check_evaluator_expectations(meta: RuleMeta, expectation: Expectation, path: Path) -> None:
-    """Reject a rule whose evaluator — one core ships — needs an `expect` field it lacks."""
+def check_evaluator_expectations(
+    meta: RuleMeta,
+    expectation: Expectation,
+    path: Path,
+    *,
+    planted_in_declaration: bool = False,
+) -> None:
+    """Reject a rule whose evaluator — one core ships — needs an `expect` field it lacks.
+
+    `planted_in_declaration` is how an agent-run rule says it carries the marker
+    itself, in a tool schema or a canned tool result, rather than needing the probe
+    to plant one in a system prompt.
+    """
     expects = _BUILTIN_EXPECTS.get(meta.evaluator or "")
     if expects is not None:
         problem = check_expectation(meta.evaluator or "", expects, expectation)
         if problem is not None:
             raise RuleLoadError(f"invalid rule in {path}: {problem}")
-    require_canary_is_plantable(meta.evaluator == "canary", meta.required_capabilities, path)
+    require_canary_is_plantable(
+        expectation.canary is not None,
+        meta.required_capabilities,
+        path,
+        planted_in_declaration=planted_in_declaration,
+    )
     require_chat(meta.required_capabilities, path)
 
 
@@ -221,19 +256,35 @@ def require_chat(capabilities: frozenset[Capability], path: Path) -> None:
 
 
 def require_canary_is_plantable(
-    uses_canary: bool, capabilities: frozenset[Capability], path: Path
+    uses_canary: bool,
+    capabilities: frozenset[Capability],
+    path: Path,
+    *,
+    planted_in_declaration: bool = False,
 ) -> None:
-    """Reject a canary-graded rule that can't have its canary planted.
+    """Reject a rule whose canary would never be planted anywhere it could be found.
 
-    The canary evaluator only finds a leak if the marker was planted in the
-    target's system prompt — which the probe does only for a rule that declares
-    `requires: [plant_system_prompt]`. Without it the canary is never planted, the
-    evaluator never finds it, and the rule passes everything: a silent gate. So it
-    is a load-time error, not a rule that looks configured but checks nothing.
+    A canary only proves a leak if it was somewhere the model could leak it *from*.
+    There are exactly two such places: the target's system prompt, which the probe
+    plants for a rule declaring `requires: [plant_system_prompt]`, and the rule's
+    own declaration — a tool schema or a canned tool result an agent run hands over.
+    With neither, the marker is never planted, the grader finds nothing, and the
+    rule reports a confident pass for every model, leaky or not. So it is a
+    load-time error rather than a rule that looks configured and checks nothing.
+
+    Keyed on the declared `expect.canary`, not on the evaluator's name. `tool_call`
+    grades a canary in an outgoing tool argument and `canary` grades one in a
+    reply; a gate that only knew about the second would leave the first free to
+    hunt for a token nobody planted.
     """
-    if uses_canary and Capability.PLANT_SYSTEM_PROMPT not in capabilities:
+    if (
+        uses_canary
+        and not planted_in_declaration
+        and Capability.PLANT_SYSTEM_PROMPT not in (capabilities)
+    ):
         raise RuleLoadError(
-            f"invalid rule in {path}: evaluator 'canary' needs its marker planted, so "
-            f"the rule must declare requires: [plant_system_prompt] — otherwise the "
-            f"canary is never planted and the rule silently passes everything"
+            f"invalid rule in {path}: the rule declares expect.canary but nothing plants it — "
+            f"declare requires: [plant_system_prompt] so the probe plants it in the system "
+            f"prompt, or carry the marker in a tool description or a tool's 'returns'. "
+            f"Otherwise the canary is never planted and the rule silently passes everything"
         )

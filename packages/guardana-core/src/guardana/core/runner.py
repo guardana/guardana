@@ -162,6 +162,10 @@ class Runner:
             # the machine. A target that does not meter itself reports None, and
             # that travels all the way to the manifest as an explicit unknown.
             usage=target.usage(),
+            # Read after the rules ran: a protocol version is only known once a
+            # session has actually been opened, and asking before would record
+            # "nothing negotiated" for a server that negotiated fine.
+            protocols=target.protocols(),
             stopped_by=stopped_by,
         )
 

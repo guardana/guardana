@@ -106,6 +106,16 @@ def _checks(venv: Path, clean_directory: Path) -> list[Check]:
         # A rule catalog reaching the CLI through entry points is what makes every
         # other check meaningful: without it the scanner passes everything.
         Check("rules discovered", [guardana, "rules"], 0, expect=("guardana.",)),
+        # Framework catalogues are data files inside the wheel, not Python. If the
+        # build ever stopped shipping them, importing the engine would raise and
+        # every rule's mapping would fail to load — so a clean install has to read
+        # one back, not just start.
+        Check(
+            "taxonomy catalogues installed",
+            [guardana, "taxonomy", "LLM07:2025"],
+            0,
+            expect=("System Prompt Leakage", "LLM08:2026"),
+        ),
         Check("scan of clean input", [guardana, "scan", str(clean_directory)], 0),
         # And the other direction, because "found nothing" must be a result, not a
         # default: the deliberately malicious fixture has to fail the scan.

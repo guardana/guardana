@@ -1,0 +1,85 @@
+# The 2026 edition, published 3 August 2026. It re-ranked seven entries and renamed
+# one, and it did not renumber into empty space: LLM05, LLM06, LLM07, LLM08, LLM09
+# and LLM10 all name a different control than they did in the 2025 edition. That is
+# why an edition is part of a reference's identity and not a label beside it.
+#
+# `supersedes` lives here rather than in the 2025 file because a published catalogue
+# is never rewritten, and the 2025 edition could not describe a relationship to an
+# edition that did not exist when it shipped.
+scheme: OWASP-LLM
+edition: "2026"
+title: OWASP Top 10 for Large Language Model Applications
+source: https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/
+published: "2026-08-03"
+entries:
+  - id: LLM01
+    rank: 1
+    title: Prompt Injection
+    supersedes:
+      - ref: LLM01:2025
+        relation: broader
+        note: scope widened to cross-modal carriers, memory persistence and agentic blast radius
+  - id: LLM02
+    rank: 2
+    title: Sensitive Information Disclosure
+    supersedes:
+      - ref: LLM02:2025
+        relation: exact
+  - id: LLM03
+    rank: 3
+    title: Excessive Agency
+    supersedes:
+      - ref: LLM06:2025
+        relation: exact
+        note: up from #6 on incident data; the control itself is unchanged
+  - id: LLM04
+    rank: 4
+    title: Supply Chain
+    supersedes:
+      - ref: LLM03:2025
+        relation: broader
+        note: absorbs artifact-trust failure
+  - id: LLM05
+    rank: 5
+    title: Data and Model Poisoning
+    supersedes:
+      - ref: LLM04:2025
+        relation: broader
+        note: absorbs fine-tuning subversion
+  - id: LLM06
+    rank: 6
+    title: Unbounded Consumption
+    supersedes:
+      - ref: LLM10:2025
+        relation: related
+        note: >
+          reframed as cost asymmetry — a cheap request that is expensive to answer —
+          rather than raw consumption, so neither wording contains the other
+  - id: LLM07
+    rank: 7
+    title: Misinformation
+    supersedes:
+      - ref: LLM09:2025
+        relation: exact
+  - id: LLM08
+    rank: 8
+    title: Hidden Context Exposure
+    supersedes:
+      - ref: LLM07:2025
+        relation: broader
+        note: >
+          renamed and widened past the system prompt to tool schemas, retrieved
+          content and credentials embedded in context
+  - id: LLM09
+    rank: 9
+    title: Vector and Embedding Weaknesses
+    supersedes:
+      - ref: LLM08:2025
+        relation: exact
+  - id: LLM10
+    rank: 10
+    title: Improper Output Handling
+    supersedes:
+      - ref: LLM05:2025
+        relation: exact
+        note: down from #5 on incident data; the control itself is unchanged

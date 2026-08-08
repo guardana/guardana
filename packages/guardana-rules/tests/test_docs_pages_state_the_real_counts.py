@@ -20,6 +20,8 @@ from guardana.rules import provide_rules
 _BUILD_RE = re.compile(r"\*\*Build-time \(static, artifact\)\*\* — (\d+) rules")
 _RUNTIME_RE = re.compile(r"\*\*Runtime \(dynamic, endpoint\)\*\* — (\d+) rules")
 _TRANSCRIPT_RE = re.compile(r"^\d+ finding\(s\); (\d+) rule\(s\) run", re.MULTILINE)
+_RUN_SCHEMA_RE = re.compile(r"\| `schema_version` \| `(\d+)`\.")
+_ENVELOPE_RE = re.compile(r"ENVELOPE_SCHEMA_VERSION`, currently\n`(\d+)`\)")
 
 
 def _docs() -> Path:
@@ -68,3 +70,27 @@ def test_the_scan_page_transcripts_run_the_rules_a_scan_really_runs() -> None:
     stated = _counts(_TRANSCRIPT_RE, _read("usage-scan.md"), "docs/usage-scan.md")
 
     assert set(stated) == {build}, f"docs/usage-scan.md shows {stated} rule(s) run; {build} do"
+
+
+def test_the_saved_run_page_states_the_schema_version_this_build_writes() -> None:
+    """A document version is the first thing a consumer branches on.
+
+    A page naming the wrong one sends somebody to the wrong contract, and the field
+    table underneath it describes a document they will not receive.
+    """
+    from guardana.core.report.run import REPORT_SCHEMA_VERSION  # noqa: PLC0415
+
+    stated = _counts(_RUN_SCHEMA_RE, _read("usage-run.md"), "docs/usage-run.md")
+
+    assert stated == [REPORT_SCHEMA_VERSION]
+
+
+def test_the_architecture_page_states_the_envelope_version_agents_send() -> None:
+    from guardana.core.reporter import ENVELOPE_SCHEMA_VERSION  # noqa: PLC0415
+
+    page = _read("architecture.md")
+
+    assert _counts(_ENVELOPE_RE, page, "docs/architecture.md") == [ENVELOPE_SCHEMA_VERSION]
+    assert f'"schema_version": {ENVELOPE_SCHEMA_VERSION},' in page, (
+        "the example envelope on docs/architecture.md carries a version no agent sends"
+    )

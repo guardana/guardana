@@ -1,0 +1,38 @@
+# Published 9 December 2025 as the *2026* edition, exactly as OWASP-LLM-2025 shipped
+# in November 2024. The edition is the label the document carries, never the year it
+# happened to appear in.
+scheme: OWASP-ASI
+edition: "2026"
+title: OWASP Top 10 for Agentic Applications
+published: "2025-12-09"
+entries:
+  - id: ASI01
+    rank: 1
+    title: Agent Goal Hijack
+  - id: ASI02
+    rank: 2
+    title: Tool Misuse
+  - id: ASI03
+    rank: 3
+    title: Identity and Privilege Abuse
+  - id: ASI04
+    rank: 4
+    title: Agentic Supply Chain Vulnerabilities
+  - id: ASI05
+    rank: 5
+    title: Unexpected Code Execution
+  - id: ASI06
+    rank: 6
+    title: Memory and Context Poisoning
+  - id: ASI07
+    rank: 7
+    title: Insecure Inter-Agent Communication
+  - id: ASI08
+    rank: 8
+    title: Cascading Failures
+  - id: ASI09
+    rank: 9
+    title: Human-Agent Trust Exploitation
+  - id: ASI10
+    rank: 10
+    title: Rogue Agents

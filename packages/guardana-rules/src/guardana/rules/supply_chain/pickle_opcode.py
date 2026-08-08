@@ -13,9 +13,11 @@ from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
 from guardana.core.taxonomy import (
     ATLAS_T0018,
     NIST_SUPPLY_CHAIN,
-    OWASP_ASI05,
-    OWASP_LLM03,
-    OWASP_LLM05,
+    OWASP_ASI05_2026,
+    OWASP_LLM03_2025,
+    OWASP_LLM04_2026,
+    OWASP_LLM05_2025,
+    OWASP_LLM10_2026,
 )
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
@@ -226,11 +228,13 @@ class PickleOpcodeRule(Rule):
         severity=Severity.CRITICAL,
         target_kind=TargetKind.ARTIFACT,
         taxonomy=(
-            OWASP_LLM03,
-            OWASP_LLM05,
+            OWASP_LLM03_2025,
+            OWASP_LLM04_2026,
+            OWASP_LLM05_2025,
+            OWASP_LLM10_2026,
             ATLAS_T0018,
             NIST_SUPPLY_CHAIN,
-            OWASP_ASI05,
+            OWASP_ASI05_2026,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
@@ -343,7 +347,10 @@ class PickleOpcodeRule(Rule):
             rule_id=self.meta.id,
             severity=Severity.LOW,
             title=_UNSCANNED_TITLE,
-            taxonomy=(OWASP_LLM03,),
+            taxonomy=(
+                OWASP_LLM03_2025,
+                OWASP_LLM04_2026,
+            ),
             target_ref=str(path),
             evidence=Evidence(summary=summary, detail=f"file={path.name}"),
         )

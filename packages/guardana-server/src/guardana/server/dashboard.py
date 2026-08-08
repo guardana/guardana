@@ -250,7 +250,15 @@ function renderFindings(items) {
   if (!items.length) { el("findings").innerHTML = `<div class="empty">No findings.</div>`; return; }
   el("findings").innerHTML = items.map(f => {
     const c = CATALOG[f.rule_id] || {}, ev = f.evidence || {}, v = f.verdict;
-    const tax = (f.taxonomy || []).map(t => `<span class="tax">${esc(t.id)}</span>`).join("");
+    // The framework travels with the id, because the id alone is not an identity:
+    // LLM07 is System Prompt Leakage in OWASP-LLM-2025 and Misinformation in
+    // OWASP-LLM-2026. The collector holds no catalogue to look one up in — by
+    // design, it never depends on the engine — so it shows what the agent sent and
+    // nothing more. An older agent sends no title, and the chip simply says less.
+    const tax = (f.taxonomy || []).map(t => {
+      const label = t.title ? `${t.id} ${t.title}` : t.id;
+      return `<span class="tax" title="${esc(t.framework)}">${esc(label)}</span>`;
+    }).join("");
     const det = `<div class="det">`
       + (c.description ? `<p>${esc(c.description)}</p>` : "")
       + (ev.summary ? `<p><span class="lbl">evidence:</span> ${esc(ev.summary)}</p>` : "")

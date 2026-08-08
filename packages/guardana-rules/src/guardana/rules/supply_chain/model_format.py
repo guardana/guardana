@@ -10,7 +10,14 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_ASI05, OWASP_LLM03, OWASP_LLM05
+from guardana.core.taxonomy import (
+    NIST_SUPPLY_CHAIN,
+    OWASP_ASI05_2026,
+    OWASP_LLM03_2025,
+    OWASP_LLM04_2026,
+    OWASP_LLM05_2025,
+    OWASP_LLM10_2026,
+)
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 _RULE_ID = "guardana.supply_chain.model_format"
@@ -28,10 +35,12 @@ def _scan_pmml(path: Path, data: bytes) -> Iterator[Finding]:
             severity=Severity.HIGH,
             title="XML model file declares DOCTYPE/ENTITY (XXE)",
             taxonomy=(
-                OWASP_LLM03,
-                OWASP_LLM05,
+                OWASP_LLM03_2025,
+                OWASP_LLM04_2026,
+                OWASP_LLM05_2025,
+                OWASP_LLM10_2026,
                 NIST_SUPPLY_CHAIN,
-                OWASP_ASI05,
+                OWASP_ASI05_2026,
             ),
             target_ref=str(path),
             evidence=Evidence(
@@ -51,7 +60,13 @@ def _scan_pmml(path: Path, data: bytes) -> Iterator[Finding]:
             rule_id=_RULE_ID,
             severity=Severity.HIGH,
             title="XML model file rejected by defused parser (XXE)",
-            taxonomy=(OWASP_LLM03, OWASP_LLM05, NIST_SUPPLY_CHAIN),
+            taxonomy=(
+                OWASP_LLM03_2025,
+                OWASP_LLM04_2026,
+                OWASP_LLM05_2025,
+                OWASP_LLM10_2026,
+                NIST_SUPPLY_CHAIN,
+            ),
             target_ref=str(path),
             evidence=Evidence(
                 summary=f"defusedxml with forbid_dtd=True refused to parse: {exc}",
@@ -111,7 +126,13 @@ class ModelFormatRule(Rule):
         title="Risky construct in a non-pickle model file format",
         severity=Severity.HIGH,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03, OWASP_LLM05, NIST_SUPPLY_CHAIN),
+        taxonomy=(
+            OWASP_LLM03_2025,
+            OWASP_LLM04_2026,
+            OWASP_LLM05_2025,
+            OWASP_LLM10_2026,
+            NIST_SUPPLY_CHAIN,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

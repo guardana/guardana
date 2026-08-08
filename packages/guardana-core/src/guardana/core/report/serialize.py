@@ -19,7 +19,13 @@ def finding_to_dict(finding: Finding) -> dict[str, object]:
         "rule_id": finding.rule_id,
         "severity": finding.severity.name,
         "title": finding.title,
-        "taxonomy": [{"framework": t.framework, "id": t.id} for t in finding.taxonomy],
+        # The title travels with the reference (schema 3). Without it a run produced
+        # with somebody's rule pack installed renders a bare `ACME-14` on a machine
+        # without it, and an offline evidence pack is unreadable exactly where it
+        # matters. `framework` and `id` stay the identity; the title is display data.
+        "taxonomy": [
+            {"framework": t.framework, "id": t.id, "title": t.title} for t in finding.taxonomy
+        ],
         "target_ref": finding.target_ref,
         "evidence": {"summary": finding.evidence.summary, "detail": finding.evidence.detail},
         "verdict": None

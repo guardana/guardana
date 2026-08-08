@@ -2,7 +2,7 @@ id: guardana.prompt.unbounded_consumption
 title: Unbounded output generation (denial-of-wallet)
 severity: medium
 target_kind: endpoint
-taxonomy: [LLM10]
+taxonomy: [LLM10:2025, LLM06:2026]
 requires: [chat]
 evaluator: length
 prompts:

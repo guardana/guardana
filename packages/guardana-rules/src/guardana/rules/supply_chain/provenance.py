@@ -7,7 +7,7 @@ from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
-from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03
+from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
 
@@ -52,7 +52,11 @@ class ProvenanceRule(Rule):
         title="Model provenance: unpinned download or risky license lead",
         severity=Severity.MEDIUM,
         target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03, NIST_SUPPLY_CHAIN),
+        taxonomy=(
+            OWASP_LLM03_2025,
+            OWASP_LLM04_2026,
+            NIST_SUPPLY_CHAIN,
+        ),
         required_capabilities=frozenset({Capability.READ_FILES}),
     )
 

@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**The mapping is true again.** OWASP published the 2026 edition of the LLM Top 10
+on 3 August 2026 and re-ranked seven entries without renumbering into empty space:
+`LLM07` used to be System Prompt Leakage and is now Misinformation, `LLM05` used to
+be Improper Output Handling and is now Data and Model Poisoning. Nothing Guardana
+published was a lie — the `framework` field on every reference has always said
+`OWASP-LLM-2025` — but the short id a report renders meant one thing to this build
+and another to an auditor who looked it up, and every saved run widened the gap. See
+[`docs/design/taxonomy-editions.md`](docs/design/taxonomy-editions.md).
+
+- **A framework reference is now scheme + edition + local id.** `OWASP-LLM/2025/LLM07`
+  and `OWASP-LLM/2026/LLM07` are different controls that share a string, and both are
+  installed. Titles and ranks became display data. Every `framework` string Guardana
+  has ever written is reproduced byte for byte, so no stored document changes meaning.
+- **Framework catalogues are immutable data files with a digest** — six of them, under
+  `guardana/core/taxonomy/catalog/` — and every run pins those digests. A report is
+  readable in three years without asking which edition was installed.
+- **A rule carries both editions where the semantics genuinely overlap.** The canary
+  system-prompt check is `LLM07:2025` *and* `LLM08:2026`. What never happens is a
+  silent remap onto the matching number, which would file it under Misinformation.
+- **The crosswalk is data with explicit relations** — `exact`, `broader`, `narrower`,
+  `related` — because the 2026 edition redrew its categories as well as re-ranking
+  them, so most pairs are not equivalences. It is read, never applied: a stored
+  reference is upgraded only in memory, when somebody asks.
+- **`guardana taxonomy`** lists the installed catalogues with their digests, or
+  explains one reference and what it corresponds to in another edition. Without it,
+  learning that a rule must say `LLM01:2025` meant reading the engine's source.
+  See [`docs/usage-taxonomy.md`](docs/usage-taxonomy.md).
+- **A coverage fingerprint on every run** (`run.coverage`): one digest over the rules
+  and their declared trial counts, the evaluators, the target's capabilities, the
+  catalogue digests and any protocol version the target negotiated. This is the
+  missing half of the promise `rules_run` started — a run with fewer applicable
+  checks must never read as an improvement, and `diff` now says *the reach changed*
+  instead of folding it into what was found. A run that recorded no fingerprint is
+  reported as **unknown reach**, never as equal reach.
+- **`guardana.agent.hidden_context.tool_schema`** — the check the 2026 edition's
+  `LLM08 Hidden Context Exposure` asks for directly. A marker planted fresh per run
+  inside a *tool description* — hidden context the model reads as trusted
+  instruction, carrying internal service names in a real deployment. A robust model
+  paraphrases what a tool does; reciting the marker is proof.
+- **`guardana.prompt.cost_asymmetry`** and the **`amplification`** evaluator —
+  `LLM06:2026`, up four places and reframed as cost asymmetry. Not how long a reply
+  is but what it cost relative to the request: a twelve-character prompt answered
+  with hundreds of times its own length is an operator paying for an attacker's
+  request. Measured on characters, so it works against a provider that reports no
+  token counts at all.
+
 ### Fixed
 
 Five defects an adversarial review of released 0.12 code found under a green gate.
@@ -55,8 +103,47 @@ now the third sieve this project uses on purpose.
   direction. `Exchange.reply_text` is the seam where that decision belongs, and it
   now reports a blank final turn as no reply, so every evaluator inherits one answer.
 
+Two more, uncovered while building the tool-schema check above — both the same
+shape as the five, and both found by asking what would happen if the marker were
+never planted rather than by reading code that looked right:
+
+- **A canary planted in a tool *schema* was never actually planted.**
+  `TrajectoryRule.with_canary` substituted the fresh per-run marker into tool
+  results only, so a rule carrying its marker in a tool description would have hunted
+  for a token nobody handed the model — the evaluator finds nothing, and the rule
+  reports a confident pass for a model that disclosed everything. Found while writing
+  the rule that needs it, which is why that rule ships with a fixture asserting the
+  fresh marker reaches the description.
+- **A declared canary that nothing plants is now a load-time error.** The gate
+  covered rules graded by the `canary` evaluator and demanded
+  `requires: [plant_system_prompt]`; it said nothing about `tool_call`, which grades
+  a marker leaving through a tool argument, and nothing about an agent rule that
+  carries its own marker. It is now keyed on the declared `expect.canary` and
+  satisfied by any of the three routes a marker can actually reach a model by.
+
 ### Changed
 
+- **Saved runs move to schema 3, the collector envelope to 8.** Both carry the
+  *title* of each framework reference beside its framework and id: a short id is not
+  self-explanatory once a framework has two editions, and the collector holds no
+  catalogue to look one up in — by design, since it never depends on the engine.
+  Older documents migrate forward in memory one step at a time, and the title is
+  recovered from the installed catalogue for the exact `(framework, id)` pair the
+  document already carries. Nothing is guessed and no reference is remapped.
+- **`Rule.digest()` no longer covers the framework mapping.** A rule remapped to a
+  renamed standard sends the same prompts and grades them the same way, so it is not
+  a different test. Leaving the mapping in would have made `diff` announce that every
+  rule "changed definition" in this release — true of the declaration, useless to a
+  reader, and it would bury the one rule whose corpus really moved. Across a version
+  boundary `diff` now says a digest moved without asserting why, because there a
+  digest moves when a rule changes *and* when what a digest covers changes.
+- **A framework reference in a rule names its edition.** `taxonomy: [LLM01]` is now a
+  load-time error listing the editions that define it. This is **breaking for a
+  third-party YAML rule pack** that names OWASP ids, and it is deliberately breaking
+  rather than defaulted: any default would silently change what a rule claims to an
+  auditor the day a catalogue is added. A framework that publishes no editions keeps
+  its bare ids — `AML.T0051` and `supply-chain` are unchanged. The Python constants
+  gained the same suffix (`OWASP_LLM03_2025`, `OWASP_ASI01_2026`).
 - `TrackedFinding.occurrences` is now `TrackedFinding.runs`, because that is what
   it counts and what every caller already claimed it counted.
 

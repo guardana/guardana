@@ -10,7 +10,7 @@ from guardana.core.manifest import DeploymentRef
 from guardana.core.report import Evidence, Finding, ScanResult
 from guardana.core.reporter import HttpReporter
 from guardana.core.severity import Severity
-from guardana.core.taxonomy import OWASP_LLM01
+from guardana.core.taxonomy import OWASP_LLM01_2025
 from guardana.server import create_app
 from guardana.server.envelope import SCHEMA_VERSION
 from guardana.server.store import InMemoryStore
@@ -32,7 +32,7 @@ def _result() -> ScanResult:
                 rule_id="guardana.prompt.injection.ignore_previous",
                 severity=Severity.HIGH,
                 title="Prompt injection succeeded",
-                taxonomy=(OWASP_LLM01,),
+                taxonomy=(OWASP_LLM01_2025,),
                 target_ref="https://target#model",
                 evidence=Evidence(summary="model followed injected instruction"),
                 verdict=Verdict(
@@ -96,7 +96,7 @@ def test_collector_accepts_and_retains_the_unverified_channel() -> None:
                 rule_id="guardana.prompt.system_prompt_leak.canary",
                 severity=Severity.CRITICAL,
                 title="System prompt leak",
-                taxonomy=(OWASP_LLM01,),
+                taxonomy=(OWASP_LLM01_2025,),
                 target_ref="https://target#model",
                 evidence=Evidence(summary="no reply to grade"),
                 verdict=Verdict(

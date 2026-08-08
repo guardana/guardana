@@ -185,13 +185,14 @@ the renderer prints them →
   hallucinated dependencies, insecure transport, hardcoded secrets, MCP tool
   poisoning, hidden-instruction "rules-file backdoors", and training-data
   integrity.
-- **Runtime (dynamic, endpoint)** — 13 rules: direct prompt injection, DAN-style
+- **Runtime (dynamic, endpoint)** — 15 rules: direct prompt injection, DAN-style
   jailbreak, a multi-turn gradual-jailbreak scenario, indirect (RAG) injection,
-  excessive tool-use agency, unbounded consumption (denial-of-wallet),
-  output-secret leakage, the canary-proven system-prompt-leak check, and five
-  agentic checks — tool-result injection, credential exfiltration through a tool
-  argument, over-broad tool arguments, memory poisoning across a session boundary,
-  and a live MCP server's tool manifest.
+  excessive tool-use agency, unbounded consumption (denial-of-wallet), the same
+  category measured as cost asymmetry, output-secret leakage, the canary-proven
+  system-prompt-leak check, and six agentic checks — tool-result injection,
+  credential exfiltration through a tool argument, over-broad tool arguments,
+  memory poisoning across a session boundary, hidden context recited out of a tool
+  schema, and a live MCP server's tool manifest.
 
 You never pick the layer by hand: `scan` runs the build layer, `probe` and
 `monitor` run the runtime layer.

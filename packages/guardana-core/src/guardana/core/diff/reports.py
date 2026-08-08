@@ -30,12 +30,13 @@ def compare_reports(before: RunReport, after: RunReport) -> RunDiff:
     diff = compare(
         before.result,
         after.result,
-        before_context=RunContext(root=before.manifest.target.ref, rules=_digests(before)),
-        after_context=RunContext(root=after.manifest.target.ref, rules=_digests(after)),
+        before_context=_context(before),
+        after_context=_context(after),
     )
     notes = (
         _target_note(before, after)
         + _version_note(before, after)
+        + _coverage_note(before, after)
         + _migration_note(before, after)
         + diff.notes
     )
@@ -47,9 +48,67 @@ def compare_reports(before: RunReport, after: RunReport) -> RunDiff:
     )
 
 
-def _digests(report: RunReport) -> dict[str, str]:
-    """Each rule that ran, mapped to the digest of what it was when it ran."""
-    return {rule.id: rule.digest for rule in report.manifest.rules}
+def _context(report: RunReport) -> RunContext:
+    """Describe one side of the comparison: what it examined, with which rules, from which build."""
+    return RunContext(
+        root=report.manifest.target.ref,
+        rules={rule.id: rule.digest for rule in report.manifest.rules},
+        tool_version=report.manifest.guardana.version,
+    )
+
+
+def _coverage_note(before: RunReport, after: RunReport) -> tuple[str, ...]:
+    """Say when the two runs could check different things, and name what moved.
+
+    A run with a narrower reach reports fewer findings, and subtracting two lists
+    cannot tell that from a fix. The rule list alone never could: it says nothing
+    about a rule whose corpus was trimmed, an evaluator that stopped being
+    installed, a target that lost a capability, or a server that answered with an
+    older protocol revision. The fingerprint covers all of those in one value.
+
+    A run that recorded no fingerprint is *unknown*, never "the same": saying
+    nothing changed about coverage nobody measured is the shape of false green this
+    project refuses everywhere else.
+    """
+    first, second = before.manifest.coverage, after.manifest.coverage
+    if first.digest is None or second.digest is None:
+        return (
+            "one of the runs records no coverage fingerprint, so whether the two verified "
+            "the same amount is unknown rather than settled — re-run the older side to compare "
+            "reach as well as findings",
+        )
+    if first.digest == second.digest:
+        return ()
+    return (
+        f"the two runs did not have the same reach{_coverage_detail(before, after)} — "
+        f"a difference in findings may be a difference in what could be checked",
+    )
+
+
+def _coverage_detail(before: RunReport, after: RunReport) -> str:
+    """Name the catalogues and protocols that moved, so the note is actionable.
+
+    Silent about the rest of the fingerprint on purpose: a differing digest whose
+    catalogues and protocols match means the rules, their trial counts, the
+    evaluators or the target's capabilities moved, and `diff` already reports those
+    per rule. Restating them here in the aggregate would be the same finding twice.
+    """
+    parts = []
+    catalogues = _changed_catalogues(before, after)
+    if catalogues:
+        parts.append(f"framework catalogue(s) {', '.join(catalogues)} differ")
+    if before.manifest.coverage.protocols != after.manifest.coverage.protocols:
+        parts.append(
+            f"negotiated protocols went from {before.manifest.coverage.protocols or 'none'} "
+            f"to {after.manifest.coverage.protocols or 'none'}"
+        )
+    return f" ({'; '.join(parts)})" if parts else ""
+
+
+def _changed_catalogues(before: RunReport, after: RunReport) -> list[str]:
+    first = {c.framework: c.digest for c in before.manifest.coverage.taxonomies}
+    second = {c.framework: c.digest for c in after.manifest.coverage.taxonomies}
+    return sorted(name for name in first | second if first.get(name) != second.get(name))
 
 
 def _migration_note(before: RunReport, after: RunReport) -> tuple[str, ...]:

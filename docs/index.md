@@ -28,6 +28,7 @@ detail below.
 - [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
 - [`usage-target.md`](usage-target.md) — `guardana target inspect`: what an endpoint really supports
 - [`usage-plan.md`](usage-plan.md) — `guardana plan`: what a run would cost, before it costs anything
+- [`usage-taxonomy.md`](usage-taxonomy.md) — `guardana taxonomy`: which framework entry a reference names, and what it corresponds to in another edition
 - [`exit-codes.md`](exit-codes.md) — the exit-status contract every command honours
 - [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run and its manifest
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build

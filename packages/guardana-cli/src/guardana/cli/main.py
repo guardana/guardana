@@ -14,6 +14,7 @@ from guardana.cli.rules import rules
 from guardana.cli.run import run_app
 from guardana.cli.scan import scan
 from guardana.cli.target import target_app
+from guardana.cli.taxonomy import taxonomy
 from guardana.core import __version__
 
 
@@ -80,6 +81,7 @@ app.callback()(_main)
 app.command()(scan)
 app.command()(init)
 app.command()(rules)
+app.command()(taxonomy)
 app.command()(probe)
 app.command()(diff)
 app.command()(monitor)

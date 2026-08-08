@@ -1,4 +1,4 @@
-"""`schemas/run-v2.schema.json` is a published contract, so it is tested.
+"""`schemas/run-v3.schema.json` is a published contract, so it is tested.
 
 A schema nothing validates against is a promise. This asserts the two directions
 that matter: what the engine writes satisfies the schema, and the schema refuses
@@ -38,7 +38,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from jsonschema import Draft202012Validator
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v2.schema.json"
+_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v3.schema.json"
 _NOW = datetime(2026, 8, 2, 10, 0, tzinfo=UTC)
 
 
@@ -176,7 +176,7 @@ def test_the_schema_identifier_carries_its_major_version() -> None:
     # in-toto/SLSA practice: a consumer must be able to tell which contract it is
     # holding without parsing the document first.
     assert _schema()["$id"] == SCHEMA_URL
-    assert "v2" in SCHEMA_URL
+    assert "v3" in SCHEMA_URL
 
 
 def test_the_schema_itself_is_a_valid_2020_12_schema() -> None:
@@ -264,8 +264,8 @@ def test_the_schema_requires_usage_keys_even_when_unknown() -> None:
     assert list(_validator().iter_errors(document))
 
 
-@pytest.mark.parametrize("version", [1, 3, "2"])
-def test_the_schema_refuses_any_version_but_two(version: object) -> None:
+@pytest.mark.parametrize("version", [1, 2, 4, "3"])
+def test_the_schema_refuses_any_version_but_the_current_one(version: object) -> None:
     document = _document(_minimal())
     document["schema_version"] = version
     assert list(_validator().iter_errors(document))
@@ -277,8 +277,13 @@ def test_a_migrated_document_validates_against_the_same_schema() -> None:
     Every unit test around migration passed while the file it produced did not
     validate: they asserted on the loaded objects, and the objects were right. The
     document was the thing being published, and nothing checked it.
+
+    Driven through `migrate_forward`, not through one migrator, because that is what
+    both `run migrate` and `load_report` call: a schema-1 run reaches the current
+    version by passing through 2, and a single hop tested in isolation would pass
+    while the chain wrote a document missing everything version 3 added.
     """
-    from guardana.core.manifest.load import migrate_v1  # noqa: PLC0415
+    from guardana.core.report.load import migrate_forward  # noqa: PLC0415
 
     v1 = {
         "schema_version": 1,
@@ -299,7 +304,7 @@ def test_a_migrated_document_validates_against_the_same_schema() -> None:
         "summary": {"rules_run": 1, "max_severity": None},
     }
 
-    migrated = migrate_v1(v1)
+    migrated = migrate_forward(v1, 1)
 
     assert not list(_validator().iter_errors(migrated)), [
         e.message for e in _validator().iter_errors(migrated)

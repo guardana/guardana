@@ -1,0 +1,39 @@
+# The edition every Guardana release up to 0.12 mapped to. Published November 2024
+# and labelled 2025, which is why the edition is the label rather than the year.
+#
+# Immutable: this file's digest is pinned in saved runs. A correction is a new
+# edition, never an edit here.
+scheme: OWASP-LLM
+edition: "2025"
+title: OWASP Top 10 for Large Language Model Applications
+entries:
+  - id: LLM01
+    rank: 1
+    title: Prompt Injection
+  - id: LLM02
+    rank: 2
+    title: Sensitive Information Disclosure
+  - id: LLM03
+    rank: 3
+    title: Supply Chain
+  - id: LLM04
+    rank: 4
+    title: Data and Model Poisoning
+  - id: LLM05
+    rank: 5
+    title: Improper Output Handling
+  - id: LLM06
+    rank: 6
+    title: Excessive Agency
+  - id: LLM07
+    rank: 7
+    title: System Prompt Leakage
+  - id: LLM08
+    rank: 8
+    title: Vector and Embedding Weaknesses
+  - id: LLM09
+    rank: 9
+    title: Misinformation
+  - id: LLM10
+    rank: 10
+    title: Unbounded Consumption

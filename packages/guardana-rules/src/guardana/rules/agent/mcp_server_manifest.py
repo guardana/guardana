@@ -13,9 +13,11 @@ from guardana.core.taxonomy import (
     ATLAS_T0084_001,
     ATLAS_T0109,
     ATLAS_T0110,
-    OWASP_ASI04,
-    OWASP_LLM01,
-    OWASP_LLM03,
+    OWASP_ASI04_2026,
+    OWASP_LLM01_2025,
+    OWASP_LLM01_2026,
+    OWASP_LLM03_2025,
+    OWASP_LLM04_2026,
 )
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_hidden_char
 
@@ -55,7 +57,16 @@ class McpServerManifestRule(Rule):
         title="Live MCP tool manifest carries a hidden instruction or has drifted",
         severity=Severity.HIGH,
         target_kind=TargetKind.ENDPOINT,
-        taxonomy=(OWASP_LLM01, OWASP_LLM03, OWASP_ASI04, ATLAS_T0110, ATLAS_T0109, ATLAS_T0084_001),
+        taxonomy=(
+            OWASP_LLM01_2025,
+            OWASP_LLM01_2026,
+            OWASP_LLM03_2025,
+            OWASP_LLM04_2026,
+            OWASP_ASI04_2026,
+            ATLAS_T0110,
+            ATLAS_T0109,
+            ATLAS_T0084_001,
+        ),
         required_capabilities=frozenset({Capability.LIST_TOOLS}),
         impact=Impact.ACTIVE,
     )
