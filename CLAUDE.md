@@ -186,7 +186,16 @@ uv run mypy --strict .         # types — whole repo, tests included
 uv run lint-imports            # architecture: the engine must not import the collector
 uv run pytest --cov            # tests + the 90% branch-coverage gate
 uv run guardana scan packages  # dogfood: must stay at zero findings
+uv run --isolated --with ./packages/guardana-core --with ./packages/guardana-rules \
+  --with ./examples/custom_rule --with pytest pytest examples/custom_rule/tests -q
 ```
+
+The last one is the third-party extension story, and it is **isolated from the
+main test environment on purpose** — installing `acme.*` into it would skew the
+dogfood scan. That isolation is also why `uv run pytest` cannot see it: a change
+to a rule-authoring contract can be green everywhere locally and still break the
+one package that stands in for everybody else's. It caught a bare `taxonomy:
+[LLM06]` in the example's own YAML that every other gate passed over.
 
 (`--cov` is not in `addopts` on purpose: it would make a single-file run like
 `uv run pytest packages/guardana-core/tests/test_runner.py` fail the coverage

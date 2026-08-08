@@ -120,6 +120,11 @@ never planted rather than by reading code that looked right:
   a marker leaving through a tool argument, and nothing about an agent rule that
   carries its own marker. It is now keyed on the declared `expect.canary` and
   satisfied by any of the three routes a marker can actually reach a model by.
+- **The example third-party rule pack named a bare `LLM06`.** Its YAML is the
+  one file in this repository that stands in for everybody else's rule pack, and
+  every local gate passed over it: `examples/custom_rule` is isolated from the main
+  test environment on purpose, so `uv run pytest` never loads it. CI caught it. The
+  command is now in the gate list in `CLAUDE.md`, where the six that miss it are.
 
 ### Changed
 
