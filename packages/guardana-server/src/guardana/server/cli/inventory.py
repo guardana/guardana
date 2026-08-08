@@ -139,7 +139,7 @@ def _print_findings(entries: tuple[TrackedFinding, ...]) -> int:
     for entry in entries:
         print(
             f"{entry.identity[7:15]}  {entry.severity:9} {entry.status:15} "
-            f"{entry.rule_id:44} {entry.occurrences:4} runs  "
+            f"{entry.rule_id:44} {entry.runs:4} runs  "
             f"{entry.first_seen} → {entry.last_seen}  {entry.target_ref}"
         )
         if entry.waiver_lapsed:

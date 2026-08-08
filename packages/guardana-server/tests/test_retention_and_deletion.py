@@ -134,7 +134,7 @@ def test_a_tracked_finding_outlives_its_occurrences(
     connection.commit()
 
     tracked = list_tracked(connection, _PROJECT, today=_NOW.date())
-    assert [(entry.status, entry.occurrences) for entry in tracked] == [("acknowledged", 0)]
+    assert [(entry.status, entry.runs) for entry in tracked] == [("acknowledged", 0)]
 
 
 def test_deleting_a_project_takes_its_evidence_with_it(

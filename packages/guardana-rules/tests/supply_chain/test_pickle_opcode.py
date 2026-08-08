@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain import pickle_opcode
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule
 
 
@@ -47,6 +48,82 @@ def test_nested_archive_member_is_flagged_not_silently_skipped(tmp_path: Path) -
     (tmp_path / "model.pt").write_bytes(_zip_with("archive/nested.zip", inner))
     findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert any(f.title == "Unscanned model file" for f in findings)
+
+
+def _pickle_padded_past(limit: int) -> bytes:
+    """A protocol-2 pickle whose payload sits behind `limit` bytes of declared string."""
+    pad = limit + 1024
+    return (
+        b"\x80\x02"
+        + b"X"
+        + pad.to_bytes(4, "little")  # BINUNICODE, `pad` bytes of content
+        + b"a" * pad
+        + b"cposix\nsystem\n"  # GLOBAL posix.system — behind the cap
+        + b"."
+    )
+
+
+def test_a_zip_member_the_cap_cut_is_flagged_not_silently_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Padding a member past the per-member read cap must not erase it from the scan.
+
+    Deflate makes this cheap for an attacker: sixty-five megabytes of padding
+    compress to a file of a few kilobytes, so no size heuristic sees it coming. The
+    payload behind the padding is never read, and reading half a pickle proves
+    nothing about the other half — so the member is unscanned, and an unscanned
+    member is a visible finding.
+    """
+    monkeypatch.setattr(pickle_opcode, "_MEMBER_MAX_BYTES", 4096)
+    (tmp_path / "model.pt").write_bytes(_zip_with("archive/data.pkl", _pickle_padded_past(4096)))
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert findings, "a pickle padded past the member cap scanned clean"
+    assert any(f.title == "Unscanned model file" for f in findings)
+
+
+def test_an_oversized_member_that_is_not_a_pickle_stays_quiet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other half: a real checkpoint's tensor storages must not become noise.
+
+    Every member is read, whatever its name, and a 7B checkpoint's storages are
+    routinely larger than the cap. Flagging each of them would put a LOW finding
+    per tensor on every honest model — so the report is reserved for a member that
+    was still parsing as a pickle when the cap cut it.
+    """
+    monkeypatch.setattr(pickle_opcode, "_MEMBER_MAX_BYTES", 4096)
+    tensor_bytes = bytes(range(1, 256)) * 64  # no valid opcode stream, over the cap
+    (tmp_path / "model.pt").write_bytes(_zip_with("archive/data/0", tensor_bytes))
+
+    assert list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+@pytest.mark.parametrize(
+    "stream",
+    [
+        b"\x80\x04\x93.",  # STACK_GLOBAL with an empty stack
+        b"\x80\x04h\x05h\x06\x93.",  # STACK_GLOBAL over two memo misses (None operands)
+    ],
+    ids=["empty-stack", "memo-miss"],
+)
+def test_an_unresolvable_stack_global_inside_a_zip_fails_closed_too(
+    tmp_path: Path, stream: bytes
+) -> None:
+    """The same crafted stream must not become quiet by being put in an archive.
+
+    A raw `.pkl` whose `STACK_GLOBAL` operands this scanner cannot model reports LOW
+    "unscanned", because an unpickler may well resolve what the model here could not.
+    Inside a ZIP member it reported nothing at all — and a ZIP is what
+    `torch.save` writes, so the silent half was the half a real checkpoint takes.
+    """
+    (tmp_path / "model.pt").write_bytes(_zip_with("archive/data.pkl", stream))
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.title for f in findings] == ["Unscanned model file"]
+    assert findings[0].severity.name == "LOW"
 
 
 def test_unreadable_zip_member_is_flagged_and_scan_continues(

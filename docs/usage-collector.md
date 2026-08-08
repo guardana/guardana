@@ -146,6 +146,12 @@ and where it was found, never the evaluator's rationale, which moves on every
 re-run — and shows how many runs saw it, first and last. That is the "has this been
 there since Tuesday, or is it new" question.
 
+**Runs, not sightings.** One run's rule can report the same identity several times
+— `malicious_dependency` names three bad packages in a single `requirements.txt`,
+and the identity is the rule plus the path — so counting rows would answer "how
+often was this printed" while the column claims to answer the other question. A
+finding a single scan reported three times reads `1 runs`.
+
 **A retried job is stored once.** The same run id in the same project is accepted
 with `200` and `"duplicate": true` instead of being stored again: a retry is not a
 failure and must not turn a pipeline red, and counting it twice would make a

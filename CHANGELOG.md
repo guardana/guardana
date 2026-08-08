@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+Five defects an adversarial review of released 0.12 code found under a green gate.
+Two of them were found by *running* the tool rather than by reading it, which is
+now the third sieve this project uses on purpose.
+
+- **A pickle padded past the per-member read cap was scanned clean, and reported
+  nothing at all.** `pickle_opcode` reads at most 64 MB of each ZIP member — a
+  bound that exists so a crafted checkpoint cannot exhaust memory — and threw away
+  the fact that it had hit it. Deflate makes that cheap to exploit: **a 66 KB
+  `model.pt` hid `posix.system` behind 65 MB of padding and produced zero
+  findings**, no CRITICAL and not even the LOW "unscanned" the rule emits
+  everywhere else it cannot see. The rule's own docstring already promised
+  otherwise: "anything it cannot fully parse becomes a visible finding, never a
+  silent clean."
+- **The same silence covered an unresolvable `STACK_GLOBAL` inside a ZIP member.**
+  A crafted stream whose operands this scanner cannot model — but an unpickler may
+  well resolve — reports LOW "unscanned" as a raw `.pkl`, and reported nothing at
+  all as a member. `torch.save` writes a ZIP, so the quiet half was the half a real
+  checkpoint takes. Both are now decided by one question — was this still parsing as
+  a pickle where the rule stopped? — and only then reported, so a real checkpoint's
+  tensor storages (larger than the cap, and not pickles) and its one-byte
+  `archive/version` stay quiet. That last one is not hypothetical: the first version
+  of this fix put a finding on every honest checkpoint, and the existing
+  benign-archive test is what caught it.
+- **`probe` enforced its request budget once per pass instead of once per run.**
+  A canary rule runs in a pass of its own, against a target whose system prompt
+  carries that rule's marker, and the target owns the meter that holds the ceiling
+  — so each pass started from zero. `--max-requests 5` sent **10** requests against
+  the shipped catalog, and the overshoot grew with every canary rule installed,
+  while `guardana plan` went on quoting the ceiling as the whole run. Every pass now
+  shares one meter, and the manifest reports that meter rather than the sum of the
+  passes' overlapping snapshots.
+- **`guardana-collector finding list` counted sightings and printed them as runs.**
+  A rule that names three bad packages in one `requirements.txt` shares one identity
+  across all three, so a *single* scan listed "3 runs" — and the question the column
+  exists to answer, printed in its own help text and in
+  [`docs/usage-collector.md`](docs/usage-collector.md), is "has this been there
+  since Tuesday, or is it new". It now counts distinct runs.
+- **An empty model reply was graded as a clean pass.** `content: null` was already
+  refused at the transport, because `str(None)` would be graded as the word "None";
+  `content: ""` is the same absence in a shape that types fine — an Azure content
+  filter returns it, and so does an assistant turn that carried only tool calls.
+  It reached the evaluators as a string, where `canary` found no marker in it and
+  answered **pass at 0.95 confidence** on a reply carrying no evidence in either
+  direction. `Exchange.reply_text` is the seam where that decision belongs, and it
+  now reports a blank final turn as no reply, so every evaluator inherits one answer.
+
+### Changed
+
+- `TrackedFinding.occurrences` is now `TrackedFinding.runs`, because that is what
+  it counts and what every caller already claimed it counted.
+
+### Documentation
+
+- **`docs/` pages state counts as fact, and now a test pins them to the registry**
+  like `FEATURES.md` and `site/index.html` already were. Both had drifted:
+  `how-it-works.md` described eight runtime rules through the five agentic checks
+  that took the number to thirteen, and `usage-scan.md` showed a dogfood transcript
+  claiming seventeen rules ran when nineteen do.
+- **Every design document opens with a status, and a test says so.**
+  `collector-domain-model.md` still read `proposed · Target: v0.7 · Current
+  maturity: experimental` four releases after persistence, authentication and
+  tenancy shipped; it is now `superseded by` the five documents that replaced it,
+  with the body kept as the record. `enterprise-readiness-plan.md` had no status
+  line at all and now carries one. The existing staleness test deliberately exempts
+  `docs/design/` — a design document is allowed to state the problem it solved —
+  which is exactly why the status line needed its own check.
+- `ROADMAP.md` said five evaluators ship; the generated catalog lists six.
+
 ## [0.12.0] - 2026-08-07 — verification where the developers already are
 
 ### Added

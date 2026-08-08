@@ -313,7 +313,7 @@ An `Evaluator` turns a model response (or artifact observation) into a
 `guardana.core.evaluator.Evaluator.evaluate(exchange, expectation) ->
 Verdict` and register via the `guardana.evaluators` entry point. See
 `packages/guardana-core/src/guardana/core/evaluator/{keyword,canary,length,
-llm_judge,guard}.py` for the existing shapes — each is one short file. An
+tool_call,llm_judge,guard}.py` for the existing shapes — each is one short file. An
 evaluator that cannot actually grade (`exchange.reply_text is None`,
 unparseable judge output) returns `inconclusive`, never `pass`. A rule
 references an evaluator by its string id (e.g. `evaluator: canary` in YAML);

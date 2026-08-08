@@ -98,7 +98,7 @@ already runs, against the model their application actually calls.
 Plus fourteen commands — `scan`/`probe`/`monitor`/`diff` and the ten that make
 them safe to gate on (`plan`, `target inspect`, `run inspect|migrate`,
 `baseline create|verify|update`, `doctor`, `config validate|explain`, `rules`,
-`init`, `new-rule`, `calibrate`) — five evaluators with measured calibration
+`init`, `new-rule`, `calibrate`) — six evaluators with measured calibration
 (Brier + ECE), the three-channel result, four report formats, profiles/gates/
 presets, the build/runtime `Surface` split, a tool-calling endpoint target, three
 endpoint providers plus a guarded-endpoint adapter, the plugin contract with test
@@ -431,6 +431,7 @@ constant in the code by a test.
 | separate local and collector evidence policies | lands with the collector |
 | signature verification of plugin packs | needs a distribution story this project does not have yet |
 | `configuration.*_digest` populated | the manifest has the fields and records `null` in all of them. A digest of a profile is easy; a digest of a *system prompt*, *tool manifest* or *retriever* has to be taken from the thing actually in front of the model, which is the application-awareness work in the milestone below — and filling in only the easy one would make the block look complete |
+| telling an unreachable endpoint from an unreadable reply | both raise `EndpointError`, and the runner treats it as fatal to the whole probe — correctly for a dead endpoint, and wrongly for one reply a provider returned in a shape no transport could parse. The run then exits `4` ("target unavailable") having abandoned every remaining rule, which is loud and wrong rather than quiet and wrong, so it is a diagnosis defect and not a fail-open. Splitting it needs a second exception type on the transport contract, which is a change third-party transports would have to follow |
 | token ceilings bounding the tool-calling path | `offer_tools` has no usage protocol, so the requests an agent probe spends most of its budget on report no tokens. They are counted in `requests_missing_token_counts`, and a request ceiling bounds them; a *token* ceiling does not, and saying so is better than a ceiling that silently covers half a run |
 
 ### Reviewed after shipping (0.7.1)

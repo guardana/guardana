@@ -138,7 +138,13 @@ The `pickle_opcode` rule also **unzips ZIP-based `.pt` archives and scans every
 member regardless of extension** (a payload hidden under a non-`.pkl` name
 cannot slip past), reports a dangerous global found **before** a
 deliberately-broken tail as CRITICAL rather than a silent skip, and flags a
-7z-compressed model it cannot decompress instead of passing it clean.
+7z-compressed model it cannot decompress instead of passing it clean. **A member it
+did not finish reading as a pickle is flagged too** — one the per-member read bound
+cut (deflate turns 65 MB of padding into a 66 KB file, so hiding a payload behind
+the bound costs an attacker nothing), and one carrying an operand the opcode model
+cannot resolve where a real unpickler might. Only a stream that was still parsing as
+a pickle where the rule stopped: a checkpoint's tensor storages are larger than the
+bound and are not pickles, so they stay quiet.
 
 ### Evaluators — "did the attack succeed, and how sure are we"
 
@@ -187,6 +193,14 @@ Every evaluator fails closed: a check that cannot actually grade returns
 `inconclusive`, surfaced on a dedicated **unverified** channel in all four
 output formats — never a silent all-clear. `fail_on_inconclusive: true`
 makes unverified checks fail the gate.
+
+**A model that said nothing is one of those cases**, and it is decided once rather
+than per evaluator: a final assistant turn with no text in it is no reply at all
+(`Exchange.reply_text` is `None`), so every grader reads it as inconclusive.
+Providers really do return one — an Azure content filter answers with an empty
+string, and so does a turn that carried only tool calls — and the alternative is
+`canary` reporting a confident pass because the marker was not in a reply that
+contained nothing.
 
 ### Measured confidence, not asserted confidence
 
@@ -374,7 +388,11 @@ containing one never claims to fit a budget.
 
 `budgets:` sets the ceiling for real: requests, input and output tokens, wall
 time. It is checked before each request rather than after each rule, so a ceiling
-of 200 means 200. Three properties keep it from becoming an excuse:
+of 200 means 200 — **for the run, not for each pass of it.** `probe` runs a canary
+rule against a target of its own, because the marker has to be in that rule's
+system prompt and nowhere else; all of those passes share one meter, or the real
+ceiling would be 200 times however many canary rules happen to be installed.
+Three properties keep it from becoming an excuse:
 
 - a run that hits its ceiling **keeps what it already found**, and says it stopped;
 - it exits `6` and **never passes the gate**, whatever its partial findings say;

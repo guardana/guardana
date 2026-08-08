@@ -1,6 +1,9 @@
+import io
 import pickletools
 import zipfile
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
@@ -132,8 +135,53 @@ def _step(
     # safe because it only ever adds noise, never hides a global.
 
 
-def _scan_opcodes(data: bytes) -> tuple[list[str], bool]:
-    """Return (dangerous refs found, truncated?).
+class ParseEnd(StrEnum):
+    """How reading a byte stream as pickle opcodes ended.
+
+    The distinctions exist because "I could not read this" has three meanings, and
+    only two of them are evidence of something unexamined. A member of a real
+    checkpoint is raw tensor data and is `NOT_PICKLE` within its first few bytes —
+    reporting that would put a finding on every tensor in every honest model. A
+    stream that was still parsing when the buffer ended (`RAN_OUT`), or one the
+    pickle machine could not model an operand for (`UNRESOLVABLE`), is a pickle this
+    rule did not finish proving clean.
+    """
+
+    COMPLETE = "complete"
+    NOT_PICKLE = "not_pickle"
+    RAN_OUT = "ran_out"
+    UNRESOLVABLE = "unresolvable"
+
+
+def _left_a_pickle_unproven(end: ParseEnd, *, cut: bool) -> bool:
+    """Whether this member is a pickle the rule stopped short of clearing.
+
+    `UNRESOLVABLE` always is: the pickle machine reached an operand it cannot model,
+    and an unpickler may well resolve what this could not.
+
+    `RAN_OUT` only counts when the read was actually cut. Any short stretch of
+    non-pickle bytes ends where the buffer does — `archive/version` in a torch
+    checkpoint is the single byte `3` — so without that guard every honest
+    checkpoint would carry a finding for the file that records its format version.
+    """
+    return end is ParseEnd.UNRESOLVABLE or (cut and end is ParseEnd.RAN_OUT)
+
+
+@dataclass(frozen=True, slots=True)
+class _OpcodeScan:
+    """What reading one byte stream as pickle opcodes established."""
+
+    refs: list[str]
+    end: ParseEnd
+
+    @property
+    def truncated(self) -> bool:
+        """Whether the stream failed to end cleanly, for any reason."""
+        return self.end is not ParseEnd.COMPLETE
+
+
+def _scan_opcodes(data: bytes) -> _OpcodeScan:
+    """Read `data` as a pickle opcode stream, keeping whatever it proves.
 
     Parses opcodes lazily and keeps what it found even if the stream breaks
     mid-way: pickle executes opcodes as encountered, so a dangerous global before
@@ -143,18 +191,23 @@ def _scan_opcodes(data: bytes) -> tuple[list[str], bool]:
     refs: list[str] = []
     stack: list[str | None] = []
     memo: dict[int, str | None] = {}
-    ops = pickletools.genops(data)
+    stream = io.BytesIO(data)
+    ops = pickletools.genops(stream)
     while True:
         try:
             op, arg, _pos = next(ops)
         except StopIteration:
-            return refs, False
-        except (ValueError, OSError):  # malformed / non-pickle bytes
-            return refs, True
+            return _OpcodeScan(refs, ParseEnd.COMPLETE)
+        except (ValueError, OSError):
+            # `genops` reads through the buffer as it goes, so a parse sitting at the
+            # end of it wanted bytes the caller did not have; one that broke earlier
+            # was reading something that is not an opcode stream at all.
+            ran_out = stream.tell() >= len(data)
+            return _OpcodeScan(refs, ParseEnd.RAN_OUT if ran_out else ParseEnd.NOT_PICKLE)
         try:
             _step(op.name, arg, stack, memo, refs)
         except UnparseableStreamError:
-            return refs, True
+            return _OpcodeScan(refs, ParseEnd.UNRESOLVABLE)
 
 
 class PickleOpcodeRule(Rule):
@@ -210,7 +263,8 @@ class PickleOpcodeRule(Rule):
             yield self._unscanned(path, "not a readable regular file; not scanned")
             return
         data, oversized = prefix
-        refs, truncated = _scan_opcodes(data)
+        scan = _scan_opcodes(data)
+        refs, truncated = scan.refs, scan.truncated
         if refs:
             yield from (self._critical(path, ref) for ref in refs)
         elif oversized:
@@ -235,21 +289,40 @@ class PickleOpcodeRule(Rule):
             yield self._unscanned(path, "malformed zip container; not scanned")
 
     def _scan_member(self, path: Path, archive: zipfile.ZipFile, name: str) -> Iterator[Finding]:
+        limit = _MEMBER_MAX_BYTES
         try:
             with archive.open(name) as member:
-                member_data = member.read(_MEMBER_MAX_BYTES)
+                raw = member.read(limit + 1)  # +1 byte reveals a member we had to cut
         except (OSError, zipfile.BadZipFile, RuntimeError):
             # RuntimeError is what zipfile raises for an encrypted member. Either
             # way, one crafted member must never abort the whole scan (a DoS) nor
             # pass as clean — the bytes we couldn't read become a visible finding.
             yield self._unscanned(path, f"zip member could not be read ({name}); not scanned")
             return
+        member_data, cut = raw[:limit], len(raw) > limit
         if member_data.startswith(_NESTED_CONTAINER_MAGICS):
             yield self._unscanned(path, f"zip member is a nested archive ({name}); not scanned")
             return
-        refs, _truncated = _scan_opcodes(member_data)
-        for ref in refs:
+        scan = _scan_opcodes(member_data)
+        for ref in scan.refs:
             yield self._critical(path, ref, member=name)
+        if not scan.refs and _left_a_pickle_unproven(scan.end, cut=cut):
+            # A member that was still a pickle where this rule stopped. Silence here
+            # was a bypass twice over: `torch.save` writes a ZIP, so an unresolvable
+            # `STACK_GLOBAL` that a raw `.pkl` reports LOW for was quiet inside one —
+            # and deflate turns the padding needed to reach the cap into kilobytes,
+            # so hiding a global behind it cost nothing. Only a stream that was
+            # *reading as a pickle* qualifies: a real checkpoint's tensor storages are
+            # bigger than the cap and are not pickles, so they stay quiet.
+            yield self._unscanned(path, self._unfinished(scan.end, name, limit))
+
+    def _unfinished(self, end: ParseEnd, name: str, limit: int) -> str:
+        if end is ParseEnd.RAN_OUT:
+            return (
+                f"zip member is a pickle larger than {limit} bytes ({name}); "
+                f"not scanned past that point"
+            )
+        return f"zip member is a pickle with an operand this scanner cannot resolve ({name})"
 
     def _critical(self, path: Path, ref: str, *, member: str | None = None) -> Finding:
         where = path.name if member is None else f"{path.name}::{member}"

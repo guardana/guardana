@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 from guardana.core.target import ChatTransport, EndpointTarget
+from guardana.core.usage import UsageMeter
 
 transport_factory: Callable[[], ChatTransport] | None = None
 """The single transport seam: when set, its product backs every endpoint the CLI builds.
@@ -18,12 +19,17 @@ def build_endpoint(  # noqa: PLR0913 — each is a distinct endpoint config knob
     system_prompt: str | None = None,
     provider: str = "openai",
     transport: ChatTransport | None = None,
+    meter: UsageMeter | None = None,
 ) -> EndpointTarget:
     """Construct the `EndpointTarget` a probe or monitor run talks to.
 
     An explicit `transport` (e.g. a custom-endpoint adapter) wins; otherwise the
     test seam `transport_factory` is used if set; otherwise `EndpointTarget` builds
     its real network transport for the named provider.
+
+    `meter` is how a caller that builds several targets for one run keeps one bill
+    across them — `probe` needs a target per planted canary, and a ceiling that
+    reset on each would not be a ceiling on the run.
     """
     if transport is None and transport_factory is not None:
         transport = transport_factory()
@@ -34,4 +40,5 @@ def build_endpoint(  # noqa: PLR0913 — each is a distinct endpoint config knob
         system_prompt=system_prompt,
         provider=provider,
         transport=transport,
+        meter=meter,
     )

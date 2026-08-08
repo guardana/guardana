@@ -376,3 +376,44 @@ def test_a_lapsed_waiver_is_found_by_filtering_for_open(
 
     assert len(list_tracked(connection, _PROJECT, status="open", today=_TODAY)) == 1
     assert list_tracked(connection, _PROJECT, status="accepted_risk", today=_TODAY) == ()
+
+
+def _run_reporting(database_url: str, project_id: int, *, occurrences: int) -> None:
+    """One run whose rule reported `occurrences` findings at the same place.
+
+    Ordinary, not contrived: `malicious_dependency` names three bad packages in one
+    `requirements.txt`, and the identity is the rule and the path — so one run
+    stores three rows under one identity.
+    """
+    submission = _submission()
+    first = submission.findings[0]
+    submission.findings = [first.model_copy(deep=True) for _ in range(occurrences)]
+    for index, finding in enumerate(submission.findings):
+        finding.identity = _IDENTITY
+        finding.evidence.summary = f"package {index} is compromised"
+    PostgresStore(database_url).add(TenantScope.for_project(project_id), submission)
+
+
+def test_one_run_reporting_a_finding_three_times_counts_as_one_run(
+    connection: DbConnection, database_url: str, project: int
+) -> None:
+    """ "How many runs saw this" is the question `finding list` answers, and it says `runs`.
+
+    Counting sightings instead answered a different one. A rule that names three bad
+    packages in a single `requirements.txt` reported "3 runs" after a single scan,
+    so "has this been there since Tuesday, or is it new" came back "since Tuesday"
+    on a finding whose first and only run was a minute ago.
+    """
+    _run_reporting(database_url, project, occurrences=3)
+
+    assert _only(connection).runs == 1
+
+
+def test_a_second_run_seeing_the_same_finding_makes_it_two(
+    connection: DbConnection, database_url: str, project: int
+) -> None:
+    """The other half: the count has to move when a genuinely separate run sees it."""
+    _run_reporting(database_url, project, occurrences=3)
+    _run_reporting(database_url, project, occurrences=3)
+
+    assert _only(connection).runs == 2

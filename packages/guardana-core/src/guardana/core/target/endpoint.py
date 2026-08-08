@@ -417,6 +417,7 @@ class EndpointTarget(Target):
         provider: str = "openai",
         transport: ChatTransport | None = None,
         budgets: Budgets | None = None,
+        meter: UsageMeter | None = None,
     ) -> None:
         scheme = urlsplit(base_url).scheme
         if scheme not in _ALLOWED_SCHEMES:
@@ -441,8 +442,16 @@ class EndpointTarget(Target):
         # The meter sits on the target, not on the transport: every request to the
         # model passes through `chat`/`offer_tools` whatever transport is plugged
         # in, so a rule — including somebody else's — cannot route around it.
-        self._meter = UsageMeter()
-        self.apply_budgets(budgets if budgets is not None else Budgets())
+        #
+        # A caller may hand one in, and `probe` does: it builds a target per planted
+        # canary out of a single run, and one bill covers all of them. Left out, the
+        # target keeps its own, which is what a single-target run wants.
+        self._meter = meter if meter is not None else UsageMeter()
+        if budgets is not None:
+            # Only when asked. `apply_budgets(Budgets())` would clear the ceilings a
+            # shared meter was handed, leaving the run bounded only for as long as
+            # nobody reorders the runner's call to restore them.
+            self.apply_budgets(budgets)
 
     def capabilities(self) -> set[Capability]:
         """Declare CHAT, plus PLANT_SYSTEM_PROMPT and CALL_TOOLS when supported."""
@@ -479,6 +488,11 @@ class EndpointTarget(Target):
         Refused before a single request rather than accepted and never enforced. A
         ceiling that can never fire is worse than no ceiling: the user stops
         watching the bill because they believe something else is.
+
+        The ceilings move onto the existing meter rather than replacing it. A fresh
+        meter here would zero the tally, and the runner applies the profile's
+        budgets at the start of every pass — so a shared meter would be reset by the
+        very call that is supposed to bound it.
         """
         if budgets.bounds_tokens and not isinstance(self._transport, UsageReportingTransport):
             raise BudgetExhausted(
@@ -486,7 +500,7 @@ class EndpointTarget(Target):
                 f"token counts, so the budget could never be enforced — remove the token "
                 f"ceiling, or use a provider that reports usage"
             )
-        self._meter = UsageMeter(budgets)
+        self._meter.apply(budgets)
 
     def usage(self) -> TargetUsage:
         """Return what this endpoint has been asked for, and what it reported costing."""

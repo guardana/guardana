@@ -38,7 +38,7 @@ clean:
 $ guardana scan packages
 ✓ No findings.
 
-0 finding(s); 17 rule(s) run, 0 skipped.
+0 finding(s); 19 rule(s) run, 0 skipped. 6 component(s) observed.
 ```
 
 Note the path: in this repository, `guardana scan .` exits `1` by design —
@@ -55,7 +55,7 @@ $ guardana scan ./some-model-repo
 ▲ [MEDIUM] guardana.supply_chain.hallucinated_package — Import of unknown package (possible slopsquat lead)
     import 'torchutilz' isn't a known package or a declared dependency — declare it in requirements/pyproject, or verify it exists on PyPI  (./some-model-repo)
 
-2 finding(s); 17 rule(s) run, 0 skipped.
+2 finding(s); 19 rule(s) run, 0 skipped. 3 component(s) observed.
 ```
 
 `hallucinated_package` scans `import`/`from` statements in `.py` source

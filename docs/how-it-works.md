@@ -118,7 +118,9 @@ rule. Shipped evaluators:
 
 **The rule that governs every evaluator:** if it cannot actually grade — no reply,
 no planted canary, an unparseable judge answer — it returns `inconclusive`, never
-`pass`. (See §8.)
+`pass`. (See §8.) "No reply" includes a reply with nothing in it: a final assistant
+turn whose text is blank makes `Exchange.reply_text` `None`, so the decision is made
+at one seam rather than in each grader.
 
 ### Finding / Report — the normalized result
 Every check produces `Finding`s in one shape. A run collects them into a
@@ -183,10 +185,13 @@ the renderer prints them →
   hallucinated dependencies, insecure transport, hardcoded secrets, MCP tool
   poisoning, hidden-instruction "rules-file backdoors", and training-data
   integrity.
-- **Runtime (dynamic, endpoint)** — 8 rules: direct prompt injection, DAN-style
+- **Runtime (dynamic, endpoint)** — 13 rules: direct prompt injection, DAN-style
   jailbreak, a multi-turn gradual-jailbreak scenario, indirect (RAG) injection,
   excessive tool-use agency, unbounded consumption (denial-of-wallet),
-  output-secret leakage, and the canary-proven system-prompt-leak check.
+  output-secret leakage, the canary-proven system-prompt-leak check, and five
+  agentic checks — tool-result injection, credential exfiltration through a tool
+  argument, over-broad tool arguments, memory poisoning across a session boundary,
+  and a live MCP server's tool manifest.
 
 You never pick the layer by hand: `scan` runs the build layer, `probe` and
 `monitor` run the runtime layer.

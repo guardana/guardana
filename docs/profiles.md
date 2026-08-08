@@ -173,6 +173,14 @@ Ceilings are checked **before each request**, so `max_requests: 200` means 200
 requests were sent and never 201. Token and duration ceilings can only be checked
 once a request has been answered, so they stop the *next* one.
 
+**The ceiling belongs to the run, not to a pass of it.** `probe` runs each
+canary-planting rule against a target of its own — the marker has to be in that
+rule's system prompt and in no other — and every one of those passes shares one
+meter. Otherwise `max_requests: 200` would buy 200 requests as many times as there
+are canary rules installed, and adding one would quietly raise the bill. A
+`monitor` cycle is a run of its own, so the ceiling applies per cycle: a single
+total over a loop with no end is not a ceiling anybody could set.
+
 A run that hits a ceiling stops, keeps the findings it already produced, records
 `stopped_by: budget_exhausted` in its manifest, and exits `6`. It never passes the
 gate, and [`guardana diff`](usage-diff.md) will not read its smaller finding count

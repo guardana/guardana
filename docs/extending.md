@@ -56,7 +56,10 @@ class MyEvaluator(Evaluator):
 
     def evaluate(self, exchange: Exchange, expectation: Expectation) -> Verdict:
         # exchange.reply_text is the model's last reply (None when there is no
-        # assistant text to grade — return "inconclusive" then, never "pass");
+        # assistant text to grade — return "inconclusive" then, never "pass").
+        # A blank reply is None too: a provider that answers with an empty string
+        # (a content filter, a tool-call-only turn) said nothing to grade, and the
+        # seam decides that once so every evaluator agrees;
         # exchange.transcript is the whole conversation, for multi-turn goals.
         # expectation carries whatever the rule declared under `expect:`.
         if exchange.reply_text is None:

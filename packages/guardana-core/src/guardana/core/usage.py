@@ -112,6 +112,18 @@ class UsageMeter:
         self._missing_token_counts = 0
         self._any_tokens_reported = False
 
+    def apply(self, budgets: "Budgets") -> None:
+        """Adopt new ceilings without forgetting what has already been spent.
+
+        A target adopts its budgets after it is built, and `probe` builds one target
+        per planted canary out of a single run. Replacing the meter there — which is
+        what building a fresh one does — handed every pass a clean slate, so a
+        ceiling of 200 bought 200 requests as many times as there were passes.
+        Ceilings move; the tally does not.
+        """
+        with self._lock:
+            self._budgets = budgets
+
     def reserve(self) -> None:
         """Claim room for one more request, or raise `BudgetExhausted`.
 

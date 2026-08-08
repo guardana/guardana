@@ -47,10 +47,20 @@ class Exchange:
 
         A conversation left on a user turn (or empty) has no reply, so this is None,
         which an evaluator must read as inconclusive: silence is never a pass.
+
+        **A turn whose content is blank is silence too.** The transport already
+        refuses `content: null`, because `str(None)` would be graded as the word
+        "None"; `content: ""` is the same absence in a shape that types fine — an
+        Azure content filter returns it, and so does an assistant turn that carried
+        only tool calls. Passed on as a string it reached `canary`, which found no
+        marker in it and reported a pass at 0.95 on a reply that carried no evidence
+        in either direction. This is the seam where that decision belongs: one
+        answer, and every evaluator inherits it.
         """
-        if self.messages and self.messages[-1].role == "assistant":
-            return self.messages[-1].content
-        return None
+        if not self.messages or self.messages[-1].role != "assistant":
+            return None
+        content = self.messages[-1].content
+        return content if content.strip() else None
 
     @property
     def transcript(self) -> str:

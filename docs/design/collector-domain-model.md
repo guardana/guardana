@@ -1,6 +1,20 @@
 # Design: collector domain model and persistence
 
-**Status:** proposed · **Target:** v0.7 · **Current maturity:** experimental
+**Status:** superseded by [`collector-persistence.md`](collector-persistence.md),
+[`collector-tenancy.md`](collector-tenancy.md),
+[`collector-runs-and-findings.md`](collector-runs-and-findings.md),
+[`finding-lifecycle-and-waivers.md`](finding-lifecycle-and-waivers.md) and
+[`audit-retention-and-deletion.md`](audit-retention-and-deletion.md) ·
+**Written:** 2026-08-02 against 0.6
+
+> The sketch argued for here was built across 0.8.0–0.11.0, one document at a time,
+> and those five say what actually shipped. It is kept because it holds the
+> reasoning — why a finding and an occurrence are separate entities, why the
+> identity comes from `diff`, why tenancy is enforced at the query boundary — and an
+> accepted decision is superseded rather than rewritten. Read the problem statement
+> below as the state of the collector **in 0.6**: it has had persistence and
+> authentication since 0.8.0 and tenancy since 0.9.0, and its maturity is **beta**.
+> What it still does not have is RBAC and human identities.
 
 ## The problem
 

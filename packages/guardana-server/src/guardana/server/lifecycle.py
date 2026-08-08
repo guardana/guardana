@@ -71,7 +71,17 @@ class TrackedFinding:
     waiver_reason: str | None
     waiver_expires: datetime.date | None
     waiver_lapsed: bool
-    occurrences: int
+    runs: int
+    """How many distinct runs of this project have reported it.
+
+    Runs, not sightings. One run's rule can report the same identity several times —
+    `malicious_dependency` names three bad packages in one `requirements.txt`, and
+    the identity is the rule and the path — so counting rows answered "how often was
+    this printed" while the listing, the help text and the documentation all
+    promised "how many runs saw it". The second is the question somebody is asking:
+    has this been here since Tuesday, or is it new.
+    """
+
     first_seen: str
     last_seen: str
 
@@ -243,7 +253,7 @@ occurrences were removed by retention still lists.
 _LIST_QUERY = f"""
 select t.identity, t.status, t.owner, t.waived_by, t.waiver_reason, t.waiver_expires,
        min(f.rule_id) {_MINE}, {worst_severity(_MINE)}, min(f.target_ref) {_MINE},
-       count(f.id) {_MINE},
+       count(distinct f.submission_id) {_MINE},
        to_char(t.first_seen_at, 'YYYY-MM-DD'), to_char(t.last_seen_at, 'YYYY-MM-DD')
 from tracked_findings t
 join projects p on p.id = t.project_id
@@ -324,7 +334,7 @@ def _entry(row: tuple[object, ...], today: datetime.date) -> TrackedFinding:
         waiver_reason=None if row[4] is None else str(row[4]),
         waiver_expires=expires,
         waiver_lapsed=lapsed,
-        occurrences=int(str(row[9])),
+        runs=int(str(row[9])),
         first_seen=str(row[10]),
         last_seen=str(row[11]),
     )
