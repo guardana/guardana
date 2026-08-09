@@ -99,8 +99,7 @@ def _read_native(path: Path, digest: str) -> TraceRead:
             break
         record = mapping_of(_parse(raw, number), f"record {number}")
         if header is None:
-            header = _native.NativeHeader(record)
-            _native.migrate_header(record, header.version)
+            header = _native.NativeHeader(_native.migrate_header(record))
             continue
         if len(spans) >= MAX_SPANS:
             truncated = TraceTruncation.READ_LIMIT

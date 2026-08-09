@@ -11,6 +11,7 @@ import pytest
 from guardana.core.rule import Rule
 from guardana.core.target import TraceTarget
 from guardana.core.trace import (
+    AgentRef,
     Approval,
     ApprovalOutcome,
     Consent,
@@ -20,15 +21,19 @@ from guardana.core.trace import (
     Delegation,
     Dimension,
     EffectStatus,
+    Handoff,
     Identity,
     Message,
     PartKind,
     PolicyDecision,
     PolicyOutcome,
+    Retrieval,
+    RetrievedDocument,
     Role,
     SessionRef,
     SideEffect,
     SinkKind,
+    Span,
     SpanKind,
     ToolExecution,
     TraceTruncation,
@@ -36,6 +41,8 @@ from guardana.core.trace import (
 from guardana.rules.trace import (
     ConsentScopeExceededRule,
     CredentialPassthroughRule,
+    CrossTenantRetrievalRule,
+    HandoffAuthorityExpansionRule,
     IdentityDisagreementRule,
     PolicyDecisionIgnoredRule,
     SecretInToolArgumentRule,
@@ -498,6 +505,8 @@ _RULES: list[Rule] = [
     PolicyDecisionIgnoredRule(),
     UnapprovedSideEffectRule(),
     SecretInToolArgumentRule(),
+    CrossTenantRetrievalRule(),
+    HandoffAuthorityExpansionRule(),
 ]
 
 
@@ -560,3 +569,165 @@ def test_a_trace_recording_everything_runs_every_trace_rule() -> None:
     result = built_in_runner().run(TraceTarget(trace_of(span("s1"))))
     trace_rules = {r for r in result.rules_run if r.startswith("guardana.trace.")}
     assert len(trace_rules) == len(_RULES)
+
+
+def _handoff_span(carried: tuple[str, ...] | None) -> Span:
+    return span(
+        "h1",
+        kind=SpanKind.HANDOFF,
+        agent=AgentRef(name="researcher"),
+        handoff=Handoff(from_agent="researcher", to_agent="writer", carried_scopes=carried),
+    )
+
+
+def test_an_agent_that_used_more_than_the_handoff_carried_is_a_finding() -> None:
+    """The check `Span.agent` exists for: what the receiver did is only attributable with it."""
+    trace = trace_of(
+        _handoff_span(("docs:read",)),
+        span(
+            "s2",
+            agent=AgentRef(name="writer"),
+            delegations=(
+                Delegation(actor="writer", boundary="writer->crm", scopes=("customers:write",)),
+            ),
+        ),
+    )
+
+    results = graded(HandoffAuthorityExpansionRule(), trace)
+
+    assert len(findings(results)) == 1
+    assert "customers:write" in findings(results)[0].evidence.summary
+
+
+def test_an_agent_staying_inside_what_crossed_is_silent() -> None:
+    trace = trace_of(
+        _handoff_span(("docs:read", "docs:list")),
+        span(
+            "s2",
+            agent=AgentRef(name="writer"),
+            delegations=(
+                Delegation(actor="writer", boundary="writer->docs", scopes=("docs:read",)),
+            ),
+        ),
+    )
+
+    assert graded(HandoffAuthorityExpansionRule(), trace) == ()
+
+
+def test_work_done_by_a_different_agent_is_not_attributed_to_the_receiver() -> None:
+    """Without the actor on the span this rule would blame whoever acted next."""
+    trace = trace_of(
+        _handoff_span(("docs:read",)),
+        span(
+            "s2",
+            agent=AgentRef(name="auditor"),
+            delegations=(Delegation(actor="auditor", boundary="a->b", scopes=("secrets:read",)),),
+        ),
+    )
+
+    assert findings(graded(HandoffAuthorityExpansionRule(), trace)) == ()
+
+
+def test_a_trace_with_handoffs_but_no_actors_declines_rather_than_reporting_clean() -> None:
+    """The shape of an OpenTelemetry export that never set `gen_ai.agent.name`."""
+    trace = trace_of(
+        span(
+            "h1",
+            kind=SpanKind.HANDOFF,
+            handoff=Handoff(from_agent="researcher", to_agent="writer", carried_scopes=()),
+        ),
+        span(
+            "s2",
+            delegations=(Delegation(actor="writer", boundary="w->crm", scopes=("crm:write",)),),
+        ),
+    )
+
+    results = graded(HandoffAuthorityExpansionRule(), trace)
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+    assert "no span says which agent" in inconclusive(results)[0].evidence.summary
+
+
+def test_a_handoff_that_did_not_record_its_scopes_declines_by_name() -> None:
+    """An unrecorded handover of authority is not a handover of none."""
+    trace = trace_of(
+        _handoff_span(None),
+        span(
+            "s2",
+            agent=AgentRef(name="writer"),
+            delegations=(Delegation(actor="writer", boundary="w->crm", scopes=("crm:write",)),),
+        ),
+    )
+
+    results = graded(HandoffAuthorityExpansionRule(), trace)
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+
+
+def test_a_handoff_carrying_no_scopes_at_all_still_bounds_the_receiver() -> None:
+    """`()` is a fact — nothing crossed — so anything the receiver then used is expansion."""
+    trace = trace_of(
+        _handoff_span(()),
+        span(
+            "s2",
+            agent=AgentRef(name="writer"),
+            delegations=(Delegation(actor="writer", boundary="w->crm", scopes=("crm:write",)),),
+        ),
+    )
+
+    assert len(findings(graded(HandoffAuthorityExpansionRule(), trace))) == 1
+
+
+def test_the_handoff_rule_does_not_run_without_both_dimensions() -> None:
+    trace = trace_of(_handoff_span(("docs:read",)), records=[Dimension.HANDOFF])
+    result = built_in_runner().run(TraceTarget(trace))
+
+    assert "guardana.trace.handoff_authority_expansion" not in result.rules_run
+    assert "guardana.trace.handoff_authority_expansion" in {s.rule_id for s in result.rules_skipped}
+
+
+def test_a_retrieval_returning_another_tenants_document_is_a_finding() -> None:
+    trace = trace_of(
+        span(
+            "r1",
+            kind=SpanKind.RETRIEVAL,
+            retrieval=Retrieval(
+                query="invoices",
+                tenant="acme",
+                source="corpus",
+                documents=(
+                    RetrievedDocument(id="d1", tenant="acme"),
+                    RetrievedDocument(id="d2", tenant="globex"),
+                ),
+            ),
+        )
+    )
+
+    results = graded(CrossTenantRetrievalRule(), trace)
+
+    assert len(findings(results)) == 1
+    assert "globex" in findings(results)[0].evidence.summary
+
+
+def test_a_retrieval_that_stayed_inside_its_tenant_is_silent() -> None:
+    trace = trace_of(
+        span(
+            "r1",
+            kind=SpanKind.RETRIEVAL,
+            retrieval=Retrieval(
+                tenant="acme",
+                documents=(RetrievedDocument(id="d1", tenant="acme"),),
+            ),
+        )
+    )
+
+    assert graded(CrossTenantRetrievalRule(), trace) == ()
+
+
+def test_the_retrieval_rule_does_not_run_when_the_producer_records_no_retrieval() -> None:
+    trace = trace_of(span("s1"), records=[Dimension.MESSAGES])
+    result = built_in_runner().run(TraceTarget(trace))
+
+    assert "guardana.trace.cross_tenant_retrieval" not in result.rules_run

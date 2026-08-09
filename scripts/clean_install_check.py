@@ -170,7 +170,91 @@ def _checks(venv: Path, clean_directory: Path) -> list[Check]:
             0,
             expect=("adapter ready",),
         ),
+        # The three translators, and the whole path they exist for: a framework's
+        # own run record becomes a trace, the trace becomes a target, and a rule
+        # grades it. Each step is fine in a checkout and each is a separate module
+        # a wheel could fail to carry.
+        Check(
+            "the trace translators turn a framework run into a graded finding",
+            [python, "-c", _TRANSLATOR_SCRIPT],
+            0,
+            expect=("cross_tenant_retrieval", "translators ready"),
+        ),
     ]
+
+
+_TRANSLATOR_SCRIPT = """
+import sys
+
+from guardana.adapters.crewai import crewai_trace
+from guardana.adapters.llama_index import llama_index_trace
+from guardana.adapters.pydantic_ai import pydantic_ai_trace
+from guardana.core.target import TraceTarget
+from guardana.testing import SecurityAssertionError, assert_secure
+
+loaded = [m for m in sys.modules if m.split(".")[0] in ("crewai", "llama_index", "pydantic_ai")]
+assert not loaded, loaded
+
+
+class Node:
+    def __init__(self, node_id, tenant):
+        self.node_id = node_id
+        self.metadata = {"tenant": tenant}
+        self.text = "an invoice"
+        self.ref_doc_id = None
+
+
+class Scored:
+    def __init__(self, node):
+        self.node = node
+        self.node_id = node.node_id
+        self.metadata = node.metadata
+        self.score = 0.7
+
+    def get_content(self):
+        return self.node.text
+
+
+trace = llama_index_trace(
+    [Scored(Node("d1", "acme")), Scored(Node("d2", "globex"))],
+    query="invoices",
+    tenant="acme",
+)
+try:
+    assert_secure(TraceTarget(trace))
+except SecurityAssertionError as exc:
+    print("graded:", "cross_tenant_retrieval" in str(exc) and "cross_tenant_retrieval")
+else:
+    raise SystemExit("a cross-tenant retrieval was not reported")
+
+
+class Task:
+    agent = "Writer"
+    raw = "the report"
+    description = "write it up"
+    name = "write"
+    messages = []
+
+
+class Output:
+    raw = "the report"
+    tasks_output = [Task()]
+
+
+assert crewai_trace(Output()).spans[0].agent.name == "Writer"
+
+
+class Result:
+    run_id = "r-1"
+    conversation_id = "c-1"
+
+    def all_messages(self):
+        return []
+
+
+assert pydantic_ai_trace(Result()).trace_id == "r-1"
+print("translators ready")
+"""
 
 
 def _report(check: Check, result: subprocess.CompletedProcess[str]) -> str | None:

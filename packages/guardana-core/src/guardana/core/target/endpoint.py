@@ -97,6 +97,29 @@ class ToolSpec:
     description: str
 
 
+def openai_tool(spec: ToolSpec) -> dict[str, object]:
+    """Render one offered tool in the OpenAI function shape every provider understands.
+
+    Shared by the HTTP transport and the framework adapters so the offer a model sees
+    cannot differ by which transport carried it — a rule that grades what the model
+    asked for would otherwise produce a different verdict against the same model
+    depending on how it was reached.
+
+    The parameter schema is an open object on purpose. Closing it would forbid the
+    arguments an agency rule exists to read: `agent_tool_argument_scope` grades what
+    the model tried to pass, and a tool that accepts nothing produces a call with
+    nothing in it.
+    """
+    return {
+        "type": "function",
+        "function": {
+            "name": spec.name,
+            "description": spec.description,
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class ToolCall:
     """A tool the model asked to invoke, with the raw arguments it passed.
@@ -282,17 +305,7 @@ class UrllibTransport:
             {
                 "model": model,
                 "messages": [wire_message(m) for m in messages],
-                "tools": [
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": t.name,
-                            "description": t.description,
-                            "parameters": {"type": "object", "properties": {}},
-                        },
-                    }
-                    for t in tools
-                ],
+                "tools": [openai_tool(t) for t in tools],
             },
             api_key,
             ref,

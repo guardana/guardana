@@ -19,6 +19,7 @@ immediately rather than waiting for someone to cut one.
 import argparse
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
@@ -44,6 +45,18 @@ _CLAIMS: tuple[tuple[re.Pattern[str], str, str], ...] = (
     (re.compile(r"(\d+) rule\(s\) run, 0 skipped"), "{n} rule(s) run, 0 skipped", "build"),
 )
 
+_EVERY_OCCURRENCE: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\b(\d+)( security)? check(s?)\b"), "total"),
+)
+"""Claims the page states in prose, wherever it states them.
+
+The eyebrows above were rewritten from the registry while the meta description, the
+`og:description`, the hero and the threat-model section all still said 47 — four
+sentences one element away from a number this script had just corrected. That is the
+same failure the docstring opens with, one layer in: automation covering the labels
+makes the prose beside them look maintained.
+"""
+
 
 def _counts() -> dict[str, int]:
     rules = list(provide_rules())
@@ -52,6 +65,15 @@ def _counts() -> dict[str, int]:
         "build": sum(1 for r in rules if r.meta.surface is Surface.BUILD),
         "runtime": sum(1 for r in rules if r.meta.surface is Surface.RUNTIME),
     }
+
+
+def _replacement(want: int) -> Callable[[re.Match[str]], str]:
+    """Rewrite one "N checks" occurrence, keeping the wording it was written with."""
+
+    def replace(match: re.Match[str]) -> str:
+        return f"{want}{match.group(2) or ''} check{match.group(3)}"
+
+    return replace
 
 
 def _rewrite(text: str, counts: dict[str, int]) -> tuple[str, list[str]]:
@@ -71,6 +93,12 @@ def _rewrite(text: str, counts: dict[str, int]) -> tuple[str, list[str]]:
         if int(match.group(1)) != want:
             changed.append(f"{kind}: {match.group(1)} -> {want}")
         text = pattern.sub(template.format(n=want), text, count=1)
+    for pattern, kind in _EVERY_OCCURRENCE:
+        want = counts[kind]
+        stale = {m.group(1) for m in pattern.finditer(text) if int(m.group(1)) != want}
+        if stale:
+            changed.append(f"{kind} in prose: {', '.join(sorted(stale))} -> {want}")
+        text = pattern.sub(_replacement(want), text)
     return text, changed
 
 

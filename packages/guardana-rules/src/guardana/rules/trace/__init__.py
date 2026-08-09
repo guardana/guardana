@@ -1,17 +1,20 @@
 """Rules over a recorded execution — the invariants a trace makes checkable.
 
-Six checks, each existing because the domain model carries a distinction that would
+Eight checks, each existing because the domain model carries a distinction that would
 otherwise be unrepresentable, and each declaring the recorded dimension it needs as a
 capability so the runner skips it rather than reading an absence as a fact.
 
-One of them — `secret_in_tool_argument` — needs only what the OpenTelemetry GenAI
-conventions carry, so it runs on any instrumented framework's export. The other five
-need the authorization half, which no convention has a field for, and say so by not
-running.
+Two of them need only what the OpenTelemetry GenAI conventions carry, so they run on
+any instrumented framework's export: `secret_in_tool_argument`, and
+`cross_tenant_retrieval` wherever a producer labels the tenant it retrieved for. The
+rest need the authorization half, which no convention has a field for, and say so by
+not running.
 """
 
 from guardana.rules.trace.consent_scope_exceeded import ConsentScopeExceededRule
 from guardana.rules.trace.credential_passthrough import CredentialPassthroughRule
+from guardana.rules.trace.cross_tenant_retrieval import CrossTenantRetrievalRule
+from guardana.rules.trace.handoff_authority_expansion import HandoffAuthorityExpansionRule
 from guardana.rules.trace.identity_disagreement import IdentityDisagreementRule
 from guardana.rules.trace.policy_decision_ignored import PolicyDecisionIgnoredRule
 from guardana.rules.trace.secret_in_tool_argument import SecretInToolArgumentRule
@@ -21,6 +24,8 @@ from guardana.rules.trace.unapproved_side_effect import UnapprovedSideEffectRule
 __all__ = [
     "ConsentScopeExceededRule",
     "CredentialPassthroughRule",
+    "CrossTenantRetrievalRule",
+    "HandoffAuthorityExpansionRule",
     "IdentityDisagreementRule",
     "PolicyDecisionIgnoredRule",
     "SecretInToolArgumentRule",

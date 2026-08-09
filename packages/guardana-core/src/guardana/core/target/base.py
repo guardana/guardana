@@ -48,6 +48,8 @@ class Capability(StrEnum):
     READ_TRACE = "read_trace"
     READ_MESSAGES = "read_messages"
     READ_TOOL_CALLS = "read_tool_calls"
+    READ_RETRIEVAL = "read_retrieval"
+    READ_HANDOFFS = "read_handoffs"
     READ_IDENTITY = "read_identity"
     READ_DELEGATION = "read_delegation"
     READ_CONSENT = "read_consent"

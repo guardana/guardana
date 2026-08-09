@@ -5,13 +5,17 @@ from enum import StrEnum
 
 from guardana.core.trace.span import Span, SpanKind
 
-TRACE_SCHEMA_VERSION = 1
+TRACE_SCHEMA_VERSION = 2
 """Version of the trace document, moved independently of the CLI.
 
 A trace is a document a user keeps and a third party writes, so principle 11
 applies to it exactly as it does to a saved run. Kept an integer for the reason the
 run manifest's is: a field that is sometimes a number and sometimes a string is a
 trap for every reader, including ours.
+
+v2 adds `Span.agent`, because a multi-agent execution records which agent performed
+each step and v1 had nowhere to put it. A v1 file still reads: the migration says
+the field is absent, which is what it was.
 """
 
 

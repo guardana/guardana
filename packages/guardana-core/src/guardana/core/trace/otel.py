@@ -38,6 +38,7 @@ from guardana.core.trace._parse import (
     parts_from,
     sequence_of,
 )
+from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.identity import Identity, SessionRef
 from guardana.core.trace.memory import MemoryAction, MemoryOperation
 from guardana.core.trace.message import Message, Role
@@ -100,6 +101,7 @@ def read_span(raw: Mapping[str, Any]) -> tuple[Span, int]:
             started_at=_time(raw, "startTimeUnixNano", "start_time"),
             ended_at=_time(raw, "endTimeUnixNano", "end_time"),
             error=_error(raw, attributes),
+            agent=_agent(attributes),
             model=_model(attributes),
             messages=messages,
             system_instructions=parts_from(
@@ -229,6 +231,21 @@ def _error(raw: Mapping[str, Any], attributes: Mapping[str, Any]) -> str | None:
     code = status.get("code")
     failed = code in ("STATUS_CODE_ERROR", 2, "ERROR")
     return (_string(status.get("message")) or "error") if failed else None
+
+
+def _agent(attributes: Mapping[str, Any]) -> AgentRef | None:
+    """Read `gen_ai.agent.name`/`.id` — who the conventions say performed this step.
+
+    Listed in the conventions since they settled, and read by nothing here until the
+    model had a field to read them into. An id with no name is still an actor, so it
+    is kept under the id: two spans naming the same id are the same agent, which is
+    the comparison the handoff rule makes.
+    """
+    name = _string(attributes.get("gen_ai.agent.name"))
+    identifier = _string(attributes.get("gen_ai.agent.id"))
+    if name is None and identifier is None:
+        return None
+    return AgentRef(name=name or identifier or "", id=identifier)
 
 
 def _model(attributes: Mapping[str, Any]) -> ModelCall | None:

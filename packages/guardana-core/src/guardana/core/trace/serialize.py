@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any
 
 from guardana.core.trace._native import VERSION_KEY
+from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.authorization import Approval, Consent, PolicyDecision
 from guardana.core.trace.content import ContentPart, PartKind
 from guardana.core.trace.effect import SideEffect
@@ -72,6 +73,7 @@ def span_of(span: Span) -> dict[str, Any]:
             "span_id": span.span_id,
             "kind": str(span.kind),
             "name": span.name,
+            "agent": _agent(span.agent),
             "parent_span_id": span.parent_span_id,
             "started_at": _time(span.started_at),
             "ended_at": _time(span.ended_at),
@@ -244,6 +246,12 @@ def _memory(memory: MemoryOperation | None) -> dict[str, Any] | None:
             "origin_span_id": memory.origin_span_id,
         }
     )
+
+
+def _agent(agent: AgentRef | None) -> dict[str, Any] | None:
+    if agent is None:
+        return None
+    return _pruned({"name": agent.name, "id": agent.id})
 
 
 def _handoff(handoff: Handoff | None) -> dict[str, Any] | None:

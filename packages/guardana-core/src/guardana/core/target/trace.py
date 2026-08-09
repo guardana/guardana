@@ -6,6 +6,8 @@ from guardana.core.trace.model import Dimension, Trace
 _DIMENSION_CAPABILITIES: tuple[tuple[Dimension, Capability], ...] = (
     (Dimension.MESSAGES, Capability.READ_MESSAGES),
     (Dimension.TOOLS, Capability.READ_TOOL_CALLS),
+    (Dimension.RETRIEVAL, Capability.READ_RETRIEVAL),
+    (Dimension.HANDOFF, Capability.READ_HANDOFFS),
     (Dimension.IDENTITY, Capability.READ_IDENTITY),
     (Dimension.DELEGATION, Capability.READ_DELEGATION),
     (Dimension.CONSENT, Capability.READ_CONSENT),

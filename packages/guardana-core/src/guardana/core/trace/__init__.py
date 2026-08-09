@@ -30,6 +30,7 @@ imported from their own modules: `guardana.core.trace.bridge.as_trajectory` and
 See `docs/design/trace-domain-model.md`.
 """
 
+from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.authorization import (
     Approval,
     ApprovalOutcome,
@@ -86,6 +87,7 @@ __all__ = [
     "MAX_TRACE_BYTES",
     "OBSERVATIONS_SCHEMA_VERSION",
     "TRACE_SCHEMA_VERSION",
+    "AgentRef",
     "Approval",
     "ApprovalOutcome",
     "Blob",

@@ -98,7 +98,7 @@ def test_the_schema_version_in_each_schema_matches_the_code() -> None:
         MANIFEST_SCHEMA_VERSION
     )
     assert (
-        _schema("trace-v1.schema.json")["$defs"]["header"]["properties"][  # type: ignore[index]
+        _schema("trace-v2.schema.json")["$defs"]["header"]["properties"][  # type: ignore[index]
             "guardana_trace"
         ]["const"]
         == TRACE_SCHEMA_VERSION
@@ -119,3 +119,24 @@ def test_the_superseded_run_schemas_stay_pinned_to_the_versions_they_describe() 
             ]
             == version
         )
+
+
+def test_the_superseded_trace_schema_stays_pinned_to_the_version_it_describes() -> None:
+    """The same promise on the trace side: a v1 file keeps a v1 contract to validate against.
+
+    A third party writing a trace exporter built against `trace-v1`, and editing that
+    file to describe v2 would move the contract under them while the name said it had
+    not moved.
+    """
+    assert (
+        _schema("trace-v1.schema.json")["$defs"]["header"]["properties"][  # type: ignore[index]
+            "guardana_trace"
+        ]["const"]
+        == 1
+    )
+    assert (
+        "agent"
+        not in (
+            _schema("trace-v1.schema.json")["$defs"]["span"]["properties"]  # type: ignore[index]
+        )
+    )

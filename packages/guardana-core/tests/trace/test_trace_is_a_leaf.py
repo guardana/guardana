@@ -33,6 +33,13 @@ _ENTRY_POINTS = [
     "guardana.core.trace.bridge",
     "guardana.core.trace.claims",
     "guardana.cli.main",
+    # The adapters reach into both the trace model and the target layer, which is the
+    # shape that closed the cycle in 0.14. Importing each in a cold interpreter is the
+    # only check that runs them rather than reading them.
+    "guardana.adapters.langchain",
+    "guardana.adapters.pydantic_ai",
+    "guardana.adapters.llama_index",
+    "guardana.adapters.crewai",
 ]
 
 

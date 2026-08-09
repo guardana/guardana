@@ -175,3 +175,24 @@ def test_the_bring_your_own_rule_block_is_the_rule_that_actually_ships() -> None
         "have drifted apart — the page would be advertising a rule that is not the one "
         "CI runs"
     )
+
+
+_PROSE_CHECKS_RE = re.compile(r"\b(\d+)(?: security)? checks?\b")
+
+
+def test_no_sentence_on_the_page_states_a_stale_check_count() -> None:
+    """The labels were rewritten from the registry while four sentences kept the old number.
+
+    `sync_site.py` corrected the eyebrows and the terminal demo; the meta description,
+    the `og:description`, the hero and the threat-model section each said 47 one element
+    away from a 49 it had just written. This is the general form of that: every "N
+    checks" anywhere in the page is the rule total, so a sentence that is reworded — or
+    a new one that repeats the number — cannot quietly stop being checked.
+    """
+    stated = {int(match.group(1)) for match in _PROSE_CHECKS_RE.finditer(_page())}
+
+    assert stated, "the page no longer states a check count in prose; update this test with it"
+    assert stated == {len(list(provide_rules()))}, (
+        f"site/index.html states {sorted(stated)} check(s) in prose, and the registry has "
+        f"{len(list(provide_rules()))} — run `uv run python scripts/sync_site.py`"
+    )

@@ -6,7 +6,7 @@ records, which is why converting an OTel export into it is how an operator adds 
 authorization dimensions their framework does not emit.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from enum import StrEnum
 from typing import Any, TypeVar
 
@@ -27,6 +27,7 @@ from guardana.core.trace._parse import (
     text_of,
     text_tuple,
 )
+from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.authorization import (
     Approval,
     ApprovalOutcome,
@@ -63,6 +64,7 @@ _SPAN_KEYS = frozenset(
         "span_id",
         "kind",
         "name",
+        "agent",
         "parent_span_id",
         "started_at",
         "ended_at",
@@ -128,17 +130,35 @@ def _version_of(raw: Mapping[str, Any]) -> int:
     return version
 
 
-def migrate_header(raw: Mapping[str, Any], version: int) -> Mapping[str, Any]:
-    """Carry an older header forward to the current schema, inventing nothing.
+def migrate_header(raw: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Carry a header forward to the current schema, inventing nothing.
 
-    There is one version, so this is the identity — and it exists at version 1 on
-    purpose. The chain shape is what makes a version-2 reader an added function
-    rather than a rewritten one, and a migration written after the fact is a
-    migration written under pressure.
+    Returns the migrated mapping, and the caller parses *that* — the v1 version of
+    this took the already-parsed header's version and threw its own result away, so
+    a migration that needed to change a field could not have. A seam whose output
+    nothing consumes is a seam nobody would notice was broken.
+
+    One step so far. v2 added a per-span field, so a v1 header carries forward
+    unchanged apart from the version it now declares; the spans need no step because
+    an added field is absent in v1 and absent is what it means.
     """
-    if version == TRACE_SCHEMA_VERSION:
-        return raw
-    raise TraceLoadError(f"no migration path from trace schema version {version}")
+    version = _version_of(raw)
+    migrated = dict(raw)
+    for step in range(version, TRACE_SCHEMA_VERSION):
+        migrate = _MIGRATIONS.get(step)
+        if migrate is None:
+            raise TraceLoadError(f"no migration path from trace schema version {step}")
+        migrated = migrate(migrated)
+        migrated[VERSION_KEY] = step + 1
+    return migrated
+
+
+def _migrate_1_to_2(raw: dict[str, Any]) -> dict[str, Any]:
+    """v2 added `Span.agent`. The header is unchanged; every span gains an absent field."""
+    return raw
+
+
+_MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {1: _migrate_1_to_2}
 
 
 def _dimensions(raw: Mapping[str, Any]) -> frozenset[Dimension]:
@@ -176,6 +196,7 @@ def span_from(raw: Mapping[str, Any]) -> Span:
         span_id=text_of(raw, "span_id", "span"),
         kind=_enum(raw, "kind", SpanKind, SpanKind.OTHER),
         name=optional_text(raw, "name") or text_of(raw, "span_id", "span"),
+        agent=_agent(raw.get("agent")),
         parent_span_id=optional_text(raw, "parent_span_id"),
         started_at=optional_time(raw, "started_at"),
         ended_at=optional_time(raw, "ended_at"),
@@ -287,6 +308,21 @@ def _memory(raw: object) -> MemoryOperation | None:
         content=parts_from(raw.get("content")),
         origin_span_id=optional_text(raw, "origin_span_id"),
     )
+
+
+def _agent(raw: object) -> AgentRef | None:
+    """Read which agent performed this step, refusing a record with no name in it.
+
+    A nameless actor is dropped rather than recorded as `"unknown"`: the point of the
+    field is to tell two agents apart, and a trace whose every span is performed by
+    `unknown` would let a rule compare two different agents and find them equal.
+    """
+    if not isinstance(raw, dict):
+        return None
+    name = optional_text(raw, "name")
+    if name is None:
+        return None
+    return AgentRef(name=name, id=optional_text(raw, "id"))
 
 
 def _handoff(raw: object) -> Handoff | None:

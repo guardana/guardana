@@ -1,6 +1,6 @@
 """The published schema and the reader cannot disagree if a round trip has to validate.
 
-`schemas/trace-v1.schema.json` is a contract a third party writes against, so it is
+`schemas/trace-v2.schema.json` is a contract a third party writes against, so it is
 tested rather than described. Two directions: what `serialize_trace` writes satisfies the
 schema line by line, and what it writes reads back as the trace it started as — including
 the tri-states, which is where a lossy writer would hurt.
@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 from guardana.core.trace import (
+    AgentRef,
     Approval,
     ApprovalOutcome,
     Blob,
@@ -51,7 +52,7 @@ from guardana.core.trace import (
 )
 from jsonschema import Draft202012Validator
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[4] / "schemas" / "trace-v1.schema.json"
+_SCHEMA_PATH = Path(__file__).resolve().parents[4] / "schemas" / "trace-v2.schema.json"
 _NOW = datetime(2026, 8, 9, 10, 0, tzinfo=UTC)
 
 
@@ -87,6 +88,7 @@ def _full_trace() -> Trace:
                 span_id="s1",
                 kind=SpanKind.MODEL_CALL,
                 name="chat",
+                agent=AgentRef(name="support-agent", id="a-1"),
                 started_at=_NOW,
                 ended_at=_NOW,
                 conversation_id="c-1",
@@ -146,6 +148,7 @@ def _full_trace() -> Trace:
                 span_id="s2",
                 kind=SpanKind.TOOL_EXECUTION,
                 name="refund",
+                agent=AgentRef(name="billing-agent"),
                 parent_span_id="s1",
                 error="none",
                 tool=ToolExecution(
@@ -285,8 +288,10 @@ def test_the_schema_refuses_a_record_that_is_neither_a_header_nor_a_span() -> No
 @pytest.mark.parametrize(
     "record",
     [
-        {"guardana_trace": 2, "trace_id": "t"},
-        {"guardana_trace": 1, "trace_id": "t", "instrumented": ["aproval"]},
+        {"guardana_trace": 3, "trace_id": "t"},
+        {"guardana_trace": 1, "trace_id": "t"},
+        {"guardana_trace": 2, "trace_id": "t", "instrumented": ["aproval"]},
+        {"span_id": "s", "agent": {"id": "a-1"}},
         {"span_id": "s", "aprovals": []},
         {"span_id": "s", "effects": [{"sink": "telepathy", "action": "x"}]},
         {"span_id": "s", "approvals": [{"action": "x", "outcome": "maybe"}]},

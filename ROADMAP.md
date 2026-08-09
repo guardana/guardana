@@ -13,7 +13,7 @@ in [`CLAUDE.md`](CLAUDE.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 **Guardana does not send the most attacks. It knows which ones worked — and says
 so plainly when it cannot tell.**
 
-Four properties carry that claim, and every item below serves at least one:
+Five properties carry that claim, and every item below serves at least one:
 
 1. **Depth over guesswork on the artifact.** We read model formats — GGUF,
    safetensors, ONNX, Keras, pickle, chat templates — instead of pattern-matching
@@ -27,6 +27,27 @@ Four properties carry that claim, and every item below serves at least one:
 4. **Cost is a security property.** A scan nobody waits for is a scan nobody runs,
    and an excluded scanner is an organisation-level fail-open. Cost must grow with
    the size of the target, not with how much we know.
+5. **The application's threat model belongs to its owner.** Built-in rules cover
+   the risks everyone shares. What is dangerous in *your* system depends on your
+   data, your tools, your permissions and your business logic, and no public
+   framework knows any of that. Rules, evaluators, targets — and the security
+   contract below — make those invariants executable under the same evidence
+   semantics as the built-ins, so "we wrote our own check" never means "we left
+   the honest verdict behind".
+
+**And one property about how the verifying is done.** Guardana runs no autonomous
+attacker, disables no guardrails, and stays out of the request path. That is a
+design constraint, not modesty: in August 2026 TechCrunch reported evaluation
+sandboxes failing to contain the models under test — an unreleased OpenAI model
+reaching Hugging Face's production systems, Moonshot's Kimi K3 using a sandbox leak
+to reach GitHub, and UK AISI agents attempting social engineering against
+open-source projects
+([TechCrunch, 9 August 2026](https://techcrunch.com/2026/08/09/the-ai-safety-test-is-becoming-a-safety-risk/)).
+A verification tool whose own apparatus needs containment has moved the risk rather
+than measured it. Guardana sends bounded, budgeted requests to the target the
+operator named and reads what came back; the ceilings are in
+[`docs/safe-testing.md`](docs/safe-testing.md) and the address barrier is in
+[`docs/threat-model.md`](docs/threat-model.md).
 
 ## Target users, and what each needs to succeed
 
@@ -68,7 +89,7 @@ files pinned by digest in every run, and a rule carries both editions where the
 semantics genuinely overlap — never a silent remap onto the matching number, since
 `LLM07:2026` is Misinformation. `guardana taxonomy` shows what is installed.
 
-## What ships today (0.14.0)
+## What ships today (0.15.0)
 
 Counts come from the registry, never from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -367,32 +388,96 @@ and [`docs/deployment.md`](docs/deployment.md) says to the operator's face what 
 cannot yet do.
 
 
-## Next: application awareness, then 1.0
+## Next: protocol and evidence first, then application awareness, then 1.0
 
 The order is: **complete the domain model → build the translators into it → prove the
 compatibility contract → freeze it.** The model landed in 0.14.0
-([design](docs/design/trace-domain-model.md)); the rest is below. Everything else,
-including the whole team platform, runs beside this and gates none of it.
+([design](docs/design/trace-domain-model.md)) and the translators in 0.15.0
+([design](docs/design/framework-adapters.md)), which met 1.0 entry criterion 2.
+Everything else, including the whole team platform, runs beside this and gates none
+of it.
 
-### Next — the adapters, as translators into the model
+One item now goes in front of all of it, because a protocol moved underneath a claim
+this project already makes.
 
-> **Outcome:** Guardana can verify an AI *application*, and the shape it freezes at
-> 1.0 is known to be right because three unrelated inputs already fit it.
+### Next — MCP, as the specification now is
 
-- **The remaining named adapters — LlamaIndex, CrewAI, PydanticAI.** They come *after*
-  the model, as translators into it: three adapters written first would have baked
-  three frameworks' quirks into an API about to be frozen. Two independent adapters
-  driving the model is the remaining half of 1.0 entry criterion 2 — raw JSONL and the
-  OpenTelemetry GenAI conventions are the two that are met.
-- **Tool-calling through an adapter**, which the five agentic rules need. Until it
-  lands they skip and say so, which `fail_on_skipped` turns into an indeterminate
-  result rather than a pass.
-- **RAG, properly (`LLM09:2026`).** `RetrieverTarget`, `CorpusTarget`,
-  `EmbeddingTarget`: retrieval-time injection, cross-tenant retrieval, unauthorized
-  document access, document and metadata poisoning, tenant-filter bypass.
+> **Outcome:** `probe --mcp` verifies a server built to the current specification,
+> and every session-shaped rule knows which revision it is grading.
+
+**The specification changed materially on 2026-07-28 and Guardana pins
+`2025-11-25`.** This is not drift at the margins
+([changelog](https://modelcontextprotocol.io/specification/2026-07-28/changelog)):
+the `initialize` handshake is gone, protocol-level sessions and the
+`Mcp-Session-Id` header are gone, `server/discover` is a new RPC servers **MUST**
+implement, server-initiated requests are replaced by Multi Round-Trip Requests with
+a required `resultType`, results carry `ttlMs`/`cacheScope`, and Roots, Sampling,
+Logging and Dynamic Client Registration are all deprecated. Guardana's client opens
+with `initialize`, so against a conforming current server it does not connect at
+all. That fails loudly rather than passing quietly — but a security tool that
+advertises MCP depth and cannot reach a current server is the item that goes first.
+
+- **Speak both revisions, and record which one was negotiated.** `server/discover`
+  for up-front version selection, the stateless request shape, and the protocol
+  version in the run manifest, so a comparison can say the two runs graded different
+  protocols instead of reading it as the system changing.
+- **Make every session-shaped rule revision-aware.** A conforming `2026-07-28`
+  server has no session by design. `mcp.session_binding` and
+  `trace.session_as_identity` must decline rather than accuse a server that is
+  correct under the specification it implements.
+- **The authorization changes are checks, not chores.** `iss` validation is now a
+  client **MUST** ([RFC 9207](https://datatracker.ietf.org/doc/html/rfc9207)),
+  credentials are bound to the issuer that minted them and must not be reused
+  across authorization servers, and Client ID Metadata Documents supersede DCR —
+  while DCR support itself stays legal and must not be reported as a defect.
+- **Cache semantics are a privacy check.** A result that depends on who asked, and
+  is returned with `cacheScope: "public"`, is a leak an intermediary is invited to
+  perform. Verify what the server *declares*; do not try to prove what a
+  hypothetical intermediary did.
+- **Sampling misuse closes as a deferral.** It was deferred as unreachable through
+  a client that only sends and reads; the feature is now deprecated, and MRTR is
+  the shape that replaces it.
+
+### Then — the rest of application awareness
+
+> **Outcome:** Guardana can verify an AI *application*: what it retrieves, what it
+> does with the output, and what a single run is entitled to claim.
+
+- **Trace evidence coverage, as a visible capability.** `guardana trace inspect`
+  printing the evidence matrix a producer supports, plus a policy that can *require*
+  dimensions — a run missing one is indeterminate, never a pass. The mechanism
+  exists and is currently only visible as a skip note; an explicit matrix is what
+  turns "unknown is never green" from an internal invariant into something an
+  operator can gate on. **No single coverage percentage** — one number hides which
+  dimension is missing, which is the whole question.
+- **Security contracts — the application's threat model, executable.** Rules are
+  tests, evaluators are judgement, targets are the system; the missing layer is what
+  the application is *allowed to do*: which principals exist, which data belongs to
+  whom, which actions need approval, which boundary may never receive a credential.
+  A generic scanner cannot know any of it, and "you can write a custom rule" is no
+  longer differentiating on its own now that policy libraries are a mainstream
+  red-team feature. Deterministic trace assertions first — tenant boundary, approval
+  requirement, allowed scopes, credential boundary, forbidden sink — and generated
+  attacks never before the invariants are provable.
+- **Rule, evaluator and pack developer tooling.** `guardana rule test` running a
+  rule's positive, negative and inconclusive fixtures; evaluator measurement against
+  a labelled set; a pack manifest declaring API compatibility and what it provides;
+  a lock file so a CI run with private packs is reproducible. This is what makes an
+  extension a safe investment after 1.0, and it has to exist *before* the freeze.
+- **RAG as a live target (`LLM09:2026`).** `RetrieverTarget`, `CorpusTarget`,
+  `EmbeddingTarget`: retrieval-time injection, unauthorized document access,
+  document and metadata poisoning, tenant-filter bypass. Cross-tenant retrieval
+  already ships as a trace check; the rest need a target that sends, with its own
+  budget surface and its own answer to who owns the corpus being written to.
 - **Injection and sink rules over retrieved content**, on a live retriever and on a
   trace. The model already carries `Retrieval` and `SideEffect`, so this is an
   addition rather than a schema change.
+- **Replay: an incident becomes a permanent regression test.** A production trace
+  that showed a cross-tenant retrieval, a leaked credential or an approval bypass,
+  re-run against a candidate deployment — model calls allowed, retrieval
+  snapshotted, tools doubled, external writes blocked unless explicitly enabled.
+  This is the strongest thing a trace makes possible and it should not stay buried
+  in the continuous-verification milestone.
 - **Sink-aware output handling (`LLM10:2026`).** Distinguish dangerous output
   *generated* from output that *reached a sink* from a sink that *executed* it from a
   *confirmed side effect*. Initial sinks: SQL, shell, HTML/Markdown, template engines,
@@ -405,6 +490,15 @@ including the whole team platform, runs beside this and gates none of it.
   belong here.
 - **Utility regression.** Security improvements weighed against legitimate task
   success, or "safer" just means "refuses more".
+- **The attack *technique* as an extension point, designed before 1.0.** Today a
+  vulnerability crossed with an encoding is another rule; a `Technique` that
+  transforms a scenario would make the same coverage a product of two small sets
+  instead of a sum of large ones. The corpora themselves stay in the content lane —
+  what moves here is the *interface*, because a new extension point added after the
+  rule and evaluator APIs freeze is a major version immediately after promising
+  stability. Deterministic transforms first (base64, invisible characters,
+  homoglyphs, role-play wrappers, payload splitting); adaptive attackers stay
+  research-gated.
 
 ### Deliberately left open, with the reason
 
@@ -414,6 +508,10 @@ one.
 
 | Deferred | Reason |
 |---|---|
+| **`RetrieverTarget`, `CorpusTarget`, `EmbeddingTarget`** | a live retriever is a target that *sends*: its own budget surface, its own safety ceiling, its own answer to who owns a corpus a test would write to. Shipping three of them inside the release that changed the trace schema would give none of them their own tests. The deterministic trace-side check shipped in 0.15.0 |
+| **Driving a framework agent or query engine** | a faithful multi-turn drive needs either the framework's own message types — which the no-import contract forbids — or a replay of the whole conversation per turn, whose cost the request meter cannot see. And a target that can only answer one turn has no way to say so: that is a missing capability the engine should answer once, not three adapters papering over |
+| **Tool calling through PydanticAI and CrewAI** | both own their tool loop, so an agent calls its tools itself rather than reporting what it *would* call. There is no seam to offer a double into; their adapters translate the loop afterwards, which is what the trace rules grade |
+| **A `crewai_target()` driver** | `kickoff()` takes the crew's own template placeholders. A driver would have to guess them, and a guess that misses produces a crew answering a prompt nobody sent — a probe grading the wrong conversation, confidently |
 | **Grading a trace with the driven-run evaluators** | `as_trajectory` makes it possible; an evaluator calibrated on runs Guardana drove has not been measured on traces it did not, and `calibrate` is how that claim gets earned |
 | **`finish_reason` and latency on `Exchange`** | a change third-party transports must follow. A trace already carries `gen_ai.response.finish_reasons`; the live transport contract is a separate piece of work with its own tests |
 | **An OTLP receiver** | a service that listens is the continuous-verification milestone and a different security posture from reading a file an operator handed over. The mapping built for `analyze-trace` is what it would reuse |
@@ -424,9 +522,11 @@ one.
 | **A saved MCP run in the compatibility corpus** | the corpus holds a real artifact scan from a released build; the 1.0 criterion asks for the same on the endpoint side |
 | **Token passthrough to an upstream API** | *(closed in 0.14.0 — `guardana.trace.credential_passthrough` grades it in a trace, which is where it becomes observable)* |
 | **Confused deputy, in full** | its preconditions live on the server's back side; the only client-side proof is registering a client on somebody's authorization server, which is a write to a third party by a tool whose proposition is that it is safe to point at production. The observable slice shipped |
-| **Sampling misuse (MCP)** | a server abusing `sampling/createMessage` issues a request *to* the client over a stream the client answers. Guardana's client sends and reads; changing that is the transport-contract work above |
+| **Sampling misuse (MCP)** | *(closed by the specification — Sampling is deprecated as of `2026-07-28`, and MRTR is the shape that replaces server-initiated requests. The MCP work above reads the replacement instead)* |
 | **Multi-user data isolation** | proving user A cannot reach user B's data needs two credentials *and* knowledge of whose data is whose. Guardana has neither and cannot ask for the second |
 | **Shadow MCP servers (`MCP09:2025`)** | finding servers nobody registered is network discovery, not verification of a target |
+| **A universal AI risk score** | every component of a single number would have to have defensible semantics, and none of the interesting ones do. `critical findings`, `indeterminate checks`, `coverage loss`, `attack success rate` and `utility regression` each answer a question; `8.4/10` answers none of them and hides which dimension is missing |
+| **A public extension registry** | a registry is meaningful once a pack has a manifest, a compatibility range, a lock file and a stated trust model. Publishing before those exist is asking people to install code on a promise |
 | **A catalogue may be a subset** | `OWASP-ML-2023` holds the entries rules map to, not all ten. A catalogue may be a subset; it may never invent an entry |
 | **Third-party catalogues have no digest to pin** | a pack registers *references* through an entry point, not a catalogue file, so a run records its refs and not a provenance nobody can produce |
 
@@ -477,6 +577,9 @@ above, which is why the order is domain completeness → compatibility proof →
    side effects and handoffs **without a framework-specific escape hatch**.
 2. That model has been driven by three unrelated inputs: raw JSONL, OpenTelemetry
    GenAI semantic conventions, and at least two independent framework adapters.
+   *(Met in 0.15.0: PydanticAI, LlamaIndex and CrewAI each drive a different half of
+   the model, and CrewAI's actor-per-step forced `Span.agent` — which is the
+   criterion doing its job rather than being ticked.)*
 3. Every published schema — run manifest, diff, plan, baseline, collector envelope,
    taxonomy catalog, rule and evaluator identity — is versioned with a documented
    migration path.
@@ -491,6 +594,19 @@ above, which is why the order is domain completeness → compatibility proof →
    rather than against the source is the honest form of this test.
 7. There is a written deprecation policy with a stated support window, and the API
    has survived a release-candidate cycle with no domain-schema break.
+8. **Every extension point the freeze covers exists before it.** A `Technique`
+   interface added after `Rule` and `Evaluator` are frozen is a major version the
+   week after promising stability, so it is designed now even if three transforms
+   ship. The same argument covers the security-contract schema and the pack
+   manifest: a third party must be able to run `pack validate` against the release
+   candidate.
+9. **Every protocol and schema version a run interpreted is in its evidence** — MCP
+   revision, OpenTelemetry convention version, trace schema, and any A2A version —
+   so a comparison can say the two runs graded different protocols rather than
+   reading it as the system changing.
+10. **The release-candidate cycle is exercised by people outside this repository**:
+    a private rule-pack author, a RAG user, an MCP operator. Freezing on internal
+    fixtures alone proves the fixtures, not the API.
 
 **Not required for 1.0**, and listed because leaving it implicit is how a
 version number turns into a wish list: RBAC, ticket integrations, Kubernetes,
@@ -512,12 +628,25 @@ naming the wrong cause confidently is worse than naming none.
 work, where they belong: they are about what a single run is entitled to claim,
 not about running one on a schedule.)*
 
-## Milestone: multi-agent protocols, after MCP
+## Milestone: multi-agent protocols — a domain proof before 1.0, the target after
 
-A2A and multi-agent identity, delegation and trust boundaries; delegated
-credentials; approval bypass; cascading failure; action-boundary policy. Split
-from the MCP work above, which is settled enough to build now while these are
-still moving.
+**A2A reached v1.0 and calls itself production-ready**, with a technical steering
+committee spanning AWS, Cisco, Google, IBM Research, Microsoft, Salesforce, SAP and
+ServiceNow ([announcement](https://a2a-protocol.org/latest/announcing-1.0/)). That
+changes what this milestone is for, in one specific way: A2A models signed agent
+cards, skills, multi-tenancy and cross-organisation delegation — the same concepts
+`Trace` claims to represent framework-neutrally. So a **read-only proof** goes
+*before* the freeze, not after it: inspect an agent card, its protocol version,
+skills, security schemes and tenant declarations, and check whether they land in
+`Identity`, `Delegation`, `Handoff` and `SessionRef` without a new field. If they
+do not, the freeze would have captured the wrong shape — which is exactly what
+CrewAI demonstrated at a smaller scale in 0.15.0.
+
+The full target comes **after** 1.0: agent-card drift against a pin, authentication
+declared but not enforced, a credential for one skill reaching another, tenant
+boundaries where the operator supplied two identities, push-notification targets
+(the SSRF barrier already exists), and delegation depth and cycles read from a
+trace. Broad coverage is not what the pre-1.0 proof is for.
 
 ## Milestone: multimodal and advanced assurance
 

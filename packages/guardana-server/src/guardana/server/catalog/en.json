@@ -173,6 +173,14 @@
       "name": "A policy decision the run went ahead against",
       "description": "A guardrail returned deny — or errored and was treated as an allow — and the action happened anyway. The second case is a fail-open in somebody else's stack and is reported at the same severity."
     },
+    "guardana.trace.cross_tenant_retrieval": {
+      "name": "A retrieval that crossed a tenant boundary",
+      "description": "A retrieval performed for one tenant returned a document belonging to another. The comparison needs a tenant on the query and on the document; without both, the check declines rather than reporting a clean run over an unlabelled corpus."
+    },
+    "guardana.trace.handoff_authority_expansion": {
+      "name": "An agent that gained authority across a handoff",
+      "description": "An agent exercised a scope wider than the handoff carried to it. The scopes that cross an agent boundary are a ceiling, and a receiver that goes past one gained privilege by being handed work."
+    },
     "guardana.trace.secret_in_tool_argument": {
       "name": "A credential in a recorded tool argument",
       "description": "A recorded trace shows an API key or password inside a tool call's arguments. The credential is now in whatever holds the trace, and it got there from the model's context."

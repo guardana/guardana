@@ -1,6 +1,6 @@
 # The `Trace` domain model: grading an execution somebody else recorded
 
-**Status:** accepted, implemented — ships in the next release · **Written:** 2026-08-09 · **Step three**
+**Status:** implemented in 0.14.0 · **Written:** 2026-08-09 · **Step three**
 
 ## The problem, stated precisely
 
@@ -95,7 +95,7 @@ design.
 | `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model` | the model call |
 | `gen_ai.usage.input_tokens` / `output_tokens`, `gen_ai.response.finish_reasons` | the call's cost and how it ended |
 | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `gen_ai.tool.description`, `gen_ai.tool.type`, `gen_ai.tool.definitions` | tool executions and tool offers |
-| `gen_ai.agent.name` / `.id`, `gen_ai.conversation.id` | who acted, and which conversation |
+| `gen_ai.agent.name` / `.id`, `gen_ai.conversation.id` | who acted, and which conversation *(the actor needed a field the model did not have until `Span.agent` in 0.15.0 — see [`framework-adapters.md`](framework-adapters.md))* |
 | `gen_ai.data_source.id` | the retrieval source |
 | `mcp.method.name`, `mcp.session.id`, `mcp.protocol.version`, `network.transport` | an MCP hop, and its session |
 | `server.address` / `server.port`, `error.type` | the callee, and whether it failed |
@@ -464,7 +464,7 @@ lookups deep.
 
 | Deferred | Why |
 |---|---|
-| **The remaining named adapters — LlamaIndex, CrewAI, PydanticAI** | The roadmap's own reason, unchanged: three adapters written before the model bakes three frameworks' quirks into an API about to be frozen. They are translators into this model, and they are cheap once it is real. 1.0 entry criterion 2 asks for two independent adapters driving the model, so this is the criterion's remaining half — stated, not hidden |
+| **The remaining named adapters — LlamaIndex, CrewAI, PydanticAI** *(shipped in 0.15.0)* | The roadmap's own reason, unchanged: three adapters written before the model bakes three frameworks' quirks into an API about to be frozen. They are translators into this model, and they are cheap once it is real. 1.0 entry criterion 2 asks for two independent adapters driving the model, so this is the criterion's remaining half — stated, not hidden |
 | **OTLP over the wire** | A receiver is a service that listens, which is the continuous-verification milestone and a different security posture from reading a file. The mapping built here is what a receiver would reuse |
 | **Metrics and logs from the conventions** | Only spans carry the message content and the tool calls rules grade. A metric says how many tokens were spent, which the manifest already records for runs Guardana drove |
 | **Injection and sink rules over retrieved content** | Needs the retrieval and sink-aware output work; the model carries the fields so it is an addition rather than a schema change. See the rejection above |
@@ -496,4 +496,6 @@ half.
 - [`../usage-analyze-trace.md`](../usage-analyze-trace.md) ·
   [`../usage-import-observations.md`](../usage-import-observations.md) — how an
   operator runs both.
+- [`framework-adapters.md`](framework-adapters.md) — the three translators built
+  against this model, and the one field they proved was missing.
 - `ROADMAP.md`, *Next — the domain model, and only then the adapters*.

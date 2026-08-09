@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.authorization import Approval, Consent, PolicyDecision
 from guardana.core.trace.content import ContentPart
 from guardana.core.trace.effect import EffectStatus, SideEffect
@@ -69,6 +70,7 @@ class Span:
     ended_at: datetime | None = None
     error: str | None = None
     # what the conventions carry
+    agent: AgentRef | None = None
     model: ModelCall | None = None
     messages: tuple[Message, ...] = ()
     system_instructions: tuple[ContentPart, ...] = ()
@@ -110,7 +112,8 @@ class Span:
 
     def render(self) -> str:
         """Render this step as readable lines — the evidence a human reads on a finding."""
-        lines = [f"[{self.span_id}] {self.kind}: {self.name}"]
+        actor = f" by {self.agent.describe()}" if self.agent is not None else ""
+        lines = [f"[{self.span_id}] {self.kind}: {self.name}{actor}"]
         lines.extend(f"  {m.render()}" for m in self.messages)
         if self.tool is not None:
             lines.append(

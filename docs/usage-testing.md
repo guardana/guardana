@@ -174,14 +174,63 @@ Three things to know:
   the network. Pass `name="support-agent"` to choose the label yourself — it is
   part of a finding's identity, so a stable one is what lets
   [`guardana diff`](usage-diff.md) line two runs up across a change of client.
-- **Tool calling is not wired up.** The five agentic rules are skipped and say so;
-  `fail_on_skipped: true` turns that into an indeterminate result rather than a
-  pass. Probe a tool-using agent through an OpenAI-compatible endpoint or an
-  [MCP server](usage-probe.md) until this lands.
+- **Tool calling is wired up when the model supports it.** `bind_tools` exists on
+  every LangChain chat model and raises on the ones without a function-calling API,
+  so Guardana finds out by binding a throwaway tool once, at construction — it
+  sends no request. A model that binds runs the six agentic rules; one that refuses
+  skips them with a reason, and `fail_on_skipped: true` turns that into an
+  indeterminate result rather than a pass. `guardana target inspect` shows which of
+  the two you have.
 - **Token budgets need a model that reports usage.** When the reply carries
   `usage_metadata` the tokens are counted; when it does not, the count is recorded
   as unknown rather than zero — so a *token* ceiling over such a model can never
   fire, while a *request* ceiling always can.
+
+## A run your framework already performed
+
+The adapters above *drive* a model. These translate the record of a run that
+already happened into a [`Trace`](design/trace-domain-model.md), which
+[`analyze-trace`](usage-analyze-trace.md)'s rules grade. Nothing is sent anywhere.
+
+```python
+from guardana.adapters.pydantic_ai import pydantic_ai_trace
+from guardana.core.target import TraceTarget
+from guardana.testing import assert_secure
+
+
+def test_the_agent_run_holds_up(agent):
+    result = agent.run_sync("refund order 7 and email the customer")
+    assert_secure(TraceTarget(pydantic_ai_trace(result)), preset="ci")
+```
+
+| Adapter | Reads | Records |
+|---|---|---|
+| `guardana.adapters.pydantic_ai` | `AgentRunResult` from `agent.run_sync(...)` | messages with typed parts, tool calls and results |
+| `guardana.adapters.llama_index` | a query `Response`, or the list `retriever.retrieve(...)` returns | messages, retrieval with per-document tenant, source and score |
+| `guardana.adapters.crewai` | `CrewOutput` from `crew.kickoff(...)` | messages, the agent that performed each step, handoffs between agents |
+
+None of the three libraries is ever imported, exactly as with `langchain_target`.
+
+**An adapter declares only what its framework really reports**, and that is the
+part worth understanding. PydanticAI records nothing about approvals, so a
+PydanticAI trace does not claim to — and the rule that grades unapproved effects
+is *skipped* rather than reporting that it found none. A run where nothing could
+be checked prints `0 rules ran — nothing was checked (this is not an all-clear)`
+and exits [`2`](exit-codes.md), which is the honest answer and not a pass.
+
+To grade the dimensions your framework does not emit, write the trace out and add
+them:
+
+```python
+from guardana.core.trace import serialize_trace
+
+Path("run.jsonl").write_text(serialize_trace(crewai_trace(result, crew=crew)))
+```
+
+Then edit `run.jsonl` — it is the native dialect, one JSON object per line — and
+run [`guardana analyze-trace run.jsonl`](usage-analyze-trace.md). The identity,
+delegation, consent, policy and approval blocks are the half no framework emits
+and the half where the interesting failures are.
 
 ## Choosing what is loaded
 

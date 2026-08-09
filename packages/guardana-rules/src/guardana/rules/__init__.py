@@ -44,6 +44,8 @@ from guardana.rules.supply_chain.saved_model_ops import SavedModelOpsRule
 from guardana.rules.trace import (
     ConsentScopeExceededRule,
     CredentialPassthroughRule,
+    CrossTenantRetrievalRule,
+    HandoffAuthorityExpansionRule,
     IdentityDisagreementRule,
     PolicyDecisionIgnoredRule,
     SecretInToolArgumentRule,
@@ -101,6 +103,8 @@ def provide_rules() -> list[Rule]:
         PolicyDecisionIgnoredRule(),
         UnapprovedSideEffectRule(),
         SecretInToolArgumentRule(),
+        CrossTenantRetrievalRule(),
+        HandoffAuthorityExpansionRule(),
         *_load_catalog_rules(),
     ]
 

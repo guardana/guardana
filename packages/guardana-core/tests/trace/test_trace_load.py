@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from guardana.core.trace import (
+    TRACE_SCHEMA_VERSION,
     Dialect,
     Dimension,
     TraceLoadError,
@@ -18,6 +19,7 @@ from guardana.core.trace import (
     detect_dialect,
     read_trace,
 )
+from guardana.core.trace._native import migrate_header
 from guardana.core.trace.limits import MAX_RECORD_BYTES, MAX_SPANS
 
 _HEADER = {
@@ -180,3 +182,52 @@ def test_an_unreadable_timestamp_reads_as_absent_never_as_now(tmp_path: Path) ->
     """Substituting the current time would date somebody else's execution to our read."""
     path = _write(tmp_path, _HEADER, {"span_id": "s1", "started_at": "last tuesday"})
     assert read_trace(path).trace.spans[0].started_at is None
+
+
+def test_a_version_one_trace_still_reads_under_this_build(tmp_path: Path) -> None:
+    """The migration, tested by the property it exists for rather than by its return value.
+
+    Every other test in this file writes a v1 header, so the whole file is the wide
+    version of this. This one states it: v2 added `Span.agent`, and a v1 span that
+    never had the field reads as absent — not as a span this build refuses, and not as
+    an agent named "unknown", which is what inventing a default would have produced.
+    """
+    path = _write(tmp_path, {**_HEADER, "guardana_trace": 1}, {"span_id": "s1", "name": "chat"})
+
+    read = read_trace(path)
+
+    assert read.trace.spans[0].agent is None
+    assert read.trace.schema_version == TRACE_SCHEMA_VERSION
+
+
+def test_a_version_two_trace_carries_the_agent_that_performed_each_step(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        {**_HEADER, "guardana_trace": 2},
+        {"span_id": "s1", "agent": {"name": "researcher", "id": "a-1"}},
+    )
+
+    agent = read_trace(path).trace.spans[0].agent
+
+    assert agent is not None
+    assert (agent.name, agent.id) == ("researcher", "a-1")
+
+
+def test_an_agent_record_with_no_name_reads_as_no_agent(tmp_path: Path) -> None:
+    """A nameless actor is dropped rather than recorded, so two of them never compare equal."""
+    path = _write(tmp_path, {**_HEADER, "guardana_trace": 2}, {"span_id": "s1", "agent": {}})
+
+    assert read_trace(path).trace.spans[0].agent is None
+
+
+def test_the_header_migration_hands_the_reader_a_current_version_document() -> None:
+    """The seam's output is consumed, which the version this replaced could not claim.
+
+    It took the already-parsed header's version and threw its own result away, so a
+    migration that needed to change a field could not have. Asserting on what comes
+    back is what makes the next migration a change with a test rather than a hope.
+    """
+    migrated = migrate_header({"guardana_trace": 1, "trace_id": "t-1"})
+
+    assert migrated["guardana_trace"] == TRACE_SCHEMA_VERSION
+    assert migrated["trace_id"] == "t-1"

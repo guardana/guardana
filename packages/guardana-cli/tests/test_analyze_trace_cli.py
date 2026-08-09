@@ -19,6 +19,7 @@ from pathlib import Path
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.manifest import SourceKind
+from guardana.core.trace import TRACE_SCHEMA_VERSION
 from typer.testing import CliRunner, Result
 
 runner = CliRunner()
@@ -186,7 +187,7 @@ def test_write_trace_converts_an_export_into_the_dialect_that_can_declare_dimens
     result = _run(str(source), "--write-trace", str(destination))
     assert "native dialect" in result.output
     lines = destination.read_text(encoding="utf-8").splitlines()
-    assert json.loads(lines[0])["guardana_trace"] == 1
+    assert json.loads(lines[0])["guardana_trace"] == TRACE_SCHEMA_VERSION
     assert "does not record" in _run(str(destination)).output
 
 

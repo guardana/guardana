@@ -77,15 +77,24 @@ guardana analyze-trace otel-export.jsonl --write-trace enriched.jsonl
 guardana analyze-trace enriched.jsonl
 ```
 
+**The written file is a faithful copy, not a redacted one.** Redaction applies to
+*evidence* — what leaves in a report, a SARIF file or a collector envelope — and a
+trace being converted is input, not evidence. Redacting it here would change what the
+rules then grade while the file still looked authoritative. So if the export contains
+customer prompts, API keys in tool arguments or personal data, the converted file
+contains them too, in a form that is easier to read than the one it came from. Write it
+where the original already belongs, and keep it out of a repository.
+
 ## The native format
 
 JSONL. The first line is a header; every later line is one span. The published schema is
-[`schemas/trace-v1.schema.json`](../schemas/trace-v1.schema.json), and each line
-validates against it independently.
+[`schemas/trace-v2.schema.json`](../schemas/trace-v2.schema.json), and each line
+validates against it independently. A v1 file still reads: v2 added `agent` to a span,
+so a v1 span simply does not carry one.
 
 ```jsonl
-{"guardana_trace": 1, "trace_id": "t-42", "producer": {"name": "acme-harness", "version": "2.1"}, "instrumented": ["messages", "tools", "identity", "delegation", "consent", "policy", "approval", "effects"]}
-{"span_id": "s1", "kind": "model_call", "name": "chat gpt-4o", "messages": [{"role": "user", "parts": [{"type": "text", "content": "refund order 12"}]}], "consents": [{"client": "support-agent", "granted": true, "scopes": ["orders:read"], "subject": "u-9"}]}
+{"guardana_trace": 2, "trace_id": "t-42", "producer": {"name": "acme-harness", "version": "2.1"}, "instrumented": ["messages", "tools", "identity", "delegation", "consent", "policy", "approval", "effects"]}
+{"span_id": "s1", "kind": "model_call", "name": "chat gpt-4o", "agent": {"name": "support-agent"}, "messages": [{"role": "user", "parts": [{"type": "text", "content": "refund order 12"}]}], "consents": [{"client": "support-agent", "granted": true, "scopes": ["orders:read"], "subject": "u-9"}]}
 {"span_id": "s2", "kind": "tool_execution", "name": "refund", "tool": {"name": "refund", "arguments": "{\"order\": 12}", "mutates": true}, "identity": {"actor": "support-agent", "session": {"id": "sess-1", "protocol": "mcp"}}, "delegations": [{"actor": "support-agent", "boundary": "agent->billing-mcp", "credential": {"kind": "bearer", "digest": "sha256:…", "audience": ["https://billing.internal/"]}, "scopes": ["orders:read", "orders:refund"]}], "effects": [{"sink": "payment", "action": "refund", "target": "order/12", "status": "executed", "reversible": false}], "approvals": [{"action": "refund", "outcome": "not_requested"}]}
 ```
 

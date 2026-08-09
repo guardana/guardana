@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-10 — the translators, and the field they proved was missing
+
+### Added
+
+**Tool calling through the LangChain adapter, which six rules were waiting for.** A
+team probing a LangChain chat model got six skips and a coverage note, because the
+adapter could send prose and nothing else. It now offers tools the way every provider
+reads them, and replays a whole tool conversation — the assistant turn carrying the
+calls, and each result paired to the call it answers. The `(role, content)` tuple form
+this used before could express neither; LangChain raises `KeyError: 'tool_call_id'` on
+the attempt, so an agentic rule replaying its own history died on the second turn.
+
+Whether a given model *can* be offered tools is **measured, not assumed**:
+`bind_tools` exists on every LangChain chat model and raises on the ones without a
+function-calling API, so Guardana binds a throwaway tool once at construction — no
+request, no token — and advertises `CALL_TOOLS` only if that worked. A model that
+refuses keeps every text rule and skips the agentic ones with a reason, which
+`fail_on_skipped` can turn into an indeterminate result.
+
+**Three framework adapters as translators into `Trace`** —
+`guardana.adapters.pydantic_ai`, `.llama_index`, `.crewai` — each turning a run its
+framework already performed into the model the trace rules grade. None of the three
+libraries is imported, and `guardana-core` gains no dependency; the shapes were read
+by running the real libraries and are recorded, with versions, in
+[`docs/design/framework-adapters.md`](docs/design/framework-adapters.md).
+
+They drive three *different* halves of the model, which is the point: PydanticAI
+supplies messages with typed parts and a tool loop, LlamaIndex supplies retrieval with
+a tenant and a score on every document, CrewAI supplies multi-agent invocations and
+handoffs. **Each declares only the dimensions its framework really records.** A
+PydanticAI trace does not claim to carry approvals, so the rule that grades unapproved
+effects is skipped rather than reporting that it found none — and a run where nothing
+could be checked says `0 rules ran — nothing was checked (this is not an all-clear)`
+and exits `2`.
+
+**Two rules over a recorded execution.** `guardana.trace.cross_tenant_retrieval` —
+a retrieval performed for one tenant returned another tenant's document, which is the
+deterministic half of the RAG work and the reason `Retrieval` carries a tenant on the
+query *and* on each document. `guardana.trace.handoff_authority_expansion` — an agent
+exercised a scope wider than the handoff carried to it. Both decline by name rather
+than passing when the comparison cannot be made: an unlabelled corpus cannot be proven
+not to have leaked, and a handoff that never recorded its scopes did not record that
+none crossed. 47 built-in rules → 49.
+
+### Changed
+
+**Trace schema v1 → v2: `Span.agent`, because a multi-agent execution records who
+acted and the model had nowhere to put it.** CrewAI names an agent on every task
+output; the OpenTelemetry conventions have carried `gen_ai.agent.name` and
+`gen_ai.agent.id` since they settled, and the trace design document listed them among
+what Guardana reads — while nothing read them, because there was no field to read them
+into. A crew of three agents over twenty steps has two handoffs and eighteen spans
+whose actor the producer recorded and this dropped.
+
+It is a named field rather than an `attributes` bag, and it is not folded into
+`Identity`: an agent name is not a credential, and a crew whose agents are named must
+not thereby satisfy the identity dimension and stop `session_as_identity` declining.
+[`schemas/trace-v2.schema.json`](schemas/trace-v2.schema.json) is published;
+`trace-v1` stays published, and a v1 file still reads — the migration says the field
+is absent, which is what it was.
+
+**The trace migration seam now hands its result to the reader.** It took the
+already-parsed header's version and threw its own return value away, so a migration
+that needed to change a field could not have. A seam nothing consumes is a seam nobody
+would notice was broken, and the first real migration is where that surfaced.
+
+**`Capability.READ_RETRIEVAL` and `READ_HANDOFFS`**, so the retrieval and handoff
+dimensions gate their rules through the same table every other dimension uses.
+
+### Documentation
+
+**`--write-trace` writes a faithful copy, not a redacted one, and now says so.**
+Redaction covers evidence — what leaves in a report, a SARIF file or a collector
+envelope — and a trace being converted is input. Redacting it would change what the
+rules then grade while the file still looked authoritative. An export holding customer
+prompts or a key in a tool argument produces a converted file holding them too, in a
+form that is easier to read than the original.
+
 ## [0.14.0] - 2026-08-09 — the domain model, and grading a run Guardana did not start
 
 ### Added
