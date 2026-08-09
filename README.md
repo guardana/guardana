@@ -182,7 +182,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.13   # moving tag → latest 0.13.x
+      - uses: guardana/guardana@v0.14   # moving tag → latest 0.14.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -300,7 +300,7 @@ the project's [principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
 
 | | Outcome |
 |---|---|
-| **0.13** *(current)* | MCP in depth — six rules over a live server's authorization surface, the OWASP MCP Top 10 installed as data, a pinned manifest covering the whole tool declaration, and `plan probe --mcp` to price a run before it costs anything |
+| **0.14** *(current)* | The domain model — a common `Trace` for model calls, typed content parts, tool offers, retrieval, identity, delegation, consent, approvals, policy decisions, memory and side effects; `analyze-trace` over OpenTelemetry GenAI spans; another tool's results imported as claims rather than verdicts |
 | **next** | The remaining framework adapters as translators into that model, tool-calling through an adapter, RAG targets, sink-aware output handling, and what a single run is entitled to claim |
 | **1.0** | A compatibility contract — the point where a third-party rule pack is a safe investment. Not a feature count: it says what will not break under you |
 

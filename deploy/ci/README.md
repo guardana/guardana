@@ -17,7 +17,7 @@ GitHub Actions has a first-class action instead — see
 ## The generic container pipeline
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.13 \
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.14 \
   scan /work --format junit > guardana-junit.xml
 ```
 
@@ -63,7 +63,7 @@ line, where it lands in shell history and in most CI logs:
 ```bash
 docker run --rm -v "$PWD:/work" \
   -e GUARDANA_COLLECTOR_TOKEN \
-  ghcr.io/guardana/guardana:0.13 \
+  ghcr.io/guardana/guardana:0.14 \
   scan /work --ai-system support-agent --environment production \
     --reporter server://https://collector.example.com
 ```
@@ -79,7 +79,7 @@ view wants and not what a person reading a failed job wants. Add a second,
 non-gating pass if your team reads logs:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.13 scan /work || true
+docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.14 scan /work || true
 ```
 
 Static scans are cheap enough for this. Do **not** do it for `probe` or

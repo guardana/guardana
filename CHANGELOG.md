@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-09 — the domain model, and grading a run Guardana did not start
+
 ### Added
 
 **A common `Trace` model, and two commands that read one.** Guardana has only ever
