@@ -9,6 +9,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+**MCP, in depth: what a client can prove about a server it does not run.** Guardana
+has spoken to a live MCP server since 0.5, and what it said was "list your tools".
+Everything a deployed MCP server actually gets wrong sits a layer below that — a
+token minted for a different service, a session id that is a counter, scopes that
+cannot be reduced — and none of it is visible in a tool description. The controls
+are settled rather than speculative (OAuth 2.1, PKCE, audience-bound tokens, no
+token passthrough), so this is depth on a target Guardana already has. See
+[`docs/design/mcp-authorization-depth.md`](docs/design/mcp-authorization-depth.md).
+
+- **Six new rules over a live server's authorization surface**, each testing an
+  invariant the specification states as a `MUST`: a server that answers without a
+  credential, an authorization surface no conforming client can use (no RFC 9728
+  metadata, no authorization server named, a `resource` on another origin, no PKCE
+  advertised), a bearer token the server could not have issued being accepted, a
+  session id that is guessable or that authenticates a request on its own, scopes
+  that cannot express least privilege, and a discovery address a client must not
+  follow.
+- **What each check refuses to conclude is part of the check.** A server that
+  requires no credential cannot demonstrate audience validation, so the audience
+  probe reports `inconclusive` there rather than putting a critical finding on every
+  development server. A server that rejected the forged token has rejected *that
+  token*, and the rule is titled for that narrow claim rather than for the one it
+  cannot support. An stdio server does not declare the capability at all — the
+  specification says stdio takes credentials from the environment instead of
+  following the authorization spec — so those rules are **skipped with a reason**,
+  which `fail_on_skipped` can make fatal, rather than reporting nothing about a
+  server they never examined.
+- **A server nobody could reach is not a secure server, and all six say so.** Every
+  one of them declines with the invariant it would have established named, because
+  silence from a rule means the invariant *holds* — and a report where three checks
+  said "not established" while three said nothing at all invites reading the second
+  three as clean.
+- **`--mcp-token-env`**, so Guardana can probe an MCP server that requires
+  authentication at all — which it previously could not. Read from the environment
+  rather than an argument, and the value never reaches a report at any privacy
+  level. The two checks that need it say so and name it when it is absent.
+- **Guardana never calls a tool on an MCP server.** Every observation is made with
+  `initialize`, `tools/list` and unauthenticated `GET`s of the discovery documents.
+- **The SSRF guard and the check are the same code path.** Discovery is the one
+  place in MCP where the server picks a URL and the client fetches it. Guardana
+  refuses an address that resolves to the cloud metadata endpoint, into the network
+  running the scan, or uses a scheme a client must reject — and the refusal *is* the
+  finding, because a scanner that followed the URL to prove it was dangerous would
+  have performed the attack in order to report it.
+- **The OWASP MCP Top 10 is installed as a seventh catalogue** (`MCP01:2025` …
+  `MCP10:2025`), pinned to `version 0.1` because it is a beta document whose next
+  revision is expected in October 2026 — one of its entries is already rendered two
+  ways in two places OWASP publishes. `guardana taxonomy` shows it.
+- **The approved MCP manifest now covers the whole tool declaration.** A server
+  could widen an input schema, add a parameter or rewrite a property description
+  while every word of the prose stayed the same, and the pin stayed green. Pin
+  schema **1 → 2**; a version 1 pin still loads and still compares descriptions, and
+  every run that uses one carries a note saying which drift it cannot see, because
+  reading it silently would claim coverage the document cannot support.
+
+### Fixed
+
+- **The MCP meter counted half of what a run spent.** One session is two JSON-RPC
+  calls, `initialize` and `tools/list`, and the meter recorded one — while the rule
+  declared "one request", so the test comparing the two agreed with both and stayed
+  green. Metering moved into the transport seam: every call reserves before it is
+  sent and records after it returns.
+- **`--max-requests` now bounds an MCP probe instead of refusing to run it.**
+  `McpServerTarget` never implemented `apply_budgets`, so it inherited the base
+  class's refusal of any ceiling — fail-closed and fine while a run cost two calls
+  nobody would budget, and useless now that an authorization probe costs a dozen.
+- **A run that stopped early no longer prints the tick people scroll for.** The exit
+  code said `6` and the saved run said `stopped_by: budget_exhausted` with an
+  `indeterminate` gate, while the terminal said `✓ No findings.` over a run that
+  ended after two rules. `StopReason` exists because "a report that does not say it
+  was cut short reads as a complete pass"; the human renderer was the one output
+  that did not say it. Found by running `probe --mcp --max-requests 3` against a
+  live server and reading the output rather than the exit code.
+- **An stdio MCP server left its pipes open.** `close()` terminated the process and
+  released neither descriptor, so a long `monitor` run accumulated a pair per cycle.
+
 **The mapping is true again.** OWASP published the 2026 edition of the LLM Top 10
 on 3 August 2026 and re-ranked seven entries without renumbering into empty space:
 `LLM07` used to be System Prompt Leakage and is now Misinformation, `LLM05` used to

@@ -245,7 +245,7 @@ reported incidents*, not which are most severe when they do.
 |---|---|---|
 | ASI01 Agent Goal Hijack | **Good** | `agent.tool_result_injection` proves a hijack deterministically; `agent.goal_hijack` judges the semantic case and is opt-in until a judge is configured and measured |
 | ASI02 Tool Misuse | **Good** | excessive tool use, over-broad arguments, whole-run result injection |
-| ASI03 Identity & Privilege Abuse | **Started** | credential exfiltration proven; delegated credentials and scope need an identity model (agent-and-protocol milestone) |
+| ASI03 Identity & Privilege Abuse | **Good** | credential exfiltration proven, and six MCP rules now grade a real identity surface: unauthenticated access, audience validation, session binding, scope breadth, discovery targets. Delegated credentials across *agents* still need the multi-agent milestone |
 | ASI04 Agentic Supply Chain | **Good** | MCP manifest on a live server plus rug-pull detection against a pin; registries and agent cards open |
 | ASI05 Unexpected Code Execution | **Strong (build side)** | the static rules are exactly this at artifact level; agent-generated code paths at runtime are open |
 | ASI06 Memory & Context Poisoning | **Good** | write in one session, grade the next; a customer's own vector store needs the application-awareness milestone |
@@ -262,10 +262,22 @@ OWASP now publishes an **[MCP Top 10](https://owasp.org/www-project-mcp-top-10/)
 (beta, `MCP01`–`MCP10`: token mismanagement and secret exposure, permission creep,
 tool poisoning, compromised MCP packages, shadow servers, context oversharing and
 the rest), and public reporting counts more than thirty CVEs filed against MCP
-servers, clients and infrastructure between January and February 2026. Guardana already probes a *live* MCP server's tool manifest and
-detects a rug-pull against a pin — the map exists to say what that does not cover
-yet, which is most of the authorization surface. It is registered as data like any
-other framework, pinned to an edition, because a beta document is one that moves.
+servers, clients and infrastructure between January and February 2026. It is
+installed as data like any other framework, pinned to `version 0.1`, because a beta
+document is one that moves.
+
+| Risk | Coverage today | What closes the rest |
+|---|---|---|
+| MCP01 Token Mismanagement & Secret Exposure | **Good** | `mcp.token_audience` proves a server accepts a token it never issued; `mcp.discovery_target` catches a server aiming its client at the cloud metadata endpoint. Passthrough to an upstream API is not client-observable and is deferred with that reason |
+| MCP02 Privilege Escalation via Scope Creep | **Started** | `mcp.scope_breadth` reads what is advertised; what a *granted* token actually carries needs a real credential from a real authorization flow |
+| MCP03 Tool Poisoning | **Good** | `agent.mcp_server_manifest` on the live server plus `prompt.mcp_tool_poisoning` on the file, both now covering the whole declaration rather than the description |
+| MCP04 Supply Chain & Dependency Tampering | **Good** | the static front door, plus rug-pull detection against a pin |
+| MCP05 Command Injection & Execution | **Gap** | proving it means calling a tool, which Guardana does not do |
+| MCP06 Intent Flow Subversion | **Started** | `agent.tool_result_injection` grades the shape of it on an agent; the MCP-specific path needs sampling and elicitation |
+| MCP07 Insufficient Authentication & Authorization | **Strong** | `mcp.unauthenticated_access`, `mcp.authorization_discovery`, `mcp.session_binding` |
+| MCP08 Lack of Audit and Telemetry | **Gap** | not observable from a client; it is a property of the operator's deployment |
+| MCP09 Shadow MCP Servers | **Out of scope** | finding unregistered servers is network discovery, not verification of a target |
+| MCP10 Context Injection & Over-Sharing | **Started** | the manifest side is covered; retrieved content needs the retriever work |
 
 ---
 
@@ -650,23 +662,57 @@ characters so it works against a provider that reports no token counts.
   provenance nobody can produce. Giving them a digest means a catalogue-file entry
   point, which is a bigger surface than this release needed.
 
-### Step two — MCP, in depth
+### Step two — MCP, in depth ~~*(next)*~~ *(shipped, unreleased)*
 
-Pulled up from the agent-and-protocol milestone, ahead of the rest of it. The
-reasons are specific: the controls are *settled* rather than speculative (OAuth
-2.1, PKCE, audience-bound tokens, no token passthrough), there is a fresh CVE
-stream, OWASP now publishes a map to align against, and Guardana already speaks to
-a live MCP server — this is depth on a target it has, not a new target.
+Done. Six rules over a live server's authorization surface, each testing a
+specification `MUST` and each stating what it refuses to conclude: unauthenticated
+access, an unusable authorization surface (RFC 9728 metadata, a named authorization
+server, a `resource` on this origin, PKCE advertised), a bearer token the server
+could not have issued, a session id that is guessable or authenticates by itself,
+scopes that cannot express least privilege, and a discovery address a client must
+not follow. `--mcp-token-env` lets Guardana probe a server that requires
+authentication at all, which it previously could not. The OWASP MCP Top 10 is
+installed as a seventh catalogue, pinned to `version 0.1` because a beta document
+moves. The pinned manifest grew from descriptions to the whole tool declaration
+(pin schema 1 → 2), so a widened parameter is drift even when the prose is
+identical. Guardana never calls a tool on an MCP server.
+See [`docs/design/mcp-authorization-depth.md`](docs/design/mcp-authorization-depth.md).
 
-Audience validation and token passthrough; confused deputy; scope and consent
-enforcement; schema drift beyond the pinned manifest; sampling misuse; multi-user
-isolation. Explicitly **not** a CVE-counting scanner: the finding is that an
-invariant does not hold on *this* server, not that a version number appears in a
-list somebody else maintains.
+It went second for a reason beyond urgency, and the reason paid off: identity,
+delegation, consent and approval are the fields the domain model below has to
+represent, and meeting them produced four distinctions a schema written first would
+have flattened — identity is three fields that can disagree (presented credential,
+token audience, claimed resource), delegation has a direction and a boundary,
+consent is per client rather than per user, and a session is not an identity.
 
-It goes second for a reason beyond urgency: identity, delegation, consent and
-approval are exactly the fields the domain model below has to represent, and
-building that model before meeting them would be guessing at its shape.
+**Deliberately deferred out of it, with the reason.** Each is deferred because the
+honest version cannot be produced from a client, not because it is large, and each
+leaves a stated gap rather than a silent one:
+
+- **Token passthrough to an upstream API.** It happens between the server and a
+  service Guardana is not talking to; no sequence of client requests makes it
+  observable. Its precondition — accepting a foreign-audience token — *is* checked.
+  The passthrough itself needs the trace work below.
+- **Confused deputy, in full.** The preconditions (a static client id toward a third
+  party, per-client consent storage) live on the server's back side. The only
+  client-side proof requires registering a client on somebody's authorization
+  server, which is a write to a third party performed by a tool whose whole
+  proposition is that it is safe to point at production. The observable slice —
+  PKCE, discovery targets, scope breadth — shipped.
+- **Sampling misuse.** A server abusing `sampling/createMessage` issues a request
+  *to the client*, over a stream the client holds open and answers. Guardana's
+  client sends a request and reads a reply. Changing that is a transport-contract
+  change third-party transports implement — the same reason `finish_reason` was
+  deferred out of step one — and it belongs beside the trace work rather than as a
+  passenger here.
+- **Multi-user data isolation.** Proving user A cannot reach user B's data needs two
+  credentials *and* knowledge of whose data is whose. Guardana has neither and
+  cannot ask for the second. The one-credential half — a session accepted as
+  authentication, a specification `MUST NOT` — shipped.
+- **Shadow MCP servers (`MCP09:2025`).** Finding servers nobody registered is a
+  discovery problem on a network, not a verification problem on a target.
+- **A digest for third-party catalogues** stays open from step one, and now covers
+  seven built-in catalogues rather than six.
 
 ### Step three — the domain model, and only then the adapters
 

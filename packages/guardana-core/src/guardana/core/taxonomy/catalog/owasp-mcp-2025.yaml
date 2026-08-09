@@ -1,0 +1,46 @@
+# A beta document, and pinned like one. OWASP's own identifiers carry the edition
+# (`MCP01:2025`), so the scheme publishes editions and a bare `MCP01` is not a
+# reference — which is what keeps a rule's claim stable when the next revision lands.
+#
+# `version: "0.1"` is the revision this file was transcribed from, recorded because
+# the project is at "Phase 3 - Beta Release and Pilot Testing" with the next release
+# expected in October 2026. Entry six is already rendered two ways in two places OWASP
+# publishes; the wording below is the one in the project's own `index.md`, which is
+# what the published page is generated from. When it moves, this file is not edited —
+# its digest is pinned in saved runs — a new edition file is added.
+scheme: OWASP-MCP
+edition: "2025"
+version: "0.1"
+title: OWASP MCP Top 10 (beta)
+source: https://owasp.org/www-project-mcp-top-10/
+entries:
+  - id: MCP01
+    rank: 1
+    title: Token Mismanagement & Secret Exposure
+  - id: MCP02
+    rank: 2
+    title: Privilege Escalation via Scope Creep
+  - id: MCP03
+    rank: 3
+    title: Tool Poisoning
+  - id: MCP04
+    rank: 4
+    title: Software Supply Chain Attacks & Dependency Tampering
+  - id: MCP05
+    rank: 5
+    title: Command Injection & Execution
+  - id: MCP06
+    rank: 6
+    title: Intent Flow Subversion
+  - id: MCP07
+    rank: 7
+    title: Insufficient Authentication & Authorization
+  - id: MCP08
+    rank: 8
+    title: Lack of Audit and Telemetry
+  - id: MCP09
+    rank: 9
+    title: Shadow MCP Servers
+  - id: MCP10
+    rank: 10
+    title: Context Injection & Over-Sharing

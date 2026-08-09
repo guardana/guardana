@@ -101,6 +101,14 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
         bool,
         typer.Option("--allow-exec", help="Permit --mcp to START the server, executing it"),
     ] = False,
+    mcp_token_env: Annotated[
+        str | None,
+        typer.Option(
+            "--mcp-token-env",
+            help="Env var holding a bearer token for the MCP server. Needed by the checks "
+            "that can only be answered with a credential.",
+        ),
+    ] = None,
     mcp_pin: Annotated[
         Path | None, typer.Option("--mcp-pin", help="Approved MCP manifest to compare against")
     ] = None,
@@ -173,7 +181,12 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
             result = run_mcp_probe(
                 registry,
                 prof,
-                McpConnection(mcp, allow_exec=allow_exec, pin=mcp_pin),
+                McpConnection(
+                    mcp,
+                    allow_exec=allow_exec,
+                    pin=mcp_pin,
+                    credential=os.environ.get(mcp_token_env) if mcp_token_env else None,
+                ),
                 write_mcp_pin,
             )
         except BudgetExhausted as exc:

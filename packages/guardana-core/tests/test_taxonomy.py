@@ -150,6 +150,7 @@ def test_every_catalogue_carries_a_digest_over_its_content() -> None:
         "OWASP-ASI-2026",
         "OWASP-LLM-2025",
         "OWASP-LLM-2026",
+        "OWASP-MCP-2025",
         "OWASP-ML-2023",
     }
     for catalog in installed.values():
@@ -158,6 +159,23 @@ def test_every_catalogue_carries_a_digest_over_its_content() -> None:
     # Two editions of one framework are two catalogues with two digests. One digest
     # for both could not say which of them a run was mapped against.
     assert installed["OWASP-LLM-2025"].digest != installed["OWASP-LLM-2026"].digest
+
+
+def test_a_beta_catalogue_records_the_revision_it_was_transcribed_from() -> None:
+    # The MCP Top 10 is a beta document at v0.1 whose next revision is expected in
+    # October 2026, and one of its entries is already rendered two ways in two places
+    # OWASP publishes. A run has to say which revision it was mapped against, or a
+    # finding filed today cannot be read back once the wording moves.
+    mcp = next(catalog for catalog in catalogs() if catalog.framework == "OWASP-MCP-2025")
+
+    assert mcp.version == "0.1"
+    assert mcp.source == "https://owasp.org/www-project-mcp-top-10/"
+    assert len(mcp.refs) == 10
+    # The scheme publishes editions, so its short ids are not references. This holds
+    # while exactly one edition is installed too — otherwise adding the next one
+    # would silently change what every existing rule claims.
+    with pytest.raises(TaxonomyError, match="MCP01:2025"):
+        resolve("MCP01")
 
 
 def test_a_reference_reaches_the_registry_exactly_once_per_edition() -> None:

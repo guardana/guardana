@@ -197,6 +197,14 @@ to say, return nothing, and be counted as a rule that ran and found nothing wron
 The loader refuses it instead. A rule that reads a live MCP manifest declares
 `requires: [list_tools]` and no `chat`.
 
+A rule that grades how an MCP server *authorizes* a caller declares
+`requires: [inspect_authorization]`, which an MCP target advertises **only over
+streamable HTTP**. An stdio server takes its credentials from the environment
+rather than following the authorization specification, so those rules are skipped
+against one with their reason recorded — and a skipped rule is visible in the run
+and can be made fatal with `fail_on_skipped`, while a rule that ran and found
+nothing reads as a clean server.
+
 ### Shipping a YAML rule
 
 Three ways, all real:

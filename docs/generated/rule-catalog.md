@@ -9,10 +9,16 @@ frameworks it maps to. A rule without a mapping does not ship.
 | `guardana.agent.credential_exfiltration` | CRITICAL | runtime | `LLM02:2025`, `LLM02:2026`, `ASI03:2026`, `AML.T0086`, `AML.T0098` |
 | `guardana.agent.excessive_tool_use` | HIGH | runtime | `LLM06:2025`, `LLM03:2026`, `ASI02:2026`, `AML.T0053` |
 | `guardana.agent.hidden_context.tool_schema` | HIGH | runtime | `LLM02:2025`, `LLM02:2026`, `LLM08:2026`, `AML.T0084.001` |
-| `guardana.agent.mcp_server_manifest` | HIGH | runtime | `LLM01:2025`, `LLM01:2026`, `LLM03:2025`, `LLM04:2026`, `ASI04:2026`, `AML.T0110`, `AML.T0109`, `AML.T0084.001` |
+| `guardana.agent.mcp_server_manifest` | HIGH | runtime | `LLM01:2025`, `LLM01:2026`, `LLM03:2025`, `LLM04:2026`, `ASI04:2026`, `MCP03:2025`, `AML.T0110`, `AML.T0109`, `AML.T0084.001` |
 | `guardana.agent.memory_poisoning` | CRITICAL | runtime | `LLM01:2025`, `LLM01:2026`, `ASI06:2026`, `AML.T0080`, `AML.T0080.000` |
 | `guardana.agent.tool_argument_scope` | HIGH | runtime | `LLM06:2025`, `LLM03:2026`, `ASI02:2026`, `AML.T0053`, `AML.T0101` |
 | `guardana.agent.tool_result_injection` | CRITICAL | runtime | `LLM01:2025`, `LLM01:2026`, `ASI01:2026`, `ASI02:2026`, `AML.T0053`, `AML.T0086` |
+| `guardana.mcp.authorization_discovery` | HIGH | runtime | `MCP07:2025`, `MCP01:2025`, `ASI03:2026` |
+| `guardana.mcp.discovery_target` | HIGH | runtime | `MCP01:2025`, `LLM02:2026`, `ASI03:2026` |
+| `guardana.mcp.scope_breadth` | MEDIUM | runtime | `MCP02:2025`, `LLM03:2026`, `ASI03:2026` |
+| `guardana.mcp.session_binding` | HIGH | runtime | `MCP07:2025`, `ASI03:2026` |
+| `guardana.mcp.token_audience` | CRITICAL | runtime | `MCP01:2025`, `MCP07:2025`, `ASI03:2026` |
+| `guardana.mcp.unauthenticated_access` | HIGH | runtime | `MCP07:2025`, `ASI03:2026`, `AML.T0084.001` |
 | `guardana.output.secrets` | HIGH | runtime | `LLM02:2025`, `LLM02:2026` |
 | `guardana.prompt.cost_asymmetry` | MEDIUM | runtime | `LLM10:2025`, `LLM06:2026`, `AML.T0034.002` |
 | `guardana.prompt.hidden_instructions` | HIGH | build | `LLM01:2025`, `LLM01:2026`, `LLM05:2025`, `LLM10:2026`, `AML.T0051`, `ASI01:2026`, `AML.T0080` |

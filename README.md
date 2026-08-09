@@ -277,14 +277,20 @@ in [`docs/integrations.md`](docs/integrations.md).
 
 ## What's in the box
 
-34 built-in rules, every finding tagged into the frameworks your compliance
+40 built-in rules, every finding tagged into the frameworks your compliance
 process already speaks — **both editions** of the OWASP LLM Top 10, the OWASP Top 10
-for Agentic Applications (ASI), OWASP ML Top 10, MITRE ATLAS and NIST. A reference
-names its edition, because `LLM07` is System Prompt Leakage in the 2025 edition and
-Misinformation in the 2026 one:
+for Agentic Applications (ASI), the OWASP MCP Top 10, OWASP ML Top 10, MITRE ATLAS
+and NIST. A reference names its edition, because `LLM07` is System Prompt Leakage in
+the 2025 edition and Misinformation in the 2026 one:
 
 | Rule id | Severity | Surface | Maps to |
 |---|---|---|---|
+| `guardana.mcp.authorization_discovery` | HIGH | runtime | MCP07:2025 · MCP01:2025 · ASI03:2026 |
+| `guardana.mcp.discovery_target` | HIGH | runtime | MCP01:2025 · LLM02:2026 · ASI03:2026 |
+| `guardana.mcp.scope_breadth` | MEDIUM | runtime | MCP02:2025 · LLM03:2026 · ASI03:2026 |
+| `guardana.mcp.session_binding` | HIGH | runtime | MCP07:2025 · ASI03:2026 |
+| `guardana.mcp.token_audience` | CRITICAL | runtime | MCP01:2025 · MCP07:2025 · ASI03:2026 |
+| `guardana.mcp.unauthenticated_access` | HIGH | runtime | MCP07:2025 · ASI03:2026 · AML.T0084.001 |
 | `guardana.prompt.hidden_instructions` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI01:2026 · AML.T0080 |
 | `guardana.prompt.mcp_tool_poisoning` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI04:2026 · AML.T0110 · AML.T0011.002 |
 | `guardana.supply_chain.chat_template` | CRITICAL | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
@@ -307,7 +313,7 @@ Misinformation in the 2026 one:
 | `guardana.agent.credential_exfiltration` | CRITICAL | runtime | LLM02:2025 · LLM02:2026 · ASI03:2026 · AML.T0086 · AML.T0098 |
 | `guardana.agent.excessive_tool_use` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 |
 | `guardana.agent.hidden_context.tool_schema` | HIGH | runtime | LLM02:2025 · LLM02:2026 · LLM08:2026 · AML.T0084.001 |
-| `guardana.agent.mcp_server_manifest` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM03:2025 · LLM04:2026 · ASI04:2026 · AML.T0110 · AML.T0109 · AML.T0084.001 |
+| `guardana.agent.mcp_server_manifest` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM03:2025 · LLM04:2026 · ASI04:2026 · MCP03:2025 · AML.T0110 · AML.T0109 · AML.T0084.001 |
 | `guardana.agent.memory_poisoning` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI06:2026 · AML.T0080 · AML.T0080.000 |
 | `guardana.agent.tool_argument_scope` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 · AML.T0101 |
 | `guardana.agent.tool_result_injection` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI01:2026 · ASI02:2026 · AML.T0053 · AML.T0086 |
@@ -321,11 +327,13 @@ Misinformation in the 2026 one:
 | `guardana.scenario.indirect_injection` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM08:2025 · LLM09:2026 · ASI01:2026 · AML.T0051 · AML.T0080 |
 
 The static 19 (`artifact` surface) need no model and no network — they're the
-CI front door. The dynamic 15 (`endpoint` surface) probe a live model and grade
+CI front door. The dynamic 21 (`endpoint` surface) probe a live model and grade
 the result through an Evaluator; two of them (`scenario.gradual_jailbreak` and
 `scenario.indirect_injection`) are **multi-turn scenarios** — declarative YAML
-conversations graded per step and as a whole. `guardana rules` prints this list generated from what's actually
-installed, **including any third-party rules you've added.**
+conversations graded per step and as a whole, and six examine how a live **MCP
+server authorizes a caller** rather than what a model says. `guardana rules` prints
+this list generated from what's actually installed, **including any third-party
+rules you've added.**
 
 A dynamic check that *cannot* reach a verdict — an unreachable judge, an empty
 model reply — is never dropped into a false all-clear: it is reported in a

@@ -18,6 +18,14 @@ that means it:
   reach production;
 - **changes MCP server state** if a tool you exposed has side effects.
 
+`probe --mcp` is narrower than that, deliberately. Against an MCP server Guardana
+speaks only `initialize`, `tools/list` and unauthenticated `GET`s of the two
+authorization discovery documents — it **never calls a tool**, because a tool call
+is a side effect on somebody's system and no verification result is worth finding
+that out by experiment. It also refuses to fetch a discovery address that points
+into the network running the scan or at the cloud metadata endpoint, and reports
+the refusal as a finding rather than following it to be sure.
+
 ## What Guardana never does
 
 **Guardana does not execute your tools.** When a rule offers a model a

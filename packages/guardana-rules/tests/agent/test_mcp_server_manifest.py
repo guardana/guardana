@@ -41,7 +41,7 @@ class _FakeMcp:
 
 
 def _target(tools: list[tuple[str, str]]) -> McpServerTarget:
-    return McpServerTarget("https://mcp.example/api", transport=_FakeMcp(tools))  # type: ignore[arg-type]
+    return McpServerTarget("https://mcp.example/api", transport=_FakeMcp(tools))
 
 
 def _approve(tmp_path: Path, tools: list[tuple[str, str]]) -> Path:
@@ -116,8 +116,27 @@ def test_stdio_is_refused_without_an_explicit_permission() -> None:
         build_mcp_target(McpConnection("some-mcp-server --stdio"))
 
 
-def test_the_target_advertises_only_tool_listing() -> None:
-    assert _target([]).capabilities() == {Capability.LIST_TOOLS}
+def test_the_target_advertises_tool_listing_and_nothing_a_model_would_need() -> None:
+    assert _target([]).capabilities() == {
+        Capability.LIST_TOOLS,
+        Capability.INSPECT_AUTHORIZATION,
+    }
+
+
+def test_an_stdio_server_does_not_claim_an_authorization_surface() -> None:
+    """The specification says stdio takes credentials from the environment instead.
+
+    Grading a pipe against OAuth requirements would be inventing a verdict, so the
+    capability is absent and the runner skips those rules with a reason. The
+    direction matters: a skipped rule is visible in the report and can be made
+    fatal with `fail_on_skipped`, while a rule that ran and found nothing reads as
+    a clean server.
+    """
+    target = McpServerTarget(command=["true"], allow_exec=True)
+    try:
+        assert target.capabilities() == {Capability.LIST_TOOLS}
+    finally:
+        target.close()
 
 
 def test_chat_rules_are_skipped_against_an_mcp_server_rather_than_passing_it() -> None:
@@ -130,12 +149,23 @@ def test_chat_rules_are_skipped_against_an_mcp_server_rather_than_passing_it() -
 
     assert result.rules_skipped, "no rule was skipped, so chat rules ran against a server"
     assert "guardana.agent.mcp_server_manifest" not in result.skipped_rule_ids
-    assert result.rules_run_count == 1
+    # Stated as the property rather than as a count, so adding an MCP rule does not
+    # need this number edited — and so a chat rule sneaking in still fails it.
+    chat_only = {Capability.CHAT, Capability.PLANT_SYSTEM_PROMPT, Capability.CALL_TOOLS}
+    by_id = {rule.meta.id: rule for rule in Registry.discover().rules()}
+    ran_needing_chat = [
+        rule_id
+        for rule_id in result.rules_run
+        if by_id[rule_id].meta.required_capabilities & chat_only
+    ]
+    assert not ran_needing_chat, (
+        f"these rules ran against a server with no model: {ran_needing_chat}"
+    )
 
 
 def test_the_manifest_is_fetched_once_however_many_rules_read_it() -> None:
     transport = _FakeMcp([("read_file", _BENIGN)])
-    target = McpServerTarget("https://mcp.example/api", transport=transport)  # type: ignore[arg-type]
+    target = McpServerTarget("https://mcp.example/api", transport=transport)
     calls = 0
     real = transport.request
 

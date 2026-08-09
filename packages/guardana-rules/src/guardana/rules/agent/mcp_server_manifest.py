@@ -1,9 +1,11 @@
 import hashlib
 import json
 from collections.abc import Iterable, Iterator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from guardana.core.evaluator.base import Verdict
+from guardana.core.fingerprint import digest_of
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.safety import Impact
@@ -18,24 +20,55 @@ from guardana.core.taxonomy import (
     OWASP_LLM01_2026,
     OWASP_LLM03_2025,
     OWASP_LLM04_2026,
+    OWASP_MCP03_2025,
 )
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_hidden_char
 
-PIN_SCHEMA_VERSION = 1
+PIN_SCHEMA_VERSION = 2
+_DESCRIPTIONS_ONLY = 1
+
+_V1_COVERAGE = (
+    "the pinned manifest is schema_version 1, which records tool descriptions and "
+    "nothing else — a widened parameter or a rewritten property description would not "
+    "be detected. Re-approve with `--write-mcp-pin` to cover the whole declaration"
+)
 
 
 def pin_document(server: str, tools: Iterable[McpTool]) -> dict[str, object]:
     """Build the approved-manifest document for a server's current tool list.
 
-    Descriptions are stored as digests rather than text: the pin records *that*
-    the wording was approved, and a repository full of tool prose invites editing
+    Declarations are stored as digests rather than text: the pin records *that*
+    the manifest was approved, and a repository full of tool prose invites editing
     the record instead of re-reviewing the change.
+
+    The digest covers the whole declaration — schemas and annotations included —
+    because a tool whose prose is untouched while its input schema gains a
+    parameter is a tool that can now be asked to do something nobody approved.
     """
     return {
         "schema_version": PIN_SCHEMA_VERSION,
         "server": server,
-        "tools": {tool.name: _digest(tool.description) for tool in sorted(tools, key=_name)},
+        "tools": {tool.name: declaration_digest(tool) for tool in sorted(tools, key=_name)},
     }
+
+
+def declaration_digest(tool: McpTool) -> str:
+    """Digest everything a server declared about one tool, canonically ordered."""
+    return digest_of(json.dumps(tool.declaration(), sort_keys=True, ensure_ascii=False))
+
+
+@dataclass(frozen=True, slots=True)
+class _Pin:
+    """An approved manifest as read from disk, and how much of a tool it covers."""
+
+    version: int
+    tools: Mapping[str, str]
+
+    def digest_of_tool(self, tool: McpTool) -> str:
+        """Digest a live tool the same way this pin's version recorded it."""
+        if self.version == _DESCRIPTIONS_ONLY:
+            return _legacy_digest(tool.description)
+        return declaration_digest(tool)
 
 
 class McpServerManifestRule(Rule):
@@ -46,6 +79,11 @@ class McpServerManifestRule(Rule):
     one. Reading it from a file catches that before adoption; reading it from the
     running server is what catches a description changed *after* adoption — the
     shape of a rug pull, and the reason `AML.T0109` exists.
+
+    The declaration is more than its prose. A property description inside an input
+    schema is read by the model exactly like the tool description, and a parameter
+    widened without a word of the prose changing is drift a description digest
+    cannot see — so both the marker scan and the pin cover the whole declaration.
 
     Without an approved manifest to compare against, drift cannot be detected at
     all. That is reported as `inconclusive`, never as a clean server: "nothing
@@ -63,6 +101,7 @@ class McpServerManifestRule(Rule):
             OWASP_LLM03_2025,
             OWASP_LLM04_2026,
             OWASP_ASI04_2026,
+            OWASP_MCP03_2025,
             ATLAS_T0110,
             ATLAS_T0109,
             ATLAS_T0084_001,
@@ -73,11 +112,16 @@ class McpServerManifestRule(Rule):
 
     @property
     def estimated_requests(self) -> int:
-        """One manifest listing. Reading what a server advertises costs no model call."""
-        return 1
+        """Two: the handshake, and the listing. Reading a manifest costs no model call.
+
+        It said one until the meter was fixed and started counting the `initialize`
+        that always went with it. The declaration and the meter were wrong in the
+        same direction, which is why the test comparing them stayed green.
+        """
+        return 2
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Fetch the live manifest, scan every description, and compare it with the pin."""
+        """Fetch the live manifest, scan every declaration, and compare it with the pin."""
         if not isinstance(target, McpServerTarget):
             return
         tools = target.list_tools()
@@ -86,14 +130,11 @@ class McpServerManifestRule(Rule):
 
     def _poisoned(self, ref: str, tools: tuple[McpTool, ...]) -> Iterator[Finding]:
         for tool in tools:
-            if has_hidden_char(tool.description):
-                yield self._finding(
-                    ref, f"invisible/hidden Unicode in the description of {tool.name!r}"
-                )
-            if OVERRIDE_PHRASE.search(tool.description):
-                yield self._finding(
-                    ref, f"instruction-override phrase in the description of {tool.name!r}"
-                )
+            for where, text in _readable_text(tool):
+                if has_hidden_char(text):
+                    yield self._finding(ref, f"invisible/hidden Unicode in {where}")
+                if OVERRIDE_PHRASE.search(text):
+                    yield self._finding(ref, f"instruction-override phrase in {where}")
 
     def _drifted(self, ref: str, tools: tuple[McpTool, ...], ctx: RuleContext) -> Iterator[Finding]:
         pin_path = ctx.get("pin", None)
@@ -109,8 +150,13 @@ class McpServerManifestRule(Rule):
         except (OSError, ValueError) as exc:
             yield self._unverified(ref, f"the pinned manifest at {pin_path} is unusable: {exc}")
             return
-        live = {tool.name: _digest(tool.description) for tool in tools}
-        for name, digest in sorted(pinned.items()):
+        if pinned.version == _DESCRIPTIONS_ONLY:
+            # An older pin still compares, and still says what it cannot compare.
+            # Reading it silently would report "no drift" about schemas nobody
+            # recorded, which is the shape of a false green.
+            yield self._unverified(ref, _V1_COVERAGE)
+        live = {tool.name: pinned.digest_of_tool(tool) for tool in tools}
+        for name, digest in sorted(pinned.tools.items()):
             if name not in live:
                 yield self._finding(
                     ref, f"tool {name!r} was approved but the server no longer offers it"
@@ -118,10 +164,10 @@ class McpServerManifestRule(Rule):
             elif live[name] != digest:
                 yield self._finding(
                     ref,
-                    f"the description of {name!r} changed after it was approved (rug pull)",
+                    f"the declaration of {name!r} changed after it was approved (rug pull)",
                     severity=Severity.CRITICAL,
                 )
-        for name in sorted(set(live) - set(pinned)):
+        for name in sorted(set(live) - set(pinned.tools)):
             yield self._finding(ref, f"tool {name!r} appeared after the manifest was approved")
 
     def _finding(self, ref: str, summary: str, severity: Severity | None = None) -> Finding:
@@ -146,7 +192,40 @@ class McpServerManifestRule(Rule):
         )
 
 
-def _load_pin(path: Path) -> Mapping[str, str]:
+def _readable_text(tool: McpTool) -> Iterator[tuple[str, str]]:
+    """Yield every string a model will read out of one tool declaration, with where it sits.
+
+    Schemas included, and keys as well as values: a property *named* with an
+    invisible character is as much a smuggled instruction as one described with
+    it, and the model is shown both.
+    """
+    yield f"the description of {tool.name!r}", tool.description
+    if tool.title:
+        yield f"the title of {tool.name!r}", tool.title
+    for label, block in (
+        ("input schema", tool.input_schema),
+        ("output schema", tool.output_schema),
+        ("annotations", tool.annotations),
+    ):
+        yield from _strings(block, f"{label} of {tool.name!r}")
+
+
+def _strings(value: object, path: str) -> Iterator[tuple[str, str]]:
+    if isinstance(value, str):
+        yield path, value
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if isinstance(key, str):
+                yield f"{path} (key {key!r})", key
+            yield from _strings(item, f"{path}.{key}")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from _strings(item, f"{path}[{index}]")
+
+
+def _load_pin(path: Path) -> _Pin:
     document = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(document, dict):
         # ValueError, not TypeError: every caller treats an unusable pin as "the
@@ -154,15 +233,19 @@ def _load_pin(path: Path) -> Mapping[str, str]:
         # way to forget one of them.
         raise ValueError("a pinned manifest must be a JSON object")  # noqa: TRY004
     version = document.get("schema_version")
-    if version != PIN_SCHEMA_VERSION:
+    if version not in (_DESCRIPTIONS_ONLY, PIN_SCHEMA_VERSION):
         raise ValueError(f"unsupported pin schema_version {version!r}")
     tools = document.get("tools")
     if not isinstance(tools, dict):
         raise ValueError("a pinned manifest needs a 'tools' object")  # noqa: TRY004
-    return {name: digest for name, digest in tools.items() if isinstance(digest, str)}
+    return _Pin(
+        version=version,
+        tools={name: digest for name, digest in tools.items() if isinstance(digest, str)},
+    )
 
 
-def _digest(description: str) -> str:
+def _legacy_digest(description: str) -> str:
+    """Reproduce a schema_version 1 digest, so an older pin still compares."""
     return hashlib.sha256(description.encode("utf-8")).hexdigest()
 
 

@@ -18,6 +18,14 @@ class HumanRenderer:
         if not result.findings:
             if not result.rules_run:
                 lines.append("⚠ 0 rules ran — nothing was checked (this is not an all-clear).")
+            elif result.stopped_by is not None:
+                # The exit code already says `6`, and nobody reads an exit code off
+                # a terminal. A tick over a run that ended after two rules is the
+                # same false green as a tick over a rule that crashed.
+                lines.append(
+                    f"⚠ No findings, but the run stopped early ({result.stopped_by.value}) "
+                    "before finishing its plan (this is not an all-clear)."
+                )
             elif result.errors:
                 # The tick is what people scroll for and what job summaries grep
                 # for, so it is never printed over a check that did not run.
@@ -59,4 +67,9 @@ def _summary(result: ScanResult) -> str:
         # Says what the run actually looked at, so "no findings" reads as "nothing
         # wrong in these N components" rather than the ambiguous "nothing here".
         summary += f" {len(result.observations)} component(s) observed."
+    if result.stopped_by is not None:
+        # Last, so it is the note the summary ends on — this line is what a CI job
+        # summary quotes, and the rule counts above it describe a plan that was
+        # never finished.
+        summary += f" Run stopped early: {result.stopped_by.value}."
     return summary

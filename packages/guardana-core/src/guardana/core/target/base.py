@@ -32,6 +32,7 @@ class Capability(StrEnum):
     PLANT_SYSTEM_PROMPT = "plant_system_prompt"
     CALL_TOOLS = "call_tools"
     LIST_TOOLS = "list_tools"
+    INSPECT_AUTHORIZATION = "inspect_authorization"
 
 
 class Target(ABC):

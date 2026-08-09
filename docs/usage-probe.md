@@ -33,6 +33,107 @@ guardana probe --url <base-url> --model <name> [OPTIONS]
 | `--rules PATH` | none | Directory or file of custom YAML rules; repeatable. Combined with the profile's `rules.paths` — see [`writing-rules.md`](writing-rules.md). A malformed rule file is a warning, never an abort. |
 | `--concurrency INTEGER` | `4` | How many rules may query the model at once. The probe is almost entirely spent waiting on the model, so overlapping rules is the biggest speed-up available; results stay in rule order, so two runs match. Rate limits (429) are retried with backoff — lower this if an endpoint keeps refusing. |
 | `--reporter TEXT` | none | Forward findings to a collector, e.g. `server://https://collector.example.com` |
+| `--mcp TEXT` | none | Examine an **MCP server** instead of a chat model — see [Probing an MCP server](#probing-an-mcp-server) |
+| `--mcp-token-env TEXT` | none | Name of an environment variable holding a bearer token for the MCP server |
+| `--mcp-pin PATH` | none | Approved MCP manifest to compare the live one against |
+| `--write-mcp-pin PATH` | none | Write the server's current manifest as approved, and exit without reporting |
+| `--allow-exec` | off | Permit `--mcp` to **start** an stdio server, which executes the code under examination |
+
+## Probing an MCP server
+
+`--mcp` points `probe` at a Model Context Protocol server rather than a chat
+endpoint. There is no model to talk to, so every chat rule is skipped by
+capability and says so; what runs instead is the manifest check and the six
+authorization checks.
+
+```bash
+export MCP_TOKEN=…
+guardana probe --url unused --model unused \
+  --mcp https://mcp.example.com/mcp \
+  --mcp-token-env MCP_TOKEN
+```
+
+**Guardana never calls a tool on your server.** Every observation is made with
+`initialize`, `tools/list`, and unauthenticated `GET`s of the two discovery
+documents. Calling a tool is a side effect on somebody's system — possibly a
+write, possibly a payment — and no verification result is worth finding that out
+by experiment.
+
+### The manifest, and pinning it
+
+A tool declaration is fed to the agent's model as trusted context, so an
+instruction hidden in one is indirect prompt injection with an audience of one.
+Guardana scans the whole declaration — description, title, input and output
+schema, annotations — because a property description is read by the model exactly
+like the tool description.
+
+Drift is only detectable against something you approved:
+
+```bash
+guardana probe --url unused --model unused --mcp https://mcp.example.com/mcp \
+  --write-mcp-pin mcp.pin.json          # approve today's manifest
+guardana probe --url unused --model unused --mcp https://mcp.example.com/mcp \
+  --mcp-pin mcp.pin.json                # compare against it
+```
+
+The pin stores a digest per tool rather than the prose, so the file records *that*
+the manifest was approved and cannot be edited into agreement. Without `--mcp-pin`
+drift is reported `inconclusive`, never as a clean server.
+
+Pins written before this release are `schema_version 1` and cover **descriptions
+only**. They still load and still compare, and every run that uses one carries a
+note saying which drift it cannot see — re-approve with `--write-mcp-pin` to cover
+schemas too.
+
+### The authorization surface
+
+Six checks, each testing an invariant the MCP specification states as a `MUST`,
+and each saying plainly when it could not reach a verdict:
+
+| Rule | What it establishes |
+|---|---|
+| `guardana.mcp.unauthenticated_access` | The server answers a tool listing with no credential. `low` on a loopback or private address, `high` elsewhere |
+| `guardana.mcp.authorization_discovery` | A protected server publishes Protected Resource Metadata (RFC 9728) naming an authorization server, identifies *this* origin as its resource, and points at an authorization server that advertises PKCE |
+| `guardana.mcp.token_audience` | The server refuses a bearer token it could not have issued |
+| `guardana.mcp.session_binding` | Session ids are not a counter, are not shared, and do not authenticate a request on their own |
+| `guardana.mcp.scope_breadth` | The advertised scopes can express least privilege, and the challenge names the scope a request needs |
+| `guardana.mcp.discovery_target` | Every discovery address the server advertises is one a client may follow |
+
+**Two of them need `--mcp-token-env` to say anything**, and say so rather than
+going quiet: whether a session authenticates on its own cannot be tested without a
+credential to remove. A run without one reports those as `inconclusive` and names
+the flag.
+
+**What a silent `token_audience` does and does not mean.** Guardana presents a
+token nobody could mistake for a credential — `alg: none`, an audience and issuer
+naming a reserved domain that never resolves, and a signature segment that says
+`guardana-probe-not-a-valid-signature` in words. A server that answers a tool
+listing while holding it validated nothing, and that is a finding. A server that
+rejects it has rejected *that token*; proving it validates audiences would need a
+correctly signed token minted for another service, which no scanner can honestly
+obtain. Against a server that requires no credential at all the check reports
+`inconclusive`, because a server that accepts everything demonstrates nothing.
+
+**stdio servers are not graded on this.** The specification says an stdio
+implementation should take credentials from the environment instead of following
+the authorization spec, so an stdio target does not declare the capability and all
+six rules are **skipped** with their reason recorded. `fail_on.fail_on_skipped`
+turns that coverage hole into an indeterminate result; what never happens is six
+rules reporting nothing about a server they could not examine.
+
+**The credential never reaches a report.** It is read from the environment rather
+than an argument — an argument is in every process list on the machine — and
+evidence records whether one was presented and what the server answered, never its
+value, at any privacy level.
+
+### Cost
+
+An MCP probe sends around a dozen requests: a handshake and a listing without a
+credential, up to five discovery fetches, a handshake and a listing with the
+forged token, and a handful of handshakes to sample session ids. Every one is
+counted, so `--max-requests` bounds it, and a run that hits the ceiling exits `6`
+with an `indeterminate` gate rather than reporting the checks it never reached as
+clean.
 
 ## Probing a guarded endpoint
 

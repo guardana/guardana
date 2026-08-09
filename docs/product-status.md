@@ -12,7 +12,7 @@ so this page is maintained as carefully as the code.
 |---|---|---|
 | Engine + built-in rules | **beta** | Stable enough to gate a build on. The public Python API still moves between minor releases. |
 | `guardana scan` | **beta** | Deterministic, offline, no false-positive theatre. The most mature part of the product. |
-| `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers. Verdict quality depends on the evaluator you configure. |
+| `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers — the last of those on both its tool manifest and its authorization surface, and never by calling a tool. Verdict quality depends on the evaluator you configure. |
 | `guardana monitor` | **beta** | Scheduled **active** verification. Not passive traffic inspection, not inline. |
 | `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and will gain fields in 0.7. |
 | Collector (`guardana-server`) | **beta** | PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. No finding lifecycle, audit log or retention controls. |

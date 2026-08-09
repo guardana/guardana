@@ -211,12 +211,66 @@ def test_the_declared_ceiling_is_not_absurdly_loose() -> None:
         )
 
 
-def test_the_whole_endpoint_plan_has_a_knowable_ceiling() -> None:
+def _mcp_rules() -> list[Rule]:
+    """Endpoint rules an MCP server can satisfy — the other run shape a probe has.
+
+    Split from the chat rules because the two sets never run together: an MCP
+    target declares neither `chat` nor `plant_system_prompt`, and a chat endpoint
+    declares neither `list_tools` nor `inspect_authorization`. Summing both into
+    one ceiling would price a run nobody can execute.
+    """
+    reachable = {Capability.LIST_TOOLS, Capability.INSPECT_AUTHORIZATION}
+    return [r for r in _endpoint_rules() if not r.meta.required_capabilities - reachable]
+
+
+def test_every_endpoint_rule_belongs_to_one_of_the_two_run_shapes() -> None:
+    # The split above is only trustworthy while it is exhaustive: a rule needing
+    # capabilities from both sets would be priced by neither ceiling and skipped by
+    # every real target, which is lost coverage nobody would notice.
+    accounted = {r.meta.id for r in _chat_rules()} | {r.meta.id for r in _mcp_rules()}
+    orphans = [r.meta.id for r in _endpoint_rules() if r.meta.id not in accounted]
+    assert not orphans, f"these rules can run against neither a chat endpoint nor MCP: {orphans}"
+
+
+def test_a_chat_probe_has_a_knowable_ceiling() -> None:
     # The number `guardana plan probe` prints, pinned so it cannot creep.
-    ceiling = sum(r.estimated_requests or 0 for r in _endpoint_rules())
+    ceiling = sum(r.estimated_requests or 0 for r in _chat_rules())
     assert ceiling <= 60, (
-        f"a full probe can cost {ceiling} requests, which is too many to default to"
+        f"a full chat probe can cost {ceiling} requests, which is too many to default to"
     )
+
+
+def test_an_mcp_probe_has_a_knowable_ceiling_and_actually_spends_far_less() -> None:
+    # Two numbers, and the gap between them is the point. Each rule declares what it
+    # would spend *alone*, which is what `plan` has to sum because it cannot know
+    # which rule runs first; the observation is bought once and shared, so a real
+    # run spends a fraction of it. The ceiling stays honest — it is an upper bound —
+    # and this pins how loose it is allowed to get.
+    ceiling = sum(r.estimated_requests or 0 for r in _mcp_rules())
+    assert ceiling <= 60, (
+        f"a full MCP probe can cost {ceiling} requests, which is too many to default to"
+    )
+
+    from guardana.core.target import McpServerTarget  # noqa: PLC0415
+    from guardana.core.testing import ScriptedMcpServer  # noqa: PLC0415
+
+    url = "https://93.184.215.14/mcp"
+    server = ScriptedMcpServer(
+        url,
+        tools=[{"name": "read", "description": "reads"}],
+        credential="t",
+        challenge=f'Bearer resource_metadata="{url[:24]}/.well-known/oauth-protected-resource"',
+        resource_metadata={"resource": url[:24], "authorization_servers": [url[:24]]},
+        authorization_metadata={"code_challenge_methods_supported": ["S256"]},
+        session_ids=["a" * 32, "b" * 32, "c" * 32],
+    )
+    target = McpServerTarget(url, credential="t", sender=server)
+    for rule in _mcp_rules():
+        list(rule.run(target, _CTX))
+
+    spent = target.usage().requests
+    assert spent < ceiling, "the observation is not being shared between rules"
+    assert spent <= 20, f"a whole MCP probe spent {spent} requests"
 
 
 def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
@@ -235,7 +289,7 @@ def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
             return None
 
     rule = next(r for r in _endpoint_rules() if r.meta.id == "guardana.agent.mcp_server_manifest")
-    target = McpServerTarget("http://mcp", transport=_Manifest())  # type: ignore[arg-type]
+    target = McpServerTarget("http://mcp", transport=_Manifest())
 
     list(rule.run(target, _CTX))
 

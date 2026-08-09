@@ -29,6 +29,13 @@ class McpConnection:
     address: str
     allow_exec: bool = False
     pin: Path | None = None
+    credential: str | None = None
+    """A bearer token for the server, read from the environment and never from an argument.
+
+    Without one, the checks that need a credential to say anything — whether a
+    session authenticates on its own — report `inconclusive` and name the flag,
+    rather than staying quiet about a question nobody asked.
+    """
 
 
 def build_mcp_target(connection: McpConnection) -> McpServerTarget:
@@ -39,7 +46,7 @@ def build_mcp_target(connection: McpConnection) -> McpServerTarget:
     place the engine ever does, so it takes an explicit flag.
     """
     if connection.address.startswith(("http://", "https://")):
-        return McpServerTarget(connection.address)
+        return McpServerTarget(connection.address, credential=connection.credential)
     return McpServerTarget(
         command=shlex.split(connection.address), allow_exec=connection.allow_exec
     )

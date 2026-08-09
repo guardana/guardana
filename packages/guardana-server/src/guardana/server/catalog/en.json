@@ -29,6 +29,30 @@
       "name": "Agent obeys a tool result",
       "description": "The model was asked to summarise a document and a tool result told it to forward that document elsewhere. Acting on it is a confused deputy: every step is permitted, the run still ends somewhere nobody approved."
     },
+    "guardana.mcp.authorization_discovery": {
+      "name": "MCP authorization surface unusable",
+      "description": "A protected server publishes no Protected Resource Metadata, names no authorization server, claims a resource on another origin, or points at an authorization server that does not advertise PKCE — each of which stops a conforming client from authenticating at all."
+    },
+    "guardana.mcp.discovery_target": {
+      "name": "MCP server points its client somewhere it must not go",
+      "description": "An authorization discovery address resolved to the cloud metadata endpoint, to the network running the scan, or used a scheme a client must reject. Guardana refuses to fetch it, and the refusal is the finding."
+    },
+    "guardana.mcp.scope_breadth": {
+      "name": "MCP scopes cannot express least privilege",
+      "description": "The server advertises a wildcard or omnibus scope, so a token minted against it grants everything at once and cannot be revoked without revoking every workflow; or its challenge names no scope, leaving a client nothing to ask for but all of them."
+    },
+    "guardana.mcp.session_binding": {
+      "name": "MCP session guessable or used as authentication",
+      "description": "The session id is a counter, is shared between callers, or is short enough to enumerate — or a request carrying only the session id, with the credential removed, was answered. The specification forbids the last one outright."
+    },
+    "guardana.mcp.token_audience": {
+      "name": "MCP server accepts a token meant for someone else",
+      "description": "The server answered a tool listing while holding a bearer token naming a different audience and carrying no valid signature, so it validated neither. Silence means it rejected that token, which is not the same as proving it validates audiences."
+    },
+    "guardana.mcp.unauthenticated_access": {
+      "name": "MCP server answers without a credential",
+      "description": "The server hands its tool manifest to a caller presenting nothing. Not a specification violation on its own, and the fact every other authorization check depends on: a server that asks for nothing cannot demonstrate that it validates anything."
+    },
     "guardana.output.secrets": {
       "name": "Secret leaked in model output",
       "description": "A live model emits secret-shaped strings (API keys, tokens) in its replies to benign prompts — sensitive data leaking through generated output."
