@@ -129,6 +129,26 @@ def test_the_site_deployment_serves_the_directory_that_exists() -> None:
     assert (served / "_headers").is_file(), "the security headers would not ship"
 
 
+def test_the_maintainer_readme_is_not_published() -> None:
+    """It was: `https://guardana.dev/README.md` served this repo's own runbook.
+
+    Wrangler uploads everything in the assets directory, so a file put there for
+    maintainers becomes a page. Found in the build log — "Uploaded 2 assets" for a
+    site with one page — rather than by anybody visiting it.
+    """
+    ignored = (_REPO / "site" / ".assetsignore").read_text(encoding="utf-8")
+
+    assert "README.md" in ignored
+
+
+def test_only_one_hostname_serves_the_page() -> None:
+    """`workers.dev` is enabled on every deploy unless the config says otherwise."""
+    config = _wrangler()
+
+    assert config["workers_dev"] is False
+    assert config["preview_urls"] is False
+
+
 def test_the_deployment_runs_no_build_and_no_worker_script() -> None:
     """One HTML file, served as it is. A `main` here would mean code nobody reviewed."""
     config = _wrangler()

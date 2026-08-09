@@ -16,5 +16,13 @@
   "compatibility_date": "2026-08-09",
   "assets": {
     "directory": "./site"
-  }
+  },
+  // One public hostname, declared rather than defaulted. Wrangler enables
+  // `workers.dev` on every deploy unless told otherwise, so the page was also
+  // reachable at guardana.<account>.workers.dev — a second address serving the
+  // same content, that nobody watches and search engines index twice.
+  "workers_dev": false,
+  // Same reasoning for branch previews: a marketing page has no reviewers who
+  // need a per-branch URL, and every one of them would be public.
+  "preview_urls": false
 }

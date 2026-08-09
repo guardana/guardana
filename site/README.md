@@ -27,9 +27,16 @@ lives in a console is one nobody can review, diff or restore. It declares a
    - **API token:** *Create new token*; leave the variable fields empty
 4. **Deploy.** You get `guardana.workers.dev` within a minute.
 
-`_headers` is applied by Workers static assets exactly as it was by Pages. Check
-it once at [securityheaders.com](https://securityheaders.com) after the first
-deploy — a header file nobody verified is a policy nobody has.
+`_headers` is applied by Workers static assets exactly as it was by Pages —
+verified after the first deploy, and all five headers are live. Check it once at
+[securityheaders.com](https://securityheaders.com) too: a header file nobody
+verified is a policy nobody has.
+
+**This file is not published.** Wrangler uploads everything in the assets
+directory, so the first deploy served it at `/README.md`; `site/.assetsignore`
+keeps maintainer files out of the site, and a test keeps that true. The config
+also pins **one** public hostname — `workers_dev` and `preview_urls` are off, so
+the page lives at `guardana.dev` and nowhere else.
 
 There is a one-off path (`npx wrangler deploy` from a laptop) but prefer the
 connected repo: a manual deploy is one more thing that can be forgotten, and the

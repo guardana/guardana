@@ -1,0 +1,6 @@
+# What is in `site/` for maintainers and must not be served to visitors.
+#
+# Wrangler uploads every file in the assets directory, so this README shipped as
+# https://guardana.dev/README.md — a page nobody meant to publish, found by
+# reading the build log rather than by anybody visiting it.
+README.md
