@@ -397,6 +397,22 @@ def migrate_v2(document: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def migrate_v3(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-3 saved run as a schema-4 one. Nothing in it changes but the label.
+
+    Version 4 permits one more target kind (`trace`), and a version-3 document by
+    definition names one of the two that were already allowed — so there is nothing to
+    recover and nothing to invent. The step exists anyway, because the alternative was
+    widening the v3 enum in place, and a contract that changes without changing its
+    name is the one thing versioning is for.
+
+    `$schema` is restated rather than carried, for the reason `migrate_v2` restates it:
+    `run migrate` writes this document to disk, and one still pointing at the v3
+    contract would tell its next reader it is holding a document it is not.
+    """
+    return {**document, "schema_version": 4, "$schema": SCHEMA_URL}
+
+
 def _titled(findings: object) -> list[dict[str, Any]]:
     """Add the recorded title to every taxonomy reference in one finding channel.
 

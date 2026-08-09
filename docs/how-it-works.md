@@ -185,7 +185,7 @@ the renderer prints them →
   hallucinated dependencies, insecure transport, hardcoded secrets, MCP tool
   poisoning, hidden-instruction "rules-file backdoors", and training-data
   integrity.
-- **Runtime (dynamic, endpoint)** — 21 rules: direct prompt injection, DAN-style
+- **Runtime (dynamic, endpoint and trace)** — 28 rules: direct prompt injection, DAN-style
   jailbreak, a multi-turn gradual-jailbreak scenario, indirect (RAG) injection,
   excessive tool-use agency, unbounded consumption (denial-of-wallet), the same
   category measured as cost asymmetry, output-secret leakage, the canary-proven
@@ -197,10 +197,15 @@ the renderer prints them →
   whether its authorization surface is one a conforming client can use, whether it
   accepts a token it could not have issued, whether its session id is guessable or
   stands in for authentication, whether its scopes can express least privilege, and
-  whether it points its client at an address a client must not follow.
+  whether it points its client at an address a client must not follow. Seven of the
+  runtime rules grade a **recorded** execution rather than a live one — a credential in a
+  tool argument, a credential crossing two trust boundaries, a token outside its audience,
+  a session standing in for an identity, a scope nobody consented to, a policy decision
+  the run went ahead against, and a consequential effect nobody approved.
 
 You never pick the layer by hand: `scan` runs the build layer, `probe` and
-`monitor` run the runtime layer.
+`monitor` run the runtime layer against a live system, and `analyze-trace` runs the part
+of it that reads a recording.
 
 ---
 

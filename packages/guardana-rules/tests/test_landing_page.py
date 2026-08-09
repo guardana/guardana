@@ -19,7 +19,7 @@ from guardana.rules import provide_rules
 
 _TOTAL_RE = re.compile(r">(\d+) rules · two surfaces<")
 _BUILD_RE = re.compile(r">(\d+) rules · your laptop")
-_RUNTIME_RE = re.compile(r">(\d+) rules · against a served model<")
+_RUNTIME_RE = re.compile(r">(\d+) rules · a served model, or a run it already performed<")
 
 
 def _page() -> str:

@@ -1,10 +1,12 @@
 import typer
+from guardana.cli.analyze_trace import analyze_trace
 from guardana.cli.baseline import baseline_app
 from guardana.cli.calibrate import calibrate_command
 from guardana.cli.config import config_app
 from guardana.cli.diff import diff
 from guardana.cli.doctor import doctor
 from guardana.cli.exit_codes import ExitCode
+from guardana.cli.import_observations import import_observations
 from guardana.cli.init import init
 from guardana.cli.monitor import monitor
 from guardana.cli.new_rule import new_rule
@@ -85,6 +87,8 @@ app.command()(taxonomy)
 app.command()(probe)
 app.command()(diff)
 app.command()(monitor)
+app.command(name="analyze-trace")(analyze_trace)
+app.command(name="import-observations")(import_observations)
 app.command(name="new-rule")(new_rule)
 app.command(name="calibrate")(calibrate_command)
 app.add_typer(run_app, name="run")

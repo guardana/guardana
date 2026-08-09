@@ -43,8 +43,20 @@ def test_every_schema_refuses_unknown_fields_at_the_top_level(path: Path) -> Non
     # A document that silently accepts anything is not a contract. This is also
     # what makes a writer that invents a field fail loudly rather than producing
     # something every reader ignores.
+    #
+    # A schema for a JSONL format describes one *record*, so its top level is a
+    # `oneOf` over the record shapes rather than one object. That is still closed —
+    # every branch is — and the check follows the structure rather than exempting
+    # the file, because an exemption is where an open schema would eventually hide.
     schema = json.loads(path.read_text(encoding="utf-8"))
-    assert schema.get("additionalProperties") is False, path.name
+    branches = schema.get("oneOf")
+    if branches is None:
+        assert schema.get("additionalProperties") is False, path.name
+        return
+    definitions = schema.get("$defs", {})
+    for branch in branches:
+        resolved = definitions[branch["$ref"].removeprefix("#/$defs/")]
+        assert resolved.get("additionalProperties") is False, f"{path.name}: {branch}"
 
 
 def test_a_diff_document_satisfies_its_schema() -> None:
@@ -74,6 +86,7 @@ def test_the_schema_version_in_each_schema_matches_the_code() -> None:
     from guardana.cli.plan import PLAN_SCHEMA_VERSION  # noqa: PLC0415
     from guardana.core.diff.model import DIFF_SCHEMA_VERSION  # noqa: PLC0415
     from guardana.core.manifest.model import MANIFEST_SCHEMA_VERSION  # noqa: PLC0415
+    from guardana.core.trace import TRACE_SCHEMA_VERSION  # noqa: PLC0415
 
     assert _schema("diff-v1.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
         DIFF_SCHEMA_VERSION
@@ -81,6 +94,28 @@ def test_the_schema_version_in_each_schema_matches_the_code() -> None:
     assert _schema("plan-v1.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
         PLAN_SCHEMA_VERSION
     )
-    assert _schema("run-v3.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
+    assert _schema("run-v4.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
         MANIFEST_SCHEMA_VERSION
     )
+    assert (
+        _schema("trace-v1.schema.json")["$defs"]["header"]["properties"][  # type: ignore[index]
+            "guardana_trace"
+        ]["const"]
+        == TRACE_SCHEMA_VERSION
+    )
+
+
+def test_the_superseded_run_schemas_stay_pinned_to_the_versions_they_describe() -> None:
+    """A saved run still has to validate against the schema it was written to.
+
+    Which is the whole reason a new version is a new file rather than an edit: widening
+    v3's target-kind enum in place would have changed a contract under a name that
+    promised it had not.
+    """
+    for version in (2, 3):
+        assert (
+            _schema(f"run-v{version}.schema.json")["properties"]["schema_version"][  # type: ignore[index]
+                "const"
+            ]
+            == version
+        )

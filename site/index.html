@@ -201,7 +201,7 @@
 
   <section>
     <div class="wrap">
-      <p class="eyebrow">40 rules · two surfaces</p>
+      <p class="eyebrow">47 rules · two surfaces</p>
       <h2 class="disp">What it checks</h2>
       <p class="sec-lede">Static checks are deterministic — no model, no network, no false-positive theatre. Dynamic checks talk to a live endpoint and are graded by a swappable evaluator.</p>
       <div class="surfaces">
@@ -219,7 +219,7 @@
         </div>
         <div class="card">
           <h3>Runtime</h3>
-          <p class="when">21 rules · against a served model</p>
+          <p class="when">28 rules · a served model, or a run it already performed</p>
           <ul class="rules">
             <li><b>system_prompt_leak</b> — proven by a planted canary</li>
             <li><b>injection.ignore_previous</b> — instruction override</li>
@@ -230,6 +230,8 @@
             <li><b>agent.mcp_server_manifest</b> — a live MCP server's tools, and drift from your pin</li>
             <li><b>mcp.token_audience</b> — a server that accepts a token it never issued</li>
             <li><b>mcp.session_binding</b> — a session id that is a counter, or that authenticates by itself</li>
+            <li><b>trace.credential_passthrough</b> — in a recorded run: one credential across two trust boundaries</li>
+            <li><b>trace.unapproved_side_effect</b> — in a recorded run: an irreversible effect nobody approved</li>
             <li><b>output.secrets</b> — keys leaking in replies</li>
           </ul>
         </div>

@@ -25,6 +25,7 @@ from guardana.core.target.endpoint import (
     ToolSpec,
 )
 from guardana.core.target.mcp import McpError, McpServerTarget, McpTool
+from guardana.core.target.trace import TraceTarget
 
 __all__ = [
     "REQUEST_TIMEOUT_SECONDS",
@@ -52,6 +53,7 @@ __all__ = [
     "ToolCallReply",
     "ToolCallingTransport",
     "ToolSpec",
+    "TraceTarget",
     "challenge_parameters",
     "forged_token",
     "is_local_address",

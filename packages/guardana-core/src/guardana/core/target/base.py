@@ -9,10 +9,17 @@ if TYPE_CHECKING:
 
 
 class TargetKind(StrEnum):
-    """What a rule is written against: files on disk, or a live model."""
+    """What a rule is written against: files on disk, a live model, or a recorded run.
+
+    `TRACE` is neither of the first two and is not folded into either. Reading it as
+    an artifact would offer every static rule a JSONL file to fail to parse; reading it
+    as an endpoint would let a rule that sends prompts be selected against a recording
+    that cannot answer.
+    """
 
     ARTIFACT = "artifact"
     ENDPOINT = "endpoint"
+    TRACE = "trace"
 
 
 class Capability(StrEnum):
@@ -33,6 +40,20 @@ class Capability(StrEnum):
     CALL_TOOLS = "call_tools"
     LIST_TOOLS = "list_tools"
     INSPECT_AUTHORIZATION = "inspect_authorization"
+    # A trace answers each of these only if its producer recorded that dimension, so
+    # they are one capability per dimension rather than one for "a trace is present".
+    # A single `READ_TRACE` would let the approval rule run against a trace with no
+    # approval records and accuse a system whose instrumentation is merely quieter
+    # than ours. See `docs/design/trace-domain-model.md`.
+    READ_TRACE = "read_trace"
+    READ_MESSAGES = "read_messages"
+    READ_TOOL_CALLS = "read_tool_calls"
+    READ_IDENTITY = "read_identity"
+    READ_DELEGATION = "read_delegation"
+    READ_CONSENT = "read_consent"
+    READ_POLICY_DECISIONS = "read_policy_decisions"
+    READ_APPROVALS = "read_approvals"
+    READ_SIDE_EFFECTS = "read_side_effects"
 
 
 class Target(ABC):

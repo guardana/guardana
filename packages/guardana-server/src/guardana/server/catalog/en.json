@@ -157,6 +157,34 @@
       "name": "TensorFlow SavedModel file ops",
       "description": "A TensorFlow SavedModel graph contains ReadFile / WriteFile operators — load-time filesystem read or overwrite baked into the model (a lead; JFrog TFLOW-MALOPS class)."
     },
+    "guardana.trace.consent_scope_exceeded": {
+      "name": "A scope nobody consented to",
+      "description": "A hop exercised a scope no consent record granted, read per client rather than per user. Privilege the user never agreed to is the escalation OWASP calls scope creep, seen from inside the run."
+    },
+    "guardana.trace.credential_passthrough": {
+      "name": "One credential across two trust boundaries",
+      "description": "The token a service received is the token it forwarded upstream, so the upstream service reads the caller's credential as its own client's. This is the confused deputy, proven by digest rather than inferred."
+    },
+    "guardana.trace.identity_disagreement": {
+      "name": "A token presented outside its audience",
+      "description": "A credential whose audience names one resource was presented to another. Audience binding is what stops a token minted for one service being replayed against a second one."
+    },
+    "guardana.trace.policy_decision_ignored": {
+      "name": "A policy decision the run went ahead against",
+      "description": "A guardrail returned deny — or errored and was treated as an allow — and the action happened anyway. The second case is a fail-open in somebody else's stack and is reported at the same severity."
+    },
+    "guardana.trace.secret_in_tool_argument": {
+      "name": "A credential in a recorded tool argument",
+      "description": "A recorded trace shows an API key or password inside a tool call's arguments. The credential is now in whatever holds the trace, and it got there from the model's context."
+    },
+    "guardana.trace.session_as_identity": {
+      "name": "A session standing in for an identity",
+      "description": "A step that changed something identified itself with a session id and nothing else. A session says which connection this is, never who it belongs to, so anything holding the id inherits what the session could do."
+    },
+    "guardana.trace.unapproved_side_effect": {
+      "name": "A consequential effect nobody approved",
+      "description": "An irreversible effect executed while its approval is recorded as denied, timed out or never sought. Requires the trace to record approvals at all, so a quieter instrumentation is never mistaken for a missing approval."
+    },
     "guardana.training.dataset_integrity": {
       "name": "Training-data integrity gap",
       "description": "A training-data hygiene gap that makes poisoning possible: a Hugging Face dataset loading script (code that runs on load), or an unpinned load_dataset(...) whose source can be swapped under you. Reported as a lead, not proof of poisoning."

@@ -45,4 +45,11 @@ frameworks it maps to. A rule without a mapping does not ship.
 | `guardana.supply_chain.remote_code` | HIGH | build | `LLM03:2025`, `LLM04:2026`, `supply-chain`, `ASI05:2026` |
 | `guardana.supply_chain.remote_code_config` | HIGH | build | `LLM03:2025`, `LLM04:2026`, `AML.T0018`, `supply-chain`, `ASI05:2026` |
 | `guardana.supply_chain.saved_model_ops` | MEDIUM | build | `LLM05:2025`, `LLM10:2026`, `ML06:2023`, `AML.T0018`, `supply-chain`, `ASI05:2026` |
+| `guardana.trace.consent_scope_exceeded` | HIGH | runtime | `MCP02:2025`, `ASI03:2026`, `LLM03:2026` |
+| `guardana.trace.credential_passthrough` | HIGH | runtime | `MCP01:2025`, `ASI03:2026`, `LLM03:2026` |
+| `guardana.trace.identity_disagreement` | HIGH | runtime | `MCP01:2025`, `ASI03:2026` |
+| `guardana.trace.policy_decision_ignored` | HIGH | runtime | `ASI02:2026`, `LLM10:2026` |
+| `guardana.trace.secret_in_tool_argument` | HIGH | runtime | `LLM02:2026`, `ASI03:2026`, `AML.T0057` |
+| `guardana.trace.session_as_identity` | HIGH | runtime | `MCP07:2025`, `ASI03:2026` |
+| `guardana.trace.unapproved_side_effect` | HIGH | runtime | `ASI09:2026`, `ASI02:2026`, `LLM03:2026` |
 | `guardana.training.dataset_integrity` | MEDIUM | build | `LLM04:2025`, `LLM05:2026`, `ML02:2023`, `poisoning` |

@@ -85,13 +85,14 @@ already have.
 
 What an older version never recorded arrives as an explicit unknown rather than as a
 default — version 1 has no usage, no execution settings and **no gate verdict**;
-version 2 has no coverage fingerprint and no declared trial counts. Recomputing any
+version 2 has no coverage fingerprint and no declared trial counts; version 3 could not
+name a `trace` target, because that kind did not exist. Recomputing any
 of them during migration would apply today's build to another build's run, which is
 exactly what storing them as fields exists to prevent. `inspect` says so at the
 bottom of its output, and `diff` adds a note.
 
 One thing *is* recovered: the **title** of a framework reference, which version 3
-records beside its framework and id. It is looked up from the installed catalogue for
+onward records beside its framework and id. It is looked up from the installed catalogue for
 the exact `(framework, id)` pair the document already carries, so nothing is guessed
 and no reference is remapped — a `LLM07` recorded under `OWASP-LLM-2025` stays System
 Prompt Leakage. A reference from a rule pack this build does not have stays
@@ -119,18 +120,24 @@ missing.
 ## The document
 
 The saved-run schema lives at
-[`schemas/run-v3.schema.json`](../schemas/run-v3.schema.json), identified by
-`https://guardana.dev/schemas/run/v3.schema.json`. The version is in the
+[`schemas/run-v4.schema.json`](../schemas/run-v4.schema.json), identified by
+`https://guardana.dev/schemas/run/v4.schema.json`. The version is in the
 identifier, so a consumer can tell which contract it is holding before parsing
 anything; it changes whenever the change is not backwards-compatible. A test
 validates what Guardana writes against that file, so the schema cannot drift
 away from the tool.
 
+Every superseded version stays published — `run-v2` and `run-v3` are still in
+[`schemas/`](../schemas/) — because a saved run has to keep validating against the schema
+it was written to. Version 4 exists for one reason: it permits a `trace` target kind.
+Widening version 3's enum in place was the alternative, and it would have changed a
+contract under a name that promised it had not.
+
 Top level:
 
 | Key | What it is |
 |---|---|
-| `schema_version` | `3`. Stated once, for the whole document. |
+| `schema_version` | `4`. Stated once, for the whole document. |
 | `run` | the manifest — everything below |
 | `findings` / `unverified` / `waived` / `errors` / `observations` | the channels |
 

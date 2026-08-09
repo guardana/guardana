@@ -37,8 +37,8 @@ _CLAIMS: tuple[tuple[re.Pattern[str], str, str], ...] = (
     (re.compile(r">(\d+) rules · two surfaces<"), ">{n} rules · two surfaces<", "total"),
     (re.compile(r">(\d+) rules · your laptop"), ">{n} rules · your laptop", "build"),
     (
-        re.compile(r">(\d+) rules · against a served model<"),
-        ">{n} rules · against a served model<",
+        re.compile(r">(\d+) rules · a served model, or a run it already performed<"),
+        ">{n} rules · a served model, or a run it already performed<",
         "runtime",
     ),
     (re.compile(r"(\d+) rule\(s\) run, 0 skipped"), "{n} rule(s) run, 0 skipped", "build"),

@@ -41,6 +41,15 @@ from guardana.rules.supply_chain.provenance import ProvenanceRule
 from guardana.rules.supply_chain.remote_code import RemoteCodeRule
 from guardana.rules.supply_chain.remote_code_config import RemoteCodeConfigRule
 from guardana.rules.supply_chain.saved_model_ops import SavedModelOpsRule
+from guardana.rules.trace import (
+    ConsentScopeExceededRule,
+    CredentialPassthroughRule,
+    IdentityDisagreementRule,
+    PolicyDecisionIgnoredRule,
+    SecretInToolArgumentRule,
+    SessionAsIdentityRule,
+    UnapprovedSideEffectRule,
+)
 from guardana.rules.training.dataset_integrity import DatasetIntegrityRule
 
 
@@ -85,6 +94,13 @@ def provide_rules() -> list[Rule]:
         McpSessionBindingRule(),
         McpScopeBreadthRule(),
         McpDiscoveryTargetRule(),
+        CredentialPassthroughRule(),
+        IdentityDisagreementRule(),
+        SessionAsIdentityRule(),
+        ConsentScopeExceededRule(),
+        PolicyDecisionIgnoredRule(),
+        UnapprovedSideEffectRule(),
+        SecretInToolArgumentRule(),
         *_load_catalog_rules(),
     ]
 

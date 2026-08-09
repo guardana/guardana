@@ -240,6 +240,21 @@ def _coverage(
     )
 
 
+def _source(kind: SourceKind | None) -> RunSource:
+    """Describe where this run came from, letting a command state what only it knows.
+
+    Detection reads the environment, which answers "laptop or pipeline" and cannot
+    answer "is this a live system or a recording somebody exported". A trace analysis
+    is `imported_trace` whether it runs on a laptop or in CI, and the provider stays
+    whatever the environment said — so a dashboard can still tell which pipeline read
+    the file.
+    """
+    detected = detect_source()
+    if kind is None:
+        return detected
+    return RunSource(kind=kind, provider=detected.provider, run_url=detected.run_url)
+
+
 def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independent facts
     registry: Registry,
     profile: Profile,
@@ -252,6 +267,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
     identity: TargetIdentity | None = None,
     concurrency: int = 1,
     deployment: DeploymentRef | None = None,
+    source_kind: SourceKind | None = None,
 ) -> RunManifest:
     """Describe the run that produced `result`, digesting the rules that actually ran.
 
@@ -281,7 +297,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         created_at=now,
         started_at=started_at,
         completed_at=now,
-        source=detect_source(),
+        source=_source(source_kind),
         deployment=deployment if deployment is not None else DeploymentRef(),
         guardana=ToolInfo(version=__version__),
         target=target,

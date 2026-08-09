@@ -17,6 +17,7 @@ from guardana.core.manifest.load import (
     manifest_from_dict,
     migrate_v1,
     migrate_v2,
+    migrate_v3,
 )
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.report.check_error import CheckError
@@ -29,7 +30,7 @@ from guardana.core.severity import Severity
 from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
-_MIGRATIONS = {1: migrate_v1, 2: migrate_v2}
+_MIGRATIONS = {1: migrate_v1, 2: migrate_v2, 3: migrate_v3}
 """One step forward per version, keyed by the version the document *is*.
 
 Chained rather than jumped: a schema-1 run goes through 2 on its way to 3, so a

@@ -7,13 +7,19 @@ from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleR
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-MANIFEST_SCHEMA_VERSION = 3
+MANIFEST_SCHEMA_VERSION = 4
 """Version of the run document, moved independently of the CLI.
 
 A run written by 0.7.3 and one written by 0.9.0 are the same document if the
 schema did not move; a schema change is a schema change whether or not a release
 happened. Kept an integer, as version 1 was: a field that is sometimes a number
 and sometimes a string is a trap for every reader, including ours.
+
+Version 4 adds one target kind — `trace` — and that is the whole change. Widening
+version 3's enum in place was the alternative and is exactly what a version exists
+to prevent: a v3 document carrying `trace` would fail validation against the v3
+schema an older build holds, so the contract would have changed under a name that
+promised it had not.
 """
 
 

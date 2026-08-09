@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**A common `Trace` model, and two commands that read one.** Guardana has only ever
+verified runs it started itself. The interesting failures happen in the runs it did
+not: the documents your retriever returned were whatever the index held at 09:41, the
+memory already contained a note from Tuesday, and the credential that reached the
+third MCP server came from a delegation chain no prompt can recreate. A trace is the
+only place those are visible.
+
+`guardana.core.trace` is the domain model for one: model calls, messages with **typed
+content parts** (so a multimodal carrier does not force a breaking change later), tool
+offers, calls and results, retrieval queries and retrieved documents, identity and
+scopes, delegation, consent, policy decisions, approvals, memory reads and writes,
+external side effects, and agent handoffs. Design and rejected options:
+[`docs/design/trace-domain-model.md`](docs/design/trace-domain-model.md).
+
+**`guardana analyze-trace` reads a trace and grades it.** OpenTelemetry GenAI
+semantic conventions are the interoperability base rather than a Guardana protocol —
+a format nobody emits is a format nobody uses — read from OTLP/JSON, from an SDK file
+exporter, and from all three generations of the message convention. It opens one file
+and no socket.
+
+**Seven rules over a recorded execution**, six of them existing because the model
+carries a distinction that would otherwise be unrepresentable: a credential in a tool
+argument, one credential crossing two trust boundaries (the token passthrough the MCP
+work had to defer as invisible from outside a server), a token presented outside its
+audience, a session standing in for an identity, a scope no consent granted, a policy
+decision the run went ahead against, and a consequential effect nobody approved.
+
+**`guardana import-observations` carries somebody else's results in as claims.**
+garak, promptfoo, or a documented shape for an internal harness — read with their
+provenance intact and landing in `unverified`, because Guardana did not send those
+prompts and cannot grade what it did not observe. Their outcome stays in their terms:
+promptfoo's `success: false` means *this assertion did not hold*, which is not the
+same sentence as "the attack worked", and nothing here upgrades it into one. The
+command **never exits `0`** — no rule ran, so "the policy passed" is a sentence that
+run is not entitled to.
+
+**The mechanism that makes all of it honest, stated once.** A trace records what an
+application *chose* to record. When no approval appears before a payment, three worlds
+fit the file: none was sought, the framework does not emit approval spans, or the
+trace was cut short. Reading the absence as the first fires on every well-governed
+system; reading it as the second passes on the one that skipped it. So a dimension the
+producer does not record becomes an undeclared **capability**, the runner skips the
+rules needing it with a reason, and `fail_on_skipped` turns the coverage hole into an
+indeterminate result. What must not happen is six rules finding nothing in a file that
+could not have contained it.
+
+That mechanism also decided the layering twice. Reading the OpenTelemetry registry
+produced the finding this design turns on — **the conventions carry the model-call
+half of the domain and have no field for the other half**: no presented credential, no
+token audience, no delegation boundary, no consent, no approval, no policy decision,
+no side effect. `mcp.session.id` is the closest thing to an identity in the whole
+registry, and a session id is precisely not one — so a session in a trace does *not*
+make identity count as instrumented, or the session-as-authentication rule would
+accuse a properly authenticated deployment of the thing its instrumentation never
+mentioned.
+
+Also in this work:
+
+- **`schemas/trace-v1.schema.json`**, published and versioned like every other
+  document a user keeps. A version this build cannot read is **refused**, not read as
+  v1 — reading it anyway would drop the fields we do not know and grade what was left.
+  A file with no version key is refused too: guessing is how an unversioned format
+  acquires a version in name only. Unknown keys on a span are refused, because a
+  misspelled `aprovals:` would leave the approval dimension declared and empty and the
+  rule would then report a system that approved everything properly.
+- **Credentials are named, never carried.** `CredentialRef` has no field for a value.
+  A trace that records a raw token gets it hashed at the reader and the value
+  discarded, so a producer's carelessness stops there rather than travelling into a
+  report, a SARIF file and a collector envelope. Binary content is described — media
+  type, size, URI, digest — never copied.
+- **`scopes: []` and no `scopes` key are different facts**, throughout: one says the
+  client was granted nothing, the other that nobody recorded what was granted. The
+  first is checkable; the second makes a rule decline by name.
+- **`--write-trace` converts any export into the native dialect**, which is how an
+  operator adds the dimensions their framework does not emit.
+- **`guardana.core.trace.bridge.as_trajectory`** reads a recorded run as the object
+  the existing agentic evaluators already grade, carrying the truncation across so a
+  trace that was cut short cannot be graded as a complete one.
+- **`TargetKind.TRACE`** — a trace is neither an artifact nor an endpoint, and folding
+  it into either would have offered the wrong rules a target they cannot read.
+- **Saved run schema v4.** The new target kind is one more value in an enum version 3
+  closed, and widening v3 in place would have changed a contract under a name that
+  promised it had not. `run-v2` and `run-v3` stay published, the 3→4 migration is in
+  the same chain as 1→2→3, and a run over a trace records
+  `source.kind: imported_trace` — a field the manifest has had since v2 with nothing
+  ever setting it.
+
+**A cycle a green gate could not see.** `guardana.core.trace` must import nothing from
+the target, report or evaluator layers: `TraceTarget` lives in the target package, and
+importing any trace submodule runs the trace package's `__init__`, so a dependency
+back closes `target → trace → evaluator → exchange → target` and every command dies at
+import time. It happened during this work under a green `ruff` and a green
+`mypy --strict` — neither analyses imports by performing them — and it is now pinned
+by a test that reads what the package's `__init__` imports *and* imports every entry
+point in a cold interpreter.
+
 ### Fixed
 
 **A redirect carried the operator's MCP credential to whatever origin the server

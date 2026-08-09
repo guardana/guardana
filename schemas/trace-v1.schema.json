@@ -1,0 +1,642 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/trace/v1.schema.json",
+  "title": "Guardana Trace v1",
+  "description": "One record of a Guardana native trace file. The file is JSONL: the first line is a header declaring the schema version, the trace identity and which dimensions the producer records; every later line is one span. Each line validates against this schema independently. The message and content-part shapes are the OpenTelemetry GenAI semantic conventions; the identity, delegation, consent, policy, approval and effect blocks are Guardana extensions, because those conventions have no field for them.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/header"
+    },
+    {
+      "$ref": "#/$defs/span"
+    }
+  ],
+  "$defs": {
+    "header": {
+      "description": "The first record. Its absence is an error rather than a default: guessing a version is how an unversioned format acquires a version in name only.",
+      "type": "object",
+      "required": [
+        "guardana_trace",
+        "trace_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "guardana_trace": {
+          "const": 1
+        },
+        "trace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "producer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "recorded_at": {
+              "type": "string"
+            }
+          }
+        },
+        "instrumented": {
+          "description": "Which parts of the domain this producer records at all. A dimension absent here stops the rules needing it from running, because an absence in the file would otherwise be read as a fact about the system. An unknown name is refused rather than ignored.",
+          "type": "array",
+          "items": {
+            "enum": [
+              "messages",
+              "tools",
+              "retrieval",
+              "memory",
+              "identity",
+              "delegation",
+              "consent",
+              "policy",
+              "approval",
+              "effects",
+              "handoff"
+            ]
+          }
+        },
+        "truncated": {
+          "description": "Why the trace is known to be incomplete. Any value here makes a rule that found nothing report inconclusive rather than a pass.",
+          "enum": [
+            "producer_limit",
+            "read_limit",
+            "unterminated"
+          ]
+        },
+        "attributes": {
+          "description": "Producer-level facts about the whole trace. Deliberately not available per span: a bag on a span is where a framework's quirks accumulate instead of forcing the question of whether the model is missing a field.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "span": {
+      "description": "One step of the execution. Unknown keys are refused: a misspelled field would leave a declared dimension empty, and a rule would then accuse a system that did nothing wrong.",
+      "type": "object",
+      "required": [
+        "span_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "model_call",
+            "tool_execution",
+            "agent_invocation",
+            "retrieval",
+            "memory",
+            "handoff",
+            "embeddings",
+            "other"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "parent_span_id": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "conversation_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "request_model": {
+              "type": "string"
+            },
+            "response_model": {
+              "type": "string"
+            },
+            "input_tokens": {
+              "type": "integer"
+            },
+            "output_tokens": {
+              "type": "integer"
+            },
+            "finish_reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/message"
+          }
+        },
+        "system_instructions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/part"
+          }
+        },
+        "tool_offers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "tool_type": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "tool": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "call_id": {
+              "type": "string"
+            },
+            "arguments": {
+              "type": "string"
+            },
+            "result": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/part"
+              }
+            },
+            "status": {
+              "enum": [
+                "succeeded",
+                "failed",
+                "unknown"
+              ]
+            },
+            "mutates": {
+              "description": "Whether this call changed anything. Absent means nobody said, which is not the same as false: a rule that needs to know treats it as unknown rather than guessing from the tool's name.",
+              "type": "boolean"
+            },
+            "server": {
+              "type": "string"
+            }
+          }
+        },
+        "retrieval": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "tenant": {
+              "type": "string"
+            },
+            "documents": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/part"
+                    }
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "tenant": {
+                    "type": "string"
+                  },
+                  "score": {
+                    "type": "number"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "read",
+                "write",
+                "delete",
+                "search"
+              ]
+            },
+            "store": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/part"
+              }
+            },
+            "origin_span_id": {
+              "description": "Which step the written content came from. This is what makes memory poisoning provable rather than suspected.",
+              "type": "string"
+            }
+          }
+        },
+        "handoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from_agent": {
+              "type": "string"
+            },
+            "to_agent": {
+              "type": "string"
+            },
+            "payload": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/part"
+              }
+            },
+            "carried_scopes": {
+              "$ref": "#/$defs/scopes"
+            }
+          }
+        },
+        "identity": {
+          "description": "Who this step acted as: three claims that can disagree, plus a session that is not one of them.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "type": "string"
+            },
+            "credential": {
+              "$ref": "#/$defs/credential"
+            },
+            "claimed_resource": {
+              "description": "What the callee says it is. The interesting failure is where this and the credential's audience diverge.",
+              "type": "string"
+            },
+            "session": {
+              "$ref": "#/$defs/session"
+            }
+          }
+        },
+        "delegations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "actor",
+              "boundary"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "actor": {
+                "type": "string"
+              },
+              "boundary": {
+                "description": "Which trust boundary this hop crossed. The same credential on two different boundaries is token passthrough.",
+                "type": "string"
+              },
+              "on_behalf_of": {
+                "type": "string"
+              },
+              "credential": {
+                "$ref": "#/$defs/credential"
+              },
+              "scopes": {
+                "$ref": "#/$defs/scopes"
+              }
+            }
+          }
+        },
+        "consents": {
+          "type": "array",
+          "items": {
+            "description": "A grant recorded against a client, with the subject as a separate fact. Per client, because the confused deputy works by reading a decision about a user as a decision about a client.",
+            "type": "object",
+            "required": [
+              "client",
+              "granted"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "client": {
+                "type": "string"
+              },
+              "granted": {
+                "type": "boolean"
+              },
+              "scopes": {
+                "$ref": "#/$defs/scopes"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "recorded_at": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "policy_decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "outcome",
+              "action"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "outcome": {
+                "description": "`error` is a member rather than an absence: a policy that could not decide and was treated as an allow is a fail-open, and it must be distinguishable from a step no policy covered.",
+                "enum": [
+                  "allow",
+                  "deny",
+                  "flag",
+                  "error"
+                ]
+              },
+              "action": {
+                "type": "string"
+              },
+              "policy": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "action",
+              "outcome"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "outcome": {
+                "description": "`not_requested` means this system records approvals and recorded that none was sought — which is not the same as a trace that records no approvals at all.",
+                "enum": [
+                  "granted",
+                  "denied",
+                  "not_requested",
+                  "timed_out",
+                  "unknown"
+                ]
+              },
+              "approver": {
+                "type": "string"
+              },
+              "requested_at": {
+                "type": "string"
+              },
+              "decided_at": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "sink",
+              "action"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "sink": {
+                "enum": [
+                  "sql",
+                  "shell",
+                  "filesystem",
+                  "http",
+                  "messaging",
+                  "email",
+                  "payment",
+                  "cloud_api",
+                  "code_execution",
+                  "other"
+                ]
+              },
+              "action": {
+                "type": "string"
+              },
+              "target": {
+                "type": "string"
+              },
+              "status": {
+                "description": "`attempted` may or may not have landed and is never read as a consequence; `executed` is a thing that happened; `failed` is the system refusing.",
+                "enum": [
+                  "attempted",
+                  "executed",
+                  "failed"
+                ]
+              },
+              "reversible": {
+                "type": "boolean"
+              },
+              "detail": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "message": {
+      "description": "One turn, in the OpenTelemetry GenAI shape. A role this build does not know is kept with the producer's word for it rather than dropped.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/part"
+          }
+        },
+        "finish_reason": {
+          "type": "string"
+        }
+      }
+    },
+    "part": {
+      "description": "One piece of a message, typed so a multimodal carrier does not force a breaking change later. Binary content is referenced by media type, size, URI or digest — never carried, because the bytes would travel into every report. A type this build does not know is kept as an opaque part rather than dropped.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "content": {},
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {},
+        "response": {},
+        "media_type": {
+          "type": "string"
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "integer"
+        },
+        "data": {
+          "description": "Inline base64. Measured and discarded on read: the size is what a rule can use, the bytes are what would end up in a report.",
+          "type": "string"
+        }
+      }
+    },
+    "credential": {
+      "description": "A credential named, never carried. There is no field for a value on the model side; a `value` written here is digested on read and discarded, so a producer's carelessness stops at the reader.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "bearer",
+            "api_key",
+            "basic",
+            "mtls",
+            "other"
+          ]
+        },
+        "digest": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "scopes": {
+          "$ref": "#/$defs/scopes"
+        }
+      }
+    },
+    "session": {
+      "description": "A session id, which is not an identity. Its own shape so it cannot stand in for a credential — a model that let it would bake in what the MCP specification forbids.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "protocol": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "scopes": {
+      "description": "A scope list where absence and emptiness are different facts. Omitting the key means the producer did not record what was granted or exercised; `[]` means it recorded that there was nothing. A reader that collapses the two either fires on every quiet trace or passes on a grant of none.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

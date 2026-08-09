@@ -18,7 +18,7 @@ from guardana.core.surface import Surface
 from guardana.rules import provide_rules
 
 _BUILD_RE = re.compile(r"\*\*Build-time \(static, artifact\)\*\* — (\d+) rules")
-_RUNTIME_RE = re.compile(r"\*\*Runtime \(dynamic, endpoint\)\*\* — (\d+) rules")
+_RUNTIME_RE = re.compile(r"\*\*Runtime \(dynamic, endpoint and trace\)\*\* — (\d+) rules")
 _TRANSCRIPT_RE = re.compile(r"^\d+ finding\(s\); (\d+) rule\(s\) run", re.MULTILINE)
 _RUN_SCHEMA_RE = re.compile(r"\| `schema_version` \| `(\d+)`\.")
 _ENVELOPE_RE = re.compile(r"ENVELOPE_SCHEMA_VERSION`, currently\n`(\d+)`\)")

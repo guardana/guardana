@@ -95,7 +95,7 @@ def test_a_migrated_document_stops_claiming_the_older_contract() -> None:
     migrated = migrate_forward(document, 2)
 
     assert migrated["$schema"] == SCHEMA_URL
-    assert "v3" in SCHEMA_URL
+    assert "v4" in SCHEMA_URL
 
 
 def test_a_malformed_taxonomy_is_refused_by_the_migration_not_quietly_emptied() -> None:

@@ -23,6 +23,8 @@ detail below.
 - [`usage-scan.md`](usage-scan.md) — `guardana scan`: static, offline, CI-friendly
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live
   endpoint or agent, and an MCP server's manifest **and authorization surface**
+- [`usage-analyze-trace.md`](usage-analyze-trace.md) — `guardana analyze-trace`: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect
+- [`usage-import-observations.md`](usage-import-observations.md) — `guardana import-observations`: carry garak, promptfoo or your own harness's results in as unverified claims
 - [`usage-doctor.md`](usage-doctor.md) — `guardana doctor`, `config validate|explain`
 - [`usage-baseline.md`](usage-baseline.md) — `guardana baseline`: accepted risk that expires
 - [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two saved runs, fail on deterioration
@@ -66,6 +68,7 @@ Written before the code they describe, so the reasoning survives the review.
 [`design/README.md`](design/README.md) explains how they are named and what a
 status means:
 
+- [`design/trace-domain-model.md`](design/trace-domain-model.md) — the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
 - [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
 - [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam
