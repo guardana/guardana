@@ -12,6 +12,7 @@ state a total that is not the total.
 """
 
 import re
+from html import unescape
 from pathlib import Path
 
 from guardana.core.surface import Surface
@@ -128,3 +129,49 @@ def test_the_terminal_demo_quotes_what_plan_probe_actually_prints() -> None:
 
     assert stated_rules.groups() == live.groups()
     assert stated_cost.groups() == cost.groups()
+
+
+_YAML_BLOCK_RE = re.compile(r'<pre class="yml"><code>(.*?)</code></pre>', re.DOTALL)
+
+
+def _shipped_example_rule() -> str:
+    for parent in Path(__file__).resolve().parents:
+        candidate = (
+            parent
+            / "examples"
+            / "custom_rule"
+            / "src"
+            / "acme_rules"
+            / "catalog"
+            / "customer_data.yaml"
+        )
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8").rstrip("\n")
+    raise AssertionError("could not locate the shipped example rule")
+
+
+def test_the_bring_your_own_rule_block_is_the_rule_that_actually_ships() -> None:
+    """The page's central claim is "add your own rules" — so its example is a real rule.
+
+    A YAML block on a landing page that nobody runs is exactly the class of claim this
+    project keeps catching itself making. This one is a rule in `examples/custom_rule/`,
+    discovered through the real entry point and graded in both directions by CI, and this
+    test is what stops the page and the file from drifting apart.
+    """
+    blocks = _YAML_BLOCK_RE.findall(_page())
+    assert blocks, "site/index.html no longer has a YAML code block — update this test with it"
+
+    def plain(markup: str) -> str:
+        text = re.sub(r"<[^>]+>", "", markup)
+        return unescape(text).strip()
+
+    shown = next((plain(b) for b in blocks if "acme.agent.customer_data" in b), None)
+    assert shown is not None, "the page no longer shows the acme.agent.customer_data rule"
+
+    # The page prefixes one comment line naming where the rule lives; the rest is the file.
+    body = "\n".join(shown.split("\n")[1:])
+    assert body == _shipped_example_rule(), (
+        "site/index.html's YAML block and examples/custom_rule/.../customer_data.yaml "
+        "have drifted apart — the page would be advertising a rule that is not the one "
+        "CI runs"
+    )

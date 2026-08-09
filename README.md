@@ -22,8 +22,9 @@ release is worse than the last one.
 
 ---
 
-No account, no telemetry, no phone-home. The only network traffic is to the target
-you point it at — and to a collector, if you run one and ask for it.
+**47 security checks to start. You add the ones only your team can know about.**
+No account, no telemetry, no phone-home. The only network traffic is to the target you
+point it at — and to a collector, if you run one and ask for it.
 
 ## The problem Guardana is built around
 
@@ -242,6 +243,15 @@ Profile** — plus a **Registry** that discovers rules and evaluators identicall
 whether they ship here or in your own private package. The engine knows almost
 nothing about specific threats; all domain knowledge lives in rules, evaluators and
 targets. You add coverage by adding one of those, never by patching the engine.
+
+**Your application has its own threat model.** The 47 built-ins cover the AI risks
+everybody shares. The dangerous behaviour in *your* application is usually specific to
+your data, your tools, your permissions and your business logic — and no public framework
+knows any of that. A support agent and a coding agent should not have the same security
+policy. So `Rule` says what must never happen, `Evaluator` says how *your* organisation
+decides whether a check passed, and `Target` connects Guardana to the stack you actually
+run. [`examples/custom_rule/`](examples/custom_rule/) is a real third-party package doing
+all three, and CI runs its fixtures on every push.
 
 **Treat it as a framework, not just a CLI.** Ship your organization's rules under
 your own `acme.*` namespace, bring your own classifier when the built-ins are not
