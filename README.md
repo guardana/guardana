@@ -4,16 +4,15 @@
 
 **Open-source AI security verification, from build to production.**
 
-Guardana scans AI artifacts, probes deployed models and agents, records
-reproducible security evidence, and detects regressions between releases.
-Run it locally, in CI/CD, as scheduled health checks, or with an optional
-self-hosted collector.
+Guardana scans AI artifacts, probes deployed models and agents, grades executions
+they already performed, records reproducible evidence, and tells you whether this
+release is worse than the last one.
 
 [![CI](https://github.com/guardana/guardana/actions/workflows/ci.yml/badge.svg)](https://github.com/guardana/guardana/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
 [![Status: beta](https://img.shields.io/badge/status-beta-yellow.svg)](docs/product-status.md)
-[![OWASP LLM Top 10](https://img.shields.io/badge/mapped-OWASP%20%C2%B7%20MITRE%20ATLAS%20%C2%B7%20NIST-informational.svg)](#standards-and-architecture)
+[![OWASP LLM Top 10](https://img.shields.io/badge/mapped-OWASP%20%C2%B7%20MITRE%20ATLAS%20%C2%B7%20NIST-informational.svg)](#standards-and-extensibility)
 [![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -23,87 +22,49 @@ self-hosted collector.
 
 ---
 
-> **Status.** The CLI and engine are **beta** — used to gate real builds, with the
-> public API still moving between minor releases. The self-hosted collector is
-> **beta** too as of 0.9: PostgreSQL, scoped API keys, project isolation, a record
-> of what each run verified and where, and — since 0.11 — a finding lifecycle with
-> waivers that expire, an audit log and retention you apply on purpose. It has no
-> RBAC and no human identities yet: the panel signs in with a read key, not as a
-> person. See [product status and known limitations](docs/product-status.md)
-> before adopting.
+No account, no telemetry, no phone-home. The only network traffic is to the target
+you point it at — and to a collector, if you run one and ask for it.
 
-- No account, no telemetry, no phone-home. The only network traffic is to the target you point it
-  at — and to a collector, if you run one and ask for it with `--reporter`.
-- Offline static scanning; explicit `findings`, `unverified` and `errors` channels.
-- Confidence and evaluator provenance on every dynamic verdict.
-- SARIF, JSON, JUnit, CI gates, and release-to-release comparison.
+## The problem Guardana is built around
 
-## Why Guardana exists
+Sending an attack is easy. Knowing whether it **landed** is not.
 
-AI systems have several security boundaries: the model artifact and its
-dependencies, the prompts and templates, the endpoint's behaviour, the tools and
-credentials an agent holds, retrieval and memory, and every deployment change
-after that. Most tools cover one of them.
+Fujitsu Research measured keyword-based judging of jailbreak attempts and found
+misclassification rates up to **37%** against human labels
+([arXiv:2410.16527](https://arxiv.org/abs/2410.16527)) — a limit of *keyword grading
+as a technique*, not of any particular tool. A check that cannot tell a refusal from
+a compliance is not a security control.
 
-The harder problem is the verdict. Sending an attack is easy; knowing whether it
-**landed** is not. Fujitsu Research measured keyword-based judging of jailbreak
-attempts and found misclassification rates of up to **37%** against human labels
-([arXiv:2410.16527](https://arxiv.org/abs/2410.16527)) — a limitation of *keyword
-grading as a technique*, not a measurement of any particular tool. A check that
-cannot tell a refusal from a compliance is not a security control.
+So Guardana is built on one rule: **deterministic evidence where the question allows
+it, a graded verdict where it does not, and an explicit "could not tell" where
+neither is honest.** Three consequences you will notice immediately:
 
-**Guardana's approach:** deterministic evidence where the question allows it, an
-evaluator-graded verdict where it does not, and an explicit "could not tell" where
-neither is honest. Grading is a first-class, pluggable, versioned component — the
-**Evaluator** — instead of a regex bolted onto the end of a probe, so every
-*graded* finding carries an `outcome`, a `confidence`, a `rationale`, and the id
-of the evaluator that produced it, and grading logic is swappable without touching
-the rule that produced it. A finding that is proof rather than judgement — a
-planted canary coming back, a server handing its tool manifest to an anonymous
-caller — carries no confidence, because there is nothing to be unsure about. Our
-own judge's confidence is *measured* (Brier score and expected calibration error
-via `guardana calibrate`), not asserted.
-
-Static supply-chain checks (pickle opcodes, unsafe model formats, dependency
-risk) don't have this problem — they're deterministic. So Guardana ships them
-as the reliable, no-false-positive-theater **front door**, and builds
-evaluator-graded dynamic checks and a live monitor around that core.
-
-## Where Guardana fits
-
-The AI-security tooling landscape has distinct categories, and Guardana is
-complementary to most of them rather than a replacement:
-
-| Category | Examples | What it does | Guardana's relationship |
-|---|---|---|---|
-| **Model/artifact scanners** | ModelScan, picklescan | Inspect model files for unsafe serialization | Overlapping — Guardana's static layer does this and reads more formats |
-| **Red-team harnesses** | garak, PyRIT, promptfoo, DeepTeam | Generate and send large volumes of attacks | Complementary, and honestly: **they ship more attacks than Guardana does.** What they do not ship is an exit-code contract, a cost ceiling, a saved run, or a regression comparison — which is what makes a check something a pipeline can block on |
-| **Evaluation frameworks** | DeepEval, Ragas | Measure answer quality: faithfulness, relevancy, hallucination | Different job — they measure whether the answer is *good*, Guardana verifies whether the system is *safe*. Run both |
-| **Runtime guardrails** | LlamaFirewall, Llama Guard | Block or filter in the request path | Different job — Guardana verifies and gates, it is never inline |
-| **AI observability** | LangSmith, Langfuse and friends | Trace and debug application behaviour | Complementary — trace ingestion is on the roadmap so their output becomes Guardana's input |
-| **SAST / CVE / secrets** | Semgrep, Trivy, gitleaks | General code and dependency security | Complementary — Guardana stays dedicated to AI-specific risk |
-
-What Guardana adds that none of the above provides as its primary job: **a
-reproducible evidence record per run, and a verdict on whether the next release is
-worse than the last one.**
+- **Grading is a component, not a regex at the end of a probe.** Every graded finding
+  carries an outcome, a confidence, a rationale and the id of the **Evaluator** that
+  produced it — and that evaluator is swappable without touching the rule. Our own
+  judge's confidence is *measured* (Brier score, expected calibration error) via
+  `guardana calibrate`, not asserted. A finding that is proof rather than judgement —
+  a planted canary coming back, a server handing its manifest to an anonymous
+  caller — carries no confidence, because there is nothing to be unsure about.
+- **"Nothing found" has three meanings, and they are three channels.** `findings`,
+  `unverified` (a check ran and could not reach a verdict) and `errors` (a check
+  never ran). A gate can fail on any of them; none of them is quietly a pass.
+- **Unknown is never zero.** A budget that ran out exits `6` and keeps what it found.
+  A comparison that cannot honestly be made exits `2`. A capability the target never
+  confirmed is recorded as unconfirmed, not as absent.
 
 ## Quickstart
 
-Run it with zero install straight from PyPI:
-
 ```bash
-uvx --from guardana-cli guardana scan .        # zero-install run (uv)
-# or add it to a project:
-uv add guardana-cli        # or: pip install guardana-cli
+uvx --from guardana-cli guardana scan .   # zero-install run (uv)
+uv add guardana-cli                       # or: pip install guardana-cli
 ```
 
-The console script is `guardana`; its distribution is `guardana-cli` (which pulls
-in `guardana-core`/`guardana-rules`/`guardana-report`), hence the `--from`.
-Working on Guardana itself? Clone and `uv sync` instead — see
-[`docs/install.md`](docs/install.md).
+The console script is `guardana`; its distribution is `guardana-cli`. Working on
+Guardana itself? Clone and `uv sync` — see [`docs/install.md`](docs/install.md).
 
-See it find something real — a bundled deliberately-vulnerable model directory
-(from a clone; run `uv run guardana …` inside the checkout):
+See it find something real, against a bundled deliberately-vulnerable model
+directory:
 
 ```console
 $ uv run guardana scan examples/vulnerable-model
@@ -120,22 +81,16 @@ $ uv run guardana scan examples/vulnerable-model
 12 finding(s); 19 rule(s) run, 0 skipped.
 ```
 
-That exits `1` — the same signal a CI gate reads. Now point it at your own code:
+That exits `1` — the signal a CI gate reads. Then point it at your own work:
 
 ```bash
-uv run guardana scan path/to/your/project   # static scan of a repo or model dir
-uv run guardana rules                  # list every discovered rule + its standards tags
-uv run guardana init                   # write a starter guardana.yaml policy file
-uv run guardana new-rule acme.prompt.demo  # scaffold a custom YAML rule (run via --rules)
-uv run guardana scan . --format sarif  # SARIF 2.1.0 for GitHub code scanning
-uv run guardana --version              # print the installed version
+guardana scan path/to/your/project     # static, offline, no model needed
+guardana rules                         # every discovered rule + its standards tags
+guardana init                           # write a starter guardana.yaml
+guardana scan . --format sarif          # SARIF 2.1.0 for GitHub code scanning
 ```
 
-(Running `guardana scan .` at the repo root exits `1` on purpose — this repo
-bundles the deliberately-vulnerable `examples/vulnerable-model/` fixture. Point
-it at `packages/` for a clean run.)
-
-### Test a deployed model
+### Probe a deployed model
 
 ```bash
 guardana probe --url http://localhost:11434 --model llama3 \
@@ -157,9 +112,9 @@ def test_the_agent_keeps_its_instructions_to_itself(chat_model):
     assert_secure(langchain_target(chat_model, system_prompt=SYSTEM), preset="ci")
 ```
 
-Same rules, same policy, same redaction and the same three-state gate as the
-commands — and a run that could not reach a verdict raises just as loudly as one
-that found something. See [`docs/usage-testing.md`](docs/usage-testing.md).
+Same rules, same policy, same redaction, same three-state gate — and a run that
+could not reach a verdict raises as loudly as one that found something.
+[`docs/usage-testing.md`](docs/usage-testing.md)
 
 ### Compare a release against the last accepted one
 
@@ -167,90 +122,53 @@ that found something. See [`docs/usage-testing.md`](docs/usage-testing.md).
 guardana diff accepted-run.json run.json
 ```
 
-Exit `0` means nothing got worse, `1` means it did, and `2` means the two runs
-could not honestly be compared — see [`docs/usage-diff.md`](docs/usage-diff.md).
+`0` nothing got worse · `1` it did · `2` the two runs could not honestly be
+compared. [`docs/usage-diff.md`](docs/usage-diff.md)
 
-### Before you probe anything that matters
+### Before you point an active check at anything that matters
 
-Active checks send real requests and cost real money. Read this once:
-
-- **Prefer staging.** A probe against production consumes tokens and may trip a
+- **Prefer staging.** A probe sends real requests, costs real money, and may trip a
   provider's abuse detection.
 - **Guardana never executes a real tool** — tool calls go to doubles. But a *model*
   wired to real tools by its own deployment can act on what Guardana prompted.
-- **Evidence can contain sensitive text.** It is redacted by default; do not enable
-  full evidence collection without reading
-  [`docs/privacy-and-redaction.md`](docs/design/privacy-and-redaction.md).
-- **`guardana monitor` is a scheduled active prober**, not passive traffic
-  inspection and not an inline firewall.
+- **Evidence can contain sensitive text.** It is redacted by default; read
+  [`docs/privacy.md`](docs/privacy.md) before turning that off.
+- **`guardana monitor` is a scheduled active prober** — not passive traffic
+  inspection, and never inline in the request path.
 
-> **On PyPI:** [`guardana-cli`](https://pypi.org/project/guardana-cli/) ·
-> [`guardana-core`](https://pypi.org/project/guardana-core/) ·
-> [`guardana-rules`](https://pypi.org/project/guardana-rules/) ·
-> [`guardana-report`](https://pypi.org/project/guardana-report/) ·
-> [`guardana-server`](https://pypi.org/project/guardana-server/) — all Apache-2.0,
-> published via PyPI Trusted Publishing (no stored token).
+## Six things you do with it
 
-## Four things you do with it
-
-One engine, four verbs:
+One engine. The verb is what you are verifying; the target is what you point it at.
 
 | Verb | Command | What it does |
 |---|---|---|
-| **Verify artifacts** | `guardana scan <path>` | Fast, static, no-network scan of a repository or model directory. Drops into a pipeline as a linter-like gate. |
-| **Verify a deployed system** | `guardana probe --url … --model …` | One-shot adversarial run against a live target: prompt injection, single- and multi-turn jailbreaks, system-prompt leakage, agent trajectories, output-secret checks — each graded by an Evaluator with a confidence. |
-| **Continuously re-verify** | `guardana monitor --url … --model …` | Scheduled re-runs next to a served model, alerting when a cycle is worse than the first. |
-| **Compare evidence** | `guardana diff before.json after.json` | Runs no rules: reads two saved runs and answers whether the second is worse. Exit `2` — never a quiet `0` — when they cannot honestly be compared. |
+| **Verify artifacts** | [`guardana scan <path>`](docs/usage-scan.md) | Static, offline, deterministic. Drops into a pipeline like a linter. |
+| **Verify a deployed system** | [`guardana probe --url … --model …`](docs/usage-probe.md) | One-shot adversarial run against a live endpoint, agent or **MCP server** (`--mcp`), each finding graded with a confidence. |
+| **Verify a recorded run** | [`guardana analyze-trace trace.jsonl`](docs/usage-analyze-trace.md) | Grades an execution your production agent already performed, read from **OpenTelemetry GenAI** spans. Opens one file and no socket. |
+| **Continuously re-verify** | [`guardana monitor --url … --model …`](docs/usage-monitor.md) | Scheduled re-runs next to a served model, alerting when a cycle is worse than the first. |
+| **Compare evidence** | [`guardana diff a.json b.json`](docs/usage-diff.md) | Runs no rules: reads two saved runs and answers whether the second is worse. |
+| **Import somebody else's** | [`guardana import-observations results.json`](docs/usage-import-observations.md) | Reads garak, promptfoo or your own harness's results into the `unverified` channel with their provenance intact. Never exits `0` — Guardana verified nothing. |
 
-**Targets, not modes.** `probe` points at an OpenAI-compatible endpoint, an Ollama
-or HF TGI server, a guarded endpoint via an adapter, or a **live MCP server**
-(`--mcp`). Those are targets the same verb supports, not separate ways to run the
-tool.
+`scan`, `probe`, `monitor` and `analyze-trace` can each forward findings to an
+optional collector with `--reporter server://<url>`.
 
-> **What `monitor` is, precisely.** `guardana monitor` performs **scheduled
-> synthetic security checks** against a configured target. It does **not** passively
-> inspect production user traffic and does **not** sit inline in the request path.
-> If you need in-path blocking, you need a guardrail product; Guardana verifies
-> and gates.
-
-`scan`, `probe` and `monitor` can each forward findings to an optional collector
-with `--reporter server://<collector-url>` (see
-[central monitoring](#central-monitoring--self-hosted-or-managed)).
-
-Full flag references and example output:
-[`docs/usage-scan.md`](docs/usage-scan.md) ·
-[`docs/usage-probe.md`](docs/usage-probe.md) ·
-[`docs/usage-diff.md`](docs/usage-diff.md) ·
-[`docs/usage-monitor.md`](docs/usage-monitor.md).
-
-### And five commands that make those four safe to gate on
+### Eleven commands that make those safe to gate on
 
 | Command | Answers |
 |---|---|
 | [`guardana plan`](docs/usage-plan.md) | what would this run cost? — **without sending a request** |
-| [`guardana target inspect`](docs/usage-target.md) | what does this endpoint *actually* support, as opposed to what it claims? |
-| [`guardana run inspect\|migrate`](docs/usage-run.md) | what exactly was verified, at what cost, and under which policy? |
+| [`guardana target inspect`](docs/usage-target.md) | what does this endpoint *actually* support, versus what it claims? |
+| [`guardana run inspect\|migrate`](docs/usage-run.md) | what exactly was verified, at what cost, under which policy? |
 | [`guardana baseline create\|verify\|update`](docs/usage-baseline.md) | which findings have we accepted, by whom, and until when? |
-| [`guardana doctor`](docs/usage-doctor.md) · `config explain` | what is this installation, and what is actually in force? |
+| [`guardana taxonomy`](docs/usage-taxonomy.md) | which framework entry does this reference name, in which edition? |
+| [`guardana doctor`](docs/usage-doctor.md) · `config validate\|explain` | what is this installation, and what is actually in force? |
+| `guardana rules` · `new-rule` · `calibrate` · `init` | what is installed, scaffold a rule, measure a judge, start a policy |
 
-Three properties run through all of them, and they are what make this a gate
-rather than a report:
-
-**Unknown is never zero.** A check that could not grade, a capability the provider
-did not confirm, a cost nobody measured — each is its own outcome, never a pass.
-
-**A budget cannot be used as an excuse.** A run that hits its ceiling exits `6`,
-keeps what it found, and never passes; `guardana diff` refuses to read the missing
-findings as an improvement.
-
-**Exit codes are a contract.** Eight documented meanings
+**Exit codes are a contract** — eight documented meanings
 ([`docs/exit-codes.md`](docs/exit-codes.md)), pinned by a test against the
 documentation. Nothing to parse out of human-readable text.
 
 ### Drop it into GitHub Actions
-
-The official Action scans on every push and uploads results to GitHub code
-scanning (alerts annotate the exact source line):
 
 ```yaml
 # .github/workflows/ai-security.yml
@@ -269,261 +187,181 @@ jobs:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
 
-Prefer a local gate? A **pre-commit** hook installs straight from PyPI. Both are
-in [`docs/integrations.md`](docs/integrations.md).
+A **pre-commit** hook installs straight from PyPI, and there are copyable templates
+for GitLab, Jenkins and Azure DevOps — [`docs/integrations.md`](docs/integrations.md).
 
-## What's in the box
+## What it checks
 
-40 built-in rules, every finding tagged into the frameworks your compliance
-process already speaks — **both editions** of the OWASP LLM Top 10, the OWASP Top 10
-for Agentic Applications (ASI), the OWASP MCP Top 10, OWASP ML Top 10, MITRE ATLAS
-and NIST. A reference names its edition, because `LLM07` is System Prompt Leakage in
-the 2025 edition and Misinformation in the 2026 one:
+47 built-in rules, every finding tagged into the frameworks your compliance process
+already speaks — **both editions** of the OWASP LLM Top 10, the OWASP Top 10 for
+Agentic Applications (ASI), the OWASP MCP Top 10, OWASP ML Top 10, MITRE ATLAS
+v5.6.0 and NIST AI 100-2e2025. A reference names its edition, because `LLM07` is
+System Prompt Leakage in 2025 and Misinformation in 2026.
 
-| Rule id | Severity | Surface | Maps to |
+| Family | Rules | Surface | What it covers |
 |---|---|---|---|
-| `guardana.mcp.authorization_discovery` | HIGH | runtime | MCP07:2025 · MCP01:2025 · ASI03:2026 |
-| `guardana.mcp.discovery_target` | HIGH | runtime | MCP01:2025 · LLM02:2026 · ASI03:2026 |
-| `guardana.mcp.scope_breadth` | MEDIUM | runtime | MCP02:2025 · LLM03:2026 · ASI03:2026 |
-| `guardana.mcp.session_binding` | HIGH | runtime | MCP07:2025 · ASI03:2026 |
-| `guardana.mcp.token_audience` | CRITICAL | runtime | MCP01:2025 · MCP07:2025 · ASI03:2026 |
-| `guardana.mcp.unauthenticated_access` | HIGH | runtime | MCP07:2025 · ASI03:2026 · AML.T0084.001 |
-| `guardana.prompt.hidden_instructions` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI01:2026 · AML.T0080 |
-| `guardana.prompt.mcp_tool_poisoning` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI04:2026 · MCP03:2025 · MCP10:2025 · AML.T0110 · AML.T0011.002 |
-| `guardana.supply_chain.chat_template` | CRITICAL | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.code_execution` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.dependency_risk` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain |
-| `guardana.supply_chain.hallucinated_package` | MEDIUM | build | LLM03:2025 · LLM04:2026 |
-| `guardana.supply_chain.hardcoded_secret` | HIGH | build | LLM02:2025 · LLM02:2026 |
-| `guardana.supply_chain.insecure_transport` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain |
-| `guardana.supply_chain.keras_lambda` | HIGH | build | LLM05:2025 · LLM10:2026 · ML06:2023 · AML.T0018 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.malicious_dependency` | HIGH | build | LLM03:2025 · LLM04:2026 · ML06:2023 · AML.T0018 · supply-chain |
-| `guardana.supply_chain.model_format` | HIGH | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · supply-chain |
-| `guardana.supply_chain.notebook_payload` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.onnx_graph` | HIGH | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.pickle_opcode` | CRITICAL | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.provenance` | MEDIUM | build | LLM03:2025 · LLM04:2026 · supply-chain |
-| `guardana.supply_chain.remote_code` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.remote_code_config` | HIGH | build | LLM03:2025 · LLM04:2026 · AML.T0018 · supply-chain · ASI05:2026 |
-| `guardana.supply_chain.saved_model_ops` | MEDIUM | build | LLM05:2025 · LLM10:2026 · ML06:2023 · AML.T0018 · supply-chain · ASI05:2026 |
-| `guardana.training.dataset_integrity` | MEDIUM | build | LLM04:2025 · LLM05:2026 · ML02:2023 · poisoning |
-| `guardana.agent.credential_exfiltration` | CRITICAL | runtime | LLM02:2025 · LLM02:2026 · ASI03:2026 · AML.T0086 · AML.T0098 |
-| `guardana.agent.excessive_tool_use` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 |
-| `guardana.agent.hidden_context.tool_schema` | HIGH | runtime | LLM02:2025 · LLM02:2026 · LLM08:2026 · AML.T0084.001 |
-| `guardana.agent.mcp_server_manifest` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM03:2025 · LLM04:2026 · ASI04:2026 · MCP03:2025 · MCP04:2025 · MCP10:2025 · AML.T0110 · AML.T0109 · AML.T0084.001 |
-| `guardana.agent.memory_poisoning` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI06:2026 · AML.T0080 · AML.T0080.000 |
-| `guardana.agent.tool_argument_scope` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 · AML.T0101 |
-| `guardana.agent.tool_result_injection` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI01:2026 · ASI02:2026 · MCP06:2025 · AML.T0053 · AML.T0086 |
-| `guardana.output.secrets` | HIGH | runtime | LLM02:2025 · LLM02:2026 |
-| `guardana.prompt.cost_asymmetry` | MEDIUM | runtime | LLM10:2025 · LLM06:2026 · AML.T0034.002 |
-| `guardana.prompt.injection.ignore_previous` | HIGH | runtime | LLM01:2025 · LLM01:2026 · AML.T0051 |
-| `guardana.prompt.jailbreak.dan_style` | HIGH | runtime | LLM01:2025 · LLM01:2026 |
-| `guardana.prompt.system_prompt_leak.canary` | CRITICAL | runtime | LLM07:2025 · LLM08:2026 · AML.T0056 |
-| `guardana.prompt.unbounded_consumption` | MEDIUM | runtime | LLM10:2025 · LLM06:2026 |
-| `guardana.scenario.gradual_jailbreak` | HIGH | runtime | LLM01:2025 · LLM01:2026 · AML.T0051 |
-| `guardana.scenario.indirect_injection` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM08:2025 · LLM09:2026 · ASI01:2026 · AML.T0051 · AML.T0080 |
+| `guardana.supply_chain.*` | 16 | build | pickle opcodes, unsafe deserialization sinks, `trust_remote_code`, config `auto_map` and kernel-dispatch RCE, chat-template SSTI, ONNX graphs, notebooks, Keras/TF code execution, advisory-backed malicious and hallucinated dependencies, insecure transport, hardcoded secrets, provenance |
+| `guardana.prompt.*` | 7 | build + runtime | hidden-instruction rules-file backdoors and MCP tool poisoning on the file; injection, DAN-style jailbreak, canary-proven system-prompt leak, unbounded consumption and cost asymmetry against a live model |
+| `guardana.agent.*` | 7 | runtime | tool-result injection, credential exfiltration through a tool argument, over-broad tool arguments, excessive tool use, memory poisoning across a session boundary, hidden context in a tool schema, a live MCP server's tool manifest |
+| `guardana.mcp.*` | 6 | runtime | a live MCP server's **authorization surface**: unauthenticated access, discovery a conforming client can use, audience validation, session binding, scope breadth, discovery targets |
+| `guardana.trace.*` | 7 | runtime | a **recorded** execution: a credential in a tool argument, one credential across two trust boundaries, a token outside its audience, a session standing in for an identity, a scope nobody consented to, a policy decision the run went ahead against, a consequential effect nobody approved |
+| `guardana.scenario.*` | 2 | runtime | multi-turn conversations — a gradual jailbreak and indirect (RAG) injection — graded per step and as a whole |
+| `guardana.output.*` | 1 | runtime | secrets in what the model said |
+| `guardana.training.*` | 1 | build | training-data integrity |
 
-The static 19 (`artifact` surface) need no model and no network — they're the
-CI front door. The dynamic 21 (`endpoint` surface) probe a live model and grade
-the result through an Evaluator; two of them (`scenario.gradual_jailbreak` and
-`scenario.indirect_injection`) are **multi-turn scenarios** — declarative YAML
-conversations graded per step and as a whole, and six examine how a live **MCP
-server authorizes a caller** rather than what a model says. `guardana rules` prints
-this list generated from what's actually installed, **including any third-party
-rules you've added.**
+The static 19 (`artifact` surface) need no model and no network — they are the CI
+front door. The dynamic 28 (`endpoint` and `trace` surfaces) grade a live model, a
+live MCP server, or an execution that already happened.
 
-A dynamic check that *cannot* reach a verdict — an unreachable judge, an empty
-model reply — is never dropped into a false all-clear: it is reported in a
-separate **unverified** channel in all four output formats, and
-`fail_on_inconclusive: true` in your profile makes it fail the gate.
+**Every rule id, severity and framework mapping** — generated from what is actually
+installed, including any third-party rules you have added — is
+[`docs/generated/rule-catalog.md`](docs/generated/rule-catalog.md), and
+`guardana rules` prints the same list locally. The complete capability surface, with
+recipes, is [`FEATURES.md`](FEATURES.md).
 
-The complete, maintained capability surface — with recipes for what you can
-build on it — is [`FEATURES.md`](FEATURES.md).
+## Where Guardana fits
 
-## Standards and architecture
+Complementary to most of the landscape rather than a replacement:
 
-Every finding carries typed references into **OWASP LLM Top 10 (2025 and 2026)**, the
-**OWASP Top 10 for Agentic Applications (ASI01–ASI10)**, **OWASP ML Top 10
-(2023)**, **MITRE ATLAS v5.6.0**, and **NIST AI 100-2e2025** attack classes — so
-results are filterable and reportable by whichever framework your audit already
-uses. The list is not closed: register your own control catalogue through the
-`guardana.taxonomies` entry point and rules can map to it the same way.
+| Category | Examples | Guardana's relationship |
+|---|---|---|
+| **Model/artifact scanners** | ModelScan, picklescan | Overlapping — the static layer does this and reads more formats |
+| **Red-team harnesses** | garak, PyRIT, promptfoo, DeepTeam | Complementary, and honestly: **they ship more attacks.** What they do not ship is an exit-code contract, a cost ceiling, a saved run or a regression comparison — and `import-observations` reads their results into Guardana's report |
+| **Evaluation frameworks** | DeepEval, Ragas | Different job — they measure whether the answer is *good*, Guardana whether the system is *safe*. Run both |
+| **Runtime guardrails** | LlamaFirewall, Llama Guard | Different job — Guardana verifies and gates, never inline |
+| **AI observability** | LangSmith, Langfuse | Complementary — their OpenTelemetry output is `analyze-trace`'s input |
+| **SAST / CVE / secrets** | Semgrep, Trivy, gitleaks | Complementary — Guardana stays dedicated to AI-specific risk |
 
-Guardana is built on five extension points — **Target, Rule, Evaluator,
-Report/Finding, Profile** — plus a **Registry** that discovers rules and
-evaluators identically whether they ship in this repo or in your own private
-package. The engine knows almost nothing about specific threats; all domain
-knowledge lives in rules, evaluators, and targets. You add coverage by adding
-one of those — never by patching the engine.
+What none of them provides as its primary job: **a reproducible evidence record per
+run, and a verdict on whether the next release is worse than the last.**
 
-**Treat it as a framework, not just a CLI.** Because every extension point is a
-small public base class discovered through standard Python entry points, you can
-adapt Guardana to your own stack without forking it: ship your organization's
-threat rules under your own `acme.*` namespace, bring your own **classifier**
-(an `Evaluator` — the "did the attack succeed, and how sure are we" grader) when
-the built-ins aren't strict enough, or teach it a new backend with a custom
-`Target`. Two config-wired evaluators ship ready to point at your own models:
-**`llm_judge`** (an LLM judge behind any OpenAI-compatible endpoint — a local
-vLLM or Ollama works — with a versioned rubric and confidence measured as
-agreement across samples) and the optional **`guard`** safety classifier
-(Llama Guard / Granite Guardian style); both are enabled by an `evaluators:`
-block in `guardana.yaml` ([docs/profiles.md](docs/profiles.md)). Keep it private or upstream it — the contract is identical either way,
-and `guardana-core` is a plain library you can drive from your own code
-(`Registry` + `Runner`) if you don't want the CLI at all.
+## Standards and extensibility
 
-- Author a rule as **declarative YAML** ("send this prompt, grade with this
-  evaluator") or as a **Python plugin** — [`docs/writing-rules.md`](docs/writing-rules.md).
-  `guardana new-rule` scaffolds the YAML, and the repeatable `--rules <dir>`
-  flag (or `rules.paths` in `guardana.yaml`) runs it with no packaging.
-- A complete, runnable example third-party package lives at
-  [`examples/custom_rule/`](examples/custom_rule/) — a plugin rule, two YAML
-  rules, and a **custom classifier** (`Evaluator`), all discovered via entry
-  points. Install it and `guardana rules` shows its `acme.*` rules alongside the
-  built-ins.
+Guardana is five extension points — **Target, Rule, Evaluator, Report/Finding,
+Profile** — plus a **Registry** that discovers rules and evaluators identically
+whether they ship here or in your own private package. The engine knows almost
+nothing about specific threats; all domain knowledge lives in rules, evaluators and
+targets. You add coverage by adding one of those, never by patching the engine.
+
+**Treat it as a framework, not just a CLI.** Ship your organization's rules under
+your own `acme.*` namespace, bring your own classifier when the built-ins are not
+strict enough, or teach it a new backend with a custom `Target`. Two config-wired
+evaluators ship ready to point at your own models: **`llm_judge`** (any
+OpenAI-compatible endpoint, versioned rubric, confidence measured as agreement
+across samples) and the optional **`guard`** safety classifier (Llama Guard /
+Granite Guardian style). `guardana-core` is a plain library you can drive from your
+own code if you do not want the CLI at all.
+
+- Author a rule as **declarative YAML** or as a **Python plugin** —
+  [`docs/writing-rules.md`](docs/writing-rules.md). `guardana new-rule` scaffolds
+  the YAML and `--rules <dir>` runs it with no packaging.
+- A complete third-party package lives at
+  [`examples/custom_rule/`](examples/custom_rule/) — a plugin rule, two YAML rules
+  and a custom `Evaluator`, all discovered through entry points. CI runs its tests.
+- The framework catalogue is open too: register your own control set through the
+  `guardana.taxonomies` entry point and rules map to it like any built-in.
 - The full model: [`docs/architecture.md`](docs/architecture.md) ·
   [`docs/extending.md`](docs/extending.md).
 
 ## Central monitoring — self-hosted or managed
 
-Every scan, probe, and monitor run works **fully offline** — no network calls
-beyond the target itself, no account, no lock-in. When you want fleet-wide
-visibility, any run can forward its normalized findings to a collector with
-`--reporter server://…`:
+Every run works **fully offline**. When you want fleet-wide visibility, any run can
+forward its normalized findings to a collector with `--reporter server://…`.
 
-> **Maturity: beta.** The collector **keeps what it is given** — PostgreSQL with
+> **Maturity: beta.** The collector keeps what it is given — PostgreSQL with
 > reversible migrations, a storage choice it refuses to make for you, separate
-> health and readiness endpoints — **requires a scoped API key** on every route
-> that carries a finding, **isolates one project from another**, and records **what
-> each run verified and where**: AI system, environment, deployment and the commit
-> behind it. A key may be **pinned to one environment**, and then it writes and
-> reads only that one. It records **whether each run passed its gate**, what it
-> cost, and the identity that links a finding to the same finding next week.
-> Standing one up is three commands, because `guardana-collector bootstrap` creates
-> the organization, the project and the first key together. Still missing: a finding
-> lifecycle, an audit log, retention and restore-tested backup — see
+> health and readiness endpoints. Every route carrying a finding **requires a scoped
+> API key**; one **project cannot read another's**; a key may be **pinned to one
+> environment**. A run records **what it verified and where** — AI system,
+> environment, deployment, the commit behind it — and whether it passed its gate.
+> Findings carry a **lifecycle with waivers that expire**, every state change is
+> **audited**, and **retention and deletion** are commands an operator runs on
+> purpose. Standing one up is three commands. **Still missing: RBAC and human
+> identities** — the panel signs in with a read key, not as a person. See
 > [`docs/usage-collector.md`](docs/usage-collector.md) and
-> [the collector design](docs/design/collector-domain-model.md).
+> [`docs/deployment.md`](docs/deployment.md).
 
-- **Self-hosted (`guardana-server`, OSS):** aggregate findings from every
-  agent — dev machines, CI, live monitors — in one place. Ingest/list/trend over
-  a versioned JSON API, plus an **opt-in monitoring dashboard**
-  (`GUARDANA_DASHBOARD=1`, off by default) — a single self-contained page with
-  severity, per-source/per-rule, and activity-over-time views.
-- **Managed cloud (planned):** the same collector, hosted for you, with
-  dashboards, multi-team rollups, retention, and policy management — for teams
-  that would rather not run it themselves.
+- **Self-hosted (`guardana-server`, OSS)** — aggregate findings from dev machines,
+  CI and live monitors over a versioned JSON API, plus an opt-in dashboard
+  (`GUARDANA_DASHBOARD=1`, off by default).
+- **Managed cloud (planned)** — the same collector, hosted, for teams that would
+  rather not run it themselves.
 
-Either way the engine stays fully independent: `guardana-core` never imports
-`guardana-server`, even transitively — a boundary enforced by a test, not just a
-promise. The collector is strictly additive; the engine delivers its full value
-with or without it.
+`guardana-core` never imports `guardana-server`, even transitively — enforced by
+import-linter and a test, not by a promise.
 
 **What stays free, stated plainly:** the engine and every built-in rule are open
-source permanently. If a managed service happens, it can only ever charge for
-*hosting* and for *curated content* (language- and industry-specific attack
-corpora, extended advisory data) — never for a security capability withheld from
-the OSS build. That boundary is written into the project's
-[principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
+source permanently. A managed service could only ever charge for *hosting* and for
+*curated content* (language and industry corpora, extended advisory data) — never
+for a security capability withheld from the OSS build. That boundary is written into
+the project's [principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
+
+## Where this is going
+
+| | Outcome |
+|---|---|
+| **0.13** *(current)* | MCP in depth — six rules over a live server's authorization surface, the OWASP MCP Top 10 installed as data, a pinned manifest covering the whole tool declaration, and `plan probe --mcp` to price a run before it costs anything |
+| **next** | The remaining framework adapters as translators into that model, tool-calling through an adapter, RAG targets, sink-aware output handling, and what a single run is entitled to claim |
+| **1.0** | A compatibility contract — the point where a third-party rule pack is a safe investment. Not a feature count: it says what will not break under you |
+
+Release history is [`CHANGELOG.md`](CHANGELOG.md). Beyond 1.0 the plan is kept as
+**milestones rather than version numbers** — the team platform, continuous
+production verification, multi-agent protocols, multimodal assurance — because a
+milestone named for a version tells a reader the wrong thing the moment a breaking
+change moves the number. Language and industry corpora grow in a **parallel content
+lane** that does not gate the platform work; corpus size is not the metric this
+project competes on.
+
+Exit criteria per milestone, what is deliberately deferred and why, the commercial
+boundary and the non-goals: [`ROADMAP.md`](ROADMAP.md).
 
 ## Why "Guardana"?
 
-**Guard** + **-ana**. *Guard* is the whole job — standing watch over the models,
-endpoints, and agents you run yourself. The *-ana* suffix is the one in
-*Americana* or *Victoriana*: a **collected body** of a thing. So Guardana is a
-living **corpus of guardianship for AI** — the growing collection of rules,
-evaluators, and checks that keep watch over your systems, together in one
-engine.
-
-It was chosen deliberately: a short, pronounceable, invented word — not another
-*shield-* / *sentinel-* / *guard-X* in an already-crowded security namespace —
-and verified unclaimed across PyPI, npm, and GitHub before a line was written,
-so the name is the project's alone.
-
-## Roadmap
-
-Guardana is a reliable static front door, an evaluator-graded dynamic core, a
-result that distinguishes "found nothing" from "could not tell" from "never ran",
-a release-to-release regression gate, and an optional collector that keeps what
-it is given. The next milestones are ordered by one
-question — *what does a real company need before it can adopt this?* — which is
-why platform work comes before coverage volume.
-
-| Version | Outcome |
-|---|---|
-| **0.6** | Regression between runs — `guardana diff`, saved runs, one definition of "worse" |
-| **0.7** | Engine and CLI foundation — run manifest, usage accounting, budgets and `plan`, capability inspection, evidence redaction, safety modes, plugin trust, baseline lifecycle, stable exit codes |
-| **0.8** | A collector a team can keep — PostgreSQL with reversible migrations, scoped API keys hashed at rest, health and readiness as separate questions |
-| **0.9** | A collector two teams can share, and one that answers a question — projects and environments as tenants, a run's gate and cost, a finding followed across runs, and `bootstrap` keeping the first run at three commands |
-| **0.10** | Company-ready — official container images, CI beyond GitHub, an SBOM and provenance on every release, a production deployment guide, a restore that has been exercised, and a clean install proven before every tag |
-| **0.11** | Life after a finding arrives — triage with waivers that expire, an audit log that says what it is worth, retention and deletion you run on purpose, bounded ingest, and a panel that signs in |
-| **0.12** | Verification where the developers already are — `assert_secure` as a `pytest` assertion, the first framework adapter, and six defects an adversarial review found in released 0.11 code |
-| **0.13** *(current)* | MCP in depth — six rules over a live server's authorization surface (audience validation, session binding, scope breadth, discovery targets), the OWASP MCP Top 10 installed as data, a pinned manifest covering the whole tool declaration, and `plan probe --mcp` to price a run before it costs anything |
-| **next** | The domain model — a common `Trace` for model calls, tool offers, retrieval, identity and side effects; real traces imported rather than a Guardana-only protocol; the remaining framework adapters written as translators into it |
-| **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment, which is why the model above lands first |
-
-Beyond that, the plan is kept as **milestones rather than version numbers** —
-environments and deployments, the team platform, continuous production
-verification, agent and protocol security, multimodal assurance. A milestone name
-that encodes a version tells a reader the wrong thing the moment a breaking change
-moves the number, which is exactly what tenancy did. See
-[`ROADMAP.md`](ROADMAP.md).
-
-Language and industry corpora grow in a **parallel content lane** that does not
-gate the platform work — corpus size is not the metric this project competes on.
-
-The detailed version — exit criteria per milestone, what is deliberately deferred
-and why, the commercial boundary, and the non-goals — is
-[`ROADMAP.md`](ROADMAP.md). What ships *today*, with counts generated from the
-registry rather than typed by hand, is [`FEATURES.md`](FEATURES.md) and the
-[rule catalog](docs/generated/rule-catalog.md).
+**Guard** + **-ana** — the suffix in *Americana*: a collected body of a thing. A
+living corpus of guardianship for AI. Chosen as a short, pronounceable, invented
+word rather than another *shield-*/*sentinel-*/*guard-X*, and verified unclaimed
+across PyPI, npm and GitHub before a line was written.
 
 ## Documentation
 
-- [`docs/index.md`](docs/index.md) — documentation map
-- [`docs/how-it-works.md`](docs/how-it-works.md) — **the whole product, A to Z** (engine, layers, extensions)
-- [`docs/install.md`](docs/install.md) — installation
-- [`docs/usage-scan.md`](docs/usage-scan.md) · [`docs/usage-probe.md`](docs/usage-probe.md) ·
-[`docs/usage-diff.md`](docs/usage-diff.md) · [`docs/usage-monitor.md`](docs/usage-monitor.md)
-- [`docs/profiles.md`](docs/profiles.md) — the `guardana.yaml` policy file
-- [`docs/integrations.md`](docs/integrations.md) — GitHub Action & pre-commit
-- [`docs/writing-rules.md`](docs/writing-rules.md) — author a rule (YAML or Python)
-- [`docs/architecture.md`](docs/architecture.md) · [`docs/extending.md`](docs/extending.md)
+- [`docs/index.md`](docs/index.md) — the map
+- [`docs/product-status.md`](docs/product-status.md) — **read first**: maturity per component and the limits worth knowing
+- [`docs/how-it-works.md`](docs/how-it-works.md) — the whole product, A to Z
+- [`docs/install.md`](docs/install.md) · [`docs/profiles.md`](docs/profiles.md) · [`docs/exit-codes.md`](docs/exit-codes.md)
+- [`docs/threat-model.md`](docs/threat-model.md) · [`docs/privacy.md`](docs/privacy.md) · [`docs/safe-testing.md`](docs/safe-testing.md)
 
 ## Contributing
 
-Contributions are very welcome — new rules especially. Every rule maps to a
-standard and ships with a positive + negative test fixture, which is how the
-project stays honest about the false-positive/false-negative failure mode
-dynamic checks are prone to.
+New rules especially. Every rule maps to a standard and ships with a positive **and**
+negative test fixture — that is how the project stays honest about the
+false-positive/false-negative failure mode dynamic checks are prone to.
 
-Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) (human contributors) and
-[`CLAUDE.md`](CLAUDE.md) (AI-agent contributors) — they cover setup, the code
-standards, and the single-commit PR workflow. Security issues go through
-[`SECURITY.md`](SECURITY.md), never public issues.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) (people) and [`CLAUDE.md`](CLAUDE.md) (AI
+agents) cover setup, the code standards and the single-commit PR workflow. Security
+issues go through [`SECURITY.md`](SECURITY.md), never public issues.
 
 ## Partner with us
 
-Guardana is open source and built to stay that way — but we're also looking for
-the people who'll shape where it goes:
-
-- **🏢 Design partners.** Running self-hosted or self-built AI in production and
-  want Guardana wired into your CI and next to your models? Partner with us
-  early — help prioritize the rules and integrations that matter to your stack,
-  and get a direct line to the maintainers while the roadmap is still soft clay.
-- **🧩 Rule & integration authors.** Have threat expertise, a model format, or a
-  guardrail you know cold? The plugin model means your checks live in your
-  package under your namespace — contribute them upstream or keep them private,
-  same contract either way.
-- **☁️ Cloud early access.** A managed, hosted version of the collector the OSS
-  engine already reports into — dashboards, multi-team rollups, and retention,
-  without running `guardana-server` yourself. If centralized AI-security posture
-  is on your radar, reach out to help shape it — and use it first.
-- **💬 Everyone else.** Stars, issues, ideas, and questions in
+- **🏢 Design partners.** Running self-hosted AI in production and want Guardana in
+  your CI and next to your models? You get a direct line to the maintainers while
+  the roadmap is still soft clay.
+- **🧩 Rule & integration authors.** Your checks live in your package under your
+  namespace — upstream them or keep them private, same contract either way.
+- **☁️ Cloud early access.** A hosted version of the collector the OSS engine
+  already reports into. Reach out to help shape it and use it first.
+- **💬 Everyone else.** Stars, issues and questions in
   [Discussions](https://github.com/guardana/guardana/discussions) genuinely move
   this forward.
 
-Reach out: **hello@guardana.io** · [guardana.dev](https://guardana.dev) ·
+**hello@guardana.io** · [guardana.dev](https://guardana.dev) ·
 [github.com/guardana](https://github.com/guardana)
+
+> On PyPI: [`guardana-cli`](https://pypi.org/project/guardana-cli/) ·
+> [`guardana-core`](https://pypi.org/project/guardana-core/) ·
+> [`guardana-rules`](https://pypi.org/project/guardana-rules/) ·
+> [`guardana-report`](https://pypi.org/project/guardana-report/) ·
+> [`guardana-server`](https://pypi.org/project/guardana-server/) — all Apache-2.0,
+> published via PyPI Trusted Publishing (no stored token).
 
 ## License
 

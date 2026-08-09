@@ -70,164 +70,19 @@ semantics genuinely overlap — never a silent remap onto the matching number, s
 
 ## What ships today (0.13.0)
 
-Counts come from the registry, not from memory:
+Counts come from the registry, never from memory:
 [rule summary](docs/generated/rule-summary.md) ·
 [full catalog](docs/generated/rule-catalog.md) ·
 [evaluators](docs/generated/evaluator-catalog.md) ·
-[taxonomy coverage](docs/generated/taxonomy-coverage.md).
+[taxonomy coverage](docs/generated/taxonomy-coverage.md). The capability surface is
+[`FEATURES.md`](FEATURES.md); what each release added, and why, is
+[`CHANGELOG.md`](CHANGELOG.md).
 
-Two rule layers — **build-time** (static, artifact: pickle opcodes,
-deserialization sinks, `trust_remote_code`/`torch.hub.load`, `config.json`
-`auto_map` and kernel-dispatch RCE, chat-template SSTI, ONNX graph risk, notebook
-payloads, Keras/TF/model-format code execution, advisory-backed malicious &
-hallucinated dependencies, insecure transport, hardcoded secrets, MCP tool
-poisoning, hidden-instruction rules-file backdoors, training-data integrity) and
-**runtime** (dynamic, endpoint: prompt injection, DAN jailbreak,
-gradual-jailbreak scenario, indirect/RAG injection, excessive tool-use agency,
-unbounded consumption and cost asymmetry, output-secret leakage, canary-proven
-system-prompt leak, six agentic checks — tool-result injection, credential
-exfiltration through a tool argument, over-broad tool arguments, memory poisoning
-across a session boundary, hidden context recited out of a tool schema, and a live
-MCP server's tool manifest — and six over a live MCP server's **authorization
-surface**: unauthenticated access, an authorization surface no conforming client
-can use, a bearer token the server could not have issued, a session id that is
-guessable or authenticates by itself, scopes that cannot express least privilege,
-and a discovery address a client must not follow).
+**This file is the plan.** It records where the project is going, what each milestone
+has to deliver before it counts, and what has been deliberately left undone with the
+reason. It deliberately does not narrate what already shipped — that is a second
+changelog, and a second changelog disagrees with the first one.
 
-Plus **verification as an ordinary `pytest` assertion**
-(`guardana.testing.assert_secure`) and the first **framework adapter**
-(`guardana.adapters.langchain`), so a check can live in the test file a team
-already runs, against the model their application actually calls.
-
-Plus fifteen commands — `scan`/`probe`/`monitor`/`diff` and the eleven that make
-them safe to gate on (`plan`, `target inspect`, `run inspect|migrate`,
-`baseline create|verify|update`, `doctor`, `config validate|explain`, `rules`,
-`taxonomy`, `init`, `new-rule`, `calibrate`) — seven evaluators with measured
-calibration
-(Brier + ECE), the three-channel result, four report formats, profiles/gates/
-presets, the build/runtime `Surface` split, a tool-calling endpoint target, three
-endpoint providers plus a guarded-endpoint adapter, the plugin contract with test
-doubles and [public model-format readers](docs/model-formats.md), a GitHub Action
-and pre-commit hook, and the optional collector — whose own command
-(`guardana-collector`) covers migrations, tenants, credentials, running the
-service, and reading back what the runs reported.
-
-0.13 is depth on a target the project already had. Guardana has spoken to a live
-MCP server since 0.5, and what it said was "list your tools" — while everything a
-deployed MCP server actually gets wrong sits a layer below that. **Six rules now
-grade its authorization surface** — four testing an invariant the specification
-states as a `MUST`, one grading a deployment fact it leaves `OPTIONAL` (whether a
-credential is required at all), and one reading a `SHOULD` at `low` beside a
-`MUST` — each stating what it *refuses* to conclude: a server that
-requires no credential cannot demonstrate audience validation, a server that
-rejected the forged token has rejected that token, an stdio server is skipped
-rather than graded, and a server nobody could reach makes all six decline by name.
-`--mcp-token-env` means a server that requires authentication can be probed at all,
-which it could not before; `plan probe --mcp` prices the run without contacting it,
-and prices an stdio server by refusing, because working out its cost would mean
-starting it. The **OWASP MCP Top 10** is installed as a seventh catalogue pinned to
-`version 0.1`, because a beta document moves. The approved manifest grew from
-descriptions to the **whole tool declaration**, so a widened parameter is drift even
-when the prose is identical. It also carries four defects found by running rather
-than reading — among them a meter that counted half of what a run spent while the
-rule declared the same wrong number, and a budget-stopped run that printed the tick
-people scroll for.
-
-0.12 turns back to the single developer, after four releases spent on the
-collector. Verification stops needing a pipeline: `assert_secure(target,
-preset="ci")` is an assertion in an ordinary test file, running the same rules
-through the same gate and the same redactor as the commands — and a run that could
-not reach a verdict raises just as loudly as one that found something, because a
-test suite is exactly where that distinction goes quiet. The first **framework
-adapter** verifies a LangChain chat model *as the application calls it*, through
-that object's own client and configuration, without Guardana importing `langchain`
-at all. It also carries **six defects an adversarial review found in released 0.11
-code** — among them evidence redaction covering two channels out of three, and
-`--preset ci` silently turning redaction off.
-
-0.11 is about everything that happens **after a finding arrives**. A finding is an
-entity with a status, an owner and a waiver that expires — and a `resolved` finding
-**reopens the moment it is seen again**, because a fix that did not hold must not
-stay green. Every state change is written to an **audit log** that says whether the
-actor was a presented credential or a name somebody asserted, which also fills the
-`created_by` column that had sat empty since 0.8. **Retention and deletion** are
-commands an operator runs, never a job that runs itself, and neither touches the
-audit log or the triage. Ingest is **bounded** by a body ceiling and a per-caller
-rate limit, both refusing a nonsense value at start-up rather than treating it as
-"no limit". And the **panel works where API keys are required**: a browser signs in
-with a read-scoped key kept in an `HttpOnly` cookie that authenticates reads and
-nothing else.
-
-0.10 is the first release this project calls **company-ready**, and it is the
-first one the checklist above allows. What it adds is not coverage: **official
-container images** for both halves, **`guardana-collector serve`** so starting a
-collector is a command rather than an ASGI factory string, **templates for
-GitLab, Jenkins and Azure DevOps** plus a generic container recipe, **an SBOM per
-distribution and signed provenance** on every release and every image, a
-**production deployment guide** with a Compose file that has no default
-credential anywhere, a **backup whose restore is exercised** rather than
-described, and a **clean install proven in CI, in the release gate, and inside
-the release workflow before anything is uploaded**. That last one exists because
-0.9.0 was tagged and cancelled: it crashed on every command in a fresh
-environment, and nothing but running it could have known.
-
-0.9 made the collector something **two teams can share, and something that can
-answer a question**. The tenant is a **project**: a key is bound to one, the scope
-is the first argument of every storage call, and a cross-tenant read returns
-nothing — proven per entity, on both storage backends and over HTTP. A run now
-says **what it verified and where** (AI system, environment, deployment, and the
-commit read from whatever CI it is), and a key may be **pinned to an environment**,
-after which it writes and reads only that one and a run declaring another is
-refused. The collector records **whether a run passed its gate**, what it cost and
-which build produced it — an absent gate is `unknown`, never a pass — and every
-finding carries the identity `guardana diff` has used since 0.6, so the collector
-can say how many runs have seen it and since when. A retried pipeline job is
-stored once. Standing one up is still **three commands**, because
-`guardana-collector bootstrap` creates the organization, the project and the first
-key together: a boundary that lengthens the first run is a boundary fewer people
-ever get behind.
-
-Its maturity moves to **beta** on the criterion stated before the work rather than
-after it. What it still does not have is everything that happens *after* a finding
-arrives: no lifecycle, no waivers, no audit log, no retention, no restore-tested
-backup.
-
-0.8 made the collector something a team can keep. It persists to **PostgreSQL**
-with **reversible migrations** — every change ships a rollback, each runs in its
-own committed transaction under an advisory lock, and the runner refuses a
-migration edited after it was applied, one numbered below the highest applied, or
-a database written by a newer build. Storage is a **decision**: without a database
-URL or an explicit `memory`, the collector does not start, because an ephemeral
-store that is the default is one that reaches production. Every route carrying a
-finding needs a **scoped API key**, hashed at rest and shown once, and a collector
-with nowhere to keep a key refuses to serve rather than serving openly.
-**Readiness is separate from health** and fails while a migration is pending.
-
-0.8 also carries **nineteen defects an adversarial review found in released 0.7
-code and in this release's own** — among them `monitor` ignoring the privacy
-policy on both the printed alert and the collector submission, a documented
-`fail_on_skipped` the profile loader rejected, `run migrate` writing a document
-that failed its own published schema over the original file, and the redactor's
-placeholder format working as a smuggling envelope for the credentials it exists
-to remove.
-
-0.7 made a run something a pipeline can block on. A saved run became a **manifest**
-(what was verified, against what, at what cost, under which policy, with an
-explicit gate verdict), runs **count what they spend**, **budgets** stop a run
-before it overspends and an exhausted one exits `6` rather than passing,
-`guardana plan` prices a run **without sending a request**, `guardana target
-inspect` separates what an endpoint *claims* from what it *demonstrates*,
-**evidence is redacted at one seam** no output path can skip, rules declare how
-far they reach, plugin trust stopped being all-or-nothing, waivers **expire**, and
-the **exit-code table** became a tested contract. Full detail below.
-
-0.6 added `guardana diff`: a run can be saved (`--output`, a versioned document
-recording which rules ran and a digest of each) and two runs compared, with
-deterioration failing the build and an impossible comparison refusing rather than
-going green. `monitor` moved onto the same comparison, so "worse" is defined once.
-0.5 made agents first-class (ASI01–ASI10, trajectory grading, memory poisoning,
-live MCP, `guardana calibrate`). 0.4 made cost grow with the target rather than
-the rule count.
 
 ## Coverage, honestly
 
@@ -402,89 +257,33 @@ than leaving them to find out.
 
 ## Milestone: engine and CLI foundation *(complete, shipped as 0.7.0)*
 
-> **Outcome:** the engine and the command line are ready to be gated on: a run
-> knows its own cost, says what it verified, refuses to call an unanswered
-> question a pass, and can be compared against last week's.
+> **Outcome:** the engine and the command line are ready to be gated on: a run knows
+> its own cost, says what it verified, refuses to call an unanswered question a pass,
+> and can be compared against last week's.
 
-**This is half of the company-ready milestone, and the checklist above says which
-half.** The collector, containers and CI-beyond-GitHub work is the milestone below;
-calling this
-release company-ready would have meant moving the checklist to match what shipped.
+Met. Run manifest, usage accounting, budgets and `plan`, capability inspection,
+evidence redaction, safety modes, plugin trust, the baseline lifecycle, the exit-code
+contract and the published schemas — detail in [`CHANGELOG.md`](CHANGELOG.md), reading
+in [`docs/design/run-manifest-v2.md`](docs/design/run-manifest-v2.md).
 
-**Run Manifest v2.** A saved run is a reproducibility and deployment-evidence
-record: run id, UTC timestamps, source, tool version, target identity with a
-fingerprint *and the fields that fingerprint covers*, deployment identifiers,
-configuration digests, execution limits, actual usage, the rules and evaluators
-that ran, a result summary with an explicit gate, and the evidence mode. Versioned
-independently of the CLI ([`schemas/run-v2.schema.json`](schemas/run-v2.schema.json)),
-with in-memory migration of 0.6 documents and `guardana run inspect|migrate`.
-
-**Usage accounting.** Requests, tokens and wall time, metered on the target so no
-transport can route around it. A target that does not meter itself and a provider
-that reports no tokens are recorded as explicit unknowns.
-
-**Budgets and `guardana plan`.** The upper bound before anything is spent, without
-sending a request. Budgets are checked before *each* request; an exhausted one
-stops the run, keeps its partial findings, exits `6`, never passes the gate, and
-cannot be used to make `guardana diff` read the missing findings as an improvement.
-
-**Stable exit codes.** Eight documented meanings, pinned by a test against
-[`docs/exit-codes.md`](docs/exit-codes.md).
-
-**Target capability inspection.** `guardana target inspect` separates *declared*
-from *verified*, and never folds "could not find out" into "not supported".
-Skipped rules carry their reason; `fail_on.fail_on_skipped` makes a coverage hole
-indeterminate.
-
-**Privacy and redaction.** One redactor at one seam, applied by the renderer
-factory so no output path can skip it. Redacted by default everywhere; secrets go
-even at `full`; redaction and truncation both announce themselves.
-
-**Safe active testing.** Rules declare `impact` and whether they are destructive;
-`--safety` sets the ceiling and `--allow-destructive` is an independent switch.
-
-**Plugin trust.** `--plugins all|builtins|allowlist|disabled`, decided by
-distribution name. A refused plugin lands in `errors` rather than being dropped.
-
-**Baseline lifecycle.** `baseline create|verify|update` with an approver, a reason
-and an expiry — and an expired waiver stops waiving.
-
-**Operational diagnostics.** `guardana doctor` and `config validate|explain`,
-contacting nothing.
-
-**Published schemas.** `run-v3` (with `run-v2` kept, because a saved run still has to
-validate against the schema it was written to), `diff-v1`, `plan-v1`, each pinned to the
-version constant in the code by a test.
-
-### Deliberately left open, and why
+Two things it left open are still open, and both are still deferred for the same
+reason:
 
 | Deferred | Reason |
 |---|---|
 | `--resume` for an interrupted run | needs a checkpoint format; exit `7` already says a run was partial |
 | cost in money (`estimated_cost` stays null) | needs a price table, which must be profile data — an invented cost is worse than none |
 | token and duration prediction in `plan` | nothing can know a request's cost before it is answered, and a guessed figure is one a team would budget against |
-| the collector envelope carrying the manifest | *(done in 0.9: v7 carries the run's verdict, cost and identity — deliberately not the whole manifest)* |
-| deployment identifiers populated from CI | *(done in 0.9: the commit is read from whatever CI it is; the system and the environment are declared, never guessed)* |
-| streaming, seed, log-prob and rate-limit probes | `target inspect` covers the four capabilities rules actually depend on |
-| separate local and collector evidence policies | lands with the collector |
-| signature verification of plugin packs | needs a distribution story this project does not have yet |
-| `configuration.*_digest` populated | the manifest has the fields and records `null` in all of them. A digest of a profile is easy; a digest of a *system prompt*, *tool manifest* or *retriever* has to be taken from the thing actually in front of the model, which is the application-awareness work in the milestone below — and filling in only the easy one would make the block look complete |
-| telling an unreachable endpoint from an unreadable reply | both raise `EndpointError`, and the runner treats it as fatal to the whole probe — correctly for a dead endpoint, and wrongly for one reply a provider returned in a shape no transport could parse. The run then exits `4` ("target unavailable") having abandoned every remaining rule, which is loud and wrong rather than quiet and wrong, so it is a diagnosis defect and not a fail-open. Splitting it needs a second exception type on the transport contract, which is a change third-party transports would have to follow |
-| token ceilings bounding the tool-calling path | `offer_tools` has no usage protocol, so the requests an agent probe spends most of its budget on report no tokens. They are counted in `requests_missing_token_counts`, and a request ceiling bounds them; a *token* ceiling does not, and saying so is better than a ceiling that silently covers half a run |
+| `configuration.*_digest` populated | a digest of a *system prompt* or *retriever* has to be taken from the thing in front of the model, which is the application-awareness work; filling in only the easy one would make the block look complete |
+| telling an unreachable endpoint from an unreadable reply | both raise `EndpointError` and the runner treats it as fatal, correctly for a dead endpoint and wrongly for one unparseable reply. Splitting it needs a second exception type third-party transports would have to follow |
+| token ceilings bounding the tool-calling path | `offer_tools` has no usage protocol, so those requests report no tokens. They are counted in `requests_missing_token_counts` and bounded by a *request* ceiling; a token ceiling that silently covered half a run would be worse |
 
-### Reviewed after shipping (0.7.1)
-
-An adversarial review of the finished 0.7 code found fourteen defects under a
-green gate — a leak of unredacted evidence from `monitor`, a documented gate the
-profile loader refused to accept, a migration writing a document that fails its
-own schema, and eleven others. All are fixed and listed in
-[`CHANGELOG.md`](CHANGELOG.md).
-
-The method is the point and it is now standing practice: **reviewing a design and
+**The review method that came out of it is standing practice:** reviewing a design and
 reviewing the code that came out of it find different defects, so both happen, and
-separately.** Three of the fourteen were things the documentation already
-described correctly while the code did something else, which is the failure mode a
-green gate is least able to see.
+separately. Three of the fourteen defects an adversarial review found in finished 0.7
+code were things the documentation already described correctly while the code did
+something else — the failure mode a green gate is least able to see.
+
 
 ## Where this sits, and what the neighbours do better
 
@@ -551,220 +350,85 @@ reader the wrong thing about the thing it names.
 > **Outcome:** the checklist above is finished, and Guardana can verify an AI
 > *application*, not only an isolated model endpoint.
 
-**Half of this milestone is finished.** The company-ready checklist above is
-complete as of `0.10.0`; the application-awareness half — verifying an AI
-*application* rather than an isolated endpoint — has not started. `0.8.0`,
-`0.9.0` and `0.10.0` are releases inside this milestone, and the checklist was
-ticked because the boxes were met, not moved to match what shipped.
+**Half of it is finished.** The company-ready checklist above is complete as of
+`0.10.0` — persistence, authenticated ingest, project isolation, container images, CI
+beyond GitHub, SBOM and provenance, a deployment guide and an exercised restore, all
+landed across `0.8.0`–`0.10.0`. The checklist was ticked because the boxes were met,
+not moved to match what shipped.
 
-Landed in **0.8.0**:
+The application-awareness half is what the plan below is about: verifying an AI
+*application* rather than an isolated endpoint. `0.14.0` is the first release inside it.
 
-- a **persistent collector** — PostgreSQL with reversible migrations, a storage
-  choice the collector refuses to make for you, health and readiness as separate
-  endpoints;
-- **authenticated runner ingest** — scoped API keys, hashed at rest, shown once,
-  and a collector that refuses to start when it has nowhere to keep one.
-
-Landed in **0.9.0**:
-
-- **project isolation** — the tenant is a project, a key names exactly one, the
-  scope is the first argument of every storage call, and a cross-tenant read
-  returns nothing on both stores and over HTTP. `guardana-collector bootstrap`
-  keeps standing a collector up to three commands, because a boundary that makes
-  the first run longer is a boundary fewer people ever get behind;
-- **AI systems, environments and deployments** — a run says what it verified and
-  where, the commit is read from whatever CI it is, and a key may be pinned to one
-  environment and then reaches only that one. Systems and environments are inferred
-  from what runs name rather than registered in advance, because a pipeline that
-  fails on a missing prerequisite gets commented out rather than fixed
-  ([design](docs/design/ai-systems-and-deployments.md));
-- **runs and findings, not just submissions** — the run's gate, cost, build and
-  timing reach the collector, an absent gate is unknown rather than a pass, a
-  retried job is stored once, and each finding carries the identity `diff` has used
-  since 0.6 so `finding list` can say how many runs have seen it
-  ([design](docs/design/collector-runs-and-findings.md));
-- **the reporter reaches the collector at the URL a user writes**, which it had
-  never done: aimed at a bare collector URL it POSTed to `/`, took a `404`, and
-  the scan still exited `0`.
-
-With both, the collector's maturity moves to **beta** — the criterion stated before
-the work, not after it.
-
-Landed in **0.10.0**, which finishes the checklist:
-
-- **official container images** for the CLI and the collector — two stages, a
-  fixed non-root uid, `amd64` and `arm64`, built *and run* in CI on every push
-  rather than first at the tag. The image smoke test scans the deliberately
-  malicious fixture and requires a `1`, because an image whose rule catalog
-  failed to ship reports "no findings" and exits `0` forever;
-- **`guardana-collector serve`**, so starting a collector is a command rather
-  than an ASGI factory string, with the server itself an extra;
-- **CI beyond GitHub** — GitLab, Jenkins and Azure DevOps templates plus a
-  generic container recipe, with three properties held by tests: the exit code
-  reaches the platform, the report is published on the run that failed, and the
-  entrypoint is overridden where the platform wraps commands in a shell;
-- **an SBOM per distribution and provenance on every release**, generated by
-  `uv export` from the lock everything else resolves against, and verified
-  against each package's own metadata as it is written;
-- **a production deployment guide** and the Compose file it describes — no
-  default credential anywhere, no published database port, TLS termination as a
-  deliberate step, migrations as a command rather than a restart side effect;
-- **backup and restore, exercised** — restored into a database that never held
-  the data, read back through the tenant-scoped store, and written to afterwards.
-  Doing it found a trap worth the whole exercise: `pg_dump` 17 produces a dump
-  PostgreSQL 16 cannot restore, so a backup can look fine every day and fail on
-  the day it matters;
-- **a clean-install test in CI, in the release gate, and inside the release
-  workflow before the upload** — the defect that made 0.9.0 unshippable was found
-  by hand, and finding it by hand is not a control.
-
-Still open in the *collector*, and deliberately: RBAC and human identities — the
+Still open in the *collector*, and deliberately: **RBAC and human identities** — the
 panel signs in with a read key rather than as a person
-([design](docs/design/panel-sessions.md)). The
-**finding lifecycle, waivers, the audit log, retention and deletion landed in
-0.11.0** ([lifecycle](docs/design/finding-lifecycle-and-waivers.md) ·
-[audit and retention](docs/design/audit-retention-and-deletion.md)). Those are the team-platform milestone below,
-not company-readiness — a company can deploy, secure, upgrade and restore this
-today, and the deployment guide states plainly what it cannot yet do.
+([design](docs/design/panel-sessions.md)). That is the team-platform milestone below,
+not company-readiness: a company can deploy, secure, upgrade and restore this today,
+and [`docs/deployment.md`](docs/deployment.md) says to the operator's face what it
+cannot yet do.
 
-Landed in **0.12.0**:
 
-- **A pytest-facing assertion API** — `guardana.testing.assert_secure`, raising an
-  `AssertionError` with the finding report, and raising just as loudly when the run
-  could not reach a verdict. DeepEval's strongest property is that a check lives in
-  an ordinary test file run by an ordinary pytest, and Guardana had no way for a
-  team to put verification where their developers already are;
-- **the first named adapter** — `guardana.adapters.langchain`, duck-typed so
-  `langchain` is never imported and `guardana-core` gains no dependency.
+## Next: application awareness, then 1.0
 
----
+The order is: **complete the domain model → build the translators into it → prove the
+compatibility contract → freeze it.** The model landed in 0.14.0
+([design](docs/design/trace-domain-model.md)); the rest is below. Everything else,
+including the whole team platform, runs beside this and gates none of it.
 
-## Next: the domain model, then 1.0
+### Next — the adapters, as translators into the model
 
-Revised 2026-08-07. Three things moved underneath this file in the days before it,
-and none of them was on it: OWASP published a **new LLM Top 10 edition** that
-re-ranks seven entries and renames one, **OpenAI bought promptfoo** and with it the
-position `assert_secure` had just taken, and the EU AI Act's **GPAI and Article 50
-duties became enforceable**. The revision was also read by an independent critic
-that disagreed with two things this file used to say — that the remaining framework
-adapters come before the `Trace` model, and that 1.0 waits for the team platform.
-Both disagreements were right, and both are corrected below.
+> **Outcome:** Guardana can verify an AI *application*, and the shape it freezes at
+> 1.0 is known to be right because three unrelated inputs already fit it.
 
-The order was: **fix what is now untrue → build where the threat is settled and the
-target already exists → complete the domain model → freeze it.** The first two are
-done and shipped in 0.13.0; what is left is the domain model, and then the freeze.
-Everything else, including the whole team platform, runs beside it and gates none
-of it.
-
-### Steps one and two shipped in 0.13.0
-
-The mapping is true again — identity is scheme + edition + local id, the catalogues
-are immutable data files pinned by digest in every run, and `guardana taxonomy`
-answers what a reference means. MCP got its depth — six rules over a live server's
-authorization surface, `--mcp-token-env`, a pin covering the whole tool
-declaration, and `plan probe --mcp`. What each of them did is in
-[`CHANGELOG.md`](CHANGELOG.md) and in [what ships today](#what-ships-today-0130);
-repeating it here would make this file a second changelog that disagrees with the
-first.
-
-Step two went second for a reason beyond urgency, and the reason paid off: identity,
-delegation, consent and approval are the fields the domain model below has to
-represent, and meeting them produced four distinctions a schema written first would
-have flattened — identity is three fields that can disagree (presented credential,
-token audience, claimed resource), delegation has a direction and a boundary,
-consent is per client rather than per user, and a session is not an identity.
-See [`docs/design/mcp-authorization-depth.md`](docs/design/mcp-authorization-depth.md).
-
-**What those two steps deliberately left open, with the reason.** Each is deferred
-because the honest version cannot be produced from where Guardana stands, not
-because it is large, and each leaves a stated gap rather than a silent one:
-
-- **`finish_reason` and latency on `Exchange`.** The cost-asymmetry rule was
-  supposed to read them; it does not need them. A ratio of reply to prompt is
-  measurable from the exchange and works against an endpoint that reports nothing —
-  while carrying a provider's finish reason honestly means adding it to the
-  transport protocol *third parties implement*. That is a contract change worth
-  doing beside the trace work below. What it would add is the difference between
-  "the model stopped" and "our ceiling stopped it".
-- **A catalogue is still a subset where the mapping is.** `OWASP-ML-2023` holds the
-  entries Guardana's rules map to, not all ten. A catalogue is allowed to be a
-  subset; what it may never do is invent an entry.
-- **Third-party catalogues have no digest to pin.** A pack registers *references*
-  through the entry point, not a catalogue file, so a run records its refs and not a
-  provenance nobody can produce. Giving them a digest means a catalogue-file entry
-  point, which is a bigger surface than that release needed.
-- **Token passthrough to an upstream API.** It happens between the server and a
-  service Guardana is not talking to; no sequence of client requests makes it
-  observable. Its precondition — accepting a foreign-audience token — *is* checked.
-  The passthrough itself needs the trace work below.
-- **Confused deputy, in full.** The preconditions (a static client id toward a third
-  party, per-client consent storage) live on the server's back side. The only
-  client-side proof requires registering a client on somebody's authorization
-  server, which is a write to a third party performed by a tool whose whole
-  proposition is that it is safe to point at production. The observable slice —
-  PKCE, discovery targets, scope breadth — shipped.
-- **Sampling misuse.** A server abusing `sampling/createMessage` issues a request
-  *to the client*, over a stream the client holds open and answers. Guardana's
-  client sends a request and reads a reply. Changing that is a transport-contract
-  change third-party transports implement — the same reason `finish_reason` is
-  deferred — and it belongs beside the trace work.
-- **Multi-user data isolation.** Proving user A cannot reach user B's data needs two
-  credentials *and* knowledge of whose data is whose. Guardana has neither and
-  cannot ask for the second. The one-credential half — a session accepted as
-  authentication, a specification `MUST NOT` — shipped.
-- **Shadow MCP servers (`MCP09:2025`).** Finding servers nobody registered is a
-  discovery problem on a network, not a verification problem on a target.
-- **`monitor --mcp`.** The rug-pull rule compares a live manifest against a pin, and
-  the thing that makes a rug pull a rug pull is that it happens *after* adoption —
-  so the check that most wants a schedule is the one without one. `probe --mcp` in a
-  cron job is the workaround, and it is a workaround.
-- **A saved MCP run in the compatibility corpus.** The corpus holds a real artifact
-  scan from a released build; the 1.0 criterion asks for the same on the endpoint
-  side, and an MCP run is the natural first one.
-
-### Next — the domain model, and only then the adapters
-
-> **Outcome:** Guardana can verify an AI *application*, and the shape it will
-> freeze at 1.0 is known to be right because three unrelated inputs already fit it.
-
-- **A common `Trace` model**: model calls, messages with **typed content parts**
-  (so a multimodal carrier does not force a breaking change later), tool offers,
-  calls and results, retrieval queries and retrieved documents, identity and
-  scopes, approvals, policy decisions, memory reads and writes, external side
-  effects, agent handoffs.
-- **Imported real traces.** `guardana analyze-trace` over JSONL, and OpenTelemetry
-  GenAI semantic conventions as the interoperability base — not a Guardana-only
-  protocol. Grading a trace exported from somebody's *running* agent is the input
-  `Trajectory` was shaped to accept.
-- **Imported third-party observations.** Somebody else's attack run — promptfoo,
-  garak, an internal harness — read with its provenance intact and landing in
-  `unverified` until Guardana can replay or grade it under its own contract. This
-  is how composition happens without a dependency on any of them.
-- **The remaining named adapters — LlamaIndex, CrewAI, PydanticAI — come after
-  the model, as translators into it.** This is the first thing the critique got
-  right and this file had wrong: three more adapters written first would bake
-  three more frameworks' quirks into an API that is about to be frozen. Adapters
-  are cheap once the model is real; an API frozen around the wrong shape is not.
+- **The remaining named adapters — LlamaIndex, CrewAI, PydanticAI.** They come *after*
+  the model, as translators into it: three adapters written first would have baked
+  three frameworks' quirks into an API about to be frozen. Two independent adapters
+  driving the model is the remaining half of 1.0 entry criterion 2 — raw JSONL and the
+  OpenTelemetry GenAI conventions are the two that are met.
 - **Tool-calling through an adapter**, which the five agentic rules need. Until it
   lands they skip and say so, which `fail_on_skipped` turns into an indeterminate
   result rather than a pass.
 - **RAG, properly (`LLM09:2026`).** `RetrieverTarget`, `CorpusTarget`,
-  `EmbeddingTarget`: retrieval-time injection, cross-tenant retrieval,
-  unauthorized document access, document and metadata poisoning, tenant-filter
-  bypass.
+  `EmbeddingTarget`: retrieval-time injection, cross-tenant retrieval, unauthorized
+  document access, document and metadata poisoning, tenant-filter bypass.
+- **Injection and sink rules over retrieved content**, on a live retriever and on a
+  trace. The model already carries `Retrieval` and `SideEffect`, so this is an
+  addition rather than a schema change.
 - **Sink-aware output handling (`LLM10:2026`).** Distinguish dangerous output
-  *generated* from output that *reached a sink* from a sink that *executed* it
-  from a *confirmed side effect*. Initial sinks: SQL, shell, HTML/Markdown,
-  template engines, URL fetch, file system, messaging, cloud APIs — plus ANSI
-  terminal injection and auto-fetching renderers, which the 2026 edition added.
-  Its priority **drops** with its rank: it fell from #5 to #10 on incident data.
-- **Verification semantics: repeated runs, and what a run is entitled to claim.**
-  A calibrated *evaluator* is not a calibrated *run* — Brier and ECE say nothing
-  about sampling noise across repetitions. Repeated runs with confidence intervals
-  and sequential stopping belong here, not in the deferred list where this file
-  also had them; holding both positions was a contradiction.
-- **Utility regression.** Security improvements must be weighed against legitimate
-  task success, or "safer" just means "refuses more".
+  *generated* from output that *reached a sink* from a sink that *executed* it from a
+  *confirmed side effect*. Initial sinks: SQL, shell, HTML/Markdown, template engines,
+  URL fetch, file system, messaging, cloud APIs, plus ANSI terminal injection and
+  auto-fetching renderers. Its priority **drops** with its rank — #5 to #10 on
+  incident data.
+- **Verification semantics: repeated runs, and what a run is entitled to claim.** A
+  calibrated *evaluator* is not a calibrated *run*: Brier and ECE say nothing about
+  sampling noise across repetitions. Confidence intervals and sequential stopping
+  belong here.
+- **Utility regression.** Security improvements weighed against legitimate task
+  success, or "safer" just means "refuses more".
+
+### Deliberately left open, with the reason
+
+Each is deferred because the honest version cannot be produced from where Guardana
+stands, not because it is large — and each leaves a stated gap rather than a silent
+one.
+
+| Deferred | Reason |
+|---|---|
+| **Grading a trace with the driven-run evaluators** | `as_trajectory` makes it possible; an evaluator calibrated on runs Guardana drove has not been measured on traces it did not, and `calibrate` is how that claim gets earned |
+| **`finish_reason` and latency on `Exchange`** | a change third-party transports must follow. A trace already carries `gen_ai.response.finish_reasons`; the live transport contract is a separate piece of work with its own tests |
+| **An OTLP receiver** | a service that listens is the continuous-verification milestone and a different security posture from reading a file an operator handed over. The mapping built for `analyze-trace` is what it would reuse |
+| **Metrics and logs from the GenAI conventions** | only spans carry the message content and tool calls a rule grades |
+| **Third-party trace dialects** (LangSmith, Langfuse) | a per-vendor reader is a per-vendor maintenance commitment; reading the convention gets the interoperable subset, and `--write-trace` means nobody is blocked on ours |
+| **Replaying an imported observation** | the stated bar for turning a third-party claim into a finding. It needs a target that accepts a recorded conversation as a script; `unverified` with provenance intact is the honest interim |
+| **`monitor --mcp`** | the rug-pull rule compares a live manifest against a pin, and a rug pull happens *after* adoption — so the check that most wants a schedule is the one without one. `probe --mcp` in a cron job is a workaround, and it is a workaround |
+| **A saved MCP run in the compatibility corpus** | the corpus holds a real artifact scan from a released build; the 1.0 criterion asks for the same on the endpoint side |
+| **Token passthrough to an upstream API** | *(closed in 0.14.0 — `guardana.trace.credential_passthrough` grades it in a trace, which is where it becomes observable)* |
+| **Confused deputy, in full** | its preconditions live on the server's back side; the only client-side proof is registering a client on somebody's authorization server, which is a write to a third party by a tool whose proposition is that it is safe to point at production. The observable slice shipped |
+| **Sampling misuse (MCP)** | a server abusing `sampling/createMessage` issues a request *to* the client over a stream the client answers. Guardana's client sends and reads; changing that is the transport-contract work above |
+| **Multi-user data isolation** | proving user A cannot reach user B's data needs two credentials *and* knowledge of whose data is whose. Guardana has neither and cannot ask for the second |
+| **Shadow MCP servers (`MCP09:2025`)** | finding servers nobody registered is network discovery, not verification of a target |
+| **A catalogue may be a subset** | `OWASP-ML-2023` holds the entries rules map to, not all ten. A catalogue may be a subset; it may never invent an entry |
+| **Third-party catalogues have no digest to pin** | a pack registers *references* through an entry point, not a catalogue file, so a run records its refs and not a provenance nobody can produce |
 
 ## Milestone: team security platform
 
@@ -948,15 +612,11 @@ what only makes sense hosted.
 
 Parked with reasons:
 
-- **Misinformation (`LLM07:2026`), still deferred — and the 2026 data does not
-  change it.** That entry rose two places and showed the widest gap between what
-  the community voted and what the incidents said, which is a real signal. It is
-  not a signal to build a factuality detector: without an authoritative truth
-  source, "the model said something false" is a verdict this project cannot honestly
-  reach, and asserting it would break the thesis in the direction that matters. What
-  the incident data actually describes — *a wrong answer becoming a wrong action* —
-  is verifiable, and it is the agentic work above: the dangerous call, the missing
-  approval, the side effect. That is where the response goes.
+- **Misinformation (`LLM07:2026`)** — without an authoritative truth source, "the
+  model said something false" is a verdict this project cannot honestly reach. What
+  the incident data actually describes, *a wrong answer becoming a wrong action*, is
+  verifiable and is the agentic work above: the dangerous call, the missing approval,
+  the side effect.
 - **Adaptive attacker strategies** (Crescendo/GOAT-style) — gated on calibration.
 - **PII & toxicity output evaluators** — classifier-backed, opt-in, same
   fail-closed contract as `guard`.
@@ -965,10 +625,6 @@ Parked with reasons:
   and says so.
 - **Comparing inventories between runs** — an inventory question, not a gate.
 - **Gherkin scenario syntax** — structured YAML won.
-
-*(Repeated runs used to sit here **and** in a milestone at the same time. They are
-in the verification-semantics work now: the budget model they were waiting on
-shipped in 0.7.)*
 
 ## Non-goals
 
