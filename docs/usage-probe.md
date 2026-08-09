@@ -21,8 +21,8 @@ guardana probe --url <base-url> --model <name> [OPTIONS]
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--url TEXT` (required) | — | Base URL of the OpenAI-compatible endpoint |
-| `--model TEXT` (required) | — | Model name to send in each request |
+| `--url TEXT` | — | Base URL of the OpenAI-compatible endpoint. Required unless `--mcp` names an MCP server instead |
+| `--model TEXT` | — | Model name to send in each request. Required unless `--mcp` names an MCP server instead |
 | `--api-key-env TEXT` | none | Name of an environment variable holding the bearer API key |
 | `--provider [openai\|ollama\|tgi]` | `openai` | Endpoint wire protocol: OpenAI-compatible (default), Ollama's native `/api/chat`, or HF TGI's `/generate` |
 | `--adapter PATH` | none | Adapter file mapping a **guarded product endpoint**'s custom request/response schema — see [Probing a guarded endpoint](#probing-a-guarded-endpoint). Overrides `--provider`. |
@@ -48,7 +48,7 @@ authorization checks.
 
 ```bash
 export MCP_TOKEN=…
-guardana probe --url unused --model unused \
+guardana probe \
   --mcp https://mcp.example.com/mcp \
   --mcp-token-env MCP_TOKEN
 ```
@@ -70,9 +70,9 @@ like the tool description.
 Drift is only detectable against something you approved:
 
 ```bash
-guardana probe --url unused --model unused --mcp https://mcp.example.com/mcp \
+guardana probe --mcp https://mcp.example.com/mcp \
   --write-mcp-pin mcp.pin.json          # approve today's manifest
-guardana probe --url unused --model unused --mcp https://mcp.example.com/mcp \
+guardana probe --mcp https://mcp.example.com/mcp \
   --mcp-pin mcp.pin.json                # compare against it
 ```
 
@@ -134,6 +134,17 @@ forged token, and a handful of handshakes to sample session ids. Every one is
 counted, so `--max-requests` bounds it, and a run that hits the ceiling exits `6`
 with an `indeterminate` gate rather than reporting the checks it never reached as
 clean.
+
+Ask before you spend, with [`guardana plan`](usage-plan.md):
+
+```bash
+guardana plan probe --mcp https://mcp.example.com/mcp
+```
+
+That contacts nothing. The ceiling it reports is higher than any run spends —
+each rule declares what it would cost *alone*, because a plan cannot know which
+one runs first and buys the shared observation — so treat it as the upper bound
+it is.
 
 ## Probing a guarded endpoint
 

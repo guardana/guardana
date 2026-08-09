@@ -11,7 +11,7 @@ from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
-from guardana.cli._mcp_run import McpConnection, run_mcp_probe
+from guardana.cli._mcp_run import McpConnection, require_chat_endpoint, run_mcp_probe
 from guardana.cli._output import emit
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe
@@ -35,8 +35,10 @@ _DEFAULT_CONCURRENCY = 4
 
 
 def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
-    url: Annotated[str, typer.Option(help="Base URL of the OpenAI-compatible endpoint")],
-    model: Annotated[str, typer.Option(help="Model name")],
+    url: Annotated[
+        str | None, typer.Option(help="Base URL of the OpenAI-compatible endpoint")
+    ] = None,
+    model: Annotated[str | None, typer.Option(help="Model name")] = None,
     api_key_env: Annotated[
         str | None, typer.Option("--api-key-env", help="Env var holding the API key")
     ] = None,
@@ -212,16 +214,17 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
         exit_with(outcome, result)
         return
 
+    endpoint_url, model_name = require_chat_endpoint(url, model)
     transport: ChatTransport | None = None
     if adapter is not None:
         try:
-            transport = HttpAdapterTransport(load_adapter_config(adapter, url))
+            transport = HttpAdapterTransport(load_adapter_config(adapter, endpoint_url))
         except EndpointError as exc:
             raise typer.BadParameter(str(exc)) from exc
 
     connection = Connection(
-        url=url,
-        model=model,
+        url=endpoint_url,
+        model=model_name,
         api_key=os.environ.get(api_key_env) if api_key_env else None,
         system_prompt=(
             system_prompt_file.read_text(encoding="utf-8") if system_prompt_file else None
@@ -232,7 +235,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
 
     try:
         result = run_against_endpoint(
-            url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
+            endpoint_url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
         )
     except BudgetExhausted as exc:
         raise refuse_unenforceable_budget(exc) from exc
@@ -243,7 +246,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
         prof,
         result,
         target_kind=TargetKind.ENDPOINT,
-        target_ref=f"{url}#{model}",
+        target_ref=f"{endpoint_url}#{model_name}",
         gate=outcome,
         started_at=started_at,
         concurrency=concurrency,
@@ -251,5 +254,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
     )
     emit(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
-        submit_safely(reporter, result, source=f"{url}#{model}", deployment=deployment, run=run)
+        submit_safely(
+            reporter, result, source=f"{endpoint_url}#{model_name}", deployment=deployment, run=run
+        )
     exit_with(outcome, result)

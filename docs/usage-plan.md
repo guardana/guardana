@@ -44,6 +44,29 @@ one place, so a second copy cannot drift from the first.
 guardana plan probe --url https://api.example.com --model m --safety passive
 ```
 
+## Pricing an MCP server
+
+`plan probe --mcp` prices an MCP run the same way, and it is where this command
+earns its keep. Reading a manifest cost two requests; the authorization checks
+send around a dozen, which is exactly the number somebody wants before pointing
+this at production.
+
+```bash
+guardana plan probe --mcp https://mcp.example.com/mcp
+```
+
+**The ceiling is higher than any run spends, on purpose.** Each rule declares what
+it would cost *alone*, because a plan cannot know which rule runs first — and the
+first one to look buys an observation the other five then share. A whole MCP probe
+declares around forty requests and spends around ten. An upper bound that is too
+high refuses a budget that would have fitted, which is the safe direction to be
+wrong in; the other way round is a ceiling that lets a run overspend.
+
+**An stdio server is priced by refusing.** Working out what one would cost means
+starting it, and starting the thing under examination is the one thing this
+command must not do. `guardana probe --mcp … --allow-exec` is where that intent is
+stated out loud.
+
 ## When the plan does not know
 
 A rule that declares no request count — anything third-party that has not

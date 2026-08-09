@@ -12,6 +12,7 @@ import shlex
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+import typer
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
@@ -36,6 +37,44 @@ class McpConnection:
     session authenticates on its own — report `inconclusive` and name the flag,
     rather than staying quiet about a question nobody asked.
     """
+
+
+def require_chat_endpoint(url: str | None, model: str | None) -> tuple[str, str]:
+    """Return the endpoint a chat run needs, refusing when it was not named.
+
+    `--url` and `--model` stopped being unconditionally required when `--mcp`
+    arrived: a run against an MCP server has no model to name, and the documented
+    incantation had become `--url unused --model unused`. A placeholder a user is
+    told to type is a field nobody reads, and the next one they mistype goes
+    unnoticed.
+
+    Returns the pair rather than checking it, so the caller gets values a type
+    checker can see are present. Coercing them at the point of use would turn a
+    missing `--url` into the literal string "None" and send a request to it.
+    """
+    if url is None or model is None:
+        raise typer.BadParameter(
+            "name what to examine: --url and --model for a chat endpoint, or --mcp for "
+            "an MCP server"
+        )
+    return url, model
+
+
+def plan_target(address: str) -> McpServerTarget:
+    """Build a target for *pricing* an MCP server, which must not start one.
+
+    An stdio server is priced by refusing: working out what it would cost means
+    running it, and a command whose whole promise is "this sends nothing" cannot
+    execute the thing under examination to answer. `guardana probe --mcp …
+    --allow-exec` is where that intent is stated.
+    """
+    if not address.startswith(("http://", "https://")):
+        raise typer.BadParameter(
+            "pricing an stdio MCP server would mean starting it, and this command sends "
+            "nothing and starts nothing. Price a streamable-HTTP server, or run "
+            "`guardana probe --mcp … --allow-exec` when you mean to execute it."
+        )
+    return McpServerTarget(address)
 
 
 def build_mcp_target(connection: McpConnection) -> McpServerTarget:
@@ -98,4 +137,12 @@ def _with_pin(profile: Profile, pin: Path | None) -> Profile:
     return replace(profile, rule_config={**profile.rule_config, _PIN_RULE_ID: {"pin": str(pin)}})
 
 
-__all__ = ["McpConnection", "McpError", "build_mcp_target", "run_mcp_probe", "write_pin"]
+__all__ = [
+    "McpConnection",
+    "McpError",
+    "build_mcp_target",
+    "plan_target",
+    "require_chat_endpoint",
+    "run_mcp_probe",
+    "write_pin",
+]

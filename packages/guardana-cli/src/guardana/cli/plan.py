@@ -14,6 +14,7 @@ from typing import Annotated
 import typer
 from guardana.cli._endpoint import build_endpoint
 from guardana.cli._formats import OutputFormat
+from guardana.cli._mcp_run import plan_target, require_chat_endpoint
 from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._safety_flags import parse_impact
@@ -115,8 +116,14 @@ def plan_scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this
 
 
 def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
-    url: Annotated[str, typer.Option(help="Base URL of the OpenAI-compatible endpoint")],
-    model: Annotated[str, typer.Option(help="Model name")],
+    url: Annotated[
+        str | None, typer.Option(help="Base URL of the OpenAI-compatible endpoint")
+    ] = None,
+    model: Annotated[str | None, typer.Option(help="Model name")] = None,
+    mcp: Annotated[
+        str | None,
+        typer.Option(help="MCP server to price instead of a model endpoint: an http(s) URL"),
+    ] = None,
     provider: Annotated[
         str, typer.Option(help="Endpoint wire protocol: openai|ollama|tgi")
     ] = "openai",
@@ -143,7 +150,15 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
         ),
     ] = False,
 ) -> None:
-    """Report what probing this endpoint would cost, without contacting it.
+    """Report what probing this endpoint or MCP server would cost, without contacting it.
+
+    An MCP probe is priced too, and it is where this command earns its keep: those
+    checks send around a dozen requests where reading a manifest sent two. The
+    ceiling it reports is the sum of what each rule would spend **alone**, which is
+    what a plan has to assume because it cannot know which rule runs first; the
+    observation is bought once and shared, so a real run spends a fraction of it.
+    An upper bound that is too high refuses a budget that would have fitted, which
+    is the safe direction to be wrong in.
 
     Capabilities are taken from what the target declares locally, so a provider
     that turns out not to support tool calls will skip more rules than this
@@ -157,9 +172,13 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
     """
     prof = resolve_profile(profile, preset)
     prof = replace(prof, max_impact=parse_impact(safety), allow_destructive=allow_destructive)
-    target = build_endpoint(
-        url,
-        model,
+    if mcp is not None:
+        _emit(_plan_for(prof, plan_target(mcp), rules, plugins=True), format)
+        return
+    endpoint_url, model_name = require_chat_endpoint(url, model)
+    target: Target = build_endpoint(
+        endpoint_url,
+        model_name,
         api_key=None,
         system_prompt=(
             system_prompt_file.read_text(encoding="utf-8") if system_prompt_file else None

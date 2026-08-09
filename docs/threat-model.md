@@ -57,15 +57,43 @@ not yet fuzzed — tracked for v0.7.
 
 **Scenario:** the endpoint under test returns a 10 GB response, hangs forever,
 returns crafted content designed to exploit the evaluator, or is not the endpoint
-the user thought it was.
+the user thought it was. **And, since MCP authorization discovery, it chooses an
+address that Guardana then fetches** — which turns the target from something that
+answers into something that can aim the scanner.
 
 **Stance:** responses are size-bounded and timed out; a hang is an error, not a
 pass. Model output is treated as untrusted throughout — it is never executed, and
-after v0.7 it is redacted before it reaches any output path.
+since v0.7 it is redacted before it reaches any output path.
 
-**Residual risk:** SSRF. A profile can point Guardana at any URL, including
-`169.254.169.254`. Today that is the user's responsibility; an allowlist and a
-metadata-endpoint denylist are v0.7 work.
+The address a target *chooses* is a different question from the address an
+operator *types*, and they are answered differently.
+
+- **Chosen by the target — refused, and the refusal is a finding.** MCP discovery
+  is the one place where the server supplies a URL and the client is expected to
+  fetch it: `resource_metadata` in a `WWW-Authenticate` challenge, then the
+  authorization servers named in that document. Guardana will not follow one that
+  resolves to a link-local, multicast or reserved address (`169.254.169.254`
+  first among them), one that reaches into the network running the scan while the
+  server under test is outside it, one served over plain `http` when the target is
+  not local, or one whose scheme a client must reject. It does not fetch the
+  address to confirm the address is dangerous — that would be performing the
+  attack in order to report it — and `guardana.mcp.discovery_target` reports the
+  refusal. Loopback and private addresses are permitted when the server under test
+  is itself local, because that is how every development setup works and a guard
+  that fires on all of them is a guard people switch off.
+- **Typed by the operator — unrestricted, deliberately.** `--url` and `--mcp` go
+  where they are pointed, including at internal and loopback addresses. That is
+  not an oversight and it is not pending work: scanning an internal endpoint is the
+  normal case for this tool, and an allowlist would make the tool refuse its own
+  primary use while stopping nobody who can already edit the command line. The
+  boundary that matters is who chose the address, and Guardana enforces it there.
+
+**Residual risk:** DNS rebinding across the check. A discovery host is resolved
+when it is validated and connected to by name afterwards, so a domain that answers
+differently between the two calls is not caught. Pinning the resolved address needs
+a custom opener on every request path; it is recorded here rather than implied to
+be solved. Guardana also still fetches whatever the *operator* points it at, per
+the position above.
 
 ### T3 — A malicious plugin or rule pack
 

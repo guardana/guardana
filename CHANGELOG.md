@@ -36,6 +36,24 @@ token passthrough), so this is depth on a target Guardana already has. See
   following the authorization spec — so those rules are **skipped with a reason**,
   which `fail_on_skipped` can make fatal, rather than reporting nothing about a
   server they never examined.
+- **`guardana plan probe --mcp` prices an MCP run without contacting the server.**
+  Reading a manifest cost two requests; the authorization checks send around a
+  dozen, which is the number somebody wants *before* pointing this at production.
+  The ceiling it reports is deliberately higher than any run spends — each rule
+  declares what it would cost alone, because a plan cannot know which one runs
+  first and buys the observation the rest then share. An **stdio server is priced
+  by refusing**: working out what it would cost means starting it, and starting the
+  thing under examination is the one thing this command must not do.
+- **`--url` and `--model` are no longer required when `--mcp` is.** The documented
+  incantation had become `--url unused --model unused`, and a placeholder a user is
+  told to type is a field nobody reads. Naming neither is refused by name.
+- **The threat model records what changed underneath it.** `T2` covered a target
+  that *answers*; since MCP discovery a target also **chooses an address Guardana
+  fetches**, which is a different actor. It now separates the two — an address the
+  target picks is refused and reported, an address the operator types is followed
+  deliberately, because scanning an internal endpoint is this tool's normal case —
+  and replaces a residual-risk note that had promised a metadata-endpoint denylist
+  as "v0.7 work" for five releases.
 - **A server nobody could reach is not a secure server, and all six say so.** Every
   one of them declines with the invariant it would have established named, because
   silence from a rule means the invariant *holds* — and a report where three checks
