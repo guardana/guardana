@@ -1,7 +1,7 @@
 # Guardana on GitLab CI — a job you can include as-is.
 #
 #   include:
-#     - remote: "https://raw.githubusercontent.com/guardana/guardana/v0.12/deploy/ci/gitlab-ci.yml"
+#     - remote: "https://raw.githubusercontent.com/guardana/guardana/v0.13/deploy/ci/gitlab-ci.yml"
 #
 # Then either take the defaults or override the variables in your own file:
 #
@@ -16,7 +16,7 @@
 guardana:
   stage: test
   image:
-    name: ghcr.io/guardana/guardana:0.12
+    name: ghcr.io/guardana/guardana:0.13
     # Required. The image's ENTRYPOINT is `guardana`, and GitLab prepends its own
     # shell to every `script`, so without this the runner tries to execute
     # `guardana sh -c …` and the job dies with a usage error that looks like ours.

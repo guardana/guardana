@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-09 — MCP in depth, and what a client may not conclude
+
 ### Added
 
 **MCP, in depth: what a client can prove about a server it does not run.** Guardana

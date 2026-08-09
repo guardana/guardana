@@ -267,7 +267,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.12   # moving tag → latest 0.12.x
+      - uses: guardana/guardana@v0.13   # moving tag → latest 0.13.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -459,7 +459,8 @@ why platform work comes before coverage volume.
 | **0.9** | A collector two teams can share, and one that answers a question — projects and environments as tenants, a run's gate and cost, a finding followed across runs, and `bootstrap` keeping the first run at three commands |
 | **0.10** | Company-ready — official container images, CI beyond GitHub, an SBOM and provenance on every release, a production deployment guide, a restore that has been exercised, and a clean install proven before every tag |
 | **0.11** | Life after a finding arrives — triage with waivers that expire, an audit log that says what it is worth, retention and deletion you run on purpose, bounded ingest, and a panel that signs in |
-| **0.12** *(current)* | Verification where the developers already are — `assert_secure` as a `pytest` assertion, the first framework adapter, and six defects an adversarial review found in released 0.11 code |
+| **0.12** | Verification where the developers already are — `assert_secure` as a `pytest` assertion, the first framework adapter, and six defects an adversarial review found in released 0.11 code |
+| **0.13** *(current)* | MCP in depth — six rules over a live server's authorization surface (audience validation, session binding, scope breadth, discovery targets), the OWASP MCP Top 10 installed as data, a pinned manifest covering the whole tool declaration, and `plan probe --mcp` to price a run before it costs anything |
 | **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
 
 Beyond that, the plan is kept as **milestones rather than version numbers** —

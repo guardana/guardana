@@ -68,7 +68,7 @@ files pinned by digest in every run, and a rule carries both editions where the
 semantics genuinely overlap — never a silent remap onto the matching number, since
 `LLM07:2026` is Misinformation. `guardana taxonomy` shows what is installed.
 
-## What ships today (0.12.0)
+## What ships today (0.13.0)
 
 Counts come from the registry, not from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -85,10 +85,14 @@ poisoning, hidden-instruction rules-file backdoors, training-data integrity) and
 **runtime** (dynamic, endpoint: prompt injection, DAN jailbreak,
 gradual-jailbreak scenario, indirect/RAG injection, excessive tool-use agency,
 unbounded consumption and cost asymmetry, output-secret leakage, canary-proven
-system-prompt leak, and six agentic checks — tool-result injection, credential
+system-prompt leak, six agentic checks — tool-result injection, credential
 exfiltration through a tool argument, over-broad tool arguments, memory poisoning
 across a session boundary, hidden context recited out of a tool schema, and a live
-MCP server's tool manifest).
+MCP server's tool manifest — and six over a live MCP server's **authorization
+surface**: unauthenticated access, an authorization surface no conforming client
+can use, a bearer token the server could not have issued, a session id that is
+guessable or authenticates by itself, scopes that cannot express least privilege,
+and a discovery address a client must not follow).
 
 Plus **verification as an ordinary `pytest` assertion**
 (`guardana.testing.assert_secure`) and the first **framework adapter**
@@ -107,6 +111,25 @@ doubles and [public model-format readers](docs/model-formats.md), a GitHub Actio
 and pre-commit hook, and the optional collector — whose own command
 (`guardana-collector`) covers migrations, tenants, credentials, running the
 service, and reading back what the runs reported.
+
+0.13 is depth on a target the project already had. Guardana has spoken to a live
+MCP server since 0.5, and what it said was "list your tools" — while everything a
+deployed MCP server actually gets wrong sits a layer below that. **Six rules now
+grade its authorization surface**, each testing an invariant the specification
+states as a `MUST`, and each stating what it *refuses* to conclude: a server that
+requires no credential cannot demonstrate audience validation, a server that
+rejected the forged token has rejected that token, an stdio server is skipped
+rather than graded, and a server nobody could reach makes all six decline by name.
+`--mcp-token-env` means a server that requires authentication can be probed at all,
+which it could not before; `plan probe --mcp` prices the run without contacting it,
+and prices an stdio server by refusing, because working out its cost would mean
+starting it. The **OWASP MCP Top 10** is installed as a seventh catalogue pinned to
+`version 0.1`, because a beta document moves. The approved manifest grew from
+descriptions to the **whole tool declaration**, so a widened parameter is drift even
+when the prose is identical. It also carries four defects found by running rather
+than reading — among them a meter that counted half of what a run spent while the
+rule declared the same wrong number, and a budget-stopped run that printed the tick
+people scroll for.
 
 0.12 turns back to the single developer, after four releases spent on the
 collector. Verification stops needing a pipeline: `assert_secure(target,
