@@ -14,7 +14,7 @@
 # in the morning wants one instruction (`guardana-collector rollback`), not a
 # restart with a different environment variable.
 
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.14-slim-bookworm AS builder
 
 WORKDIR /src
 COPY packages/guardana-server packages/guardana-server
@@ -24,7 +24,7 @@ RUN python -m venv /opt/guardana \
     && /opt/guardana/bin/pip install --no-cache-dir --upgrade pip \
     && /opt/guardana/bin/pip install --no-cache-dir "./packages/guardana-server[serve]"
 
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ARG VERSION=0.0.0
 LABEL org.opencontainers.image.title="guardana-collector" \

@@ -9,7 +9,7 @@
 # Two stages so the shipped image carries no build tooling, and a non-root user
 # because a scanner reads other people's code and never needs to own it.
 
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.14-slim-bookworm AS builder
 
 WORKDIR /src
 COPY packages/guardana-core packages/guardana-core
@@ -28,7 +28,7 @@ RUN python -m venv /opt/guardana \
         ./packages/guardana-report \
         ./packages/guardana-cli
 
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ARG VERSION=0.0.0
 LABEL org.opencontainers.image.title="guardana" \
