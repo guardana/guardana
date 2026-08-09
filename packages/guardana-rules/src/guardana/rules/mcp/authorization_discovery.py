@@ -1,5 +1,5 @@
 from collections.abc import Iterator, Mapping
-from urllib.parse import urlsplit
+from urllib.parse import SplitResult, urlsplit
 
 from guardana.core.report import Finding
 from guardana.core.rule import RuleMeta
@@ -10,6 +10,7 @@ from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP01_2025, OWASP_MCP
 from guardana.rules.mcp._base import McpAuthorizationRule
 
 _PKCE_METHOD = "S256"
+_DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
@@ -169,7 +170,18 @@ def _different_origin(declared: str, server: str) -> bool:
     left, right = urlsplit(declared), urlsplit(server)
     if not left.scheme or not left.netloc:
         return True
-    return (left.scheme.lower(), left.netloc.lower()) != (
-        right.scheme.lower(),
-        right.netloc.lower(),
-    )
+    return _origin(left) != _origin(right)
+
+
+def _origin(parts: SplitResult) -> tuple[str, str, int | None]:
+    """Scheme, host and port, with the scheme's default port treated as absent.
+
+    RFC 9728 documents omit `:443`, so comparing netloc verbatim reported a
+    conforming deployment as naming a different origin the moment an operator
+    wrote the port out in `--mcp`.
+    """
+    scheme = parts.scheme.lower()
+    port = parts.port
+    if port == _DEFAULT_PORTS.get(scheme):
+        port = None
+    return scheme, (parts.hostname or "").lower(), port

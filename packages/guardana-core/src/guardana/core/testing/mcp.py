@@ -72,8 +72,15 @@ class ScriptedMcpServer:
         method: str = "POST",
         body: bytes | None = None,
         headers: Mapping[str, str] | None = None,
+        alongside: str | None = None,
     ) -> RawReply:
-        """Answer one request the way the configured server would."""
+        """Answer one request the way the configured server would.
+
+        `alongside` is accepted and ignored: it exists so the real sender can guard
+        each redirect hop, and this double never redirects. Taking it keeps the
+        signature the one the `Sender` protocol publishes, so a double cannot drift
+        out of the contract it stands in for.
+        """
         sent = dict(headers or {})
         self.requests.append((method, url, sent))
         if method == "GET":

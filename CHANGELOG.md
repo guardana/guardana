@@ -103,6 +103,47 @@ token passthrough), so this is depth on a target Guardana already has. See
 - **An stdio MCP server left its pipes open.** `close()` terminated the process and
   released neither descriptor, so a long `monitor` run accumulated a pair per cycle.
 
+And **eight defects an adversarial review found in this release's own code**, before
+any of it shipped. Six were the same shape — a confident answer the code had not
+earned:
+
+- **A tool listing delivered over SSE read as a refusal.** A streamable-HTTP MCP
+  server routinely answers a POST with `text/event-stream`, and this client asks for
+  it by name in every `Accept` header — but the authorization observations parsed
+  the body with a plain `json.loads` while the JSON-RPC reader unwrapped the frame.
+  One wire format, two readers, and the one that drifted silenced the
+  unauthenticated-access, audience and session checks at once *and* made the
+  discovery check report a HIGH about missing metadata on an open server. There is
+  one reader now.
+- **A reply nobody could parse counted as a refusal.** `False` meant "the server
+  declined"; an unreadable `200` was folded into it, which is a pass on a question
+  that was never answered. It is a third answer now, and it reads `inconclusive`.
+- **A redirect walked straight past the discovery guard.** The guard checked the
+  advertised address once and `urlopen` then followed up to ten hops unchecked, so a
+  server that answered its own well-known path with `302 Location:
+  http://169.254.169.254/…` was followed there. Every hop is checked now, the
+  refusal is reported by `guardana.mcp.discovery_target`, and the response is closed
+  rather than leaked on the way out.
+- **The session verdict depended on which rules were selected.** The sample reused
+  ids recorded by other sections, so on a server issuing one session per credential
+  `session_binding` alone reported a critical finding while the same server with
+  `token_audience` also selected reported nothing. A profile exclusion must not
+  change what is true about the target; the sample is its own handshakes now.
+- **An injected transport left the authorization probe on the real network.**
+  Replacing the JSON-RPC half does not replace the HTTP half, and the target claimed
+  the capability anyway — so tests that believed they had no network made outbound
+  requests, saved only by an NXDOMAIN.
+- **A conforming deployment was reported for naming a different origin** when the
+  operator wrote `:443` out: RFC 9728 documents omit the default port, and the
+  comparison was made on the netloc verbatim.
+- **`--mcp-token-env` naming an unset or empty variable was not refused.** The run
+  then told the operator to pass the flag they had passed — or, for an empty
+  variable, treated a credential as present while sending no `Authorization` header
+  and blamed the server for issuing no session id.
+- **A test that could not fail.** `test_the_maintainer_readme_is_not_published`
+  matched the whole of `site/.assetsignore`, whose comment quotes the URL of the
+  incident — so deleting the actual ignore entry kept it green.
+
 **The mapping is true again.** OWASP published the 2026 edition of the LLM Top 10
 on 3 August 2026 and re-ranked seven entries without renumbering into empty space:
 `LLM07` used to be System Prompt Leakage and is now Misinformation, `LLM05` used to

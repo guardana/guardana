@@ -10,7 +10,8 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from guardana.cli._mcp_run import McpConnection, run_mcp_probe, write_pin
+import typer
+from guardana.cli._mcp_run import McpConnection, credential_from, run_mcp_probe, write_pin
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.target import McpError, McpServerTarget
@@ -117,3 +118,27 @@ def test_writing_a_pin_produces_no_report(
 
     assert result is None
     assert "1 approved tool description" in capsys.readouterr().out
+
+
+def test_a_credential_variable_that_holds_nothing_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Naming a variable that is unset or empty must not read as "no credential given".
+
+    A typo'd name yielded `None` and the run then told the operator to pass
+    `--mcp-token-env`, which they had. An exported-but-empty variable was worse: the
+    empty string is not `None`, so the session checks treated a credential as
+    present while no `Authorization` header was ever sent, and the report blamed the
+    server for issuing no session id.
+    """
+    monkeypatch.delenv("GUARDANA_TEST_MCP_TOKEN", raising=False)
+    with pytest.raises(typer.BadParameter, match="unset or empty"):
+        credential_from("GUARDANA_TEST_MCP_TOKEN")
+
+    monkeypatch.setenv("GUARDANA_TEST_MCP_TOKEN", "")
+    with pytest.raises(typer.BadParameter, match="unset or empty"):
+        credential_from("GUARDANA_TEST_MCP_TOKEN")
+
+    monkeypatch.setenv("GUARDANA_TEST_MCP_TOKEN", "a-real-token")
+    assert credential_from("GUARDANA_TEST_MCP_TOKEN") == "a-real-token"
+    assert credential_from(None) is None

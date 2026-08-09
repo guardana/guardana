@@ -81,7 +81,11 @@ class McpServerTarget(Target):
     ) -> McpTransport:
         if transport is not None:
             self._ref = url or "mcp://injected"
-            self._url = url
+            # Only when a sender was supplied too. A caller that injects a transport
+            # has replaced the JSON-RPC half and not the HTTP half, and claiming
+            # INSPECT_AUTHORIZATION anyway sent the authorization probe to the real
+            # network from tests that thought they had no network at all.
+            self._url = url if self._sender is not send else None
             return transport
         if command is not None:
             if not allow_exec:
@@ -95,7 +99,7 @@ class McpServerTarget(Target):
         raise McpError("an MCP target needs a URL or a command")
 
     def capabilities(self) -> set[Capability]:
-        """Declare tool listing always, and authorization inspection only over HTTP."""
+        """Declare tool listing always, and authorization inspection only over real HTTP."""
         declared = {Capability.LIST_TOOLS}
         if self._url is not None:
             declared.add(Capability.INSPECT_AUTHORIZATION)

@@ -136,9 +136,15 @@ def test_the_maintainer_readme_is_not_published() -> None:
     maintainers becomes a page. Found in the build log — "Uploaded 2 assets" for a
     site with one page — rather than by anybody visiting it.
     """
-    ignored = (_REPO / "site" / ".assetsignore").read_text(encoding="utf-8")
+    text = (_REPO / "site" / ".assetsignore").read_text(encoding="utf-8")
+    # The entries only. The comment above them explains the incident by quoting the
+    # URL, so matching the whole file passed whether or not the rule was still
+    # there — delete the entry and the prose alone kept the test green.
+    entries = {
+        line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")
+    }
 
-    assert "README.md" in ignored
+    assert "README.md" in entries, f"site/.assetsignore no longer ignores it: {sorted(entries)}"
 
 
 def test_only_one_hostname_serves_the_page() -> None:

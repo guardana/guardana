@@ -85,6 +85,7 @@ def unreachable(
     method: str = "POST",
     body: bytes | None = None,
     headers: Mapping[str, str] | None = None,
+    alongside: str | None = None,
 ) -> RawReply:
     """A sender for the server that is not there."""
     raise McpError(f"could not reach {url}: connection refused")

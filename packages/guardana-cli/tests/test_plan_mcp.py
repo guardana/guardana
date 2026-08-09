@@ -15,14 +15,26 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 _SERVER = "https://93.184.215.14/mcp"
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def plain(output: str) -> str:
+    """Strip colour and line wrapping so an assertion survives a narrower terminal.
+
+    Typer renders an error inside a box sized to the terminal, so a message that
+    reads on one line locally is wrapped across three in CI — and a substring
+    assertion against the raw text passes on a laptop and fails on a runner. Found
+    exactly that way.
+    """
+    return " ".join(_ANSI.sub("", output).replace("│", " ").split())
 
 
 def test_an_mcp_probe_is_priced() -> None:
     result = runner.invoke(app, ["plan", "probe", "--mcp", _SERVER])
 
     assert result.exit_code == 0, result.output
-    assert "rule(s) would run" in result.output
-    assert "No request was sent to produce this estimate." in result.output
+    assert "rule(s) would run" in plain(result.output)
+    assert "No request was sent to produce this estimate." in plain(result.output)
 
 
 def test_pricing_sends_nothing_at_all() -> None:
@@ -48,8 +60,8 @@ def test_an_stdio_server_is_refused_rather_than_started() -> None:
     result = runner.invoke(app, ["plan", "probe", "--mcp", "npx some-mcp-server"])
 
     assert result.exit_code != 0
-    assert "starts nothing" in result.output
-    assert "--allow-exec" in result.output
+    assert "starts nothing" in plain(result.output)
+    assert "--allow-exec" in plain(result.output)
 
 
 def test_the_ceiling_is_the_sum_of_what_each_rule_would_spend_alone() -> None:
@@ -58,7 +70,7 @@ def test_the_ceiling_is_the_sum_of_what_each_rule_would_spend_alone() -> None:
     # bound that is too high refuses a budget that would have fitted.
     result = runner.invoke(app, ["plan", "probe", "--mcp", _SERVER])
 
-    ceiling = re.search(r"at most (\d+)", result.output)
+    ceiling = re.search(r"at most (\d+)", plain(result.output))
     assert ceiling is not None, result.output
     assert int(ceiling.group(1)) > 10, "the MCP rules are not being priced at all"
 
@@ -74,7 +86,7 @@ def test_a_ceiling_that_does_not_fit_the_budget_refuses_before_anything_is_spent
     result = runner.invoke(app, ["plan", "probe", "--mcp", _SERVER, "--profile", str(profile)])
 
     assert result.exit_code != 0
-    assert "would stop early" in result.output
+    assert "would stop early" in plain(result.output)
 
 
 def test_naming_neither_an_endpoint_nor_a_server_is_refused() -> None:
@@ -82,4 +94,4 @@ def test_naming_neither_an_endpoint_nor_a_server_is_refused() -> None:
         result = runner.invoke(app, command)
 
         assert result.exit_code != 0
-        assert "--mcp for an MCP server" in result.output, command
+        assert "--mcp for an MCP server" in plain(result.output), command

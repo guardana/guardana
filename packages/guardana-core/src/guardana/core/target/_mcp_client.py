@@ -22,6 +22,7 @@ from guardana.core.target._mcp_http import (
     McpError,
     RawReply,
     Sender,
+    json_text,
     send,
 )
 from guardana.core.usage import UsageMeter
@@ -292,10 +293,7 @@ def result_of(raw: bytes, ref: str) -> Mapping[str, object]:
     """Read a JSON-RPC reply, whether it arrived as JSON or inside an SSE frame."""
     if len(raw) > MAX_RESPONSE_BYTES:
         raise McpError(f"reply from {ref} exceeds {MAX_RESPONSE_BYTES} bytes; refusing it")
-    text = raw.decode("utf-8", errors="replace").strip()
-    if text.startswith(("event:", "data:")):
-        data = [line[5:].strip() for line in text.splitlines() if line.startswith("data:")]
-        text = data[-1] if data else ""
+    text = json_text(raw)
     try:
         payload = json.loads(text)
     except ValueError as exc:
@@ -311,15 +309,22 @@ def result_of(raw: bytes, ref: str) -> Mapping[str, object]:
     return result
 
 
-def carries_tools(reply: RawReply) -> bool:
-    """Say whether this reply is a tool listing the caller actually received.
+def carries_tools(reply: RawReply) -> bool | None:
+    """Say whether this reply is a tool listing — or None when nobody could tell.
 
-    Deliberately strict: a `200` carrying a JSON-RPC *error* is not a tool listing,
-    and reading the status alone would report a server that politely refused as one
-    that handed over its manifest.
+    Three answers, not two. `True` is a manifest the caller received. `False` is a
+    refusal: a non-`200`, or a `200` carrying a JSON-RPC error, both of which are
+    the server declining on purpose. `None` is a `200` whose body could not be
+    parsed at all, which is neither — and folding it into `False` reported a server
+    nobody could read as a server that refused, which is a pass on a question that
+    was never answered.
     """
+    if reply.status != 200:  # noqa: PLR2004 — the HTTP success boundary
+        return False
     payload = reply.json_object()
-    if reply.status != 200 or payload is None or payload.get("error") is not None:  # noqa: PLR2004
+    if payload is None:
+        return None
+    if payload.get("error") is not None:
         return False
     result = payload.get("result")
     return isinstance(result, dict) and isinstance(result.get("tools"), list)

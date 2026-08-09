@@ -11,7 +11,12 @@ from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
-from guardana.cli._mcp_run import McpConnection, require_chat_endpoint, run_mcp_probe
+from guardana.cli._mcp_run import (
+    McpConnection,
+    credential_from,
+    require_chat_endpoint,
+    run_mcp_probe,
+)
 from guardana.cli._output import emit
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe
@@ -187,7 +192,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
                     mcp,
                     allow_exec=allow_exec,
                     pin=mcp_pin,
-                    credential=os.environ.get(mcp_token_env) if mcp_token_env else None,
+                    credential=credential_from(mcp_token_env),
                 ),
                 write_mcp_pin,
             )

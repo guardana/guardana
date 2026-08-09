@@ -20,7 +20,13 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
 
 from guardana.core.target._mcp_client import PROTOCOL_VERSION, body_for, carries_tools
-from guardana.core.target._mcp_http import McpError, RawReply, Sender, refusal_for
+from guardana.core.target._mcp_http import (
+    McpError,
+    RawReply,
+    RedirectRefusedError,
+    Sender,
+    refusal_for,
+)
 from guardana.core.usage import UsageMeter
 
 _CLIENT = {"name": "guardana", "version": "0"}
@@ -219,7 +225,6 @@ class _Probe:
         self._credential = credential
         self._meter = meter
         self._send = send
-        self._seen_sessions: list[str] = []
 
     @property
     def url(self) -> str:
@@ -238,18 +243,22 @@ class _Probe:
         except McpError as exc:
             return Anonymous(error=str(exc))
         challenge = handshake.header("WWW-Authenticate")
-        session = self._remember(handshake)
+        session = self._session_id_of(handshake)
         if handshake.status >= _HTTP_ERROR:
             return Anonymous(status=handshake.status, challenge=challenge)
         try:
             listing = self._call("tools/list", {}, credential=None, session=session)
         except McpError as exc:
             return Anonymous(status=handshake.status, challenge=challenge, error=str(exc))
-        return Anonymous(
-            status=listing.status,
-            listed_tools=carries_tools(listing),
-            challenge=challenge or listing.header("WWW-Authenticate"),
-        )
+        listed = carries_tools(listing)
+        challenge = challenge or listing.header("WWW-Authenticate")
+        if listed is None:
+            return Anonymous(
+                status=listing.status,
+                challenge=challenge,
+                error="the reply to tools/list could not be read as JSON or as an SSE frame",
+            )
+        return Anonymous(status=listing.status, listed_tools=listed, challenge=challenge)
 
     def discovery(self, anonymous: Anonymous) -> "Discovery":
         """Follow the authorization discovery chain, refusing addresses a client must not."""
@@ -292,14 +301,13 @@ class _Probe:
             return ForeignToken(not_attempted_because=f"the probe could not be sent: {exc}")
         if handshake.status >= _HTTP_ERROR:
             return ForeignToken(attempted=True, status=handshake.status)
-        session = self._remember(handshake)
+        session = self._session_id_of(handshake)
         try:
             listing = self._call("tools/list", {}, credential=token, session=session)
         except McpError as exc:
             return ForeignToken(not_attempted_because=f"the probe could not be completed: {exc}")
-        return ForeignToken(
-            attempted=True, status=listing.status, listed_tools=carries_tools(listing)
-        )
+        listed = carries_tools(listing)
+        return ForeignToken(attempted=True, status=listing.status, listed_tools=listed is True)
 
     def sessions(self, anonymous: Anonymous) -> Sessions:
         """Collect session ids, then try one on its own without the credential that made it."""
@@ -316,11 +324,20 @@ class _Probe:
             listing = self._call("tools/list", {}, credential=None, session=ids[-1])
         except McpError as exc:
             return Sessions(ids=ids, not_stripped_because=f"the probe could not be sent: {exc}")
+        listed = carries_tools(listing)
+        if listed is None:
+            return Sessions(
+                ids=ids,
+                not_stripped_because=(
+                    "the reply to the credential-stripped request could not be read, so "
+                    "whether the session authenticated it is unknown"
+                ),
+            )
         return Sessions(
             ids=ids,
             stripped_credential=True,
             stripped_status=listing.status,
-            stripped_listed_tools=carries_tools(listing),
+            stripped_listed_tools=listed,
         )
 
     def _cannot_establish_a_session(self, anonymous: Anonymous) -> str | None:
@@ -346,21 +363,29 @@ class _Probe:
         return None
 
     def _sample_session_ids(self) -> tuple[str, ...]:
-        """Handshake until there are enough ids to look at, or the server stops issuing them.
+        """Handshake `_SESSION_SAMPLES` times and return the ids those handshakes issued.
 
-        Bounded by attempts rather than by results. A server that issues no session
-        id would otherwise never reach the sample count, and a loop waiting for one
-        would keep sending handshakes until the budget stopped it.
+        Its own handshakes, deliberately. The sample used to reuse ids recorded by
+        the anonymous probe and the forged-token probe, which made the verdict
+        depend on *which rules were selected*: on a server that issues one session
+        per credential, `session_binding` alone saw three identical ids and reported
+        a critical finding, while the same server with `token_audience` also
+        selected saw a fourth id and reported nothing. A profile exclusion must not
+        change what is true about the target.
+
+        Bounded by attempts rather than by results, so a server that issues no
+        session id ends the loop instead of handshaking until the budget stops it.
         """
+        sampled: list[str] = []
         for _ in range(_SESSION_SAMPLES):
-            if len(self._seen_sessions) >= _SESSION_SAMPLES:
-                break
             try:
-                if self._remember(self._call("initialize", _INITIALIZE)) is None:
-                    break
+                issued = self._session_id_of(self._call("initialize", _INITIALIZE))
             except McpError:
                 break
-        return tuple(self._seen_sessions)
+            if issued is None:
+                break
+            sampled.append(issued)
+        return tuple(sampled)
 
     def _call(
         self,
@@ -390,8 +415,17 @@ class _Probe:
             return Document(url=url, refused=refusal)
         try:
             reply = self._spend(
-                lambda: self._send(url, method="GET", headers={"Accept": "application/json"})
+                lambda: self._send(
+                    url,
+                    method="GET",
+                    headers={"Accept": "application/json"},
+                    alongside=self._url,
+                )
             )
+        except RedirectRefusedError as exc:
+            # A refusal is a finding, not a gap in the evidence: the address was
+            # reached for and turned down, which is what `discovery_target` reports.
+            return Document(url=url, refused=f"it redirected to {exc.url}, and {exc.reason}")
         except McpError as exc:
             return Document(url=url, error=str(exc))
         if reply.status >= _HTTP_ERROR:
@@ -430,17 +464,9 @@ class _Probe:
         finally:
             self._meter.record(None)
 
-    def _remember(self, reply: RawReply) -> str | None:
-        """Record the session id a reply issued, duplicates included.
-
-        Deliberately not de-duplicated. A server that hands the same id to every
-        caller is the worst case this observation exists to catch, and collapsing
-        repeats into one would make it look like a server that answered once.
-        """
-        issued = reply.header("Mcp-Session-Id")
-        if issued:
-            self._seen_sessions.append(issued)
-        return issued
+    def _session_id_of(self, reply: RawReply) -> str | None:
+        """Read the session id a reply issued, or None when it issued none."""
+        return reply.header("Mcp-Session-Id")
 
 
 def forged_token() -> str:

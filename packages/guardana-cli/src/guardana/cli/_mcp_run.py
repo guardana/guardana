@@ -8,6 +8,7 @@ its own.
 """
 
 import json
+import os
 import shlex
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -58,6 +59,28 @@ def require_chat_endpoint(url: str | None, model: str | None) -> tuple[str, str]
             "an MCP server"
         )
     return url, model
+
+
+def credential_from(variable: str | None) -> str | None:
+    """Read the MCP bearer token out of the environment, refusing a name that holds nothing.
+
+    A typo'd variable name yielded `None`, and the run then told the operator to
+    "pass --mcp-token-env" — which they had. An exported-but-empty variable was
+    worse: the empty string is not `None`, so the session checks treated a
+    credential as present while no `Authorization` header was ever sent, and the
+    report said "the server issues no session id" about a server that was simply
+    refusing an anonymous caller. Both are true sentences about the wrong thing.
+    """
+    if variable is None:
+        return None
+    value = os.environ.get(variable)
+    if not value:
+        raise typer.BadParameter(
+            f"--mcp-token-env names {variable!r}, which is unset or empty in this "
+            f"environment; export it, or drop the flag and accept that the checks "
+            f"needing a credential will report inconclusive"
+        )
+    return value
 
 
 def plan_target(address: str) -> McpServerTarget:
@@ -141,6 +164,7 @@ __all__ = [
     "McpConnection",
     "McpError",
     "build_mcp_target",
+    "credential_from",
     "plan_target",
     "require_chat_endpoint",
     "run_mcp_probe",

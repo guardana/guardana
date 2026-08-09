@@ -19,10 +19,11 @@ import json
 import socket
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from http.client import HTTPMessage
+from typing import IO, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 TIMEOUT_SECONDS = 30
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -48,12 +49,73 @@ class RawReply:
         return next((v for k, v in self.headers.items() if k.lower() == lowered), None)
 
     def json_object(self) -> Mapping[str, object] | None:
-        """Parse the body as a JSON object, or None when it is not one."""
+        """Parse the body as a JSON object, or None when it is not one.
+
+        Understands an SSE frame, because a streamable-HTTP MCP server routinely
+        answers a POST with `text/event-stream` — this client asks for it by name
+        in every `Accept` header. Reading only bare JSON here made a perfectly good
+        tool listing look like a refusal, which silenced three checks at once.
+        """
         try:
-            payload = json.loads(self.body.decode("utf-8", errors="replace"))
+            payload = json.loads(json_text(self.body))
         except ValueError:
             return None
         return payload if isinstance(payload, dict) else None
+
+
+def json_text(raw: bytes) -> str:
+    """Return the JSON in a reply body, unwrapping an SSE frame when there is one.
+
+    One definition, used by the JSON-RPC reader and by the authorization
+    observations, because two readers of the same wire format drift and the one
+    that drifts reports the wrong thing quietly.
+    """
+    text = raw.decode("utf-8", errors="replace").strip()
+    if not text.startswith(("event:", "data:", ":")):
+        return text
+    data = [line[5:].strip() for line in text.splitlines() if line.startswith("data:")]
+    return data[-1] if data else ""
+
+
+class RedirectRefusedError(McpError):
+    """Raised when a redirect points somewhere a client must not follow."""
+
+    def __init__(self, url: str, reason: str) -> None:
+        super().__init__(f"refused to follow a redirect to {url}: {reason}")
+        self.url = url
+        self.reason = reason
+
+
+class _GuardedRedirect(HTTPRedirectHandler):
+    """Re-checks every hop, because the guard was only ever applied to the first one.
+
+    A server that serves its own well-known path with a `302` to the cloud metadata
+    endpoint passed the check on the advertised address and was then followed
+    anywhere `urlopen` liked — which is precisely the confused deputy this module
+    exists to refuse.
+    """
+
+    def __init__(self, alongside: str) -> None:
+        super().__init__()
+        self._alongside = alongside
+
+    def redirect_request(  # noqa: PLR0913, PLR0917 — the signature urllib calls
+        self,
+        req: Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+        newurl: str,
+    ) -> Request | None:
+        """Refuse the hop, or hand it to urllib's own handling."""
+        refusal = refusal_for(newurl, alongside=self._alongside)
+        if refusal is not None:
+            # urllib drains and closes the current response only *after* this
+            # returns, so raising past it leaks the socket. Close it ourselves.
+            fp.close()
+            raise RedirectRefusedError(newurl, refusal)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 class Sender(Protocol):
@@ -72,6 +134,7 @@ class Sender(Protocol):
         method: str = "POST",
         body: bytes | None = None,
         headers: Mapping[str, str] | None = None,
+        alongside: str | None = None,
     ) -> RawReply:
         """Send one request and return the reply, whatever status it carries."""
         ...
@@ -83,19 +146,25 @@ def send(
     method: str = "POST",
     body: bytes | None = None,
     headers: Mapping[str, str] | None = None,
+    alongside: str | None = None,
 ) -> RawReply:
     """Send one request and return the reply, whatever status it carries.
 
     Only a transport failure raises. A server that answers `401`, `403` or `500`
     has answered, and every caller here is more interested in *which* of those it
     was than in being handed an exception.
+
+    `alongside` is the server under test, and it decides how strict the guard on
+    each **redirect hop** is; it defaults to the address being fetched, so even a
+    direct call to the server cannot be bounced somewhere a client must not go.
     """
     scheme = urlsplit(url).scheme
     if scheme not in _SAFE_SCHEMES:
         raise McpError(f"unsupported URL scheme {scheme!r} in {url!r}: expected http(s)")
     request = Request(url, data=body, headers=dict(headers or {}), method=method)  # noqa: S310
+    opener = build_opener(_GuardedRedirect(alongside if alongside is not None else url))
     try:
-        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
+        with opener.open(request, timeout=TIMEOUT_SECONDS) as response:
             return RawReply(
                 status=response.status,
                 headers=dict(response.headers.items()),

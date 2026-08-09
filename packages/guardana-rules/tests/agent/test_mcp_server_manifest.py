@@ -117,10 +117,16 @@ def test_stdio_is_refused_without_an_explicit_permission() -> None:
 
 
 def test_the_target_advertises_tool_listing_and_nothing_a_model_would_need() -> None:
-    assert _target([]).capabilities() == {
-        Capability.LIST_TOOLS,
-        Capability.INSPECT_AUTHORIZATION,
-    }
+    # An injected transport replaces the JSON-RPC half and not the HTTP half, so it
+    # does not claim an authorization surface — otherwise the authorization probe
+    # would go to the real network from a test that believed it had none.
+    assert _target([]).capabilities() == {Capability.LIST_TOOLS}
+
+
+def test_a_target_reached_over_real_http_does_claim_an_authorization_surface() -> None:
+    target = McpServerTarget("https://mcp.example/api")
+
+    assert target.capabilities() == {Capability.LIST_TOOLS, Capability.INSPECT_AUTHORIZATION}
 
 
 def test_an_stdio_server_does_not_claim_an_authorization_surface() -> None:
