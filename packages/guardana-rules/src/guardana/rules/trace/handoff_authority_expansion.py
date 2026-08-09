@@ -66,8 +66,24 @@ class HandoffAuthorityExpansionRule(TraceRule):
                 f"{len(silent)} handoff(s) do not record which scopes crossed, so {self.claim} "
                 f"for them — an unrecorded handover of authority is not a handover of none",
             )
+        unattributed = 0
         for span in handoffs:
+            if span.handoff is None or span.handoff.carried_scopes is None:
+                continue
+            if not any(s.agent is not None for s in trace.after(span.span_id)):
+                # A trace can name the actor on its handoffs and on nothing after them.
+                # Staying silent then would read "the receiver stayed inside what it was
+                # given" off a trace that never said the receiver did anything.
+                unattributed += 1
+                continue
             yield from self._after(trace, span)
+        if unattributed:
+            yield self.unverified(
+                trace,
+                f"no step recorded after {unattributed} handoff(s) says which agent performed "
+                f"it, so what the receiving agent went on to use is not attributable and "
+                f"{self.claim} for them",
+            )
 
     def _after(self, trace: Trace, handoff_span: Span) -> Iterator[Finding]:
         """Grade every delegation the receiving agent made once the work reached it."""

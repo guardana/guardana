@@ -47,7 +47,10 @@ class CrossTenantRetrievalRule(TraceRule):
         unattributed = 0
         for span in trace.spans:
             retrieval = span.retrieval
-            if retrieval is None:
+            if retrieval is None or not retrieval.documents:
+                # A retrieval that returned nothing crossed no boundary. Declining on it
+                # would put an inconclusive verdict on every empty search — a run turned
+                # indeterminate by a question that was in fact answered.
                 continue
             if retrieval.tenant is None or not any(d.tenant for d in retrieval.documents):
                 ungradable += 1

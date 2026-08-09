@@ -731,3 +731,37 @@ def test_the_retrieval_rule_does_not_run_when_the_producer_records_no_retrieval(
     result = built_in_runner().run(TraceTarget(trace))
 
     assert "guardana.trace.cross_tenant_retrieval" not in result.rules_run
+
+
+def test_an_empty_retrieval_is_not_reported_as_an_unanswered_question() -> None:
+    """Nothing came back, so nothing crossed. Declining here turns a clean run red."""
+    trace = trace_of(
+        span(
+            "r1",
+            kind=SpanKind.RETRIEVAL,
+            retrieval=Retrieval(query="invoices", tenant="acme", documents=()),
+        )
+    )
+
+    assert graded(CrossTenantRetrievalRule(), trace) == ()
+
+
+def test_a_handoff_whose_aftermath_names_no_agent_declines_rather_than_staying_silent() -> None:
+    """The narrow false green: actors on the handoffs and on nothing after them.
+
+    Silence would read "the receiver stayed inside what it was given" off a trace that
+    never recorded the receiver doing anything at all.
+    """
+    trace = trace_of(
+        _handoff_span(("docs:read",)),
+        span(
+            "s2",
+            delegations=(Delegation(actor="writer", boundary="w->crm", scopes=("crm:write",)),),
+        ),
+    )
+
+    results = graded(HandoffAuthorityExpansionRule(), trace)
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+    assert "not attributable" in inconclusive(results)[0].evidence.summary

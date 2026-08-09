@@ -69,6 +69,7 @@ Written before the code they describe, so the reasoning survives the review.
 status means:
 
 - [`design/trace-domain-model.md`](design/trace-domain-model.md) — the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
+- [`design/framework-adapters.md`](design/framework-adapters.md) — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing
 - [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
 - [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam
