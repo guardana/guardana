@@ -10,6 +10,7 @@ environment variable.
 import os
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from guardana.core import __version__
@@ -137,6 +138,23 @@ def detect_deployment(
         commit_sha=_first(*_COMMIT_VARIABLES),
         image_digest=_first(*_IMAGE_VARIABLES),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class ProbeOutcome:
+    """What a probe produced, and what it was pointed at.
+
+    The identity travels back with the result because the command cannot rebuild
+    it: the targets are constructed and closed inside the run, and an MCP server
+    reached over stdio would have to be *started again* to be asked what it
+    supports. Without it the manifest recorded no fingerprint and no capabilities
+    for any endpoint run — so the coverage fingerprint, whose whole job is to
+    notice that one run could check less than the other, was blind to a target
+    that lost a capability.
+    """
+
+    result: ScanResult
+    identity: TargetIdentity
 
 
 def target_identity(target: Target, ref: str) -> TargetIdentity:

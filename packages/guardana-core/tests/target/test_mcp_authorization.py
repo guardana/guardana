@@ -7,7 +7,7 @@ meter that under-counts makes every declared cost agree with it and stay wrong.
 
 import pytest
 from guardana.core.budget import BudgetExhausted, Budgets
-from guardana.core.target import McpServerTarget
+from guardana.core.target import McpError, McpServerTarget
 from guardana.core.testing import ScriptedMcpServer
 
 ROUTABLE = "https://93.184.215.14/mcp"
@@ -92,3 +92,11 @@ def test_authorization_over_stdio_is_refused_rather_than_answered_emptily() -> N
             target.authorization()
     finally:
         target.close()
+
+
+def test_an_stdio_target_with_no_command_refuses_with_a_sentence() -> None:
+    # The reference was formatted from `command[0]` before the transport could
+    # refuse an empty command, so this raised `IndexError` — which no caller
+    # catches, so a target that should decline crashed with a traceback instead.
+    with pytest.raises(McpError, match="needs a command to run"):
+        McpServerTarget(command=[], allow_exec=True)

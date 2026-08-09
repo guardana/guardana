@@ -185,7 +185,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
 
     if mcp is not None:
         try:
-            result = run_mcp_probe(
+            probed = run_mcp_probe(
                 registry,
                 prof,
                 McpConnection(
@@ -195,12 +195,13 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
                     credential=credential_from(mcp_token_env),
                 ),
                 write_mcp_pin,
+                concurrency=concurrency,
             )
         except BudgetExhausted as exc:
             raise refuse_unenforceable_budget(exc) from exc
-        if result is None:
+        if probed is None:
             return
-        result = EvidenceRedactor(prof.privacy).redact_result(result)
+        result = EvidenceRedactor(prof.privacy).redact_result(probed.result)
         outcome = gate_outcome(result, prof.policy)
         run = build_manifest(
             registry,
@@ -210,6 +211,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
             target_ref=mcp,
             gate=outcome,
             started_at=started_at,
+            identity=probed.identity,
             concurrency=concurrency,
             deployment=deployment,
         )
@@ -239,12 +241,12 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
     )
 
     try:
-        result = run_against_endpoint(
+        probed = run_against_endpoint(
             endpoint_url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
         )
     except BudgetExhausted as exc:
         raise refuse_unenforceable_budget(exc) from exc
-    result = EvidenceRedactor(prof.privacy).redact_result(result)
+    result = EvidenceRedactor(prof.privacy).redact_result(probed.result)
     outcome = gate_outcome(result, prof.policy)
     run = build_manifest(
         registry,
@@ -254,6 +256,7 @@ def probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is 
         target_ref=f"{endpoint_url}#{model_name}",
         gate=outcome,
         started_at=started_at,
+        identity=probed.identity,
         concurrency=concurrency,
         deployment=deployment,
     )

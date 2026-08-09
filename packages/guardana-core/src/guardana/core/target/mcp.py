@@ -90,6 +90,11 @@ class McpServerTarget(Target):
         if command is not None:
             if not allow_exec:
                 raise McpError(_EXEC_REFUSED)
+            if not command:
+                # Named before it is indexed. `command[0]` on an empty sequence
+                # raised `IndexError`, which no caller catches — so a target that
+                # should refuse with a sentence crashed with a traceback instead.
+                raise McpError("an stdio MCP server needs a command to run")
             self._ref = f"mcp+stdio://{command[0]}"
             return StdioMcpTransport(command)
         if url is not None:

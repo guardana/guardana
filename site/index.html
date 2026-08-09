@@ -173,7 +173,7 @@
     <div class="hero-grid">
       <div>
         <h1 class="disp">Verify the AI you run yourself.</h1>
-        <p class="lede">Guardana scans model files for supply-chain risk, probes live endpoints for prompt injection and jailbreaks, and <strong>grades every finding with a confidence</strong>. Built to be the thing a pipeline blocks on: a cost you know in advance, a run you can compare against last week, and an unanswered question that never reads as a pass.</p>
+        <p class="lede">Guardana scans model files for supply-chain risk, probes live endpoints for prompt injection and jailbreaks, and <strong>grades every judgement with a confidence</strong>. Built to be the thing a pipeline blocks on: a cost you know in advance, a run you can compare against last week, and an unanswered question that never reads as a pass.</p>
         <div class="cmd"><span class="sig">$</span><code>uvx --from guardana-cli guardana scan .</code></div>
         <p class="alt">or <code>pip install guardana-cli</code> — Apache-2.0, runs fully offline.</p>
         <div class="cta">
@@ -241,7 +241,7 @@
     <div class="wrap">
       <p class="eyebrow">The differentiator</p>
       <h2 class="disp">Did the attack actually work?</h2>
-      <p class="sec-lede">Most scanners are good at <em>sending</em> attacks and bad at telling you whether one landed. Guardana treats that judgement as a first-class, swappable, versioned component — so every dynamic finding arrives with an outcome, a rationale, and a number you can gate on.</p>
+      <p class="sec-lede">Most scanners are good at <em>sending</em> attacks and bad at telling you whether one landed. Guardana treats that judgement as a first-class, swappable, versioned component — so every graded finding arrives with an outcome, a rationale, and a number you can gate on — while a deterministic one, like a planted canary coming back, is proof rather than an opinion.</p>
 
       <div class="verdict">
         <div class="vrow">
@@ -264,7 +264,7 @@
     <div class="wrap">
       <p class="eyebrow">CI in one step</p>
       <h2 class="disp">Gate it on every push</h2>
-      <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every finding maps to OWASP LLM Top 10, MITRE ATLAS, and NIST.</p>
+      <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every rule maps to a public framework — OWASP LLM Top 10, OWASP Agentic, OWASP MCP Top 10, MITRE ATLAS or NIST.</p>
       <pre class="yml"><code><span class="c">// .github/workflows/ai-security.yml</span>
 <span class="k">- uses:</span> <span class="s">actions/checkout@v4</span>
 <span class="k">- uses:</span> <span class="s">guardana/guardana@v0.13</span>
@@ -300,8 +300,8 @@
       <p class="sec-lede">Evaluation frameworks measure quality; red-teaming tools generate attacks. Guardana is built to be the thing a pipeline blocks on, which needs three properties those don't have to provide.</p>
       <pre class="yml"><code><span class="c">// what will this cost, before it costs anything</span>
 <span class="k">$</span> <span class="s">guardana plan probe --url … --model …</span>
-<span class="c">   13 rule(s) would run, 0 skipped.</span>
-<span class="c">   requests: at least 13, at most 43</span>
+<span class="c">   14 rule(s) would run, 7 skipped.</span>
+<span class="c">   requests: at least 14, at most 47</span>
 <span class="c">   No request was sent to produce this estimate.</span>
 
 <span class="c">// is this worse than last week?</span>

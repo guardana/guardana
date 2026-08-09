@@ -115,8 +115,10 @@ service, and reading back what the runs reported.
 0.13 is depth on a target the project already had. Guardana has spoken to a live
 MCP server since 0.5, and what it said was "list your tools" — while everything a
 deployed MCP server actually gets wrong sits a layer below that. **Six rules now
-grade its authorization surface**, each testing an invariant the specification
-states as a `MUST`, and each stating what it *refuses* to conclude: a server that
+grade its authorization surface** — four testing an invariant the specification
+states as a `MUST`, one grading a deployment fact it leaves `OPTIONAL` (whether a
+credential is required at all), and one reading a `SHOULD` at `low` beside a
+`MUST` — each stating what it *refuses* to conclude: a server that
 requires no credential cannot demonstrate audience validation, a server that
 rejected the forged token has rejected that token, an stdio server is skipped
 rather than graded, and a server nobody could reach makes all six decline by name.
@@ -450,8 +452,9 @@ and an expiry — and an expired waiver stops waiving.
 **Operational diagnostics.** `guardana doctor` and `config validate|explain`,
 contacting nothing.
 
-**Published schemas.** `run-v2`, `diff-v1`, `plan-v1`, each pinned to the version
-constant in the code by a test.
+**Published schemas.** `run-v3` (with `run-v2` kept, because a saved run still has to
+validate against the schema it was written to), `diff-v1`, `plan-v1`, each pinned to the
+version constant in the code by a test.
 
 ### Deliberately left open, and why
 
@@ -636,7 +639,7 @@ Landed in **0.12.0**:
 
 ---
 
-## Next: three steps, in this order, then 1.0
+## Next: the domain model, then 1.0
 
 Revised 2026-08-07. Three things moved underneath this file in the days before it,
 and none of them was on it: OWASP published a **new LLM Top 10 edition** that
@@ -647,71 +650,49 @@ that disagreed with two things this file used to say — that the remaining fram
 adapters come before the `Trace` model, and that 1.0 waits for the team platform.
 Both disagreements were right, and both are corrected below.
 
-The order is: **fix what is now untrue → build where the threat is settled and the
-target already exists → complete the domain model → freeze it.** Everything else,
-including the whole team platform, runs beside it and gates none of it.
+The order was: **fix what is now untrue → build where the threat is settled and the
+target already exists → complete the domain model → freeze it.** The first two are
+done and shipped in 0.13.0; what is left is the domain model, and then the freeze.
+Everything else, including the whole team platform, runs beside it and gates none
+of it.
 
-### Step one — the mapping is true again ~~*(next release)*~~ *(shipped, unreleased)*
+### Steps one and two shipped in 0.13.0
 
-Done. Identity is scheme + edition + local id; the catalogues are six immutable data
-files with digests every run pins; a rule carries both editions where the semantics
-overlap and the crosswalk carries an explicit relation on every pair; saved runs and
-collector rows are never rewritten, and the recorded title travels with the
-reference. `guardana taxonomy` shows what is installed and what a reference
-corresponds to. The coverage fingerprint landed with it, and `diff` reports a
-differing reach as its own statement rather than folding it into what was found.
+The mapping is true again — identity is scheme + edition + local id, the catalogues
+are immutable data files pinned by digest in every run, and `guardana taxonomy`
+answers what a reference means. MCP got its depth — six rules over a live server's
+authorization surface, `--mcp-token-env`, a pin covering the whole tool
+declaration, and `plan probe --mcp`. What each of them did is in
+[`CHANGELOG.md`](CHANGELOG.md) and in [what ships today](#what-ships-today-0130);
+repeating it here would make this file a second changelog that disagrees with the
+first.
 
-Both rules the 2026 edition argued for shipped: a canary planted in a **tool schema**
-(`LLM08:2026`) and **cost asymmetry** (`LLM06:2026`), the latter measured on
-characters so it works against a provider that reports no token counts.
-
-**Deliberately deferred out of it, with the reason:**
-
-- **`finish_reason` and latency on `Exchange`.** The cost-asymmetry rule was
-  supposed to read them; it does not need them. A ratio of reply to prompt is
-  measurable from the exchange, needs no cooperation from the provider, and works
-  against an endpoint that reports nothing — while carrying a provider's finish
-  reason honestly means adding it to the transport protocol *third parties
-  implement*. That is a contract change worth doing on its own, alongside the trace
-  work, not as a passenger on a taxonomy release. What it would add is the
-  difference between "the model stopped" and "our ceiling stopped it", which
-  sharpens the finding without being load-bearing for it.
-- **A catalogue is still a subset where the mapping is.** `OWASP-ML-2023` holds the
-  five entries Guardana's rules map to, not all ten. A catalogue is allowed to be a
-  subset; what it may never do is invent an entry, so the gaps stay gaps rather than
-  being filled in from memory.
-- **Third-party catalogues have no digest to pin.** A pack registers *references*
-  through the entry point, not a catalogue file, so a run records its refs and not a
-  provenance nobody can produce. Giving them a digest means a catalogue-file entry
-  point, which is a bigger surface than this release needed.
-
-### Step two — MCP, in depth ~~*(next)*~~ *(shipped, unreleased)*
-
-Done. Six rules over a live server's authorization surface, each testing a
-specification `MUST` and each stating what it refuses to conclude: unauthenticated
-access, an unusable authorization surface (RFC 9728 metadata, a named authorization
-server, a `resource` on this origin, PKCE advertised), a bearer token the server
-could not have issued, a session id that is guessable or authenticates by itself,
-scopes that cannot express least privilege, and a discovery address a client must
-not follow. `--mcp-token-env` lets Guardana probe a server that requires
-authentication at all, which it previously could not. The OWASP MCP Top 10 is
-installed as a seventh catalogue, pinned to `version 0.1` because a beta document
-moves. The pinned manifest grew from descriptions to the whole tool declaration
-(pin schema 1 → 2), so a widened parameter is drift even when the prose is
-identical. Guardana never calls a tool on an MCP server.
-See [`docs/design/mcp-authorization-depth.md`](docs/design/mcp-authorization-depth.md).
-
-It went second for a reason beyond urgency, and the reason paid off: identity,
+Step two went second for a reason beyond urgency, and the reason paid off: identity,
 delegation, consent and approval are the fields the domain model below has to
 represent, and meeting them produced four distinctions a schema written first would
 have flattened — identity is three fields that can disagree (presented credential,
 token audience, claimed resource), delegation has a direction and a boundary,
 consent is per client rather than per user, and a session is not an identity.
+See [`docs/design/mcp-authorization-depth.md`](docs/design/mcp-authorization-depth.md).
 
-**Deliberately deferred out of it, with the reason.** Each is deferred because the
-honest version cannot be produced from a client, not because it is large, and each
-leaves a stated gap rather than a silent one:
+**What those two steps deliberately left open, with the reason.** Each is deferred
+because the honest version cannot be produced from where Guardana stands, not
+because it is large, and each leaves a stated gap rather than a silent one:
 
+- **`finish_reason` and latency on `Exchange`.** The cost-asymmetry rule was
+  supposed to read them; it does not need them. A ratio of reply to prompt is
+  measurable from the exchange and works against an endpoint that reports nothing —
+  while carrying a provider's finish reason honestly means adding it to the
+  transport protocol *third parties implement*. That is a contract change worth
+  doing beside the trace work below. What it would add is the difference between
+  "the model stopped" and "our ceiling stopped it".
+- **A catalogue is still a subset where the mapping is.** `OWASP-ML-2023` holds the
+  entries Guardana's rules map to, not all ten. A catalogue is allowed to be a
+  subset; what it may never do is invent an entry.
+- **Third-party catalogues have no digest to pin.** A pack registers *references*
+  through the entry point, not a catalogue file, so a run records its refs and not a
+  provenance nobody can produce. Giving them a digest means a catalogue-file entry
+  point, which is a bigger surface than that release needed.
 - **Token passthrough to an upstream API.** It happens between the server and a
   service Guardana is not talking to; no sequence of client requests makes it
   observable. Its precondition — accepting a foreign-audience token — *is* checked.
@@ -725,19 +706,23 @@ leaves a stated gap rather than a silent one:
 - **Sampling misuse.** A server abusing `sampling/createMessage` issues a request
   *to the client*, over a stream the client holds open and answers. Guardana's
   client sends a request and reads a reply. Changing that is a transport-contract
-  change third-party transports implement — the same reason `finish_reason` was
-  deferred out of step one — and it belongs beside the trace work rather than as a
-  passenger here.
+  change third-party transports implement — the same reason `finish_reason` is
+  deferred — and it belongs beside the trace work.
 - **Multi-user data isolation.** Proving user A cannot reach user B's data needs two
   credentials *and* knowledge of whose data is whose. Guardana has neither and
   cannot ask for the second. The one-credential half — a session accepted as
   authentication, a specification `MUST NOT` — shipped.
 - **Shadow MCP servers (`MCP09:2025`).** Finding servers nobody registered is a
   discovery problem on a network, not a verification problem on a target.
-- **A digest for third-party catalogues** stays open from step one, and now covers
-  seven built-in catalogues rather than six.
+- **`monitor --mcp`.** The rug-pull rule compares a live manifest against a pin, and
+  the thing that makes a rug pull a rug pull is that it happens *after* adoption —
+  so the check that most wants a schedule is the one without one. `probe --mcp` in a
+  cron job is the workaround, and it is a workaround.
+- **A saved MCP run in the compatibility corpus.** The corpus holds a real artifact
+  scan from a released build; the 1.0 criterion asks for the same on the endpoint
+  side, and an MCP run is the natural first one.
 
-### Step three — the domain model, and only then the adapters
+### Next — the domain model, and only then the adapters
 
 > **Outcome:** Guardana can verify an AI *application*, and the shape it will
 > freeze at 1.0 is known to be right because three unrelated inputs already fit it.

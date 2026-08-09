@@ -115,3 +115,22 @@ def test_a_plan_document_satisfies_its_published_schema(
     payload = _json.loads(_probe_plan(monkeypatch, "--format", "json").output)
 
     Draft202012Validator(schema).validate(payload)
+
+
+def test_a_probe_plan_prices_the_canary_rules_the_probe_will_actually_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The plan under-priced the run, which is the dangerous direction to be wrong in.
+
+    `probe` plants a fresh canary system prompt for every rule that needs one,
+    whether or not `--system-prompt-file` was given — that is how the leak check
+    works at all. The plan built its target without one, so the target declared no
+    `plant_system_prompt`, and every canary rule was listed as skipped and left out
+    of the ceiling. A budget sized from that plan stops the real run early, and a
+    run that stops early reports no verdict.
+    """
+    payload = json.loads(_probe_plan(monkeypatch, "--format", "json").output)
+
+    assert "guardana.prompt.system_prompt_leak.canary" in payload["rules"]
+    assert "guardana.scenario.indirect_injection" in payload["rules"]
+    assert "guardana.prompt.system_prompt_leak.canary" not in payload["skipped"]

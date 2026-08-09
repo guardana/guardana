@@ -180,13 +180,30 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
         endpoint_url,
         model_name,
         api_key=None,
-        system_prompt=(
-            system_prompt_file.read_text(encoding="utf-8") if system_prompt_file else None
-        ),
+        system_prompt=_system_prompt_the_probe_will_send(system_prompt_file),
         provider=provider,
         transport=None,
     )
     _emit(_plan_for(prof, target, rules, plugins=True), format)
+
+
+def _system_prompt_the_probe_will_send(named: Path | None) -> str:
+    """Return the system prompt this plan must assume, which is never nothing.
+
+    `probe` plants a fresh canary system prompt for every rule that needs one,
+    with or without `--system-prompt-file` — that is how the leak check works at
+    all. Building the plan's target without one made it declare no
+    `plant_system_prompt`, so every canary rule was listed as skipped and left out
+    of the ceiling: the plan under-priced the run, which is the direction that
+    matters. A budget sized from it stops the real run early, and a run that stops
+    early reports no verdict.
+
+    The content is irrelevant and never sent — a plan contacts nothing — so what
+    is read from the file is used when there is one, and a stand-in otherwise.
+    """
+    if named is not None:
+        return named.read_text(encoding="utf-8")
+    return "(placeholder: guardana probe plants a fresh canary here at run time)"
 
 
 plan_app.command(name="scan")(plan_scan)

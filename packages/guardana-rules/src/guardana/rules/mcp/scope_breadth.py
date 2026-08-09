@@ -61,12 +61,14 @@ class McpScopeBreadthRule(McpAuthorizationRule):
             return
         if view.anonymous.open_to_anyone:
             return
+        read = 0
         for document, where in (
             (view.protected_resource, "protected resource metadata"),
             (view.authorization_server, "authorization server metadata"),
         ):
             if document is None or not document.readable:
                 continue
+            read += 1
             omnibus = sorted(s for s in scopes_in(document.content) if _is_omnibus(s))
             if omnibus:
                 yield self.finding(
@@ -75,6 +77,18 @@ class McpScopeBreadthRule(McpAuthorizationRule):
                     f"once; a token minted against it cannot be reduced and cannot be "
                     f"revoked without revoking every workflow",
                 )
+        if read == 0:
+            # Silence from a rule means the invariant held, so a rule that read no
+            # scopes at all must not fall into it: "this server's scopes are narrow"
+            # and "nobody ever saw this server's scopes" are different answers, and
+            # `authorization_discovery` reporting the missing document is a
+            # different rule id that a profile may have excluded.
+            yield self.unverified(
+                view,
+                "no metadata document could be read, so the scopes this server advertises "
+                "were never seen; guardana.mcp.authorization_discovery reports why the "
+                "surface could not be fetched",
+            )
         yield from self._challenge(view)
 
     def _challenge(self, view: McpAuthorizationView) -> Iterator[Finding]:

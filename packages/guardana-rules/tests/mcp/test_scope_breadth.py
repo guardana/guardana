@@ -2,7 +2,14 @@
 
 from guardana.core.severity import Severity
 from guardana.rules.mcp import McpScopeBreadthRule
-from mcp_fixtures import CONFORMING_RESOURCE, CREDENTIAL, findings, guarded, summaries
+from mcp_fixtures import (
+    CONFORMING_RESOURCE,
+    CREDENTIAL,
+    findings,
+    guarded,
+    outcomes,
+    summaries,
+)
 
 RULE = McpScopeBreadthRule()
 
@@ -43,3 +50,18 @@ def test_a_challenge_naming_no_scope_is_reported_low() -> None:
 
     assert [f.severity for f in reported] == [Severity.LOW]
     assert "will ask for all of them" in reported[0].evidence.summary
+
+
+def test_a_server_publishing_no_metadata_at_all_is_declined_rather_than_passed() -> None:
+    # Silence from a rule here means "the invariant holds". This server published
+    # nothing to read scopes from, so a silent rule would be reporting that its
+    # scopes are narrow enough on evidence nobody ever saw — and the reader cannot
+    # tell that apart from the conforming server two tests up.
+    reported = findings(
+        RULE,
+        guarded(resource_metadata=None, authorization_metadata=None),
+        credential=CREDENTIAL,
+    )
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "no metadata document" in reported[0].evidence.summary

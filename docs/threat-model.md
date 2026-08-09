@@ -81,6 +81,14 @@ operator *types*, and they are answered differently.
   refusal. Loopback and private addresses are permitted when the server under test
   is itself local, because that is how every development setup works and a guard
   that fires on all of them is a guard people switch off.
+- **Chosen by the target, and permitted — but it travels alone.** Not every hop a
+  server names is dangerous; a redirect to its own path is ordinary, and one to
+  another public host may be too. What must not travel with it is the operator's
+  credential. `urllib` copies every request header onto a redirected request, so a
+  permitted hop used to hand the bearer token from `--mcp-token-env` to whatever
+  origin the server named — the same confused deputy as the address, aimed at the
+  credential. A hop to a different scheme, host or port now carries no
+  `Authorization` and no `Mcp-Session-Id`.
 - **Typed by the operator — unrestricted, deliberately.** `--url` and `--mcp` go
   where they are pointed, including at internal and loopback addresses. That is
   not an oversight and it is not pending work: scanning an internal endpoint is the

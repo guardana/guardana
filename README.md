@@ -32,7 +32,8 @@ self-hosted collector.
 > person. See [product status and known limitations](docs/product-status.md)
 > before adopting.
 
-- No account, no telemetry, no phone-home. The only network traffic is to the target you point it at.
+- No account, no telemetry, no phone-home. The only network traffic is to the target you point it
+  at — and to a collector, if you run one and ask for it with `--reporter`.
 - Offline static scanning; explicit `findings`, `unverified` and `errors` channels.
 - Confidence and evaluator provenance on every dynamic verdict.
 - SARIF, JSON, JUnit, CI gates, and release-to-release comparison.
@@ -53,19 +54,15 @@ cannot tell a refusal from a compliance is not a security control.
 
 **Guardana's approach:** deterministic evidence where the question allows it, an
 evaluator-graded verdict where it does not, and an explicit "could not tell" where
-neither is honest. Grading is a first-class, versioned, swappable component — the
-**Evaluator** — so every dynamic finding carries an `outcome`, a `confidence`, a
-`rationale`, and the id of the evaluator that produced it. Our own judge's
-confidence is *measured* (Brier score and expected calibration error via
-`guardana calibrate`), not asserted.
-
-**Guardana's answer:** treat *"did it succeed, and how confident are we?"* as a
-first-class, pluggable, versioned component — the **Evaluator** — instead of
-bolting a regex onto the end of a probe. Every dynamic finding carries an
-`outcome`, a `confidence`, a `rationale`, and the id of the evaluator that
-produced it. Grading logic is swappable without touching the rule that produced
-it, and the confidence is right there in the report so you know how much to
-trust it.
+neither is honest. Grading is a first-class, pluggable, versioned component — the
+**Evaluator** — instead of a regex bolted onto the end of a probe, so every
+*graded* finding carries an `outcome`, a `confidence`, a `rationale`, and the id
+of the evaluator that produced it, and grading logic is swappable without touching
+the rule that produced it. A finding that is proof rather than judgement — a
+planted canary coming back, a server handing its tool manifest to an anonymous
+caller — carries no confidence, because there is nothing to be unsure about. Our
+own judge's confidence is *measured* (Brier score and expected calibration error
+via `guardana calibrate`), not asserted.
 
 Static supply-chain checks (pickle opcodes, unsafe model formats, dependency
 risk) don't have this problem — they're deterministic. So Guardana ships them
@@ -292,7 +289,7 @@ the 2025 edition and Misinformation in the 2026 one:
 | `guardana.mcp.token_audience` | CRITICAL | runtime | MCP01:2025 · MCP07:2025 · ASI03:2026 |
 | `guardana.mcp.unauthenticated_access` | HIGH | runtime | MCP07:2025 · ASI03:2026 · AML.T0084.001 |
 | `guardana.prompt.hidden_instructions` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI01:2026 · AML.T0080 |
-| `guardana.prompt.mcp_tool_poisoning` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI04:2026 · AML.T0110 · AML.T0011.002 |
+| `guardana.prompt.mcp_tool_poisoning` | HIGH | build | LLM01:2025 · LLM01:2026 · LLM05:2025 · LLM10:2026 · AML.T0051 · ASI04:2026 · MCP03:2025 · MCP10:2025 · AML.T0110 · AML.T0011.002 |
 | `guardana.supply_chain.chat_template` | CRITICAL | build | LLM03:2025 · LLM04:2026 · LLM05:2025 · LLM10:2026 · AML.T0018 · supply-chain · ASI05:2026 |
 | `guardana.supply_chain.code_execution` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain · ASI05:2026 |
 | `guardana.supply_chain.dependency_risk` | HIGH | build | LLM03:2025 · LLM04:2026 · supply-chain |
@@ -313,10 +310,10 @@ the 2025 edition and Misinformation in the 2026 one:
 | `guardana.agent.credential_exfiltration` | CRITICAL | runtime | LLM02:2025 · LLM02:2026 · ASI03:2026 · AML.T0086 · AML.T0098 |
 | `guardana.agent.excessive_tool_use` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 |
 | `guardana.agent.hidden_context.tool_schema` | HIGH | runtime | LLM02:2025 · LLM02:2026 · LLM08:2026 · AML.T0084.001 |
-| `guardana.agent.mcp_server_manifest` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM03:2025 · LLM04:2026 · ASI04:2026 · MCP03:2025 · AML.T0110 · AML.T0109 · AML.T0084.001 |
+| `guardana.agent.mcp_server_manifest` | HIGH | runtime | LLM01:2025 · LLM01:2026 · LLM03:2025 · LLM04:2026 · ASI04:2026 · MCP03:2025 · MCP04:2025 · MCP10:2025 · AML.T0110 · AML.T0109 · AML.T0084.001 |
 | `guardana.agent.memory_poisoning` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI06:2026 · AML.T0080 · AML.T0080.000 |
 | `guardana.agent.tool_argument_scope` | HIGH | runtime | LLM06:2025 · LLM03:2026 · ASI02:2026 · AML.T0053 · AML.T0101 |
-| `guardana.agent.tool_result_injection` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI01:2026 · ASI02:2026 · AML.T0053 · AML.T0086 |
+| `guardana.agent.tool_result_injection` | CRITICAL | runtime | LLM01:2025 · LLM01:2026 · ASI01:2026 · ASI02:2026 · MCP06:2025 · AML.T0053 · AML.T0086 |
 | `guardana.output.secrets` | HIGH | runtime | LLM02:2025 · LLM02:2026 |
 | `guardana.prompt.cost_asymmetry` | MEDIUM | runtime | LLM10:2025 · LLM06:2026 · AML.T0034.002 |
 | `guardana.prompt.injection.ignore_previous` | HIGH | runtime | LLM01:2025 · LLM01:2026 · AML.T0051 |
@@ -461,7 +458,8 @@ why platform work comes before coverage volume.
 | **0.11** | Life after a finding arrives — triage with waivers that expire, an audit log that says what it is worth, retention and deletion you run on purpose, bounded ingest, and a panel that signs in |
 | **0.12** | Verification where the developers already are — `assert_secure` as a `pytest` assertion, the first framework adapter, and six defects an adversarial review found in released 0.11 code |
 | **0.13** *(current)* | MCP in depth — six rules over a live server's authorization surface (audience validation, session binding, scope breadth, discovery targets), the OWASP MCP Top 10 installed as data, a pinned manifest covering the whole tool declaration, and `plan probe --mcp` to price a run before it costs anything |
-| **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment |
+| **next** | The domain model — a common `Trace` for model calls, tool offers, retrieval, identity and side effects; real traces imported rather than a Guardana-only protocol; the remaining framework adapters written as translators into it |
+| **1.0** | Stable extension platform — the point where a third-party rule pack is a safe investment, which is why the model above lands first |
 
 Beyond that, the plan is kept as **milestones rather than version numbers** —
 environments and deployments, the team platform, continuous production

@@ -25,7 +25,10 @@ lives in a console is one nobody can review, diff or restore. It declares a
    - **Deploy command:** `npx wrangler deploy` *(the default)*
    - **Path:** `/` — the config is at the repository root, not in `site/`
    - **API token:** *Create new token*; leave the variable fields empty
-4. **Deploy.** You get `guardana.workers.dev` within a minute.
+4. **Deploy.** It is live on the custom domain within a minute — not on
+   `guardana.dev.workers.dev`, because `workers_dev` is off in the config (see below).
+   Until the domain resolves, check the deployment from the Cloudflare dashboard
+   rather than by guessing a `workers.dev` address that will not answer.
 
 `_headers` is applied by Workers static assets exactly as it was by Pages —
 verified after the first deploy, and all five headers are live. Check it once at
@@ -69,9 +72,11 @@ being true of the website too, not only the engine. Worth a check at
 Two mechanisms, because the page has two kinds of claim that go stale in
 different ways.
 
-**Version markers** — the `v0.6.0` in the header and the `guardana/guardana@v0.6`
+**Version markers** — the `v0.13.0` in the header and the `guardana/guardana@v0.13`
 Action pin — are rewritten by `scripts/bump_version.py` on every release, and the
-bump **refuses to run** if either marker has gone missing.
+bump **refuses to run** if either marker has gone missing. The numbers here are the
+ones the page carries today; they move with every release, which is the whole reason
+the script owns them.
 
 **Factual claims** — the rule total and the build/runtime split — come from the
 registry, not from memory:
@@ -98,10 +103,13 @@ survives or silently stops existing.
 ## What is still hand-maintained
 
 The illustrative rule list, the terminal demo's finding lines, and the prose. A
-landing page may show six checks out of thirty-two — it may not state a total that
-is not the total, which is the part that is now pinned. `test_landing_page.py`
-does refuse a rule *name* the project does not ship, so the list cannot advertise
-something that was renamed or removed.
+landing page may show six checks out of forty — it may not state a total that is
+not the total, which is the part that is pinned. `test_landing_page.py` refuses a
+rule *name* the project does not ship, so the list cannot advertise something that
+was renamed or removed, and it now also runs `guardana plan probe` and compares the
+transcript in the page against what the command actually prints — that transcript
+had drifted to numbers no build produced, which is this file's own warning happening
+one element over.
 
 The **Docs** link in the header still points at the GitHub README, from when the
 domain was parked. Point it at the documentation site when there is one.

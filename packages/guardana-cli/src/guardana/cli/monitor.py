@@ -88,7 +88,7 @@ def run_monitor(  # noqa: PLR0913 — the test seam needs every hook injectable
         else alert_handler(EvidenceRedactor(profile.privacy), None, connection.url)
     )
     monitor = Monitor(
-        scan=lambda: run_probe(registry, profile, connection, concurrency=concurrency),
+        scan=lambda: run_probe(registry, profile, connection, concurrency=concurrency).result,
         policy=profile.policy,
         config=MonitorConfig(interval_seconds=interval_seconds, max_cycles=max_cycles),
     )

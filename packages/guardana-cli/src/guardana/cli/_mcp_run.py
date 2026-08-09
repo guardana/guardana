@@ -14,10 +14,10 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import typer
+from guardana.cli._run_meta import ProbeOutcome, target_identity
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
-from guardana.core.report import ScanResult
-from guardana.core.runner import Runner
+from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY, Runner
 from guardana.core.target import McpError, McpServerTarget
 from guardana.rules.agent.mcp_server_manifest import pin_document
 
@@ -128,13 +128,24 @@ def write_pin(connection: McpConnection, path: Path) -> int:
 
 
 def run_mcp_probe(
-    registry: Registry, profile: Profile, connection: McpConnection, write_to: Path | None
-) -> ScanResult | None:
+    registry: Registry,
+    profile: Profile,
+    connection: McpConnection,
+    write_to: Path | None,
+    *,
+    concurrency: int = DEFAULT_ENDPOINT_CONCURRENCY,
+) -> ProbeOutcome | None:
     """Examine the server, or write its manifest as the pin and return None.
 
     Writing a pin is an approval, not a check: it records the manifest as it is
     today, so producing a report in the same breath would say "clean" about
     something nobody compared to anything.
+
+    `concurrency` is taken rather than defaulted because the manifest records it
+    either way: `probe --concurrency 4 --mcp …` wrote a four into the run document
+    while this ran the rules one at a time, which is a saved run stating an
+    execution setting the run did not have. The shared observation is bought under
+    a lock, so overlapping rules cost the server no more than sequential ones.
     """
     if write_to is not None:
         count = write_pin(connection, write_to)
@@ -143,7 +154,8 @@ def run_mcp_probe(
     target = build_mcp_target(connection)
     profile = _with_pin(profile, connection.pin)
     try:
-        return Runner(registry=registry, profile=profile).run(target)
+        result = Runner(registry=registry, profile=profile, concurrency=concurrency).run(target)
+        return ProbeOutcome(result, target_identity(target, target.ref))
     finally:
         target.close()
 

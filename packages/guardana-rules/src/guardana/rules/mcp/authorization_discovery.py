@@ -1,16 +1,21 @@
 from collections.abc import Iterator, Mapping
-from urllib.parse import SplitResult, urlsplit
+from urllib.parse import urlsplit
 
 from guardana.core.report import Finding
 from guardana.core.rule import RuleMeta
 from guardana.core.safety import Impact
 from guardana.core.severity import Severity
-from guardana.core.target import Capability, Document, McpAuthorizationView, TargetKind
+from guardana.core.target import (
+    Capability,
+    Document,
+    McpAuthorizationView,
+    TargetKind,
+    same_origin,
+)
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP01_2025, OWASP_MCP07_2025
 from guardana.rules.mcp._base import McpAuthorizationRule
 
 _PKCE_METHOD = "S256"
-_DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
@@ -109,6 +114,12 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
     def _authorization_server(self, view: McpAuthorizationView) -> Iterator[Finding]:
         document = view.authorization_server
         if document is None:
+            # No document and no issuer named is already reported above. No document
+            # *with* an issuer named means every discovery address for it was
+            # refused as unsafe to fetch — so PKCE is a question this run never
+            # asked, and staying silent about it reads as a server that advertises
+            # S256 correctly.
+            yield from self._refused_issuer(view)
             return
         if not document.readable:
             yield from self._unreadable(view, document, "authorization server metadata")
@@ -127,6 +138,31 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
                 f"the authorization server advertises PKCE methods {sorted(methods)} without "
                 f"{_PKCE_METHOD!r}, which OAuth 2.1 requires of a client that can do it",
             )
+
+    def _refused_issuer(self, view: McpAuthorizationView) -> Iterator[Finding]:
+        """Say that PKCE went unchecked, when the issuer's every address was refused.
+
+        Matched on the issuer's own host rather than on the well-known paths the
+        engine builds: a rule that recognised a refusal by the shape of a URL would
+        go quiet the day those paths gain a third candidate, and going quiet here is
+        the failure this whole branch exists to prevent.
+        """
+        issuer = _named_issuer(view.protected_resource)
+        if issuer is None:
+            return
+        host = urlsplit(issuer).hostname
+        refused = next(
+            (d for d in view.refused_addresses if urlsplit(d.url).hostname == host), None
+        )
+        if refused is None:
+            return
+        yield self.unverified(
+            view,
+            f"the authorization server this document names ({issuer}) could not be fetched — "
+            f"{refused.url} was refused because {refused.refused} — so whether it advertises "
+            f"PKCE was never established; guardana.mcp.discovery_target reports that address "
+            f"as a finding",
+        )
 
     def _unreadable(
         self, view: McpAuthorizationView, document: Document, what: str
@@ -150,6 +186,16 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
         )
 
 
+def _named_issuer(resource: Document | None) -> str | None:
+    """Return the first authorization server a readable resource document names, or None."""
+    if resource is None or resource.content is None:
+        return None
+    issuers = resource.content.get("authorization_servers")
+    if not isinstance(issuers, list):
+        return None
+    return next((entry for entry in issuers if isinstance(entry, str) and entry), None)
+
+
 def _methods(content: Mapping[str, object] | None) -> set[str]:
     raw = (content or {}).get("code_challenge_methods_supported")
     if not isinstance(raw, list):
@@ -166,22 +212,10 @@ def _different_origin(declared: str, server: str) -> bool:
     finding on a correct deployment. What cannot be right is a different origin:
     that is the case where a token minted for the declared resource is usable
     somewhere the operator did not intend.
+
+    The comparison itself is the engine's, shared with the guard that decides
+    whether a redirect hop may carry a credential. Two copies of "same origin"
+    would drift, and the one that drifted would be reporting a conforming
+    deployment as a finding — or worse, the other way round.
     """
-    left, right = urlsplit(declared), urlsplit(server)
-    if not left.scheme or not left.netloc:
-        return True
-    return _origin(left) != _origin(right)
-
-
-def _origin(parts: SplitResult) -> tuple[str, str, int | None]:
-    """Scheme, host and port, with the scheme's default port treated as absent.
-
-    RFC 9728 documents omit `:443`, so comparing netloc verbatim reported a
-    conforming deployment as naming a different origin the moment an operator
-    wrote the port out in `--mcp`.
-    """
-    scheme = parts.scheme.lower()
-    port = parts.port
-    if port == _DEFAULT_PORTS.get(scheme):
-        port = None
-    return scheme, (parts.hostname or "").lower(), port
+    return not same_origin(declared, server)

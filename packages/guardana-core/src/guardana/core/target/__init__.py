@@ -9,7 +9,7 @@ from guardana.core.target._mcp_authorization import (
     forged_token,
     scopes_in,
 )
-from guardana.core.target._mcp_http import Sender, is_local_address
+from guardana.core.target._mcp_http import Sender, is_local_address, same_origin
 from guardana.core.target.adapter import AdapterConfig, HttpAdapterTransport
 from guardana.core.target.artifact import ArtifactTarget
 from guardana.core.target.base import Capability, Target, TargetKind
@@ -55,5 +55,6 @@ __all__ = [
     "challenge_parameters",
     "forged_token",
     "is_local_address",
+    "same_origin",
     "scopes_in",
 ]

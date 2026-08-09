@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+**A redirect carried the operator's MCP credential to whatever origin the server
+named.** `--mcp-token-env` exists so a real bearer token reaches a real server, and
+`urllib` copies every header onto a redirected request — it strips only
+`Content-Length` and `Content-Type`. The address guard added in 0.13.0 re-checked
+each hop and then let a permitted one leave with the token, so any MCP server under
+test could answer `302` and be handed the credential of whoever was scanning it.
+That is the same confused deputy the guard exists to refuse, pointed at the
+credential instead of the address. A hop to another origin now arrives with no
+`Authorization` and no `Mcp-Session-Id`; a hop within one origin is untouched,
+because a server redirecting to its own path is ordinary. "Same origin" is one
+definition in the engine now, shared with the rule that decides whether a metadata
+document identifies the server it was served for — two copies of it would drift,
+and the one that drifted would be reporting a conforming deployment as a finding.
+
+**Two MCP rules stayed silent about something they never looked at.** Silence from
+a rule means *the invariant holds*, which is why these rules have an `inconclusive`
+channel at all:
+
+- `guardana.mcp.scope_breadth` reported nothing when neither metadata document
+  could be read — so a server whose scopes were never seen was indistinguishable
+  from one whose scopes are narrow. `guardana.mcp.authorization_discovery` does
+  report the missing document, but that is a different rule id, and a profile that
+  excluded it turned the silence into the only answer.
+- `guardana.mcp.authorization_discovery` said nothing about PKCE when the issuer
+  named in a perfectly good resource document could not be fetched — every
+  discovery address for it refused as unsafe to follow. A server aiming its client
+  at the cloud metadata endpoint therefore came back clean on the requirement a
+  conforming client **must refuse to proceed** without.
+
+**`guardana plan probe` under-priced the run it was pricing.** `probe` plants a
+fresh canary system prompt for every rule that needs one, with or without
+`--system-prompt-file` — that is how the leak check works at all — while the plan
+built its target without one. Every canary rule was therefore listed as skipped and
+left out of the ceiling: `guardana.prompt.system_prompt_leak.canary` and
+`guardana.scenario.indirect_injection` among them. A budget sized from that plan
+stops the real run early, and a run that stops early reports no verdict. The plan
+now assumes what `probe` will actually send. An upper bound that is too high refuses
+a budget that would have fitted; this was the other direction.
+
+**A probe's manifest recorded neither what it reached nor how it ran.**
+
+- `probe` built its run document without a `TargetIdentity`, so every endpoint and
+  MCP run saved a null fingerprint and an empty capability list — and the coverage
+  fingerprint, whose stated job includes noticing "a target that lost a
+  capability", could not see one. `scan` had been recording both since 0.12.0.
+- `probe --concurrency N --mcp …` wrote `N` into the manifest and ran the rules one
+  at a time. The setting is now passed to the runner, which the shared observation's
+  lock already made safe.
+
+**`McpServerTarget(command=[], allow_exec=True)` raised `IndexError`** from
+formatting the reference before the transport could refuse an empty command. No
+caller catches that, so a target that should decline with a sentence crashed with a
+traceback.
+
+### Changed
+
+- **Four MCP references a rule did the work for but never declared.**
+  `guardana.taxonomy` could not answer `MCP04`, `MCP06` or `MCP10` while the roadmap
+  called them covered and named the rules that covered them. `agent.mcp_server_manifest`
+  now carries `MCP04:2025` (drift from an approved pin is dependency tampering) and
+  `MCP10:2025`; `prompt.mcp_tool_poisoning` carries `MCP03:2025` and `MCP10:2025`;
+  `agent.tool_result_injection` carries `MCP06:2025`. A mapping is what makes a
+  finding answerable in somebody else's audit, so a claim of coverage the registry
+  cannot show is not a claim worth making.
+
+### Documentation
+
+- **The landing page's `plan probe` transcript had drifted** to `13 rule(s) would
+  run, 0 skipped` — numbers no build has printed for several releases. It is now
+  pinned by a test that runs the command and compares, which is the mechanism the
+  rule *counts* on the same page have had since 0.11 and this transcript did not.
+- **Three claims on the page and in `README.md` were wider than the code.**
+  "grades every finding with a confidence" — a deterministic finding carries none,
+  because there is nothing to be unsure about; "every finding maps to OWASP LLM Top
+  10, MITRE ATLAS, and NIST" — the six MCP authorization rules map to OWASP MCP and
+  OWASP Agentic; and `README.md` said the only network traffic is to the target,
+  without the qualifier its own collector needs.
+- **`ROADMAP.md` still listed as "next" two steps that shipped in 0.13.0**, and said
+  all six MCP rules test a specification `MUST` when one grades a deployment fact the
+  specification leaves `OPTIONAL` and one reads a `SHOULD`. The shipped steps are
+  deleted per this project's own rule; every deferral they carried is kept, plus the
+  two 0.13 left open without writing down — `monitor --mcp` and a saved MCP run in the
+  compatibility corpus.
+- **`FEATURES.md` pointed at `run-v2` while the writer emits `run-v3`**, and carried a
+  `monitor` blockquote spliced into the middle of a paragraph about `diff`.
+- **`README.md` explained the Evaluator twice**, in two adjacent paragraphs saying
+  the same thing, and its roadmap table jumped from 0.13 to 1.0 without the domain
+  model that gates it.
+- **`site/README.md` promised a `workers.dev` hostname its own config turns off**,
+  named `v0.6.0` as the header marker, and said the page shows six checks out of
+  thirty-two. The page says forty.
+
 ## [0.13.0] - 2026-08-09 — MCP in depth, and what a client may not conclude
 
 ### Added
@@ -305,6 +399,13 @@ never planted rather than by reading code that looked right:
   `docs/design/` — a design document is allowed to state the problem it solved —
   which is exactly why the status line needed its own check.
 - `ROADMAP.md` said five evaluators ship; the generated catalog lists six.
+- **The plugin-trust snippet in `SECURITY.md` named an API that does not exist**, so
+  the one page telling somebody how to bound an untrusted rule pack could not be
+  followed.
+- **The landing page's deployment is written down rather than clicked.** `wrangler.jsonc`
+  at the repository root pins one public hostname (`workers_dev` and `preview_urls`
+  off), and `site/.assetsignore` keeps the maintainer README out of the published
+  site — it had been served at `/README.md`.
 
 ## [0.12.0] - 2026-08-07 — verification where the developers already are
 

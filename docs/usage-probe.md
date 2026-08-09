@@ -59,6 +59,15 @@ documents. Calling a tool is a side effect on somebody's system — possibly a
 write, possibly a payment — and no verification result is worth finding that out
 by experiment.
 
+**The token never leaves the origin you named.** MCP is the one protocol here
+where the server picks an address and the client fetches it, so every redirect hop
+is checked against the same guard as the first request — and a hop to a different
+scheme, host or port arrives with no `Authorization` and no `Mcp-Session-Id`. The
+alternative is a server under test answering `302` and being handed the credential
+of whoever is scanning it, which is the confused deputy these checks exist to look
+for. A redirect *within* one origin keeps the header, because a server pointing at
+its own path is ordinary.
+
 ### The manifest, and pinning it
 
 A tool declaration is fed to the agent's model as trusted context, so an

@@ -21,6 +21,8 @@ from guardana.core.taxonomy import (
     OWASP_LLM03_2025,
     OWASP_LLM04_2026,
     OWASP_MCP03_2025,
+    OWASP_MCP04_2025,
+    OWASP_MCP10_2025,
 )
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_hidden_char
 
@@ -102,6 +104,8 @@ class McpServerManifestRule(Rule):
             OWASP_LLM04_2026,
             OWASP_ASI04_2026,
             OWASP_MCP03_2025,
+            OWASP_MCP04_2025,
+            OWASP_MCP10_2025,
             ATLAS_T0110,
             ATLAS_T0109,
             ATLAS_T0084_001,

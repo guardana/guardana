@@ -44,12 +44,14 @@ single file or a whole directory; a single-file target never walks nothing.
 **pre-commit** hook installs straight from PyPI — see
 [`docs/integrations.md`](docs/integrations.md).
 
+> **What `monitor` is, precisely.** It performs **scheduled synthetic security
+> checks** against a configured target. It does **not** passively inspect
+> production user traffic and does **not** sit inline in the request path.
+
 ### The re-test gate: is this worse than last time? (`guardana diff`)
 
 A fourth command sits **on top of** the three above rather than beside them — it
-runs no rules. > **What `monitor` is, precisely.** It performs **scheduled synthetic security
-> checks** against a configured target. It does **not** passively inspect
-> production user traffic and does **not** sit inline in the request path.
+runs no rules.
 
 Save a run with `--output` on `scan`/`probe` (a versioned JSON
 document, not just output: it records the tool version, the target, the profile,
@@ -289,9 +291,11 @@ would surface as a green build.
 fields the digest was computed from, so nobody mistakes a digest of a declared
 endpoint for a digest of model weights.
 
-The schema is published as [`schemas/run-v2.schema.json`](schemas/run-v2.schema.json)
+The schema is published as [`schemas/run-v3.schema.json`](schemas/run-v3.schema.json)
 with its major version in its identifier, and a test validates what Guardana
-writes against it. Runs written by 0.6 are migrated forward in memory when read,
+writes against it; [`run-v2`](schemas/run-v2.schema.json) stays published, because a
+document somebody kept is still a document that has to validate against the schema
+it was written to. Runs written by 0.6 are migrated forward in memory when read,
 so upgrading does not strand the evidence you already have — and what the older
 schema never recorded stays an explicit unknown rather than becoming a default.
 

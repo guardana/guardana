@@ -2,6 +2,7 @@ import secrets
 from dataclasses import dataclass, replace
 
 from guardana.cli._endpoint import build_endpoint
+from guardana.cli._run_meta import ProbeOutcome, target_identity
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
@@ -78,7 +79,7 @@ def run_probe(
     connection: Connection,
     *,
     concurrency: int = DEFAULT_ENDPOINT_CONCURRENCY,
-) -> ScanResult:
+) -> ProbeOutcome:
     """Run every endpoint-kind rule in `registry` against a live model.
 
     Canary rules (those requiring `PLANT_SYSTEM_PROMPT` with a declared canary) are run
@@ -108,6 +109,12 @@ def run_probe(
 
     meter = UsageMeter(profile.budgets)
     results: list[ScanResult] = []
+    # Built before the passes and read for the manifest afterwards. Every pass
+    # points at the same endpoint with the same transport, so one identity
+    # describes all of them; taking it from whichever pass happened to run would
+    # make it depend on which rules the profile selected.
+    reference = f"{connection.url}#{connection.model}"
+    identity = target_identity(_target(connection, connection.system_prompt, meter), reference)
 
     if normal_rules:
         normal_target = _target(connection, connection.system_prompt, meter)
@@ -132,11 +139,11 @@ def run_probe(
         )
 
     if not results:
-        return ScanResult((), (), ())
+        return ProbeOutcome(ScanResult((), (), ()), identity)
     # The bill comes from the shared meter, not from summing the passes: each pass
     # reports the same meter's running total, so adding them up would charge the
     # first pass's requests once per pass that followed it.
-    return replace(ScanResult.merged(results), usage=meter.snapshot())
+    return ProbeOutcome(replace(ScanResult.merged(results), usage=meter.snapshot()), identity)
 
 
 def _target(connection: Connection, system_prompt: str | None, meter: UsageMeter) -> EndpointTarget:

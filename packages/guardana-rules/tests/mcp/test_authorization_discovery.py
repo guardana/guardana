@@ -76,3 +76,17 @@ def test_a_server_that_needs_no_credential_is_left_to_the_rule_that_owns_it() ->
     # There is no protected resource on an open server, so this rule has nothing to
     # say; `guardana.mcp.unauthenticated_access` is the one with the finding.
     assert findings(RULE, wide_open()) == []
+
+
+def test_an_authorization_server_nobody_could_reach_leaves_pkce_unsettled() -> None:
+    # The resource document is perfect and names an issuer a client must not follow,
+    # so every discovery address for it is refused. PKCE is then a question this run
+    # never asked — and staying silent about it reads exactly like the conforming
+    # server in the first test.
+    document = {**CONFORMING_RESOURCE, "authorization_servers": ["http://169.254.169.254/"]}
+
+    reported = findings(RULE, guarded(resource_metadata=document), credential=CREDENTIAL)
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "PKCE" in reported[0].evidence.summary
+    assert "169.254.169.254" in reported[0].evidence.summary

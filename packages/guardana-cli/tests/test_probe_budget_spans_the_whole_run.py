@@ -99,7 +99,7 @@ def test_the_request_ceiling_bounds_every_pass_of_one_probe_together() -> None:
         f"the probe sent {_CountingTransport.sent} requests under a ceiling of {_CEILING} "
         f"— three passes, three ceilings"
     )
-    assert result.stopped_by is StopReason.BUDGET_EXHAUSTED
+    assert result.result.stopped_by is StopReason.BUDGET_EXHAUSTED
 
 
 def test_the_manifest_reports_what_the_whole_probe_spent_exactly_once() -> None:
@@ -115,5 +115,5 @@ def test_the_manifest_reports_what_the_whole_probe_spent_exactly_once() -> None:
     finally:
         _endpoint.transport_factory = None
 
-    assert result.usage is not None
-    assert result.usage.requests == _CountingTransport.sent
+    assert result.result.usage is not None
+    assert result.result.usage.requests == _CountingTransport.sent

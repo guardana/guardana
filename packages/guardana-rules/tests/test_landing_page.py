@@ -90,3 +90,41 @@ def test_the_page_does_not_promise_a_hosted_collector() -> None:
 
     assert "managed cloud" not in page
     assert "hosted for you" not in page
+
+
+_PLAN_RULES_RE = re.compile(r"(\d+) rule\(s\) would run, (\d+) skipped\.")
+_PLAN_COST_RE = re.compile(r"requests: at least (\d+), at most (\d+)")
+
+
+def test_the_terminal_demo_quotes_what_plan_probe_actually_prints() -> None:
+    """The other half of the staleness this file exists to stop.
+
+    The rule counts were pinned; the `plan probe` transcript beside them was not,
+    and it drifted to numbers no build has produced for several releases — the same
+    shape as the "25 rules" sentence, one element over. Nothing here contacts a
+    model: pricing a run is the one command that must not.
+    """
+    from guardana.cli.main import app  # noqa: PLC0415 — the page quotes the CLI, not the rules
+    from typer.testing import CliRunner  # noqa: PLC0415
+
+    printed = CliRunner().invoke(
+        app, ["plan", "probe", "--url", "http://model.invalid", "--model", "m"]
+    )
+    assert printed.exit_code == 0, printed.output
+    live = _PLAN_RULES_RE.search(printed.output)
+    cost = _PLAN_COST_RE.search(printed.output)
+    assert live is not None, printed.output
+    assert cost is not None, printed.output
+
+    page = _page()
+    reworded = (
+        "site/index.html no longer shows a `plan probe` transcript in the form this "
+        "test pins — reword the test with the page rather than deleting the check"
+    )
+    stated_rules = _PLAN_RULES_RE.search(page)
+    stated_cost = _PLAN_COST_RE.search(page)
+    assert stated_rules is not None, reworded
+    assert stated_cost is not None, reworded
+
+    assert stated_rules.groups() == live.groups()
+    assert stated_cost.groups() == cost.groups()

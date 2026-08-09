@@ -16,6 +16,8 @@ from guardana.core.taxonomy import (
     OWASP_LLM01_2026,
     OWASP_LLM05_2025,
     OWASP_LLM10_2026,
+    OWASP_MCP03_2025,
+    OWASP_MCP10_2025,
 )
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_hidden_char
 from guardana.rules.supply_chain._leads import lead_verdict
@@ -65,6 +67,8 @@ class McpToolPoisoningRule(Rule):
             OWASP_LLM10_2026,
             ATLAS_T0051,
             OWASP_ASI04_2026,
+            OWASP_MCP03_2025,
+            OWASP_MCP10_2025,
             ATLAS_T0110,
             ATLAS_T0011_002,
         ),

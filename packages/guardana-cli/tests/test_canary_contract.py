@@ -95,7 +95,7 @@ def test_a_third_party_rule_shape_gets_its_canary_planted() -> None:
     # EchoingTransport discloses whatever system prompt was planted. If nothing was
     # planted, the canary evaluator finds nothing and reports a confident pass —
     # a fully leaky model graded clean.
-    assert [f.rule_id for f in result.findings] == ["acme.leak.canary"]
+    assert [f.rule_id for f in result.result.findings] == ["acme.leak.canary"]
 
 
 def test_a_rule_that_grades_by_canary_but_refuses_to_take_one_is_rejected() -> None:

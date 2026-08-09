@@ -9,8 +9,8 @@ guardana plan scan .
 ```
 
 ```text
-13 rule(s) would run, 0 skipped.
-requests: at least 13, at most 43
+14 rule(s) would run, 7 skipped.
+requests: at least 14, at most 47
 budget: 200 request(s)
 
 No request was sent to produce this estimate.

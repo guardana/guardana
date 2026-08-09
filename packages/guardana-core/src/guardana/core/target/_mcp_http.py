@@ -22,13 +22,23 @@ from dataclasses import dataclass
 from http.client import HTTPMessage
 from typing import IO, Protocol
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
+from urllib.parse import SplitResult, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 TIMEOUT_SECONDS = 30
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 _SAFE_SCHEMES = frozenset({"http", "https"})
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+_CREDENTIAL_HEADERS = frozenset({"authorization", "mcp-session-id"})
+"""What a hop to another origin must not carry.
+
+`urlopen` copies every header onto the redirected request — it strips only
+`Content-Length` and `Content-Type` — so a bearer token survives a `302` to
+anywhere the address guard permits. A session id goes with it: MCP treats one as a
+credential often enough that a whole rule exists to grade servers that do.
+"""
 
 
 class McpError(Exception):
@@ -93,6 +103,12 @@ class _GuardedRedirect(HTTPRedirectHandler):
     endpoint passed the check on the advertised address and was then followed
     anywhere `urlopen` liked — which is precisely the confused deputy this module
     exists to refuse.
+
+    A permitted hop is guarded a second way. `urlopen` copies the request's headers
+    onto the new one, so following a redirect to another origin handed that origin
+    the operator's bearer token — the same confused deputy aimed at the credential
+    rather than at the address, and the reason `--mcp-token-env` needs this before
+    it is safe to point at a server nobody controls.
     """
 
     def __init__(self, alongside: str) -> None:
@@ -108,14 +124,65 @@ class _GuardedRedirect(HTTPRedirectHandler):
         headers: HTTPMessage,
         newurl: str,
     ) -> Request | None:
-        """Refuse the hop, or hand it to urllib's own handling."""
+        """Refuse the hop, strip what it must not carry, or hand it back unchanged."""
         refusal = refusal_for(newurl, alongside=self._alongside)
         if refusal is not None:
             # urllib drains and closes the current response only *after* this
             # returns, so raising past it leaks the socket. Close it ourselves.
             fp.close()
             raise RedirectRefusedError(newurl, refusal)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        hop = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if hop is None or same_origin(req.full_url, newurl):
+            return hop
+        return _without_credentials(hop)
+
+
+def _without_credentials(request: Request) -> Request:
+    """Return this request with every credential header removed.
+
+    Rebuilt rather than mutated: `Request.headers` is also read through
+    `unredirected_hdrs`, and deleting from one of the two dictionaries is the kind
+    of half-measure that leaves the value still being sent.
+    """
+    kept = {
+        name: value
+        for name, value in request.headers.items()
+        if name.lower() not in _CREDENTIAL_HEADERS
+    }
+    return Request(  # noqa: S310 — the scheme was checked by `refusal_for` one frame up
+        request.full_url,
+        data=request.data,
+        headers=kept,
+        origin_req_host=request.origin_req_host,
+        unverifiable=True,
+        method=request.get_method(),
+    )
+
+
+def same_origin(left: str, right: str) -> bool:
+    """Whether two addresses share a scheme, host and port. A missing scheme is never a match.
+
+    One definition, because two would drift: the redirect guard decides what a hop
+    may carry with it, and `guardana.mcp.authorization_discovery` decides whether a
+    metadata document identifies the server it was served for. Both are asking
+    exactly this question, and a scheme's default port is treated as absent so a
+    conforming deployment that writes `:443` out is not a different origin from one
+    that does not.
+    """
+    first, second = urlsplit(left), urlsplit(right)
+    if not first.scheme or not first.netloc or not second.scheme or not second.netloc:
+        return False
+    return _origin(first) == _origin(second)
+
+
+def _origin(parts: SplitResult) -> tuple[str, str, int | None]:
+    scheme = parts.scheme.lower()
+    port = parts.port
+    return (
+        scheme,
+        (parts.hostname or "").lower(),
+        None if port == _DEFAULT_PORTS.get(scheme) else port,
+    )
 
 
 class Sender(Protocol):
