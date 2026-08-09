@@ -1,29 +1,44 @@
 # `site/` — the guardana.dev landing page
 
 One static page. No build step, no framework, no JavaScript — just `index.html`
-plus `_headers` (Cloudflare Pages reads that file for the security headers).
+plus `_headers`, which Cloudflare reads for the security headers.
 
 Preview locally:
 
 ```bash
-open site/index.html          # macOS; or just drag it into a browser
+open site/index.html                    # macOS; or drag it into a browser
+python3 -m http.server -d site 8099     # if you want it over HTTP
 ```
 
-## Deploy to Cloudflare Pages
+## Deploy: connect the repo once, then every push to `main` publishes itself
 
-**Connect the repo. Every push to `main` then publishes itself.**
+The deployment is described by [`wrangler.jsonc`](../wrangler.jsonc) at the
+repository root rather than by dashboard settings, because a deployment that
+lives in a console is one nobody can review, diff or restore. It declares a
+**static-assets-only Worker**: no script, no build, `site/` served as it is.
 
-1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
-2. Pick `guardana/guardana`.
-3. Build settings:
-   - **Framework preset:** None
-   - **Build command:** *(leave empty)*
-   - **Build output directory:** `site`
-4. **Save and Deploy.** You get `guardana.pages.dev` within a minute.
+1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import a repository**
+2. Pick `guardana/guardana`
+3. On **Set up your application**:
+   - **Project name:** `guardana` — it must match `name` in `wrangler.jsonc`
+   - **Build command:** *(leave empty — there is nothing to build)*
+   - **Deploy command:** `npx wrangler deploy` *(the default)*
+   - **Path:** `/` — the config is at the repository root, not in `site/`
+   - **API token:** *Create new token*; leave the variable fields empty
+4. **Deploy.** You get `guardana.workers.dev` within a minute.
 
-There is a one-off upload path (`npx wrangler pages deploy site --project-name=guardana`)
-but prefer the connected repo: a manual deploy is one more thing that can be
-forgotten, and the whole point below is that nothing here should need remembering.
+`_headers` is applied by Workers static assets exactly as it was by Pages. Check
+it once at [securityheaders.com](https://securityheaders.com) after the first
+deploy — a header file nobody verified is a policy nobody has.
+
+There is a one-off path (`npx wrangler deploy` from a laptop) but prefer the
+connected repo: a manual deploy is one more thing that can be forgotten, and the
+whole point below is that nothing here should need remembering.
+
+> **Pages instead of Workers?** It still works — *Create → Pages → Connect to
+> Git*, build command empty, output directory `site` — and needs no file in the
+> repository. Workers is the path Cloudflare is steering new projects to, and it
+> is the one where the deployment is written down.
 
 ## Point guardana.dev at it
 
@@ -31,8 +46,8 @@ forgotten, and the whole point below is that nothing here should need rememberin
 2. Cloudflare gives you two nameservers; set them at the registrar in place of
    the current ones.
 3. Wait for the domain to show as **Active** in Cloudflare — usually minutes.
-4. **Workers & Pages → guardana → Custom domains → Set up a custom domain** →
-   `guardana.dev`, and `www.guardana.dev` if you want it.
+4. **Workers & Pages → guardana → Settings → Domains & Routes → Add → Custom
+   domain** → `guardana.dev`, and `www.guardana.dev` if you want it.
 
 Cloudflare issues the TLS certificate itself.
 

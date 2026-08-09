@@ -15,6 +15,7 @@ commands were run against this file, and `docs/deployment.md` documents what cam
 back.
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,7 @@ _COMPOSE = _REPO / "deploy" / "docker-compose.yml"
 _ENV_EXAMPLE = _REPO / "deploy" / "env.example"
 _GUIDE = _REPO / "docs" / "deployment.md"
 _SECRETS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
+_WRANGLER = _REPO / "wrangler.jsonc"
 
 
 @pytest.fixture(scope="module")
@@ -100,3 +102,36 @@ def test_the_guide_documents_the_file_it_ships() -> None:
 
     for command in ("--profile migrate", "bootstrap --org", "/readyz", "pull"):
         assert command in guide, f"the deployment guide never mentions {command!r}"
+
+
+def _wrangler() -> dict[str, object]:
+    """Parse `wrangler.jsonc`, which is JSON with comments."""
+    text = _WRANGLER.read_text(encoding="utf-8")
+    stripped = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("//"))
+    loaded = json.loads(stripped)
+    assert isinstance(loaded, dict)
+    return loaded
+
+
+def test_the_site_deployment_serves_the_directory_that_exists() -> None:
+    """Rename `site/` and this fails, rather than the website 404ing after a push.
+
+    The deployment is declared in the repository instead of in a dashboard so it
+    can be reviewed and restored — which is only worth anything if something
+    checks that it still points at a real page.
+    """
+    assets = _wrangler()["assets"]
+    assert isinstance(assets, dict)
+
+    served = (_REPO / str(assets["directory"])).resolve()
+
+    assert (served / "index.html").is_file(), f"{served} has no page to serve"
+    assert (served / "_headers").is_file(), "the security headers would not ship"
+
+
+def test_the_deployment_runs_no_build_and_no_worker_script() -> None:
+    """One HTML file, served as it is. A `main` here would mean code nobody reviewed."""
+    config = _wrangler()
+
+    assert "main" not in config
+    assert config["name"] == "guardana"

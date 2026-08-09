@@ -1,0 +1,20 @@
+{
+  // What Cloudflare deploys when the dashboard runs `npx wrangler deploy` from the
+  // repository root. Kept here rather than in dashboard settings on purpose: a
+  // deployment described in a console is one nobody can review, diff or restore.
+  //
+  // There is no Worker script — `assets` without `main` is a static-assets-only
+  // Worker, which is exactly what this site is: one HTML file, no build step, no
+  // JavaScript. `site/_headers` travels with it and is what sets the closed
+  // Content-Security-Policy, so the no-telemetry principle is true of the website
+  // and not only of the engine.
+  //
+  // Deploying: connect the repo in Cloudflare (Workers → Import a repository),
+  // leave the build command empty, keep the deploy command `npx wrangler deploy`,
+  // and set the path to `/`. Full runbook: site/README.md.
+  "name": "guardana",
+  "compatibility_date": "2026-08-09",
+  "assets": {
+    "directory": "./site"
+  }
+}
