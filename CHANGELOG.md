@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+**The README is shorter, and every count in it is now pinned to the registry.**
+`test_readme_rule_table.py` covered the family table and the headline beside it and
+stopped there — so the first line under the badges offered "47 security checks to
+start" through the releases that took the number to 51, three screens above a table
+that said 51 correctly. A count is not covered because it is *near* a covered one.
+The lede, the extension-point sentence and the quickstart transcript are pinned now
+too, and `docs/writing-rules.md` no longer says "of the 32 built-in rules" — that was
+the *runtime* count promoted to a total, two true numbers rearranged into a false
+sentence.
+
+The reference material that duplicated `docs/` — the twelve-command table, the
+extensibility walkthrough, the collector's full feature list — is now a sentence and
+a link. The rule-family table stayed: it is machine-pinned, and trading a checkable
+claim for prose is the wrong direction for this repository.
+
+### Added
+
+**A design document for a documentation site on guardana.dev**
+([`docs/design/documentation-site.md`](docs/design/documentation-site.md)), closing
+the open item at the end of `site/README.md`. It argues that the interactivity worth
+building is a *generated rule explorer* rather than a docs theme, that prose stays
+markdown while facts stay generated from the registry — the answer to "should docs
+live in YAML" is no for the first and already-yes for the second — and it states the
+constraint that decides the shape: `site/_headers` sets `script-src 'none'` as a
+product claim, so free-text search costs that claim on the docs subtree and
+pre-rendered filtering does not. Proposed, not agreed.
+
 ## [0.17.1] - 2026-08-10 — three things 0.17.0 said that were not true
 
 An audit of the release, done by running it rather than by reading it. Every item

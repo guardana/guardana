@@ -20,6 +20,7 @@ from guardana.rules import provide_rules
 _BUILD_RE = re.compile(r"\*\*Build-time \(static, artifact\)\*\* — (\d+) rules")
 _RUNTIME_RE = re.compile(r"\*\*Runtime \(dynamic, endpoint and trace\)\*\* — (\d+) rules")
 _TRANSCRIPT_RE = re.compile(r"^\d+ finding\(s\); (\d+) rule\(s\) run", re.MULTILINE)
+_PLUGIN_SPLIT_RE = re.compile(r"Of the (\d+) built-in rules, (\d+) are build-time")
 _RUN_SCHEMA_RE = re.compile(r"\| `schema_version` \| `(\d+)`\.")
 _ENVELOPE_RE = re.compile(r"ENVELOPE_SCHEMA_VERSION`, currently\n`(\d+)`\)")
 
@@ -56,6 +57,27 @@ def test_how_it_works_states_the_real_split_between_the_two_surfaces() -> None:
     assert _counts(_RUNTIME_RE, page, "docs/how-it-works.md") == [
         sum(1 for r in rules if r.meta.surface is Surface.RUNTIME)
     ]
+
+
+def test_the_rule_authoring_page_states_the_real_total_and_split() -> None:
+    """It said "of the 32 built-in rules, 19 are build-time" while 51 shipped.
+
+    The 32 was the *runtime* count, promoted to a total by a release that grew the
+    other half — two true numbers rearranged into a false sentence, which is what a
+    hand-maintained count does when only one of its parts is remembered.
+    """
+    rules = list(provide_rules())
+    page = _read("writing-rules.md")
+
+    match = _PLUGIN_SPLIT_RE.search(page)
+    assert match is not None, (
+        "docs/writing-rules.md no longer states the total/build split in the form this "
+        "test pins — update the test with the rewording rather than deleting the check"
+    )
+    assert (int(match.group(1)), int(match.group(2))) == (
+        len(rules),
+        sum(1 for r in rules if r.meta.surface is Surface.BUILD),
+    )
 
 
 def test_the_scan_page_transcripts_run_the_rules_a_scan_really_runs() -> None:

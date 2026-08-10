@@ -72,6 +72,11 @@ status means:
 
 - [`design/trace-domain-model.md`](design/trace-domain-model.md) — the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
 - [`design/framework-adapters.md`](design/framework-adapters.md) — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing
+- [`design/security-contracts.md`](design/security-contracts.md) — the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does
+- [`design/mcp-protocol-eras.md`](design/mcp-protocol-eras.md) — two revisions of MCP, and settling which one a server speaks before asking it anything
+- [`design/mcp-authorization-depth.md`](design/mcp-authorization-depth.md) — what a live MCP server's authorization surface can be asked with one credential
+- [`design/taxonomy-editions.md`](design/taxonomy-editions.md) — why a reference is scheme + edition + id, and never a bare `LLM07`
+- [`design/documentation-site.md`](design/documentation-site.md) — a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way
 - [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
 - [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam

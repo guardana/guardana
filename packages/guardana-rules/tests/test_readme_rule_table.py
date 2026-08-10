@@ -29,6 +29,9 @@ from guardana.rules import provide_rules
 _FAMILY_ROW = re.compile(r"^\| `guardana\.([a-z_]+)\.\*` \| (\d+) \| ([a-z +]+) \| ", re.MULTILINE)
 _TOTAL = re.compile(r"^(\d+) built-in rules,", re.MULTILINE)
 _SPLIT = re.compile(r"The static (\d+) \(`artifact` surface\).+?The dynamic (\d+) ", re.DOTALL)
+_LEDE = re.compile(r"\*\*(\d+) security checks to start")
+_THREAT_MODEL = re.compile(r"The (\d+) built-ins cover the risks everybody shares")
+_TRANSCRIPT = re.compile(r"^\d+ finding\(s\); (\d+) rule\(s\) run", re.MULTILINE)
 
 _REWORDED = (
     "README.md no longer states its counts in the form this test pins — it was "
@@ -117,3 +120,36 @@ def test_the_family_rows_account_for_every_installed_rule() -> None:
     stated = sum(int(m.group(2)) for m in _FAMILY_ROW.finditer(_readme()))
 
     assert stated == len(_rules())
+
+
+def test_every_other_sentence_stating_a_total_states_the_same_one() -> None:
+    """The two counts outside the table's blast radius, one of which went stale.
+
+    This test pinned the table and the headline beside it, and stopped there — so the
+    very first line under the badges, the one sentence every reader sees, offered "47
+    security checks to start" through the releases that took the number to 51, three
+    screens above a table that said 51 correctly. A count is not covered because it is
+    *near* a covered one.
+    """
+    total = len(_rules())
+    readme = _readme()
+
+    lede = _LEDE.search(readme)
+    assert lede is not None, _REWORDED
+    threat_model = _THREAT_MODEL.search(readme)
+    assert threat_model is not None, _REWORDED
+    assert (int(lede.group(1)), int(threat_model.group(1))) == (total, total)
+
+
+def test_the_quickstart_transcript_runs_the_rules_a_scan_really_runs() -> None:
+    """The first command a reader types, and the first number they can check us on.
+
+    `scan` selects every build-surface rule and skips none against a directory, so the
+    number in the example is not illustrative: a reader who types it and sees a
+    different one concludes their install is broken.
+    """
+    build = sum(1 for r in _rules() if r.meta.surface is Surface.BUILD)
+
+    transcript = _TRANSCRIPT.search(_readme())
+    assert transcript is not None, _REWORDED
+    assert int(transcript.group(1)) == build
