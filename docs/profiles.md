@@ -46,6 +46,15 @@ fail_on:
   fail_on_inconclusive: false   # true: unverified checks also fail the gate
   fail_on_error: true           # false: a check that could not run stops blocking
 
+trace:                          # only ever governs `analyze-trace` / `trace inspect`
+  require: [identity, approval, effects]   # optional; evidence this run demands. A
+                                            # producer that does not record one of
+                                            # these makes the run indeterminate —
+                                            # with no fail_on_* in front of it
+
+contracts:                      # optional; security contracts to load, files or
+  - ./contracts/checkout.yaml   # directories — see usage-contracts.md
+
 evaluators:                     # config-wired evaluators — see the section below
   llm_judge:
     endpoint: "http://localhost:11434"   # any OpenAI-compatible server
@@ -68,6 +77,8 @@ evaluators:                     # config-wired evaluators — see the section be
 | `fail_on.min_confidence` | float `0.0`–`1.0` | `0.0` | For findings that carry a `Verdict` (dynamic checks), the minimum confidence required to count toward the gate. Static findings have no verdict and always count once their severity threshold is met. |
 | `fail_on.fail_on_inconclusive` | bool | `false` | When `true`, a check that ran but could not reach a verdict (reported on the `unverified` channel) also fails the gate — the strict posture for a hard CI gate. |
 | `fail_on.fail_on_error` | bool | **`true`** | A check that could not run *at all* — a plugin that failed to import, a custom rule file that would not load, a rule that raised — fails the gate. Note the default is the opposite of `fail_on_inconclusive`, and deliberately so: `inconclusive` is a verdict (the check ran and honestly could not tell), while an error means the check never happened while the result looked as though it had. Set `false` only if you would rather ship than fix the broken check. |
+| `trace.require` | list of dimension names | `[]` | Evidence a trace run demands: `messages`, `tools`, `retrieval`, `memory`, `identity`, `delegation`, `consent`, `policy`, `approval`, `effects`, `handoff`. A producer that does not record one makes the run **`indeterminate`, unconditionally** — no `fail_on_*` governs it, because you asked for this coverage by name. An unknown dimension raises at load. Governs traces only: a shared config carrying it does not affect `scan` or `probe`. See [`usage-trace-inspect.md`](usage-trace-inspect.md). |
+| `contracts` | list of paths | `[]` | Security contracts to load — files, or directories of `.yaml`/`.yml`. Added to anything passed via the repeatable `--contract PATH` flag. Unlike a malformed *rule* file, a contract that will not load is a hard error: it is your own threat model, and a silently absent one is a gate you think you have. See [`usage-contracts.md`](usage-contracts.md). |
 | `evaluators` | mapping | `{}` | Config blocks for evaluators that need a model of their own, keyed by evaluator id — `llm_judge` and `guard` today. `probe` and `monitor` build and register them from this block at startup; see the next section. With no block, a rule naming that evaluator is skipped **visibly**, never silently passed. |
 
 `include`/`exclude` are matched with shell-style globbing (`fnmatch`) against
@@ -90,6 +101,15 @@ and each `monitor` cycle's gate check.
 Checks that could not reach a verdict are reported on the separate
 `unverified` channel and do **not** fail the gate by default; set
 `fail_on.fail_on_inconclusive: true` to make them count.
+
+**One thing no `fail_on` switch governs: coverage you demanded and did not get.**
+A dimension named in `trace.require`, or needed by an assertion you wrote in a
+security contract, that the producer does not record makes the run `indeterminate`
+(exit `2`) with nothing to turn off. Every other branch above is behind a switch,
+correctly — they cover checks nobody specifically asked for. This one you asked for
+by name, and `fail_on_skipped` defaulting to off would otherwise turn "your
+contract could not be checked" into exit `0`. The saved run records which demand
+went unmet under `run.coverage.shortfall`.
 
 ## Config-wired evaluators: `llm_judge` and `guard`
 

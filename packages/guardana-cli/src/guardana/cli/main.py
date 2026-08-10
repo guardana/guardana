@@ -17,6 +17,7 @@ from guardana.cli.run import run_app
 from guardana.cli.scan import scan
 from guardana.cli.target import target_app
 from guardana.cli.taxonomy import taxonomy
+from guardana.cli.trace import trace_app
 from guardana.core import __version__
 
 
@@ -96,4 +97,5 @@ app.add_typer(plan_app, name="plan")
 app.add_typer(target_app, name="target")
 app.add_typer(baseline_app, name="baseline")
 app.add_typer(config_app, name="config")
+app.add_typer(trace_app, name="trace")
 app.command()(doctor)

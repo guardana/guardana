@@ -248,3 +248,41 @@ def load_baseline_from_text(text: str) -> frozenset[str]:
         path = Path(directory) / "baseline.yaml"
         path.write_text(text, encoding="utf-8")
         return load_baseline(path)
+
+
+def test_the_shortfall_channel_goes_through_the_redactor_like_every_other() -> None:
+    """The defect class this file already caught once: a channel added later, left out.
+
+    A shortfall's detail is Guardana's own prose *about the user's material* — a target
+    ref they chose, the AI system they named, the contract names they wrote — which is
+    the same borrowed text `errors[].reason` carries. `errors` went untouched for four
+    releases on exactly that reasoning.
+    """
+    from guardana.core.report import CoverageShortfall, ShortfallKind  # noqa: PLC0415
+
+    gap = CoverageShortfall(
+        kind=ShortfallKind.MISSING_DIMENSION,
+        name="approval",
+        detail=f"requires approval evidence and /tmp/t.jsonl (key={_FAKE_OPENAI})",
+    )
+    redactor = EvidenceRedactor(RedactionPolicy(mode=EvidenceMode.REDACTED))
+
+    redacted = redactor.redact_result(ScanResult((), (), (), coverage_shortfall=(gap,)))
+
+    assert _FAKE_OPENAI not in redacted.coverage_shortfall[0].detail
+    assert "approval evidence" in redacted.coverage_shortfall[0].detail
+
+
+def test_a_shortfall_is_never_left_without_a_reason_under_metadata_only() -> None:
+    """A demand that failed for no stated reason reads as a defect rather than a policy."""
+    from guardana.core.report import CoverageShortfall, ShortfallKind  # noqa: PLC0415
+
+    gap = CoverageShortfall(
+        kind=ShortfallKind.MISSING_DIMENSION, name="approval", detail="a detailed sentence"
+    )
+    redactor = EvidenceRedactor(RedactionPolicy(mode=EvidenceMode.METADATA_ONLY))
+
+    redacted = redactor.redact_result(ScanResult((), (), (), coverage_shortfall=(gap,)))
+
+    assert redacted.coverage_shortfall[0].detail
+    assert redacted.coverage_shortfall[0].name == "approval"

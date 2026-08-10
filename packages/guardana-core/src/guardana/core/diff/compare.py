@@ -162,11 +162,28 @@ def _incomplete(before: ScanResult, after: ScanResult) -> tuple[str, ...]:
     two lists cannot tell that from a fix. Naming the reason matters as much as
     naming the fact: the remedy for a spent budget is a bigger budget, not a
     re-enabled rule.
+
+    **Coverage the operator demanded and did not get counts here too**, and it is the
+    case a comparison hides most quietly. A run that could not check the contract
+    somebody wrote produces the same finding list as one where the contract held, so
+    subtracting them yields no change at all — and `diff` would report "no
+    regression" over a run that is `indeterminate` on its own. That is the false
+    green this project refuses from every direction, including from a comparison.
     """
-    return tuple(
-        f"the {label} run {_STOP_EXPLANATIONS[result.stopped_by]}"
-        for label, result in (("first", before), ("second", after))
-        if result.stopped_by is not None
+    sides = (("first", before), ("second", after))
+    return (
+        *(
+            f"the {label} run {_STOP_EXPLANATIONS[result.stopped_by]}"
+            for label, result in sides
+            if result.stopped_by is not None
+        ),
+        *(
+            f"the {label} run did not get coverage it demanded "
+            f"({', '.join(gap.name for gap in result.coverage_shortfall)}), so what needed "
+            f"that evidence is unknown rather than clean"
+            for label, result in sides
+            if result.coverage_shortfall
+        ),
     )
 
 

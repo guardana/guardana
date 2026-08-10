@@ -1,0 +1,64 @@
+# A security contract: what one application is allowed to do.
+#
+#   guardana analyze-trace run.jsonl \
+#     --contract examples/contracts/checkout-agent.yaml \
+#     --ai-system checkout-agent
+#
+# Everything here is deterministic and offline — each assertion compares values the
+# producer recorded. Nothing in this file is a prompt, and nothing sends anything.
+#
+# Documentation: docs/usage-contracts.md
+# Reasoning:     docs/design/security-contracts.md
+
+schema_version: 1
+name: checkout
+
+# Which application this is about, matched against `--ai-system`, which the trace
+# commands never guess. Omit it and the contract applies to whatever you point it
+# at; set it and pass no `--ai-system`, and the run is refused rather than guessed.
+applies_to:
+  ai_system: checkout-agent
+
+assertions:
+  # The failure a shared vector store exists to avoid, stated for the whole run:
+  # an agent that retrieves for one customer and then, three steps later, for
+  # another breaks no single retrieval — and only we know that is not allowed here.
+  - id: one-tenant-per-run
+    type: tenant_boundary
+    title: A checkout run serves exactly one customer
+    severity: critical
+
+  # Needs the `approval` dimension. Against a producer that does not record
+  # approvals this is `indeterminate`, never a pass: a rule that read "no approval
+  # recorded" as "no approval sought" would fire on every well-governed system.
+  - id: refunds-need-a-human
+    type: approval_required
+    title: Money only moves after a person says so
+    severity: critical
+    actions: ["payment.refund", "payment.capture"]
+    approvers: ["human:*"]        # an agent approving its own action is not oversight
+
+  # An allow list, not a deny list: the scope worth catching is the one nobody
+  # anticipated, and a deny list cannot name what nobody anticipated.
+  - id: payments-hop-moves-money-only
+    type: allowed_scopes
+    title: The payments hop may move money and nothing else
+    severity: high
+    boundaries: ["https://pay.example/*"]
+    allow: ["payments.read", "payments.write"]
+
+  # The strongest statement available about a hop, and the cheapest to prove: the
+  # question is whether a credential is present at all, not which one it was.
+  - id: no-credential-on-the-open-web
+    type: credential_boundary
+    title: Nothing we send to the public internet carries a credential
+    severity: critical
+    boundaries: ["http://*", "https://*.public.example/*"]
+
+  # `attempted` counts by default as well as `executed`: an agent stopped mid-reach
+  # still reached. `failed` does not, because that is the system refusing.
+  - id: no-shell-no-code
+    type: forbidden_sink
+    title: A checkout agent has no business running code
+    severity: critical
+    sinks: [shell, code_execution]

@@ -37,7 +37,7 @@ from guardana.core.manifest.settings import PrivacyRecord
 from guardana.core.manifest.summary import summarize
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
-from guardana.core.report import ScanResult
+from guardana.core.report import CoverageShortfall, ScanResult
 from guardana.core.rule import Rule
 from guardana.core.target import REQUEST_TIMEOUT_SECONDS, Target, TargetKind
 from guardana.core.taxonomy import catalogs
@@ -222,6 +222,7 @@ def _coverage(
     evaluators: Sequence[EvaluatorRecord],
     capabilities: Sequence[str],
     protocols: Mapping[str, str],
+    shortfall: Sequence[CoverageShortfall],
 ) -> CoverageRecord:
     """Describe what this run was able to check, and pin the catalogues it mapped against."""
     taxonomies = tuple(
@@ -237,6 +238,10 @@ def _coverage(
         digest=coverage_digest(rules, evaluators, capabilities, taxonomies, protocols),
         taxonomies=taxonomies,
         protocols=dict(protocols),
+        # Carried into the document rather than left on the in-memory result: the
+        # verdict this run reached is `indeterminate` because of these, and evidence
+        # that states a conclusion without its cause is evidence nobody can act on.
+        shortfall=tuple(shortfall),
     )
 
 
@@ -317,7 +322,9 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         usage=_run_usage(result.usage, started_at, now),
         rules=rules,
         evaluators=evaluators,
-        coverage=_coverage(rules, evaluators, target.capabilities, result.protocols),
+        coverage=_coverage(
+            rules, evaluators, target.capabilities, result.protocols, result.coverage_shortfall
+        ),
         result_summary=summarize(result, gate),
         # Recorded, so a reader knows what was applied to the evidence they are
         # looking at rather than assuming the default of whatever build they run.

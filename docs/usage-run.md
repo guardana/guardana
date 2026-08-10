@@ -120,8 +120,8 @@ missing.
 ## The document
 
 The saved-run schema lives at
-[`schemas/run-v4.schema.json`](../schemas/run-v4.schema.json), identified by
-`https://guardana.dev/schemas/run/v4.schema.json`. The version is in the
+[`schemas/run-v5.schema.json`](../schemas/run-v5.schema.json), identified by
+`https://guardana.dev/schemas/run/v5.schema.json`. The version is in the
 identifier, so a consumer can tell which contract it is holding before parsing
 anything; it changes whenever the change is not backwards-compatible. A test
 validates what Guardana writes against that file, so the schema cannot drift
@@ -137,7 +137,7 @@ Top level:
 
 | Key | What it is |
 |---|---|
-| `schema_version` | `4`. Stated once, for the whole document. |
+| `schema_version` | `5`. Stated once, for the whole document. |
 | `run` | the manifest — everything below |
 | `findings` / `unverified` / `waived` / `errors` / `observations` | the channels |
 

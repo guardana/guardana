@@ -32,7 +32,7 @@ from guardana.core.target.mcp import (
     McpServerTarget,
     McpTool,
 )
-from guardana.core.target.trace import TraceTarget
+from guardana.core.target.trace import TraceTarget, capability_for
 
 __all__ = [
     "REQUEST_TIMEOUT_SECONDS",
@@ -64,6 +64,7 @@ __all__ = [
     "ToolCallingTransport",
     "ToolSpec",
     "TraceTarget",
+    "capability_for",
     "challenge_parameters",
     "forged_token",
     "is_local_address",

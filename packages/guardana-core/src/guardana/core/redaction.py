@@ -23,6 +23,7 @@ if TYPE_CHECKING:  # everything downstream builds on this module; the arrow runs
     from guardana.core.report.check_error import CheckError
     from guardana.core.report.finding import Finding
     from guardana.core.report.result import ScanResult
+    from guardana.core.report.shortfall import CoverageShortfall
 
 
 class EvidenceMode(StrEnum):
@@ -211,10 +212,28 @@ class EvidenceRedactor:
             return error
         return replace(error, reason=reason or _WITHHELD_REASON)
 
-    def redact_result(self, result: "ScanResult") -> "ScanResult":
-        """Apply the policy to every channel of a result — errors included.
+    def redact_shortfall(self, gap: "CoverageShortfall") -> "CoverageShortfall":
+        """Return this unmet coverage demand with its sentence brought within the policy.
 
-        All four, because "nothing to report" has more than one meaning and the
+        The detail is Guardana's own prose, which is why it is tempting to leave
+        alone — and it is prose *about the user's material*: it quotes a target ref
+        (a file path an operator chose), the AI system they named, and the contract
+        names they wrote. That is the same shape of borrowed text `errors[].reason`
+        carries, and leaving one channel out is precisely how the redactor covered
+        three of four before.
+
+        Never emptied: a shortfall with no detail reads as a demand that failed for
+        no reason rather than one whose reason this run declined to keep.
+        """
+        detail = self.redact_text(gap.detail)
+        if detail == gap.detail:
+            return gap
+        return replace(gap, detail=detail or _WITHHELD_REASON)
+
+    def redact_result(self, result: "ScanResult") -> "ScanResult":
+        """Apply the policy to every channel of a result — errors and shortfalls included.
+
+        All of them, because "nothing to report" has more than one meaning and the
         redactor's promise is about the seam, not about the channel: a run that kept
         a secret out of its findings and posted it to a collector inside
         `errors[].reason` has leaked it exactly as far.
@@ -225,6 +244,7 @@ class EvidenceRedactor:
             unverified=tuple(self.redact(f) for f in result.unverified),
             waived=tuple(self.redact(f) for f in result.waived),
             errors=tuple(self.redact_error(e) for e in result.errors),
+            coverage_shortfall=tuple(self.redact_shortfall(g) for g in result.coverage_shortfall),
         )
 
     def _apply(self, text: str, patterns: tuple[tuple[str, re.Pattern[str]], ...]) -> str:

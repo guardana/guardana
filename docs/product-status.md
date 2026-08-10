@@ -109,13 +109,14 @@ Until then, probe staging endpoints or ones you control the quota for.
 
 ## How to read a Guardana result
 
-Three channels, because "nothing to report" has three meanings:
+Four channels, because "nothing to report" has four meanings:
 
 | Channel | Meaning | What to do |
 |---|---|---|
 | `findings` | A check ran and found something | Fix it, or waive it with a reason |
 | `unverified` | A check ran and honestly could not reach a verdict | Investigate why — a judge outage, an empty reply, a capability gap |
 | `errors` | A check **never ran** | Treat as a broken gate, not as a clean result |
+| `coverage shortfall` | Evidence you **demanded** was not available — a dimension your policy requires, or one your security contract needs | Instrument the producer, or stop demanding it. No `fail_on_*` setting makes this a pass |
 
 A run that reports zero findings and three errors has not told you the system is
 clean. It has told you it could not look.

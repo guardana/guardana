@@ -1,6 +1,6 @@
 [project]
 name = "guardana-cli"
-version = "0.16.0"
+version = "0.17.0"
 description = "Guardana command-line interface: scan, probe, monitor, init, rules, new-rule."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,9 +28,9 @@ classifiers = [
 # only there transitively is one a dependant can remove without anybody noticing
 # until a clean install fails.
 dependencies = [
-    "guardana-core>=0.16.0,<0.17",
-    "guardana-rules>=0.16.0,<0.17",
-    "guardana-report>=0.16.0,<0.17",
+    "guardana-core>=0.17.0,<0.18",
+    "guardana-rules>=0.17.0,<0.18",
+    "guardana-report>=0.17.0,<0.18",
     "typer>=0.12",
     "pyyaml>=6.0",
 ]

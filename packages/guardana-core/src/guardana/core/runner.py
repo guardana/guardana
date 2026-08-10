@@ -9,11 +9,12 @@ from guardana.core.inventory import observe
 from guardana.core.profile.model import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import CheckError, Finding, ScanResult, StopReason
+from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
 from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.rule.base import Rule, RuleContext
 from guardana.core.safety import permits
 from guardana.core.source import UnreadSource
-from guardana.core.target import ArtifactTarget, EndpointError, Target, TargetKind
+from guardana.core.target import ArtifactTarget, EndpointError, Target, TargetKind, TraceTarget
 
 DEFAULT_ENDPOINT_CONCURRENCY = 1
 """Rules run one at a time unless a caller asks for more.
@@ -166,6 +167,10 @@ class Runner:
             # session has actually been opened, and asking before would record
             # "nothing negotiated" for a server that negotiated fine.
             protocols=target.protocols(),
+            # Computed here rather than in a command, because a run whose verdict is
+            # `indeterminate` for a reason that is not in its own document leaves
+            # `diff` and the collector holding a conclusion with no cause.
+            coverage_shortfall=_coverage_shortfall(self.profile, target),
             stopped_by=stopped_by,
         )
 
@@ -347,6 +352,37 @@ def _unread_sources(target: Target) -> tuple[UnreadSource, ...]:
     if isinstance(target, ArtifactTarget):
         return target.unread_sources()
     return ()
+
+
+def _coverage_shortfall(profile: Profile, target: Target) -> tuple[CoverageShortfall, ...]:
+    """Return the demanded evidence this target cannot supply.
+
+    Measured against what the *producer declared it records*, not against the
+    capabilities derived from it. The two agree for every dimension a rule needs
+    today, and they come apart for one that no rule needs yet: a producer that
+    records `memory` has satisfied a `require: [memory]` even though nothing in this
+    build licenses a capability from it. Checking the derived set would report that
+    trace as missing evidence it plainly contains.
+
+    Only a trace is asked. `trace.require` is a statement about a *producer's*
+    instrumentation, so demanding it of an artifact scan is a category error — and
+    reading it as one would make a shared `guardana.yaml` a `guardana scan` that can
+    never pass.
+    """
+    if not profile.required_dimensions or not isinstance(target, TraceTarget):
+        return ()
+    return tuple(
+        CoverageShortfall(
+            kind=ShortfallKind.MISSING_DIMENSION,
+            name=str(dimension),
+            detail=(
+                f"this run requires {dimension} evidence and {target.ref} does not record it, "
+                f"so nothing here could establish what needs it"
+            ),
+        )
+        for dimension in profile.required_dimensions
+        if dimension not in target.trace.instrumented
+    )
 
 
 def _is_inconclusive(finding: Finding) -> bool:

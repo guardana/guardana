@@ -25,9 +25,15 @@ gets finer control only if it asks for it — the safe reading is the default
 reading.
 
 **`2` never means "nothing was found".** It means the question was not answered:
-no rule ran, a check could not run under `fail_on_error`, or one side of a
-comparison never finished. If indeterminate and clean shared a code, a broken
-setup would read as a green build.
+no rule ran, a check could not run under `fail_on_error`, one side of a comparison
+never finished, or **coverage the operator demanded was not there** — a dimension
+named in `trace.require`, or one an assertion in a security contract needs. If
+indeterminate and clean shared a code, a broken setup would read as a green build.
+
+That last case is the only one no `fail_on_*` setting can switch off, and
+deliberately: every other branch covers checks nobody specifically asked for, while
+this one was asked for by name. `fail_on_skipped` defaults to off, so without it the
+default path for "the contract I wrote could not be checked" would have been `0`.
 
 **`6` is separate from `1`, in both directions.** A budget stopping a run is not
 a security verdict, so an under-budgeted pipeline must not report a failure that
@@ -51,8 +57,12 @@ says it is partial.
 
 `scan`, `probe` and `monitor` can produce any of them. `diff` has no target to be
 unavailable, so `4` never occurs there; it uses `2` both for "these runs cannot be
-compared" and for "one of them never finished". `run inspect`, `run migrate` and
-`plan` produce `0` or `3`. `baseline create`, `baseline update` and
+compared" and for "one of them never finished". `run inspect`, `run migrate`,
+`trace inspect` and `plan` produce `0` or `3` — `trace inspect` grades nothing, so
+it has no verdict to report and says what is missing in its output instead.
+`analyze-trace` adds one route to `2` the others do not have: demanded coverage that
+was not available, and a security contract that turned out to be about a different
+AI system than the one under test. `baseline create`, `baseline update` and
 `scan --write-baseline` produce `2` when a check did not run, because a snapshot
 taken over a rule that never ran is missing whatever it would have found.
 

@@ -9,13 +9,25 @@ from guardana.core.profile.errors import ProfileError
 from guardana.core.profile.model import FailOn, Policy, Profile
 from guardana.core.redaction import DEFAULT_MAX_EVIDENCE_BYTES, EvidenceMode, RedactionPolicy
 from guardana.core.severity import Severity
+from guardana.core.trace.model import Dimension
 
 # Typos must fail loudly: a misspelled `fail_on:` would otherwise silently
 # fall back to defaults and weaken the gate the user thinks they configured.
 _ALLOWED_PROFILE_KEYS = frozenset(
-    {"name", "rules", "fail_on", "rule_config", "evaluators", "budgets", "privacy"}
+    {
+        "name",
+        "rules",
+        "fail_on",
+        "rule_config",
+        "evaluators",
+        "budgets",
+        "privacy",
+        "trace",
+        "contracts",
+    }
 )
 _ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
+_ALLOWED_TRACE_KEYS = frozenset({"require"})
 _ALLOWED_FAIL_ON_KEYS = frozenset(
     {"severity", "min_confidence", "fail_on_inconclusive", "fail_on_error", "fail_on_skipped"}
 )
@@ -213,6 +225,27 @@ def _privacy(raw: dict[str, Any], path: Path) -> RedactionPolicy:
     )
 
 
+def _required_dimensions(raw: dict[str, Any], path: Path) -> tuple[Dimension, ...]:
+    """Parse `trace.require:`, refusing a dimension nobody can satisfy.
+
+    Loud on an unknown name, for the reason every other list here is: `require:
+    [aproval]` would be a coverage demand that can never be met, so every run
+    against every trace would be indeterminate — a gate that fails closed on
+    everything is as useless as one that fails open on everything, and neither is
+    what the operator wrote.
+    """
+    _reject_unknown_keys(raw, _ALLOWED_TRACE_KEYS, "trace", path)
+    names = _as_glob_list(raw.get("require"), "trace.require", path)
+    known = {str(d) for d in Dimension}
+    unknown = sorted(set(names) - known)
+    if unknown:
+        raise ProfileError(
+            f"invalid profile {path}: unknown trace.require dimension(s): "
+            f"{', '.join(unknown)}; expected one of {sorted(known)}"
+        )
+    return tuple(dict.fromkeys(Dimension(name) for name in names))
+
+
 def load_profile(path: Path) -> Profile:
     """Parse a `guardana.yaml`, rejecting anything it can't honour.
 
@@ -251,4 +284,8 @@ def load_profile(path: Path) -> Profile:
         path_excludes=_as_glob_list(rules.get("paths_exclude"), "rules.paths_exclude", path),
         budgets=_budgets(_as_mapping(raw.get("budgets"), "budgets", path), path),
         privacy=_privacy(_as_mapping(raw.get("privacy"), "privacy", path), path),
+        required_dimensions=_required_dimensions(
+            _as_mapping(raw.get("trace"), "trace", path), path
+        ),
+        contract_paths=_as_glob_list(raw.get("contracts"), "contracts", path),
     )

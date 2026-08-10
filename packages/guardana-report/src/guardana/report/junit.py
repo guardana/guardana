@@ -53,12 +53,25 @@ class JUnitRenderer:
                 f"      <error message={message}>{escape(e.reason)}</error>\n"
                 f"    </testcase>"
             )
+        # Also `<error>`, and counted as one: a pipeline that renders this XML reads
+        # `errors="0"` as a suite that ran cleanly, and coverage the operator demanded
+        # and did not get is the one thing that must never look like that.
+        for gap in result.coverage_shortfall:
+            name = quoteattr(gap.name)
+            classname = quoteattr(f"guardana.coverage.{gap.kind}")
+            message = quoteattr("demanded coverage was not available")
+            cases.append(
+                f"    <testcase name={name} classname={classname}>\n"
+                f"      <error message={message}>{escape(gap.detail)}</error>\n"
+                f"    </testcase>"
+            )
         body = "\n".join(cases)
         skipped = len(result.unverified) + len(result.waived)
+        errors = len(result.errors) + len(result.coverage_shortfall)
         return (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<testsuite name="guardana" tests="{result.rules_run_count}" '
             f'failures="{len(result.findings)}" skipped="{skipped}" '
-            f'errors="{len(result.errors)}">\n'
+            f'errors="{errors}">\n'
             f"{body}\n</testsuite>"
         )

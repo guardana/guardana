@@ -22,7 +22,22 @@ approvals leaves `READ_APPROVALS` undeclared, the runner skips the rule that nee
 with a reason, and `fail_on.fail_on_skipped` turns that coverage hole into an
 indeterminate result for whoever wants it that way. What must not happen is the
 alternative: a rule finding nothing in a file that could not have contained it.
+
+**Not every dimension is in here, and that is a fact rather than an omission.**
+`Dimension.MEMORY` has no capability because no rule needs one yet; `guardana trace
+inspect` prints it with zero licensed rules instead of leaving it looking covered.
+Adding a memory rule means adding a capability here, which is one line and a
+pull request somebody reads — the same bar `Capability` sets for being a closed list.
 """
+
+
+def capability_for(dimension: Dimension) -> Capability | None:
+    """Which capability this dimension licenses, or None when no rule needs it yet.
+
+    The single reader of the table above, so the sentence `trace inspect` prints,
+    the set the runner skips on, and the coverage a policy demands cannot come apart.
+    """
+    return next((c for d, c in _DIMENSION_CAPABILITIES if d is dimension), None)
 
 
 class TraceTarget(Target):

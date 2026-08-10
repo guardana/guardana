@@ -126,8 +126,9 @@ refused too: guessing is how an unversioned format acquires a version in name on
 
 ## What it checks
 
-Seven rules. One works on a plain OpenTelemetry export; the other six need the
-authorization half.
+Nine built-in rules, plus whatever your own [security contract](usage-contracts.md)
+asserts. One works on a plain OpenTelemetry export; the rest need the authorization
+half.
 
 | Rule | What makes it fire | Needs |
 |---|---|---|
@@ -138,6 +139,8 @@ authorization half.
 | `guardana.trace.consent_scope_exceeded` | a hop exercised a scope no consent granted | consent |
 | `guardana.trace.policy_decision_ignored` | a policy said no — or could not say — and the action happened anyway | policy |
 | `guardana.trace.unapproved_side_effect` | a consequential effect executed with its approval denied or never sought | approval + effects |
+| `guardana.trace.cross_tenant_retrieval` | a retrieval for one tenant returned a document belonging to another | retrieval |
+| `guardana.trace.handoff_authority_expansion` | an agent exercised a scope wider than the handoff carried to it | delegation + handoff |
 
 Full mapping to OWASP and MITRE ATLAS:
 [the generated catalog](generated/rule-catalog.md).
@@ -161,11 +164,18 @@ missing.
 | `--reporter server://URL` | Forward findings to a collector |
 | `--ai-system`, `--environment`, `--deployment-id` | What this trace came from. Never guessed |
 | `--rules`, `--plugins`, `--allow-plugin` | Rule loading, as for `scan` |
+| `--contract PATH` | A [security contract](usage-contracts.md) to check this execution against; repeatable, and a directory loads every `.yaml` in it |
 
 ## Exit codes
 
 The [same contract as every command](exit-codes.md). `2` is the one to expect from a
 sparse trace: no rule could run, so nothing was verified.
+
+Two more routes to `2` exist here and nowhere else, and neither can be switched off:
+a dimension named in `trace.require:` (or needed by a contract assertion) that this
+producer does not record, and a set of contracts none of which was about the AI
+system you named. Run [`guardana trace inspect`](usage-trace-inspect.md) first to
+see which dimensions the file actually carries.
 
 ## Saved runs
 
@@ -177,6 +187,10 @@ an improvement.
 
 ## Related
 
+- [`usage-trace-inspect.md`](usage-trace-inspect.md) — what this file can answer at
+  all, before anything grades it
+- [`usage-contracts.md`](usage-contracts.md) — your own invariants, as a versioned
+  file this command checks
 - [`usage-import-observations.md`](usage-import-observations.md) — carrying another
   tool's results in as unverified claims
 - [`design/trace-domain-model.md`](design/trace-domain-model.md) — why the model is

@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-10 — the evidence matrix, and the application's own threat model
+
+### Added
+
+**`guardana trace inspect` — what a recorded execution can answer at all.** The
+trace design's central mechanism, that a producer which does not record a dimension
+stops the rules needing it from running, has existed since 0.14 and was visible only
+as a skip note on a run that had already happened. An operator could not gate on
+it, because they could not see what was missing until a rule was missed. The new
+command prints the matrix ahead of time: per dimension, whether the producer
+**declares** it, how many **records** this execution carries, whether the profile
+**requires** it, and how many installed rules it **licenses** — counted from the
+registry, so a rule pack a team installed is included and the number cannot rot.
+
+`declared` and `records` are separate columns because they are separate failures.
+`declared: yes, records: 0` is an execution with nothing to approve and is gradable;
+`declared: no` is an instrumentation gap where silence proves nothing. Collapsing
+them would make the two indistinguishable, which is the one inference the trace
+model exists to refuse. **There is no coverage percentage and there will not be
+one** — a single number is compatible with having no identity evidence whatsoever,
+and a team gating on a number rather than on a name ships the day the missing part
+is the part that mattered. The command opens one file, writes no run document, and
+reaches no network. See [`docs/usage-trace-inspect.md`](docs/usage-trace-inspect.md).
+
+**`trace.require:` in `guardana.yaml` — evidence a run demands.** A producer that
+does not record a required dimension makes the run `indeterminate`, never a pass,
+and **no `fail_on_*` setting governs it**. Every other branch of the gate is behind
+a switch, correctly: they cover checks nobody specifically asked for. This one was
+asked for by name, and `fail_on_skipped` defaulting to off is exactly what would
+otherwise have turned "the coverage I gate on was not there" into exit `0`. It
+governs traces only — demanding that a file scan record approvals is a category
+error, and reading it as one would make a shared config a `guardana scan` that can
+never pass.
+
+**Security contracts — the application's threat model, executable.** Rules are
+tests, evaluators are judgement, targets are the system. The missing layer was what
+an application is *allowed to do*: which principals exist, whose data is whose,
+which actions need a human, which boundary may never receive a credential. No public
+framework knows any of that, and "you can write a custom rule" stopped being a
+differentiator once policy libraries became a mainstream red-team feature.
+
+A contract is a versioned YAML file a team keeps in its own repository, loaded with
+`--contract` (repeatable, directories accepted) or `contracts:` in `guardana.yaml`.
+Five deterministic assertion kinds — `tenant_boundary`, `approval_required`,
+`allowed_scopes`, `credential_boundary`, `forbidden_sink` — each compiled into an
+ordinary `Rule`, so redaction, baselines, `diff`, the collector and the exit-code
+contract all apply with no new path through the engine. Generated attacks aimed at
+*breaking* an invariant are deliberately not part of this: the order is state the
+invariant, prove it, then generate traffic. See
+[`docs/usage-contracts.md`](docs/usage-contracts.md) and the design document,
+[`docs/design/security-contracts.md`](docs/design/security-contracts.md), which
+records what was rejected — a contract as a profile, a contract as a YAML rule, and
+an evaluator seam that would have let a tenant boundary be graded by a language
+model.
+
+**The `coverage_shortfall` channel, and why it has no switch.** A contract assertion
+whose dimension the producer does not record is skipped by the runner for a missing
+capability — and a skip reaches the gate only through `fail_on_skipped`, which
+defaults to `false`. So the default path for *"the contract you wrote could not be
+checked at all"* was a clean report and exit `0`. That is now its own channel on the
+result, it makes the run `indeterminate` unconditionally, and it is recorded in the
+saved run under `run.coverage.shortfall` — because a run whose verdict is not
+explained in its own evidence leaves `diff` and the collector holding a conclusion
+with no cause. It is deliberately neither a `CheckError` (a framework that emits no
+approval spans has malfunctioned in no way, and `fail_on_error` is a toggle) nor a
+second copy of the skip.
+
+**A contract can say "not mine" without that being a pass.** `applies_to.ai_system`
+is matched against `--ai-system`, which the trace commands already take and never
+guess. A contract about another system has its assertions recorded as **not
+applicable** — the first `SkipReason` whose `is_coverage_gap` is `false`, because
+nothing is missing — printed rather than dropped, and counted as coverage by
+nothing. A contract that names a system when no `--ai-system` was given is
+**refused** (exit `3`): "I cannot tell whether this applies" has two wrong answers
+and no right one. And a run where contracts were loaded and *none* of them applied
+is `indeterminate`, which is the wrong-file case and the only way the
+not-applicable state could have become a silent green.
+
+### Changed
+
+- **Run schema v5.** `run.coverage.shortfall` records the coverage a run's operator
+  demanded and did not get, and `rules_skipped[].reason` gains `not_applicable`. The
+  second is why this is a version rather than an addition: the reason is read
+  against a closed list, so a v4 reader handed a v5 document refuses it outright —
+  which is correct, and exactly why the enum is not widened in place. A v4 run
+  migrates forward in memory and through `guardana run migrate`; the shortfall
+  arrives empty, which is what a v4 run knew, because nothing could demand coverage
+  yet. Published as [`schemas/run-v5.schema.json`](schemas/run-v5.schema.json).
+- The human report no longer prints `✓ No findings.` over a run with unmet coverage,
+  and the JUnit report counts one as an `<error>` rather than leaving `errors="0"`.
+  The tick is what people scroll for and what a CI dashboard reads.
+- Evidence redaction covers the shortfall channel. Its detail is Guardana's own
+  prose *about the user's material* — a target ref they chose, the AI system they
+  named, the contract names they wrote — which is the same borrowed text
+  `errors[].reason` carries, and leaving one channel out is precisely how the
+  redactor covered three of four for four releases.
+
+### Fixed
+
+Two false verdicts found by auditing the new assertions rather than by a gate, both
+in `approval_required`:
+
+- **A false red on same-step approvals.** Approvals were only counted from *earlier*
+  spans, so a producer recording the approval and the effect it authorised on one
+  step — the common shape, since they are one decision — was accused of acting
+  unapproved. A span has no internal order, so the rule was reading its own
+  iteration order back as evidence. Approvals recorded on the step itself now count;
+  an approval in a *later* span still does not, which is the audit trail written to
+  look compliant.
+- **`guardana diff` reported "no regression" over a run that could not answer.**
+  Found by running the documented commands on two real files, not by a test: a run
+  whose contract could not be checked produces exactly the finding list of one where
+  the contract held, so subtracting them yields no change and the comparison exited
+  `0` over a run that was `indeterminate` on its own. A pipeline gating on the
+  comparison alone would have gone green. Unmet coverage now makes the comparison
+  **incomplete**, which fails before any threshold is consulted — the same treatment,
+  and the same reasoning, as a run stopped by an exhausted budget.
+- **A false red on a mixed approver record.** With `approvers:` set, a step carrying
+  one approval by the wrong approver and one by nobody recorded was reported as a
+  finding. The unnamed one may have been the right approver, so that step is one
+  this build cannot grade: it is now `inconclusive`, and a finding only when every
+  matching approval names an approver and none of them matches.
+
+
 ## [0.16.0] - 2026-08-10 — MCP, as the specification now is
 
 ### Added

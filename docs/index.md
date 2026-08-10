@@ -24,6 +24,8 @@ detail below.
 - [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live
   endpoint or agent, and an MCP server's manifest **and authorization surface**
 - [`usage-analyze-trace.md`](usage-analyze-trace.md) — `guardana analyze-trace`: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect
+- [`usage-trace-inspect.md`](usage-trace-inspect.md) — `guardana trace inspect`: which evidence dimensions a producer really records, and which ones your policy requires
+- [`usage-contracts.md`](usage-contracts.md) — **security contracts**: your application's own invariants — tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink — as a versioned file the engine compiles into rules
 - [`usage-import-observations.md`](usage-import-observations.md) — `guardana import-observations`: carry garak, promptfoo or your own harness's results in as unverified claims
 - [`usage-doctor.md`](usage-doctor.md) — `guardana doctor`, `config validate|explain`
 - [`usage-baseline.md`](usage-baseline.md) — `guardana baseline`: accepted risk that expires

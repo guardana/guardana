@@ -7,7 +7,7 @@ from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleR
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-MANIFEST_SCHEMA_VERSION = 4
+MANIFEST_SCHEMA_VERSION = 5
 """Version of the run document, moved independently of the CLI.
 
 A run written by 0.7.3 and one written by 0.9.0 are the same document if the
@@ -20,6 +20,12 @@ version 3's enum in place was the alternative and is exactly what a version exis
 to prevent: a v3 document carrying `trace` would fail validation against the v3
 schema an older build holds, so the contract would have changed under a name that
 promised it had not.
+
+Version 5 adds `coverage.shortfall` and one skip reason, `not_applicable`. The
+second is why this is a version rather than an addition: `rules_skipped[].reason`
+is read against a closed list, so a v4 reader handed a v5 document refuses it
+outright — which is the correct behaviour and exactly the reason the enum is not
+widened in place.
 """
 
 

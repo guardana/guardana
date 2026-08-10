@@ -17,6 +17,17 @@ class SkipReason(StrEnum):
     UNSAFE_MODE = "unsafe_mode"
     """The rule has side effects the current safety mode does not permit."""
 
+    NOT_APPLICABLE = "not_applicable"
+    """The check was about a different system than the one under test.
+
+    Only a security contract produces this today: a contract naming `checkout-agent`
+    against a trace the operator declared came from `support-agent` is about
+    something else entirely. Nothing is missing, so it is not a coverage gap — but
+    it is also not a pass, which is why it is recorded and printed rather than
+    dropped. A contract layer where *nothing* applied is a `CoverageShortfall`, not
+    a pile of these.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class SkippedRule:
@@ -37,9 +48,13 @@ class SkippedRule:
     def is_coverage_gap(self) -> bool:
         """Whether this skip means a check somebody wanted did not happen.
 
-        Every reason here is one — the type exists because "did not apply" used to
-        be indistinguishable from "could not run". It is a property rather than a
-        constant so a future reason that is genuinely benign has somewhere to say
-        so, instead of being quietly folded in with the ones that are not.
+        The type exists because "did not apply" used to be indistinguishable from
+        "could not run", and this is the property that keeps them apart. It was
+        written as a constant `True` with a note that a future benign reason should
+        say so here rather than be folded in with the ones that are not;
+        `NOT_APPLICABLE` is that reason. Nothing is missing when a contract is about
+        another system, so `fail_on_skipped` must not fire on it — while the fact
+        that it did not apply is still recorded, and a run where *no* contract
+        applied is refused through `CoverageShortfall` instead.
         """
-        return True
+        return self.reason is not SkipReason.NOT_APPLICABLE

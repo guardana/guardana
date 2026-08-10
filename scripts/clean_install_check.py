@@ -97,7 +97,7 @@ def _uv(arguments: list[str], environment: dict[str, str]) -> None:
         raise SystemExit(f"uv {' '.join(arguments)} failed with {result.returncode}")
 
 
-def _checks(venv: Path, clean_directory: Path) -> list[Check]:
+def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
     guardana = str(venv / _BIN / "guardana")
     collector = str(venv / _BIN / "guardana-collector")
     python = str(venv / _BIN / "python")
@@ -190,8 +190,108 @@ def _checks(venv: Path, clean_directory: Path) -> list[Check]:
             0,
             expect=("modern 2026-07-28", "legacy 2025-11-25", "eras ready"),
         ),
+        # A security contract crosses both wheels — the schema and its refusals live
+        # in `guardana.core.contract`, the checking in `guardana.rules.contract` — so
+        # a build that carried one and not the other would load a contract and grade
+        # nothing with it. Both halves of the honesty boundary are exercised: an
+        # assertion that fires, and one whose dimension the producer does not record,
+        # which has to come back as a demand rather than as a clean run.
+        Check(
+            "a security contract compiles, fires, and refuses what it cannot check",
+            [python, "-c", _CONTRACT_SCRIPT],
+            0,
+            expect=("finding: contract.acme.never-shell", "demanded: approval", "contract ready"),
+        ),
+        # And the same capability through the command line, on a file, the way the
+        # documentation says to run it — because a subcommand group registered in one
+        # place and imported in another is exactly what a wheel can drop.
+        Check(
+            "trace inspect prints the evidence matrix and no coverage percentage",
+            [guardana, "trace", "inspect", str(trace_file)],
+            0,
+            expect=("dimension", "declared", "records", "licenses", "effects"),
+        ),
     ]
 
+
+_TRACE_FILE = """\
+{"guardana_trace": 2, "instrumented": ["effects"], "producer": {"name": "acme"}, \
+"trace_id": "t-1"}
+{"kind": "tool_execution", "name": "refund", "span_id": "s1", \
+"effects": [{"sink": "payment", "action": "payment.refund", "status": "executed"}]}
+"""
+"""A native trace, written by hand rather than serialized from the model.
+
+Hand-written on purpose: this file is what a *third party* would produce against the
+published `trace-v2` schema, so a reader that quietly stopped accepting the documented
+shape would still pass a check that round-tripped Guardana's own writer.
+"""
+
+_CONTRACT_SCRIPT = """
+from guardana.core.contract import contract_from_dict
+from guardana.core.profile import Policy, Profile
+from guardana.core.registry import Registry
+from guardana.core.runner import Runner
+from guardana.core.target import TraceTarget
+from guardana.core.trace import (
+    Dimension,
+    EffectStatus,
+    Provenance,
+    SideEffect,
+    SinkKind,
+    Span,
+    SpanKind,
+    Trace,
+)
+from guardana.rules.contract import compile_contracts
+
+contract = contract_from_dict(
+    {
+        "schema_version": 1,
+        "name": "acme",
+        "assertions": [
+            {"id": "never-shell", "type": "forbidden_sink", "sinks": ["shell"]},
+            {"id": "pay-needs-a-human", "type": "approval_required", "actions": ["payment.*"]},
+        ],
+    },
+    source="acme.yaml",
+)
+compiled = compile_contracts([contract], None)
+
+trace = Trace(
+    trace_id="t-1",
+    spans=(
+        Span(
+            span_id="s1",
+            kind=SpanKind.TOOL_EXECUTION,
+            name="s1",
+            effects=(
+                SideEffect(sink=SinkKind.SHELL, action="sh", status=EffectStatus.EXECUTED),
+                SideEffect(
+                    sink=SinkKind.PAYMENT, action="payment.refund", status=EffectStatus.EXECUTED
+                ),
+            ),
+        ),
+    ),
+    provenance=Provenance(producer="acme", source="acme.jsonl", dialect="guardana"),
+    # Effects only: the approval assertion cannot be checked, and must say so.
+    instrumented=frozenset({Dimension.EFFECTS}),
+)
+
+registry = Registry.discover()
+for rule in compiled.rules:
+    registry.register_rule(rule)
+profile = Profile(name="t", policy=Policy()).demanding(compiled.required_dimensions)
+result = Runner(registry=registry, profile=profile).run(TraceTarget(trace))
+
+for finding in result.findings:
+    print("finding:", finding.rule_id)
+for gap in result.coverage_shortfall:
+    print("demanded:", gap.name)
+if not result.coverage_shortfall:
+    raise SystemExit("an unverifiable contract assertion reported no unmet demand")
+print("contract ready")
+"""
 
 _MCP_ERAS_SCRIPT = """
 from guardana.core.rule import RuleContext
@@ -322,12 +422,17 @@ def main() -> int:
         clean_directory = workspace / "clean"
         clean_directory.mkdir()
         (clean_directory / "app.py").write_text("print('hello')\n", encoding="utf-8")
+        # Beside the scan input rather than inside it: the clean directory exists to
+        # prove a scan of ordinary files finds nothing, and adding material to it
+        # would quietly change what that check is checking.
+        trace_file = workspace / "trace.jsonl"
+        trace_file.write_text(_TRACE_FILE, encoding="utf-8")
 
         environment = _clean_environment(venv)
         _install(venv, environment)
 
         failures = 0
-        for check in _checks(venv, clean_directory):
+        for check in _checks(venv, clean_directory, trace_file):
             result = _run(check.argv, environment)
             problem = _report(check, result)
             if problem is None:

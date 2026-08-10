@@ -1,4 +1,4 @@
-"""`schemas/run-v4.schema.json` is a published contract, so it is tested.
+"""`schemas/run-v5.schema.json` is a published contract, so it is tested.
 
 A schema nothing validates against is a promise. This asserts the two directions
 that matter: what the engine writes satisfies the schema, and the schema refuses
@@ -38,7 +38,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from jsonschema import Draft202012Validator
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v4.schema.json"
+_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v5.schema.json"
 _NOW = datetime(2026, 8, 2, 10, 0, tzinfo=UTC)
 
 
@@ -176,7 +176,7 @@ def test_the_schema_identifier_carries_its_major_version() -> None:
     # in-toto/SLSA practice: a consumer must be able to tell which contract it is
     # holding without parsing the document first.
     assert _schema()["$id"] == SCHEMA_URL
-    assert "v4" in SCHEMA_URL
+    assert "v5" in SCHEMA_URL
 
 
 def test_the_schema_itself_is_a_valid_2020_12_schema() -> None:
@@ -264,7 +264,7 @@ def test_the_schema_requires_usage_keys_even_when_unknown() -> None:
     assert list(_validator().iter_errors(document))
 
 
-@pytest.mark.parametrize("version", [1, 2, 3, 5, "4"])
+@pytest.mark.parametrize("version", [1, 2, 3, 4, 6, "5"])
 def test_the_schema_refuses_any_version_but_the_current_one(version: object) -> None:
     document = _document(_minimal())
     document["schema_version"] = version

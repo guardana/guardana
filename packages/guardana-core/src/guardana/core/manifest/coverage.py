@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from guardana.core.fingerprint import digest_of
 from guardana.core.manifest.records import EvaluatorRecord, RuleRecord
+from guardana.core.report.shortfall import CoverageShortfall
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +50,17 @@ class CoverageRecord:
     A server that answered an MCP handshake with an older revision than the client
     offered supports fewer methods, so a run against it verified less — and the
     only place that is knowable is the handshake.
+    """
+
+    shortfall: tuple[CoverageShortfall, ...] = ()
+    """Coverage this run's operator demanded and did not get.
+
+    In the coverage block rather than beside the findings, because that is what it
+    is: reach that was asked for and not achieved. Deliberately **not** folded into
+    `digest` — the digest answers "could these two runs have found the same things",
+    and the capabilities it already covers are where a missing dimension shows up.
+    Hashing the shortfall as well would count one fact twice and make a run that
+    merely *demanded* more read as a run that could check less.
     """
 
 

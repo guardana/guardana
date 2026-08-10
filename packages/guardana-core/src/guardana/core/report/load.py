@@ -18,19 +18,21 @@ from guardana.core.manifest.load import (
     migrate_v1,
     migrate_v2,
     migrate_v3,
+    migrate_v4,
 )
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.result import ScanResult
 from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunReport
+from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
 from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
-_MIGRATIONS = {1: migrate_v1, 2: migrate_v2, 3: migrate_v3}
+_MIGRATIONS = {1: migrate_v1, 2: migrate_v2, 3: migrate_v3, 4: migrate_v4}
 """One step forward per version, keyed by the version the document *is*.
 
 Chained rather than jumped: a schema-1 run goes through 2 on its way to 3, so a
@@ -143,8 +145,23 @@ def _result(raw: dict[str, Any], path: Path) -> ScanResult:
         waived=_findings(raw.get("waived"), "waived", path),
         errors=_errors(raw.get("errors"), path),
         observations=_observations(raw.get("observations"), path),
+        # Read back so a saved run re-gates to the verdict it was written with. A
+        # reader that dropped this would turn an indeterminate run into a pass the
+        # moment anybody loaded it — which is what `diff` and `run inspect` do.
+        coverage_shortfall=_coverage_shortfall(run, path),
         stopped_by=stopped_by,
     )
+
+
+def _coverage_shortfall(run: object, path: Path) -> tuple[CoverageShortfall, ...]:
+    """Read the demanded-coverage channel, delegating the shape to the manifest loader."""
+    from guardana.core.manifest.load import _shortfall as parse_shortfall  # noqa: PLC0415
+
+    coverage = run.get("coverage") if isinstance(run, dict) else None
+    try:
+        return parse_shortfall(coverage.get("shortfall") if isinstance(coverage, dict) else None)
+    except ManifestLoadError as exc:
+        raise ReportLoadError(f"{path}: {exc}") from exc
 
 
 def _findings(raw: object, channel: str, path: Path) -> tuple[Finding, ...]:

@@ -20,8 +20,9 @@ Five properties carry that claim, and every item below serves at least one:
    filenames. Deterministic, offline, no false-positive theatre.
 2. **An honest verdict.** Grading is a first-class, versioned, swappable component
    with a measured confidence, and a check that could not run is never reported as
-   a check that passed. Three channels — `findings`, `unverified`, `errors` —
-   because "nothing to report" has three different meanings.
+   a check that passed. Four channels — `findings`, `unverified`, `errors` and a
+   coverage shortfall — because "nothing to report" has four different meanings,
+   and the last of them is what an operator demanded and did not get.
 3. **One engine, three moments.** The same rules run on a laptop, in CI, and next
    to a served model, so a verdict does not change because the runner did.
 4. **Cost is a security property.** A scan nobody waits for is a scan nobody runs,
@@ -89,7 +90,7 @@ files pinned by digest in every run, and a rule carries both editions where the
 semantics genuinely overlap — never a silent remap onto the matching number, since
 `LLM07:2026` is Misinformation. `guardana taxonomy` shows what is installed.
 
-## What ships today (0.16.0)
+## What ships today (0.17.0)
 
 Counts come from the registry, never from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -131,7 +132,7 @@ reported incidents*, not which are most severe when they do.
 |---|---|---|---|
 | LLM01 Prompt Injection | held #1, scope now covers cross-modal carriers, memory persistence and agentic blast radius | **Strong** | direct injection, DAN, gradual-jailbreak scenario, MCP + rules-file backdoors; cross-modal carriers are the multimodal milestone |
 | LLM02 Sensitive Information Disclosure | held #2 | **Good** | hardcoded secrets, output-secret leakage |
-| LLM03 Excessive Agency | **up from #6** | **Good** | trajectory grading, tool-argument scope, excessive tool use; approval bypass and delegated credentials need the identity work |
+| LLM03 Excessive Agency | **up from #6** | **Good** | trajectory grading, tool-argument scope, excessive tool use; a security contract makes approval requirements, allowed scopes and credential boundaries assertable on a recorded run, for the team that knows what theirs are |
 | LLM04 Supply Chain | down from #3, absorbs artifact-trust failure | **Very strong** | the static front door |
 | LLM05 Data and Model Poisoning | down from #4, absorbs fine-tuning subversion | **Started** | `training.dataset_integrity` (hygiene leads); statistical/backdoor detection is research-gated |
 | LLM06 Unbounded Consumption | **up from #10**, reframed as cost asymmetry | **Good** | `prompt.unbounded_consumption` for raw output, plus `prompt.cost_asymmetry` for the reframing: the ratio of reply to prompt, measured on characters so it needs nothing from the provider. `finish_reason` would separate "the model stopped" from "our ceiling stopped it" and is deferred with the transport-contract work |
@@ -152,7 +153,7 @@ reported incidents*, not which are most severe when they do.
 | ASI06 Memory & Context Poisoning | **Good** | write in one session, grade the next; a customer's own vector store needs the application-awareness milestone |
 | ASI07 Insecure Inter-Agent Communication | **Gap** | multi-agent protocols are the agent-and-protocol milestone |
 | ASI08 Cascading Failures | **Started** | the trajectory is observable; no rule grades cascade depth yet |
-| ASI09 Human-Agent Trust Exploitation | **Gap** | judged behaviour; unblocked by `calibrate`, not yet written |
+| ASI09 Human-Agent Trust Exploitation | **Started** | `approval_required` in a security contract proves a deterministic slice — an action that went ahead without a granted approval, optionally by a named approver. The judged half of it is still unwritten, unblocked by `calibrate` |
 | ASI10 Rogue Agents | **Started** | `diff` names deterioration between runs and `monitor` alerts on it continuously; no rule grades drift as such |
 
 MITRE ATLAS references follow v5.6.0, including the agentic techniques.
@@ -337,7 +338,7 @@ consequences, and neither is "build more attacks":
   distinctions are *governance independence* — a verifier that does not share a
   control plane with the vendor of the system under test, runs fully offline, keeps
   evidence in the customer's own database and works identically against a model
-  nobody sells — and *stricter result semantics*: three channels, an explicit
+  nobody sells — and *stricter result semantics*: four channels, an explicit
   indeterminate, a budget that fails closed, a comparison that refuses rather than
   reading missing coverage as improvement.
 - **Stop competing where the money is.** Attack volume, provider matrices, hosted
@@ -395,7 +396,9 @@ compatibility contract → freeze it.** The model landed in 0.14.0
 ([design](docs/design/trace-domain-model.md)) and the translators in 0.15.0
 ([design](docs/design/framework-adapters.md)), which met 1.0 entry criterion 2. MCP
 caught up with its own specification in 0.16.0
-([design](docs/design/mcp-protocol-eras.md)). Everything else, including the whole
+([design](docs/design/mcp-protocol-eras.md)), and 0.17.0 made the evidence matrix
+gateable and the application's own threat model executable
+([design](docs/design/security-contracts.md)). Everything else, including the whole
 team platform, runs beside this and gates none of it.
 
 ### Next — the rest of application awareness
@@ -403,22 +406,6 @@ team platform, runs beside this and gates none of it.
 > **Outcome:** Guardana can verify an AI *application*: what it retrieves, what it
 > does with the output, and what a single run is entitled to claim.
 
-- **Trace evidence coverage, as a visible capability.** `guardana trace inspect`
-  printing the evidence matrix a producer supports, plus a policy that can *require*
-  dimensions — a run missing one is indeterminate, never a pass. The mechanism
-  exists and is currently only visible as a skip note; an explicit matrix is what
-  turns "unknown is never green" from an internal invariant into something an
-  operator can gate on. **No single coverage percentage** — one number hides which
-  dimension is missing, which is the whole question.
-- **Security contracts — the application's threat model, executable.** Rules are
-  tests, evaluators are judgement, targets are the system; the missing layer is what
-  the application is *allowed to do*: which principals exist, which data belongs to
-  whom, which actions need approval, which boundary may never receive a credential.
-  A generic scanner cannot know any of it, and "you can write a custom rule" is no
-  longer differentiating on its own now that policy libraries are a mainstream
-  red-team feature. Deterministic trace assertions first — tenant boundary, approval
-  requirement, allowed scopes, credential boundary, forbidden sink — and generated
-  attacks never before the invariants are provable.
 - **Rule, evaluator and pack developer tooling.** `guardana rule test` running a
   rule's positive, negative and inconclusive fixtures; evaluator measurement against
   a labelled set; a pack manifest declaring API compatibility and what it provides;
@@ -468,6 +455,12 @@ one.
 
 | Deferred | Reason |
 |---|---|
+| **A contract assertion over a live endpoint** | every kind shipped reads *recorded authority* — a delegation's boundary, an approval's outcome. Proving one live would mean provoking the action to observe it, which is generated attack traffic, and the stated order is invariants first |
+| **Custom assertion kinds from a plugin** | a sixth kind today is a pull request; an extension point for kinds is an API 1.0 would freeze. It belongs with the pack manifest and `pack validate`, where compatibility is expressed, not bolted onto the contract loader |
+| **A contract-authored taxonomy mapping** | the framework mapping lives on the assertion *kind*, so a team does not have to learn OWASP's numbering to say that payments need a human. A mapping invented to fill a column is worse than none, and the mapping is the part that has to survive somebody else's audit |
+| **`tenant` on `Identity`** | the tenant-boundary assertion would be sharper if the acting principal carried one, and adding a field to a type 1.0 is about to freeze, to serve one assertion, is how a domain model acquires an escape hatch. Retrieval already carries the tenant on both sides, which is where the failure is observable |
+| **The coverage shortfall in the collector envelope** | the envelope carries the `indeterminate` *verdict*, so no dashboard is misled — it just cannot yet say which demand went unmet. Carrying the cause means envelope v9, a column and a migration on a shipped beta, which is a tenancy-and-storage change rather than a field. The saved run records it in full today |
+| **`trace.require` for `probe` and `scan`** | it is a statement about a *producer's* instrumentation. The live-target equivalent is "this provider must support tool calling", which is a different question with a different failure mode, and inventing one syntax for both before either has a user is how a schema acquires a shape nobody wanted |
 | **`RetrieverTarget`, `CorpusTarget`, `EmbeddingTarget`** | a live retriever is a target that *sends*: its own budget surface, its own safety ceiling, its own answer to who owns a corpus a test would write to. Shipping three of them inside the release that changed the trace schema would give none of them their own tests. The deterministic trace-side check shipped in 0.15.0 |
 | **Driving a framework agent or query engine** | a faithful multi-turn drive needs either the framework's own message types — which the no-import contract forbids — or a replay of the whole conversation per turn, whose cost the request meter cannot see. And a target that can only answer one turn has no way to say so: that is a missing capability the engine should answer once, not three adapters papering over |
 | **Tool calling through PydanticAI and CrewAI** | both own their tool loop, so an agent calls its tools itself rather than reporting what it *would* call. There is no seam to offer a double into; their adapters translate the loop afterwards, which is what the trace rules grade |
@@ -562,9 +555,10 @@ above, which is why the order is domain completeness → compatibility proof →
 8. **Every extension point the freeze covers exists before it.** A `Technique`
    interface added after `Rule` and `Evaluator` are frozen is a major version the
    week after promising stability, so it is designed now even if three transforms
-   ship. The same argument covers the security-contract schema and the pack
-   manifest: a third party must be able to run `pack validate` against the release
-   candidate.
+   ship. The security-contract schema is the half of this that landed in 0.17.0 —
+   versioned, migratable, and refusing a version it cannot read; the pack manifest
+   is the half still open, and a third party must be able to run `pack validate`
+   against the release candidate.
 9. **Every protocol and schema version a run interpreted is in its evidence** — MCP
    revision, OpenTelemetry convention version, trace schema, and any A2A version —
    so a comparison can say the two runs graded different protocols rather than

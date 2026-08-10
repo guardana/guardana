@@ -47,9 +47,11 @@ neither is honest.** Three consequences you will notice immediately:
   `guardana calibrate`, not asserted. A finding that is proof rather than judgement —
   a planted canary coming back, a server handing its manifest to an anonymous
   caller — carries no confidence, because there is nothing to be unsure about.
-- **"Nothing found" has three meanings, and they are three channels.** `findings`,
-  `unverified` (a check ran and could not reach a verdict) and `errors` (a check
-  never ran). A gate can fail on any of them; none of them is quietly a pass.
+- **"Nothing found" has four meanings, and they are four channels.** `findings`,
+  `unverified` (a check ran and could not reach a verdict), `errors` (a check
+  never ran), and a **coverage shortfall** (evidence you demanded that this run
+  could not get). A gate can fail on any of them; none of them is quietly a pass,
+  and the last one has no switch to turn it off.
 - **Unknown is never zero.** A budget that ran out exits `6` and keeps what it found.
   A comparison that cannot honestly be made exits `2`. A capability the target never
   confirmed is recorded as unconfirmed, not as absent.
@@ -137,7 +139,7 @@ compared. [`docs/usage-diff.md`](docs/usage-diff.md)
 - **`guardana monitor` is a scheduled active prober** — not passive traffic
   inspection, and never inline in the request path.
 
-## Six things you do with it
+## Seven things you do with it
 
 One engine. The verb is what you are verifying; the target is what you point it at.
 
@@ -145,7 +147,8 @@ One engine. The verb is what you are verifying; the target is what you point it 
 |---|---|---|
 | **Verify artifacts** | [`guardana scan <path>`](docs/usage-scan.md) | Static, offline, deterministic. Drops into a pipeline like a linter. |
 | **Verify a deployed system** | [`guardana probe --url … --model …`](docs/usage-probe.md) | One-shot adversarial run against a live endpoint, agent or **MCP server** (`--mcp`), each finding graded with a confidence. |
-| **Verify a recorded run** | [`guardana analyze-trace trace.jsonl`](docs/usage-analyze-trace.md) | Grades an execution your production agent already performed, read from **OpenTelemetry GenAI** spans. Opens one file and no socket. |
+| **Verify a recorded run** | [`guardana analyze-trace trace.jsonl`](docs/usage-analyze-trace.md) | Grades an execution your production agent already performed, read from **OpenTelemetry GenAI** spans — against the built-in checks and against your own [security contract](docs/usage-contracts.md). Opens one file and no socket. |
+| **Verify what the evidence allows** | [`guardana trace inspect trace.jsonl`](docs/usage-trace-inspect.md) | Prints which evidence dimensions a producer really records, and whether the ones your policy requires are there. No coverage percentage: one number hides which dimension is missing. |
 | **Continuously re-verify** | [`guardana monitor --url … --model …`](docs/usage-monitor.md) | Scheduled re-runs next to a served model, alerting when a cycle is worse than the first. |
 | **Compare evidence** | [`guardana diff a.json b.json`](docs/usage-diff.md) | Runs no rules: reads two saved runs and answers whether the second is worse. |
 | **Import somebody else's** | [`guardana import-observations results.json`](docs/usage-import-observations.md) | Reads garak, promptfoo or your own harness's results into the `unverified` channel with their provenance intact. Never exits `0` — Guardana verified nothing. |
@@ -153,7 +156,7 @@ One engine. The verb is what you are verifying; the target is what you point it 
 `scan`, `probe`, `monitor` and `analyze-trace` can each forward findings to an
 optional collector with `--reporter server://<url>`.
 
-### Eleven commands that make those safe to gate on
+### Twelve commands that make those safe to gate on
 
 | Command | Answers |
 |---|---|
@@ -163,6 +166,7 @@ optional collector with `--reporter server://<url>`.
 | [`guardana baseline create\|verify\|update`](docs/usage-baseline.md) | which findings have we accepted, by whom, and until when? |
 | [`guardana taxonomy`](docs/usage-taxonomy.md) | which framework entry does this reference name, in which edition? |
 | [`guardana doctor`](docs/usage-doctor.md) · `config validate\|explain` | what is this installation, and what is actually in force? |
+| [`guardana trace inspect`](docs/usage-trace-inspect.md) | which evidence dimensions does this producer record, and does my policy get what it demands? |
 | `guardana rules` · `new-rule` · `calibrate` · `init` | what is installed, scaffold a rule, measure a judge, start a policy |
 
 **Exit codes are a contract** — eight documented meanings
@@ -183,7 +187,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.16   # moving tag → latest 0.16.x
+      - uses: guardana/guardana@v0.17   # moving tag → latest 0.17.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -310,8 +314,8 @@ the project's [principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
 
 | | Outcome |
 |---|---|
-| **0.16** *(current)* | MCP as the specification now is: a client that speaks both revisions, settles which one a server implements before asking it anything, and records that in the run manifest; session-shaped rules that decline rather than accuse a server built to a revision without sessions; issuer identification (RFC 9207) and cache scope as the checks the revision creates |
-| **next** | A visible trace-evidence matrix, the application's own threat model as an executable contract, rule and pack developer tooling, then RAG targets and sink-aware output handling |
+| **0.17** *(current)* | The evidence matrix made visible and gateable — `guardana trace inspect`, and a policy that can *require* dimensions — plus **security contracts**: the application's own invariants (tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink) as a versioned file the engine compiles into rules. A contract that could not be checked is `indeterminate`, never a pass, and no policy setting can turn that off |
+| **next** | Rule, evaluator and pack developer tooling, then RAG as a live target and sink-aware output handling |
 | **1.0** | A compatibility contract — the point where a third-party rule pack is a safe investment. Not a feature count: it says what will not break under you |
 
 Release history is [`CHANGELOG.md`](CHANGELOG.md). Beyond 1.0 the plan is kept as

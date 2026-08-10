@@ -1,0 +1,972 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/run/v5.schema.json",
+  "title": "Guardana Saved Run v5",
+  "description": "One Guardana run written to disk: the manifest (what was verified, against what, under which configuration and limits, at what cost, with what reach, and with what verdict) plus the finding channels. Versioned independently of the CLI.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run",
+    "findings",
+    "unverified",
+    "waived",
+    "errors",
+    "observations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 5
+    },
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
+    "run": {
+      "$ref": "#/$defs/manifest"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "unverified": {
+      "description": "Checks that ran and could not reach a verdict. Never folded into findings and never dropped: a check that could not grade is not a pass.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "waived": {
+      "description": "Findings a baseline accepted with a reason. Still reported, no longer gating.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "errors": {
+      "description": "Checks that could not run at all.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/checkError"
+      }
+    },
+    "observations": {
+      "description": "What the run saw, as opposed to what it found wrong.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "manifest": {
+      "description": "The circumstances of the run. Carries no version of its own: the document above states it once.",
+      "type": "object",
+      "required": [
+        "run_id",
+        "created_at",
+        "started_at",
+        "completed_at",
+        "migrated_from",
+        "source",
+        "guardana",
+        "target",
+        "deployment",
+        "configuration",
+        "execution",
+        "usage",
+        "rules",
+        "evaluators",
+        "coverage",
+        "result_summary",
+        "privacy"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "$comment": "Nullability above exists for migrated documents only. A run written at this version must record when it ran, under what limits, and how it was gated \u2014 otherwise the allowance made for migration becomes a way for a fresh run to skip them.",
+          "if": {
+            "properties": {
+              "migrated_from": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "migrated_from"
+            ]
+          },
+          "then": {
+            "properties": {
+              "created_at": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "started_at": {
+                "$ref": "#/$defs/timestamp"
+              },
+              "execution": {
+                "properties": {
+                  "concurrency": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "result_summary": {
+                "properties": {
+                  "gate": {
+                    "type": "string",
+                    "enum": [
+                      "pass",
+                      "fail",
+                      "indeterminate"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "started_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "completed_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "migrated_from": {
+          "description": "Which older schema this document was migrated from. Null means it was written at this version \u2014 which is how a reader tells 'this run spent nothing' from 'this run predates the version that counted'.",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "kind",
+            "provider",
+            "run_url"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "local",
+                "ci",
+                "scheduled",
+                "imported_trace",
+                "replay"
+              ]
+            },
+            "provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "run_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "guardana": {
+          "type": "object",
+          "required": [
+            "version",
+            "commit",
+            "distribution_versions"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "commit": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "distribution_versions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "type",
+            "ref",
+            "fingerprint",
+            "fingerprint_inputs",
+            "capabilities"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "artifact",
+                "endpoint",
+                "trace"
+              ]
+            },
+            "ref": {
+              "type": "string"
+            },
+            "fingerprint": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "fingerprint_inputs": {
+              "description": "The fields the fingerprint was computed from. Present so no reader mistakes a digest of declared identity for a digest of model weights.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "deployment": {
+          "description": "Which deployment this verifies. Null means not known, never not applicable.",
+          "type": "object",
+          "required": [
+            "ai_system",
+            "environment",
+            "deployment_id",
+            "commit_sha",
+            "image_digest",
+            "model_digest",
+            "model_name",
+            "model_revision"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ai_system": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "environment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "deployment_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "commit_sha": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "image_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "model_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "model_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "configuration": {
+          "description": "What settings produced this result, by digest rather than by content.",
+          "type": "object",
+          "required": [
+            "profile_name",
+            "profile_digest",
+            "system_prompt_digest",
+            "tool_manifest_digest",
+            "retriever_digest",
+            "dataset_digest",
+            "adapter_digest"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "profile_name": {
+              "type": "string"
+            },
+            "profile_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "system_prompt_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "tool_manifest_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "retriever_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "dataset_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "adapter_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            }
+          }
+        },
+        "execution": {
+          "description": "The limits the run was given, recorded whether or not it hit them.",
+          "type": "object",
+          "required": [
+            "concurrency",
+            "timeout_seconds",
+            "seed",
+            "temperature",
+            "max_requests",
+            "max_input_tokens",
+            "max_output_tokens",
+            "max_duration_seconds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "concurrency": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "timeout_seconds": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "seed": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "temperature": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "max_requests": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "max_input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "max_output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "max_duration_seconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "usage": {
+          "description": "What the run consumed. Null means nobody counted, never that the run was free.",
+          "type": "object",
+          "required": [
+            "requests",
+            "input_tokens",
+            "output_tokens",
+            "requests_missing_token_counts",
+            "estimated_cost",
+            "wall_time_seconds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "input_tokens": {
+              "description": "Maps to gen_ai.usage.input_tokens in the OpenTelemetry GenAI conventions.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "output_tokens": {
+              "description": "Maps to gen_ai.usage.output_tokens in the OpenTelemetry GenAI conventions.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "requests_missing_token_counts": {
+              "description": "How many requests reported no token counts. Non-zero means the token sums above are partial.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "estimated_cost": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "wall_time_seconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "rules": {
+          "description": "The rules that ran, with the digest of what each was when it ran.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "digest",
+              "version",
+              "maturity",
+              "trials"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "maturity": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "trials": {
+                "description": "Model calls this rule declared it would make; null when it could not say.",
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "evaluators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "version",
+              "digest",
+              "calibration"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "digest": {
+                "$ref": "#/$defs/nullableDigest"
+              },
+              "calibration": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "required": [
+                  "dataset_digest",
+                  "measured_at",
+                  "brier",
+                  "ece"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "dataset_digest": {
+                    "$ref": "#/$defs/nullableDigest"
+                  },
+                  "measured_at": {
+                    "$ref": "#/$defs/nullableTimestamp"
+                  },
+                  "brier": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "ece": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "coverage": {
+          "description": "What this run was able to check, as opposed to what it found. `digest` is one value over the rules, evaluators, target capabilities, catalogue digests and negotiated protocols, so a comparison can say the reach changed without diffing five lists. Null means the run recorded no fingerprint, which is not the same as an unchanged one.",
+          "type": "object",
+          "required": [
+            "digest",
+            "taxonomies",
+            "protocols",
+            "shortfall"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "$ref": "#/$defs/nullableDigest"
+            },
+            "taxonomies": {
+              "description": "The framework catalogues installed when the run happened, pinned by digest so the report's mapping stays readable without asking which edition was in use.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "framework",
+                  "digest",
+                  "entries",
+                  "version"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "framework": {
+                    "type": "string"
+                  },
+                  "digest": {
+                    "type": "string"
+                  },
+                  "entries": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "version": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "protocols": {
+              "description": "Protocol versions the target negotiated, by protocol name. What the server answered, never what the client offered.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "shortfall": {
+              "description": "Coverage this run's operator demanded and did not get: a dimension named in `trace.require` or needed by a security-contract assertion that the producer does not record, or a set of contracts none of which was about this execution. A non-empty list means the run's verdict is `indeterminate`, with no policy toggle in front of it.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "name",
+                  "detail"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "missing_dimension",
+                      "contract_not_applicable"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "result_summary": {
+          "type": "object",
+          "required": [
+            "findings",
+            "unverified",
+            "waived",
+            "errors",
+            "observations",
+            "rules_run",
+            "rules_skipped",
+            "max_severity",
+            "gate",
+            "stopped_by"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "findings": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unverified": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "waived": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "errors": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "observations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rules_run": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "rules_skipped": {
+              "description": "Rules that did not run, each with the reason. A bare list of ids could not tell a rule that never applied from one the target could not support. `not_applicable` is the one reason that is not a coverage gap: the check was about a different system, so nothing is missing \u2014 and it is still not a pass.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "rule_id",
+                  "reason",
+                  "missing",
+                  "detail"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "rule_id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "missing_capability",
+                      "unsafe_mode",
+                      "not_applicable"
+                    ]
+                  },
+                  "missing": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "max_severity": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gate": {
+              "description": "Written by the engine, never re-derived by a consumer: a reader that recomputes the verdict will eventually compute it differently, and the divergence shows up as a green build. Null only in a migrated document, whose original schema recorded no verdict.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "pass",
+                "fail",
+                "indeterminate",
+                null
+              ]
+            },
+            "stopped_by": {
+              "description": "Set when the run ended before finishing its plan. Any value here means the coverage is partial and the counts must not be read as a complete pass.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "budget_exhausted",
+                "interrupted",
+                null
+              ]
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "required": [
+            "evidence_mode",
+            "redaction_policy_digest"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "evidence_mode": {
+              "type": "string",
+              "enum": [
+                "metadata_only",
+                "redacted",
+                "full"
+              ]
+            },
+            "redaction_policy_digest": {
+              "$ref": "#/$defs/nullableDigest"
+            }
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "rule_id",
+        "severity",
+        "title",
+        "taxonomy",
+        "target_ref",
+        "evidence",
+        "verdict"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "taxonomy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "framework",
+              "id",
+              "title"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "framework": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "description": "One framework reference. `framework` and `id` together are the identity \u2014 a short id means different controls in different editions \u2014 and `title` is display data recorded so a reader without that catalogue installed can still read the report."
+          }
+        },
+        "target_ref": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "object",
+          "required": [
+            "summary",
+            "detail"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "summary": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            }
+          }
+        },
+        "verdict": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "outcome",
+            "confidence",
+            "rationale",
+            "evaluator_id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "inconclusive"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "rationale": {
+              "type": "string"
+            },
+            "evaluator_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "checkError": {
+      "type": "object",
+      "required": [
+        "source",
+        "stage",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "kind",
+        "name",
+        "ref",
+        "attributes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "timestamp": {
+      "description": "RFC 3339 in UTC. A local-time timestamp in an evidence record is a bug waiting for a timezone.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "nullableTimestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "nullableDigest": {
+      "description": "An algorithm-qualified digest, e.g. sha256:1a2b\u2026 A digest whose algorithm is implied cannot be migrated when the algorithm changes.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-z0-9]+:[0-9a-f]+$"
+    }
+  }
+}

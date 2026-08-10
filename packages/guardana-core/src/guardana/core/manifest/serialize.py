@@ -9,7 +9,7 @@ from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleR
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-SCHEMA_URL = "https://guardana.dev/schemas/run/v4.schema.json"
+SCHEMA_URL = "https://guardana.dev/schemas/run/v5.schema.json"
 """Identifier of the saved-run document, carrying its major version in the path.
 
 The practice in-toto and SLSA settled on, for the reason they settled on it: a
@@ -129,6 +129,10 @@ def _coverage(coverage: CoverageRecord) -> dict[str, object]:
             for catalog in coverage.taxonomies
         ],
         "protocols": dict(coverage.protocols),
+        "shortfall": [
+            {"kind": str(gap.kind), "name": gap.name, "detail": gap.detail}
+            for gap in coverage.shortfall
+        ],
     }
 
 

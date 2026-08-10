@@ -1,11 +1,12 @@
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from fnmatch import fnmatch
 
 from guardana.core.budget import Budgets
 from guardana.core.redaction import RedactionPolicy
 from guardana.core.safety import Impact
 from guardana.core.severity import Severity
+from guardana.core.trace.model import Dimension
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,3 +85,33 @@ class Profile:
     `redacted`. The difference is deliberate: a library caller has already decided
     what to do with the objects it is handed, while a command writes files.
     """
+
+    required_dimensions: tuple[Dimension, ...] = ()
+    """Trace evidence this run demands, from `trace.require:` and from any contract.
+
+    Two sources, one set, because they are the same statement: *I am gating on this
+    coverage.* A dimension in here that the producer does not record makes the run
+    `indeterminate` with no `fail_on_*` in the path — see `guardana.core.gate`.
+
+    Empty by default, and it only ever governs a trace. Demanding that a *file scan*
+    record approvals would be a category error, and reading it as one would turn a
+    shared `guardana.yaml` into a `guardana scan` that can never pass.
+    """
+
+    contract_paths: tuple[str, ...] = ()
+    """Security contracts this profile loads, from `contracts:` in `guardana.yaml`.
+
+    Beside `rule_paths` and read the same way, so a team that keeps one config for a
+    pipeline does not have to repeat `--contract` in every job.
+    """
+
+    def demanding(self, dimensions: Iterable[Dimension]) -> "Profile":
+        """Return this profile with `dimensions` added to what the run demands.
+
+        How a loaded contract's implicit requirements join the operator's explicit
+        ones without either side having to know about the other. De-duplicated and
+        order-preserving, so the shortfall a report prints reads in the order it was
+        asked for rather than in whatever order a set happened to iterate.
+        """
+        merged = dict.fromkeys((*self.required_dimensions, *dimensions))
+        return replace(self, required_dimensions=tuple(merged))

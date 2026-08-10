@@ -20,6 +20,7 @@ from guardana.core.manifest.serialize import SCHEMA_URL
 from guardana.core.manifest.settings import ConfigurationRef, EvidenceMode, ExecutionSettings
 from guardana.core.manifest.settings import PrivacyRecord as _PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
+from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
 from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.report.stop import StopReason
 from guardana.core.target import TargetKind
@@ -213,7 +214,37 @@ def _coverage(raw: object) -> CoverageRecord:
         protocols=(
             {str(k): str(v) for k, v in protocols.items()} if isinstance(protocols, dict) else {}
         ),
+        shortfall=_shortfall(block.get("shortfall")),
     )
+
+
+def _shortfall(raw: object) -> tuple[CoverageShortfall, ...]:
+    """Read the demanded coverage a run did not get, refusing a kind nobody can place.
+
+    Closed like the skip reasons, and for a sharper reason: this channel is the only
+    one that makes a run indeterminate with no policy in front of it, so a kind read
+    leniently would be a refusal somebody could smuggle past by writing a word this
+    build has never seen.
+    """
+    if not isinstance(raw, list):
+        return ()
+    out: list[CoverageShortfall] = []
+    for entry in raw:
+        block = _mapping(entry, "run.coverage.shortfall[]")
+        try:
+            kind = ShortfallKind(_text(block, "kind", "run.coverage.shortfall[]"))
+        except ValueError as exc:
+            raise ManifestLoadError(
+                f"unknown coverage shortfall kind {block.get('kind')!r}"
+            ) from exc
+        out.append(
+            CoverageShortfall(
+                kind=kind,
+                name=_text(block, "name", "run.coverage.shortfall[]"),
+                detail=_optional_text(block, "detail") or "",
+            )
+        )
+    return tuple(out)
 
 
 def _taxonomy_catalogs(raw: object) -> tuple[TaxonomyCatalogRecord, ...]:
@@ -411,6 +442,32 @@ def migrate_v3(document: Mapping[str, Any]) -> dict[str, Any]:
     contract would tell its next reader it is holding a document it is not.
     """
     return {**document, "schema_version": 4, "$schema": SCHEMA_URL}
+
+
+def migrate_v4(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-4 saved run as a schema-5 one, inventing nothing.
+
+    Version 5 adds `coverage.shortfall` — coverage the operator demanded and did not
+    get — and it arrives **empty**, which is exactly what a version-4 run knew. That
+    run could not have recorded a shortfall because nothing could demand coverage
+    yet, and an empty list says "none recorded" in the same breath as "none
+    happened". Those two are the same fact here, unlike the coverage *digest*, which
+    `migrate_v2` leaves null precisely because they are not.
+
+    The other half of version 5 — the `not_applicable` skip reason — needs no step:
+    no version-4 document can contain one, since no version-4 build could write it.
+    """
+    run = _mapping(document.get("run"), "run")
+    coverage = run.get("coverage")
+    return {
+        **document,
+        "schema_version": 5,
+        "$schema": SCHEMA_URL,
+        "run": {
+            **run,
+            "coverage": {**(coverage if isinstance(coverage, dict) else {}), "shortfall": []},
+        },
+    }
 
 
 def _titled(findings: object) -> list[dict[str, Any]]:

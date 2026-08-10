@@ -15,6 +15,7 @@ from guardana.core.report.location import relativize, relativize_findings
 from guardana.core.report.result import ScanResult
 from guardana.core.report.run import REPORT_SCHEMA_VERSION, RunReport
 from guardana.core.report.serialize import error_to_dict, finding_to_dict, run_to_dict
+from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
 from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.report.stop import StopReason
 
@@ -23,11 +24,13 @@ __all__ = [
     "Baseline",
     "BaselineError",
     "CheckError",
+    "CoverageShortfall",
     "Evidence",
     "Finding",
     "ReportLoadError",
     "RunReport",
     "ScanResult",
+    "ShortfallKind",
     "SkipReason",
     "SkippedRule",
     "StopReason",

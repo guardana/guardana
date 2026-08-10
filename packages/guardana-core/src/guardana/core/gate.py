@@ -58,6 +58,14 @@ def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them woul
     crashed check is `FAIL`: the finding is a fact somebody has to act on, and
     reporting the missing check instead would bury it.
 
+    **Coverage the operator demanded and did not get is `INDETERMINATE`, with no
+    toggle in front of it.** Every other branch below is behind a `fail_on_*`
+    switch, correctly: they cover checks nobody specifically asked for. A dimension
+    named in `trace.require`, or needed by an assertion somebody wrote in a security
+    contract, is not in that category — it was demanded, and `fail_on_skipped`
+    defaulting to off would otherwise turn "your contract could not be checked" into
+    exit `0`.
+
     **Everything else that leaves a question open is `INDETERMINATE`** — no rule
     ran at all, a check could not run under `fail_on_error`, a check ran and could
     not grade under `fail_on_inconclusive`, or a check the target could not
@@ -73,6 +81,8 @@ def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them woul
         # that threshold is what keeps a noisy heuristic from breaking CI.
         if f.verdict is None or f.verdict.confidence >= threshold.min_confidence:
             return GateOutcome.FAIL
+    if result.coverage_shortfall:
+        return GateOutcome.INDETERMINATE
     # Nothing was verified, so a pass would be a confident all-clear on a target
     # nothing looked at — a misconfigured include/exclude, an empty registry, or
     # a target no installed rule applies to.

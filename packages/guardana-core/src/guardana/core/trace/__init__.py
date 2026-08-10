@@ -39,6 +39,7 @@ from guardana.core.trace.authorization import (
     PolicyOutcome,
 )
 from guardana.core.trace.content import Blob, ContentPart, PartKind
+from guardana.core.trace.coverage import DimensionCoverage, evidence_matrix
 from guardana.core.trace.effect import EffectStatus, SideEffect, SinkKind
 from guardana.core.trace.handoff import Handoff
 from guardana.core.trace.identity import (
@@ -98,6 +99,7 @@ __all__ = [
     "Delegation",
     "Dialect",
     "Dimension",
+    "DimensionCoverage",
     "EffectStatus",
     "Handoff",
     "Identity",
@@ -131,6 +133,7 @@ __all__ = [
     "UnreadableRecord",
     "detect_dialect",
     "detect_observation_dialect",
+    "evidence_matrix",
     "read_observations",
     "read_trace",
     "serialize_trace",

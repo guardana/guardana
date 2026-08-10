@@ -163,7 +163,7 @@
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5 4 5.6v6.1c0 4.6 3.2 8.4 8 9.8 4.8-1.4 8-5.2 8-9.8V5.6L12 2.5Z" stroke="#5B3DF5" stroke-width="1.9" stroke-linejoin="round"/></svg>
       Guardana
     </a>
-    <span class="ver mono">v0.16.0</span>
+    <span class="ver mono">v0.17.0</span>
     <nav>
       <a href="https://github.com/guardana/guardana#readme" class="hide-sm">Docs</a>
       <a href="https://pypi.org/project/guardana-cli/" class="hide-sm">PyPI</a>
@@ -248,7 +248,7 @@
     <div class="wrap">
       <p class="eyebrow">Bring your own threat model</p>
       <h2 class="disp">Your application has its own threat model.</h2>
-      <p class="sec-lede">Guardana ships security gates for the AI risks everybody shares. But the dangerous behaviour in <em>your</em> application is usually specific to your data, your tools, your permissions and your business logic — and no public framework knows any of that. Your support agent and a coding agent should not have the same security policy. So the 51 checks are where you start, not what you are limited to.</p>
+      <p class="sec-lede">Guardana ships security gates for the AI risks everybody shares. But the dangerous behaviour in <em>your</em> application is usually specific to your data, your tools, your permissions and your business logic — and no public framework knows any of that. Your support agent and a coding agent should not have the same security policy. So the 51 checks are where you start, not what you are limited to — and a <strong>security contract</strong> lets you write the invariants down as data rather than as code.</p>
 
       <div class="byo-grid">
         <div>
@@ -265,6 +265,10 @@
             <div class="card">
               <h3>Targets</h3>
               <p>Connect Guardana to the AI stack you actually run — an endpoint, an MCP server, a recorded trace, or something only you have.</p>
+            </div>
+            <div class="card">
+              <h3>Security contracts</h3>
+              <p>State what the application is <em>allowed</em> to do, in a versioned file your reviewer can read: one tenant per run, refunds need a human, this boundary never receives a credential, this agent never runs a shell. No code. And a contract that could not be checked is <strong>indeterminate</strong>, never a pass.</p>
             </div>
           </div>
         </div>
@@ -289,7 +293,7 @@
         </div>
       </div>
 
-      <div class="byo-note"><strong>This is the architecture, not a plugin bolted on.</strong> The engine deliberately holds no domain knowledge: every built-in rule is discovered through the same <code>guardana.rules</code> entry point your package uses, so there is no built-in-versus-custom distinction at the registry level — only namespacing by id. Your rule maps to the same OWASP, MITRE ATLAS and NIST entries an auditor already reads, gates the same build, and lands in the same three-channel result. Run it with <code>--rules ./my-rules/</code> and no packaging at all, or ship it as a distribution and keep it private. The rule above is not an illustration: it lives in <code>examples/custom_rule/</code>, and CI runs its positive and negative fixtures on every push.</div>
+      <div class="byo-note"><strong>This is the architecture, not a plugin bolted on.</strong> The engine deliberately holds no domain knowledge: every built-in rule is discovered through the same <code>guardana.rules</code> entry point your package uses, so there is no built-in-versus-custom distinction at the registry level — only namespacing by id. Your rule maps to the same OWASP, MITRE ATLAS and NIST entries an auditor already reads, gates the same build, and lands in the same four-channel result. Run it with <code>--rules ./my-rules/</code> and no packaging at all, or ship it as a distribution and keep it private. The rule above is not an illustration: it lives in <code>examples/custom_rule/</code>, and CI runs its positive and negative fixtures on every push.</div>
     </div>
   </section>
 
@@ -323,7 +327,7 @@
       <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every rule maps to a public framework — OWASP LLM Top 10, OWASP Agentic, OWASP MCP Top 10, MITRE ATLAS or NIST.</p>
       <pre class="yml"><code><span class="c">// .github/workflows/ai-security.yml</span>
 <span class="k">- uses:</span> <span class="s">actions/checkout@v4</span>
-<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.16</span>
+<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.17</span>
   <span class="k">with:</span>
     <span class="k">args:</span> <span class="s">--preset ci</span></code></pre>
       <p class="ci-note">Turning a gate on for an existing repo? <code>guardana baseline create</code> accepts today's findings with a reason, an owner and an expiry date — and an expired waiver stops waiving. There's a pre-commit hook too.</p>

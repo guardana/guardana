@@ -23,14 +23,15 @@ Full detail, including what is deliberately not covered:
 
 ## Out of the box
 
-### Six things you do with one engine
+### Seven things you do with one engine
 
 | Mode | Command | What it gives you |
 |---|---|---|
 | **Static scan** | `guardana scan <path>` | Offline, no-network, deterministic supply-chain checks over a repo or model directory. Exit code `1` on a gate failure — drops into CI like a linter. |
 | **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. Rules run concurrently (`--concurrency`, default 4) with rate-limit backoff, and results stay in rule order so two runs match. |
 | **MCP server** | `guardana probe --mcp <url>` | Examines a **live** MCP server on two levels, over **either revision of the protocol** — which one a server speaks is settled by `server/discover` before anything else is asked, and recorded in the run manifest. Its **manifest**: hidden instructions anywhere in a tool declaration — description, title, input and output schema — and drift from the manifest you approved (`--write-mcp-pin` to approve, `--mcp-pin` to compare). And its **authorization surface**: whether it answers without a credential, publishes discovery a conforming client can use, accepts a token it could not have issued, binds its sessions (where the revision still has them), scopes least privilege, identifies its issuer, declares a safe cache scope, and points its client only at addresses a client may follow. Pass `--mcp-token-env` for the checks that need a credential to say anything. Guardana never calls a tool. Streamable HTTP needs no permission; an stdio server is *started* by Guardana, so it takes an explicit `--allow-exec`. |
-| **Recorded run** | `guardana analyze-trace trace.jsonl` | Grades an execution somebody's *production* agent already performed, read from **OpenTelemetry GenAI** spans or Guardana's native dialect. Seven checks over identity, delegation, consent, policy decisions, approvals and side effects — and a rule's silence is licensed by what the producer actually recorded, so a dimension nobody instruments makes the rules that need it skip rather than report nothing found. Opens one file and no socket. |
+| **Recorded run** | `guardana analyze-trace trace.jsonl` | Grades an execution somebody's *production* agent already performed, read from **OpenTelemetry GenAI** spans or Guardana's native dialect. Nine checks over identity, delegation, consent, policy decisions, approvals, retrieval and side effects — plus whatever your own **security contract** asserts — and a rule's silence is licensed by what the producer actually recorded, so a dimension nobody instruments makes the rules that need it skip rather than report nothing found. Opens one file and no socket. |
+| **Evidence matrix** | `guardana trace inspect trace.jsonl` | Prints, dimension by dimension, what a producer really records, how many records this execution carries, and how many installed rules that dimension licenses. **No coverage percentage** — one number hides which dimension is missing, which is the whole question. With `--profile`, it says whether the evidence your policy *requires* is there, so you learn that before a pipeline does. Opens one file and no socket. |
 | **Imported claims** | `guardana import-observations results.json` | Reads garak, promptfoo or your own harness's results and files them in `unverified` with their provenance intact — producer, version, timestamp and a digest of the bytes. Their verdict stays theirs: it never exits `0`, because Guardana verified nothing. |
 | **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, on a check that could not run, and on any cycle that is *worse* than the first one by the same definition `diff` uses — including a check that can no longer grade what it used to. Plants a fresh random canary every cycle. |
 
@@ -251,17 +252,18 @@ empty corpus raises instead of returning a perfect-looking zero. A report is tie
 to the *versioned* evaluator id (`llm_judge@2025.1`), so a changed rubric cannot
 inherit an older measurement.
 
-### Three channels, because "no findings" has three meanings
+### Four channels, because "no findings" has four meanings
 
-A clean report can mean three different things, and conflating them is how a
-scanner lies. Guardana keeps them apart end to end — in every output format and
-in the collector envelope:
+A clean report can mean four different things, and conflating them is how a
+scanner lies. Guardana keeps them apart end to end — in every output format, and
+the first three in the collector envelope as well:
 
 | Channel | Meaning |
 |---|---|
 | **findings** | a check ran and found something |
 | **unverified** | a check ran and honestly could not reach a verdict |
 | **errors** | a check **never ran** — a plugin that failed to import, a rule file that would not load, a rule that raised |
+| **coverage shortfall** | evidence the operator **demanded** and this run did not get — a dimension named in `trace.require`, or one an assertion in your security contract needs. The only channel with no `fail_on_*` switch in front of it, because switching one off is exactly how "my contract was never checked" would become exit `0`. It travels in the saved run under `run.coverage.shortfall`; the collector receives the resulting `indeterminate` verdict but not yet its cause |
 
 A fourth channel answers a different question: **observations** is what the run
 *saw* — models and their formats, dependency manifests, datasets, notebooks —
@@ -278,6 +280,65 @@ check blowing up looked exactly like a check that did not apply — and the buil
 stayed green. It now has its own channel and **fails the gate by default**
 (`fail_on_error`), one broken rule never stops the rest of the scan, and one
 broken plugin never takes rule discovery down with it.
+
+### Your application's threat model, executable (`--contract`)
+
+Rules are tests, evaluators are judgement, targets are the system. The missing
+layer is **what the application is allowed to do**: which principals exist, whose
+data is whose, which actions need a human, which boundary may never receive a
+credential. No public framework knows any of that, and no generic scanner can.
+
+A **security contract** is a versioned YAML file your team keeps in its own
+repository. Guardana compiles each assertion into an ordinary rule, so redaction,
+baselines, `diff`, the collector and the exit-code contract all apply unchanged:
+
+| `type` | The invariant it proves | Evidence it needs |
+|---|---|---|
+| `tenant_boundary` | one execution stayed on one tenant, and every document it read belongs to that tenant | `retrieval` |
+| `approval_required` | an action in scope happened only after an approval was **granted** | `approval` + `effects` |
+| `allowed_scopes` | a hop across a named boundary exercised only scopes on the allow list | `delegation` |
+| `credential_boundary` | a named boundary never received a credential at all | `delegation` |
+| `forbidden_sink` | no side effect landed on a sink the application forbids | `effects` |
+
+Deterministic and offline: each one compares values the producer recorded. Attacks
+generated to *break* an invariant are deliberately not part of this — the order is
+state the invariant, prove it, then generate traffic.
+
+**The part that decides whether any of it is worth having:** an assertion whose
+dimension the producer does not record makes the run `indeterminate`, never a pass
+— and with no `fail_on_*` in front of it, because `fail_on_skipped` defaults to off
+and the default path for "your contract could not be checked" would otherwise be a
+green build. A contract that turns out to be about a different AI system is
+recorded as *not applicable*, which is not a coverage gap and is also not a pass;
+and a run where **no** loaded contract applied is refused outright, because that is
+the wrong-file case. `schema_version` is required, unknown keys raise at load, and
+a mistyped `--contract` path exits `3` rather than quietly grading nothing.
+
+See [`docs/usage-contracts.md`](docs/usage-contracts.md) and
+[`docs/design/security-contracts.md`](docs/design/security-contracts.md).
+
+### What a recorded execution can answer at all (`guardana trace inspect`)
+
+The trace design's central mechanism — a producer that does not record a dimension
+stops the rules needing it from running — used to be visible only as a skip note on
+a run that had already happened. An operator could not gate on it, because they
+could not see what was missing until a rule was missed.
+
+`guardana trace inspect` prints the matrix ahead of time: per dimension, whether
+the producer **declares** it, how many **records** this execution carries, whether
+your profile **requires** it, and how many installed rules it **licenses**. The
+first two are separate columns on purpose — `declared: yes, records: 0` is an
+execution with nothing to approve and is gradable, while `declared: no` is an
+instrumentation gap where silence means nothing.
+
+**There is no coverage percentage.** One number is compatible with having no
+identity evidence whatsoever, and a team gating on a number rather than on a name
+ships the day the missing part is the part that mattered.
+
+`trace.require: [identity, approval, effects]` in `guardana.yaml` turns the matrix
+into a gate, and `trace inspect --profile` tells you whether that gate would pass
+before a pipeline finds out. It opens one file, writes no run document, and reaches
+no network.
 
 ### A saved run is evidence, not a screenshot (`guardana run`)
 

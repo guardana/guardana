@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from guardana.core.observation import Observation
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
+from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
@@ -44,6 +45,16 @@ class ScanResult:
     waived: tuple[Finding, ...] = ()
     errors: tuple[CheckError, ...] = ()
     observations: tuple[Observation, ...] = ()
+    coverage_shortfall: tuple[CoverageShortfall, ...] = ()
+    """Coverage the operator demanded and this run did not get. Never a pass.
+
+    The one channel with no policy toggle in front of it, and that is what it is
+    for: `fail_on_skipped` defaults to off because most skips are ordinary, so a
+    contract that could not be checked would otherwise exit `0` by default. A
+    demand somebody wrote down and did not get is `indeterminate`, and there is
+    nothing to switch off.
+    """
+
     stopped_by: StopReason | None = None
     usage: TargetUsage | None = None
     """What the target spent producing this result, or None if it does not count.
@@ -88,6 +99,12 @@ class ScanResult:
             # pass per planted canary), and the model under test is one component,
             # not one per pass.
             observations=tuple({o.ref: o for r in results for o in r.observations}.values()),
+            # De-duplicated by what was demanded: probe merges one result per
+            # planted canary, and one unrecorded dimension is one shortfall however
+            # many passes noticed it.
+            coverage_shortfall=tuple(
+                {(s.kind, s.name): s for r in results for s in r.coverage_shortfall}.values()
+            ),
             # A stop recorded in any pass is a stop for the whole run: probe merges
             # one result per planted canary, and a budget that ran out during the
             # third pass leaves the first two looking complete. Dropping it here

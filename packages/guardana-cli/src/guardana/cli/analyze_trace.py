@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from guardana.cli._contracts import contract_paths, describe_contracts, wire_contracts
 from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
 from guardana.cli._output import emit
@@ -85,6 +86,14 @@ def analyze_trace(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; 
         Path | None,
         typer.Option("--output", help="Write the report to this file (needed by `guardana diff`)."),
     ] = None,
+    contract: Annotated[
+        list[Path],
+        typer.Option(
+            "--contract",
+            help="Security contract to check this execution against; repeatable, and a "
+            "directory loads every .yaml in it.",
+        ),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
     write_trace: Annotated[
         Path | None,
         typer.Option(
@@ -100,6 +109,10 @@ def analyze_trace(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; 
     read = load_trace_or_exit(trace, dialect)
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
     load_custom_rules(registry, prof, rules)
+    # Before the run, because a contract changes both what runs and what the run is
+    # required to have: its assertions become rules, and the dimensions they need
+    # join whatever `trace.require` already demanded.
+    prof, contracts = wire_contracts(registry, prof, contract_paths(prof, contract), ai_system)
     target = TraceTarget(read.trace)
     typer.echo(trace_source(read), err=True)
     started_at = datetime.now(UTC)
@@ -110,13 +123,23 @@ def analyze_trace(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; 
     # The observations the trace itself supplies — which models actually answered —
     # are merged in here rather than produced by a rule: they are a fact about the
     # file, not a judgement about it.
-    result = ScanResult.merged([result, ScanResult((), (), (), observations=target.observations())])
+    result = ScanResult.merged(
+        [
+            result,
+            ScanResult((), (), (), observations=target.observations()),
+            # A contract about another system contributes its skips and, when *no*
+            # contract was about this execution, the shortfall that refuses the run.
+            ScanResult((), (), contracts.skipped, coverage_shortfall=contracts.shortfall),
+        ]
+    )
     result = record_errors(result, read)
     result = EvidenceRedactor(prof.privacy).redact_result(result)
     if write_trace is not None:
         _write_native(read, write_trace)
-    for line in describe_coverage(read, target):
+    for line in [*describe_coverage(read, target), *describe_contracts(contracts)]:
         typer.echo(line, err=True)
+    for gap in result.coverage_shortfall:
+        typer.echo(f"error: {gap.detail}", err=True)
 
     outcome = gate_outcome(result, prof.policy)
     deployment = detect_deployment(ai_system, environment, deployment_id)

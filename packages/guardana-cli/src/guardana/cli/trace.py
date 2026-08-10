@@ -1,0 +1,195 @@
+"""`guardana trace inspect` — what a recorded execution can answer, before anything grades it.
+
+Opens one file and no socket, writes no run document, and reaches no network. It
+exists because the trace design's central mechanism — a producer that does not
+record a dimension stops the rules needing it from running — was visible only as a
+skip note *after* a run. An operator cannot gate on evidence they can only see once
+a rule has already been missed.
+"""
+
+import json
+from enum import StrEnum
+from pathlib import Path
+from typing import Annotated
+
+import typer
+from guardana.cli._plugins import resolve_trust
+from guardana.cli._profile import resolve_profile
+from guardana.cli._rules_loading import load_custom_rules
+from guardana.cli._trace_input import load_trace_or_exit, trace_source
+from guardana.core.registry import Registry
+from guardana.core.target import Capability, TargetKind, capability_for
+from guardana.core.trace import Dialect, Dimension, DimensionCoverage, Trace, evidence_matrix
+
+trace_app = typer.Typer(help="Inspect a recorded execution without grading it.")
+
+
+class InspectFormat(StrEnum):
+    """How `guardana trace inspect` prints the evidence matrix."""
+
+    human = "human"
+    json = "json"
+
+
+@trace_app.command()
+def inspect(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; the command's surface
+    trace: Annotated[Path, typer.Argument(help="JSONL trace file to inspect")],
+    dialect: Annotated[
+        Dialect | None,
+        typer.Option(
+            "--dialect",
+            help="guardana|otel. Detected from the file's first record when not given.",
+        ),
+    ] = None,
+    profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
+    preset: Annotated[
+        str | None, typer.Option(help="Named policy preset: ci|pre-training|monitor")
+    ] = None,
+    format: Annotated[InspectFormat, typer.Option(help="human|json")] = InspectFormat.human,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
+    rules: Annotated[
+        list[Path],
+        typer.Option("--rules", help="Directory or file of custom YAML rules; repeatable."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
+) -> None:
+    """Print which evidence dimensions this trace carries, and which rules they license.
+
+    Pass `--profile` to see whether the dimensions that profile requires are
+    actually there: this is the command that answers "would my gate go indeterminate"
+    before a pipeline finds out.
+    """
+    prof = resolve_profile(profile, preset)
+    read = load_trace_or_exit(trace, dialect)
+    registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
+    load_custom_rules(registry, prof, rules)
+    matrix = evidence_matrix(read.trace)
+    licensed = _licensed_rules(registry)
+    required = frozenset(prof.required_dimensions)
+    if format is InspectFormat.json:
+        typer.echo(json.dumps(_document(read.trace, matrix, licensed, required), indent=2))
+        return
+    typer.echo(trace_source(read))
+    typer.echo("")
+    for line in _table(matrix, licensed, required):
+        typer.echo(line)
+    for line in _notes(read.trace, matrix, required):
+        typer.echo(line)
+
+
+def _licensed_rules(registry: Registry) -> dict[str, tuple[str, ...]]:
+    """Which installed rules each dimension licenses, keyed by dimension name.
+
+    Counted from the registry rather than from a written-down list, so a rule pack a
+    team installed is included and the number cannot rot the way a hand-maintained
+    table does. A dimension no installed rule needs reports none, which is honest and
+    immediately useful: it says the evidence would buy nothing here today.
+    """
+    licensed: dict[str, list[str]] = {}
+    for rule in registry.rules():
+        if rule.meta.target_kind is not TargetKind.TRACE:
+            continue
+        for dimension in _dimensions_of(rule.meta.required_capabilities):
+            licensed.setdefault(dimension, []).append(rule.meta.id)
+    return {name: tuple(sorted(ids)) for name, ids in licensed.items()}
+
+
+def _dimensions_of(capabilities: frozenset[Capability]) -> list[str]:
+    """Which dimensions a rule's capability set corresponds to, via the one shared table."""
+    return [str(d) for d in Dimension if capability_for(d) in capabilities]
+
+
+def _table(
+    matrix: tuple[DimensionCoverage, ...],
+    licensed: dict[str, tuple[str, ...]],
+    required: frozenset[Dimension],
+) -> list[str]:
+    """Render the matrix as aligned columns, one row per dimension and no total.
+
+    **No coverage percentage, deliberately.** One number is compatible with having no
+    identity evidence whatsoever, and a team gating on a number rather than on a name
+    ships the day the missing part is the part that mattered.
+    """
+    rows = [("dimension", "declared", "records", "required", "licenses")]
+    rows += [
+        (
+            str(row.dimension),
+            "yes" if row.declared else "no",
+            str(row.records),
+            "yes" if row.dimension in required else "-",
+            f"{len(licensed.get(str(row.dimension), ()))} rule(s)",
+        )
+        for row in matrix
+    ]
+    widths = [max(len(cell) for cell in column) for column in zip(*rows, strict=True)]
+    return [
+        "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
+        for row in rows
+    ]
+
+
+def _notes(
+    trace: Trace, matrix: tuple[DimensionCoverage, ...], required: frozenset[Dimension]
+) -> list[str]:
+    """Say what a clean-looking matrix still does not mean."""
+    lines = [""]
+    missing = [row.dimension for row in matrix if row.is_gap and row.dimension in required]
+    if missing:
+        lines.append(
+            f"error: this profile requires {', '.join(str(d) for d in missing)}, which this "
+            f"producer does not record — `guardana analyze-trace` on this file is "
+            f"indeterminate, never a pass"
+        )
+    elif required:
+        lines.append(
+            f"ok: every dimension this profile requires "
+            f"({', '.join(sorted(str(d) for d in required))}) is recorded here"
+        )
+    gaps = [row.dimension for row in matrix if row.is_gap]
+    if gaps:
+        lines.append(
+            f"note: {', '.join(str(d) for d in gaps)} are not recorded at all, so the rules "
+            f"needing them do not run — their silence is not evidence that nothing happened"
+        )
+    if trace.truncated is not None:
+        lines.append(
+            f"note: the trace is incomplete ({trace.truncated}), so a step this file does "
+            f"not contain may still have happened"
+        )
+    return lines
+
+
+def _document(
+    trace: Trace,
+    matrix: tuple[DimensionCoverage, ...],
+    licensed: dict[str, tuple[str, ...]],
+    required: frozenset[Dimension],
+) -> dict[str, object]:
+    """Build the machine-readable matrix — the same facts, named rather than aligned."""
+    return {
+        "trace_id": trace.trace_id,
+        "source": trace.provenance.source,
+        "dialect": trace.provenance.dialect,
+        "producer": trace.provenance.producer,
+        "spans": len(trace.spans),
+        "truncated": None if trace.truncated is None else str(trace.truncated),
+        "dimensions": [
+            {
+                "dimension": str(row.dimension),
+                "declared": row.declared,
+                "records": row.records,
+                "required": row.dimension in required,
+                "licenses": list(licensed.get(str(row.dimension), ())),
+            }
+            for row in matrix
+        ],
+    }
+
+
+__all__ = ["trace_app"]
