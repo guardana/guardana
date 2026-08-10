@@ -129,7 +129,12 @@ def analyze_trace(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; 
             ScanResult((), (), (), observations=target.observations()),
             # A contract about another system contributes its skips and, when *no*
             # contract was about this execution, the shortfall that refuses the run.
-            ScanResult((), (), contracts.skipped, coverage_shortfall=contracts.shortfall),
+            ScanResult(
+                (),
+                (),
+                contracts.compilation.skipped,
+                coverage_shortfall=contracts.compilation.shortfall,
+            ),
         ]
     )
     result = record_errors(result, read)

@@ -18,7 +18,8 @@ from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._trace_input import load_trace_or_exit, trace_source
 from guardana.core.registry import Registry
-from guardana.core.target import Capability, TargetKind, capability_for
+from guardana.core.rule import Rule
+from guardana.core.target import Capability, TargetKind, dimensions_of
 from guardana.core.trace import Dialect, Dimension, DimensionCoverage, Trace, evidence_matrix
 
 trace_app = typer.Typer(help="Inspect a recorded execution without grading it.")
@@ -71,43 +72,71 @@ def inspect(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; the co
     load_custom_rules(registry, prof, rules)
     matrix = evidence_matrix(read.trace)
     licensed = _licensed_rules(registry)
+    unlocked = _unlocked_rules(registry, read.trace.instrumented)
     required = frozenset(prof.required_dimensions)
     if format is InspectFormat.json:
-        typer.echo(json.dumps(_document(read.trace, matrix, licensed, required), indent=2))
+        document = _document(read.trace, matrix, licensed, unlocked, required)
+        typer.echo(json.dumps(document, indent=2))
         return
     typer.echo(trace_source(read))
     typer.echo("")
-    for line in _table(matrix, licensed, required):
+    for line in _table(matrix, licensed, unlocked, required):
         typer.echo(line)
     for line in _notes(read.trace, matrix, required):
         typer.echo(line)
 
 
 def _licensed_rules(registry: Registry) -> dict[str, tuple[str, ...]]:
-    """Which installed rules each dimension licenses, keyed by dimension name.
+    """Which installed rules each dimension is needed by, keyed by dimension name.
 
     Counted from the registry rather than from a written-down list, so a rule pack a
     team installed is included and the number cannot rot the way a hand-maintained
     table does. A dimension no installed rule needs reports none, which is honest and
     immediately useful: it says the evidence would buy nothing here today.
+
+    **Needed by, not unlocked by.** A rule wanting two dimensions is counted under both
+    of them, so this number alone cannot answer "what do I instrument next" —
+    `_unlocked_rules` answers that, and the gap between the two is the useful part.
     """
     licensed: dict[str, list[str]] = {}
-    for rule in registry.rules():
-        if rule.meta.target_kind is not TargetKind.TRACE:
-            continue
+    for rule in _trace_rules(registry):
         for dimension in _dimensions_of(rule.meta.required_capabilities):
             licensed.setdefault(dimension, []).append(rule.meta.id)
     return {name: tuple(sorted(ids)) for name, ids in licensed.items()}
 
 
+def _unlocked_rules(
+    registry: Registry, declared: frozenset[Dimension]
+) -> dict[str, tuple[str, ...]]:
+    """Which rules recording *this one further dimension* would actually make runnable.
+
+    A rule is unlocked by a dimension exactly when that dimension is the only one it
+    still lacks — so an assertion needing approvals *and* side effects unlocks under
+    neither on its own, and an operator budgeting instrumentation work sees that before
+    they do it rather than after. Counting "needs it" alone told them the opposite.
+    """
+    unlocked: dict[str, list[str]] = {}
+    for rule in _trace_rules(registry):
+        needed = {str(d) for d in dimensions_of(rule.meta.required_capabilities)}
+        missing = needed - {str(d) for d in declared}
+        if len(missing) == 1:
+            unlocked.setdefault(missing.pop(), []).append(rule.meta.id)
+    return {name: tuple(sorted(ids)) for name, ids in unlocked.items()}
+
+
+def _trace_rules(registry: Registry) -> list[Rule]:
+    return [rule for rule in registry.rules() if rule.meta.target_kind is TargetKind.TRACE]
+
+
 def _dimensions_of(capabilities: frozenset[Capability]) -> list[str]:
     """Which dimensions a rule's capability set corresponds to, via the one shared table."""
-    return [str(d) for d in Dimension if capability_for(d) in capabilities]
+    return [str(d) for d in dimensions_of(capabilities)]
 
 
 def _table(
     matrix: tuple[DimensionCoverage, ...],
     licensed: dict[str, tuple[str, ...]],
+    unlocked: dict[str, tuple[str, ...]],
     required: frozenset[Dimension],
 ) -> list[str]:
     """Render the matrix as aligned columns, one row per dimension and no total.
@@ -115,8 +144,14 @@ def _table(
     **No coverage percentage, deliberately.** One number is compatible with having no
     identity evidence whatsoever, and a team gating on a number rather than on a name
     ships the day the missing part is the part that mattered.
+
+    Two rule counts rather than one, because they answer different questions and the
+    old single column silently answered the wrong one. `needed by` is how many rules
+    read this dimension; `unlocks` is how many would start running if this were the
+    next thing instrumented. They differ wherever a rule wants two dimensions, and
+    `needed by 1 / unlocks 0` is the row that says "this one needs a partner".
     """
-    rows = [("dimension", "declared", "records", "required", "licenses")]
+    rows = [("dimension", "declared", "records", "required", "needed by", "unlocks")]
     rows += [
         (
             str(row.dimension),
@@ -124,6 +159,10 @@ def _table(
             str(row.records),
             "yes" if row.dimension in required else "-",
             f"{len(licensed.get(str(row.dimension), ()))} rule(s)",
+            # Nothing to buy where the evidence is already there, and printing `0` for
+            # a dimension the producer records would read as "worthless" rather than
+            # as "already counted".
+            "-" if row.declared else f"{len(unlocked.get(str(row.dimension), ()))} rule(s)",
         )
         for row in matrix
     ]
@@ -169,6 +208,7 @@ def _document(
     trace: Trace,
     matrix: tuple[DimensionCoverage, ...],
     licensed: dict[str, tuple[str, ...]],
+    unlocked: dict[str, tuple[str, ...]],
     required: frozenset[Dimension],
 ) -> dict[str, object]:
     """Build the machine-readable matrix — the same facts, named rather than aligned."""
@@ -186,6 +226,10 @@ def _document(
                 "records": row.records,
                 "required": row.dimension in required,
                 "licenses": list(licensed.get(str(row.dimension), ())),
+                # Additive beside `licenses`, which keeps its meaning: every rule that
+                # reads this dimension. This is the subset that has nothing else
+                # missing, which is the one a team deciding what to instrument needs.
+                "unlocks": [] if row.declared else list(unlocked.get(str(row.dimension), ())),
             }
             for row in matrix
         ],

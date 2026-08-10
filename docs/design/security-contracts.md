@@ -1,6 +1,7 @@
 # Security contracts, and the evidence matrix that decides whether one can be checked
 
-**Status:** implemented in 0.17.0 · **Written:** 2026-08-10 · **Step four**
+**Status:** implemented in 0.17.0, corrected in 0.17.1 · **Written:** 2026-08-10 ·
+**Step four**
 
 ## Two halves of one thing
 
@@ -243,6 +244,38 @@ it, and the collector would receive a verdict with no cause. A run whose
 conclusion is not in its own evidence is the failure this project has fixed
 twice already.
 
+### The implied demand ends where the assertion does *(corrected in 0.17.1)*
+
+The two sources are the same statement — *I am gating on this coverage* — but they
+are not owned by the same person, and 0.17.0 shipped as though they were. The
+implicit demand was computed from every applicable assertion before the policy said
+which rules would run, so `rules.exclude: ["contract.checkout.*"]` switched the
+assertions off and left their requirement standing. The run then went
+`indeterminate` for missing evidence that no surviving check would have read.
+
+Measured rather than reasoned about: the same trace, the same six rules run and
+seven skipped, exit `0` with the assertion deleted from the contract and exit `2`
+with the assertion present and its rule excluded. Identical work, opposite verdict.
+
+That is a **false red**, and this project owes it the same treatment as a false
+green. A tool that accuses a run of missing coverage nobody asked for gets its
+coverage demands turned off, and then it is protecting nothing. So the implication
+now lives and dies with the assertion: `wire_contracts` demands only the dimensions
+of assertions this run will actually check, using `refused_by_this_run` — the same
+predicate composed from the two things the runner's plan already consults, with a
+test asserting the predicate agrees with the plan the runner really builds rather
+than with a second reading of the same conditions.
+
+`trace.require:` is deliberately untouched by this. It is a sentence the operator
+wrote, not an implication of a check, and a team paying for instrumentation is
+entitled to demand it arrive whether or not a rule currently wants it.
+
+**And the exclusion is printed.** Subtracting the demand silently would leave
+`contracts: 1 assertion(s) apply to this execution` standing over a green report
+about a rule nothing ran — a true sentence about loading and a false one about
+grading. Recording it as evidence in the saved run needs a new `SkipReason` value,
+which is a persisted-schema change; the roadmap carries it with that reason.
+
 ### Ordering against a finding
 
 A finding still outranks a shortfall: a run with both is `FAIL`. The finding is a
@@ -300,11 +333,11 @@ not see what was missing until a rule was missed.
 ```
 $ guardana trace inspect run.jsonl
 
-dimension      declared  records  licenses
-messages       yes       12       3 rule(s)
-retrieval      yes        4       2 rule(s)
-approval       no         0       2 rule(s)   ← not instrumented
-memory         yes        2       0 rule(s)
+dimension      declared  records  needed by  unlocks
+messages       yes       12       3 rule(s)  -
+retrieval      yes        4       2 rule(s)  -
+approval       no         0       2 rule(s)  0 rule(s)   ← not instrumented
+memory         yes        2       0 rule(s)  -
 ```
 
 Two columns rather than one, because the difference between them is a real and
@@ -322,12 +355,21 @@ all, and a team that gates on a number rather than on a name will ship the day t
 missing 22% is the 22% that mattered. The roadmap already refuses a universal AI
 risk score for the same reason; this is that decision applied one level down.
 
-**`licenses` counts installed rules, not a fixed list.** It is computed from the
+**`needed by` counts installed rules, not a fixed list.** It is computed from the
 registry, so a rule pack a team installed is counted and the number cannot rot the
 way a hand-written table does. A dimension no installed rule needs says `0`, which
 is honest and immediately useful: `memory` is instrumented by several frameworks
 and has no capability mapped to it today, and the matrix says so out loud instead
 of leaving it looking covered.
+
+**`unlocks` is a separate column because it answers a separate question, and one
+column answering both answered the wrong one.** `needed by` is how many rules read
+the dimension; `unlocks` is how many would start running if it were the next thing
+instrumented — which is only the rules with nothing else missing. `approval` above
+is needed by two rules and unlocks neither, because both also want side effects. A
+team reading the single column budgeted a sprint of instrumentation and gained no
+check. Added in 0.17.1 after `guardana trace inspect` was run against a real
+adapter's output and the two numbers turned out to disagree.
 
 **It opens a file and no socket.** Same input `analyze-trace` takes, no
 network, no run document written, exit `0` unless the file cannot be read. An
@@ -353,6 +395,25 @@ Stated so nothing here implies otherwise.
 - **No regulation and no vendor appears in the engine.** An assertion kind names
   tenants, scopes, boundaries and sinks — domain nouns, not framework names. The
   OWASP mapping is data on the kind, as every other mapping in this repository is.
+- **No shipped framework adapter can carry four of the five kinds.** Measured in
+  0.17.1 against a real run from each, not against a fixture:
+
+  | Producer | Records | Kinds it can grade |
+  |---|---|---|
+  | pydantic-ai 2.27.0 | `messages`, `tools` | none |
+  | llama-index-core 0.14.23 | `messages`, `retrieval` | `tenant_boundary` |
+  | crewai 1.15.14 | `messages`, `handoff` | none |
+
+  `approval_required`, `allowed_scopes`, `credential_boundary` and `forbidden_sink`
+  decline on all three, because no framework records approvals, delegations or side
+  effects of its own accord. The declines are correct — that is
+  [decision 5](#decision-5--the-meeting-point-unverifiable-is-indeterminate-unconditionally)
+  doing its job — but they mean **contracts today serve a team that instruments its
+  own agent**, through the native dialect, an OpenTelemetry exporter it controls, or
+  `--write-trace` output it fills in. The one measured success is the shape of the
+  win: a two-tenant LlamaIndex run produced a `critical` `tenant_boundary` finding
+  that no built-in rule could reach, because whether one execution may serve two
+  customers is knowledge only the owning team has.
 
 ## Deferred, with the reason
 

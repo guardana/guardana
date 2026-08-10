@@ -347,6 +347,19 @@ def safety_refusal(profile: Profile, rule: Rule) -> SkippedRule | None:
     return None
 
 
+def refused_by_this_run(profile: Profile, rule: Rule) -> bool:
+    """Whether this run will not execute `rule` because of a decision its operator made.
+
+    Deliberately narrower than "did not run". A capability the target cannot satisfy is
+    the *target's* answer and is exactly what a coverage demand exists to catch; an
+    exclusion glob or a safety ceiling is the operator's, and a demand derived from a
+    check they switched off would fail the build for not running it. Composed from the
+    two things the plan already consults, so the wiring that withdraws a demand and the
+    runner that drops the rule cannot disagree about which rules those are.
+    """
+    return not profile.policy.matches(rule.meta.id) or safety_refusal(profile, rule) is not None
+
+
 def _unread_sources(target: Target) -> tuple[UnreadSource, ...]:
     """Return what this target could not read, for targets that track it."""
     if isinstance(target, ArtifactTarget):
@@ -389,4 +402,12 @@ def _is_inconclusive(finding: Finding) -> bool:
     return finding.verdict is not None and finding.verdict.outcome == "inconclusive"
 
 
-__all__ = ["DEFAULT_ENDPOINT_CONCURRENCY", "GateOutcome", "Runner", "gate", "gate_outcome"]
+__all__ = [
+    "DEFAULT_ENDPOINT_CONCURRENCY",
+    "GateOutcome",
+    "Runner",
+    "gate",
+    "gate_outcome",
+    "refused_by_this_run",
+    "safety_refusal",
+]

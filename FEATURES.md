@@ -31,7 +31,7 @@ Full detail, including what is deliberately not covered:
 | **Live probe** | `guardana probe --url … --model …` | One-shot dynamic run against a live endpoint: injection, jailbreaks (single- and multi-turn), system-prompt leakage, output-secret checks — every finding graded by an Evaluator with an explicit confidence. Rules run concurrently (`--concurrency`, default 4) with rate-limit backoff, and results stay in rule order so two runs match. |
 | **MCP server** | `guardana probe --mcp <url>` | Examines a **live** MCP server on two levels, over **either revision of the protocol** — which one a server speaks is settled by `server/discover` before anything else is asked, and recorded in the run manifest. Its **manifest**: hidden instructions anywhere in a tool declaration — description, title, input and output schema — and drift from the manifest you approved (`--write-mcp-pin` to approve, `--mcp-pin` to compare). And its **authorization surface**: whether it answers without a credential, publishes discovery a conforming client can use, accepts a token it could not have issued, binds its sessions (where the revision still has them), scopes least privilege, identifies its issuer, declares a safe cache scope, and points its client only at addresses a client may follow. Pass `--mcp-token-env` for the checks that need a credential to say anything. Guardana never calls a tool. Streamable HTTP needs no permission; an stdio server is *started* by Guardana, so it takes an explicit `--allow-exec`. |
 | **Recorded run** | `guardana analyze-trace trace.jsonl` | Grades an execution somebody's *production* agent already performed, read from **OpenTelemetry GenAI** spans or Guardana's native dialect. Nine checks over identity, delegation, consent, policy decisions, approvals, retrieval and side effects — plus whatever your own **security contract** asserts — and a rule's silence is licensed by what the producer actually recorded, so a dimension nobody instruments makes the rules that need it skip rather than report nothing found. Opens one file and no socket. |
-| **Evidence matrix** | `guardana trace inspect trace.jsonl` | Prints, dimension by dimension, what a producer really records, how many records this execution carries, and how many installed rules that dimension licenses. **No coverage percentage** — one number hides which dimension is missing, which is the whole question. With `--profile`, it says whether the evidence your policy *requires* is there, so you learn that before a pipeline does. Opens one file and no socket. |
+| **Evidence matrix** | `guardana trace inspect trace.jsonl` | Prints, dimension by dimension, what a producer really records, how many records this execution carries, how many installed rules read that dimension, and how many of them would **start running** if it were the next thing instrumented — two counts, because a rule needing two dimensions is unlocked by neither on its own. **No coverage percentage** — one number hides which dimension is missing, which is the whole question. With `--profile`, it says whether the evidence your policy *requires* is there, so you learn that before a pipeline does. Opens one file and no socket. |
 | **Imported claims** | `guardana import-observations results.json` | Reads garak, promptfoo or your own harness's results and files them in `unverified` with their provenance intact — producer, version, timestamp and a digest of the bytes. Their verdict stays theirs: it never exits `0`, because Guardana verified nothing. |
 | **Monitor** | `guardana monitor --url … --model …` | Long-running sampling observer next to a served model; alerts on gate failure, on a check that could not run, and on any cycle that is *worse* than the first one by the same definition `diff` uses — including a check that can no longer grade what it used to. Plants a fresh random canary every cycle. |
 
@@ -326,10 +326,13 @@ could not see what was missing until a rule was missed.
 
 `guardana trace inspect` prints the matrix ahead of time: per dimension, whether
 the producer **declares** it, how many **records** this execution carries, whether
-your profile **requires** it, and how many installed rules it **licenses**. The
-first two are separate columns on purpose — `declared: yes, records: 0` is an
-execution with nothing to approve and is gradable, while `declared: no` is an
-instrumentation gap where silence means nothing.
+your profile **requires** it, how many installed rules **need** it, and how many
+those would **unlock** if it were added next. The first two are separate columns on
+purpose — `declared: yes, records: 0` is an execution with nothing to approve and is
+gradable, while `declared: no` is an instrumentation gap where silence means
+nothing. So are the last two: a rule wanting approvals *and* side effects is needed
+by both and unlocked by neither, and a single column saying otherwise sent teams to
+instrument one half for no new coverage.
 
 **There is no coverage percentage.** One number is compatible with having no
 identity evidence whatsoever, and a team gating on a number rather than on a name

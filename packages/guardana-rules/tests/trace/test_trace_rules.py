@@ -746,6 +746,60 @@ def test_an_empty_retrieval_is_not_reported_as_an_unanswered_question() -> None:
     assert graded(CrossTenantRetrievalRule(), trace) == ()
 
 
+def test_a_decline_names_the_side_that_is_actually_unlabelled() -> None:
+    """Labelled documents, unlabelled query — and the decline used to accuse the documents.
+
+    Found by reading the artifact of a real LlamaIndex run rather than by a test: its
+    `source_nodes` carry a tenant each and its `Response` carries none, so the one
+    sentence covering both cases told a team its documents were unlabelled when they
+    were the half already done. The verdict was right; the instruction was wrong.
+    """
+    trace = trace_of(
+        span(
+            "r1",
+            kind=SpanKind.RETRIEVAL,
+            retrieval=Retrieval(
+                query="invoices",
+                source="corpus",
+                documents=(
+                    RetrievedDocument(id="d1", tenant="acme"),
+                    RetrievedDocument(id="d2", tenant="globex"),
+                ),
+            ),
+        )
+    )
+
+    declines = inconclusive(graded(CrossTenantRetrievalRule(), trace))
+
+    assert len(declines) == 1
+    summary = declines[0].evidence.summary
+    assert "no tenant on the query" in summary
+    assert "document" not in summary.split("compare the")[0], (
+        "the documents are labelled, so the decline must not say otherwise"
+    )
+
+
+def test_a_labelled_query_with_unlabelled_documents_says_that_instead() -> None:
+    """The mirror case, so the fix is a distinction rather than a reworded sentence."""
+    trace = trace_of(
+        span(
+            "r1",
+            kind=SpanKind.RETRIEVAL,
+            retrieval=Retrieval(
+                query="invoices",
+                tenant="acme",
+                source="corpus",
+                documents=(RetrievedDocument(id="d1"),),
+            ),
+        )
+    )
+
+    declines = inconclusive(graded(CrossTenantRetrievalRule(), trace))
+
+    assert len(declines) == 1
+    assert "none on any document" in declines[0].evidence.summary
+
+
 def test_a_handoff_whose_aftermath_names_no_agent_declines_rather_than_staying_silent() -> None:
     """The narrow false green: actors on the handoffs and on nothing after them.
 

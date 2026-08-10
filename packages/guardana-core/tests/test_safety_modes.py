@@ -13,7 +13,7 @@ from guardana.core.profile import FailOn, Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.report import Evidence, Finding, SkipReason
 from guardana.core.rule import Rule, RuleContext, RuleMeta
-from guardana.core.runner import Runner
+from guardana.core.runner import Runner, refused_by_this_run
 from guardana.core.safety import Impact, Maturity, permits
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, EndpointTarget, Target, TargetKind
@@ -48,6 +48,34 @@ def _run(*rules: Rule, profile: Profile) -> object:
 
 def _profile(**kwargs: object) -> Profile:
     return Profile("t", Policy(), **kwargs)  # type: ignore[arg-type]
+
+
+def test_refusal_agrees_with_the_plan_the_runner_actually_builds() -> None:
+    """The predicate that withdraws a coverage demand must name the rules the runner drops.
+
+    Two copies of "will this run?" is how a contract came to demand evidence for an
+    assertion the policy had switched off — the demand said yes while the plan said no.
+    So this compares the predicate against the run, not against a second reading of the
+    same conditions: every rule it calls refused is absent from `rules_run`, and every
+    rule it permits is present.
+    """
+    rules = (
+        _rule("acme.passive", Impact.PASSIVE),
+        _rule("acme.active", Impact.ACTIVE),
+        _rule("acme.destructive", Impact.ACTIVE, destructive=True),
+        _rule("acme.excluded", Impact.PASSIVE),
+    )
+    profile = Profile("t", Policy(exclude=("acme.excluded",)), max_impact=Impact.PASSIVE)
+
+    result = _run(*rules, profile=profile)
+
+    ran = set(result.rules_run)  # type: ignore[attr-defined]
+    for rule in rules:
+        refused = refused_by_this_run(profile, rule)
+        assert refused is (rule.meta.id not in ran), (
+            f"{rule.meta.id}: refused_by_this_run said {refused}, the run said "
+            f"{rule.meta.id not in ran}"
+        )
 
 
 def test_impact_is_ordered_not_compared_by_name() -> None:

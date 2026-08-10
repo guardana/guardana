@@ -209,7 +209,7 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
             "trace inspect prints the evidence matrix and no coverage percentage",
             [guardana, "trace", "inspect", str(trace_file)],
             0,
-            expect=("dimension", "declared", "records", "licenses", "effects"),
+            expect=("dimension", "declared", "records", "needed by", "unlocks", "effects"),
         ),
     ]
 

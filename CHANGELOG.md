@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-08-10 — three things 0.17.0 said that were not true
+
+An audit of the release, done by running it rather than by reading it. Every item
+below was found by pointing a command at a real file and reading the artifact; two
+of them are wrong *sentences* rather than wrong verdicts, which is the class a green
+test suite is structurally unable to see.
+
+### Fixed
+
+**A contract's coverage demand survived the policy that switched the assertion off —
+a false red.** `rules.exclude:` matching a compiled assertion dropped its rule from
+the run and left its requirement standing, so the run went `indeterminate` for
+missing evidence that no surviving check would have read. Measured on one trace: exit
+`0` with the assertion deleted from the contract, exit `2` with the assertion present
+and its rule excluded, with the same six rules run and seven skipped either way.
+Identical work, opposite verdict.
+
+This project treats a false red as seriously as a false green, and for the same
+reason: a tool that accuses a run of missing coverage nobody asked for gets its
+coverage demands turned off, and then it protects nothing. The implied demand now
+lives and dies with the assertion — `wire_contracts` requires only the dimensions of
+assertions the run will actually check, through a shared `refused_by_this_run`
+predicate that a test holds against the plan the runner really builds. **`trace.require:`
+is deliberately unchanged**: it is a demand the operator stated outright rather than
+one implied by a check, so it stands whether or not a rule wants the dimension.
+
+An excluded assertion is now also **printed** as excluded. Subtracting the demand
+silently would have left `contracts: 1 assertion(s) apply to this execution` standing
+over a green report about a rule nothing ran.
+
+**`guardana trace inspect` counted rules a dimension is *needed by* and labelled the
+column as what it *unlocks*.** Those are different numbers wherever a rule wants two
+dimensions: `guardana.trace.unapproved_side_effect` needs approvals *and* side
+effects, so against a producer recording neither it was counted under both while
+instrumenting either alone unlocked nothing. A team budgeting instrumentation read
+`approval: 1 rule(s)` and would have gained no check for the work. The table now
+carries both counts — `needed by` and `unlocks` — and the JSON gains an additive
+`unlocks` key beside `licenses`, which keeps its meaning.
+
+**`guardana.trace.cross_tenant_retrieval` said no document carried a tenant when the
+documents were the labelled half.** One sentence covered two different gaps: a query
+with no tenant, and a query with one where no returned document has any. A real
+LlamaIndex run is the first case — `source_nodes` each carry a tenant and the
+`Response` carries none — so the decline sent a team to instrument the side that was
+already done. The verdict was right and the instruction was wrong; the two cases are
+now counted and reported apart.
+
+### Changed
+
+**The measured reach of security contracts is now written down where it is decided.**
+Against a real run from every shipped adapter — pydantic-ai 2.27.0, llama-index-core
+0.14.23, crewai 1.15.14 — four of the five assertion kinds decline, because no
+framework records approvals, delegations or side effects on its own. The declines are
+the honest verdict working, and they also mean contracts today serve a team that
+instruments its own agent. `docs/usage-contracts.md`, `ROADMAP.md`, the design
+document and the landing page say so rather than leaving a reader to discover it in
+a pipeline.
+
+*Checked and deliberately left alone:* a contract directory picking up a stray
+`.yaml` (fail-closed, and the message names the file and the reason); an explicitly
+empty selector list reading as "all" (it widens, never narrows, and the loader
+already refuses empty wherever empty would silence a check); `tenant_boundary`
+reporting one finding per tenant beyond the first (one per site of the crossing, each
+with its own span, which is the pattern the built-in retrieval rule already uses).
+
 ## [0.17.0] - 2026-08-10 — the evidence matrix, and the application's own threat model
 
 ### Added

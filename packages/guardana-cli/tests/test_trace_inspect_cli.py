@@ -89,6 +89,7 @@ def test_declared_and_recorded_are_printed_as_two_columns(tmp_path: Path) -> Non
         "records": 1,
         "required": False,
         "licenses": rows["approval"]["licenses"],
+        "unlocks": [],
     }
     assert rows["retrieval"]["declared"] is True, "declared and empty is gradable"
     assert rows["retrieval"]["records"] == 0
@@ -106,6 +107,44 @@ def test_the_licensed_rules_come_from_the_registry_rather_than_a_written_down_li
     rows = {row["dimension"]: row for row in json.loads(result.output)["dimensions"]}
     assert "guardana.trace.unapproved_side_effect" in rows["effects"]["licenses"]
     assert rows["memory"]["licenses"] == [], "no installed rule needs memory, and it says so"
+
+
+def test_a_dimension_needed_by_a_rule_does_not_claim_to_unlock_it_on_its_own(
+    tmp_path: Path,
+) -> None:
+    """ "Needed by" and "would start working" are different numbers, and one used to stand in.
+
+    `guardana.trace.unapproved_side_effect` needs approvals *and* side effects. A trace
+    recording neither counted it under both, so an operator budgeting instrumentation
+    read "approval: 1 rule" and got nothing at all for the work. The column that answers
+    their actual question counts a rule only under the last dimension it is waiting for.
+    """
+    path = _write_trace(tmp_path, Dimension.MESSAGES)
+
+    result = runner.invoke(app, ["trace", "inspect", str(path), "--format", "json"])
+
+    rows = {row["dimension"]: row for row in json.loads(result.output)["dimensions"]}
+    assert "guardana.trace.unapproved_side_effect" in rows["approval"]["licenses"]
+    assert rows["approval"]["unlocks"] == [], "approvals alone leave that rule still waiting"
+    assert rows["effects"]["unlocks"] == [], "and so do side effects alone"
+    assert "guardana.trace.identity_disagreement" in rows["identity"]["unlocks"], (
+        "a rule waiting on one dimension is unlocked by it"
+    )
+
+
+def test_recording_the_partner_dimension_makes_the_rule_unlockable(tmp_path: Path) -> None:
+    """The other half of the same column: with approvals in hand, effects now buys the rule.
+
+    Inverted by the trace rather than by the code — the same command over a producer
+    that records one of the pair must move the rule into the other's `unlocks`.
+    """
+    path = _write_trace(tmp_path, Dimension.MESSAGES, Dimension.APPROVAL)
+
+    result = runner.invoke(app, ["trace", "inspect", str(path), "--format", "json"])
+
+    rows = {row["dimension"]: row for row in json.loads(result.output)["dimensions"]}
+    assert "guardana.trace.unapproved_side_effect" in rows["effects"]["unlocks"]
+    assert rows["approval"]["unlocks"] == [], "a dimension already recorded has nothing to buy"
 
 
 def test_it_says_a_required_dimension_is_missing_before_a_pipeline_finds_out(

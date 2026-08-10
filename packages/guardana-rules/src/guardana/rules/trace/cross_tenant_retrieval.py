@@ -43,7 +43,8 @@ class CrossTenantRetrievalRule(TraceRule):
         not checked, and a run that says so is a run whose silence still means
         something.
         """
-        ungradable = 0
+        unlabelled_query = 0
+        unlabelled_documents = 0
         unattributed = 0
         for span in trace.spans:
             retrieval = span.retrieval
@@ -52,16 +53,29 @@ class CrossTenantRetrievalRule(TraceRule):
                 # would put an inconclusive verdict on every empty search — a run turned
                 # indeterminate by a question that was in fact answered.
                 continue
-            if retrieval.tenant is None or not any(d.tenant for d in retrieval.documents):
-                ungradable += 1
+            # Counted apart, because they send an operator to different work. Folded
+            # into one sentence, this told a team whose documents were fully labelled
+            # that no document carried a tenant — sending them to instrument the side
+            # that was already done while the missing query tenant stayed missing.
+            if retrieval.tenant is None:
+                unlabelled_query += 1
+                continue
+            if not any(d.tenant for d in retrieval.documents):
+                unlabelled_documents += 1
                 continue
             unattributed += sum(1 for d in retrieval.documents if d.tenant is None)
             yield from self._foreign(trace, span, retrieval)
-        if ungradable:
+        if unlabelled_query:
             yield self.unverified(
                 trace,
-                f"{ungradable} retrieval(s) record no tenant on the query or on any document "
-                f"they returned, so {self.claim} for them",
+                f"{unlabelled_query} retrieval(s) record no tenant on the query, so there is "
+                f"nothing to compare the documents they returned against — {self.claim} for them",
+            )
+        if unlabelled_documents:
+            yield self.unverified(
+                trace,
+                f"{unlabelled_documents} retrieval(s) name a tenant on the query and none on "
+                f"any document they returned, so {self.claim} for them",
             )
         if unattributed:
             yield self.unverified(

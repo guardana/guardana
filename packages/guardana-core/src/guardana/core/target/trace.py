@@ -40,6 +40,17 @@ def capability_for(dimension: Dimension) -> Capability | None:
     return next((c for d, c in _DIMENSION_CAPABILITIES if d is dimension), None)
 
 
+def dimensions_of(capabilities: frozenset[Capability]) -> tuple[Dimension, ...]:
+    """Which dimensions this capability set stands for — the inverse of `capability_for`.
+
+    Reads the same table in the other direction, so "what this rule needs recorded"
+    and "what the runner skips it for" can never be two different answers. A rule
+    asking only for `READ_TRACE` needs no dimension in particular and gets an empty
+    tuple, which is different from needing one nobody has.
+    """
+    return tuple(d for d, c in _DIMENSION_CAPABILITIES if c in capabilities)
+
+
 class TraceTarget(Target):
     """A recorded execution, parsed once and read by every rule.
 

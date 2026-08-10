@@ -232,6 +232,96 @@ def test_contracts_can_be_configured_once_in_a_profile(tmp_path: Path) -> None:
     assert "contract.checkout.never-shell" in result.output
 
 
+def test_an_assertion_the_policy_excluded_demands_no_evidence(tmp_path: Path) -> None:
+    """The demand belongs to the assertion, so switching the assertion off withdraws it.
+
+    A contract's requirement is *implied by* an assertion, unlike `trace.require:`,
+    which the operator states outright. Keeping the implication alive after the policy
+    dropped the rule turns off a check and then fails the build for not having run it —
+    an accusation with no accuser, and the fastest route to a team deleting the whole
+    mechanism from its pipeline.
+    """
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("name: t\nrules:\n  exclude: ['contract.approvals.*']\n", encoding="utf-8")
+
+    result = _run(
+        str(_trace_file(tmp_path, Dimension.EFFECTS, Dimension.IDENTITY)),
+        "--contract",
+        str(_contract_file(tmp_path, _NEEDS_APPROVAL)),
+        "--profile",
+        str(profile),
+    )
+
+    assert " 0 rule(s) run" not in result.output, "otherwise the empty-plan branch decides this"
+    assert "requires approval evidence" not in result.output
+    assert result.exit_code == 0, result.output
+
+
+def test_an_excluded_assertion_is_never_reported_as_one_that_applied(tmp_path: Path) -> None:
+    """Withdrawing the demand must not also withdraw the sentence saying it was withdrawn.
+
+    "1 assertion(s) apply to this execution" over a green report reads as "your
+    invariant held". Said about a rule this run will not execute, it is false in the
+    one direction this project cannot afford, so the exclusion is printed beside it.
+    """
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("name: t\nrules:\n  exclude: ['contract.approvals.*']\n", encoding="utf-8")
+
+    result = _run(
+        str(_trace_file(tmp_path, Dimension.EFFECTS, Dimension.APPROVAL)),
+        "--contract",
+        str(_contract_file(tmp_path, _NEEDS_APPROVAL)),
+        "--profile",
+        str(profile),
+    )
+
+    assert "contract.approvals.refunds-need-a-human" in result.output
+    assert "excluded by this run's policy" in result.output
+
+
+def test_an_assertion_the_policy_kept_still_demands_its_evidence(tmp_path: Path) -> None:
+    """The other half of the same switch, so the fix cannot be "stop demanding anything".
+
+    An `exclude:` aimed at a different rule leaves this assertion running, and a
+    producer that records no approvals still takes the verdict away.
+    """
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text(
+        "name: t\nrules:\n  exclude: ['contract.something-else.*']\n", encoding="utf-8"
+    )
+
+    result = _run(
+        str(_trace_file(tmp_path, Dimension.EFFECTS, Dimension.IDENTITY)),
+        "--contract",
+        str(_contract_file(tmp_path, _NEEDS_APPROVAL)),
+        "--profile",
+        str(profile),
+    )
+
+    assert result.exit_code == 2, result.output
+    assert "requires approval evidence" in result.output
+
+
+def test_an_explicit_trace_require_survives_a_policy_that_excludes_every_rule(
+    tmp_path: Path,
+) -> None:
+    """`trace.require:` is the operator's own sentence, not an implication of a rule.
+
+    It is what a team writes when it is paying for instrumentation and wants to know
+    when it did not arrive, and no rule has to want the dimension for that to be a
+    fair thing to demand. So it holds where a contract's implied demand gives way.
+    """
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text(
+        "name: t\nrules:\n  exclude: ['*']\ntrace:\n  require: [approval]\n", encoding="utf-8"
+    )
+
+    result = _run(str(_trace_file(tmp_path, Dimension.EFFECTS)), "--profile", str(profile))
+
+    assert result.exit_code == 2, result.output
+    assert "requires approval evidence" in result.output
+
+
 def test_the_saved_run_records_why_it_was_indeterminate(tmp_path: Path) -> None:
     """A conclusion with no cause in its own evidence is a conclusion nobody can act on."""
     import json  # noqa: PLC0415

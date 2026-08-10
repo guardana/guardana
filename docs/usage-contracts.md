@@ -143,6 +143,36 @@ for "your contract could not be checked" would be a green build.
 Use [`guardana trace inspect`](usage-trace-inspect.md) to see which dimensions a
 producer records before you write assertions that depend on them.
 
+**Excluding an assertion withdraws what it demanded.** `rules.exclude:` matching a
+compiled rule id switches that assertion off *and* stops the run requiring the
+evidence it would have read — and the exclusion is printed, so a green report never
+reads as "your invariant held". `trace.require:` behaves the opposite way and is
+meant to: it is a demand you stated outright rather than one implied by a check, so
+it stands whether or not a rule wants the dimension.
+
+## What your framework can actually prove today
+
+Measured, not estimated — against a real run from each adapter, not a fixture:
+
+| Producer | Dimensions it records | Assertion kinds it can grade |
+|---|---|---|
+| **pydantic-ai** 2.27 | `messages`, `tools` | none of the five |
+| **llama-index** 0.14 | `messages`, `retrieval` | `tenant_boundary` |
+| **crewai** 1.15 | `messages`, `handoff` | none of the five |
+| **OpenTelemetry GenAI** | whatever your instrumentation emits | whatever it emits |
+| **Guardana native** | whatever you write | all five |
+
+So four of the five kinds — `approval_required`, `allowed_scopes`,
+`credential_boundary`, `forbidden_sink` — decline against every framework adapter
+that ships today, because no framework records approvals, delegations or side
+effects on its own. **Contracts are for a team that instruments its own agent**:
+emit Guardana's native dialect, or add the dimensions to an OpenTelemetry exporter,
+or take `--write-trace` output and fill in what your framework left out. The
+declines are the feature working — an assertion graded against evidence nobody
+recorded would be the false green this whole mechanism exists to refuse — but they
+are also why writing a contract before you have instrumented anything buys a run
+that can only ever be `indeterminate`.
+
 ## `applies_to` — saying "not mine" without saying "fine"
 
 ```yaml
