@@ -5,19 +5,31 @@ from guardana.core.budget import Budgets
 from guardana.core.target._mcp_authorization import McpAuthorizationView
 from guardana.core.target._mcp_authorization import observe as observe_authorization
 from guardana.core.target._mcp_client import (
+    CacheHints,
     HttpMcpTransport,
-    McpSession,
+    McpConversation,
     McpTool,
     McpTransport,
     MeteredTransport,
+    Negotiation,
     StdioMcpTransport,
-    open_session,
+    negotiate,
+    read_manifest,
 )
 from guardana.core.target._mcp_http import McpError, Sender, send
+from guardana.core.target._mcp_wire import Era
 from guardana.core.target.base import Capability, Target, TargetKind
 from guardana.core.usage import TargetUsage, UsageMeter
 
-__all__ = ["McpAuthorizationView", "McpError", "McpServerTarget", "McpTool"]
+__all__ = [
+    "CacheHints",
+    "Era",
+    "McpAuthorizationView",
+    "McpConversation",
+    "McpError",
+    "McpServerTarget",
+    "McpTool",
+]
 
 _EXEC_REFUSED = (
     "an stdio MCP server is started by Guardana, which means executing the code "
@@ -40,6 +52,12 @@ class McpServerTarget(Target):
     target observes those; it never judges them. What an observation *means* is a
     rule's business, which is what keeps the engine free of security opinions and
     lets a profile switch one off.
+
+    The protocol underneath it has two eras, and this target speaks both: which one
+    a given server is in gets settled once, before any question is asked, and is
+    recorded in the run manifest so a later comparison can say the two runs graded
+    different revisions rather than that the system changed. See
+    `docs/design/mcp-protocol-eras.md`.
 
     Kind is `endpoint` — this is a live service, not files. It advertises
     `LIST_TOOLS` always, so every chat rule is skipped against it by capability
@@ -68,7 +86,8 @@ class McpServerTarget(Target):
         self._sender: Sender = sender if sender is not None else send
         raw = self._connect(url, command, allow_exec, transport)
         self._transport: McpTransport = MeteredTransport(raw, self._meter)
-        self._session: McpSession | None = None
+        self._negotiation: Negotiation | None = None
+        self._conversation: McpConversation | None = None
         self._authorization: McpAuthorizationView | None = None
         self._lock = threading.Lock()
 
@@ -140,27 +159,45 @@ class McpServerTarget(Target):
         self._meter.apply(budgets)
 
     def protocols(self) -> dict[str, str]:
-        """Report the MCP revision this server agreed to, once a session has been opened.
+        """Report the MCP revision this server agreed to, once a conversation has been opened.
 
         Empty until then, and empty when the server stated none — never the version
         Guardana offered. Recording our own offer would put a coverage claim in the
-        manifest that no server ever confirmed.
-        """
-        agreed = self._session.protocol_version if self._session is not None else None
-        return {"mcp": agreed} if agreed else {}
-
-    def list_tools(self) -> tuple[McpTool, ...]:
-        """Every tool the server advertises, fetched once per run and cached.
-
-        Cached under a lock because several rules read the same manifest and `probe`
-        may run them at once: a scan's cost must grow with the target rather than
-        with how many rules look at it, and an unlocked check would buy the same
-        handshake once per concurrent reader.
+        manifest that no server ever confirmed, which is exactly the trap the
+        discovery probe exists to avoid: an era-ambiguous request answered by a
+        legacy server would otherwise have been filed as the newest revision.
         """
         with self._lock:
-            if self._session is None:
-                self._session = open_session(self._transport)
-            return self._session.tools
+            negotiation = self._negotiation
+        agreed = negotiation.agreed if negotiation is not None else None
+        return {"mcp": agreed} if agreed else {}
+
+    def conversation(self) -> McpConversation:
+        """Everything one exchange with this server established: revision, tools, cache claims.
+
+        Bought once per run and cached under a lock, because several rules read the
+        same manifest and `probe` may run them at once: a scan's cost must grow with
+        the target rather than with how many rules look at it, and an unlocked check
+        would buy the same negotiation once per concurrent reader.
+        """
+        with self._lock:
+            if self._conversation is None:
+                self._conversation = read_manifest(self._transport, self._settle())
+                # The handshake era only confirms its revision when a conversation
+                # is opened, so what `protocols()` reports comes from here rather
+                # than from the negotiation that preceded it.
+                self._negotiation = self._conversation.negotiation
+            return self._conversation
+
+    def list_tools(self) -> tuple[McpTool, ...]:
+        """Every tool the server advertises, fetched once per run and cached."""
+        return self.conversation().tools
+
+    def _settle(self) -> Negotiation:
+        """Settle which revision this server speaks. The caller holds the lock."""
+        if self._negotiation is None:
+            self._negotiation = negotiate(self._transport)
+        return self._negotiation
 
     def authorization(self) -> McpAuthorizationView:
         """Observe how the server authorizes a caller, as far as a client can tell.
@@ -183,6 +220,7 @@ class McpServerTarget(Target):
                     credential=self._credential,
                     meter=self._meter,
                     send=self._sender,
+                    negotiation=self._settle(),
                 )
             return self._authorization
 

@@ -115,6 +115,9 @@ def test_an_injected_transport_alone_does_not_claim_an_authorization_surface() -
     # Claiming the capability anyway sent the authorization probe to the real
     # network from tests that believed they had none.
     class _Transport:
+        def speak(self, wire: object) -> None:
+            pass
+
         def request(self, method: str, params: object) -> dict[str, object]:
             return {"protocolVersion": "x"} if method == "initialize" else {"tools": []}
 

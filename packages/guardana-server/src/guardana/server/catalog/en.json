@@ -33,9 +33,17 @@
       "name": "MCP authorization surface unusable",
       "description": "A protected server publishes no Protected Resource Metadata, names no authorization server, claims a resource on another origin, or points at an authorization server that does not advertise PKCE — each of which stops a conforming client from authenticating at all."
     },
+    "guardana.mcp.cache_scope": {
+      "name": "MCP tool listing declared publicly cacheable behind a credential",
+      "description": "The server refused its tool manifest to an unauthenticated caller and returned it to an authorized one declaring `cacheScope: \"public\"`, which invites any shared gateway to serve those tool declarations to a caller the server would have refused."
+    },
     "guardana.mcp.discovery_target": {
       "name": "MCP server points its client somewhere it must not go",
       "description": "An authorization discovery address resolved to the cloud metadata endpoint, to the network running the scan, or used a scheme a client must reject. Guardana refuses to fetch it, and the refusal is the finding."
+    },
+    "guardana.mcp.issuer_identification": {
+      "name": "MCP authorization server cannot be identified in its own response",
+      "description": "The authorization server's metadata does not advertise `authorization_response_iss_parameter_supported`, so a client redeeming an authorization code cannot tell that the response came from the issuer it started the flow with. RFC 9207 `iss` is the only defence the protocol offers against an authorization-server mix-up."
     },
     "guardana.mcp.scope_breadth": {
       "name": "MCP scopes cannot express least privilege",
@@ -165,14 +173,6 @@
       "name": "One credential across two trust boundaries",
       "description": "The token a service received is the token it forwarded upstream, so the upstream service reads the caller's credential as its own client's. This is the confused deputy, proven by digest rather than inferred."
     },
-    "guardana.trace.identity_disagreement": {
-      "name": "A token presented outside its audience",
-      "description": "A credential whose audience names one resource was presented to another. Audience binding is what stops a token minted for one service being replayed against a second one."
-    },
-    "guardana.trace.policy_decision_ignored": {
-      "name": "A policy decision the run went ahead against",
-      "description": "A guardrail returned deny — or errored and was treated as an allow — and the action happened anyway. The second case is a fail-open in somebody else's stack and is reported at the same severity."
-    },
     "guardana.trace.cross_tenant_retrieval": {
       "name": "A retrieval that crossed a tenant boundary",
       "description": "A retrieval performed for one tenant returned a document belonging to another. The comparison needs a tenant on the query and on the document; without both, the check declines rather than reporting a clean run over an unlabelled corpus."
@@ -180,6 +180,14 @@
     "guardana.trace.handoff_authority_expansion": {
       "name": "An agent that gained authority across a handoff",
       "description": "An agent exercised a scope wider than the handoff carried to it. The scopes that cross an agent boundary are a ceiling, and a receiver that goes past one gained privilege by being handed work."
+    },
+    "guardana.trace.identity_disagreement": {
+      "name": "A token presented outside its audience",
+      "description": "A credential whose audience names one resource was presented to another. Audience binding is what stops a token minted for one service being replayed against a second one."
+    },
+    "guardana.trace.policy_decision_ignored": {
+      "name": "A policy decision the run went ahead against",
+      "description": "A guardrail returned deny — or errored and was treated as an allow — and the action happened anyway. The second case is a fail-open in somebody else's stack and is reported at the same severity."
     },
     "guardana.trace.secret_in_tool_argument": {
       "name": "A credential in a recorded tool argument",

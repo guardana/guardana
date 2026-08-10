@@ -6,6 +6,7 @@ otherwise look like a server with nothing to poison.
 """
 
 import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -15,7 +16,9 @@ from guardana.cli._mcp_run import McpConnection, credential_from, run_mcp_probe,
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.target import McpError, McpServerTarget
-from guardana.core.target._mcp_client import HttpMcpTransport, open_session, result_of
+from guardana.core.target._mcp_client import HttpMcpTransport, open_conversation
+from guardana.core.target._mcp_wire import result_of
+from guardana.core.testing import ScriptedMcpServer
 
 _TOOLS = {"tools": [{"name": "read_file", "description": "Read a file."}]}
 
@@ -23,6 +26,9 @@ _TOOLS = {"tools": [{"name": "read_file", "description": "Read a file."}]}
 class _Fake:
     def __init__(self, tools: list[dict[str, object]] | object) -> None:
         self._tools = tools
+
+    def speak(self, wire: object) -> None:
+        pass
 
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
         return {"protocolVersion": "x"} if method == "initialize" else {"tools": self._tools}
@@ -62,17 +68,18 @@ def test_a_non_json_reply_is_refused() -> None:
 
 def test_a_missing_tool_list_is_refused_rather_than_read_as_no_tools() -> None:
     with pytest.raises(McpError, match="did not return a tool list"):
-        open_session(_Fake("not a list"))
+        open_conversation(_Fake("not a list"))
 
 
 def test_malformed_tool_entries_are_dropped_and_the_rest_survive() -> None:
-    session = open_session(_Fake(["junk", {"no_name": 1}, {"name": "ok", "description": "d"}]))
+    entries = ["junk", {"no_name": 1}, {"name": "ok", "description": "d"}]
+    conversation = open_conversation(_Fake(entries))
 
-    assert [t.name for t in session.tools] == ["ok"]
+    assert [t.name for t in conversation.tools] == ["ok"]
 
 
 def test_a_tool_without_a_description_reads_as_empty_not_missing() -> None:
-    (tool,) = open_session(_Fake([{"name": "bare"}])).tools
+    (tool,) = open_conversation(_Fake([{"name": "bare"}])).tools
 
     assert tool.description == ""
 
@@ -142,3 +149,76 @@ def test_a_credential_variable_that_holds_nothing_is_refused(
     monkeypatch.setenv("GUARDANA_TEST_MCP_TOKEN", "a-real-token")
     assert credential_from("GUARDANA_TEST_MCP_TOKEN") == "a-real-token"
     assert credential_from(None) is None
+
+
+def test_the_negotiated_revision_reaches_the_run_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What makes a later `diff` say the reach changed rather than the system did.
+
+    `coverage.protocols` is built from this, and its digest is part of the coverage
+    fingerprint — so a deployment that moved between MCP revisions reads as a
+    different reach instead of as a server that started behaving differently.
+    """
+    server = ScriptedMcpServer(
+        "https://93.184.215.14/mcp", tools=_TOOLS["tools"], protocol_versions=["2026-07-28"]
+    )
+    monkeypatch.setattr(
+        "guardana.cli._mcp_run.build_mcp_target",
+        lambda connection: McpServerTarget(server.url, sender=server),
+    )
+
+    outcome = run_mcp_probe(
+        Registry.discover(),
+        Profile(name="t", policy=Policy()),
+        McpConnection(server.url),
+        None,
+    )
+
+    assert outcome is not None
+    assert outcome.result.protocols == {"mcp": "2026-07-28"}
+
+
+def test_the_documented_jq_path_exists_in_the_document_probe_actually_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The page tells a reader where to look; nothing checked that it was there.
+
+    It said `.coverage.protocols`, and a run document nests that under `.run`. The
+    command was right, the path was wrong, and every gate stayed green because no
+    test had ever walked it. Running the documented command and reading the artifact
+    is what found it, so that is what this pins.
+    """
+    from guardana.cli.main import app  # noqa: PLC0415
+    from typer.testing import CliRunner  # noqa: PLC0415
+
+    page = (Path(__file__).resolve().parents[3] / "docs" / "usage-probe.md").read_text("utf-8")
+    documented = re.search(r"--format json \| jq \.([\w.]+)", page)
+    assert documented is not None, (
+        "docs/usage-probe.md no longer shows a `jq` path into a run document — reword "
+        "this test with the page rather than deleting the check"
+    )
+
+    server = ScriptedMcpServer(
+        "https://93.184.215.14/mcp", tools=_TOOLS["tools"], protocol_versions=["2026-07-28"]
+    )
+    monkeypatch.setattr(
+        "guardana.cli._mcp_run.build_mcp_target",
+        lambda connection: McpServerTarget(server.url, sender=server),
+    )
+    written = tmp_path / "run.json"
+    result = CliRunner().invoke(
+        app, ["probe", "--mcp", server.url, "--format", "json", "--output", str(written)]
+    )
+    assert result.exit_code in (0, 1), result.output
+
+    document: object = json.loads(written.read_text(encoding="utf-8"))
+    for step in documented.group(1).split("."):
+        missing = (
+            f"docs/usage-probe.md points at `.{documented.group(1)}`, and the run document "
+            f"probe writes has no {step!r} there"
+        )
+        assert isinstance(document, dict), missing
+        assert step in document, missing
+        document = document[step]
+    assert document == {"mcp": "2026-07-28"}

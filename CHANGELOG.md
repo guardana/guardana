@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-10 — MCP, as the specification now is
+
+### Added
+
+**Guardana speaks both revisions of MCP, and records which one it spoke.** The
+specification revised on 2026-07-28 removed the `initialize` handshake and
+protocol-level sessions, and made every request carry its own protocol version and
+client capabilities in `_meta`. Guardana pinned `2025-11-25` and opened every
+conversation with `initialize`, so against a server built to the current
+specification it did not connect at all. It now settles which era a server is in
+before asking it anything, and the negotiated revision lands in `coverage.protocols`
+— so [`guardana diff`](docs/usage-diff.md) reports a server that moved between
+revisions as *the reach changed* rather than as the system behaving differently.
+
+The probe is one `server/discover` call, which is the method the newer revision
+requires and the older one has never heard of. The cheaper route the HTTP binding
+permits — send an ordinary request, read the body of a `400` — is **deliberately not
+taken**: the specification warns that some older servers answer an era-ambiguous
+method without a handshake, so a client that opened with `tools/list` would take
+their manifest and write `2026-07-28` into a run manifest as a coverage claim no
+server ever agreed to. Reasoning in
+[`docs/design/mcp-protocol-eras.md`](docs/design/mcp-protocol-eras.md).
+
+**Guardana declares no client capabilities, which is a safety property.** Under the
+new Multi Round-Trip Requests pattern a server asks for sampling, elicitation or a
+root listing by returning them in a result — and it **MUST NOT** ask for a capability
+the client did not declare. A client declaring none cannot be asked to run a model
+completion or to prompt a human on the server's behalf. An interim `input_required`
+result is refused rather than read, because it carries no `tools`: a reader that
+shrugged would have recorded a server asking a question as a server offering nothing
+to poison.
+
+**`guardana.mcp.issuer_identification` (medium).** An authorization server whose
+metadata does not advertise `authorization_response_iss_parameter_supported` gives a
+client no way to tell that an authorization response came back from the issuer it
+started the flow with. Validating a present `iss` is now a client `MUST` (RFC 9207),
+and mix-up is the attack it exists to catch — a `MUST` a client cannot perform where
+nothing is advertised.
+
+**`guardana.mcp.cache_scope` (medium).** A server that refuses its tool manifest to
+an unauthenticated caller and returns it to an authorized one declaring
+`cacheScope: "public"` has made two declarations about one document that cannot both
+be intended: any shared gateway on the path is invited to serve those tool
+declarations to a caller the server would have refused. It grades **what the server
+declares** and never goes looking for a cache, which would be reporting somebody
+else's infrastructure.
+
+**Dynamic Client Registration is not reported as a defect**, and there is a test that
+says so. `2026-07-28` deprecates it in favour of Client ID Metadata Documents and
+keeps it legal for at least twelve months; it remains the only registration route
+some authorization servers offer, and reporting a supported feature as a defect is a
+false red.
+
+### Changed
+
+**`guardana.mcp.session_binding` is silent against a server with no sessions.** A
+conforming `2026-07-28` server mints none, so there is nothing to guess and nothing
+to authenticate with: the invariant holds, and silence is what this codebase says
+when it does. It previously reported `inconclusive — the server issues no session
+id`, which under a policy that fails on indeterminate checks broke the build of the
+team that had upgraded correctly.
+
+A server that offers an older revision **alongside** the new one is still graded over
+that older one. It answers `server/discover`, so the conversation settles as modern
+and carries no session — while the same server keeps handing a predictable one to
+every legacy client it serves, which is a live defect the modern half cannot show.
+
+**A version mismatch is an outcome, never a pass.** Where client and server share no
+revision, the authorization checks report `inconclusive` naming both version lists,
+the manifest checks are skipped with the same sentence, and `protocols()` claims
+nothing — so `fail_on_skipped` turns it into an indeterminate run.
+
+**A `200` nobody could read is no longer read as a refusal.** A reply carrying
+neither a result nor an error was folded into "the server declined", which is a pass
+on a question that was never answered.
+
+**Every MCP rule declares one more request** — the single `server/discover` that
+settles the revision, bought once per run and shared by every rule that reads the
+same observation.
+
+
 ## [0.15.0] - 2026-08-10 — the translators, and the field they proved was missing
 
 ### Added

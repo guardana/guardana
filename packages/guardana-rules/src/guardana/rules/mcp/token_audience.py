@@ -48,7 +48,7 @@ class McpTokenAudienceRule(McpAuthorizationRule):
     @property
     def estimated_requests(self) -> int:
         """The anonymous probe this depends on, then a handshake and a listing with the token."""
-        return 4
+        return 5
 
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Report a server that answered the foreign token, or why the probe was declined."""

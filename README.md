@@ -183,7 +183,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.15   # moving tag → latest 0.15.x
+      - uses: guardana/guardana@v0.16   # moving tag → latest 0.16.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -193,7 +193,7 @@ for GitLab, Jenkins and Azure DevOps — [`docs/integrations.md`](docs/integrati
 
 ## What it checks
 
-49 built-in rules, every finding tagged into the frameworks your compliance process
+51 built-in rules, every finding tagged into the frameworks your compliance process
 already speaks — **both editions** of the OWASP LLM Top 10, the OWASP Top 10 for
 Agentic Applications (ASI), the OWASP MCP Top 10, OWASP ML Top 10, MITRE ATLAS
 v5.6.0 and NIST AI 100-2e2025. A reference names its edition, because `LLM07` is
@@ -204,14 +204,14 @@ System Prompt Leakage in 2025 and Misinformation in 2026.
 | `guardana.supply_chain.*` | 16 | build | pickle opcodes, unsafe deserialization sinks, `trust_remote_code`, config `auto_map` and kernel-dispatch RCE, chat-template SSTI, ONNX graphs, notebooks, Keras/TF code execution, advisory-backed malicious and hallucinated dependencies, insecure transport, hardcoded secrets, provenance |
 | `guardana.prompt.*` | 7 | build + runtime | hidden-instruction rules-file backdoors and MCP tool poisoning on the file; injection, DAN-style jailbreak, canary-proven system-prompt leak, unbounded consumption and cost asymmetry against a live model |
 | `guardana.agent.*` | 7 | runtime | tool-result injection, credential exfiltration through a tool argument, over-broad tool arguments, excessive tool use, memory poisoning across a session boundary, hidden context in a tool schema, a live MCP server's tool manifest |
-| `guardana.mcp.*` | 6 | runtime | a live MCP server's **authorization surface**: unauthenticated access, discovery a conforming client can use, audience validation, session binding, scope breadth, discovery targets |
+| `guardana.mcp.*` | 8 | runtime | a live MCP server's **authorization surface**, over either revision of the protocol: unauthenticated access, discovery a conforming client can use, audience validation, session binding, scope breadth, discovery targets, issuer identification, cache scope |
 | `guardana.trace.*` | 9 | runtime | a **recorded** execution: a credential in a tool argument, one credential across two trust boundaries, a token outside its audience, a session standing in for an identity, a scope nobody consented to, a policy decision the run went ahead against, a consequential effect nobody approved, a retrieval that crossed a tenant boundary, an agent that gained authority across a handoff |
 | `guardana.scenario.*` | 2 | runtime | multi-turn conversations — a gradual jailbreak and indirect (RAG) injection — graded per step and as a whole |
 | `guardana.output.*` | 1 | runtime | secrets in what the model said |
 | `guardana.training.*` | 1 | build | training-data integrity |
 
 The static 19 (`artifact` surface) need no model and no network — they are the CI
-front door. The dynamic 30 (`endpoint` and `trace` surfaces) grade a live model, a
+front door. The dynamic 32 (`endpoint` and `trace` surfaces) grade a live model, a
 live MCP server, or an execution that already happened.
 
 **Every rule id, severity and framework mapping** — generated from what is actually
@@ -244,7 +244,7 @@ whether they ship here or in your own private package. The engine knows almost
 nothing about specific threats; all domain knowledge lives in rules, evaluators and
 targets. You add coverage by adding one of those, never by patching the engine.
 
-**Your application has its own threat model.** The 49 built-ins cover the AI risks
+**Your application has its own threat model.** The 51 built-ins cover the AI risks
 everybody shares. The dangerous behaviour in *your* application is usually specific to
 your data, your tools, your permissions and your business logic — and no public framework
 knows any of that. A support agent and a coding agent should not have the same security
@@ -310,8 +310,8 @@ the project's [principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
 
 | | Outcome |
 |---|---|
-| **0.15** *(current)* | Framework adapters as translators into the `Trace` model — PydanticAI, LlamaIndex and CrewAI, each driving a different half of it; tool calling through the LangChain adapter, which six agentic rules were waiting for; a cross-tenant retrieval check and an agent-handoff authority check |
-| **next** | MCP as the specification now is (`2026-07-28` removed sessions and the `initialize` handshake), a visible trace-evidence matrix, the application's own threat model as an executable contract, then RAG targets and sink-aware output handling |
+| **0.16** *(current)* | MCP as the specification now is: a client that speaks both revisions, settles which one a server implements before asking it anything, and records that in the run manifest; session-shaped rules that decline rather than accuse a server built to a revision without sessions; issuer identification (RFC 9207) and cache scope as the checks the revision creates |
+| **next** | A visible trace-evidence matrix, the application's own threat model as an executable contract, rule and pack developer tooling, then RAG targets and sink-aware output handling |
 | **1.0** | A compatibility contract — the point where a third-party rule pack is a safe investment. Not a feature count: it says what will not break under you |
 
 Release history is [`CHANGELOG.md`](CHANGELOG.md). Beyond 1.0 the plan is kept as

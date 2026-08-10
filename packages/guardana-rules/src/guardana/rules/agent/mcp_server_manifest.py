@@ -116,13 +116,16 @@ class McpServerManifestRule(Rule):
 
     @property
     def estimated_requests(self) -> int:
-        """Two: the handshake, and the listing. Reading a manifest costs no model call.
+        """Three: the discovery probe, the handshake it may fall back to, and the listing.
 
         It said one until the meter was fixed and started counting the `initialize`
         that always went with it. The declaration and the meter were wrong in the
         same direction, which is why the test comparing them stayed green.
+
+        The third is which era the server speaks, asked once and shared with every
+        other rule. A modern server needs no handshake and costs two.
         """
-        return 2
+        return 3
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Fetch the live manifest, scan every declaration, and compare it with the pin."""

@@ -20,8 +20,16 @@ class _Manifest:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
+    def speak(self, wire: object) -> None:
+        pass
+
     def request(self, method: str, params: object) -> dict[str, object]:
         self.calls.append(method)
+        if method == "server/discover":
+            # A server written before `2026-07-28` has no such method. Answering with
+            # something that is not a discovery result is what makes this a legacy
+            # server, and the client falls back on the shape rather than on a code.
+            return {}
         return {"protocolVersion": "2025-11-25"} if method == "initialize" else {"tools": TOOLS}
 
     def close(self) -> None:
@@ -37,7 +45,7 @@ def test_the_meter_counts_every_call_that_left_the_machine() -> None:
 
     target.list_tools()
 
-    assert transport.calls == ["initialize", "tools/list"]
+    assert transport.calls == ["server/discover", "initialize", "tools/list"]
     assert target.usage().requests == len(transport.calls)
 
 
@@ -52,7 +60,7 @@ def test_a_request_ceiling_stops_a_run_before_it_sends_the_next_one() -> None:
     with pytest.raises(BudgetExhausted):
         target.list_tools()
 
-    assert transport.calls == ["initialize"], "the ceiling was checked after the fact"
+    assert transport.calls == ["server/discover"], "the ceiling was checked after the fact"
 
 
 def test_an_unread_section_of_the_observation_costs_nothing() -> None:
@@ -61,7 +69,7 @@ def test_an_unread_section_of_the_observation_costs_nothing() -> None:
 
     assert target.authorization().anonymous.open_to_anyone
 
-    assert len(server.requests) == 2, "reading one section bought the whole probe"
+    assert len(server.requests) == 3, "reading one section bought the whole probe"
 
 
 def test_a_section_read_twice_is_bought_once() -> None:
@@ -72,7 +80,7 @@ def test_a_section_read_twice_is_bought_once() -> None:
     for _ in range(5):
         assert view.anonymous.open_to_anyone
 
-    assert len(server.requests) == 2
+    assert len(server.requests) == 3
 
 
 def test_the_view_is_shared_between_callers() -> None:
@@ -82,7 +90,7 @@ def test_the_view_is_shared_between_callers() -> None:
     assert target.authorization().anonymous.open_to_anyone
     assert target.authorization().anonymous.open_to_anyone
 
-    assert len(server.requests) == 2
+    assert len(server.requests) == 3
 
 
 def test_authorization_over_stdio_is_refused_rather_than_answered_emptily() -> None:

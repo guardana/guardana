@@ -16,7 +16,9 @@ from guardana.rules.agent.excessive_agency import ExcessiveAgencyRule
 from guardana.rules.agent.mcp_server_manifest import McpServerManifestRule
 from guardana.rules.mcp import (
     McpAuthorizationDiscoveryRule,
+    McpCacheScopeRule,
     McpDiscoveryTargetRule,
+    McpIssuerIdentificationRule,
     McpScopeBreadthRule,
     McpSessionBindingRule,
     McpTokenAudienceRule,
@@ -96,6 +98,8 @@ def provide_rules() -> list[Rule]:
         McpSessionBindingRule(),
         McpScopeBreadthRule(),
         McpDiscoveryTargetRule(),
+        McpIssuerIdentificationRule(),
+        McpCacheScopeRule(),
         CredentialPassthroughRule(),
         IdentityDisagreementRule(),
         SessionAsIdentityRule(),

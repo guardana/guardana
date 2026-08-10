@@ -19,10 +19,14 @@ that means it:
 - **changes MCP server state** if a tool you exposed has side effects.
 
 `probe --mcp` is narrower than that, deliberately. Against an MCP server Guardana
-speaks only `initialize`, `tools/list` and unauthenticated `GET`s of the two
-authorization discovery documents — it **never calls a tool**, because a tool call
-is a side effect on somebody's system and no verification result is worth finding
-that out by experiment. It also refuses to fetch a discovery address that points
+speaks only `server/discover`, `tools/list`, the `initialize` handshake where the
+server still expects one, and unauthenticated `GET`s of the two authorization
+discovery documents — it **never calls a tool**, because a tool call is a side
+effect on somebody's system and no verification result is worth finding that out by
+experiment. It also **declares no client capabilities**, so a server following the
+`2026-07-28` Multi Round-Trip Requests pattern cannot ask it to run a model
+completion or to prompt a human on the server's behalf: a server may only ask for
+a capability the client declared, and Guardana declares none. It also refuses to fetch a discovery address that points
 into the network running the scan or at the cloud metadata endpoint, and reports
 the refusal as a finding rather than following it to be sure.
 

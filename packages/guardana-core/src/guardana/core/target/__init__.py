@@ -24,7 +24,14 @@ from guardana.core.target.endpoint import (
     ToolCallReply,
     ToolSpec,
 )
-from guardana.core.target.mcp import McpError, McpServerTarget, McpTool
+from guardana.core.target.mcp import (
+    CacheHints,
+    Era,
+    McpConversation,
+    McpError,
+    McpServerTarget,
+    McpTool,
+)
 from guardana.core.target.trace import TraceTarget
 
 __all__ = [
@@ -32,6 +39,7 @@ __all__ = [
     "AdapterConfig",
     "Anonymous",
     "ArtifactTarget",
+    "CacheHints",
     "Capability",
     "ChatMessage",
     "ChatTransport",
@@ -39,9 +47,11 @@ __all__ = [
     "Document",
     "EndpointError",
     "EndpointTarget",
+    "Era",
     "ForeignToken",
     "HttpAdapterTransport",
     "McpAuthorizationView",
+    "McpConversation",
     "McpError",
     "McpServerTarget",
     "McpTool",

@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Guardana — customizable security gates for AI systems</title>
-<meta name="description" content="Open-source AI security verification. 49 checks across model artifacts, live endpoints, MCP servers and real execution traces — identity, credentials, scopes, approvals, memory and side effects. Then add the rules only your team can know about, without forking.">
+<meta name="description" content="Open-source AI security verification. 51 checks across model artifacts, live endpoints, MCP servers and real execution traces — identity, credentials, scopes, approvals, memory and side effects. Then add the rules only your team can know about, without forking.">
 <meta property="og:title" content="Guardana — customizable security gates for AI systems">
-<meta property="og:description" content="49 security checks to start. Add the ones only your team can know about — your data, your tools, your permissions, your business logic. Apache-2.0.">
+<meta property="og:description" content="51 security checks to start. Add the ones only your team can know about — your data, your tools, your permissions, your business logic. Apache-2.0.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -163,7 +163,7 @@
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5 4 5.6v6.1c0 4.6 3.2 8.4 8 9.8 4.8-1.4 8-5.2 8-9.8V5.6L12 2.5Z" stroke="#5B3DF5" stroke-width="1.9" stroke-linejoin="round"/></svg>
       Guardana
     </a>
-    <span class="ver mono">v0.15.0</span>
+    <span class="ver mono">v0.16.0</span>
     <nav>
       <a href="https://github.com/guardana/guardana#readme" class="hide-sm">Docs</a>
       <a href="https://pypi.org/project/guardana-cli/" class="hide-sm">PyPI</a>
@@ -178,7 +178,7 @@
     <div class="hero-grid">
       <div>
         <h1 class="disp">Verify the AI you run yourself.</h1>
-        <p class="lede">Guardana scans model artifacts, probes live endpoints and MCP servers, and grades the <strong>execution traces your agents already produced</strong> — identity, credentials, scopes, approvals, memory and side effects. <strong>49 checks to start; you add the ones only your team can know about.</strong> Built to be the thing a pipeline blocks on: a cost you know in advance, a run you can compare against last week, and an unanswered question that never reads as a pass.</p>
+        <p class="lede">Guardana scans model artifacts, probes live endpoints and MCP servers, and grades the <strong>execution traces your agents already produced</strong> — identity, credentials, scopes, approvals, memory and side effects. <strong>51 checks to start; you add the ones only your team can know about.</strong> Built to be the thing a pipeline blocks on: a cost you know in advance, a run you can compare against last week, and an unanswered question that never reads as a pass.</p>
         <div class="cmd"><span class="sig">$</span><code>uvx --from guardana-cli guardana scan .</code></div>
         <p class="alt">or <code>pip install guardana-cli</code> — Apache-2.0, runs fully offline.</p>
         <div class="cta">
@@ -206,7 +206,7 @@
 
   <section>
     <div class="wrap">
-      <p class="eyebrow">49 rules · two surfaces</p>
+      <p class="eyebrow">51 rules · two surfaces</p>
       <h2 class="disp">What it checks</h2>
       <p class="sec-lede">Static checks are deterministic — no model, no network, no false-positive theatre. Dynamic checks talk to a live endpoint and are graded by a swappable evaluator.</p>
       <div class="surfaces">
@@ -224,7 +224,7 @@
         </div>
         <div class="card">
           <h3>Runtime</h3>
-          <p class="when">30 rules · a served model, or a run it already performed</p>
+          <p class="when">32 rules · a served model, or a run it already performed</p>
           <ul class="rules">
             <li><b>system_prompt_leak</b> — proven by a planted canary</li>
             <li><b>injection.ignore_previous</b> — instruction override</li>
@@ -248,7 +248,7 @@
     <div class="wrap">
       <p class="eyebrow">Bring your own threat model</p>
       <h2 class="disp">Your application has its own threat model.</h2>
-      <p class="sec-lede">Guardana ships security gates for the AI risks everybody shares. But the dangerous behaviour in <em>your</em> application is usually specific to your data, your tools, your permissions and your business logic — and no public framework knows any of that. Your support agent and a coding agent should not have the same security policy. So the 49 checks are where you start, not what you are limited to.</p>
+      <p class="sec-lede">Guardana ships security gates for the AI risks everybody shares. But the dangerous behaviour in <em>your</em> application is usually specific to your data, your tools, your permissions and your business logic — and no public framework knows any of that. Your support agent and a coding agent should not have the same security policy. So the 51 checks are where you start, not what you are limited to.</p>
 
       <div class="byo-grid">
         <div>
@@ -323,7 +323,7 @@
       <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every rule maps to a public framework — OWASP LLM Top 10, OWASP Agentic, OWASP MCP Top 10, MITRE ATLAS or NIST.</p>
       <pre class="yml"><code><span class="c">// .github/workflows/ai-security.yml</span>
 <span class="k">- uses:</span> <span class="s">actions/checkout@v4</span>
-<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.15</span>
+<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.16</span>
   <span class="k">with:</span>
     <span class="k">args:</span> <span class="s">--preset ci</span></code></pre>
       <p class="ci-note">Turning a gate on for an existing repo? <code>guardana baseline create</code> accepts today's findings with a reason, an owner and an expiry date — and an expired waiver stops waiving. There's a pre-commit hook too.</p>
@@ -357,7 +357,7 @@
       <p class="sec-lede">Evaluation frameworks measure quality; red-teaming tools generate attacks. Guardana is built to be the thing a pipeline blocks on, which needs three properties those don't have to provide.</p>
       <pre class="yml"><code><span class="c">// what will this cost, before it costs anything</span>
 <span class="k">$</span> <span class="s">guardana plan probe --url … --model …</span>
-<span class="c">   14 rule(s) would run, 7 skipped.</span>
+<span class="c">   14 rule(s) would run, 9 skipped.</span>
 <span class="c">   requests: at least 14, at most 47</span>
 <span class="c">   No request was sent to produce this estimate.</span>
 

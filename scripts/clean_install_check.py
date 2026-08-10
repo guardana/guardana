@@ -180,7 +180,50 @@ def _checks(venv: Path, clean_directory: Path) -> list[Check]:
             0,
             expect=("cross_tenant_retrieval", "translators ready"),
         ),
+        # Both eras of MCP, settled the way a real run settles them. Nothing here
+        # reaches the network — the scripted server ships in `guardana.core.testing`
+        # — but everything else is the production path, including the decision that
+        # records which revision a server agreed to.
+        Check(
+            "the MCP client speaks both revisions and records the one it agreed to",
+            [python, "-c", _MCP_ERAS_SCRIPT],
+            0,
+            expect=("modern 2026-07-28", "legacy 2025-11-25", "eras ready"),
+        ),
     ]
+
+
+_MCP_ERAS_SCRIPT = """
+from guardana.core.rule import RuleContext
+from guardana.core.target import McpServerTarget
+from guardana.core.testing import ScriptedMcpServer
+from guardana.rules.mcp import McpSessionBindingRule
+
+URL = "https://93.184.215.14/mcp"
+TOOLS = [{"name": "read_file", "description": "Read a file."}]
+COUNTER = ["mcp-session-1000", "mcp-session-1001", "mcp-session-1002"]
+
+
+def probe(**settings):
+    server = ScriptedMcpServer(URL, tools=TOOLS, credential="t", session_ids=COUNTER, **settings)
+    target = McpServerTarget(URL, credential="t", sender=server)
+    reported = list(McpSessionBindingRule().run(target, RuleContext()))
+    target.list_tools()
+    return target.protocols(), reported
+
+
+modern, silent = probe(protocol_versions=["2026-07-28"])
+print("modern", modern["mcp"])
+if silent:
+    raise SystemExit(f"a server with no sessions was accused: {silent[0].evidence.summary}")
+
+legacy, reported = probe()
+print("legacy", legacy["mcp"])
+if not reported:
+    raise SystemExit("a counter for session ids went unreported on the handshake era")
+
+print("eras ready")
+"""
 
 
 _TRANSLATOR_SCRIPT = """

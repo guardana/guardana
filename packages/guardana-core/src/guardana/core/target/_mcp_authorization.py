@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
 
-from guardana.core.target._mcp_client import PROTOCOL_VERSION, body_for, carries_tools
+from guardana.core.target._mcp_client import Negotiation, carries_tools
 from guardana.core.target._mcp_http import (
     McpError,
     RawReply,
@@ -27,10 +27,10 @@ from guardana.core.target._mcp_http import (
     Sender,
     refusal_for,
 )
+from guardana.core.target._mcp_wire import Era, Wire
 from guardana.core.usage import UsageMeter
 
 _CLIENT = {"name": "guardana", "version": "0"}
-_INITIALIZE = {"protocolVersion": PROTOCOL_VERSION, "capabilities": {}, "clientInfo": _CLIENT}
 _CHALLENGE_PARAM = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 _SESSION_SAMPLES = 3
 _HTTP_ERROR = 400
@@ -114,13 +114,22 @@ class ForeignToken:
 
 @dataclass(frozen=True, slots=True)
 class Sessions:
-    """The session ids this run saw, and what the server did with one on its own."""
+    """The session ids this run saw, and what the server did with one on its own.
+
+    `no_protocol_sessions` names the revision when the server offers no era that has
+    sessions at all. It is not a gap in the evidence and it is not a reason nobody
+    could look: MCP `2026-07-28` removed protocol sessions, so a server offering
+    only modern revisions has none to mint, none to guess, and none to authenticate
+    with. The rule reading this stays silent, which here means what silence always
+    means — the invariant holds.
+    """
 
     ids: tuple[str, ...] = ()
     stripped_credential: bool = False
     stripped_status: int | None = None
     stripped_listed_tools: bool = False
     not_stripped_because: str | None = None
+    no_protocol_sessions: str | None = None
 
 
 class McpAuthorizationView:
@@ -204,27 +213,45 @@ class McpAuthorizationView:
 
 
 def observe(
-    url: str, *, credential: str | None, meter: UsageMeter, send: Sender
+    url: str,
+    *,
+    credential: str | None,
+    meter: UsageMeter,
+    send: Sender,
+    negotiation: Negotiation,
 ) -> McpAuthorizationView:
     """Open a view onto `url`, sending nothing until a section of it is read.
 
     Sections are ordered so each can decline on what an earlier one found: there is
     no protected resource to discover on a server that answered an anonymous
     caller, and no audience validation to demonstrate on one either.
+
+    `negotiation` is the revision the target already settled, shared rather than
+    repeated: asking the same server twice which protocol it speaks would double
+    the one request every run makes before any question is asked.
     """
-    return McpAuthorizationView(_Probe(url, credential=credential, meter=meter, send=send))
+    return McpAuthorizationView(
+        _Probe(url, credential=credential, meter=meter, send=send, negotiation=negotiation)
+    )
 
 
 class _Probe:
     """One server, one credential, and the requests needed to observe it."""
 
     def __init__(
-        self, url: str, *, credential: str | None, meter: UsageMeter, send: Sender
+        self,
+        url: str,
+        *,
+        credential: str | None,
+        meter: UsageMeter,
+        send: Sender,
+        negotiation: Negotiation,
     ) -> None:
         self._url = url
         self._credential = credential
         self._meter = meter
         self._send = send
+        self._negotiation = negotiation
 
     @property
     def url(self) -> str:
@@ -237,26 +264,37 @@ class _Probe:
         return self._credential
 
     def anonymous(self) -> Anonymous:
-        """Ask for the tool list presenting nothing, and record what came back."""
-        try:
-            handshake = self._call("initialize", _INITIALIZE, credential=None)
-        except McpError as exc:
-            return Anonymous(error=str(exc))
-        challenge = handshake.header("WWW-Authenticate")
-        session = self._session_id_of(handshake)
-        if handshake.status >= _HTTP_ERROR:
-            return Anonymous(status=handshake.status, challenge=challenge)
+        """Ask for the tool list presenting nothing, and record what came back.
+
+        Two requests over the handshake era, one over the modern one, because a
+        modern conversation has no handshake to open. The `WWW-Authenticate`
+        challenge is read from whichever reply carried it — on a modern server that
+        is the listing itself, which is the only request there was.
+        """
+        if self._negotiation.unsupported is not None:
+            return Anonymous(error=self._negotiation.unsupported)
+        challenge: str | None = None
+        session: str | None = None
+        if self._negotiation.era is Era.LEGACY:
+            try:
+                handshake = self._call("initialize", self._opening(), credential=None)
+            except McpError as exc:
+                return Anonymous(error=str(exc))
+            challenge = handshake.header("WWW-Authenticate")
+            session = self._session_id_of(handshake)
+            if handshake.status >= _HTTP_ERROR:
+                return Anonymous(status=handshake.status, challenge=challenge)
         try:
             listing = self._call("tools/list", {}, credential=None, session=session)
         except McpError as exc:
-            return Anonymous(status=handshake.status, challenge=challenge, error=str(exc))
+            return Anonymous(challenge=challenge, error=str(exc))
         listed = carries_tools(listing)
         challenge = challenge or listing.header("WWW-Authenticate")
         if listed is None:
             return Anonymous(
                 status=listing.status,
                 challenge=challenge,
-                error="the reply to tools/list could not be read as JSON or as an SSE frame",
+                error="the reply to tools/list could not be read as a manifest or as a refusal",
             )
         return Anonymous(status=listing.status, listed_tools=listed, challenge=challenge)
 
@@ -295,13 +333,15 @@ class _Probe:
                 not_attempted_because=f"the server could not be reached: {anonymous.error}"
             )
         token = forged_token()
-        try:
-            handshake = self._call("initialize", _INITIALIZE, credential=token)
-        except McpError as exc:
-            return ForeignToken(not_attempted_because=f"the probe could not be sent: {exc}")
-        if handshake.status >= _HTTP_ERROR:
-            return ForeignToken(attempted=True, status=handshake.status)
-        session = self._session_id_of(handshake)
+        session: str | None = None
+        if self._negotiation.era is Era.LEGACY:
+            try:
+                handshake = self._call("initialize", self._opening(), credential=token)
+            except McpError as exc:
+                return ForeignToken(not_attempted_because=f"the probe could not be sent: {exc}")
+            if handshake.status >= _HTTP_ERROR:
+                return ForeignToken(attempted=True, status=handshake.status)
+            session = self._session_id_of(handshake)
         try:
             listing = self._call("tools/list", {}, credential=token, session=session)
         except McpError as exc:
@@ -310,18 +350,32 @@ class _Probe:
         return ForeignToken(attempted=True, status=listing.status, listed_tools=listed is True)
 
     def sessions(self, anonymous: Anonymous) -> Sessions:
-        """Collect session ids, then try one on its own without the credential that made it."""
+        """Collect session ids, then try one on its own without the credential that made it.
+
+        Bought over the *handshake* era, whichever era the run negotiated. A
+        dual-era server settles as modern and has no session in that conversation,
+        while still handing one to every legacy client it serves — so asking only
+        over the negotiated era would leave a counter for session ids unseen on
+        exactly the servers running through a migration.
+        """
+        legacy = self._negotiation.legacy_wire
+        if legacy is None:
+            return Sessions(no_protocol_sessions=self._negotiation.wire.version)
         blocked = self._cannot_establish_a_session(anonymous)
         if blocked is not None:
             return Sessions(not_stripped_because=blocked)
-        ids = self._sample_session_ids()
+        ids = self._sample_session_ids(legacy)
         if not ids:
             return Sessions(not_stripped_because="the server issues no session id")
         declined = self._cannot_strip_the_credential(anonymous)
         if declined is not None:
             return Sessions(ids=ids, not_stripped_because=declined)
+        return self._without_the_credential(ids, legacy)
+
+    def _without_the_credential(self, ids: tuple[str, ...], wire: Wire) -> Sessions:
+        """Send one request carrying the session and not the credential that made it."""
         try:
-            listing = self._call("tools/list", {}, credential=None, session=ids[-1])
+            listing = self._call("tools/list", {}, wire=wire, credential=None, session=ids[-1])
         except McpError as exc:
             return Sessions(ids=ids, not_stripped_because=f"the probe could not be sent: {exc}")
         listed = carries_tools(listing)
@@ -362,7 +416,7 @@ class _Probe:
             )
         return None
 
-    def _sample_session_ids(self) -> tuple[str, ...]:
+    def _sample_session_ids(self, wire: Wire) -> tuple[str, ...]:
         """Handshake `_SESSION_SAMPLES` times and return the ids those handshakes issued.
 
         Its own handshakes, deliberately. The sample used to reuse ids recorded by
@@ -379,7 +433,9 @@ class _Probe:
         sampled: list[str] = []
         for _ in range(_SESSION_SAMPLES):
             try:
-                issued = self._session_id_of(self._call("initialize", _INITIALIZE))
+                issued = self._session_id_of(
+                    self._call("initialize", self._opening(wire), wire=wire)
+                )
             except McpError:
                 break
             if issued is None:
@@ -387,26 +443,43 @@ class _Probe:
             sampled.append(issued)
         return tuple(sampled)
 
+    def _opening(self, wire: Wire | None = None) -> Mapping[str, object]:
+        """Build the `initialize` parameters for one era, naming the version that era carries.
+
+        Built from the wire rather than from a constant, because the version in the
+        body and the version in the `MCP-Protocol-Version` header have to be the
+        same one — a dual-era server offering `2025-06-18` is handshaken at
+        `2025-06-18`, not at whatever this client would have preferred.
+        """
+        used = wire if wire is not None else self._negotiation.wire
+        return {"protocolVersion": used.version, "capabilities": {}, "clientInfo": _CLIENT}
+
     def _call(
         self,
         method: str,
         params: Mapping[str, object],
         *,
+        wire: Wire | None = None,
         credential: str | None = "",
         session: str | None = None,
     ) -> RawReply:
+        """Send one probe request, written for the era this observation belongs to.
+
+        `wire` defaults to the negotiated one; the session observations pass the
+        handshake era explicitly, because that is the only era a session exists in.
+        The body and the headers are built from the same `Wire`, so the version a
+        modern server reads in `_meta` is the one it reads in the header — a
+        disagreement is a `HeaderMismatch` and the probe would grade a rejection it
+        caused itself.
+        """
+        used = wire if wire is not None else self._negotiation.wire
         token = self._credential if credential == "" else credential
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-            "MCP-Protocol-Version": PROTOCOL_VERSION,
-        }
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        if session:
-            headers["Mcp-Session-Id"] = session
         return self._spend(
-            lambda: self._send(self._url, body=body_for(method, params), headers=headers)
+            lambda: self._send(
+                self._url,
+                body=used.body(method, params),
+                headers=used.headers(method, credential=token, session=session),
+            )
         )
 
     def _fetch(self, url: str) -> Document:

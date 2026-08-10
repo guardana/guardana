@@ -53,8 +53,8 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
 
     @property
     def estimated_requests(self) -> int:
-        """The anonymous probe, then the documented discovery attempts for each document."""
-        return 8
+        """The discovery probe, the anonymous pair, then the documented attempts per document."""
+        return 9
 
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Walk the discovery chain and report the first requirement that is not met."""

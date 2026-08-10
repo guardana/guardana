@@ -89,7 +89,7 @@ files pinned by digest in every run, and a rule carries both editions where the
 semantics genuinely overlap — never a silent remap onto the matching number, since
 `LLM07:2026` is Misinformation. `guardana taxonomy` shows what is installed.
 
-## What ships today (0.15.0)
+## What ships today (0.16.0)
 
 Counts come from the registry, never from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -169,16 +169,16 @@ document is one that moves.
 
 | Risk | Coverage today | What closes the rest |
 |---|---|---|
-| MCP01 Token Mismanagement & Secret Exposure | **Good** | `mcp.token_audience` proves a server accepts a token it never issued; `mcp.discovery_target` catches a server aiming its client at the cloud metadata endpoint. Passthrough to an upstream API is not client-observable and is deferred with that reason |
+| MCP01 Token Mismanagement & Secret Exposure | **Good** | `mcp.token_audience` proves a server accepts a token it never issued; `mcp.discovery_target` catches a server aiming its client at the cloud metadata endpoint; `mcp.issuer_identification` catches an authorization server whose clients cannot detect a mix-up. Passthrough to an upstream API is not client-observable and is graded in a trace instead |
 | MCP02 Privilege Escalation via Scope Creep | **Started** | `mcp.scope_breadth` reads what is advertised; what a *granted* token actually carries needs a real credential from a real authorization flow |
 | MCP03 Tool Poisoning | **Good** | `agent.mcp_server_manifest` on the live server plus `prompt.mcp_tool_poisoning` on the file, both now covering the whole declaration rather than the description |
 | MCP04 Supply Chain & Dependency Tampering | **Good** | the static front door, plus rug-pull detection against a pin |
 | MCP05 Command Injection & Execution | **Gap** | proving it means calling a tool, which Guardana does not do |
-| MCP06 Intent Flow Subversion | **Started** | `agent.tool_result_injection` grades the shape of it on an agent; the MCP-specific path needs sampling and elicitation |
-| MCP07 Insufficient Authentication & Authorization | **Strong** | `mcp.unauthenticated_access`, `mcp.authorization_discovery`, `mcp.session_binding` |
+| MCP06 Intent Flow Subversion | **Started** | `agent.tool_result_injection` grades the shape of it on an agent; the MCP-specific path ran through sampling and elicitation, which `2026-07-28` deprecates in favour of Multi Round-Trip Requests — and a client that declared the capability in order to test it would be acquiring exactly the ability it exists to refuse |
+| MCP07 Insufficient Authentication & Authorization | **Strong** | `mcp.unauthenticated_access`, `mcp.authorization_discovery`, `mcp.session_binding` — the last of which now declines rather than accuses a server on a revision that has no sessions |
 | MCP08 Lack of Audit and Telemetry | **Gap** | not observable from a client; it is a property of the operator's deployment |
 | MCP09 Shadow MCP Servers | **Out of scope** | finding unregistered servers is network discovery, not verification of a target |
-| MCP10 Context Injection & Over-Sharing | **Started** | the manifest side is covered; retrieved content needs the retriever work |
+| MCP10 Context Injection & Over-Sharing | **Started** | the manifest side is covered, and `mcp.cache_scope` grades a credential-gated manifest a server declares publicly cacheable; retrieved content needs the retriever work |
 
 ---
 
@@ -388,57 +388,17 @@ and [`docs/deployment.md`](docs/deployment.md) says to the operator's face what 
 cannot yet do.
 
 
-## Next: protocol and evidence first, then application awareness, then 1.0
+## Next: application awareness, then 1.0
 
 The order is: **complete the domain model → build the translators into it → prove the
 compatibility contract → freeze it.** The model landed in 0.14.0
 ([design](docs/design/trace-domain-model.md)) and the translators in 0.15.0
-([design](docs/design/framework-adapters.md)), which met 1.0 entry criterion 2.
-Everything else, including the whole team platform, runs beside this and gates none
-of it.
+([design](docs/design/framework-adapters.md)), which met 1.0 entry criterion 2. MCP
+caught up with its own specification in 0.16.0
+([design](docs/design/mcp-protocol-eras.md)). Everything else, including the whole
+team platform, runs beside this and gates none of it.
 
-One item now goes in front of all of it, because a protocol moved underneath a claim
-this project already makes.
-
-### Next — MCP, as the specification now is
-
-> **Outcome:** `probe --mcp` verifies a server built to the current specification,
-> and every session-shaped rule knows which revision it is grading.
-
-**The specification changed materially on 2026-07-28 and Guardana pins
-`2025-11-25`.** This is not drift at the margins
-([changelog](https://modelcontextprotocol.io/specification/2026-07-28/changelog)):
-the `initialize` handshake is gone, protocol-level sessions and the
-`Mcp-Session-Id` header are gone, `server/discover` is a new RPC servers **MUST**
-implement, server-initiated requests are replaced by Multi Round-Trip Requests with
-a required `resultType`, results carry `ttlMs`/`cacheScope`, and Roots, Sampling,
-Logging and Dynamic Client Registration are all deprecated. Guardana's client opens
-with `initialize`, so against a conforming current server it does not connect at
-all. That fails loudly rather than passing quietly — but a security tool that
-advertises MCP depth and cannot reach a current server is the item that goes first.
-
-- **Speak both revisions, and record which one was negotiated.** `server/discover`
-  for up-front version selection, the stateless request shape, and the protocol
-  version in the run manifest, so a comparison can say the two runs graded different
-  protocols instead of reading it as the system changing.
-- **Make every session-shaped rule revision-aware.** A conforming `2026-07-28`
-  server has no session by design. `mcp.session_binding` and
-  `trace.session_as_identity` must decline rather than accuse a server that is
-  correct under the specification it implements.
-- **The authorization changes are checks, not chores.** `iss` validation is now a
-  client **MUST** ([RFC 9207](https://datatracker.ietf.org/doc/html/rfc9207)),
-  credentials are bound to the issuer that minted them and must not be reused
-  across authorization servers, and Client ID Metadata Documents supersede DCR —
-  while DCR support itself stays legal and must not be reported as a defect.
-- **Cache semantics are a privacy check.** A result that depends on who asked, and
-  is returned with `cacheScope: "public"`, is a leak an intermediary is invited to
-  perform. Verify what the server *declares*; do not try to prove what a
-  hypothetical intermediary did.
-- **Sampling misuse closes as a deferral.** It was deferred as unreachable through
-  a client that only sends and reads; the feature is now deprecated, and MRTR is
-  the shape that replaces it.
-
-### Then — the rest of application awareness
+### Next — the rest of application awareness
 
 > **Outcome:** Guardana can verify an AI *application*: what it retrieves, what it
 > does with the output, and what a single run is entitled to claim.
@@ -522,7 +482,12 @@ one.
 | **A saved MCP run in the compatibility corpus** | the corpus holds a real artifact scan from a released build; the 1.0 criterion asks for the same on the endpoint side |
 | **Token passthrough to an upstream API** | *(closed in 0.14.0 — `guardana.trace.credential_passthrough` grades it in a trace, which is where it becomes observable)* |
 | **Confused deputy, in full** | its preconditions live on the server's back side; the only client-side proof is registering a client on somebody's authorization server, which is a write to a third party by a tool whose proposition is that it is safe to point at production. The observable slice shipped |
-| **Sampling misuse (MCP)** | *(closed by the specification — Sampling is deprecated as of `2026-07-28`, and MRTR is the shape that replaces server-initiated requests. The MCP work above reads the replacement instead)* |
+| **Sampling misuse (MCP)** | *(closed by the specification — Sampling is deprecated as of `2026-07-28`, and Multi Round-Trip Requests replace server-initiated requests. Guardana declares no client capabilities, so a conforming server can never ask it for one; exercising the retry would mean declaring the capability in order to test it, which is acquiring the ability the refusal exists to withhold)* |
+| **`subscriptions/listen`** | a long-lived stream is a listener, and a scanner holding one has a different safety posture and a request meter that cannot bound it. What it would buy is a *schedule* for the rug-pull check, which is `monitor --mcp` |
+| **The MCP tasks extension** (`io.modelcontextprotocol/tasks`) | an extension is opt-in on both sides; nothing Guardana sends can be answered with a task handle unless it declares support, and declaring support to test it is the same trade as sampling above |
+| **`x-mcp-header` mirroring** | it applies to `tools/call`, which Guardana does not send. Grading a tool's header mirroring would mean calling the tool |
+| **`ttlMs` as a freshness policy** | how long a manifest may be cached is an operational choice, not a security invariant. `cacheScope` is graded because it names *who may hold it*, which is |
+| **A second authorization context for the cache check** | proving a manifest *varies* by caller needs two credentials, and Guardana has one. What the server **declares** is graded instead, which is the part an intermediary acts on |
 | **Multi-user data isolation** | proving user A cannot reach user B's data needs two credentials *and* knowledge of whose data is whose. Guardana has neither and cannot ask for the second |
 | **Shadow MCP servers (`MCP09:2025`)** | finding servers nobody registered is network discovery, not verification of a target |
 | **A universal AI risk score** | every component of a single number would have to have defensible semantics, and none of the interesting ones do. `critical findings`, `indeterminate checks`, `coverage loss`, `attack success rate` and `utility regression` each answer a question; `8.4/10` answers none of them and hides which dimension is missing |

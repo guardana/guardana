@@ -280,6 +280,9 @@ def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
     from guardana.core.target.mcp import McpServerTarget  # noqa: PLC0415
 
     class _Manifest:
+        def speak(self, wire: object) -> None:
+            pass
+
         def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
             if method == "initialize":
                 return {"protocolVersion": "x"}

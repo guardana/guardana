@@ -1,6 +1,6 @@
 """A server nobody could reach is not a secure server, and every rule has to say so.
 
-Three of the six used to decline explicitly while three returned nothing, and
+Three of the original six used to decline explicitly while three returned nothing, and
 silence from a rule here means *the invariant holds*. A report where half the
 checks said "not established" and half said nothing at all invites reading the
 second half as clean, which is the same false green in a quieter voice.
@@ -10,7 +10,9 @@ from guardana.core.rule import Rule, RuleContext
 from guardana.core.target import McpServerTarget
 from guardana.rules.mcp import (
     McpAuthorizationDiscoveryRule,
+    McpCacheScopeRule,
     McpDiscoveryTargetRule,
+    McpIssuerIdentificationRule,
     McpScopeBreadthRule,
     McpSessionBindingRule,
     McpTokenAudienceRule,
@@ -18,18 +20,20 @@ from guardana.rules.mcp import (
 )
 from mcp_fixtures import ROUTABLE, unreachable
 
-ALL_SIX: list[Rule] = [
+EVERY_MCP_RULE: list[Rule] = [
     McpUnauthenticatedAccessRule(),
     McpAuthorizationDiscoveryRule(),
     McpTokenAudienceRule(),
     McpSessionBindingRule(),
     McpScopeBreadthRule(),
     McpDiscoveryTargetRule(),
+    McpIssuerIdentificationRule(),
+    McpCacheScopeRule(),
 ]
 
 
 def test_no_rule_stays_silent_about_a_server_it_never_reached() -> None:
-    for rule in ALL_SIX:
+    for rule in EVERY_MCP_RULE:
         target = McpServerTarget(ROUTABLE, sender=unreachable)
 
         reported = list(rule.run(target, RuleContext()))
@@ -43,7 +47,7 @@ def test_no_rule_stays_silent_about_a_server_it_never_reached() -> None:
 def test_each_one_says_what_it_would_have_established() -> None:
     # A generic "could not run" is true and useless. The reason names the invariant
     # so an operator reading the report knows what they are missing.
-    for rule in ALL_SIX:
+    for rule in EVERY_MCP_RULE:
         target = McpServerTarget(ROUTABLE, sender=unreachable)
 
         summary = next(iter(rule.run(target, RuleContext()))).evidence.summary

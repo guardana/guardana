@@ -28,6 +28,9 @@ class _Server:
     def __init__(self, schema: Mapping[str, Any]) -> None:
         self._schema = schema
 
+    def speak(self, wire: object) -> None:
+        pass
+
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
         if method == "initialize":
             return {"protocolVersion": "2025-11-25"}

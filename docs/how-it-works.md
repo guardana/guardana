@@ -185,7 +185,7 @@ the renderer prints them →
   hallucinated dependencies, insecure transport, hardcoded secrets, MCP tool
   poisoning, hidden-instruction "rules-file backdoors", and training-data
   integrity.
-- **Runtime (dynamic, endpoint and trace)** — 30 rules: direct prompt injection, DAN-style
+- **Runtime (dynamic, endpoint and trace)** — 32 rules: direct prompt injection, DAN-style
   jailbreak, a multi-turn gradual-jailbreak scenario, indirect (RAG) injection,
   excessive tool-use agency, unbounded consumption (denial-of-wallet), the same
   category measured as cost asymmetry, output-secret leakage, the canary-proven

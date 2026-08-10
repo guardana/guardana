@@ -43,7 +43,7 @@ guardana probe --url <base-url> --model <name> [OPTIONS]
 
 `--mcp` points `probe` at a Model Context Protocol server rather than a chat
 endpoint. There is no model to talk to, so every chat rule is skipped by
-capability and says so; what runs instead is the manifest check and the six
+capability and says so; what runs instead is the manifest check and the eight
 authorization checks.
 
 ```bash
@@ -54,10 +54,52 @@ guardana probe \
 ```
 
 **Guardana never calls a tool on your server.** Every observation is made with
-`initialize`, `tools/list`, and unauthenticated `GET`s of the two discovery
-documents. Calling a tool is a side effect on somebody's system — possibly a
-write, possibly a payment — and no verification result is worth finding that out
-by experiment.
+`server/discover`, `tools/list`, the `initialize` handshake where the server still
+expects one, and unauthenticated `GET`s of the two discovery documents. Calling a
+tool is a side effect on somebody's system — possibly a write, possibly a payment
+— and no verification result is worth finding that out by experiment.
+
+**Guardana declares no client capabilities**, which is a safety property rather
+than an omission. Under the `2026-07-28` Multi Round-Trip Requests pattern a server
+asks for sampling, elicitation or a root listing by returning them in a result, and
+it **MUST NOT** ask for a capability the client did not declare. A client declaring
+none cannot be asked to run a model completion or to prompt a human on the server's
+behalf; a server that asks anyway gets an error, never an answer.
+
+### Two revisions of the protocol, and which one your server speaks
+
+The specification revised on 2026-07-28 removed the `initialize` handshake and
+protocol-level sessions, and made every request carry its own version. Guardana
+speaks both that revision and `2025-11-25`, and settles which one applies before
+asking a server anything else:
+
+```
+$ guardana probe --mcp https://mcp.example.com/mcp --format json | jq .run.coverage.protocols
+{ "mcp": "2026-07-28" }
+```
+
+The probe is one `server/discover` call — the method the newer revision requires
+and the older one has never heard of, which makes its *answer* identify the era.
+Guardana deliberately does not use the cheaper route the HTTP binding allows
+(send an ordinary request, read the body of a `400`): some servers built to the
+older revision will answer `tools/list` without a handshake, and a client that
+opened with one would take their manifest and record `2026-07-28` in the run
+manifest — a coverage claim about a revision that server has never heard of.
+
+Three consequences worth knowing:
+
+- **The negotiated revision is in the run manifest**, so [`guardana diff`](usage-diff.md)
+  reports a server that moved between revisions as *the reach changed*, not as the
+  system behaving differently.
+- **`guardana.mcp.session_binding` is silent on a server with no sessions.** A
+  conforming `2026-07-28` server mints none, so there is nothing to guess and
+  nothing to authenticate with. A server that still offers an older revision
+  alongside the new one is graded over that older one, because it is still handing
+  sessions to every client that asks for them.
+- **No revision in common is an outcome, never a pass.** The authorization checks
+  report `inconclusive` naming both version lists, and the manifest checks are
+  skipped with the same sentence — which `fail_on.fail_on_skipped` turns into an
+  indeterminate run.
 
 **The token never leaves the origin you named.** MCP is the one protocol here
 where the server picks an address and the client fetches it, so every redirect hop
@@ -96,8 +138,8 @@ schemas too.
 
 ### The authorization surface
 
-Six checks, each testing an invariant the MCP specification states as a `MUST`,
-and each saying plainly when it could not reach a verdict:
+Eight checks, each testing an invariant the MCP specification states, and each
+saying plainly when it could not reach a verdict:
 
 | Rule | What it establishes |
 |---|---|
@@ -107,6 +149,8 @@ and each saying plainly when it could not reach a verdict:
 | `guardana.mcp.session_binding` | Session ids are not a counter, are not shared, and do not authenticate a request on their own |
 | `guardana.mcp.scope_breadth` | The advertised scopes can express least privilege, and the challenge names the scope a request needs |
 | `guardana.mcp.discovery_target` | Every discovery address the server advertises is one a client may follow |
+| `guardana.mcp.issuer_identification` | The authorization server advertises `authorization_response_iss_parameter_supported`, without which a client cannot detect an authorization-server mix-up (RFC 9207) |
+| `guardana.mcp.cache_scope` | A tool listing the server gates behind a credential is not also declared `cacheScope: "public"`, which would invite any shared gateway to serve it to a caller the server would have refused |
 
 **Two of them need `--mcp-token-env` to say anything**, and say so rather than
 going quiet: whether a session authenticates on its own cannot be tested without a
@@ -123,10 +167,15 @@ correctly signed token minted for another service, which no scanner can honestly
 obtain. Against a server that requires no credential at all the check reports
 `inconclusive`, because a server that accepts everything demonstrates nothing.
 
+**Dynamic Client Registration is not reported as a defect.** `2026-07-28`
+deprecates it in favour of Client ID Metadata Documents and keeps it legal for at
+least twelve months, and it remains the only registration route some authorization
+servers offer. Reporting a supported feature as a defect is a false red.
+
 **stdio servers are not graded on this.** The specification says an stdio
 implementation should take credentials from the environment instead of following
 the authorization spec, so an stdio target does not declare the capability and all
-six rules are **skipped** with their reason recorded. `fail_on.fail_on_skipped`
+eight rules are **skipped** with their reason recorded. `fail_on.fail_on_skipped`
 turns that coverage hole into an indeterminate result; what never happens is six
 rules reporting nothing about a server they could not examine.
 
@@ -137,9 +186,10 @@ value, at any privacy level.
 
 ### Cost
 
-An MCP probe sends around a dozen requests: a handshake and a listing without a
-credential, up to five discovery fetches, a handshake and a listing with the
-forged token, and a handful of handshakes to sample session ids. Every one is
+An MCP probe sends around a dozen requests: one `server/discover` to settle the
+revision, a listing without a credential (preceded by a handshake where the server
+still expects one), up to five discovery fetches, a listing with the forged token,
+and a handful of handshakes to sample session ids. Every one is
 counted, so `--max-requests` bounds it, and a run that hits the ceiling exits `6`
 with an `indeterminate` gate rather than reporting the checks it never reached as
 clean.

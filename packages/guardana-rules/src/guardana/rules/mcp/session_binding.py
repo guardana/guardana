@@ -34,6 +34,20 @@ class McpSessionBindingRule(McpAuthorizationRule):
     claims to measure randomness — four samples cannot support that, and a number
     invented from them would be worse than none — it looks for structure: the same
     id handed to everybody, a counter, or an id short enough to enumerate.
+
+    **Silent against a server that offers no revision with sessions in it.** MCP
+    `2026-07-28` removed protocol sessions, so a server implementing only modern
+    revisions has none to mint, none to guess and none to authenticate with: the
+    invariant holds, and silence is what this codebase says when it does. Reporting
+    `inconclusive` there would have failed the build of the team that upgraded
+    correctly, which is an accusation rather than a verdict. Which revision was
+    negotiated is recorded in `coverage.protocols`, where a `diff` reads it as the
+    reach changing rather than as the system changing.
+
+    A **dual-era** server is graded exactly as before, whichever era the run
+    negotiated. It still hands a session to every legacy client it serves, and a
+    counter there is a live defect that the modern half of the same server cannot
+    show. See `docs/design/mcp-protocol-eras.md`.
     """
 
     meta = RuleMeta(
@@ -50,8 +64,8 @@ class McpSessionBindingRule(McpAuthorizationRule):
 
     @property
     def estimated_requests(self) -> int:
-        """The anonymous probe, a handshake per session sample, and the credential-stripped one."""
-        return 6
+        """The discovery probe, the anonymous pair, a handshake per sample, and the stripped one."""
+        return 7
 
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Grade the session ids, then the request that carried one without a credential."""
@@ -60,6 +74,8 @@ class McpSessionBindingRule(McpAuthorizationRule):
             yield blocked
             return
         sessions = view.sessions
+        if sessions.no_protocol_sessions is not None:
+            return
         yield from self._shape(view, sessions.ids)
         if sessions.stripped_credential:
             if sessions.stripped_listed_tools:

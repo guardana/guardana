@@ -29,12 +29,15 @@ class _FakeMcp:
         self._tools = tools
         self.closed = False
 
+    def speak(self, wire: object) -> None:
+        pass
+
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
         if method == "initialize":
             return {"protocolVersion": "2025-06-18"}
         if method == "tools/list":
             return {"tools": [{"name": n, "description": d} for n, d in self._tools]}
-        raise AssertionError(f"unexpected MCP method {method!r}")
+        raise McpError(f"unexpected MCP method {method!r}")
 
     def close(self) -> None:
         self.closed = True
