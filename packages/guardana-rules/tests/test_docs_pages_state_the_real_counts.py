@@ -116,3 +116,54 @@ def test_the_architecture_page_states_the_envelope_version_agents_send() -> None
     assert f'"schema_version": {ENVELOPE_SCHEMA_VERSION},' in page, (
         "the example envelope on docs/architecture.md carries a version no agent sends"
     )
+
+
+def _repo_file(name: str) -> str:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / name
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8")
+    raise AssertionError(f"could not locate {name} at the repo root")
+
+
+_ROADMAP_OURS_RE = re.compile(r"against our (\d+) rules")
+_SAMPLED_RE = re.compile(r"(\d+) rules ship and \*\*(\d+) are fully sampled\*\*")
+
+
+def test_the_roadmap_compares_competitors_against_the_real_rule_total() -> None:
+    """A count in a sentence about somebody else is still a count about us.
+
+    `ROADMAP.md` compared DeepTeam's coverage "against our 32 rules" while 51
+    shipped, for four releases. It is the `47 security checks` failure exactly: a
+    number three screens away from a table that was correct, in a file nothing
+    checked, because the check was written for the *pages* and this one is at the
+    repository root. Grep the whole file for every other number of the same thing —
+    a number is not covered because it sits near one that is.
+    """
+    total = len(list(provide_rules()))
+
+    stated = _counts(_ROADMAP_OURS_RE, _repo_file("ROADMAP.md"), "ROADMAP.md")
+
+    assert stated == [total], (
+        f"ROADMAP.md compares competitors against {stated} rule(s); the registry has {total}"
+    )
+
+
+def test_the_rule_test_page_states_how_many_rules_are_really_sampled() -> None:
+    """Two numbers, and the second is the honest one this project keeps pointing at.
+
+    "51 ship and 5 are fully sampled" is a coverage claim, and a coverage claim that
+    drifts upward on its own is the shape of a false green. The ratchet in
+    `test_builtin_fixture_coverage.py` pins the sampled count; nothing pinned the
+    sentence that quotes it.
+    """
+    from test_builtin_fixture_coverage import _FULLY_SAMPLED  # noqa: PLC0415
+
+    total = len(list(provide_rules()))
+
+    (stated,) = _SAMPLED_RE.findall(_read("usage-rule-test.md"))
+
+    assert (int(stated[0]), int(stated[1])) == (total, _FULLY_SAMPLED), (
+        f"docs/usage-rule-test.md says {stated[0]} ship and {stated[1]} are sampled; "
+        f"the registry has {total} and the ratchet pins {_FULLY_SAMPLED}"
+    )

@@ -318,7 +318,7 @@ Guardana verifies security. Adding faithfulness or hallucination metrics would m
 this project onto their pitch, where it would lose and where it adds nothing.
 
 **On attack coverage we are behind, and that is the wrong race.** DeepTeam ships
-40+ vulnerability types and three jailbreak strategies against our 32 rules; garak
+40+ vulnerability types and three jailbreak strategies against our 51 rules; garak
 ships roughly a hundred probes and can fire twenty thousand prompts in a run. What
 none of them ships is an exit-code contract, a budget that cannot be used as an
 excuse, a saved run, or a regression comparison. That is where this project
