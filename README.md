@@ -41,7 +41,7 @@ neither is honest.**
 - **Grading is a swappable component, not a regex at the end of a probe.** Every
   graded finding carries an outcome, a confidence, a rationale and the id of the
   `Evaluator` that produced it, and that judge's confidence is *measured* — Brier
-  score, expected calibration error — by [`guardana calibrate`](docs/usage-run.md).
+  score, expected calibration error — by `guardana calibrate`.
   Proof carries no confidence: a planted canary coming back is not a judgement.
 - **"Nothing found" has four meanings, so it has four channels.** `findings`,
   `unverified` (a check ran and could not conclude), `errors` (a check never ran),
