@@ -33,6 +33,7 @@ sys.path.insert(0, str(_REPO / "packages" / "guardana-core" / "src"))
 sys.path.insert(0, str(_REPO / "packages" / "guardana-rules" / "src"))
 
 from guardana.core import __version__  # noqa: E402
+
 from sitegen import SiteBuildError, build  # noqa: E402
 
 _NAMED = 8

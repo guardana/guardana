@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-08-11 — the gate lied about itself
+
+**`v0.19.0` was tagged and never published.** Its CI was red on an import-ordering
+lint, so the release run was cancelled before it could reach PyPI rather than
+publishing from a commit that failed its own gate. `0.19.1` is that release plus
+this fix; nothing else moved. The tag stays where it is — a pushed tag is not
+rewritten here, and a version number is cheaper than a rewritten history.
+
+### Fixed
+
+**A stale `.ruff_cache` entry made the local gate green while CI was red.** The
+lint gate answered from a cached result for a file whose imports had since been
+rewritten — so `uv run ruff check .` reported success on exactly the code CI
+refused. Same family as the `__pycache__` trap: a cache that keys on something
+coarser than what changed will eventually tell you what you want to hear.
+
+The ordering itself was ambiguous, which is why it could differ at all: whether
+`sitegen` is a first-party module decides which block its import belongs in, and
+nothing had said. `[tool.ruff] src` now declares it, so the answer is a decision
+rather than an inference that can vary by machine.
+
 ## [0.19.0] - 2026-08-11 — documentation that is generated, and two documents read back wrong
 
 ### Added

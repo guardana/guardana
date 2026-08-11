@@ -11,6 +11,11 @@ guardana-server = { workspace = true }
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Where a first-party module lives, so import sorting is decided rather than
+# inferred. `scripts/build_site.py` imports the `sitegen` package beside it, and
+# whether that counts as first-party changes which block the import belongs in —
+# a difference that shows up as a lint failure on one machine and not another.
+src = [".", "scripts"]
 # Deliberately-insecure demo inputs — not project source; never lint/format them.
 # force-exclude so pre-commit (which passes explicit file paths) also skips them.
 extend-exclude = ["examples/vulnerable-model"]
