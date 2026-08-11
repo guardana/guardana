@@ -39,6 +39,9 @@ detail below.
 - [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run and its manifest
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
 - [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin
+- [`usage-rule-test.md`](usage-rule-test.md) — `guardana rule test`: a rule's positive, negative and **inconclusive** fixtures, run as a command
+- [`usage-pack.md`](usage-pack.md) — `guardana pack validate`: the manifest declaring which extension API your pack needs and what it provides
+- [`usage-calibrate.md`](usage-calibrate.md) — `guardana calibrate`: measure an evaluator's confidence against known outcomes, and carry the measurement into a run
 - [`extending.md`](extending.md) — add a Rule, an Evaluator, or a Target; the entry-point contract
 - [`model-formats.md`](model-formats.md) — the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract
 
@@ -77,6 +80,7 @@ status means:
 - [`design/mcp-protocol-eras.md`](design/mcp-protocol-eras.md) — two revisions of MCP, and settling which one a server speaks before asking it anything
 - [`design/mcp-authorization-depth.md`](design/mcp-authorization-depth.md) — what a live MCP server's authorization surface can be asked with one credential
 - [`design/taxonomy-editions.md`](design/taxonomy-editions.md) — why a reference is scheme + edition + id, and never a bare `LLM07`
+- [`design/extension-author-tooling.md`](design/extension-author-tooling.md) — fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment
 - [`design/documentation-site.md`](design/documentation-site.md) — a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way
 - [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
 - [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle

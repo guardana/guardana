@@ -10,8 +10,10 @@ from guardana.cli.import_observations import import_observations
 from guardana.cli.init import init
 from guardana.cli.monitor import monitor
 from guardana.cli.new_rule import new_rule
+from guardana.cli.pack import pack_app
 from guardana.cli.plan import plan_app
 from guardana.cli.probe import probe
+from guardana.cli.rule import rule_app
 from guardana.cli.rules import rules
 from guardana.cli.run import run_app
 from guardana.cli.scan import scan
@@ -98,4 +100,6 @@ app.add_typer(target_app, name="target")
 app.add_typer(baseline_app, name="baseline")
 app.add_typer(config_app, name="config")
 app.add_typer(trace_app, name="trace")
+app.add_typer(rule_app, name="rule")
+app.add_typer(pack_app, name="pack")
 app.command()(doctor)

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.report import Finding
@@ -10,6 +11,9 @@ from guardana.core.severity import Severity
 from guardana.core.surface import Surface
 from guardana.core.target import Capability, Target, TargetKind
 from guardana.core.taxonomy import TaxonomyRef
+
+if TYPE_CHECKING:
+    from guardana.core.rule.fixture import RuleFixture
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +92,22 @@ class Rule(ABC):
         that defines an evaluator, that every rule naming it actually satisfies its
         contract. A rule that grades entirely in Python declares nothing and is not
         checked — there is nothing to check against.
+        """
+        return ()
+
+    def fixtures(self) -> Iterable["RuleFixture"]:
+        """Return the samples this rule must classify correctly.
+
+        Declared rather than left in a test file, so `guardana rule test` can run
+        them for a pack this repository never saw — which is the whole of a third
+        party's problem, since their proof otherwise lives in their own suite and no
+        one else's tool can repeat it.
+
+        Returning nothing is **not** a pass. A rule nobody sampled is a rule nobody
+        checked, and `rule test` reports it as `indeterminate` rather than green.
+        A rule declaring no `INCONCLUSIVE` sample is reported the same way: it has
+        demonstrated that it fires and that it stays quiet, and nothing at all about
+        the case this project treats as disqualifying.
         """
         return ()
 

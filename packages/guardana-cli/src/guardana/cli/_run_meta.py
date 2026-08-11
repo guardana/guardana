@@ -12,8 +12,14 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 
 from guardana.core import __version__
+from guardana.core.calibration.store import (
+    CalibrationStoreError,
+    RecordedCalibration,
+    load_calibrations,
+)
 from guardana.core.gate import GateOutcome
 from guardana.core.manifest import (
     ConfigurationRef,
@@ -196,7 +202,9 @@ def _run_usage(spent: TargetUsage | None, started_at: datetime, completed_at: da
     )
 
 
-def _evaluator_records(rules: Sequence[Rule]) -> tuple[EvaluatorRecord, ...]:
+def _evaluator_records(
+    rules: Sequence[Rule], calibrations: Mapping[str, RecordedCalibration] | None = None
+) -> tuple[EvaluatorRecord, ...]:
     """Record the evaluators the rules that ran declared they would grade with.
 
     Declared, not "every evaluator installed": an evaluator nobody used graded
@@ -207,6 +215,11 @@ def _evaluator_records(rules: Sequence[Rule]) -> tuple[EvaluatorRecord, ...]:
     No digest. An `Evaluator` has no declaration to hash — it is Python — and
     inventing one from its class name would claim to detect a change it cannot see.
     The tool version recorded beside it is what covers the code.
+
+    A calibration is attached when this run was pointed at one. An evaluator with no
+    recorded measurement carries `None`, which is what every run said for every
+    evaluator until `calibrate --record` existed — honest then and honest now, but
+    now distinguishable from "measured, and here is how honest it was".
     """
     declared = {
         evaluator_id
@@ -214,7 +227,33 @@ def _evaluator_records(rules: Sequence[Rule]) -> tuple[EvaluatorRecord, ...]:
         for evaluator_id, _expectation in rule.declared_expectations()
         if evaluator_id
     }
-    return tuple(EvaluatorRecord(id=evaluator_id) for evaluator_id in sorted(declared))
+    measured = calibrations or {}
+    return tuple(
+        EvaluatorRecord(
+            id=evaluator_id,
+            calibration=(measured[evaluator_id].as_record() if evaluator_id in measured else None),
+        )
+        for evaluator_id in sorted(declared)
+    )
+
+
+def _recorded_calibrations(profile: Profile) -> dict[str, RecordedCalibration]:
+    """Read every calibration file this profile points at, refusing one it cannot parse.
+
+    Refusing rather than skipping. A calibration file that silently failed to load
+    would leave every evaluator recorded as unmeasured, which reads as "nobody
+    checked this judge" — the opposite of what the operator configured and asked to
+    have in their evidence.
+    """
+    measured: dict[str, RecordedCalibration] = {}
+    for raw_path in profile.calibration_paths:
+        path = Path(raw_path)
+        if not path.exists():
+            raise CalibrationStoreError(
+                f"{path} does not exist, so the calibrations it names cannot be recorded"
+            )
+        measured.update(load_calibrations(path))
+    return measured
 
 
 def _coverage(
@@ -291,7 +330,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         )
         for rule in ran
     )
-    evaluators = _evaluator_records(ran)
+    evaluators = _evaluator_records(ran, _recorded_calibrations(profile))
     target = (
         identity
         if identity is not None

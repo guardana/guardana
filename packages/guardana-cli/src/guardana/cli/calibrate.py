@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -7,6 +8,13 @@ from guardana.cli._profile import resolve_profile
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.calibration import CalibrationReport, calibrate
 from guardana.core.calibration.corpus import CorpusError, bundled_corpus, load_corpus
+from guardana.core.calibration.store import (
+    CalibrationStoreError,
+    RecordedCalibration,
+    corpus_digest,
+    load_calibrations,
+    write_calibrations,
+)
 from guardana.core.registry import Registry
 
 _UNMEASURED = "—"
@@ -24,6 +32,13 @@ def calibrate_command(
     max_ece: Annotated[
         float | None,
         typer.Option("--max-ece", help="Fail if expected calibration error exceeds this"),
+    ] = None,
+    record: Annotated[
+        Path | None,
+        typer.Option(
+            "--record",
+            help="Write the measurement here so runs can carry it; see `calibrations:`.",
+        ),
     ] = None,
 ) -> None:
     """Measure how honest an evaluator's stated confidence is, against known labels.
@@ -50,6 +65,8 @@ def calibrate_command(
 
     report = calibrate(grader, samples)
     typer.echo(_render(report, len(samples)))
+    if record is not None:
+        _record(report, corpus or bundled_corpus(), record)
     if not report.is_reliable:
         # `INDETERMINATE`, not a policy failure: the measurement did not happen.
         # Exiting zero would let "we measured nothing" read as "we measured, and
@@ -59,6 +76,39 @@ def calibrate_command(
     if max_ece is not None and measured_ece is not None and measured_ece > max_ece:
         # This one *is* a verdict: it measured, and the result is over the bar.
         raise typer.Exit(code=ExitCode.POLICY_FAILED)
+
+
+def _record(report: CalibrationReport, corpus: Path, destination: Path) -> None:
+    """Write this measurement where a run can find it, unless it is not worth quoting.
+
+    **An unreliable measurement is refused rather than recorded.** `is_reliable` is
+    false when too few samples were graded or the judge abstained on too many, and
+    writing that number into a run's evidence would put a figure the tool itself
+    calls noise where a reader takes it for a measurement. Recording it "with a
+    caveat" is not available: the manifest carries the number, not the prose.
+    """
+    if not report.is_reliable:
+        typer.echo(
+            f"error: not recording an unreliable measurement — {report.caveat}",
+            err=True,
+        )
+        return
+    existing: dict[str, RecordedCalibration] = {}
+    if destination.exists():
+        try:
+            existing = load_calibrations(destination)
+        except CalibrationStoreError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+    existing[report.evaluator_id] = RecordedCalibration(
+        evaluator=report.evaluator_id,
+        dataset_digest=corpus_digest(corpus),
+        measured_at=datetime.now(UTC),
+        brier=report.brier,
+        ece=report.expected_calibration_error,
+        samples=report.graded,
+    )
+    write_calibrations(destination, existing)
+    typer.echo(f"recorded {report.evaluator_id} in {destination}")
 
 
 def _render(report: CalibrationReport, total: int) -> str:

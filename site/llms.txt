@@ -36,6 +36,9 @@ This file is generated from the documentation map; do not edit it by hand.
 - [usage-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-run.md): `guardana run inspect|migrate`: reading a saved run and its manifest
 - [profiles.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/profiles.md): the `guardana.yaml` policy file: which rules run, what fails the build
 - [writing-rules.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/writing-rules.md): author a rule as YAML or as a Python plugin
+- [usage-rule-test.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-rule-test.md): `guardana rule test`: a rule's positive, negative and **inconclusive** fixtures, run as a command
+- [usage-pack.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-pack.md): `guardana pack validate`: the manifest declaring which extension API your pack needs and what it provides
+- [usage-calibrate.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-calibrate.md): `guardana calibrate`: measure an evaluator's confidence against known outcomes, and carry the measurement into a run
 - [extending.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/extending.md): add a Rule, an Evaluator, or a Target; the entry-point contract
 - [model-formats.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/model-formats.md): the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract
 
@@ -75,6 +78,7 @@ This file is generated from the documentation map; do not edit it by hand.
 - [design/mcp-protocol-eras.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/mcp-protocol-eras.md): two revisions of MCP, and settling which one a server speaks before asking it anything
 - [design/mcp-authorization-depth.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/mcp-authorization-depth.md): what a live MCP server's authorization surface can be asked with one credential
 - [design/taxonomy-editions.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/taxonomy-editions.md): why a reference is scheme + edition + id, and never a bare `LLM07`
+- [design/extension-author-tooling.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/extension-author-tooling.md): fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment
 - [design/documentation-site.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/documentation-site.md): a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way
 - [design/run-manifest-v2.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/run-manifest-v2.md): the reproducible run record
 - [design/collector-domain-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/collector-domain-model.md): persistence, tenancy and the finding lifecycle

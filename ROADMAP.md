@@ -406,11 +406,20 @@ team platform, runs beside this and gates none of it.
 > **Outcome:** Guardana can verify an AI *application*: what it retrieves, what it
 > does with the output, and what a single run is entitled to claim.
 
-- **Rule, evaluator and pack developer tooling.** `guardana rule test` running a
-  rule's positive, negative and inconclusive fixtures; evaluator measurement against
-  a labelled set; a pack manifest declaring API compatibility and what it provides;
-  a lock file so a CI run with private packs is reproducible. This is what makes an
-  extension a safe investment after 1.0, and it has to exist *before* the freeze.
+- **A lock file, so a CI run with private packs is reproducible.** The half of the
+  developer-tooling item still open — `rule test`, evaluator measurement and the pack
+  manifest landed in 0.18.0
+  ([design](docs/design/extension-author-tooling.md)). It is the only one of the four
+  that is *not* a 1.0 entry criterion and the only one sharing no schema with the
+  others, which is why it separated cleanly. A lock covering distribution versions is
+  not a lock for this project: `Rule.digest()` exists so that "the same rule" means
+  more than "the same package version", and what a lock should pin is a question the
+  manifest's `provides:` block now informs.
+- **Fixtures for the other 46 built-in rules.** 51 ship and 5 are fully sampled. A
+  gate pins that number so it can only rise, and `guardana rule test 'guardana.*'`
+  reports the rest as `indeterminate`, truthfully. Writing 46 sets in an afternoon
+  would mean writing them to move a counter, and a fixture written for that reason is
+  a test that cannot fail — which this repository treats as worse than none.
 - **RAG as a live target (`LLM09:2026`).** `RetrieverTarget`, `CorpusTarget`,
   `EmbeddingTarget`: retrieval-time injection, unauthorized document access,
   document and metadata poisoning, tenant-filter bypass. Cross-tenant retrieval

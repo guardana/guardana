@@ -19,6 +19,13 @@ class ScriptedTransport:
     def __init__(self, *replies: str) -> None:
         if not replies:
             raise ValueError("ScriptedTransport needs at least one reply")
+        self.scripted: tuple[str, ...] = replies
+        """What this double was told to say, kept readable after the fact.
+
+        The sequence below is an iterator and consuming it to find out what a
+        fixture replied would change the behaviour being inspected. `rule test
+        --write-corpus` reads this to turn a fixture into a labelled sample.
+        """
         self._replies = chain(replies, repeat(replies[-1]))
         self.seen: list[Sequence[ChatMessage]] = []
 

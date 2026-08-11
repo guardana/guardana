@@ -24,6 +24,14 @@ def digest_parts(parts: Iterable[object]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:_DIGEST_CHARS]
 
 
+_NOT_THE_TEST = ("taxonomy", "fixtures")
+"""Declaration keys that say nothing about how this rule behaves against a target.
+
+Both were added after a release proved the cost of leaving one in, and the second
+was added before that cost was paid twice.
+"""
+
+
 def declaration_digest(raw: object) -> str:
     """Hash a YAML rule's own declaration, canonically, without its framework mapping.
 
@@ -40,12 +48,19 @@ def declaration_digest(raw: object) -> str:
     is recorded once per run, in the manifest's coverage fingerprint, where a change
     is one line instead of one per rule.
 
+    **`fixtures:` is excluded for the same reason, and pre-emptively.** A fixture
+    says what we know about a rule, not what the rule sends or how it grades — so
+    sampling a rule that was never sampled does not make it a different test. Left
+    in, the release that gave the catalog its fixtures would have announced that
+    every rule changed definition, against every saved run from before it: the
+    taxonomy mistake repeated with a different key, one release after paying for it.
+
     This is also what keeps a planted canary out of the digest without anyone
     having to remember to exclude it: the value hashed here is the one the rule
     file ships, and the probe's per-run token arrives later, on a copy.
     """
     declaration = (
-        {key: value for key, value in raw.items() if key != "taxonomy"}
+        {key: value for key, value in raw.items() if key not in _NOT_THE_TEST}
         if isinstance(raw, dict)
         else raw
     )

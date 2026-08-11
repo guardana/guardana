@@ -36,6 +36,7 @@ _ALLOWED_RULE_KEYS = frozenset(
         "requires",
         "prompts",
         "expect",
+        "fixtures",
     }
 )
 _TYPED_EXPECT_KEYS = frozenset({"canary", "goal"})

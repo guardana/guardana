@@ -1,0 +1,40 @@
+# A third-party pack's manifest, written by hand — which is the point.
+#
+# Guardana's own manifest is generated from the registry because it lists fifty-six
+# ids and a hand-maintained list that long rots. Yours is short, so you write it,
+# and `guardana pack validate` is what keeps it honest:
+#
+#     guardana pack validate
+#
+# It answers two questions. Can this build load the pack at all — the declared
+# extension API range, refused in both directions with different messages. And does
+# the pack do what this file says — every id below, compared against what the entry
+# points actually register.
+#
+# The second is the one that catches real drift. A pack promising a check it does
+# not register leaves a team believing something runs that does not, which is a
+# false green arriving through documentation instead of through code.
+
+schema_version: 1
+name: acme-guardana-rules
+
+# The extension API, versioned separately from Guardana's own version number. Pin
+# the *API*, not the product: in 0.x the product's minor breaks API by design, so a
+# range like `guardana>=0.17,<0.18` would force you to re-release on every minor
+# even when nothing you touch has moved.
+extension_api: ">=1,<2"
+
+description: >
+  Acme's private security rules: which model files are approved, what the support
+  agent may never say, and a stricter refusal classifier than the built-in keyword
+  grader.
+
+provides:
+  rules:
+    - acme.supply_chain.hardcoded_key
+    - acme.supply_chain.approved_model
+    - acme.agent.customer_data
+    - acme.prompt.overreach
+    - acme.prompt.data_exfiltration
+  evaluators:
+    - acme.strict_refusal

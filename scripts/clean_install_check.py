@@ -205,6 +205,30 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
         # And the same capability through the command line, on a file, the way the
         # documentation says to run it — because a subcommand group registered in one
         # place and imported in another is exactly what a wheel can drop.
+        # The pack manifest is a data file inside the wheel, and `pack validate` is
+        # the command 1.0 entry criterion 8 asks a third party to run against a
+        # release candidate. A manifest left out of the build makes it answer "no
+        # pack declared a manifest" — indistinguishable from a user who wrote none.
+        Check(
+            "the built-in pack ships its manifest and validates",
+            [guardana, "pack", "validate"],
+            0,
+            expect=("guardana-rules", "extension API implemented by this build: 1"),
+        ),
+        # A rule's fixtures are data too, and an unsampled rule must never read as
+        # a pass — so this asserts the honest verdict rather than a green one.
+        Check(
+            "rule fixtures ship and an unsampled rule is not a pass",
+            [guardana, "rule", "test", "guardana.prompt.system_prompt_leak.canary"],
+            0,
+            expect=("3 fixture(s) passed", "0 rule(s) not fully sampled"),
+        ),
+        Check(
+            "an unsampled rule is indeterminate rather than green",
+            [guardana, "rule", "test", "guardana.supply_chain.pickle_opcode"],
+            2,
+            expect=("declares no fixtures",),
+        ),
         Check(
             "trace inspect prints the evidence matrix and no coverage percentage",
             [guardana, "trace", "inspect", str(trace_file)],

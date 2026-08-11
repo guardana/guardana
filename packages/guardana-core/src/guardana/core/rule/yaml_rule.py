@@ -7,6 +7,7 @@ from guardana.core.evaluator.base import Expectation
 from guardana.core.exchange import Exchange
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule._digest import declaration_digest
+from guardana.core.rule._fixture_schema import parse_fixtures
 from guardana.core.rule._scenario_schema import is_scenario, parse_scenario
 from guardana.core.rule._trajectory_schema import is_trajectory, parse_trajectory
 from guardana.core.rule._yaml_schema import (
@@ -17,6 +18,7 @@ from guardana.core.rule._yaml_schema import (
 )
 from guardana.core.rule.base import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError, RuleLoadError
+from guardana.core.rule.fixture import RuleFixture
 from guardana.core.target import ChatMessage, Target
 from guardana.core.target.endpoint import EndpointTarget
 
@@ -30,6 +32,18 @@ class YamlRule(Rule):
     expectation: Expectation
     source_digest: str = ""
     """Hash of the declaration this rule was parsed from; see `Rule.digest`."""
+
+    declared_fixtures: tuple[RuleFixture, ...] = ()
+    """Samples from the rule file's `fixtures:` block, if it has one.
+
+    Named `declared_fixtures` because `fixtures()` is the contract every rule
+    implements: a field and a method cannot share a name, and the method is the
+    part a third party overrides.
+    """
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Return the samples this rule file declared."""
+        return self.declared_fixtures
 
     def digest(self) -> str:
         """Return the declaration hash, falling back to the metadata-only default.
@@ -119,6 +133,7 @@ def _build_rule(raw: object, path: Path) -> Rule:
         prompts=prompts,
         expectation=expectation,
         source_digest=declaration_digest(raw),
+        declared_fixtures=parse_fixtures(raw.get("fixtures"), path),
     )
 
 

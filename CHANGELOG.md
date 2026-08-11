@@ -7,7 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**`guardana rule test` — a rule's own samples, run as a command, including the one
+nobody writes.** "Every rule ships a positive *and* a negative fixture" has been
+project law since 0.1 and a `pytest` convention in practice — which meant the engine
+could not see those fixtures, and nothing could repeat the proof for a pack this
+repository never shipped. That is precisely the third party's problem. `Rule.fixtures()`
+makes them data: declared in a YAML rule's `fixtures:` block, or returned from a
+Python plugin using the doubles `guardana.core.testing` already ships.
+
+**The third outcome is the whole point.** A rule that cannot fire is caught by a
+positive sample and a rule that fires on everything by a negative one; **a rule that
+cannot say "I could not tell" is caught by nothing**, and it is the one that will
+eventually report clean about something it never examined. So a rule declaring no
+`inconclusive` fixture exits `2`, and so does a rule declaring none at all — a
+command built to disprove false greens cannot print "ok" over an empty set of cases
+in its own output. `--write-corpus` turns a fixture set into the labelled corpus
+`calibrate` measures a judge against, dropping `inconclusive` samples and saying how
+many, because a sample with no known outcome cannot measure accuracy against
+anything.
+
+**51 rules ship and 5 are fully sampled.** A gate pins that number so it can only
+rise, and `guardana rule test 'guardana.*'` reports the rest as `indeterminate`,
+truthfully. Writing 46 more sets in an afternoon would mean writing them to move a
+counter, and a fixture written for that reason is a test that cannot fail.
+
+**`guardana pack validate`, and a versioned pack manifest.** 1.0 entry criterion 8
+asks in these words that a third party be able to run it against a release
+candidate. `guardana-pack.yaml` ships *inside* the package — `pack validate` runs
+against an installed distribution, and `pyproject.toml` is not in a wheel — and
+declares two things: which extension API the pack needs, and what it provides.
+
+**`extension_api` is versioned separately from the product, and refuses in both
+directions.** In 0.x the product's minor breaks API by design, so a pack pinned to
+`guardana>=0.17,<0.18` would need re-releasing on every minor even when nothing it
+touches moved; this integer moves only when `Rule`, `Evaluator`, `Target` or
+`Finding` change shape. Too old and too new get different messages and one outcome:
+refuse to load. A "close enough" acceptance is worse than no declaration, because it
+is the point at which an author stops checking. `provides:` is compared against what
+the entry points really register, and the missing direction is the one that matters —
+a pack promising a check it does not register leaves a team believing something runs
+that does not. Guardana's own pack ships a manifest and goes through the same door;
+its `provides:` block is generated from the registry, because 56 hand-maintained ids
+is how every stale count here began.
+
+**`guardana calibrate --record`, and the field that was never filled.**
+`CalibrationRecord` has been in the run manifest since the manifest existed, has
+always been serialized, and until now nothing outside a test ever constructed one:
+every saved run said `"calibration": null` for every evaluator. A field in a
+persisted schema no production path fills is a promise the document makes and never
+keeps — and here it is the promise a judge-graded verdict most needs. `--record`
+writes the measurement, a profile's `calibrations:` block picks it up, and a run now
+carries the Brier score, the ECE, **the date it was measured and a digest of the
+corpus** — because a judge model gets replaced under the same name, and a score with
+no date describes an evaluator that may not exist any more. An unreliable
+measurement is refused rather than recorded: the manifest carries the number, not
+the caveat.
+
+**`docs/usage-calibrate.md` exists.** `calibrate` shipped in 0.5 and was documented
+by one sentence in `product-status.md` — so for `Evaluator`, one of the four
+extension points 1.0 freezes, there was nothing to write an extension *from*, which
+is 1.0 entry criterion 6 failing quietly. Two of the three things the roadmap asked
+for here already worked: `--evaluator` has always taken any registered id including a
+third party's, and `--corpus` has always taken anyone's labelled set.
+
 ### Changed
+
+**Adding fixtures to a rule does not change its digest.** `taxonomy:` was excluded
+from `declaration_digest` in 0.12 after leaving it in made every rule announce
+"changed definition" the release an OWASP edition landed. `fixtures:` is excluded
+for the same reason and before paying the same cost twice: sampling a rule that was
+never sampled is not a different test, and leaving it in would have made this release
+report all 51 rules as changed against every saved run from before it.
 
 **The README is shorter, and every count in it is now pinned to the registry.**
 `test_readme_rule_table.py` covered the family table and the headline beside it and

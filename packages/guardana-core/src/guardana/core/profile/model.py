@@ -98,6 +98,15 @@ class Profile:
     shared `guardana.yaml` into a `guardana scan` that can never pass.
     """
 
+    calibration_paths: tuple[str, ...] = ()
+    """Recorded evaluator calibrations, from `calibrations:` in `guardana.yaml`.
+
+    A run that grades with a measured judge carries the measurement into its own
+    evidence, so a reader can see how honest that confidence was and when it was
+    checked. Absent, every evaluator is recorded uncalibrated — which is the honest
+    answer and was, until this existed, the only one available.
+    """
+
     contract_paths: tuple[str, ...] = ()
     """Security contracts this profile loads, from `contracts:` in `guardana.yaml`.
 

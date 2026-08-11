@@ -24,6 +24,7 @@ _ALLOWED_PROFILE_KEYS = frozenset(
         "privacy",
         "trace",
         "contracts",
+        "calibrations",
     }
 )
 _ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
@@ -288,4 +289,5 @@ def load_profile(path: Path) -> Profile:
             _as_mapping(raw.get("trace"), "trace", path), path
         ),
         contract_paths=_as_glob_list(raw.get("contracts"), "contracts", path),
+        calibration_paths=_as_glob_list(raw.get("calibrations"), "calibrations", path),
     )
