@@ -158,7 +158,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.17   # moving tag → latest 0.17.x
+      - uses: guardana/guardana@v0.18   # moving tag → latest 0.18.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -271,8 +271,9 @@ the project's [principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
 
 | | Outcome |
 |---|---|
-| **0.17** *(current)* | The evidence matrix made visible and gateable — `guardana trace inspect`, and a policy that can *require* dimensions — plus **security contracts**: the application's own invariants (tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink) as a versioned file the engine compiles into rules. A contract that could not be checked is `indeterminate`, never a pass, and no policy setting can turn that off |
-| **next** | Rule, evaluator and pack developer tooling, then RAG as a live target and sink-aware output handling |
+| **0.17** | The evidence matrix made visible and gateable — `guardana trace inspect`, and a policy that can *require* dimensions — plus **security contracts**: the application's own invariants (tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink) as a versioned file the engine compiles into rules. A contract that could not be checked is `indeterminate`, never a pass, and no policy setting can turn that off |
+| **0.18** *(current)* | What a third party needs before the API freezes: `guardana rule test` running a rule's positive, negative and **inconclusive** fixtures; a versioned pack manifest and `guardana pack validate`, refusing an extension API this build cannot honour in **both** directions; and an evaluator's measured calibration carried into the run document rather than left null |
+| **next** | A lock file for reproducible CI with private packs, then RAG as a live target and sink-aware output handling |
 | **1.0** | A compatibility contract — the point where a third-party rule pack is a safe investment. Not a feature count: it says what will not break under you |
 
 Beyond 1.0 the plan is kept as **milestones rather than version numbers**, because a

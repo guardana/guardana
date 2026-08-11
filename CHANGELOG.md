@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-11 — what a third party needs before the API freezes
+
 ### Added
 
 **`guardana rule test` — a rule's own samples, run as a command, including the one

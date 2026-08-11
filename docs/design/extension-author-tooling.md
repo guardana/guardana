@@ -1,6 +1,6 @@
 # What a third party needs before the API freezes: fixtures, measurement, a manifest
 
-**Status:** accepted, not yet implemented · **Written:** 2026-08-11 · **Step five**
+**Status:** implemented in 0.18.0 · **Written:** 2026-08-11 · **Step five**
 
 1.0 says one thing: *what will not break under you.* That promise is worthless to
 somebody who cannot demonstrate their own extension still works — so the tooling
