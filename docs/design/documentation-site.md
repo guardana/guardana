@@ -2,12 +2,12 @@
 title: "A documentation site"
 nav_order: 80
 summary: "a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way"
-status: proposed
+status: implemented
 ---
 
 # A documentation site on guardana.dev, and what "interactive" is allowed to mean
 
-**Status:** proposed · **Written:** 2026-08-10
+**Status:** implemented in 0.19.0 · **Written:** 2026-08-10
 
 `site/README.md` ends with an open item: *"The **Docs** link in the header still
 points at the GitHub README, from when the domain was parked. Point it at the
@@ -83,8 +83,8 @@ stronger statement than any comparable site makes.
 trading it for a copy-to-clipboard button is the exact shape of trade this project
 refuses elsewhere.
 
-Recommendation: **A for the first release, B only when search is the thing being
-asked for**, and if B is taken, `connect-src 'none'` is non-negotiable and gets a
+Recommendation, and what shipped: **A for the first release, B only when search is
+the thing being asked for**, and if B is taken, `connect-src 'none'` is non-negotiable and gets a
 test. A pre-rendered explorer answers all four reader questions above; only
 free-text prose search needs B. Shipping A first also means the fallback exists if
 B is ever regretted.
@@ -183,3 +183,24 @@ explorer covering their own rules under the same evidence semantics, which is th
 extension story told one more way. They are not exclusive, and the second is
 cheap once `rules.json` exists, but it is scope this document deliberately does
 not decide.
+
+## What shipping it changed about this document
+
+Plan **A** shipped in 0.19.0, and the open question above was answered the narrow
+way: the site is generated from this repository's registry, and `guardana docs`
+stayed out of scope with the reason recorded in `ROADMAP.md`. Three things the
+design did not anticipate, kept here because they are the parts a reader would
+otherwise have to rediscover:
+
+- **The anchor rewrite was the real risk, not the `.md` → `.html` one.** Checking
+  that a *file* exists is what `test_docs_consistency.py` already did. Checking
+  that the *anchor* exists after rendering found four links in the shipped
+  documentation pointing at a heading that does not exist — all four written
+  against GitHub's slugger, which keeps the underscore in a code span and which a
+  regex over the markdown source does not reproduce.
+- **A frontmatter summary is markdown, and escaping it printed backticks.** The
+  summaries were lifted from `docs/index.md`'s curated bullets, which is why they
+  are worth having at all — and why they are rendered rather than escaped.
+- **The generated pages had no author to write frontmatter**, so
+  `generate_docs.py` emits theirs beside the renderer. Guessing a title for four
+  files would have reintroduced exactly the inference this document rejects.

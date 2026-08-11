@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-11 — documentation that is generated, and two documents read back wrong
+
 ### Added
 
 **Documentation on guardana.dev, generated from the prose and the registry.**

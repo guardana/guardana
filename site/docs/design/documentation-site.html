@@ -79,7 +79,7 @@
 <li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="../design/documentation-site.html" aria-current="page">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html" aria-current="page">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
 <li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
@@ -99,7 +99,7 @@
 </ul>
 </nav>
 <main>
-<h1>A documentation site on guardana.dev, and what &quot;interactive&quot; is allowed to mean<span class="status proposed">proposed</span></h1><p class="lede">a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-08-10</p>
+<h1>A documentation site on guardana.dev, and what &quot;interactive&quot; is allowed to mean<span class="status implemented">implemented</span></h1><p class="lede">a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way</p><p><strong>Status:</strong> implemented in 0.19.0 · <strong>Written:</strong> 2026-08-10</p>
 <p><code>site/README.md</code> ends with an open item: <em>&quot;The <strong>Docs</strong> link in the header still
 points at the GitHub README, from when the domain was parked. Point it at the
 documentation site when there is one.&quot;</em> This is the design for that site.</p>
@@ -158,8 +158,8 @@ stronger statement than any comparable site makes.</p>
 <p><strong>C. Relax globally.</strong> Rejected. The landing page is where the claim is read, and
 trading it for a copy-to-clipboard button is the exact shape of trade this project
 refuses elsewhere.</p>
-<p>Recommendation: <strong>A for the first release, B only when search is the thing being
-asked for</strong>, and if B is taken, <code>connect-src 'none'</code> is non-negotiable and gets a
+<p>Recommendation, and what shipped: <strong>A for the first release, B only when search is
+the thing being asked for</strong>, and if B is taken, <code>connect-src 'none'</code> is non-negotiable and gets a
 test. A pre-rendered explorer answers all four reader questions above; only
 free-text prose search needs B. Shipping A first also means the fallback exists if
 B is ever regretted.</p>
@@ -285,11 +285,31 @@ explorer covering their own rules under the same evidence semantics, which is th
 extension story told one more way. They are not exclusive, and the second is
 cheap once <code>rules.json</code> exists, but it is scope this document deliberately does
 not decide.</p>
+<h2 id="what-shipping-it-changed-about-this-document">What shipping it changed about this document</h2>
+<p>Plan <strong>A</strong> shipped in 0.19.0, and the open question above was answered the narrow
+way: the site is generated from this repository's registry, and <code>guardana docs</code>
+stayed out of scope with the reason recorded in <code>ROADMAP.md</code>. Three things the
+design did not anticipate, kept here because they are the parts a reader would
+otherwise have to rediscover:</p>
+<ul>
+<li><strong>The anchor rewrite was the real risk, not the <code>.md</code> → <code>.html</code> one.</strong> Checking
+that a <em>file</em> exists is what <code>test_docs_consistency.py</code> already did. Checking
+that the <em>anchor</em> exists after rendering found four links in the shipped
+documentation pointing at a heading that does not exist — all four written
+against GitHub's slugger, which keeps the underscore in a code span and which a
+regex over the markdown source does not reproduce.</li>
+<li><strong>A frontmatter summary is markdown, and escaping it printed backticks.</strong> The
+summaries were lifted from <code>docs/index.md</code>'s curated bullets, which is why they
+are worth having at all — and why they are rendered rather than escaped.</li>
+<li><strong>The generated pages had no author to write frontmatter</strong>, so
+<code>generate_docs.py</code> emits theirs beside the renderer. Guessing a title for four
+files would have reintroduced exactly the inference this document rejects.</li>
+</ul>
 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.18.1 · Apache-2.0</span>
+<span>Guardana 0.19.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/design/documentation-site.md">Edit this page on GitHub</a>
 <a href="../../llms.txt">llms.txt</a>
 </div></footer>
