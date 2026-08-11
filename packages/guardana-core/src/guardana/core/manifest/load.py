@@ -15,7 +15,12 @@ from guardana.core.manifest.coverage import CoverageRecord, TaxonomyCatalogRecor
 from guardana.core.manifest.fingerprint import digest_of
 from guardana.core.manifest.identity import RunSource, SourceKind, TargetIdentity, ToolInfo
 from guardana.core.manifest.model import RunManifest
-from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleRecord
+from guardana.core.manifest.records import (
+    CalibrationRecord,
+    EvaluatorRecord,
+    ResultSummary,
+    RuleRecord,
+)
 from guardana.core.manifest.serialize import SCHEMA_URL
 from guardana.core.manifest.settings import ConfigurationRef, EvidenceMode, ExecutionSettings
 from guardana.core.manifest.settings import PrivacyRecord as _PrivacyRecord
@@ -265,6 +270,14 @@ def _taxonomy_catalogs(raw: object) -> tuple[TaxonomyCatalogRecord, ...]:
 
 
 def _evaluators(raw: object) -> tuple[EvaluatorRecord, ...]:
+    """Rebuild the evaluators, calibration included.
+
+    The calibration was written by the serializer and dropped here, so a saved run
+    carried the measurement to a machine reading the JSON and to nobody reading it
+    through `run inspect` or comparing it with `diff`. A field written and never read
+    back is not a half-feature: it is a document whose two halves disagree about what
+    the run recorded.
+    """
     if not isinstance(raw, list):
         return ()
     return tuple(
@@ -272,8 +285,27 @@ def _evaluators(raw: object) -> tuple[EvaluatorRecord, ...]:
             id=_text(_mapping(entry, "run.evaluators[]"), "id", "run.evaluators[]"),
             version=_optional_text(entry, "version"),
             digest=_optional_text(entry, "digest"),
+            calibration=_calibration(entry),
         )
         for entry in raw
+    )
+
+
+def _calibration(entry: object) -> CalibrationRecord | None:
+    """Read one evaluator's calibration, or None when it was never measured.
+
+    Absent and null are the same answer and both are honest — every run written
+    before 0.18 said null for every evaluator. What must not happen is a recorded
+    measurement reading back as an unmeasured one.
+    """
+    raw = entry.get("calibration") if isinstance(entry, dict) else None
+    if not isinstance(raw, dict):
+        return None
+    return CalibrationRecord(
+        dataset_digest=_optional_text(raw, "dataset_digest"),
+        measured_at=_timestamp(raw.get("measured_at"), "run.evaluators[].calibration.measured_at"),
+        brier=_optional_number(raw, "brier"),
+        ece=_optional_number(raw, "ece"),
     )
 
 

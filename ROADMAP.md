@@ -420,6 +420,27 @@ team platform, runs beside this and gates none of it.
   reports the rest as `indeterminate`, truthfully. Writing 46 sets in an afternoon
   would mean writing them to move a counter, and a fixture written for that reason is
   a test that cannot fail — which this repository treats as worse than none.
+- **Documentation generated onto guardana.dev, from a source a build can read.**
+  `docs/` is 31 hand-written markdown files and 4 generated ones, and the header's
+  **Docs** link still points at the GitHub README. The design is written
+  ([design](docs/design/documentation-site.md)) and the shape it settles is the part
+  worth stating here: **prose stays markdown with YAML frontmatter, facts stay
+  generated from the registry as JSON, and nothing moves into YAML wholesale.** Prose
+  in YAML is prose in a worse container — it loses diff readability in review and buys
+  exactly one thing markdown already has a convention for, which is metadata for the
+  nav. `scripts/generate_docs.py` gains a JSON emitter beside its markdown one, and a
+  `scripts/build_site.py` renders both to plain HTML at build time; `wrangler.jsonc`
+  stays a static-assets Worker with no build step of its own.
+
+  Two decisions inside it that are not tooling choices. The interactivity worth
+  building is a **generated rule explorer** — filter 51 rules by framework, surface,
+  impact and cost — rather than a docs theme, because the theme is commodity and the
+  explorer is the one page a competitor cannot copy without also having the rules.
+  And `site/_headers` sets `script-src 'none'` as a *product claim*, so the first
+  release pre-renders every view and keeps it; relaxing to `script-src 'self'` under
+  `/docs/*` is what free-text search would cost, and `connect-src 'none'` is not
+  negotiable in either case.
+
 - **RAG as a live target (`LLM09:2026`).** `RetrieverTarget`, `CorpusTarget`,
   `EmbeddingTarget`: retrieval-time injection, unauthorized document access,
   document and metadata poisoning, tenant-filter bypass. Cross-tenant retrieval

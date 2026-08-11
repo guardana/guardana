@@ -63,10 +63,38 @@ def _lines(manifest: RunManifest) -> list[str]:
             f"  evidence:  {manifest.privacy.evidence_mode}",
         ]
     )
+    lines.extend(_calibration_lines(manifest))
     if manifest.migrated_from is not None:
         lines.append(
             f"  note:      migrated from schema {manifest.migrated_from}; anything shown as "
             f"'{_UNKNOWN}' was never written by that version, and is not a zero"
+        )
+    return lines
+
+
+def _calibration_lines(manifest: RunManifest) -> list[str]:
+    """Say how honest each grading evaluator's confidence was, and when that was measured.
+
+    A run carries the measurement in its document; without this it reached a machine
+    and no person reading the documented way. The date is printed beside the score
+    because a judge model gets replaced under the same name, and a Brier score with
+    no age is a claim about an evaluator that may not exist any more.
+
+    An unmeasured evaluator says so rather than being left out. Omitting it would let
+    a reader assume the ones listed are all of them.
+    """
+    evaluators = manifest.evaluators
+    if not evaluators:
+        return []
+    lines = ["  graded by:"]
+    for evaluator in evaluators:
+        calibration = evaluator.calibration
+        if calibration is None:
+            lines.append(f"    {evaluator.id} — confidence not measured")
+            continue
+        lines.append(
+            f"    {evaluator.id} — brier {_value(calibration.brier)}, "
+            f"ECE {_value(calibration.ece)}, measured {_value(calibration.measured_at)}"
         )
     return lines
 

@@ -19,15 +19,27 @@ import importlib.resources
 from guardana.core.evaluator import Evaluator
 from guardana.core.rule import Rule
 from guardana.core.rule.yaml_rule import load_yaml_rules
+from guardana.core.target import Target
 
 from acme_rules.approved_model import ApprovedModelRule
 from acme_rules.hardcoded_secret import HardcodedAcmeKeyRule
+from acme_rules.prompt_library_target import AcmePromptLibraryTarget
 from acme_rules.refusal_classifier import StrictRefusalClassifier
 
 
 def provide_evaluators() -> list[Evaluator]:
     """Entry point target for `guardana.evaluators`: Acme's custom classifier."""
     return [StrictRefusalClassifier()]
+
+
+def provide_targets() -> list[type[Target]]:
+    """Entry point target for `guardana.targets`: Acme's prompt library.
+
+    The third group in the contract table, and the one nothing here registered until
+    0.18.1 — which is how `pack validate` shipped accusing every pack with a target
+    of not registering it, with no example able to notice.
+    """
+    return [AcmePromptLibraryTarget]
 
 
 def _load_catalog_rules() -> list[Rule]:

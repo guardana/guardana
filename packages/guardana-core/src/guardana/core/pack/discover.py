@@ -7,7 +7,8 @@ the same false green the engine refuses everywhere else, arriving through
 documentation instead of through code.
 """
 
-from collections.abc import Iterable
+from collections import Counter
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from importlib import metadata, resources
 
@@ -39,13 +40,41 @@ def installed_manifests() -> list[PackManifest]:
     indistinguishable from a package that declared nothing. The entry point already
     names the module that provides the extension, and that module's package is
     exactly the one that owns the manifest.
+
+    **Not de-duplicated by declared name.** Two packs claiming one name is a real
+    situation — a fork, a rename half-done — and dropping the second would silently
+    stop validating somebody's pack. The contract compiler refuses that exact shape
+    for two contracts producing one rule id; this reports it, in `check_packs`, and
+    validates both.
     """
-    manifests: dict[str, PackManifest] = {}
-    for package in sorted(_extension_packages()):
-        found = _manifest_in(package)
-        if found is not None:
-            manifests.setdefault(found.name, found)
-    return list(manifests.values())
+    found = [_manifest_in(package) for package in sorted(_extension_packages())]
+    return [manifest for manifest in found if manifest is not None]
+
+
+def check_packs(manifests: Sequence[PackManifest], registered: Iterable[str]) -> list[PackCheck]:
+    """Check every pack, and report two of them claiming one name.
+
+    A manifest name is how a person identifies a pack in the output, so two packs
+    answering to it makes the report ambiguous about which one was checked — and
+    an ambiguous report about a security control is the thing somebody acts on
+    wrongly.
+    """
+    available = list(registered)
+    counts = Counter(manifest.name for manifest in manifests)
+    checks = []
+    for manifest in manifests:
+        check = check_pack(manifest, available)
+        if counts[manifest.name] > 1:
+            check = PackCheck(
+                manifest,
+                (
+                    *check.problems,
+                    f"{counts[manifest.name]} installed packs declare the name "
+                    f"{manifest.name!r} — a report naming one of them cannot say which",
+                ),
+            )
+        checks.append(check)
+    return checks
 
 
 def check_pack(manifest: PackManifest, registered: Iterable[str]) -> PackCheck:

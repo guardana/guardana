@@ -1,4 +1,9 @@
-from guardana.core.pack.discover import PackCheck, check_pack, installed_manifests
+from guardana.core.pack.discover import (
+    PackCheck,
+    check_pack,
+    check_packs,
+    installed_manifests,
+)
 from guardana.core.pack.load import MANIFEST_NAME, PACK_SCHEMA_VERSION, load_manifest
 from guardana.core.pack.model import (
     EXTENSION_API_VERSION,
@@ -16,6 +21,7 @@ __all__ = [
     "PackError",
     "PackManifest",
     "check_pack",
+    "check_packs",
     "installed_manifests",
     "load_manifest",
 ]

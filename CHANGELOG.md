@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-08-11 — six things the audit of 0.18.0 found
+
+Audited by running the release rather than reading it. Three of the six could only
+have been found that way: the suite was green, the types checked, and the documents
+were being written correctly and read wrongly.
+
+### Fixed
+
+**`pack validate` accused every pack that ships a `Target` — a false red.** The
+manifest accepts `provides.targets`, and the command built its "what is registered"
+set from rules and evaluators only. Any pack declaring a target was told it declares
+something it does not register. This project treats a false red exactly as seriously
+as a false green: a validator that accuses a pack of a fault it does not have is a
+validator somebody turns off, and then it protects nothing.
+
+It survived because **nothing in this repository had ever registered a target**.
+`guardana.targets` has been in the entry-point contract table since 0.1 with no
+example, so `Registry.targets()` came back empty in every install and the path a
+third party would use was never exercised. `examples/custom_rule` now ships one, and
+its suite asserts both halves.
+
+**A run pointed at an unreadable calibrations file exited `1` with a stack trace.**
+Exit `1` means *policy failed*, so a pipeline reading exit codes would have reported
+a security regression when the only thing wrong was a broken JSON file — a wrong
+verdict, which is worse than a crash. It now refuses with `3` and a sentence, like a
+profile or a contract that will not load.
+
+**A recorded calibration was written to the run document and never read back.** The
+serializer wrote it; the loader dropped it. So `guardana run inspect` said
+"confidence not measured" over a document that plainly contained the measurement,
+and `diff` could not have seen a judge whose calibration changed. A field written and
+never read is not a half-feature — it is a document whose two halves disagree about
+what the run recorded.
+
+**`guardana run inspect` never showed the calibration at all.** Even once the loader
+kept it, the human path was blind: the whole point of the feature is that a reader
+opening a run sees how honest the judge's confidence was, and it arrived only for
+whoever parsed the JSON themselves. An evaluator nobody measured now says so rather
+than being left out, so a reader cannot assume the ones listed are all of them.
+
+**Two installed packs claiming one manifest name silently lost one of them.**
+Discovery keyed manifests by declared name, so the second vanished — a pack that
+stops being validated without saying so. The contract compiler refuses exactly this
+shape for two contracts producing one rule id; `pack validate` now validates both and
+reports the collision.
+
+**`guardana rule test` graded fixtures with default configuration** while the runner
+grades with the profile's `rule_config`. A rule configured in `guardana.yaml` was
+verified in a shape the pipeline never executes, so a green fixture said nothing
+about the rule that actually runs.
+
+### Changed
+
+**The roadmap carries the documentation site**, with the decision the design settles:
+prose stays markdown with YAML frontmatter, facts stay generated from the registry as
+JSON, and the interactivity worth building is a generated rule explorer rather than a
+docs theme. See [`docs/design/documentation-site.md`](docs/design/documentation-site.md).
+
 ## [0.18.0] - 2026-08-11 — what a third party needs before the API freezes
 
 ### Added

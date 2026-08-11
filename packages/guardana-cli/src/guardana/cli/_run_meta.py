@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import typer
+from guardana.cli.exit_codes import ExitCode
 from guardana.core import __version__
 from guardana.core.calibration.store import (
     CalibrationStoreError,
@@ -256,6 +258,22 @@ def _recorded_calibrations(profile: Profile) -> dict[str, RecordedCalibration]:
     return measured
 
 
+def calibrations_or_exit(profile: Profile) -> dict[str, RecordedCalibration]:
+    """Read the calibrations, or refuse in words with a code from the exit table.
+
+    A configuration file this build cannot parse is `INVALID_USAGE`, like a profile
+    or a contract that will not load. Letting `CalibrationStoreError` propagate exited
+    `1` with a stack trace — and `1` means *policy failed*, so a pipeline reading exit
+    codes would report a security regression when the only thing wrong was a broken
+    JSON file. A wrong verdict is worse than a crash.
+    """
+    try:
+        return _recorded_calibrations(profile)
+    except CalibrationStoreError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
+
+
 def _coverage(
     rules: Sequence[RuleRecord],
     evaluators: Sequence[EvaluatorRecord],
@@ -330,7 +348,7 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
         )
         for rule in ran
     )
-    evaluators = _evaluator_records(ran, _recorded_calibrations(profile))
+    evaluators = _evaluator_records(ran, calibrations_or_exit(profile))
     target = (
         identity
         if identity is not None

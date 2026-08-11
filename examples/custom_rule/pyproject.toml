@@ -14,6 +14,9 @@ acme = "acme_rules:provide_rules"
 [project.entry-points."guardana.evaluators"]
 acme = "acme_rules:provide_evaluators"
 
+[project.entry-points."guardana.targets"]
+acme = "acme_rules:provide_targets"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

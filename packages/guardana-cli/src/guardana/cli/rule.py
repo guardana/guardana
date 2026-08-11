@@ -24,7 +24,7 @@ from guardana.core.calibration.sample import CalibrationSample
 from guardana.core.exchange import Exchange
 from guardana.core.registry import Registry
 from guardana.core.rule import FixtureOutcome, Rule, RuleContext
-from guardana.core.rule.verify import FixtureVerdict, RuleVerification, verify_rules
+from guardana.core.rule.verify import FixtureVerdict, RuleVerification, verify_rule
 from guardana.core.target import ChatMessage, EndpointTarget
 
 rule_app = typer.Typer(help="Work on one rule: run its fixtures.")
@@ -84,8 +84,20 @@ def run_fixtures(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; t
         )
         raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
-    ctx = RuleContext(evaluators=registry.evaluators())
-    verifications = verify_rules(selected, ctx)
+    verifications = tuple(
+        verify_rule(
+            rule,
+            # The same context the runner builds, per rule. Grading a fixture with
+            # default settings while the run grades with the profile's would verify a
+            # rule nobody executes — the check would be green about behaviour the
+            # pipeline never sees.
+            RuleContext(
+                config=dict(prof.rule_config.get(rule.meta.id, {})),
+                evaluators=registry.evaluators(),
+            ),
+        )
+        for rule in selected
+    )
     for line in _render(verifications, unsampled_ok=unsampled_ok):
         typer.echo(line)
     if write_corpus is not None:

@@ -8,6 +8,7 @@ suite cannot see this: installing `acme.*` into it would skew the dogfood scan.
 from importlib import resources
 
 import acme_rules
+from acme_rules.prompt_library_target import AcmePromptLibraryTarget
 from guardana.core.pack import (
     EXTENSION_API_VERSION,
     PackManifest,
@@ -15,6 +16,8 @@ from guardana.core.pack import (
     installed_manifests,
     load_manifest,
 )
+from guardana.core.registry import Registry
+from guardana.core.target import TargetKind
 
 
 def _manifest() -> PackManifest:
@@ -37,9 +40,7 @@ def test_this_build_can_load_this_pack() -> None:
 
 def test_the_manifest_lists_exactly_what_the_entry_points_register() -> None:
     """The failure that matters is the missing one, so it is asserted both ways."""
-    registered = {rule.meta.id for rule in acme_rules.provide_rules()} | {
-        evaluator.id for evaluator in acme_rules.provide_evaluators()
-    }
+    registered = _registered_ids() | {target.__name__ for target in acme_rules.provide_targets()}
 
     assert set(_manifest().provides) == registered
 
@@ -64,3 +65,35 @@ def test_a_promise_the_package_does_not_keep_is_reported() -> None:
     assert not check.ok
     assert "acme.agent.customer_data" in check.problems[0]
     assert "believes a check runs that does not" in check.problems[0]
+
+
+def test_the_target_entry_point_is_registered_and_declared() -> None:
+    """`guardana.targets` is in the contract table and had no example until 0.18.1.
+
+    Nothing registering one meant `Registry.targets()` came back empty in every
+    install, so `pack validate` could omit targets from its "what is registered" set
+    and accuse any pack shipping one — with no example able to notice. This closes
+    both halves: the entry point is exercised, and the manifest declares it.
+    """
+    registered = {target.__name__ for target in Registry.discover().targets()}
+
+    assert "AcmePromptLibraryTarget" in registered
+    assert "AcmePromptLibraryTarget" in _manifest().provides
+    assert check_pack(_manifest(), registered | _registered_ids()).ok
+    assert AcmePromptLibraryTarget("/no/such/dir").kind is TargetKind.ARTIFACT
+
+
+def test_a_prompt_library_that_is_not_there_lists_nothing_rather_than_raising() -> None:
+    """A repository with no prompt library has none to check.
+
+    What a rule over this target must not do is read that as "the templates are
+    fine" — which is why the docstring points at declining, and why this asserts the
+    empty list rather than an exception a rule would have to guess about.
+    """
+    assert AcmePromptLibraryTarget("/no/such/dir").templates() == []
+
+
+def _registered_ids() -> set[str]:
+    return {rule.meta.id for rule in acme_rules.provide_rules()} | {
+        evaluator.id for evaluator in acme_rules.provide_evaluators()
+    }

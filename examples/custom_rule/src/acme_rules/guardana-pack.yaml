@@ -38,3 +38,5 @@ provides:
     - acme.prompt.data_exfiltration
   evaluators:
     - acme.strict_refusal
+  targets:
+    - AcmePromptLibraryTarget

@@ -21,7 +21,7 @@ from guardana.core.pack import (
     EXTENSION_API_VERSION,
     PackCheck,
     PackError,
-    check_pack,
+    check_packs,
     installed_manifests,
     load_manifest,
 )
@@ -51,7 +51,15 @@ def validate(
     declared a manifest · `3` the manifest could not be read at all.
     """
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
-    registered = {rule.meta.id for rule in registry.rules()} | set(registry.evaluators())
+    # All three groups a manifest may declare. Leaving targets out made every pack
+    # shipping one accused of not registering it — a false red, which this project
+    # treats exactly as seriously as a false green: a validator that accuses a pack
+    # of a fault it does not have is a validator somebody turns off.
+    registered = (
+        {rule.meta.id for rule in registry.rules()}
+        | set(registry.evaluators())
+        | {target.__name__ for target in registry.targets()}
+    )
 
     try:
         manifests = [load_manifest(manifest)] if manifest is not None else installed_manifests()
@@ -67,7 +75,7 @@ def validate(
         )
         raise typer.Exit(code=ExitCode.INDETERMINATE)
 
-    checks = [check_pack(found, registered) for found in manifests]
+    checks = check_packs(manifests, registered)
     for line in _render(checks):
         typer.echo(line)
     raise typer.Exit(code=ExitCode.POLICY_FAILED if any(not c.ok for c in checks) else ExitCode.OK)
