@@ -1,3 +1,10 @@
+---
+title: "How these are written"
+nav_order: 200
+summary: "How a design document here is named, what its status line means, and why an accepted decision is superseded rather than rewritten."
+status: stable
+---
+
 # Design documents
 
 Why something is shaped the way it is, written before the code and kept

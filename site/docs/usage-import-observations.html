@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana import-observations — Guardana documentation</title>
+<meta name="description" content="guardana import-observations: carry garak, promptfoo or your own harness&#x27;s results in as unverified claims">
+<link rel="canonical" href="https://guardana.dev/docs/usage-import-observations.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html" aria-current="page">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana import-observations</code> — carry another tool's results in as claims</h1><p class="lede"><code>guardana import-observations</code>: carry garak, promptfoo or your own harness's results in as unverified claims</p><p>You ran garak. You ran promptfoo. You have an internal harness. Their results are real
+evidence and they belong beside Guardana's — without Guardana pretending it produced them.</p>
+<pre><code class="language-bash">guardana import-observations garak.report.jsonl --target https://llm.internal/v1
+</code></pre>
+<h2 id="this-command-never-exits-0-and-that-is-the-design">This command never exits 0, and that is the design</h2>
+<p>Guardana did not send those prompts, did not see the replies, and cannot grade what it did
+not observe. So every imported result lands in the <strong><code>unverified</code></strong> channel, no rule ran,
+and the gate is <code>indeterminate</code> — exit <code>2</code>.</p>
+<pre><code>$ guardana import-observations garak.report.jsonl
+imported 2 claim(s) from garak 0.13.1 via garak from garak.report.jsonl into the
+  unverified channel — Guardana did not send these prompts and has not graded them
+note: 1 result(s) the producer marked as passing were not imported — a pass is not a finding
+note: 2 record(s) were setup or raw-attempt records, not verdicts, and were not imported
+⚠ 0 rules ran — nothing was checked (this is not an all-clear).
+
+0 finding(s); 0 rule(s) run, 0 skipped. 2 unverified.
+</code></pre>
+<p><strong>Do not gate a build on this command.</strong> Gate on <a href="usage-probe.html"><code>probe</code></a>,
+<a href="usage-scan.html"><code>scan</code></a> or <a href="usage-analyze-trace.html"><code>analyze-trace</code></a>, and use this to put
+another tool's findings in the same report, the same collector and the same triage queue.</p>
+<h2 id="what-their-claim-our-channel-means-in-practice">What &quot;their claim, our channel&quot; means in practice</h2>
+<p><strong>The outcome stays in the producer's terms.</strong> promptfoo's <code>success: false</code> means <em>this
+assertion did not hold</em>. Whether that is an attack succeeding depends entirely on what the
+assertion was, and only whoever wrote it knows — so the imported outcome is <code>failed</code>,
+<code>passed</code>, <code>errored</code> or <code>undecided</code>, never &quot;attack succeeded&quot;.</p>
+<p><strong>Severity is carried and attributed.</strong> When the producer states one it is kept, and the
+evidence says who said so. When it does not — garak reports none at all — the claim is
+filed at <code>INFO</code>, which is an honest floor rather than a judgement, and the evidence says
+that too.</p>
+<p><strong>No framework reference is attached.</strong> Mapping somebody else's result onto <code>LLM01</code> would
+be Guardana vouching for a mapping it did not make. The producer's own category travels in
+the evidence, where it reads as a quotation.</p>
+<p><strong>Nothing is dropped.</strong> A record that cannot be read goes to the <code>errors</code> channel and — with
+<code>fail_on_error</code> on by default — makes the run indeterminate. A dropped record is a failing
+check that disappears, which is a false green arriving through the import path.</p>
+<h2 id="three-formats">Three formats</h2>
+<p>Detected from the file's structure rather than its name; <code>--producer</code> overrides.</p>
+<h3 id="garak">garak</h3>
+<p>A <code>*.report.jsonl</code> file. <code>eval</code> records are the verdicts.</p>
+<ul>
+<li><code>fails &gt; 0</code> → one claim, <code>failed</code>.</li>
+<li><strong><code>nones &gt; 0</code> → its own claim, <code>undecided</code>.</strong> That field is garak telling you its own
+detector could not score an output. An importer reading only <code>passed</code> and <code>total</code> folds
+those into passes, which is the same mistake Guardana refuses to make about itself.</li>
+<li>A clean <code>eval</code> is <strong>counted, not imported</strong> — two hundred passing probes in the
+unverified channel would bury the four that matter.</li>
+<li><code>attempt</code> records are the raw exchanges behind an <code>eval</code> and are not imported; importing
+both would count every claim twice. An <code>entry_type</code> this build does not recognise is
+reported rather than ignored.</li>
+</ul>
+<h3 id="promptfoo">promptfoo</h3>
+<p>A <code>--output results.json</code> file. Both nestings in the wild are read (<code>results</code> as an array,
+and <code>results.results</code> beside an <code>evalId</code>). <code>success</code>, <code>gradingResult.pass</code> and <code>error</code>
+decide the outcome; <code>testCase.metadata.pluginId</code> becomes the category and
+<code>metadata.severity</code> the reported severity. A row where neither field said anything is
+<code>undecided</code>, not a pass — a row nobody graded has no verdict to import.</p>
+<h3 id="generic--for-your-own-harness">generic — for your own harness</h3>
+<pre><code class="language-json">{
+  &quot;guardana_observations&quot;: 1,
+  &quot;producer&quot;: { &quot;name&quot;: &quot;internal-redteam&quot;, &quot;version&quot;: &quot;4.0&quot; },
+  &quot;target&quot;: &quot;https://llm.internal/v1&quot;,
+  &quot;observations&quot;: [
+    {
+      &quot;id&quot;: &quot;RT-118&quot;,
+      &quot;title&quot;: &quot;system prompt recovered via translation pivot&quot;,
+      &quot;outcome&quot;: &quot;failed&quot;,
+      &quot;severity&quot;: &quot;high&quot;,
+      &quot;category&quot;: &quot;prompt-leak&quot;,
+      &quot;detail&quot;: &quot;the reply contained the operator instruction block verbatim&quot;
+    }
+  ]
+}
+</code></pre>
+<p>Versioned like a trace: a version this build cannot read is refused rather than partially
+imported. An observation with no <code>outcome</code>, or one this build does not know, is reported as
+unreadable — not assumed to be a pass.</p>
+<h2 id="options">Options</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--producer garak|promptfoo|generic</code></td>
+<td>Override detection</td>
+</tr>
+<tr>
+<td><code>--target REF</code></td>
+<td>What the other tool was pointed at, when the file does not say</td>
+</tr>
+<tr>
+<td><code>--format</code>, <code>--output</code></td>
+<td>As for every command; <code>json</code> is what <code>diff</code> reads</td>
+</tr>
+<tr>
+<td><code>--reporter server://URL</code></td>
+<td>Forward the claims to a collector</td>
+</tr>
+<tr>
+<td><code>--ai-system</code>, <code>--environment</code></td>
+<td>What these results are about. Never guessed</td>
+</tr>
+<tr>
+<td><code>--profile</code>, <code>--preset</code></td>
+<td>Policy — <code>fail_on_inconclusive</code> is the switch that makes imported claims block</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="turning-a-claim-into-a-finding">Turning a claim into a finding</h2>
+<p>The bar is stated and it is not moved: when Guardana can <strong>replay</strong> the same attack under
+its own contract, the result of <em>that</em> is a finding. Until then the claim keeps its
+provenance — producer, version, file, timestamp and a digest of the bytes as read — so it
+can be traced back to the document that carried it.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="usage-analyze-trace.html"><code>usage-analyze-trace.md</code></a> — grading a recorded execution with
+Guardana's own rules</li>
+<li><a href="design/trace-domain-model.html"><code>design/trace-domain-model.md</code></a> — why an import is a claim
+and not a verdict</li>
+<li><a href="usage-collector.html"><code>usage-collector.md</code></a> — where the claims land when <code>--reporter</code> is set</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-import-observations.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

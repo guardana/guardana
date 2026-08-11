@@ -1,3 +1,10 @@
+---
+title: "Panel sessions"
+nav_order: 190
+summary: "signing in to the panel with a read key, and why the cookie cannot write"
+status: accepted
+---
+
 # Design: signing in to the panel, without inventing a user model
 
 **Status:** accepted · **Implemented in:** 0.11.0 · **Component:** collector

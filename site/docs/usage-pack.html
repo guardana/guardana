@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana pack validate — Guardana documentation</title>
+<meta name="description" content="guardana pack validate: the manifest declaring which extension API your pack needs and what it provides">
+<link rel="canonical" href="https://guardana.dev/docs/usage-pack.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html" aria-current="page">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana pack validate</code> — can this build load your pack, and does it do what it says</h1><p class="lede"><code>guardana pack validate</code>: the manifest declaring which extension API your pack needs and what it provides</p><p>1.0 promises that <code>Rule</code>, <code>Evaluator</code> and <code>Target</code> will not break under you. A
+promise is only worth something if you can check whether <em>this</em> build keeps it for
+<em>your</em> package — so a pack declares what it needs and what it provides, and this
+command answers both questions.</p>
+<pre><code class="language-bash">guardana pack validate
+</code></pre>
+<pre><code>extension API implemented by this build: 1
+
+✓ acme-guardana-rules (extension_api &gt;=1,&lt;2) — 6 declared
+
+1 pack(s) checked, 0 with problems.
+</code></pre>
+<h2 id="the-manifest">The manifest</h2>
+<p><code>guardana-pack.yaml</code>, <strong>inside your package directory</strong> — not at your repository
+root:</p>
+<pre><code class="language-yaml">schema_version: 1
+name: acme-guardana-rules
+extension_api: &quot;&gt;=1,&lt;2&quot;
+
+description: &gt;
+  Acme's private security rules.
+
+provides:
+  rules:
+    - acme.agent.customer_data
+    - acme.prompt.overreach
+  evaluators:
+    - acme.strict_refusal
+</code></pre>
+<p>It goes inside the package because <code>pack validate</code> runs against an <strong>installed
+distribution</strong>, and <code>pyproject.toml</code> is not in a wheel. A manifest a user cannot
+read from what they installed cannot be checked at the only moment that matters —
+which is also why the declaration is not <code>[tool.guardana]</code> in <code>pyproject.toml</code>.</p>
+<h2 id="extension_api-is-not-the-product-version"><code>extension_api</code> is not the product version</h2>
+<p>This is the field worth understanding before you pin anything.</p>
+<p>Guardana's own version breaks API on every minor while it is pre-1.0, by design. A
+pack pinned to <code>guardana&gt;=0.17,&lt;0.18</code> would need re-releasing on every minor even
+when nothing it touches has moved. <strong><code>extension_api</code> moves only when <code>Rule</code>,
+<code>Evaluator</code>, <code>Target</code> or <code>Finding</code> actually change shape</strong>, so it is the thing a
+pack can usefully bind to.</p>
+<p>Both ends are required. An open range claims compatibility with an API nobody has
+written yet.</p>
+<p><strong>Both directions refuse, with different messages and one outcome:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>What you are told</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the pack needs a <em>newer</em> API than this build has</td>
+<td>upgrade Guardana</td>
+</tr>
+<tr>
+<td>the pack needs an <em>older</em> API than this build has</td>
+<td>upgrade the pack — it may rely on behaviour that has changed</td>
+</tr>
+</tbody>
+</table></div>
+<p>A &quot;close enough&quot; acceptance would be worse than no declaration at all, because it is
+the point at which an author stops checking.</p>
+<h2 id="provides-is-checked-against-what-you-register"><code>provides:</code> is checked against what you register</h2>
+<p>Every id you list is compared against what your entry points actually register. The
+direction that matters is the <strong>missing</strong> one: a pack promising
+<code>acme.agent.customer_data</code> and not registering it leaves a team believing a check
+runs that never does — a false green arriving through documentation instead of
+through code.</p>
+<p>Registering <em>more</em> than you list is not an error. That is untidy, not a lie, and
+failing a build over it would make this something teams switch off.</p>
+<h2 id="exit-codes">Exit codes</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Verdict</th>
+<th>Exit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>every pack is loadable and accurate</td>
+<td>pass</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>a pack is unloadable, or promises what it does not register</td>
+<td>fail</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>nothing declared a manifest</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>the manifest named on the command line could not be read</td>
+<td>refused</td>
+<td><code>3</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Exit <code>2</code> over an empty run is deliberate: validating nothing is not the same as
+nothing being wrong.</p>
+<h2 id="versioning">Versioning</h2>
+<p><code>schema_version</code> is required, and a version this build has never heard of is refused
+rather than read optimistically. Older versions migrate forward in memory at load.
+Unknown keys raise.</p>
+<p><strong>There is no <code>pack migrate</code> command, deliberately.</strong> A saved run is generated and
+Guardana may rewrite it; a manifest is hand-written and belongs to you.</p>
+<h2 id="guardanas-own-pack-has-one">Guardana's own pack has one</h2>
+<p><code>guardana-rules</code> ships a manifest and goes through this same door. Its <code>provides:</code>
+block is <em>generated</em> from the registry — 56 ids is too many to hand-maintain, and a
+hand-maintained list of that length is how every stale count in this repository
+began. Yours is short, so you write it.</p>
+<p>A validator this project exempted itself from would be a bar we ask other people to
+clear alone, and the first drift it would stop catching is our own.</p>
+<h2 id="a-complete-example">A complete example</h2>
+<p><a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule"><code>examples/custom_rule/</code></a> is a real third-party package —
+a plugin rule, YAML rules, a custom evaluator and this manifest — and CI runs its
+tests in an isolated environment on every push.</p>
+<p>Reasoning: <a href="design/extension-author-tooling.html"><code>design/extension-author-tooling.md</code></a>.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-pack.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

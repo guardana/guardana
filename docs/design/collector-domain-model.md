@@ -1,3 +1,10 @@
+---
+title: "Collector domain model"
+nav_order: 100
+summary: "persistence, tenancy and the finding lifecycle"
+status: superseded
+---
+
 # Design: collector domain model and persistence
 
 **Status:** superseded by [`collector-persistence.md`](collector-persistence.md),

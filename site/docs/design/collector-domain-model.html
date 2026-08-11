@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collector domain model — Guardana documentation</title>
+<meta name="description" content="persistence, tenancy and the finding lifecycle">
+<link rel="canonical" href="https://guardana.dev/docs/design/collector-domain-model.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html" aria-current="page">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: collector domain model and persistence<span class="status superseded">superseded</span></h1><p class="lede">persistence, tenancy and the finding lifecycle</p><p><strong>Status:</strong> superseded by <a href="collector-persistence.html"><code>collector-persistence.md</code></a>,
+<a href="collector-tenancy.html"><code>collector-tenancy.md</code></a>,
+<a href="collector-runs-and-findings.html"><code>collector-runs-and-findings.md</code></a>,
+<a href="finding-lifecycle-and-waivers.html"><code>finding-lifecycle-and-waivers.md</code></a> and
+<a href="audit-retention-and-deletion.html"><code>audit-retention-and-deletion.md</code></a> ·
+<strong>Written:</strong> 2026-08-02 against 0.6</p>
+<blockquote>
+<p>The sketch argued for here was built across 0.8.0–0.11.0, one document at a time,
+and those five say what actually shipped. It is kept because it holds the
+reasoning — why a finding and an occurrence are separate entities, why the
+identity comes from <code>diff</code>, why tenancy is enforced at the query boundary — and an
+accepted decision is superseded rather than rewritten. Read the problem statement
+below as the state of the collector <strong>in 0.6</strong>: it has had persistence and
+authentication since 0.8.0 and tenancy since 0.9.0, and its maturity is <strong>beta</strong>.
+What it still does not have is RBAC and human identities.</p>
+</blockquote>
+<h2 id="the-problem">The problem</h2>
+<p><code>guardana-server</code> ingests findings, keeps them in memory, and renders a dashboard.
+It has no persistence, no authentication and no tenancy, which means it is a
+demonstration rather than a product — and the README should not have implied
+otherwise. A team that runs it today loses everything on restart and exposes every
+finding to anyone who can reach the port.</p>
+<p>It is also the single largest gap between &quot;an individual can use Guardana&quot; and &quot;a
+company can adopt Guardana&quot;, because everything a team wants — history, ownership,
+regression across deployments, an audit trail — needs a place to live.</p>
+<h2 id="design">Design</h2>
+<h3 id="domain-model">Domain model</h3>
+<pre><code>Organization
+ └─ Project
+     └─ AISystem
+         ├─ Environment          (dev / staging / production)
+         ├─ Deployment           (a specific version of the system in an environment)
+         ├─ Run                  (one Guardana execution, carrying its Run Manifest)
+         ├─ Finding              (a problem, identified stably across runs)
+         │   └─ FindingOccurrence (this finding, in this run)
+         ├─ Waiver               (accepted risk, with an expiry)
+         └─ Policy
+</code></pre>
+<p>Plus <code>User</code>, <code>ServiceAccount</code>, <code>ApiKey</code>, <code>AuditEvent</code>, <code>Integration</code>.</p>
+<p><strong>Why <code>Finding</code> and <code>FindingOccurrence</code> are separate.</strong> A finding has a lifecycle
+that outlives any single run: first seen, owner, status, remediation, resolution.
+An occurrence is one run's sighting of it. Collapsing them means either losing the
+history on every run or re-litigating triage every time — the mistake that makes
+scanners produce alert fatigue.</p>
+<p><strong>The identity that links occurrences is the one <code>diff</code> already uses</strong>: rule plus
+location relative to what the run examined, never the evaluator's rationale. That
+decision was made in 0.6 for comparison and the collector inherits it rather than
+inventing a second identity — two notions of &quot;the same finding&quot; in one system
+guarantees they diverge.</p>
+<h3 id="persistence">Persistence</h3>
+<p>PostgreSQL, with migrations from the first release. Not SQLite: multi-writer
+ingest from concurrent CI jobs is the normal case, and a team that outgrows SQLite
+mid-adoption has to migrate under pressure.</p>
+<p>Every migration ships with a tested rollback or a documented restore procedure. A
+migration that cannot be undone is an upgrade nobody will risk.</p>
+<h3 id="authentication-and-tenancy">Authentication and tenancy</h3>
+<ul>
+<li><strong>API keys for runners.</strong> A CI job needs to <em>write</em>, not to browse. Scoped to a
+project, revocable, hashed at rest, shown once.</li>
+<li><strong>Users for humans</strong>, local auth first with an OIDC-shaped interface so SSO
+slots in later without reworking the model.</li>
+<li><strong>RBAC:</strong> owner, admin, member, viewer, runner. Five roles cover the real
+distinctions and stop short of a permission system nobody can reason about.</li>
+<li><strong>Tenancy is enforced at the query boundary, not in the handler.</strong> Every
+repository method takes the tenant scope; there is no unscoped query. A test
+asserts that reading another organization's data returns nothing regardless of
+the identifier presented — cross-tenant reads are the failure that ends trust in
+a security product.</li>
+<li><strong>No default credentials, ever.</strong> First-run bootstrap generates one and prints
+it once; public registration is disabled by default.</li>
+</ul>
+<h3 id="finding-lifecycle">Finding lifecycle</h3>
+<pre><code>open → acknowledged → in_progress → resolved
+  ↓                                    ↑
+accepted_risk (waiver, expires) ───────┘
+  ↓
+expired_waiver → reopened
+false_positive
+</code></pre>
+<p><strong>A waiver expires.</strong> Accepted risk that never comes back is not accepted risk, it
+is a permanently disabled check. When a waiver expires the finding reopens and the
+gate sees it again.</p>
+<h3 id="ingest-is-redacted-before-it-arrives">Ingest is redacted before it arrives</h3>
+<p>The collector never sees evidence the sending agent's privacy policy excluded, and
+it enforces its own policy on top. Two independent applications of the same rule,
+because the collector cannot trust that every agent in a fleet was configured
+correctly.</p>
+<h3 id="api">API</h3>
+<p>Stable and versioned, with OpenAPI generated from the implementation rather than
+maintained beside it. Pagination and filtering on every list. Health and readiness
+endpoints separate: readiness fails while migrations are pending, so a rolling
+deploy does not send traffic at a schema that is not there yet.</p>
+<h3 id="ui-scope">UI scope</h3>
+<p>Deliberately small for v0.7: sign-in, project switcher, AI systems, runs, finding
+list, finding detail with evidence, deployment regression, policies, API keys,
+audit log. No charts nobody asked for. <strong>Evidence rendering is escaped and
+sanitized</strong> — evidence is attacker-influenced text by definition, and a dashboard
+that renders it raw is a stored-XSS vector delivered by the tool that was supposed
+to find them.</p>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ul>
+<li>Migration up, migration down (or documented restore), on a database with data.</li>
+<li>Cross-tenant read and write attempts fail, per entity, as tests.</li>
+<li>An authorization matrix test: every role against every endpoint.</li>
+<li>Redaction enforced on ingest, tested independently of the agent's redaction.</li>
+<li>Backup and restore documented <strong>and exercised</strong> — an untested backup is a
+belief, not a procedure.</li>
+<li>No default credential; first-run bootstrap tested.</li>
+<li>Rate limits and request-size limits on ingest.</li>
+</ul>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li><strong>Does a <code>Deployment</code> need to be created explicitly, or inferred from a run's
+manifest?</strong> Inferring is friendlier and risks silently creating a deployment per
+typo'd identifier. Leaning: inferred, but listed as &quot;unclaimed&quot; until a human or
+an API call adopts it.</li>
+<li><strong>Retention granularity.</strong> Per-organization is simplest; per-project is what
+people will ask for. Starting per-organization and stating so.</li>
+<li><strong>Does the collector need to run rules?</strong> No — and stating it here so it does
+not creep in. The collector aggregates verdicts; the engine produces them. A
+collector that runs rules would need the target's credentials, which is exactly
+what a team self-hosts to avoid.</li>
+</ol>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/collector-domain-model.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

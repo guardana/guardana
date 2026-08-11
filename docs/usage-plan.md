@@ -1,3 +1,10 @@
+---
+title: "guardana plan"
+nav_order: 170
+summary: "`guardana plan`: what a run would cost, before it costs anything"
+status: stable
+---
+
 # `guardana plan` — what a run would cost, before it costs anything
 
 Probing a hosted model costs money, and the number nobody could state before 0.7

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana scan — Guardana documentation</title>
+<meta name="description" content="guardana scan: static, offline, CI-friendly">
+<link rel="canonical" href="https://guardana.dev/docs/usage-scan.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html" aria-current="page">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana scan</code> — static, offline, CI-friendly</h1><p class="lede"><code>guardana scan</code>: static, offline, CI-friendly</p><p>Scans a directory as an <strong>artifact target</strong>: model files, dependency
+manifests, and source. No network access, no live model required. This is
+the fast, deterministic front door — the one that's safe to run on every
+commit.</p>
+<pre><code class="language-bash">guardana scan &lt;path&gt; [OPTIONS]
+</code></pre>
+<h2 id="flags">Flags</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PATH</code> (positional, required)</td>
+<td>—</td>
+<td>Directory to scan</td>
+</tr>
+<tr>
+<td><code>--profile PATH</code></td>
+<td>none (built-in default profile)</td>
+<td>Path to a <code>guardana.yaml</code> policy file — see <a href="profiles.html"><code>profiles.md</code></a></td>
+</tr>
+<tr>
+<td><code>--preset [ci|pre-training|monitor]</code></td>
+<td>none</td>
+<td>Named policy preset (mutually exclusive with <code>--profile</code>) — see <a href="profiles.html#named-presets---preset"><code>profiles.md</code></a></td>
+</tr>
+<tr>
+<td><code>--format [human|json|sarif|junit]</code></td>
+<td><code>human</code></td>
+<td>Output format</td>
+</tr>
+<tr>
+<td><code>--no-plugins</code></td>
+<td>off</td>
+<td>Disable entry-point rule/evaluator discovery (YAML-only safe mode) — see <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a></td>
+</tr>
+<tr>
+<td><code>--rules PATH</code></td>
+<td>none</td>
+<td>Directory or file of custom YAML rules; repeatable. Combined with the profile's <code>rules.paths</code> — see <a href="writing-rules.html"><code>writing-rules.md</code></a>. A malformed rule file is a warning, never an abort.</td>
+</tr>
+<tr>
+<td><code>--baseline PATH</code></td>
+<td>none</td>
+<td>Baseline file: findings it lists are <strong>waived</strong> — still reported (as <code>WAIVED</code>), but they no longer fail the gate. A <em>new</em> finding elsewhere still does. See <a href="#baselining-existing-findings">Baselining</a>.</td>
+</tr>
+<tr>
+<td><code>--write-baseline PATH</code></td>
+<td>none</td>
+<td>Write a baseline waiving every current finding to <code>PATH</code>, then exit 0. Add a reason to each entry before committing it.</td>
+</tr>
+<tr>
+<td><code>--reporter TEXT</code></td>
+<td>none</td>
+<td>Forward findings to a collector, e.g. <code>server://https://collector.example.com/findings</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="what-runs">What runs</h2>
+<p>Only rules whose <code>target_kind</code> is <code>artifact</code> and whose declared
+<code>required_capabilities</code> are satisfied by an artifact target (i.e.
+<code>read_files</code>) execute. Endpoint-only rules (prompt injection, jailbreak,
+system-prompt leak, output-secrets) are silently skipped against <code>scan</code> —
+they need a live model, so use <code>guardana probe</code> for those.</p>
+<p>Guardana dogfoods itself in CI by scanning its own source, which must stay
+clean:</p>
+<pre><code class="language-console">$ guardana scan packages
+✓ No findings.
+
+0 finding(s); 19 rule(s) run, 0 skipped. 6 component(s) observed.
+</code></pre>
+<p>Note the path: in this repository, <code>guardana scan .</code> exits <code>1</code> by design —
+<a href="https://github.com/guardana/guardana/tree/main/examples/vulnerable-model"><code>examples/vulnerable-model/</code></a> is deliberately
+malicious so the quickstart has something real to find. CI therefore scans
+<code>packages</code>, not <code>.</code>.</p>
+<h2 id="example-output-with-findings---format-human-the-default">Example output with findings (<code>--format human</code>, the default)</h2>
+<pre><code class="language-console">$ guardana scan ./some-model-repo
+✖ [CRITICAL] guardana.supply_chain.pickle_opcode — Dangerous pickle opcode (arbitrary code on load)
+    unpickling imports non-allowlisted callable: os.system  (./some-model-repo)
+▲ [MEDIUM] guardana.supply_chain.hallucinated_package — Import of unknown package (possible slopsquat lead)
+    import 'torchutilz' isn't a known package or a declared dependency — declare it in requirements/pyproject, or verify it exists on PyPI  (./some-model-repo)
+
+2 finding(s); 19 rule(s) run, 0 skipped. 3 component(s) observed.
+</code></pre>
+<p><code>hallucinated_package</code> scans <code>import</code>/<code>from</code> statements in <code>.py</code> source
+files via <code>ast.parse</code>; it does not read <code>requirements.txt</code> or lockfiles.</p>
+<h2 id="other-formats">Other formats</h2>
+<pre><code class="language-bash">guardana scan . --format json    # machine-readable findings + summary
+guardana scan . --format sarif   # SARIF 2.1.0, for GitHub code-scanning upload
+guardana scan . --format junit   # JUnit XML, for CI test-result reporting
+</code></pre>
+<h2 id="baselining-existing-findings">Baselining existing findings</h2>
+<p>Turning on a blocking gate for an existing repository is usually all-or-nothing:
+either you fix the whole backlog first, or you exclude a rule entirely and go
+blind to new occurrences. A baseline is the middle path — accept <em>today's</em>
+findings with a reason, while a genuinely new one still fails the build.</p>
+<pre><code class="language-bash"># 1. Snapshot the current findings into a baseline file.
+guardana scan . --write-baseline guardana-baseline.yaml
+
+# 2. Edit guardana-baseline.yaml: replace each placeholder 'reason' with why the
+#    finding is acceptable, and commit the file.
+
+# 3. From now on, scan against it. Baselined findings are reported as WAIVED and
+#    do not fail the gate; a NEW finding (a different fingerprint) still does.
+guardana scan . --baseline guardana-baseline.yaml
+</code></pre>
+<p>A waiver is matched by a <strong>fingerprint</strong> — a stable hash of the rule id and the
+finding's location — so it keeps waiving the same finding but never a different
+one. Waived findings are never silently dropped: they appear in every format (a
+<code>WAIVED</code> line in human output, a <code>waived</code> array in JSON, <code>suppressions</code> in SARIF),
+so a reviewer can always see what was accepted and why. A malformed baseline file
+is a hard error (exit 2), never a silent &quot;waive nothing&quot; or &quot;waive everything&quot;.</p>
+<h2 id="exit-codes">Exit codes</h2>
+<p><code>scan</code> exits <code>1</code> (and CI treats the step as failed) when any finding's
+severity is at or above the active profile's <code>fail_on.severity</code> <strong>and</strong>
+either it has no verdict (a static check) or its verdict's <code>confidence</code> is
+at or above <code>fail_on.min_confidence</code>. Otherwise it exits <code>0</code>. This is the
+same <code>gate()</code> policy logic <code>probe</code> uses — see <a href="profiles.html"><code>profiles.md</code></a>.</p>
+<pre><code class="language-bash">guardana scan . || echo &quot;gate failed — see findings above&quot;
+</code></pre>
+<h2 id="forwarding-to-a-collector">Forwarding to a collector</h2>
+<pre><code class="language-bash">guardana scan . --reporter server://https://collector.example.com
+</code></pre>
+<p>Findings are POSTed to the collector after being printed locally — this
+never blocks the local exit-code gate. See
+<a href="architecture.html#the-coreserver-boundary"><code>architecture.md</code></a>.</p>
+<h2 id="saving-a-run-for-comparison">Saving a run for comparison</h2>
+<p><code>--output &lt;path&gt;</code> writes the report to a file instead of stdout. With
+<code>--format json</code> that file is a versioned document <code>guardana diff</code> reads back, so
+you can ask whether the next run is worse than this one — see
+<a href="usage-diff.html"><code>usage-diff.md</code></a>.</p>
+<pre><code class="language-bash">guardana scan .  --format json --output run.json
+</code></pre>
+<p>Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
+on the other end cannot parse that.</p>
+<p><strong><code>--format json</code> is not optional here.</strong> <code>--output</code> on its own writes whatever
+<code>--format</code> says, and that defaults to human text — a file named like a saved run
+that <code>guardana diff</code> refuses. Since 0.7.1 saving any other format says so at the
+moment it is written, rather than leaving it to be discovered on the next run,
+which is the run you wanted compared.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-scan.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

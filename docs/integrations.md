@@ -1,3 +1,10 @@
+---
+title: "CI and pre-commit"
+nav_order: 280
+summary: "GitHub Action, pre-commit, and gating on deterioration"
+status: stable
+---
+
 # Integrations — CI and pre-commit
 
 Guardana ships ready-made ways to gate on AI/LLM risk without wiring anything by

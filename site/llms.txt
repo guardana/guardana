@@ -58,7 +58,7 @@ This file is generated from the documentation map; do not edit it by hand.
 - [safe-testing.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/safe-testing.md): side effects, staging, and reading a result honestly
 - [architecture.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/architecture.md): the five abstractions, the Registry, the core↔server boundary
 
-## Reference — generated from the registry, never typed by hand
+## Reference
 
 - [generated/rule-summary.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/rule-summary.md): counts by surface, target kind and severity
 - [generated/rule-catalog.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/rule-catalog.md): every built-in rule and what it maps to
@@ -72,6 +72,7 @@ This file is generated from the documentation map; do not edit it by hand.
 
 ## Optional
 
+- [design/README.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/README.md): how these are named, what each status means, and why an accepted decision is superseded rather than rewritten
 - [design/trace-domain-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/trace-domain-model.md): the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
 - [design/framework-adapters.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/framework-adapters.md): the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing
 - [design/security-contracts.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/security-contracts.md): the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does
@@ -91,5 +92,6 @@ This file is generated from the documentation map; do not edit it by hand.
 - [design/finding-lifecycle-and-waivers.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/finding-lifecycle-and-waivers.md): statuses, waivers that expire, and why this is not a second `baseline`
 - [design/audit-retention-and-deletion.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/audit-retention-and-deletion.md): who did what, how long evidence is kept, and deleting on purpose
 - [design/panel-sessions.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/panel-sessions.md): signing in to the panel with a read key, and why the cookie cannot write
+- [design/enterprise-readiness-plan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/enterprise-readiness-plan.md): superseded by `ROADMAP.md`, kept because it records what the constraints were when the company-readiness work was planned
 - [RELEASING.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/RELEASING.md): versioning (SemVer, lockstep), the release runbook, tags, and PyPI publishing.
 - [maintainers/github-setup.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/maintainers/github-setup.md): one-time GitHub repository configuration.

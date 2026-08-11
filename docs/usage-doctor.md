@@ -1,3 +1,10 @@
+---
+title: "guardana doctor"
+nav_order: 120
+summary: "`guardana doctor`, `config validate|explain`"
+status: stable
+---
+
 # `guardana doctor` and `guardana config`
 
 The commands for "why did that scan do what it did", and the ones a support

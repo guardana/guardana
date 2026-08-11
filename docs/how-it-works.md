@@ -1,3 +1,10 @@
+---
+title: "How Guardana works"
+nav_order: 20
+summary: "what Guardana is, how the engine works, the two rule layers, the four verbs, and how extensions plug in"
+status: stable
+---
+
 # How Guardana works — the whole product, from A to Z
 
 This is the map of the entire product: what it is, why it exists, how the engine

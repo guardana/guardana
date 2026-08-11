@@ -237,7 +237,9 @@ one of those, never by patching the engine.
   `guardana.taxonomies` entry point.
 
 [`examples/custom_rule/`](examples/custom_rule/) is a real third-party package doing
-three of these, and CI runs its fixtures on every push. `guardana-core` is a plain
+all four — it registers through every one of the entry-point groups, which is how a
+documented seam stops being one nobody has run — and CI runs its fixtures on every
+push. `guardana-core` is a plain
 library you can drive from your own code if you do not want the CLI at all —
 [`docs/architecture.md`](docs/architecture.md) ·
 [`docs/extending.md`](docs/extending.md).

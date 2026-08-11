@@ -1,3 +1,10 @@
+---
+title: "guardana rule test"
+nav_order: 230
+summary: "`guardana rule test`: a rule's positive, negative and **inconclusive** fixtures, run as a command"
+status: stable
+---
+
 # `guardana rule test` — a rule's own samples, run as a command
 
 A rule that cannot fire is caught by a positive sample. A rule that fires on

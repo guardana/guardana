@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taxonomy editions — Guardana documentation</title>
+<meta name="description" content="why a reference is scheme + edition + id, and never a bare LLM07">
+<link rel="canonical" href="https://guardana.dev/docs/design/taxonomy-editions.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html" aria-current="page">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Taxonomy editions: a short id is not an identity<span class="status accepted">accepted</span></h1><p class="lede">why a reference is scheme + edition + id, and never a bare <code>LLM07</code></p><p><strong>Status:</strong> accepted, implemented — ships in the next release · <strong>Written:</strong> 2026-08-08</p>
+<h2 id="the-problem-stated-precisely">The problem, stated precisely</h2>
+<p>Every Guardana rule maps to a public framework, because a finding nobody can look
+up is a finding nobody can answer for. Until now a mapping was stored as a short
+id plus a framework name — <code>LLM07</code>, <code>OWASP-LLM-2025</code> — and the registry that
+resolves those ids was keyed on <strong>the short id alone</strong>, with redefinition refused:</p>
+<pre><code class="language-python">_registry: dict[str, TaxonomyRef] = {ref.id: ref for ref in ...}
+</code></pre>
+<p>That was correct while one edition of each framework existed. It stopped being
+correct on <strong>3 August 2026</strong>, when OWASP published the 2026 edition of the LLM Top
+10. The new edition did not renumber into empty space:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Short id</th>
+<th>2025 edition</th>
+<th>2026 edition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLM05</code></td>
+<td>Improper Output Handling</td>
+<td>Data and Model Poisoning</td>
+</tr>
+<tr>
+<td><code>LLM06</code></td>
+<td>Excessive Agency</td>
+<td>Unbounded Consumption</td>
+</tr>
+<tr>
+<td><code>LLM07</code></td>
+<td>System Prompt Leakage</td>
+<td>Misinformation</td>
+</tr>
+<tr>
+<td><code>LLM08</code></td>
+<td>Vector and Embedding Weaknesses</td>
+<td>Hidden Context Exposure</td>
+</tr>
+<tr>
+<td><code>LLM09</code></td>
+<td>Misinformation</td>
+<td>Vector and Embedding Weaknesses</td>
+</tr>
+<tr>
+<td><code>LLM10</code></td>
+<td>Unbounded Consumption</td>
+<td>Improper Output Handling</td>
+</tr>
+</tbody>
+</table></div>
+<p>Nothing Guardana has published is a lie: the <code>framework</code> field on every reference
+says <code>OWASP-LLM-2025</code>, and a reader who looks at it gets the right answer. But the
+short id is what a report renders, what a dashboard chip shows, and what a person
+types into a search box — and <code>LLM07</code> now means Misinformation to an auditor and
+System Prompt Leakage to this build. That gap widens with every run somebody
+saves, which is why this is a defect with a clock on it rather than a backlog item.</p>
+<h2 id="the-decision">The decision</h2>
+<p><strong>Identity is scheme + edition + local id.</strong> <code>OWASP-LLM/2025/LLM07</code> and
+<code>OWASP-LLM/2026/LLM07</code> are two different controls that happen to share a string.
+Titles and ranks are display data hanging off that identity; they are never part
+of it.</p>
+<p>Seven consequences, each of which is a section below.</p>
+<ol>
+<li><code>TaxonomyRef</code> splits <code>framework</code> into <code>scheme</code> + <code>edition</code>, and keeps
+<code>framework</code> as the composed string the wire already carries.</li>
+<li>Catalogs become immutable data files with a digest, and the digest is pinned
+in the run manifest.</li>
+<li>A reference in a rule names its edition: <code>LLM07:2025</code>. A bare local id is the
+canonical reference only of an entry whose scheme publishes no editions.</li>
+<li>A rule carries both editions where the semantics overlap, and never a silent
+remap.</li>
+<li>The crosswalk is data with explicit relations, held by the <em>newer</em> catalog.</li>
+<li>Saved runs, baselines and collector rows are never rewritten, and the recorded
+title travels with the reference.</li>
+<li>Every run carries a coverage fingerprint, so <code>diff</code> can say <em>coverage changed</em>
+instead of folding it into <em>security changed</em>.</li>
+</ol>
+<h2 id="1-taxonomyref--scheme-edition-local-id">1. <code>TaxonomyRef</code> — scheme, edition, local id</h2>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class TaxonomyRef:
+    scheme: str            # &quot;OWASP-LLM&quot;
+    id: str                # &quot;LLM07&quot;
+    title: str             # &quot;System Prompt Leakage&quot;  — display data
+    edition: str | None = None   # &quot;2025&quot;
+    rank: int | None = None      # display data: where it sits in its edition
+</code></pre>
+<p><code>framework</code> survives as a <strong>property</strong>, composed as <code>f&quot;{scheme}-{edition}&quot;</code> when
+there is an edition and <code>scheme</code> when there is not. Every framework string in
+every document Guardana has ever written is reproduced exactly:
+<code>OWASP-LLM-2025</code>, <code>OWASP-ASI-2026</code>, <code>MITRE-ATLAS</code>, <code>NIST-AI-100-2</code>. That is the
+whole reason for keeping it: the wire format and the collector's stored rows are a
+contract, and this change must not touch a single stored byte's meaning.</p>
+<p>The first field keeps position 1, so a third party's
+<code>TaxonomyRef(&quot;ACME-CONTROLS-1&quot;, &quot;ACME-14&quot;, &quot;Model change control&quot;)</code> still
+constructs, still has <code>framework == &quot;ACME-CONTROLS-1&quot;</code>, and still needs no
+edition. <strong>An absent edition is a statement, not a default:</strong> it says this scheme
+publishes one catalogue whose local ids do not change meaning between revisions.</p>
+<h3 id="why-mitre-atlas-and-nist-get-no-edition">Why MITRE ATLAS and NIST get no edition</h3>
+<p>ATLAS technique ids are stable across ATLAS releases — <code>AML.T0051</code> has meant LLM
+Prompt Injection since it was minted — so the version of ATLAS a catalogue was
+transcribed from is <em>provenance</em>, not identity. It is recorded as a catalogue-level
+<code>version</code> field, which lands in the digest, and it does not enter the framework
+string. Giving ATLAS an edition would rewrite <code>MITRE-ATLAS</code> to
+<code>MITRE-ATLAS-5.6.0</code> in every future document for no gain in truth, and would split
+one control into two for every reader comparing an old run against a new one.</p>
+<p>If ATLAS ever <em>does</em> renumber, its catalogue gains an <code>edition</code> and the bare ids
+stop resolving — loudly, at load time, which is the failure direction this whole
+document argues for.</p>
+<h3 id="rejected-a-taxonomyref-that-parses-its-own-framework-string">Rejected: a <code>TaxonomyRef</code> that parses its own framework string</h3>
+<p><code>&quot;OWASP-LLM-2025&quot;.rsplit(&quot;-&quot;, 1)</code> would have produced scheme and edition without a
+schema change. Rejected on product principle 1: that heuristic <em>is</em> knowledge of
+how OWASP names things, living in the engine, and it gets <code>NIST-AI-100-2</code> wrong on
+the first try. The split belongs in the data file, where a curator writes it down.</p>
+<h2 id="2-catalogs-are-immutable-data-files-with-a-digest">2. Catalogs are immutable data files with a digest</h2>
+<p>The refs move out of Python and into
+<code>packages/guardana-core/src/guardana/core/taxonomy/catalog/*.yaml</code>, one file per
+scheme-and-edition:</p>
+<pre><code class="language-yaml">scheme: OWASP-LLM
+edition: &quot;2026&quot;
+title: OWASP Top 10 for LLM Applications
+source: https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/
+published: &quot;2026-08-03&quot;
+entries:
+  - id: LLM08
+    rank: 8
+    title: Hidden Context Exposure
+    supersedes:
+      - ref: LLM07:2025
+        relation: broader
+        note: renamed and widened past the system prompt to tool schemas and retrieved content
+</code></pre>
+<p>The Python constants stay — they are the public API twenty rules and
+<code>examples/custom_rule</code> are written against — but they become lookups into the
+loaded catalogue rather than literals. A missing or malformed catalogue file is a
+loud <code>TaxonomyError</code> at import, not an empty registry: an engine that starts with
+no taxonomy would fail <em>every</em> rule's mapping, and it must say so in one sentence
+rather than twenty.</p>
+<p><strong>Immutable</strong> is the operative word. A catalogue file is never edited once
+published, because its digest is pinned in saved runs; a correction is a new
+edition. This is also why the crosswalk lives in the newer file (§5): a 2025
+catalogue cannot describe its relationship to an edition that did not exist when
+it was written without being rewritten.</p>
+<p><code>digest</code> is taken over the catalogue's <em>parsed content</em>, canonically dumped —
+never over the file's bytes. Reformatting a file or adding a comment is not a
+changed catalogue, while a reworded entry is; hashing bytes would also make the
+digest depend on which line endings a checkout happened to produce. It is recorded
+per catalogue in the run manifest's coverage block, so a report read in three years
+says which editions were installed and exactly which revision of each, without
+asking anybody to remember.</p>
+<h3 id="rejected-shipping-the-catalogues-in-guardana-rules">Rejected: shipping the catalogues in <code>guardana-rules</code></h3>
+<p>It is where a purist would put framework data, and it is wrong here for a
+mechanical reason: <code>guardana.core.taxonomy</code> resolves a rule's <code>taxonomy:</code> while
+the rule is being parsed, and <code>guardana-core</code> must not import <code>guardana-rules</code>.
+Moving the data there would make every mapping depend on discovery order. Data
+files inside core satisfy the principle that matters — the engine holds no
+framework <em>logic</em>; a curator edits YAML, not Python.</p>
+<h2 id="3-naming-a-reference-llm072025">3. Naming a reference: <code>LLM07:2025</code></h2>
+<p><code>resolve()</code> looks up the <strong>canonical reference</strong>, which is <code>LOCAL_ID:EDITION</code> for an
+entry whose scheme publishes editions and a bare <code>LOCAL_ID</code> for one whose scheme
+does not. So <code>LLM07:2025</code> and <code>ASI06:2026</code> resolve, and so do <code>AML.T0051</code>,
+<code>supply-chain</code> and a third party's <code>ACME-14</code>.</p>
+<p>A bare id that is only held by editions raises <code>TaxonomyError</code>, and
+<code>_parse_taxonomy</code> turns that into a <code>RuleLoadError</code> naming every candidate. So
+<code>taxonomy: [LLM01]</code> is now a load-time failure that says:</p>
+<blockquote>
+<p>taxonomy id 'LLM01' does not say which edition it means; write one of:
+<code>LLM01:2025</code>, <code>LLM01:2026</code></p>
+</blockquote>
+<p>Note what this is <em>not</em>: &quot;resolves while exactly one edition happens to be
+installed&quot;. That reading would make a rule file load on one machine and fail on
+another, and would silently change a rule's meaning the day a second catalogue
+arrives. Whether a bare id is legal depends on the scheme, not on the install.</p>
+<p>This is a <strong>breaking change for third-party YAML rule packs</strong> that name OWASP LLM
+ids, and it is deliberately breaking rather than defaulted. Any default — newest
+edition, oldest edition, a configured one — silently changes what a rule claims to
+an auditor when a catalogue is added, which is precisely the failure this document
+exists to end. A load error costs a pack author one line per reference and cannot
+be misread. The typo gate is untouched: an id nobody registered is still a load
+error, with the same message it had before.</p>
+<p><code>register()</code> keeps refusing a redefinition, on a slightly narrower rule than
+before: <strong>a local id may be shared across editions of one scheme, never across
+schemes.</strong> A pack registering <code>LLM01</code> under <code>ACME-CONTROLS-1</code> is still refused —
+otherwise an installed package could quietly change what <code>LLM01</code> means in a report
+— and the refusal message is unchanged.</p>
+<h2 id="4-a-rule-carries-both-editions">4. A rule carries both editions</h2>
+<p>Where the semantics genuinely overlap, a rule names both:</p>
+<pre><code class="language-yaml">taxonomy: [LLM07:2025, LLM08:2026, AML.T0056]
+</code></pre>
+<pre><code class="language-python">taxonomy=(OWASP_LLM03_2025, OWASP_LLM04_2026, NIST_SUPPLY_CHAIN)
+</code></pre>
+<p>The Python constants gain an edition suffix for every scheme that has editions,
+which is the point: <code>OWASP_LLM03_2025</code> could not tell a reader which edition it meant,
+and after August 2026 that ambiguity is the bug. <code>ATLAS_T0051</code> and
+<code>NIST_POISONING</code> keep their names, because their schemes have no edition to state.</p>
+<p>What must never happen is a <strong>silent remap</strong>: rewriting <code>LLM07:2025</code> to
+<code>LLM07:2026</code> would move a system-prompt-leak finding into Misinformation. Only the
+crosswalk decides which 2026 control a 2025 one corresponds to, and it says
+<code>LLM07:2025 → LLM08:2026</code>.</p>
+<h2 id="5-the-crosswalk-is-data-with-relations">5. The crosswalk is data with relations</h2>
+<p>Not a global alias table. Most of these pairs are not equivalences, because the
+categories changed meaning as well as position. Four relations, each read as <em>this
+entry, relative to the one it names</em>:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Relation</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exact</code></td>
+<td>same control, the rank moved</td>
+<td><code>LLM09:2025 Misinformation</code> → <code>LLM07:2026</code></td>
+</tr>
+<tr>
+<td><code>broader</code></td>
+<td>this one covers more</td>
+<td><code>LLM07:2025 System Prompt Leakage</code> → <code>LLM08:2026 Hidden Context Exposure</code></td>
+</tr>
+<tr>
+<td><code>narrower</code></td>
+<td>this one covers less</td>
+<td>(none in this crosswalk; the inverse of <code>broader</code>)</td>
+</tr>
+<tr>
+<td><code>related</code></td>
+<td>they overlap, neither contains the other</td>
+<td><code>LLM10:2025 Unbounded Consumption</code> → <code>LLM06:2026</code>, reframed as cost asymmetry</td>
+</tr>
+</tbody>
+</table></div>
+<p>The inverse direction is derived (<code>broader</code> ⇄ <code>narrower</code>, <code>exact</code> and <code>related</code>
+symmetric), so one statement is written once and read from both sides.</p>
+<p>A crosswalk is <strong>never applied to stored data</strong>. It answers a question a reader
+asks — &quot;what does this 2025 reference correspond to today&quot; — in memory, at the
+moment of asking.</p>
+<h2 id="6-saved-runs-are-never-rewritten-and-the-title-travels">6. Saved runs are never rewritten, and the title travels</h2>
+<p>A saved run records <code>{&quot;framework&quot;: &quot;...&quot;, &quot;id&quot;: &quot;...&quot;}</code> per reference. Two changes:</p>
+<ul>
+<li><strong>The recorded title travels with the reference.</strong> Without it, a run produced
+with somebody's rule pack installed and read on a machine without it renders a
+bare <code>ACME-14</code>, and an offline evidence pack is unintelligible. This is a
+document schema change: saved-run schema <strong>v2 → v3</strong>, <code>SCHEMA_URL</code> moves to
+<code>run/v3.schema.json</code>, and <code>migrate_v2</code> fills the title from the registry where
+the <code>(framework, id)</code> pair is known and leaves it empty where it is not —
+inventing nothing, exactly as <code>migrate_v1</code> invents no usage and no verdict.</li>
+<li><strong>A recorded reference is read as the edition it names.</strong> <code>load.py</code> already
+takes a registry ref only when the recorded <code>framework</code> matches, and keeps the
+document's own framework otherwise. That behaviour is kept and tested: a 2025
+reference in a 0.12 run stays a 2025 reference in this build, forever.</li>
+</ul>
+<p>The collector envelope moves <strong>v7 → v8</strong> for the same field, optional, and
+<code>SUPPORTED_SCHEMA_VERSIONS</code> grows to <code>{2..8}</code>. An older agent simply sends no
+title, which is honest — it could not observe one. No database migration is
+needed: the taxonomy column is JSON.</p>
+<p><code>finding_identity</code> in <code>guardana.core.diff</code> is <code>(rule_id, location)</code> and taxonomy
+does not enter it. That is load-bearing and gets a test of its own: remapping must
+not invalidate a baseline waiver or a triage decision in the collector.</p>
+<h2 id="7-a-coverage-fingerprint-on-every-run">7. A coverage fingerprint on every run</h2>
+<p><code>Rule.digest()</code> covers <code>meta</code>, and <code>meta</code> includes the taxonomy — so every rule
+digest changes in this release, correctly, and <code>diff</code> would emit <em>&quot;19 rule(s)
+changed definition … a different result there may be the sharper test rather than
+a worse system&quot;</em> on every 0.12→0.13 comparison. True but useless: nothing about
+what those rules <em>do</em> changed.</p>
+<p>So <code>RuleRecord</code> gains a second digest over everything except the mapping, and
+<code>diff</code> distinguishes the two cases:</p>
+<ul>
+<li>behaviour digest equal, full digest different → <em>&quot;N rule(s) changed only their
+framework mapping&quot;</em></li>
+<li>behaviour digest different → the existing <em>&quot;changed definition&quot;</em> note</li>
+</ul>
+<p>And the manifest gains a <code>coverage</code> block: catalogue digests, negotiated protocol
+versions (a new optional <code>Target.protocols()</code> hook — the MCP client negotiates
+<code>2025-06-18</code> today and discards the server's answer), the declared trial count per
+rule, and one digest over all of it plus the rule/evaluator digests and the
+target's capabilities. <code>diff</code> reports a differing coverage fingerprint as its own
+statement, because a run with fewer applicable checks must never read as an
+improvement.</p>
+<h2 id="what-this-does-not-do">What this does not do</h2>
+<ul>
+<li><strong>No <code>if edition == &quot;2026&quot;</code> anywhere in the engine.</strong> The edition is a string in
+a data file. If a future change needs the engine to know one edition from
+another, that change is wrong.</li>
+<li><strong>No re-ranking of severities.</strong> A rule's severity is Guardana's judgement about
+the finding, not OWASP's about the category. The 2026 ranks are recorded as
+display data and gate nothing.</li>
+<li><strong>No new coverage claimed from a remap.</strong> Mapping a supply-chain rule to
+<code>LLM04:2026</code> does not make it cover more; <code>ROADMAP.md</code>'s coverage table already
+reads in 2026 categories and says where the gaps are.</li>
+<li><strong><code>finish_reason</code> and latency on <code>Exchange</code> stay deferred.</strong> The 2026 edition's
+cost-asymmetry framing is measurable without them — a short prompt against a
+large reply is a ratio anybody can compute from the exchange — and carrying a
+provider's finish reason honestly means adding it to the transport protocol that
+third-party transports implement. That is a contract change worth doing on its
+own, not as a passenger on a taxonomy release.</li>
+</ul>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="run-manifest-v2.html"><code>run-manifest-v2.md</code></a> — the document this extends to v3.</li>
+<li><a href="../writing-rules.html"><code>../writing-rules.md</code></a> — where a rule author reads the
+reference syntax.</li>
+<li><code>ROADMAP.md</code>, <em>Step one — the mapping is true again</em>.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/taxonomy-editions.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

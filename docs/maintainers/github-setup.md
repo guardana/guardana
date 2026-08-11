@@ -1,3 +1,10 @@
+---
+title: "GitHub repository setup"
+nav_order: 10
+summary: "One-time GitHub repository configuration: branch protection, environments and the settings a release depends on."
+status: stable
+---
+
 # GitHub repository setup (maintainers)
 
 A one-time checklist to make `github.com/guardana/guardana` a first-class

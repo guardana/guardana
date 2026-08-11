@@ -1,3 +1,10 @@
+---
+title: "Framework adapters"
+nav_order: 20
+summary: "the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing"
+status: implemented
+---
+
 # Framework adapters: translators into the model, and the field they found missing
 
 **Status:** accepted, implemented — ships in the next release · **Written:** 2026-08-10 · **Step four**

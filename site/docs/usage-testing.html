@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>In your test suite — Guardana documentation</title>
+<meta name="description" content="guardana.testing.assert_secure: verification as an ordinary pytest assertion, plus the LangChain adapter">
+<link rel="canonical" href="https://guardana.dev/docs/usage-testing.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html" aria-current="page">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Guardana in your test suite</h1><p class="lede"><code>guardana.testing.assert_secure</code>: verification as an ordinary <code>pytest</code> assertion, plus the LangChain adapter</p><p><code>guardana.testing.assert_secure</code> runs Guardana from inside an ordinary <code>pytest</code>
+test and fails it when the verdict is not a pass.</p>
+<p>It exists because a security check that needs its own command, its own pipeline
+stage and its own report is a check somebody runs on Tuesdays. A team already
+runs <code>pytest</code>; this puts the verification where they already are, with no new
+pipeline to own and no report to go and read.</p>
+<p>Same rules, same policy, same redaction and the same three-state gate as
+<a href="usage-scan.html"><code>guardana scan</code></a> and <a href="usage-probe.html"><code>guardana probe</code></a> — a
+verdict does not change because the runner did.</p>
+<pre><code class="language-bash">pip install guardana-cli   # brings the engine, the rules and the reporters
+</code></pre>
+<h2 id="the-two-things-it-takes">The two things it takes</h2>
+<pre><code class="language-python">from guardana.testing import assert_secure
+
+
+def test_the_repository_ships_no_dangerous_artifact():
+    assert_secure(&quot;models&quot;, preset=&quot;ci&quot;)
+</code></pre>
+<p><strong>A target.</strong> Either a path to scan — the static, offline half — or a <code>Target</code>
+object for something live: an <code>EndpointTarget</code>, an <code>McpServerTarget</code>, or one of
+the <a href="#a-langchain-model">framework adapters</a> below.</p>
+<p><strong>A policy.</strong> <code>preset=&quot;ci&quot;</code> (or <code>&quot;pre-training&quot;</code>, <code>&quot;monitor&quot;</code>), or
+<code>profile=Path(&quot;guardana.yaml&quot;)</code>, or a <code>Profile</code> built in code. Passing both a
+profile and a preset is a <code>ValueError</code>, exactly as <code>--profile</code> with <code>--preset</code> is
+a usage error on the command line. With neither, the default applies: every rule,
+fail on <code>HIGH</code>, evidence redacted.</p>
+<p>A path that does not exist raises <code>ValueError</code> rather than passing. A scan pointed
+at a typo finds nothing, and &quot;no findings&quot; from a directory nobody looked in is
+the worst shape of false green there is — the same refusal <code>guardana scan</code> makes.</p>
+<h2 id="what-a-failure-looks-like">What a failure looks like</h2>
+<pre><code>E   guardana: 8 finding(s) at or above HIGH — examples/vulnerable-model
+E
+E     CRITICAL guardana.supply_chain.pickle_opcode
+E              examples/vulnerable-model/model.pt
+E              unpickling imports non-allowlisted callable: posix.system
+E
+E     HIGH     guardana.supply_chain.malicious_dependency
+E              examples/vulnerable-model/requirements.txt
+E              ultralytics==8.3.41: compromised build pipeline shipped a cryptominer
+E              downloader; 8.3.43 is the clean release
+E
+E     MEDIUM   guardana.supply_chain.hallucinated_package  (below the bar)
+E              examples/vulnerable-model/train.py:1
+E              import 'torchutilz' isn't a known package or a declared dependency
+E
+E   policy: fails on HIGH and above; a check that could not run is indeterminate.
+</code></pre>
+<p>Findings below the failure bar are printed and marked rather than hidden: they did
+not fail the build, and they are still what somebody asked this tool to look for.</p>
+<p>The last line says what the run was told to fail on, so a surprising verdict is
+explainable without going to read the profile.</p>
+<h2 id="could-not-check-is-not-checked-and-clean">&quot;Could not check&quot; is not &quot;checked and clean&quot;</h2>
+<p><code>assert_secure</code> raises on <strong>anything that is not a pass</strong>, and says which it was:</p>
+<pre><code>E   guardana: the run could not reach a verdict — http://localhost:11434#llama3
+E
+E     1 check(s) could not run:
+E       - guardana.prompt.system_prompt_leak.canary (run): EndpointError: connection refused
+E
+E     6 check(s) skipped:
+E       - guardana.agent.tool_result_injection: … does not support call_tools
+E
+E   policy: fails on HIGH and above; a check that could not run is indeterminate.
+</code></pre>
+<p>This is the distinction the rest of Guardana is built around, and a test suite is
+where it goes quiet: an empty registry, an over-narrow profile, an endpoint that
+was down, a target no installed rule applies to — every one of those used to be
+indistinguishable from a clean result. The exception carries it too:</p>
+<pre><code class="language-python">from guardana.testing import SecurityAssertionError
+
+try:
+    assert_secure(target, preset=&quot;ci&quot;)
+except SecurityAssertionError as failure:
+    failure.outcome   # GateOutcome.FAIL or GateOutcome.INDETERMINATE
+    failure.result    # the ScanResult: findings, unverified, errors, rules_run
+</code></pre>
+<p>Which reasons make a run indeterminate is the policy's decision, not this
+function's — see <a href="profiles.html"><code>profiles.md</code></a> for <code>fail_on_error</code>,
+<code>fail_on_inconclusive</code> and <code>fail_on_skipped</code>.</p>
+<h2 id="evidence-in-a-ci-log">Evidence in a CI log</h2>
+<p>The failure message is redacted by the profile's privacy policy before it is
+raised. That is not a detail: the message goes into a CI log, which is a file on
+somebody's build server, and a security tool that writes the credential it just
+found into one has made a second incident out of the first.</p>
+<p>Every preset and the default profile redact. A <code>Profile</code> you build in code
+defaults to <code>full</code> evidence — see <a href="privacy.html"><code>privacy.md</code></a> — so set
+<code>privacy=RedactionPolicy(mode=EvidenceMode.REDACTED)</code> if you assemble one by hand
+and the result goes anywhere a person can read it.</p>
+<h2 id="a-live-model">A live model</h2>
+<pre><code class="language-python">import pytest
+from guardana.core.target import EndpointTarget
+from guardana.testing import assert_secure
+
+
+@pytest.fixture
+def local_model():
+    return EndpointTarget(
+        &quot;http://localhost:11434&quot;,
+        &quot;llama3&quot;,
+        provider=&quot;ollama&quot;,
+        system_prompt=SYSTEM_PROMPT,   # what your application really sends
+    )
+
+
+def test_the_model_resists_prompt_injection(local_model):
+    assert_secure(local_model, preset=&quot;ci&quot;)
+</code></pre>
+<p>This sends real requests and costs real money against a hosted provider. Bound it
+in the profile — <code>budgets:</code> in <a href="profiles.html"><code>profiles.md</code></a> — and read
+<a href="safe-testing.html"><code>safe-testing.md</code></a> before pointing it at anything that matters.
+<code>guardana plan</code> prices the same run without sending a request.</p>
+<p>Passing <code>system_prompt</code> is worth doing: without something planted, the
+canary-backed system-prompt-leak rule has nothing to look for and is skipped, so
+the coverage a run reports shrinks quietly.</p>
+<h2 id="a-langchain-model">A LangChain model</h2>
+<pre><code class="language-python">from guardana.adapters.langchain import langchain_target
+from guardana.testing import assert_secure
+
+
+def test_our_agent_keeps_its_instructions_to_itself(chat_model):
+    target = langchain_target(chat_model, system_prompt=SYSTEM_PROMPT)
+    assert_secure(target, preset=&quot;ci&quot;)
+</code></pre>
+<p><code>langchain_target</code> wraps any LangChain chat model — <code>ChatOpenAI</code>,
+<code>ChatAnthropic</code>, <code>ChatOllama</code>, anything with <code>invoke</code> — as an ordinary Guardana
+target. It verifies the model <strong>as your application calls it</strong>, through whatever
+client, credentials and configuration that object carries, instead of an endpoint
+underneath it that nobody deployed.</p>
+<p><code>langchain</code> is never imported by Guardana, so it is not a dependency and no
+release of it can break this. An object that is not a chat model is refused when
+the target is built, not on the first prompt of a paid probe.</p>
+<p>Three things to know:</p>
+<ul>
+<li><strong>Findings name it <code>http://langchain.invalid#&lt;model&gt;</code>.</strong> <code>.invalid</code> is reserved
+and never resolves, so the reference says plainly that nothing was fetched over
+the network. Pass <code>name=&quot;support-agent&quot;</code> to choose the label yourself — it is
+part of a finding's identity, so a stable one is what lets
+<a href="usage-diff.html"><code>guardana diff</code></a> line two runs up across a change of client.</li>
+<li><strong>Tool calling is wired up when the model supports it.</strong> <code>bind_tools</code> exists on
+every LangChain chat model and raises on the ones without a function-calling API,
+so Guardana finds out by binding a throwaway tool once, at construction — it
+sends no request. A model that binds runs the six agentic rules; one that refuses
+skips them with a reason, and <code>fail_on_skipped: true</code> turns that into an
+indeterminate result rather than a pass. <code>guardana target inspect</code> shows which of
+the two you have.</li>
+<li><strong>Token budgets need a model that reports usage.</strong> When the reply carries
+<code>usage_metadata</code> the tokens are counted; when it does not, the count is recorded
+as unknown rather than zero — so a <em>token</em> ceiling over such a model can never
+fire, while a <em>request</em> ceiling always can.</li>
+</ul>
+<h2 id="a-run-your-framework-already-performed">A run your framework already performed</h2>
+<p>The adapters above <em>drive</em> a model. These translate the record of a run that
+already happened into a <a href="design/trace-domain-model.html"><code>Trace</code></a>, which
+<a href="usage-analyze-trace.html"><code>analyze-trace</code></a>'s rules grade. Nothing is sent anywhere.</p>
+<pre><code class="language-python">from guardana.adapters.pydantic_ai import pydantic_ai_trace
+from guardana.core.target import TraceTarget
+from guardana.testing import assert_secure
+
+
+def test_the_agent_run_holds_up(agent):
+    result = agent.run_sync(&quot;refund order 7 and email the customer&quot;)
+    assert_secure(TraceTarget(pydantic_ai_trace(result)), preset=&quot;ci&quot;)
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Reads</th>
+<th>Records</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.adapters.pydantic_ai</code></td>
+<td><code>AgentRunResult</code> from <code>agent.run_sync(...)</code></td>
+<td>messages with typed parts, tool calls and results</td>
+</tr>
+<tr>
+<td><code>guardana.adapters.llama_index</code></td>
+<td>a query <code>Response</code>, or the list <code>retriever.retrieve(...)</code> returns</td>
+<td>messages, retrieval with per-document tenant, source and score</td>
+</tr>
+<tr>
+<td><code>guardana.adapters.crewai</code></td>
+<td><code>CrewOutput</code> from <code>crew.kickoff(...)</code></td>
+<td>messages, the agent that performed each step, handoffs between agents</td>
+</tr>
+</tbody>
+</table></div>
+<p>None of the three libraries is ever imported, exactly as with <code>langchain_target</code>.</p>
+<p><strong>An adapter declares only what its framework really reports</strong>, and that is the
+part worth understanding. PydanticAI records nothing about approvals, so a
+PydanticAI trace does not claim to — and the rule that grades unapproved effects
+is <em>skipped</em> rather than reporting that it found none. A run where nothing could
+be checked prints <code>0 rules ran — nothing was checked (this is not an all-clear)</code>
+and exits <a href="exit-codes.html"><code>2</code></a>, which is the honest answer and not a pass.</p>
+<p>To grade the dimensions your framework does not emit, write the trace out and add
+them:</p>
+<pre><code class="language-python">from guardana.core.trace import serialize_trace
+
+Path(&quot;run.jsonl&quot;).write_text(serialize_trace(crewai_trace(result, crew=crew)))
+</code></pre>
+<p>Then edit <code>run.jsonl</code> — it is the native dialect, one JSON object per line — and
+run <a href="usage-analyze-trace.html"><code>guardana analyze-trace run.jsonl</code></a>. The identity,
+delegation, consent, policy and approval blocks are the half no framework emits
+and the half where the interesting failures are.</p>
+<h2 id="choosing-what-is-loaded">Choosing what is loaded</h2>
+<pre><code class="language-python">from guardana.core.plugins import PluginMode, PluginTrust
+from guardana.core.registry import Registry
+
+
+def test_with_only_guardanas_own_rules():
+    trusted = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
+    assert_secure(&quot;models&quot;, preset=&quot;ci&quot;, registry=trusted)
+</code></pre>
+<p>Left out, <code>assert_secure</code> discovers entry-point rules and loads the rule
+directories the profile names. Passed in, the registry is used exactly as given —
+a registry you assembled is not one this should add to behind your back. See
+<a href="extending.html"><code>extending.md</code></a> and <code>SECURITY.md</code> for what plugin trust means.</p>
+<h2 id="what-this-is-not">What this is not</h2>
+<p>It is not a second engine, and it does not have its own idea of &quot;secure&quot;. If a
+check passes here and fails in CI, that is a fact about the target, not a
+disagreement between two implementations.</p>
+<p>It is also not <code>guardana.core.testing</code>, which is the other direction: test doubles
+(scripted transports, crafted artifacts, fake credentials) for writing tests about
+a <strong>rule you are writing</strong>. See <a href="writing-rules.html"><code>writing-rules.md</code></a>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="usage-scan.html"><code>usage-scan.md</code></a> · <a href="usage-probe.html"><code>usage-probe.md</code></a> — the same
+verification as commands, with reports, baselines and a collector</li>
+<li><a href="profiles.html"><code>profiles.md</code></a> — what a policy can say</li>
+<li><a href="privacy.html"><code>privacy.md</code></a> — evidence modes and what is kept</li>
+<li><a href="exit-codes.html"><code>exit-codes.md</code></a> — the command-line equivalent of the three-state
+gate</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-testing.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

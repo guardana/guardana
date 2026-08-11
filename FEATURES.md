@@ -618,6 +618,35 @@ deliberately not wired up yet: the agentic rules skip and say so, which
   skip the CLI entirely.
 - A complete runnable third-party package: [`examples/custom_rule/`](examples/custom_rule/).
 
+### Documentation that is generated, including a rule explorer (`scripts/build_site.py`)
+
+`guardana.dev/docs/` is rendered from this repository's own markdown and its own
+registry — never hand-written HTML, and never edited in place. Every page of
+`docs/` carries four lines of YAML frontmatter (`title`, `nav_order`, `summary`,
+`status`) and **the build refuses a page without them** rather than guessing a title
+from a filename, because an inferred navigation reorders itself the day somebody
+retitles a page and nothing notices.
+
+The page worth having is the **rule explorer**: every built-in rule gets a page
+stating its severity, surface, impact, declared request budget, required
+capabilities and framework mapping, and every filter — by family, surface,
+severity, impact, cost, framework and *framework entry, edition included* — is its
+own pre-rendered page. It is generated from `docs/generated/rules.json`, which comes
+from the same registry walk as `rule-catalog.md`, so the explorer and the catalogue
+cannot describe different products; a test compares them.
+
+**Filtering is navigation, not JavaScript.** `site/_headers` ships
+`script-src 'none'; connect-src 'none'`, and that is a claim a visitor can confirm
+in devtools rather than a default nobody chose — so the whole filter space is
+rendered ahead of time. A test reads the built pages and refuses a script tag, an
+inline handler or a `javascript:` URL anywhere in the site, and a second one pins
+`connect-src 'none'` in the header file.
+
+Every internal link is checked **after rendering**, anchors included: `.md` becomes
+`.html`, a page outside `docs/` becomes a GitHub URL, and each heading anchor is
+regenerated the way GitHub generates it. That check found four links in the shipped
+documentation pointing at an anchor that did not exist.
+
 ### Optional central collector + dashboard
 
 > **Maturity: beta.** Durable (PostgreSQL, reversible migrations), authenticated

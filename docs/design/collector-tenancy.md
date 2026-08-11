@@ -1,3 +1,10 @@
+---
+title: "Collector tenancy"
+nav_order: 140
+summary: "organizations, projects, and the scope on every query"
+status: implemented
+---
+
 # Design: collector tenancy — organizations and projects
 
 **Status:** implemented in 0.9.0 · **Written:** 2026-08-04 · **Phase C, item 21**

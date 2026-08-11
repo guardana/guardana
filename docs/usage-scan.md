@@ -1,3 +1,10 @@
+---
+title: "guardana scan"
+nav_order: 60
+summary: "`guardana scan`: static, offline, CI-friendly"
+status: stable
+---
+
 # `guardana scan` — static, offline, CI-friendly
 
 Scans a directory as an **artifact target**: model files, dependency

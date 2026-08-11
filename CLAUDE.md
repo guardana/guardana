@@ -352,6 +352,16 @@ Discovery is uniform and resolved by `guardana.core.registry.Registry`:
 | `guardana.rules` | one `Rule`, or an iterable of `Rule`s | `Registry.discover()` |
 | `guardana.evaluators` | one `Evaluator`, or an iterable | `Registry.discover()` |
 | `guardana.targets` | one `Target` subclass, or an iterable | `Registry.discover()` |
+| `guardana.taxonomies` | one `TaxonomyRef`, or an iterable | `Registry.discover()`, **first** |
+
+Taxonomies load before rules, because a YAML rule resolves `taxonomy:` while its own
+entry point is being read. **Every one of the four is registered by
+`examples/custom_rule`, and that is not decoration.** `guardana.targets` sat in this
+table from 0.1 with no registrant anywhere, so `pack validate` shipped in 0.18.0
+accusing every pack that had a target of not registering it, and nothing installed
+could notice; `guardana.taxonomies` was in the same state until 0.19.0, where the
+listing command turned out to be printing only the built-ins. A documented seam
+nothing exercises is a seam nobody has run.
 
 A package registers by adding to its `pyproject.toml`:
 

@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Trace domain model — Guardana documentation</title>
+<meta name="description" content="the Trace model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact">
+<link rel="canonical" href="https://guardana.dev/docs/design/trace-domain-model.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html" aria-current="page">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>The <code>Trace</code> domain model: grading an execution somebody else recorded<span class="status implemented">implemented</span></h1><p class="lede">the <code>Trace</code> model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact</p><p><strong>Status:</strong> implemented in 0.14.0 · <strong>Written:</strong> 2026-08-09 · <strong>Step three</strong></p>
+<h2 id="the-problem-stated-precisely">The problem, stated precisely</h2>
+<p>Guardana verifies by <em>driving</em>: it sends prompts, offers tool doubles, reads
+replies. <code>Trajectory</code> is the record of a run Guardana conducted, and every
+agentic rule grades one. That is a strong position and it has one hard limit —
+<strong>it only sees the runs Guardana started.</strong></p>
+<p>The interesting failures happen in the runs it did not. A production agent
+handles a request, calls three MCP servers, reads two documents out of a vector
+store, writes a note to memory, and sends an email. Nobody can reproduce that
+from the outside: the retrieved documents were whatever the index held at
+09:41, the memory already contained a note from Tuesday, and the credential
+that reached the third server came from a delegation chain no prompt can
+recreate.</p>
+<p>What <em>does</em> exist is a trace. Every serious agent framework emits one, and since
+the OpenTelemetry GenAI semantic conventions settled there is a shape they
+broadly agree on. Grading a trace is the only way Guardana reaches the execution
+that actually happened.</p>
+<p>Principle 14 also puts this before 1.0: <code>Trace</code>, <code>AISystem</code> and <code>Deployment</code>
+land before anything is frozen, because freezing the wrong shape is worse than
+freezing late. Step two (MCP authorization) went first on purpose, and it paid
+for itself — four distinctions arrived from meeting a real protocol that a schema
+written from imagination would have flattened. They are in
+<a href="mcp-authorization-depth.html"><code>mcp-authorization-depth.md</code></a> and each one is
+represented below.</p>
+<p><strong>What this is not.</strong> Not a tracing SDK — Guardana does not instrument anybody's
+application, and nothing here runs in a request path (a listed non-goal). Not a
+Guardana wire protocol competing with OpenTelemetry. And not a passive traffic
+tap: a trace arrives as a file, after the fact, by the operator's decision.</p>
+<h2 id="the-honesty-boundary-decided-first">The honesty boundary, decided first</h2>
+<p>This is the most important decision in the document, and it is not about which
+checks to write.</p>
+<p><strong>A trace records what an application chose to record.</strong> That single sentence
+governs everything below, because it breaks the inference every scanner wants to
+make. When a trace shows no approval before a payment, there are three possible
+worlds:</p>
+<ol>
+<li>no approval was sought, and the payment went out unapproved — a finding;</li>
+<li>an approval was sought and granted, and the framework does not emit approval
+spans — nothing wrong at all;</li>
+<li>the trace was cut short before the approval span was written — unknown.</li>
+</ol>
+<p>A rule that reads &quot;no approval record&quot; as world 1 fires on every well-governed
+system whose instrumentation is merely quieter than ours. A rule that reads it as
+world 2 passes on the one system that really did skip the approval. <strong>Both are
+false verdicts, in opposite directions, from the same absence.</strong></p>
+<p>So absence is never read as evidence. Three states, and every check names which
+one it is in:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>State</th>
+<th>Meaning</th>
+<th>What a rule may conclude</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>recorded, present</strong></td>
+<td>the dimension is instrumented and the record is there</td>
+<td>grade it</td>
+</tr>
+<tr>
+<td><strong>recorded, absent</strong></td>
+<td>the dimension is instrumented and this step has no record</td>
+<td>grade the absence — <em>this</em> is where a finding lives</td>
+</tr>
+<tr>
+<td><strong>not instrumented</strong></td>
+<td>the producer never emits this dimension at all</td>
+<td>nothing; the rule does not run</td>
+</tr>
+</tbody>
+</table></div>
+<p>The third state is what makes the second one safe, and it is why this design
+spends a capability on each dimension rather than a boolean on each record.</p>
+<h3 id="the-corollary-stated-so-no-report-implies-otherwise">The corollary, stated so no report implies otherwise</h3>
+<p>A clean trace analysis says: <em>in this recorded execution, these invariants held.</em>
+It does not say the system is secure, and it cannot — the attacker's request may
+simply not be in the file. That is a weaker claim than <code>probe</code> makes, and it is
+stated in <a href="../usage-analyze-trace.html"><code>../usage-analyze-trace.md</code></a> rather than
+left for a reader to infer.</p>
+<h2 id="opentelemetry-genai-is-the-interoperability-floor-not-the-domain-model">OpenTelemetry GenAI is the interoperability floor, not the domain model</h2>
+<p>Checked against the OpenTelemetry
+<a href="https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/">GenAI attribute registry</a>
+and the
+<a href="https://github.com/open-telemetry/semantic-conventions-genai">GenAI semantic conventions repository</a>
+on 2026-08-09. Reading them produced the single most useful finding in this
+design.</p>
+<p><strong>What the conventions carry, and Guardana therefore reads directly:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Convention</th>
+<th>Guardana reads it as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gen_ai.operation.name</code> (<code>chat</code>, <code>execute_tool</code>, <code>invoke_agent</code>, <code>retrieval</code>, <code>search_memory</code>, <code>upsert_memory</code>, <code>embeddings</code>, <code>plan</code>, …)</td>
+<td>the span's kind</td>
+</tr>
+<tr>
+<td><code>gen_ai.input.messages</code> / <code>gen_ai.output.messages</code> — <code>[{role, parts:[…], finish_reason}]</code></td>
+<td>messages with typed content parts</td>
+</tr>
+<tr>
+<td>part <code>type</code> = <code>text</code> (<code>content</code>), <code>tool_call</code> (<code>id</code>, <code>name</code>, <code>arguments</code>), <code>tool_call_response</code> (<code>id</code>, <code>response</code>)</td>
+<td><code>ContentPart</code> kinds</td>
+</tr>
+<tr>
+<td><code>gen_ai.system_instructions</code></td>
+<td>the system instruction parts</td>
+</tr>
+<tr>
+<td><code>gen_ai.provider.name</code>, <code>gen_ai.request.model</code>, <code>gen_ai.response.model</code></td>
+<td>the model call</td>
+</tr>
+<tr>
+<td><code>gen_ai.usage.input_tokens</code> / <code>output_tokens</code>, <code>gen_ai.response.finish_reasons</code></td>
+<td>the call's cost and how it ended</td>
+</tr>
+<tr>
+<td><code>gen_ai.tool.name</code>, <code>gen_ai.tool.call.id</code>, <code>gen_ai.tool.description</code>, <code>gen_ai.tool.type</code>, <code>gen_ai.tool.definitions</code></td>
+<td>tool executions and tool offers</td>
+</tr>
+<tr>
+<td><code>gen_ai.agent.name</code> / <code>.id</code>, <code>gen_ai.conversation.id</code></td>
+<td>who acted, and which conversation <em>(the actor needed a field the model did not have until <code>Span.agent</code> in 0.15.0 — see <a href="framework-adapters.html"><code>framework-adapters.md</code></a>)</em></td>
+</tr>
+<tr>
+<td><code>gen_ai.data_source.id</code></td>
+<td>the retrieval source</td>
+</tr>
+<tr>
+<td><code>mcp.method.name</code>, <code>mcp.session.id</code>, <code>mcp.protocol.version</code>, <code>network.transport</code></td>
+<td>an MCP hop, and its session</td>
+</tr>
+<tr>
+<td><code>server.address</code> / <code>server.port</code>, <code>error.type</code></td>
+<td>the callee, and whether it failed</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>What they do not carry — and this is the finding:</strong> there is no GenAI
+convention for the credential a hop presented, the audience a token names, the
+scopes in play, a delegation boundary, a consent grant, a human approval, a
+policy decision, a memory write's provenance, an external side effect, or an
+agent handoff. <code>mcp.session.id</code> is the closest thing to an identity in the whole
+registry, and a session id is precisely <em>not</em> an identity — which is one of the
+four things step two established.</p>
+<p>So the authorization half of the domain — the half where the interesting failures
+live — is <strong>structurally absent</strong> from an OTel-only trace. Two consequences, and
+the design turns on both:</p>
+<ul>
+<li><strong><code>Trace</code> is a superset of the conventions, not a rename of them.</strong> Mapping
+OTel onto a model shaped like OTel would have produced a model that cannot
+represent the failures step two spent a release learning to name.</li>
+<li><strong>An OTel-imported trace declares those dimensions <em>not instrumented</em>.</strong> The
+six rules below are then skipped by the runner, each with its reason, and
+<code>fail_on.fail_on_skipped</code> turns the coverage hole into an indeterminate result
+for anyone who wants it that way. What must not happen is the alternative: six
+rules finding nothing in a file that could not have contained it, and a report
+that reads clean.</li>
+</ul>
+<h3 id="rejected-a-guardana-only-trace-protocol">Rejected: a Guardana-only trace protocol</h3>
+<p>Tempting, because the model needs fields OTel does not have. Rejected: a format
+nobody emits is a format nobody uses, and the whole value here is grading a trace
+that already exists. The native JSONL dialect exists as the <strong>superset carrier</strong> —
+what an operator writes when they want the authorization dimensions graded — and
+it is defined as OTel plus named extensions, not as an alternative to it.</p>
+<h3 id="rejected-waiting-for-the-conventions-to-grow-the-missing-half">Rejected: waiting for the conventions to grow the missing half</h3>
+<p>The conventions may one day carry identity. Waiting means the model that freezes
+at 1.0 is shaped by a document still in flux, and it means the four distinctions
+from step two go unrepresented in the meantime. When a convention does land,
+adding a reader for it is a mapping change, not a model change — which is the
+test of whether this layering is right.</p>
+<h2 id="the-four-distinctions-made-executable">The four distinctions, made executable</h2>
+<p>Each came out of step two, each would have been flattened by a schema written
+first, and each now has a field and a rule.</p>
+<p><strong>Identity is three claims that can disagree.</strong> <code>Identity</code> carries the credential
+presented, the audience the token names, and the resource the callee claims to
+be — separately, because the interesting failure is exactly where they diverge.
+One <code>credential</code> field per call cannot express it.</p>
+<p><strong>Delegation has a direction and a boundary.</strong> <code>Delegation</code> records who is
+acting, on whose authority, across which boundary, with which credential <em>on this
+hop</em>. Token passthrough — deferred in step two as &quot;not client-observable&quot; — is
+the same credential appearing on two hops that cross different boundaries. In a
+trace it is observable, and it is rule 1 below. That is this step paying a
+documented gap back.</p>
+<p><strong>Consent is per client, not per user.</strong> <code>Consent</code> is keyed on the client, with
+the subject as a separate field. The confused deputy works because a decision
+recorded against a user is read as a decision about a client, and a model with
+<code>consents: dict[user, scopes]</code> cannot represent the bug at all.</p>
+<p><strong>A session is not an identity.</strong> <code>SessionRef</code> is its own type and never
+substitutes for <code>Identity</code>. A step whose only identification is a session id is
+rule 3.</p>
+<h2 id="the-model">The model</h2>
+<p>Twelve concepts, one file each, under <code>guardana.core.trace</code>. The container is a
+flat, ordered tuple of spans with parent links — the OTel shape — rather than a
+tree, because a tree makes &quot;what happened next&quot; (the question every rule asks)
+into a traversal, and because a flat list survives a producer that emits a parent
+after its child.</p>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Trace:
+    trace_id: str
+    spans: tuple[Span, ...]              # ordered as recorded
+    provenance: Provenance               # who produced this, and a digest of the file
+    instrumented: frozenset[Dimension]   # what the producer records at all
+    truncated: TraceTruncation | None    # why it is incomplete, if it is
+    unreadable: int = 0                  # records this build could not interpret
+</code></pre>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Span:
+    span_id: str
+    kind: SpanKind
+    name: str
+    parent_span_id: str | None
+    # the model-call half — what OTel carries
+    messages: tuple[Message, ...]
+    system_instructions: tuple[ContentPart, ...]
+    tool_offers: tuple[ToolDeclaration, ...]
+    tool: ToolExecution | None
+    retrieval: Retrieval | None
+    memory: MemoryOperation | None
+    handoff: Handoff | None
+    # the authorization half — what OTel does not
+    identity: Identity | None
+    delegations: tuple[Delegation, ...]
+    consents: tuple[Consent, ...]
+    policy_decisions: tuple[PolicyDecision, ...]
+    approvals: tuple[Approval, ...]
+    effects: tuple[SideEffect, ...]
+</code></pre>
+<p>A span is the unit and the domain content hangs off it as optional blocks. The
+alternative — a record type per concept, eleven of them in one JSONL stream — was
+rejected because it duplicates ordering, parentage and timing eleven times, and
+because it does not map onto an OTel span without inventing a join key.</p>
+<h3 id="typed-content-parts-and-the-multimodal-carrier">Typed content parts, and the multimodal carrier</h3>
+<p><code>ContentPart</code> is what keeps a multimodal carrier from forcing a breaking change
+later — the roadmap's stated reason for typing content at all. Kinds: <code>TEXT</code>,
+<code>TOOL_CALL</code>, <code>TOOL_RESULT</code>, <code>IMAGE</code>, <code>AUDIO</code>, <code>VIDEO</code>, <code>DOCUMENT</code>, <code>REASONING</code>,
+<code>REFUSAL</code>, <code>OPAQUE</code>.</p>
+<p>Two rules about them, both fail-closed:</p>
+<p><strong>Binary content is referenced, never carried.</strong> An image part holds a media
+type, a size, a URI or a digest — not the bytes. A trace with twenty base64
+images would otherwise arrive in an evidence field and from there into a report,
+a SARIF file and a collector envelope. Nothing in the redaction seam is shaped to
+remove a megabyte of base64.</p>
+<p><strong>A part kind this build does not know becomes <code>OPAQUE</code> and is kept.</strong> Dropping
+it is the fail-open: a text-reading rule over a trace whose payload was in a part
+type we skipped would report clean on the one carrier that mattered. <code>OPAQUE</code>
+records the producer's own type string, and a span carrying one is visible to any
+rule that needs to decline.</p>
+<h3 id="dimensions-and-why-they-are-capabilities">Dimensions, and why they are capabilities</h3>
+<p><code>Dimension</code> names the parts of the domain a producer may or may not record:
+<code>MESSAGES</code>, <code>TOOLS</code>, <code>RETRIEVAL</code>, <code>MEMORY</code>, <code>IDENTITY</code>, <code>DELEGATION</code>, <code>CONSENT</code>,
+<code>POLICY</code>, <code>APPROVAL</code>, <code>EFFECTS</code>, <code>HANDOFF</code>.</p>
+<p><code>TraceTarget</code> translates the ones its rules depend on into capabilities —
+<code>TRACE_IDENTITY</code>, <code>TRACE_CONSENT</code>, <code>TRACE_POLICY</code>, <code>TRACE_APPROVALS</code>,
+<code>TRACE_EFFECTS</code> — and the runner does the rest, because it already skips a rule
+whose target cannot satisfy it and already records the reason. This is the
+<code>INSPECT_AUTHORIZATION</code> pattern from step two, reused rather than reinvented, and
+it buys three things a boolean on the rule could not: the skip is in
+<code>rules_skipped</code> with a reason, <code>fail_on_skipped</code> can escalate it, and the
+manifest's coverage fingerprint records that this run checked less — so <code>diff</code>
+against a richer trace says the reach changed instead of reading the missing
+findings as an improvement.</p>
+<p><strong>A declared dimension is believed; an undeclared one is derived from what is
+present.</strong> The native dialect declares explicitly. For everything else, a
+dimension counts as instrumented when at least one record of it appears. That
+derivation can only ever <em>reduce</em> what runs, which is the safe direction: a trace
+with no consent records anywhere is indistinguishable from a producer that does
+not emit them, and both correctly stop the consent rule from running.</p>
+<h3 id="truncation-makes-a-silent-rule-speak">Truncation makes a silent rule speak</h3>
+<p>A trace cut off mid-execution is <code>Trajectory</code>'s truncation problem on somebody
+else's data, and the answer is the same: a rule that <strong>found</strong> something in a
+truncated trace reports it — the evidence is real — and a rule that found nothing
+reports <code>inconclusive</code>, because the step it needed may have been in the part that
+was cut. Silence has to keep meaning &quot;the invariant held&quot;.</p>
+<h2 id="versioning-and-migration">Versioning and migration</h2>
+<p><code>Trace</code> is a document a user keeps and a third party writes, so principle 11
+applies: <code>schemas/trace-v1.schema.json</code>, <code>TRACE_SCHEMA_VERSION = 1</code>, and a
+<code>guardana_trace</code> version on the header record of every native file.</p>
+<p>Three decisions, because a first version is where migratability is designed and
+not where it is exercised:</p>
+<ul>
+<li><strong>A version this build cannot read is refused, loudly.</strong> A v2 document read as
+v1 would have its unknown fields dropped and be graded on what was left — a
+partial trace reported as a whole one. <code>TraceLoadError</code> names the version and
+the build.</li>
+<li><strong>The migration seam exists at v1</strong>, shaped like the manifest's 1→2→3 chain, so
+a v2 reader is an added function rather than a rewritten one.</li>
+<li><strong>A missing header is an error, not a default.</strong> Guessing v1 for a file with no
+version is how an unversioned format gets a version in name only.</li>
+</ul>
+<p><code>serialize_trace</code> writes the native form from any dialect. Its first job is a
+test — the published schema and the reader cannot disagree if a round trip has to
+validate — and its second is a real one: converting an OTel export into the
+native dialect is how an operator adds the authorization dimensions their
+framework does not emit.</p>
+<h2 id="the-six-invariants">The six invariants</h2>
+<p>Each is deterministic, each maps to a public framework, and each exists because
+the model carries a distinction that would otherwise be unrepresentable. Every
+one names what makes it decline.</p>
+<h3 id="1-guardanatracecredential_passthrough">1. <code>guardana.trace.credential_passthrough</code></h3>
+<p><em>One credential crossed two trust boundaries.</em></p>
+<p>The token an agent received and the token it presents upstream must be different
+tokens. The same credential digest on two <code>Delegation</code> hops with different
+boundaries is the confused deputy, and it is the check step two deferred for
+being invisible from outside. <code>MCP01:2025</code>, <code>ASI03:2026</code>, <code>LLM03:2026</code>.</p>
+<p>Declines: without the <code>DELEGATION</code> dimension, and when fewer than two hops carry
+a credential digest at all.</p>
+<h3 id="2-guardanatraceidentity_disagreement">2. <code>guardana.trace.identity_disagreement</code></h3>
+<p><em>A token's audience is not the resource it was presented to.</em></p>
+<p>The three-field identity, read as three fields. A credential whose audience names
+<code>https://a/</code> presented to a resource claiming to be <code>https://b/</code> is a token being
+accepted — or offered — outside the audience it was minted for. <code>MCP01:2025</code>,
+<code>ASI03:2026</code>.</p>
+<p>Declines: without <code>IDENTITY</code>, and on any span where either the audience or the
+claimed resource is absent — two thirds of a disagreement is not a disagreement.</p>
+<h3 id="3-guardanatracesession_as_identity">3. <code>guardana.trace.session_as_identity</code></h3>
+<p><em>A step that changed something identified itself with a session and nothing else.</em></p>
+<p>The MCP specification forbids sessions as authentication in a sentence, and it is
+not an MCP-only mistake. Fires on a span carrying a <code>SessionRef</code>, no credential,
+and an effect or a state-changing tool execution. <code>MCP07:2025</code>, <code>ASI03:2026</code>.</p>
+<p>Declines: without <code>IDENTITY</code>; and silent, deliberately, on a read-only span,
+because an unauthenticated read is a different question with its own answer.</p>
+<h3 id="4-guardanatraceconsent_scope_exceeded">4. <code>guardana.trace.consent_scope_exceeded</code></h3>
+<p><em>A hop used a scope the client was never granted.</em></p>
+<p>Consent read per client, as step two established. Scopes on a delegation that do
+not appear in any <code>Consent</code> for that client are privilege the user did not agree
+to. <code>MCP02:2025</code>, <code>ASI03:2026</code>, <code>LLM03:2026</code>.</p>
+<p>Declines: without <code>CONSENT</code>; and when a consent record exists whose scopes are
+unknown rather than empty — &quot;we did not record what was granted&quot; is not &quot;nothing
+was granted&quot;.</p>
+<h3 id="5-guardanatracepolicy_decision_ignored">5. <code>guardana.trace.policy_decision_ignored</code></h3>
+<p><em>A policy said no, or could not say, and the action happened anyway.</em></p>
+<p>Two shapes in one rule because they are two halves of one property — whether the
+decision was load-bearing. A <code>DENY</code> followed by the action is a bypass. An
+<code>ERROR</code> followed by the action is somebody else's fail-open, which is the failure
+this whole project is named after, and it is reported at the same severity for
+the same reason. <code>ASI02:2026</code>, <code>LLM10:2026</code>.</p>
+<p>Declines: without <code>POLICY</code>; and on a decision whose subject action never appears
+in the trace, because a decision about something that did not happen is not a
+bypass.</p>
+<h3 id="6-guardanatraceunapproved_side_effect">6. <code>guardana.trace.unapproved_side_effect</code></h3>
+<p><em>An irreversible effect executed with its approval denied or never sought.</em></p>
+<p>The one rule that needs two dimensions — <code>APPROVAL</code> and <code>EFFECTS</code> — and the
+clearest case for why absence must be tri-stated: run it against a trace that
+does not record approvals and it fires on every payment any system ever made.
+<code>ASI09:2026</code>, <code>ASI02:2026</code>, <code>LLM03:2026</code>.</p>
+<p>Declines: without either dimension. An effect whose status is <code>ATTEMPTED</code> rather
+than <code>EXECUTED</code> reports <code>inconclusive</code> — an attempt that may or may not have
+landed is not an effect that did.</p>
+<h3 id="rejected-injection-rules-over-retrieved-content-in-this-step">Rejected: injection rules over retrieved content, in this step</h3>
+<p><code>agent.tool_result_injection</code> already grades a driven run, and the trace
+equivalent is the obvious next rule. It is not here, because the deterministic
+form of &quot;the agent followed the injected instruction&quot; needs the retrieval and
+sink-aware work that is its own roadmap item: without a sink, &quot;the agent then did
+something&quot; is a judgement, and a judged rule shipped without calibration is the
+opposite of what this project sells. The model carries <code>Retrieval</code> and
+<code>SideEffect</code> so that rule is an addition, not a schema change.</p>
+<h2 id="third-party-observations-somebody-elses-verdict-kept-as-theirs">Third-party observations: somebody else's verdict, kept as theirs</h2>
+<p>Composition with promptfoo and garak was on the roadmap as the answer to a
+landscape where &quot;developer-centric security testing in CI&quot; stopped being a
+differentiator. The mechanism is narrow on purpose.</p>
+<p><strong>An imported observation is a claim, not a finding.</strong> It lands in <code>unverified</code>
+with a <code>Verdict</code> of <code>inconclusive</code>, whose <code>evaluator_id</code> names the producer
+(<code>imported:garak</code>). Guardana did not send the prompt, did not see the reply, and
+cannot grade what it did not observe — so the report says who said it and stops
+there. When Guardana can replay the same attack under its own contract, the
+result of <em>that</em> is a finding.</p>
+<p><strong>Provenance is kept whole</strong>: producer, version, source file, the timestamp the
+file states, and a digest of the bytes as read. A claim nobody can trace back is
+a claim with no weight in an audit.</p>
+<p><strong>Severity is carried when the producer stated one, and attributed.</strong> Dropping it
+loses what a triager needs; inventing one presents our opinion as measurement.
+The evidence line names the producer, and <code>unverified</code> never fails a gate unless
+an operator asks it to.</p>
+<p><strong>One rule id per producer</strong> (<code>imported.garak</code>, <code>imported.promptfoo</code>,
+<code>imported.generic</code>) so a profile can exclude a producer with a glob and a
+baseline can waive an individual claim — the finding fingerprint already covers
+rule plus evidence summary, and the summary carries the foreign test id.</p>
+<p>Three dialects, all verified against the producing code rather than from memory:</p>
+<ul>
+<li><strong>garak</strong> (JSONL). <code>eval</code> records carry <code>probe</code>, <code>detector</code>, <code>passed</code>, <code>fails</code>,
+<code>nones</code>, <code>total_evaluated</code>. <strong><code>fails &gt; 0</code> is a claim; <code>nones &gt; 0</code> is garak
+telling us its own detector could not decide</strong>, and an importer reading only
+<code>passed</code>/<code>total</code> folds those into passes. They are carried as a separate
+unknown, which is the same distinction Guardana makes about itself.</li>
+<li><strong>promptfoo</strong> (JSON). <code>results[]</code> entries carry <code>success</code>, <code>score</code>, <code>error</code>,
+<code>testCase</code>, <code>gradingResult</code>, <code>metadata</code>. Two nestings exist in the wild
+(<code>results</code> as an array, and <code>results.results</code> beside an <code>evalId</code>); both are
+read and the file says which it was.</li>
+<li><strong>generic</strong> — a documented shape for an internal harness, so composing does not
+require pretending to be one of the two above.</li>
+</ul>
+<p><strong>A record that cannot be read is counted and reported, never dropped.</strong> A
+dropped record is a failed attack that disappears, which is a false green
+arriving through the import path. Unreadable records become <code>errors</code>, and
+<code>fail_on_error</code> — on by default — makes the run indeterminate.</p>
+<h2 id="cost-one-parse-and-the-rules-read">Cost: one parse, and the rules read</h2>
+<p>Principle 2, and the same seam as step two. <code>TraceTarget</code> parses the file once,
+holds the <code>Trace</code>, and every rule reads it. A seventh rule costs a pass over
+spans already in memory; it does not re-read the file. The reader is streaming
+per line, so a large trace is bounded by its largest span rather than by the
+file.</p>
+<p>Nothing here sends a request, so both commands are offline by construction —
+<code>analyze-trace</code> and <code>import-observations</code> open one file and no socket.</p>
+<h2 id="rejected-options">Rejected options</h2>
+<p><strong>Making <code>Trajectory</code> into <code>Trace</code>.</strong> They are different things and merging them
+would have cost the distinction that matters: a <code>Trajectory</code> is an experiment
+Guardana controlled, a <code>Trace</code> is a recording it did not. Every claim either one
+supports depends on knowing which it is. <code>Trace.as_trajectory()</code> exists as a
+one-way bridge, so the existing agentic evaluators can grade a recorded run — and
+it is one-way because a <code>Trajectory</code> is not entitled to a trace's provenance.</p>
+<p><strong>A new <code>TargetKind</code>.</strong> Considered and taken: a trace is neither an artifact nor
+an endpoint, and folding it into <code>ARTIFACT</code> would have offered every static rule
+a JSONL file to fail to parse. <code>TargetKind.TRACE</code> keeps rule selection honest,
+and <code>Surface</code> reads it as runtime evidence, because that is what it is.</p>
+<p><strong>Reading a trace through the collector.</strong> The collector ingests findings, not
+traces, and the import contract is one direction only. A trace is a large
+document full of raw prompts; routing it through a service would make the
+privacy question about a network hop instead of about a file the operator chose.</p>
+<p><strong>Taking an OpenTelemetry dependency.</strong> The reader parses a JSON object with
+<code>gen_ai.*</code> keys. Principle 6 puts a dependency in front of a justification, and
+<code>opentelemetry-sdk</code> pulls a protobuf stack to read a shape that is four <code>dict</code>
+lookups deep.</p>
+<h2 id="deliberately-deferred-with-the-reason">Deliberately deferred, with the reason</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Deferred</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>The remaining named adapters — LlamaIndex, CrewAI, PydanticAI</strong> <em>(shipped in 0.15.0)</em></td>
+<td>The roadmap's own reason, unchanged: three adapters written before the model bakes three frameworks' quirks into an API about to be frozen. They are translators into this model, and they are cheap once it is real. 1.0 entry criterion 2 asks for two independent adapters driving the model, so this is the criterion's remaining half — stated, not hidden</td>
+</tr>
+<tr>
+<td><strong>OTLP over the wire</strong></td>
+<td>A receiver is a service that listens, which is the continuous-verification milestone and a different security posture from reading a file. The mapping built here is what a receiver would reuse</td>
+</tr>
+<tr>
+<td><strong>Metrics and logs from the conventions</strong></td>
+<td>Only spans carry the message content and the tool calls rules grade. A metric says how many tokens were spent, which the manifest already records for runs Guardana drove</td>
+</tr>
+<tr>
+<td><strong>Injection and sink rules over retrieved content</strong></td>
+<td>Needs the retrieval and sink-aware output work; the model carries the fields so it is an addition rather than a schema change. See the rejection above</td>
+</tr>
+<tr>
+<td><strong>Grading a trace against the driven-run evaluators</strong></td>
+<td><code>as_trajectory()</code> makes it possible and no rule does it yet: an evaluator calibrated on runs Guardana drove has not been measured on traces it did not, and <code>calibrate</code> is how that claim would be earned</td>
+</tr>
+<tr>
+<td><strong><code>finish_reason</code> on <code>Exchange</code></strong></td>
+<td>Deferred out of step one to be done &quot;beside the trace work&quot;, and it is not here. A trace <em>carries</em> <code>gen_ai.response.finish_reasons</code> and the model records it; putting it on the live transport contract is a change third-party transports must follow, and doing it as a passenger to this step would give it no test of its own</td>
+</tr>
+<tr>
+<td><strong>Replaying an imported trace</strong></td>
+<td>The stated bar for turning a third-party claim into a finding, and it needs a target that can accept a recorded conversation as a script. <code>unverified</code> with provenance is the honest interim, and it is what the roadmap asked for</td>
+</tr>
+<tr>
+<td><strong>Redacting a trace on the way in</strong></td>
+<td>Evidence drawn from a trace goes through the same redactor as everything else, at the same seam. The <em>input file</em> is not rewritten, and an operator pointing this at a trace full of customer prompts should know the report is redacted and the file is theirs</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="what-this-leaves-for-10">What this leaves for 1.0</h2>
+<p>Entry criterion 1 — messages with typed content, retrieval, tool
+offers/calls/results, identity and scopes, approvals, memory, side effects and
+handoffs, with no framework-specific escape hatch — is met by the model above,
+and the absence of an escape hatch is the part to keep checking: an <code>attributes</code>
+free-for-all on <code>Span</code> would have made every later mapping easy and the freeze
+meaningless.</p>
+<p>Entry criterion 2 asks for three unrelated inputs. Two are here — raw JSONL and
+the OpenTelemetry conventions — and they already disagreed usefully enough to
+change the design once. The two independent framework adapters are the remaining
+half.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="mcp-authorization-depth.html"><code>mcp-authorization-depth.md</code></a> — where the four
+distinctions came from, and what each one cost to learn.</li>
+<li><a href="run-manifest-v2.html"><code>run-manifest-v2.md</code></a> — the run document a trace analysis
+writes, and why <code>source.kind</code> has said <code>imported_trace</code> since v2.</li>
+<li><a href="../usage-analyze-trace.html"><code>../usage-analyze-trace.md</code></a> ·
+<a href="../usage-import-observations.html"><code>../usage-import-observations.md</code></a> — how an
+operator runs both.</li>
+<li><a href="framework-adapters.html"><code>framework-adapters.md</code></a> — the three translators built
+against this model, and the one field they proved was missing.</li>
+<li><code>ROADMAP.md</code>, <em>Next — the domain model, and only then the adapters</em>.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/trace-domain-model.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

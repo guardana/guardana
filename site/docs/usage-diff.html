@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana diff — Guardana documentation</title>
+<meta name="description" content="guardana diff: compare two saved runs, fail on deterioration">
+<link rel="canonical" href="https://guardana.dev/docs/usage-diff.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html" aria-current="page">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html" aria-current="page">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana diff</code> — is this worse than last time?</h1><p class="lede"><code>guardana diff</code>: compare two saved runs, fail on deterioration</p><p><code>scan</code>, <code>probe</code> and <code>monitor</code> all answer <em>how is it now</em>. This one answers the
+question a team actually has at every change — a new model, an edited system
+prompt, one more tool wired into an agent: <strong>is it worse than it was?</strong></p>
+<p>That is what turns security testing from a launch ritual into part of the change
+process. A regression stops the deploy, and a comparison that cannot honestly be
+made says so instead of going green.</p>
+<h2 id="save-a-run-then-compare-two">Save a run, then compare two</h2>
+<pre><code class="language-bash">guardana probe --url http://localhost:11434 --model llama3 \
+  --format json --output monday.json
+
+# …swap the model, edit the system prompt, add a tool…
+
+guardana probe --url http://localhost:11434 --model llama4 \
+  --format json --output friday.json
+
+guardana diff monday.json friday.json
+</code></pre>
+<p>Use <code>--output</code> rather than a shell redirect. A redirect in PowerShell writes
+UTF-16, which the reader on the other end cannot parse, and the corruption
+surfaces a day later far from its cause.</p>
+<p>The same works for a static scan:</p>
+<pre><code class="language-bash">guardana scan . --format json --output before.json
+guardana scan . --format json --output after.json
+guardana diff before.json after.json
+</code></pre>
+<h2 id="exit-codes">Exit codes</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+<th>In CI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Nothing got worse</td>
+<td>pass</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>A regression above your policy's bar</td>
+<td><strong>fail</strong></td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>The two runs could not be compared</td>
+<td><strong>fail</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>2</code> is not a softer <code>0</code>. A comparison nobody could make and a comparison that
+found nothing wrong are opposite answers, and only one of them is safe to print
+next to a green build. You will see <code>2</code> for a run saved by Guardana 0.5 or
+earlier (no schema version), a truncated file, two different kinds of target, two
+runs with no rule in common, or a pair of arguments passed in the wrong order.</p>
+<h2 id="what-counts-as-worse">What counts as worse</h2>
+<p>A check is <em>one rule, in one place</em>. Against files the place is the path; against
+a live model or MCP server there is only one thing under test, so the check is
+the rule itself — which is why swapping <code>llama3</code> for <code>llama4</code> still compares.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Reported as</th>
+<th>What happened</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>appeared</code></td>
+<td>A problem where there was none.</td>
+</tr>
+<tr>
+<td><code>proven</code></td>
+<td>A check that could not grade now proves a problem. Not a new flaw — new evidence for an old one.</td>
+</tr>
+<tr>
+<td><code>blinded</code></td>
+<td>A check that used to reach a verdict no longer can. <strong>The finding count falls here</strong>, which is exactly why a comparison that counted would call going blind an improvement.</td>
+</tr>
+<tr>
+<td><code>escalated</code></td>
+<td>Same check, higher severity.</td>
+</tr>
+<tr>
+<td><code>coverage_lost</code></td>
+<td>A rule that ran before did not run this time. Whatever it would have found is unknown, not absent.</td>
+</tr>
+</tbody>
+</table></div>
+<p>And the other direction, reported but never failing the build: <code>resolved</code>,
+<code>clarified</code> (a check that could not grade now grades clean), <code>de_escalated</code>,
+<code>coverage_gained</code>, <code>waiver_changed</code>, <code>count_changed</code>.</p>
+<p>Two of those deserve their own sentence:</p>
+<p><strong>A waiver is not a fix.</strong> Adding a finding to a baseline reports as
+<code>waiver_changed</code>, never as <code>resolved</code>. The problem did not go away; a person
+decided to accept it.</p>
+<p><strong>A narrower run is not a better one.</strong> If the second run used a tighter profile,
+its missing findings are <code>coverage_lost</code> — a regression — not progress. This is
+the failure mode the whole feature is built around, and the reason a saved run
+records <em>which</em> rules ran rather than how many.</p>
+<h2 id="noise-and-why-the-count-does-not-fail-the-build">Noise, and why the count does not fail the build</h2>
+<p>A live model answers differently every time. If the gate tripped on &quot;three
+findings yesterday, four today&quot; it would trip constantly, someone would switch it
+off, and a scanner nobody runs is the worst outcome available.</p>
+<p>So the comparison works on <strong>state</strong>, not on tallies: a model either fails a check
+or it does not, and that is far steadier than how many prompts it failed. A
+changed count is reported and never gates on its own. Under a static scan nothing
+is lost by that — a genuinely new problem lands in a new file, which is a new
+check and a regression in its own right.</p>
+<p>The second filter is confidence. Your policy's <code>min_confidence</code> applies to
+regressions backed by a graded verdict, so a shaky judge cannot stop a deploy.
+It deliberately does <strong>not</strong> apply to <code>blinded</code> or <code>coverage_lost</code>: an ungraded
+result carries confidence 0.0 by definition, so filtering those by confidence
+would mean a stricter setting silently switched off detection of checks going
+dark.</p>
+<h2 id="policy">Policy</h2>
+<p><code>guardana diff</code> takes <code>--profile</code> and <code>--preset</code> like the other commands, and uses
+the same <code>fail_on</code> bars:</p>
+<pre><code class="language-bash">guardana diff before.json after.json --preset ci
+guardana diff before.json after.json --profile guardana.yaml
+</code></pre>
+<p><code>fail_on.severity</code> sets how bad a regression has to be to fail. <code>coverage_lost</code>
+ignores it — a rule that did not run has no severity, and an unknown cannot be
+thresholded away.</p>
+<h2 id="was-it-the-model-or-was-it-the-test">Was it the model, or was it the test?</h2>
+<p>A saved run records a digest of every rule that ran. If a rule's own definition
+changed between the two runs — someone added prompts, sharpened an expectation —
+the comparison says so on the change and in its notes, so nobody blames the model
+for a test that got harder.</p>
+<p>The digest covers a rule's <em>declaration</em>. It cannot see a change inside the Python
+of a plugin rule; the recorded tool version is what covers that, and a run made by
+a different Guardana version is flagged in the notes.</p>
+<h2 id="in-ci">In CI</h2>
+<pre><code class="language-yaml">- name: Save this run
+  run: guardana scan . --format json --output current.json
+
+- name: Compare against the last green run
+  run: guardana diff baseline.json current.json --preset ci
+</code></pre>
+<p>Keep <code>baseline.json</code> wherever your CI keeps artifacts, and refresh it when you
+accept a change. A <code>2</code> means the pair could not be compared — treat it exactly
+like a <code>1</code> until you have read why.</p>
+<h2 id="what-it-does-not-do">What it does not do</h2>
+<ul>
+<li><strong>It does not re-run anything.</strong> It reads two saved runs. Smoothing noise by
+repeating a probe N times would multiply the cost of every run and needs its own
+design, with that cost knowable before you start it.</li>
+<li><strong>It does not compare inventories.</strong> What components a run <em>saw</em> is a real
+question with a real answer in the report's <code>observations</code>, but it is an
+inventory, not a gate.</li>
+<li><strong>It does not keep history.</strong> Two runs, one answer.</li>
+</ul>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="usage-scan.html"><code>usage-scan.md</code></a>, <a href="usage-probe.html"><code>usage-probe.md</code></a> — producing the runs</li>
+<li><a href="usage-monitor.html"><code>usage-monitor.md</code></a> — the same definition of &quot;worse&quot;, applied continuously</li>
+<li><a href="profiles.html"><code>profiles.md</code></a> — the <code>fail_on</code> bars this command reads</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-diff.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

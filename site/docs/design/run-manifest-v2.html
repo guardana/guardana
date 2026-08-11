@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run manifest v2 — Guardana documentation</title>
+<meta name="description" content="the reproducible run record">
+<link rel="canonical" href="https://guardana.dev/docs/design/run-manifest-v2.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html" aria-current="page">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: Run Manifest v2<span class="status implemented">implemented</span></h1><p class="lede">the reproducible run record</p><p><strong>Status:</strong> implemented in 0.7 · <strong>Supersedes:</strong> the <code>run</code> block introduced in 0.6</p>
+<blockquote>
+<p>Shipped. Where the built shape differs from this proposal, the differences and
+their reasons are recorded under &quot;What changed during implementation&quot; at the
+bottom; the user-facing description lives in <a href="../usage-run.html"><code>docs/usage-run.md</code></a>.</p>
+</blockquote>
+<h2 id="the-problem">The problem</h2>
+<p>0.6 made a run saveable. <code>guardana diff</code> reads it back, which turned the JSON
+report into a public contract, and it carries just enough to compare two runs:
+tool version, target, profile, which rules ran and a digest of each, and a
+timestamp.</p>
+<p>That is enough for <em>comparison</em> and not enough for <em>evidence</em>. A company asking
+&quot;what exactly was verified, against what, by whom, at what cost, and can we
+reproduce it&quot; cannot answer from a 0.6 run. Specifically it cannot say:</p>
+<ul>
+<li><strong>what the target actually was</strong> — <code>http://host#model</code> is a label, not a
+fingerprint; the same label can point at a different deployment tomorrow;</li>
+<li><strong>what configuration produced this</strong> — a profile <em>name</em> is not a profile, and a
+system prompt that changed between runs is invisible;</li>
+<li><strong>what it cost</strong> — no request count, no tokens, no wall time, so a team cannot
+budget the next run from the last one;</li>
+<li><strong>which deployment it belongs to</strong> — no commit, no image digest, no environment,
+so a run cannot be attached to the thing it verified;</li>
+<li><strong>whether the evidence is safe to store</strong> — no record of which redaction policy
+was in force when the evidence was written.</li>
+</ul>
+<h2 id="design">Design</h2>
+<p>One versioned document, <code>schema_version: &quot;2&quot;</code>, versioned <strong>independently of the
+CLI</strong>. A run written by 0.7.3 and one written by 0.9.0 are the same document if
+the schema did not move; a schema change is a schema change whether or not a
+release happened.</p>
+<h3 id="shape">Shape</h3>
+<p>Grouped by the question each block answers, because a flat bag of forty fields is
+unreadable and invites drift:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>top level</td>
+<td>which document is this, and when</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>who started it — a laptop, CI, a schedule, a replay</td>
+</tr>
+<tr>
+<td><code>guardana</code></td>
+<td>what software produced it</td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td>what was examined, identified stably</td>
+</tr>
+<tr>
+<td><code>deployment</code></td>
+<td>which deployment of which AI system this verifies</td>
+</tr>
+<tr>
+<td><code>configuration</code></td>
+<td>what settings produced this result, by digest</td>
+</tr>
+<tr>
+<td><code>execution</code></td>
+<td>what limits it ran under</td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td>what it actually consumed</td>
+</tr>
+<tr>
+<td><code>rules</code> / <code>evaluators</code></td>
+<td>what did the checking, with versions and calibration</td>
+</tr>
+<tr>
+<td><code>result_summary</code></td>
+<td>the counts and the gate outcome</td>
+</tr>
+<tr>
+<td><code>privacy</code></td>
+<td>what evidence policy was in force</td>
+</tr>
+</tbody>
+</table></div>
+<p>The full field list lives in <code>schemas/run-v2.schema.json</code>; it is not repeated
+here, because two copies of a schema is one copy too many.</p>
+<h3 id="decisions">Decisions</h3>
+<p><strong>Fingerprints name their algorithm.</strong> <code>sha256:…</code>, never a bare hex string. A
+digest whose algorithm is implied cannot be migrated when the algorithm changes.</p>
+<p><strong>Timestamps are UTC, RFC 3339, always.</strong> A local-time timestamp in an evidence
+record is a bug waiting for a timezone.</p>
+<p><strong>Nullable is explicit, and null means &quot;not known&quot;, never &quot;not applicable&quot;.</strong> A
+run from a laptop has no <code>deployment.commit_sha</code>; that is a null with a meaning,
+and a consumer must be able to tell it from zero.</p>
+<p><strong>Digests, not contents.</strong> <code>configuration.system_prompt_digest</code> rather than the
+system prompt. A manifest is an evidence record that may leave the machine that
+produced it, and a system prompt is frequently the most sensitive thing in a
+deployment. The digest answers &quot;did this change between runs&quot;, which is the
+question a manifest exists to answer.</p>
+<p><strong>Usage is recorded even when unbounded.</strong> A run with no budget still records what
+it spent, or a team can never set a budget from experience.</p>
+<p><strong>The gate outcome is a field, not an inference.</strong> <code>pass | fail | indeterminate</code>,
+written by the engine. A consumer that has to re-derive the verdict from counts
+will eventually derive it differently from the engine — and the divergence will
+appear as a green build.</p>
+<h3 id="compatibility">Compatibility</h3>
+<ul>
+<li><code>load_report</code> accepts v1 and v2, and <strong>migrates v1 forward in memory</strong> rather
+than refusing it: a team upgrading Guardana must be able to compare today's run
+against last week's.</li>
+<li>A v1 document lacks blocks v2 has; those become explicit nulls, and <code>diff</code> says
+so when a comparison depends on one of them.</li>
+<li>A document with no <code>schema_version</code> (0.5 and earlier) is still refused. There is
+nothing to migrate <em>from</em> — the shape was never declared.</li>
+<li><code>guardana run migrate</code> rewrites a v1 file to v2 on disk for anyone who wants the
+richer document without re-running.</li>
+</ul>
+<h3 id="acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Two runs of the same target and configuration are either reproducible or
+explicitly marked non-reproducible, with the reason.</li>
+<li><code>diff</code> explains every incompatibility rather than refusing opaquely.</li>
+<li>No secret is written by default at any evidence mode.</li>
+<li>Every timestamp is UTC; every fingerprint names its algorithm.</li>
+<li>Schema compatibility tests cover v1→v2 migration and unknown-field handling.</li>
+</ul>
+<h2 id="what-changed-during-implementation">What changed during implementation</h2>
+<p>Five decisions moved. Each is here because the reason only became visible once
+the code existed.</p>
+<p><strong>One version number, not two.</strong> The proposal versioned &quot;the manifest&quot;; the file
+on disk is the manifest <em>plus</em> the finding channels, and giving it two numbers is
+how they start to disagree. <code>schema_version</code> is stated once, at the root, and the
+schema (<code>schemas/run-v2.schema.json</code>) describes the whole document. The manifest
+block carries no version of its own.</p>
+<p><strong><code>schema_version</code> stays an integer.</strong> The proposal wrote <code>&quot;2&quot;</code> as a string while
+version 1 on disk is the number <code>1</code>. A field that is sometimes a string and
+sometimes a number is a trap for every reader, ours included.</p>
+<p><strong>More fields are nullable than planned, and one of them matters.</strong> A migrated
+version-1 document knows no <code>usage</code>, no <code>execution</code> settings, and — the important
+one — <strong>no gate verdict</strong>. <code>result_summary.gate</code> is therefore nullable. Computing
+a verdict during migration was the tempting alternative and would have been the
+re-derivation that storing the gate as a field exists to prevent, done with this
+build's thresholds against another build's run. Nullability is constrained rather
+than free: a document with <code>migrated_from: null</code> must carry its timestamps and a
+gate, enforced both in <code>RunManifest.__post_init__</code> and by an <code>if/then</code> in the
+schema, so the allowance made for migration cannot become a way for a fresh run
+to skip them.</p>
+<p><strong>The target fingerprint declares its inputs.</strong> <code>fingerprint_inputs</code> was not in
+the proposal. Without it, a digest over a URL and a model name invites the
+stronger reading — &quot;this identifies the model&quot; — and nothing in the document
+contradicts it.</p>
+<p><strong>The writer moved into the engine, next to the reader.</strong> Serialization used to
+live in <code>guardana-report</code> while the loader lived in <code>guardana-core</code>, so a field
+added on one side could sit unread on the other with nothing to notice. Both
+halves are now in <code>guardana.core.report.serialize</code> / <code>.load</code>.</p>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li><strong>Does <code>run_id</code> need to be globally unique, or unique per target?</strong> Answered
+for the local case: a fresh run gets a UUID4, and a migrated run gets a
+deterministic digest of what the old document contained, so opening the same
+file twice does not mint a new run. Whether the collector keys on it or on
+<code>(target, started_at)</code> is still open, and lands with the collector schema.</li>
+<li><strong>Cost estimation needs a price table Guardana does not have.</strong> Settled as
+proposed: <code>estimated_cost</code> stays null. A price table belongs in profile data
+if it arrives at all, never in the engine — the engine knows no vendor.</li>
+<li><strong>Should the manifest record the <em>effective</em> profile, not just its digest?</strong>
+Still open. A digest tells you it changed; it does not tell you what changed.
+An <code>--explain</code> mode that stores the resolved profile may belong here, gated on
+the privacy policy since profiles can carry endpoint URLs.</li>
+</ol>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/run-manifest-v2.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

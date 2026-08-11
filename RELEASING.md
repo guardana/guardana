@@ -98,23 +98,27 @@ uv run python scripts/clean_install_check.py   # the five packages in an EMPTY v
 python scripts/bump_version.py minor --dry-run   # eyeball it
 python scripts/bump_version.py minor
 
-# 3. Roll the changelog: rename "## [X.Y.Z] - Unreleased" to today's date and add
+# 3. Fix the two pieces of prose the bump moves the label on but not the text.
+$EDITOR README.md    # the roadmap table
+$EDITOR ROADMAP.md   # "## What ships today (X.Y.Z)"
+
+# 4. Roll the changelog: rename "## [X.Y.Z] - Unreleased" to today's date and add
 #    a fresh empty "## [Unreleased]" above it. (Keep-a-Changelog format.)
 $EDITOR CHANGELOG.md
 
-# 4. Re-run the gate — the bump changed pyprojects and the lock.
+# 5. Re-run the gate — the bump changed pyprojects and the lock.
 uv run pytest -q && uv run guardana scan packages
 
-# 5. Commit the release as ONE conventional commit.
+# 6. Commit the release as ONE conventional commit.
 git add -A
 git commit -m "chore(release): vX.Y.Z"
 
-# 6. Tag it (annotated — see below) and push the branch, then the tag.
+# 7. Tag it (annotated — see below) and push the branch, then the tag.
 git tag -a vX.Y.Z -m "Guardana vX.Y.Z"
 git push origin main
 git push origin vX.Y.Z          # this is what triggers the publish
 
-# 7. Publish the GitHub Release (see below), pasting the changelog section.
+# 8. Publish the GitHub Release (see below), pasting the changelog section.
 ```
 
 Pushing the `vX.Y.Z` tag triggers [`release.yml`](.github/workflows/release.yml),

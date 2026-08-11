@@ -1,3 +1,10 @@
+---
+title: "guardana trace inspect"
+nav_order: 90
+summary: "`guardana trace inspect`: which evidence dimensions a producer really records, and which ones your policy requires"
+status: stable
+---
+
 # `guardana trace inspect` — what a recorded execution can answer
 
 Grading a trace tells you whether invariants held. This tells you which questions

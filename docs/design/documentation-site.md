@@ -1,3 +1,10 @@
+---
+title: "A documentation site"
+nav_order: 80
+summary: "a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way"
+status: proposed
+---
+
 # A documentation site on guardana.dev, and what "interactive" is allowed to mean
 
 **Status:** proposed · **Written:** 2026-08-10

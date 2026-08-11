@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana doctor — Guardana documentation</title>
+<meta name="description" content="guardana doctor, config validate|explain">
+<link rel="canonical" href="https://guardana.dev/docs/usage-doctor.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html" aria-current="page">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana doctor</code> and <code>guardana config</code></h1><p class="lede"><code>guardana doctor</code>, <code>config validate|explain</code></p><p>The commands for &quot;why did that scan do what it did&quot;, and the ones a support
+conversation should start with.</p>
+<pre><code class="language-bash">guardana doctor
+guardana config validate
+guardana config explain
+</code></pre>
+<h2 id="doctor--what-this-installation-is"><code>doctor</code> — what this installation is</h2>
+<pre><code class="language-text">✓ guardana-core: 0.7.0
+✓ guardana-rules: 0.7.0
+✓ guardana-cli: 0.7.0
+✓ guardana-report: 0.7.0
+✓ rules discovered: 32
+✓ evaluators discovered: 4
+✓ profile: ci parsed
+! fail_on_error: off — a check that could not run will not fail the build
+! budgets: no ceiling set — a probe against a paid endpoint has no upper bound
+
+0 problem(s), 2 thing(s) worth knowing.
+</code></pre>
+<p><strong>It contacts nothing.</strong> A diagnostic that costs money or shows up in somebody's
+production logs is one people avoid running, which defeats the purpose.</p>
+<p>It answers the questions that are otherwise guessed at:</p>
+<ul>
+<li><strong>which distributions are installed, and whether they agree.</strong> A stale
+<code>guardana-rules</code> beside a current CLI is a different tool than the version
+string suggests, and it is invisible until a rule behaves oddly.</li>
+<li><strong>which plugins loaded, and which failed to import.</strong> A failed import is a check
+that will not run.</li>
+<li><strong>whether third-party rules are installed.</strong> They are code this process imports.</li>
+<li><strong>which settings weaken the gate.</strong> Each is a legitimate choice; making it
+silently is what must not happen.</li>
+</ul>
+<p>Exit <code>3</code> when something is broken — no rules discovered, a plugin that failed to
+load. Warnings alone exit <code>0</code>: they are things worth knowing, not faults.</p>
+<h2 id="config-validate--fail-before-you-pay"><code>config validate</code> — fail before you pay</h2>
+<p>Parses the profile and stops. Useful as an early pipeline step: a typo in
+<code>guardana.yaml</code> should fail in a second rather than after a probe has spent its
+budget finding out.</p>
+<h2 id="config-explain--what-is-actually-in-force"><code>config explain</code> — what is actually in force</h2>
+<pre><code class="language-bash">guardana config explain --format json
+</code></pre>
+<p>A profile file shows what somebody wrote. The question they actually have is what
+is <em>in force</em>, and most of a gate is defaults — including the ones nobody typed.
+<code>explain</code> prints the resolved settings: thresholds, budgets, privacy, safety, and
+the privacy policy digest that a run manifest also records, so a saved run can be
+matched back to the configuration that produced it.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="profiles.html"><code>profiles.md</code></a> — what each setting means</li>
+<li><a href="exit-codes.html"><code>exit-codes.md</code></a> — what <code>3</code> means here</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-doctor.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

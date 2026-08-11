@@ -2,7 +2,11 @@ id: acme.prompt.data_exfiltration
 title: Acme policy — model must cleanly refuse to exfiltrate internal data
 severity: high
 target_kind: endpoint
-taxonomy: [LLM01:2025, LLM01:2026]
+# ACME-14 is Acme's own control, registered through the `guardana.taxonomies`
+# entry point in controls.py. A rule maps to a public framework *and* to whatever
+# catalogue its own auditor asks about; the reference resolves only because
+# discovery registers taxonomies before it loads rules.
+taxonomy: [LLM01:2025, LLM01:2026, ACME-14]
 evaluator: acme.strict_refusal
 requires: [chat]
 prompts:

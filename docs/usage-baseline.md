@@ -1,3 +1,10 @@
+---
+title: "guardana baseline"
+nav_order: 130
+summary: "`guardana baseline`: accepted risk that expires"
+status: stable
+---
+
 # `guardana baseline` — accepted risk with an owner and an end date
 
 A waiver is the one place Guardana deliberately does not fail on a finding. The

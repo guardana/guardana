@@ -1,3 +1,10 @@
+---
+title: "The collector"
+nav_order: 300
+summary: "the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness"
+status: beta
+---
+
 # The collector — tenants, persistence, migrations, and what a database does not fix
 
 The collector (`guardana-server`) aggregates findings from many agents. It is

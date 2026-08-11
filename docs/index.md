@@ -1,3 +1,10 @@
+---
+title: "Documentation"
+nav_order: 340
+summary: "The map: every guide, reference and design document, grouped by who needs it."
+status: stable
+---
+
 # Guardana documentation
 
 Guardana is an open-source engine and CLI for verifying the security of
@@ -61,7 +68,9 @@ detail below.
 - [`safe-testing.md`](safe-testing.md) — side effects, staging, and reading a result honestly
 - [`architecture.md`](architecture.md) — the five abstractions, the Registry, the core↔server boundary
 
-## Reference — generated from the registry, never typed by hand
+## Reference
+
+Generated from the registry, never typed by hand.
 
 - [`generated/rule-summary.md`](generated/rule-summary.md) — counts by surface, target kind and severity
 - [`generated/rule-catalog.md`](generated/rule-catalog.md) — every built-in rule and what it maps to
@@ -71,9 +80,8 @@ detail below.
 ## Design documents
 
 Written before the code they describe, so the reasoning survives the review.
-[`design/README.md`](design/README.md) explains how they are named and what a
-status means:
 
+- [`design/README.md`](design/README.md) — how these are named, what each status means, and why an accepted decision is superseded rather than rewritten
 - [`design/trace-domain-model.md`](design/trace-domain-model.md) — the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
 - [`design/framework-adapters.md`](design/framework-adapters.md) — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing
 - [`design/security-contracts.md`](design/security-contracts.md) — the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does
@@ -93,6 +101,7 @@ status means:
 - [`design/finding-lifecycle-and-waivers.md`](design/finding-lifecycle-and-waivers.md) — statuses, waivers that expire, and why this is not a second `baseline`
 - [`design/audit-retention-and-deletion.md`](design/audit-retention-and-deletion.md) — who did what, how long evidence is kept, and deleting on purpose
 - [`design/panel-sessions.md`](design/panel-sessions.md) — signing in to the panel with a read key, and why the cookie cannot write
+- [`design/enterprise-readiness-plan.md`](design/enterprise-readiness-plan.md) — superseded by `ROADMAP.md`, kept because it records what the constraints were when the company-readiness work was planned
 
 ## Project direction
 

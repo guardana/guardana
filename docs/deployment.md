@@ -1,3 +1,10 @@
+---
+title: "Deploying the collector"
+nav_order: 290
+summary: "running the collector in production: Compose, TLS, upgrades, what to watch, and what it does not give you yet"
+status: beta
+---
+
 # Deploying the collector in production
 
 Everything Guardana does on a laptop or in CI works without this page. The

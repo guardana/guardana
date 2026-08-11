@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana analyze-trace — Guardana documentation</title>
+<meta name="description" content="guardana analyze-trace: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana&#x27;s native dialect">
+<link rel="canonical" href="https://guardana.dev/docs/usage-analyze-trace.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html" aria-current="page">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana analyze-trace</code> — grade an execution that already happened</h1><p class="lede"><code>guardana analyze-trace</code>: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect</p><p><code>scan</code> reads files. <code>probe</code> talks to a live model. <code>analyze-trace</code> reads a <strong>trace</strong>:
+a recording of what your agent actually did, exported by whatever instrumentation you
+already run.</p>
+<pre><code class="language-bash">guardana analyze-trace trace.jsonl
+</code></pre>
+<p>It opens one file and no socket. Nothing is sent anywhere, no model is called, and no
+tool is invoked.</p>
+<h2 id="what-it-is-for">What it is for</h2>
+<p>Some failures cannot be reproduced from outside. The documents your retriever returned
+were whatever the index held at 09:41. The memory already contained a note from Tuesday.
+The credential that reached the third MCP server came from a delegation chain no prompt
+can recreate. A trace is the only place those are visible.</p>
+<h2 id="the-one-thing-to-understand-first">The one thing to understand first</h2>
+<p><strong>A trace records what your application chose to record.</strong> That bounds what any verdict
+over it can mean, and Guardana would rather say so than let you find out later.</p>
+<p>When no approval appears before a payment, three worlds fit the file:</p>
+<ol>
+<li>no approval was sought, and the payment went out unapproved — a finding;</li>
+<li>an approval <em>was</em> sought and your framework does not emit approval spans — nothing
+wrong at all;</li>
+<li>the trace was cut short before the approval was written — unknown.</li>
+</ol>
+<p>A tool that reads that absence as world 1 fires on every well-governed system. One that
+reads it as world 2 passes on the one system that really skipped it. So Guardana reads it
+as neither: <strong>a dimension your producer does not record makes the rules that need it not
+run</strong>, and the command says which ones and why.</p>
+<pre><code>$ guardana analyze-trace otel-export.jsonl
+read 2 span(s) from otel-export.jsonl as otel (producer: opentelemetry)
+note: this producer does not record identity, delegation, consent, policy, approval,
+      effects — the rules needing those dimensions were skipped rather than reporting
+      nothing found. Set fail_on_skipped to treat that as indeterminate
+</code></pre>
+<p>Two consequences worth stating plainly:</p>
+<ul>
+<li>A clean result means <em>in this recorded execution, these invariants held.</em> It does not
+mean the system is secure — the request that broke it may simply not be in the file.</li>
+<li>A trace that no rule can check exits <code>2</code> (indeterminate), not <code>0</code>. Nothing was
+verified, so &quot;passed&quot; is not a sentence that run is entitled to.</li>
+</ul>
+<h2 id="two-dialects">Two dialects</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>--dialect</code></th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>otel</code></td>
+<td><strong>OpenTelemetry GenAI semantic conventions.</strong> What your instrumentation already emits. Read from OTLP/JSON and from an SDK file exporter, and from all three generations of the message convention (<code>gen_ai.input.messages</code>, the <code>gen_ai.*.message</code> events, and the deprecated <code>gen_ai.prompt</code>)</td>
+</tr>
+<tr>
+<td><code>guardana</code></td>
+<td><strong>The native dialect: OpenTelemetry's message shape plus named extensions</strong> for identity, delegation, consent, policy decisions, approvals and side effects — the half the conventions have no field for</td>
+</tr>
+</tbody>
+</table></div>
+<p>The dialect is detected from the file's first record and <strong>announced on every run</strong>,
+because getting it wrong yields a partial trace and a partial trace grades clean. Pass
+<code>--dialect</code> to override.</p>
+<h2 id="adding-the-half-your-framework-does-not-emit">Adding the half your framework does not emit</h2>
+<p>The OpenTelemetry conventions carry the model-call half of the picture: messages with
+typed content parts, tool calls, retrieval, memory, tokens, agents, MCP sessions. They
+have <strong>no field</strong> for the credential a hop presented, the audience a token names, a
+delegation boundary, a consent grant, a human approval, a policy decision or an external
+side effect — which is where most of the interesting failures live.</p>
+<p><code>--write-trace</code> converts any export into the native dialect so you can add them:</p>
+<pre><code class="language-bash">guardana analyze-trace otel-export.jsonl --write-trace enriched.jsonl
+# add the blocks your framework knows about but does not emit, then:
+guardana analyze-trace enriched.jsonl
+</code></pre>
+<p><strong>The written file is a faithful copy, not a redacted one.</strong> Redaction applies to
+<em>evidence</em> — what leaves in a report, a SARIF file or a collector envelope — and a
+trace being converted is input, not evidence. Redacting it here would change what the
+rules then grade while the file still looked authoritative. So if the export contains
+customer prompts, API keys in tool arguments or personal data, the converted file
+contains them too, in a form that is easier to read than the one it came from. Write it
+where the original already belongs, and keep it out of a repository.</p>
+<h2 id="the-native-format">The native format</h2>
+<p>JSONL. The first line is a header; every later line is one span. The published schema is
+<a href="https://github.com/guardana/guardana/blob/main/schemas/trace-v2.schema.json"><code>schemas/trace-v2.schema.json</code></a>, and each line
+validates against it independently. A v1 file still reads: v2 added <code>agent</code> to a span,
+so a v1 span simply does not carry one.</p>
+<pre><code class="language-jsonl">{&quot;guardana_trace&quot;: 2, &quot;trace_id&quot;: &quot;t-42&quot;, &quot;producer&quot;: {&quot;name&quot;: &quot;acme-harness&quot;, &quot;version&quot;: &quot;2.1&quot;}, &quot;instrumented&quot;: [&quot;messages&quot;, &quot;tools&quot;, &quot;identity&quot;, &quot;delegation&quot;, &quot;consent&quot;, &quot;policy&quot;, &quot;approval&quot;, &quot;effects&quot;]}
+{&quot;span_id&quot;: &quot;s1&quot;, &quot;kind&quot;: &quot;model_call&quot;, &quot;name&quot;: &quot;chat gpt-4o&quot;, &quot;agent&quot;: {&quot;name&quot;: &quot;support-agent&quot;}, &quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;parts&quot;: [{&quot;type&quot;: &quot;text&quot;, &quot;content&quot;: &quot;refund order 12&quot;}]}], &quot;consents&quot;: [{&quot;client&quot;: &quot;support-agent&quot;, &quot;granted&quot;: true, &quot;scopes&quot;: [&quot;orders:read&quot;], &quot;subject&quot;: &quot;u-9&quot;}]}
+{&quot;span_id&quot;: &quot;s2&quot;, &quot;kind&quot;: &quot;tool_execution&quot;, &quot;name&quot;: &quot;refund&quot;, &quot;tool&quot;: {&quot;name&quot;: &quot;refund&quot;, &quot;arguments&quot;: &quot;{\&quot;order\&quot;: 12}&quot;, &quot;mutates&quot;: true}, &quot;identity&quot;: {&quot;actor&quot;: &quot;support-agent&quot;, &quot;session&quot;: {&quot;id&quot;: &quot;sess-1&quot;, &quot;protocol&quot;: &quot;mcp&quot;}}, &quot;delegations&quot;: [{&quot;actor&quot;: &quot;support-agent&quot;, &quot;boundary&quot;: &quot;agent-&gt;billing-mcp&quot;, &quot;credential&quot;: {&quot;kind&quot;: &quot;bearer&quot;, &quot;digest&quot;: &quot;sha256:…&quot;, &quot;audience&quot;: [&quot;https://billing.internal/&quot;]}, &quot;scopes&quot;: [&quot;orders:read&quot;, &quot;orders:refund&quot;]}], &quot;effects&quot;: [{&quot;sink&quot;: &quot;payment&quot;, &quot;action&quot;: &quot;refund&quot;, &quot;target&quot;: &quot;order/12&quot;, &quot;status&quot;: &quot;executed&quot;, &quot;reversible&quot;: false}], &quot;approvals&quot;: [{&quot;action&quot;: &quot;refund&quot;, &quot;outcome&quot;: &quot;not_requested&quot;}]}
+</code></pre>
+<p>Four rules of the format, each with a reason:</p>
+<p><strong><code>instrumented</code> is what licenses a finding.</strong> List the dimensions your producer really
+records. Leave one out and its rules do not run — which is the safe direction. If you
+omit the field entirely, Guardana derives it from what is present, and derivation can only
+ever <em>reduce</em> what runs.</p>
+<p><strong>Unknown keys are refused.</strong> A misspelled <code>aprovals:</code> would leave the approval dimension
+declared and empty, the rule would run, and it would report a system that approved
+everything properly. A load error is better than a false accusation.</p>
+<p><strong>Credentials are named, never carried.</strong> Write a <code>digest</code> if you have one. If you write a
+<code>value</code>, Guardana hashes it on read and keeps only the hash — the model has no field to
+put a token in. Nothing here reaches a report at any privacy level.</p>
+<p><strong><code>scopes: []</code> and no <code>scopes</code> key are different facts.</strong> <code>[]</code> means the client was
+granted nothing; omitting it means nobody recorded what was granted. The first is
+checkable, the second makes the rule decline.</p>
+<h3 id="versioning">Versioning</h3>
+<p><code>guardana_trace</code> is the schema version. A version this build cannot read is <strong>refused</strong>,
+not read as v1 — reading it anyway would drop the fields we do not know and grade what was
+left, which is a partial trace reported as a whole one. A file with no version key is
+refused too: guessing is how an unversioned format acquires a version in name only.</p>
+<h2 id="what-it-checks">What it checks</h2>
+<p>Nine built-in rules, plus whatever your own <a href="usage-contracts.html">security contract</a>
+asserts. One works on a plain OpenTelemetry export; the rest need the authorization
+half.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What makes it fire</th>
+<th>Needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.trace.secret_in_tool_argument</code></td>
+<td>a credential appears in a recorded tool argument</td>
+<td>messages/tools</td>
+</tr>
+<tr>
+<td><code>guardana.trace.credential_passthrough</code></td>
+<td>one credential crossed two trust boundaries — the confused deputy</td>
+<td>delegation</td>
+</tr>
+<tr>
+<td><code>guardana.trace.identity_disagreement</code></td>
+<td>a token's audience is not the resource it was presented to</td>
+<td>identity</td>
+</tr>
+<tr>
+<td><code>guardana.trace.session_as_identity</code></td>
+<td>a step that changed something identified itself with a session and nothing else</td>
+<td>identity</td>
+</tr>
+<tr>
+<td><code>guardana.trace.consent_scope_exceeded</code></td>
+<td>a hop exercised a scope no consent granted</td>
+<td>consent</td>
+</tr>
+<tr>
+<td><code>guardana.trace.policy_decision_ignored</code></td>
+<td>a policy said no — or could not say — and the action happened anyway</td>
+<td>policy</td>
+</tr>
+<tr>
+<td><code>guardana.trace.unapproved_side_effect</code></td>
+<td>a consequential effect executed with its approval denied or never sought</td>
+<td>approval + effects</td>
+</tr>
+<tr>
+<td><code>guardana.trace.cross_tenant_retrieval</code></td>
+<td>a retrieval for one tenant returned a document belonging to another</td>
+<td>retrieval</td>
+</tr>
+<tr>
+<td><code>guardana.trace.handoff_authority_expansion</code></td>
+<td>an agent exercised a scope wider than the handoff carried to it</td>
+<td>delegation + handoff</td>
+</tr>
+</tbody>
+</table></div>
+<p>Full mapping to OWASP and MITRE ATLAS:
+<a href="generated/rule-catalog.html">the generated catalog</a>.</p>
+<h2 id="a-truncated-trace-is-not-a-shorter-one">A truncated trace is not a shorter one</h2>
+<p>If the header says <code>truncated</code>, or the file exceeds a read ceiling, then a rule that
+<strong>found</strong> something still reports it — the evidence is real — and a rule that found
+nothing reports <code>inconclusive</code>, because the step it needed may be in the part that is
+missing.</p>
+<h2 id="options">Options</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--dialect guardana|otel</code></td>
+<td>Override detection</td>
+</tr>
+<tr>
+<td><code>--write-trace PATH</code></td>
+<td>Also write the trace in the native dialect</td>
+</tr>
+<tr>
+<td><code>--profile</code>, <code>--preset</code></td>
+<td>Policy, as for every other command — see <a href="profiles.html"><code>profiles.md</code></a></td>
+</tr>
+<tr>
+<td><code>--format human|json|sarif|junit</code></td>
+<td><code>json</code> is what <a href="usage-diff.html"><code>guardana diff</code></a> reads</td>
+</tr>
+<tr>
+<td><code>--output PATH</code></td>
+<td>Save the run</td>
+</tr>
+<tr>
+<td><code>--reporter server://URL</code></td>
+<td>Forward findings to a collector</td>
+</tr>
+<tr>
+<td><code>--ai-system</code>, <code>--environment</code>, <code>--deployment-id</code></td>
+<td>What this trace came from. Never guessed</td>
+</tr>
+<tr>
+<td><code>--rules</code>, <code>--plugins</code>, <code>--allow-plugin</code></td>
+<td>Rule loading, as for <code>scan</code></td>
+</tr>
+<tr>
+<td><code>--contract PATH</code></td>
+<td>A <a href="usage-contracts.html">security contract</a> to check this execution against; repeatable, and a directory loads every <code>.yaml</code> in it</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="exit-codes">Exit codes</h2>
+<p>The <a href="exit-codes.html">same contract as every command</a>. <code>2</code> is the one to expect from a
+sparse trace: no rule could run, so nothing was verified.</p>
+<p>Two more routes to <code>2</code> exist here and nowhere else, and neither can be switched off:
+a dimension named in <code>trace.require:</code> (or needed by a contract assertion) that this
+producer does not record, and a set of contracts none of which was about the AI
+system you named. Run <a href="usage-trace-inspect.html"><code>guardana trace inspect</code></a> first to
+see which dimensions the file actually carries.</p>
+<h2 id="saved-runs">Saved runs</h2>
+<p>A run over a trace records <code>source.kind: imported_trace</code> in its manifest, so a dashboard
+can tell a recording from a live check. It compares with <code>guardana diff</code> like any other
+run, and the coverage fingerprint records which dimensions were available — so a diff
+against a richer trace says the <em>reach</em> changed instead of reading the missing findings as
+an improvement.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="usage-trace-inspect.html"><code>usage-trace-inspect.md</code></a> — what this file can answer at
+all, before anything grades it</li>
+<li><a href="usage-contracts.html"><code>usage-contracts.md</code></a> — your own invariants, as a versioned
+file this command checks</li>
+<li><a href="usage-import-observations.html"><code>usage-import-observations.md</code></a> — carrying another
+tool's results in as unverified claims</li>
+<li><a href="design/trace-domain-model.html"><code>design/trace-domain-model.md</code></a> — why the model is
+shaped this way, and what was rejected</li>
+<li><a href="usage-probe.html"><code>usage-probe.md</code></a> — verifying a live endpoint or MCP server instead</li>
+<li><a href="privacy.html"><code>privacy.md</code></a> — what evidence keeps, and what the redactor removes</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-analyze-trace.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

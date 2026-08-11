@@ -1,0 +1,2649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enterprise-readiness plan — Guardana documentation</title>
+<meta name="description" content="The original plan for making Guardana deployable by a company. Superseded by ROADMAP.md, kept because it records what the constraints were at the time.">
+<link rel="canonical" href="https://guardana.dev/docs/design/enterprise-readiness-plan.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html" aria-current="page">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Guardana: Enterprise-Readiness Change Plan<span class="status superseded">superseded</span></h1><p class="lede">The original plan for making Guardana deployable by a company. Superseded by ROADMAP.md, kept because it records what the constraints were at the time.</p><p><strong>Status:</strong> superseded by <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md"><code>ROADMAP.md</code></a> · <strong>Written:</strong> 2026-08-02 against 0.6</p>
+<blockquote>
+<p><strong>Historical input document, kept for the record.</strong> Written before any of it was
+built. Phases A and B shipped in 0.7, Phase C completed across 0.8.0–0.11.0, and
+parts of what follows were reconsidered on the way. It is
+not a statement of current capability and not the roadmap — for what ships
+today read <a href="https://github.com/guardana/guardana/blob/main/FEATURES.md"><code>FEATURES.md</code></a>, and for direction
+<a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md"><code>ROADMAP.md</code></a>.</p>
+</blockquote>
+<p><strong>Repository:</strong> https://github.com/guardana/guardana<br />
+<strong>Prepared against:</strong> public <code>main</code> branch reviewed on 2026-08-02<br />
+<strong>Primary objective:</strong> make Guardana usable by real companies as quickly as possible, before broadening the engine into a larger AI-security platform.</p>
+<hr />
+<h2 id="0-how-to-use-this-document">0. How to use this document</h2>
+<p>This is an implementation brief for an AI coding agent or maintainer.</p>
+<p>Treat the work in this order:</p>
+<ol>
+<li><strong>Fix public truth and positioning.</strong></li>
+<li><strong>Deliver a company-usable, securely deployable product.</strong></li>
+<li><strong>Add application-aware and runtime evidence.</strong></li>
+<li><strong>Freeze the extension API only after the core domain model is complete.</strong></li>
+<li><strong>Expand corpora, languages, protocols, and multimodal coverage in parallel packs.</strong></li>
+</ol>
+<p>Do not implement the entire future roadmap before shipping the P0 enterprise-readiness milestone.</p>
+<h3 id="priority-definitions">Priority definitions</h3>
+<ul>
+<li><strong>P0 — company-ready:</strong> required before Guardana can credibly be adopted by a real team.</li>
+<li><strong>P1 — platform foundation:</strong> required to test complete AI applications rather than only artifacts and endpoints.</li>
+<li><strong>P2 — expansion:</strong> broader attack coverage, protocols, multimodality, advanced assurance, and managed-cloud differentiation.</li>
+<li><strong>DOC:</strong> documentation or public-message change.</li>
+<li><strong>CODE:</strong> implementation change.</li>
+<li><strong>OPS:</strong> packaging, deployment, release, or operational change.</li>
+<li><strong>SEC:</strong> security-hardening change.</li>
+</ul>
+<hr />
+<h1 id="1-product-decision-to-adopt">1. Product decision to adopt</h1>
+<h2 id="11-replace-the-current-narrow-product-definition">1.1 Replace the current narrow product definition</h2>
+<p>Current messaging centers on:</p>
+<blockquote>
+<p>security verification for self-hosted and self-built AI, model files, live endpoints, and agents.</p>
+</blockquote>
+<p>This is a good starting point but too model-centric for the intended market. Real companies deploy <strong>AI systems</strong>, not isolated models.</p>
+<p>Adopt the following product definition everywhere:</p>
+<blockquote>
+<p><strong>Guardana is an open-source AI security verification platform that continuously verifies what you built, what you deployed, and whether it became less secure.</strong></p>
+</blockquote>
+<p>Longer version:</p>
+<blockquote>
+<p>Guardana verifies AI systems across build time, pre-deployment testing, and production health checks. It scans model and application artifacts, probes live endpoints and agents, records reproducible security evidence, detects regressions between deployments, and optionally aggregates results in a self-hosted collector.</p>
+</blockquote>
+<h2 id="12-core-positioning">1.2 Core positioning</h2>
+<p>Guardana should not position itself as:</p>
+<ul>
+<li>the scanner with the largest number of jailbreak prompts;</li>
+<li>a generic LLM observability platform;</li>
+<li>an inline firewall or guardrail proxy;</li>
+<li>a general SAST, CVE, or secrets scanner;</li>
+<li>a compliance-certification engine;</li>
+<li>an autonomous production attack platform.</li>
+</ul>
+<p>Guardana should position itself as:</p>
+<blockquote>
+<p><strong>Open-source AI Security Verification Fabric</strong></p>
+</blockquote>
+<p>The product should connect four moments:</p>
+<ol>
+<li><strong>Build</strong> — repositories, model files, datasets, prompts, configuration, MCP manifests, dependencies.</li>
+<li><strong>Pre-deploy</strong> — controlled adversarial verification of endpoints, agents, tools, and RAG systems.</li>
+<li><strong>Runtime evidence</strong> — scheduled synthetic health checks and imported traces from real systems.</li>
+<li><strong>Fleet governance</strong> — deployment history, regressions, policies, waivers, ownership, and evidence.</li>
+</ol>
+<h2 id="13-primary-differentiator">1.3 Primary differentiator</h2>
+<p>Keep and strengthen the existing evaluator-first thesis:</p>
+<blockquote>
+<p>Guardana does not win by sending the most attacks. It wins by producing reproducible evidence of which attacks succeeded, which did not, and which could not be verified.</p>
+</blockquote>
+<p>The primary moat should be:</p>
+<ul>
+<li>reproducible run manifests;</li>
+<li>explicit evaluator versions;</li>
+<li>evidence and confidence;</li>
+<li>deterministic side-effect verification where possible;</li>
+<li>honest <code>findings</code>, <code>unverified</code>, and <code>errors</code>;</li>
+<li>regression comparison between deployments;</li>
+<li>one evidence model from repository scan to production trace.</li>
+</ul>
+<h2 id="14-target-users">1.4 Target users</h2>
+<p>Document these first-class user journeys:</p>
+<h3 id="individual-developer">Individual developer</h3>
+<ul>
+<li>scan a repository or downloaded model locally;</li>
+<li>test a local Ollama, vLLM, TGI, or compatible endpoint;</li>
+<li>receive understandable remediation;</li>
+<li>save a run and compare after a change;</li>
+<li>operate without an account or telemetry.</li>
+</ul>
+<h3 id="small-engineering-team">Small engineering team</h3>
+<ul>
+<li>run Guardana in pull requests and deployment pipelines;</li>
+<li>enforce a shared <code>guardana.yaml</code>;</li>
+<li>store accepted baselines;</li>
+<li>run scheduled checks;</li>
+<li>aggregate runs in a self-hosted collector;</li>
+<li>assign findings and track regressions.</li>
+</ul>
+<h3 id="enterprise-platformsecurity-team">Enterprise platform/security team</h3>
+<ul>
+<li>register multiple AI systems, environments, and deployments;</li>
+<li>use service accounts and central policies;</li>
+<li>retain evidence and audit history;</li>
+<li>integrate with GitLab, Jenkins, Azure DevOps, Kubernetes, webhooks, ticketing, and SIEM;</li>
+<li>use private extensions and private runners;</li>
+<li>keep prompts, traces, models, and credentials inside its own environment.</li>
+</ul>
+<hr />
+<h1 id="2-immediate-public-truth-corrections">2. Immediate public-truth corrections</h1>
+<p>These must be fixed before adding new marketing claims.</p>
+<h2 id="21-version-inconsistencies">2.1 Version inconsistencies</h2>
+<p>The current public files contain conflicting version statements:</p>
+<ul>
+<li><code>ROADMAP.md</code> says “What ships today (0.5.0)” and then describes features added in 0.6.</li>
+<li><code>README.md</code> calls <code>0.6</code> current.</li>
+<li>the README roadmap table contains both a current <code>0.6</code> row and another <code>0.6</code> future row;</li>
+<li>the README introduction to the roadmap still refers to Guardana <code>0.3</code>.</li>
+</ul>
+<h3 id="required-change">Required change</h3>
+<p>Create one canonical version source, for example:</p>
+<pre><code class="language-text">packages/guardana-core/src/guardana/core/_version.py
+</code></pre>
+<p>or a release metadata file generated from Git tags.</p>
+<p>Add a documentation test that fails when:</p>
+<ul>
+<li>README current version differs from package version;</li>
+<li>ROADMAP current version differs from package version;</li>
+<li>Action examples point to a different major/minor moving tag;</li>
+<li>the changelog lacks the current release.</li>
+</ul>
+<h2 id="22-rule-count-inconsistencies">2.2 Rule-count inconsistencies</h2>
+<p>Current public copy contains multiple rule counts and older layer totals.</p>
+<h3 id="required-change-1">Required change</h3>
+<p>Do not manually maintain rule counts in README, FEATURES, or ROADMAP.</p>
+<p>Generate the following from the installed registry during CI:</p>
+<ul>
+<li>total rules;</li>
+<li>rules by <code>Surface</code>;</li>
+<li>rules by <code>TargetKind</code>;</li>
+<li>rules by severity;</li>
+<li>rules by maturity;</li>
+<li>taxonomy coverage;</li>
+<li>evaluator list;</li>
+<li>target/provider support.</li>
+</ul>
+<p>Commit generated Markdown fragments or inject them during documentation build.</p>
+<p>Suggested generated files:</p>
+<pre><code class="language-text">docs/generated/rule-summary.md
+docs/generated/rule-catalog.md
+docs/generated/evaluator-catalog.md
+docs/generated/target-support.md
+docs/generated/taxonomy-coverage.md
+</code></pre>
+<p>README and FEATURES should include or link to generated truth instead of duplicating it.</p>
+<h2 id="23-three-ways-to-run-inconsistency">2.3 “Three ways to run” inconsistency</h2>
+<p>Public docs describe three ways to run but list static scan, endpoint probe, MCP probe, monitor, and then diff.</p>
+<h3 id="required-change-2">Required change</h3>
+<p>Use this conceptual model:</p>
+<ul>
+<li><strong>Verify artifacts:</strong> <code>scan</code></li>
+<li><strong>Verify a deployed system:</strong> <code>probe</code></li>
+<li><strong>Continuously re-verify:</strong> <code>monitor</code></li>
+<li><strong>Compare evidence:</strong> <code>diff</code></li>
+</ul>
+<p>Treat MCP as a target supported by <code>probe</code>, not another top-level operating mode.</p>
+<h2 id="24-clarify-what-monitor-is">2.4 Clarify what <code>monitor</code> is</h2>
+<p>Current wording can be interpreted as passive runtime monitoring. Today it is a scheduled active prober.</p>
+<h3 id="required-copy">Required copy</h3>
+<blockquote>
+<p><code>guardana monitor</code> performs scheduled synthetic security checks against a configured target. It does not passively inspect production user traffic and does not sit inline in the request path.</p>
+</blockquote>
+<p>Place this statement in:</p>
+<ul>
+<li>README;</li>
+<li><code>FEATURES.md</code>;</li>
+<li><code>docs/how-it-works.md</code>;</li>
+<li><code>docs/usage-monitor.md</code>;</li>
+<li>website;</li>
+<li>collector documentation.</li>
+</ul>
+<h2 id="25-clarify-collector-maturity">2.5 Clarify collector maturity</h2>
+<p>Do not describe the current collector as a complete team or enterprise monitoring product until it has persistence and authentication.</p>
+<p>Use an explicit maturity label:</p>
+<blockquote>
+<p><strong>Experimental collector:</strong> suitable for local evaluation and development. Production use requires the persistence, authentication, migration, backup, and deployment work listed in the P0 milestone.</p>
+</blockquote>
+<p>After P0 is completed, change the label to <code>beta</code>.</p>
+<h2 id="26-comparison-table">2.6 Comparison table</h2>
+<p>The current competitor table creates maintenance and credibility risk.</p>
+<p>Choose one of these approaches:</p>
+<h3 id="preferred">Preferred</h3>
+<p>Replace the checkbox comparison with a “Where Guardana fits” section describing categories:</p>
+<ul>
+<li>model/artifact scanners;</li>
+<li>red-team harnesses;</li>
+<li>runtime guardrails;</li>
+<li>AI observability platforms;</li>
+<li>Guardana’s verification/regression layer.</li>
+</ul>
+<h3 id="acceptable-alternative">Acceptable alternative</h3>
+<p>Keep the table only if:</p>
+<ul>
+<li>every claim links to a dated primary source;</li>
+<li>the methodology and date are shown;</li>
+<li>“partial” is defined;</li>
+<li>a test or scheduled review opens an issue every 60 days;</li>
+<li>unsupported or unverifiable claims are removed.</li>
+</ul>
+<h2 id="27-claims-about-evaluator-accuracy">2.7 Claims about evaluator accuracy</h2>
+<p>The “up to 37%” statement should not appear as an unsupported generalization.</p>
+<p>Required:</p>
+<ul>
+<li>cite the exact study;</li>
+<li>describe what was measured;</li>
+<li>avoid implying every competing tool has that exact error rate;</li>
+<li>distinguish a limitation of keyword grading from a measured result for Guardana;</li>
+<li>publish Guardana’s own benchmark dataset and calibration results.</li>
+</ul>
+<hr />
+<h1 id="3-new-roadmap-structure">3. New roadmap structure</h1>
+<p>Replace the current roadmap order.</p>
+<h2 id="31-recommended-sequence">3.1 Recommended sequence</h2>
+<h3 id="v07--company-ready-foundation">v0.7 — Company-Ready Foundation</h3>
+<p>Goal:</p>
+<blockquote>
+<p>A real company can install, configure, run, secure, persist, and upgrade Guardana without relying on undocumented knowledge.</p>
+</blockquote>
+<p>Includes:</p>
+<ul>
+<li>Run Manifest v2;</li>
+<li>predictable budgets and <code>guardana plan</code>;</li>
+<li>target capability inspection;</li>
+<li>stable machine-readable result schemas;</li>
+<li>safe privacy/redaction defaults;</li>
+<li>Docker images;</li>
+<li>production-grade collector baseline;</li>
+<li>generic CI support plus GitLab;</li>
+<li>deployment and operations documentation;</li>
+<li>release provenance and SBOM;</li>
+<li>supported-version policy;</li>
+<li>clear product maturity labels.</li>
+</ul>
+<h3 id="v08--application-aware-verification">v0.8 — Application-Aware Verification</h3>
+<p>Goal:</p>
+<blockquote>
+<p>Guardana can verify an AI application, not only an isolated model endpoint.</p>
+</blockquote>
+<p>Includes:</p>
+<ul>
+<li>common Trace model;</li>
+<li>imported real-agent traces;</li>
+<li>OpenTelemetry GenAI mapping;</li>
+<li>tool calls, tool results, identities, approvals, retrieval events, and side effects;</li>
+<li>sink-aware output handling;</li>
+<li>initial RAG targets and cross-tenant tests;</li>
+<li>utility regression tests.</li>
+</ul>
+<h3 id="v09--team-security-platform">v0.9 — Team Security Platform</h3>
+<p>Goal:</p>
+<blockquote>
+<p>Teams can manage AI systems, deployments, policies, findings, and evidence centrally.</p>
+</blockquote>
+<p>Includes:</p>
+<ul>
+<li>organization/project/AI-system/environment/deployment model;</li>
+<li>RBAC;</li>
+<li>service accounts;</li>
+<li>finding lifecycle;</li>
+<li>waivers with expiration;</li>
+<li>audit log;</li>
+<li>central policy distribution;</li>
+<li>deployment history;</li>
+<li>webhooks, Slack/Teams, Jira/GitHub/GitLab issue integrations;</li>
+<li>Kubernetes deployment;</li>
+<li>retention controls.</li>
+</ul>
+<h3 id="v10--stable-extension-platform">v1.0 — Stable Extension Platform</h3>
+<p>Goal:</p>
+<blockquote>
+<p>Third parties can invest in Guardana extensions with a stable compatibility contract.</p>
+</blockquote>
+<p>Freeze only after Trace, AI System, Deployment, Identity, Retrieval Event, Side Effect, and Run Manifest are settled.</p>
+<p>Includes:</p>
+<ul>
+<li>stable extension interfaces;</li>
+<li>deprecation policy;</li>
+<li>compatibility matrix;</li>
+<li>extension manifest;</li>
+<li>extension conformance suite;</li>
+<li>signed package metadata;</li>
+<li>declarative extension path that does not execute arbitrary Python.</li>
+</ul>
+<h3 id="v11--continuous-production-verification">v1.1 — Continuous Production Verification</h3>
+<p>Includes:</p>
+<ul>
+<li>OTLP receiver;</li>
+<li>scheduled synthetic checks;</li>
+<li>trace replay;</li>
+<li>statistical repeated runs;</li>
+<li>confidence intervals;</li>
+<li>drift and regression root cause;</li>
+<li>fleet history;</li>
+<li>private runner pattern.</li>
+</ul>
+<h3 id="v12--agent-and-protocol-security">v1.2 — Agent and Protocol Security</h3>
+<p>Includes:</p>
+<ul>
+<li>deep MCP security;</li>
+<li>A2A and multi-agent;</li>
+<li>delegated credentials;</li>
+<li>identity and privilege abuse;</li>
+<li>approval bypass;</li>
+<li>inter-agent trust boundaries;</li>
+<li>cascading failure;</li>
+<li>action-boundary policies.</li>
+</ul>
+<h3 id="v13--multimodal-and-advanced-assurance">v1.3 — Multimodal and Advanced Assurance</h3>
+<p>Includes:</p>
+<ul>
+<li>images;</li>
+<li>PDFs and document carriers;</li>
+<li>OCR injection;</li>
+<li>audio;</li>
+<li>multimodal tool results;</li>
+<li>adaptive attackers;</li>
+<li>deeper poisoning and backdoor research;</li>
+<li>advanced industry packs.</li>
+</ul>
+<h2 id="32-move-language-and-corpus-growth-to-a-parallel-lane">3.2 Move language and corpus growth to a parallel lane</h2>
+<p>Do not make “10× more prompts” and multilingual corpora the main dependency for company readiness.</p>
+<p>Create a parallel section:</p>
+<h3 id="community-and-curated-content-lane">Community and curated content lane</h3>
+<ul>
+<li><code>guardana-pack-owasp</code>;</li>
+<li><code>guardana-pack-mcp</code>;</li>
+<li><code>guardana-pack-rag</code>;</li>
+<li><code>guardana-pack-polish</code>;</li>
+<li><code>guardana-pack-healthcare</code>;</li>
+<li><code>guardana-pack-finance</code>;</li>
+<li><code>guardana-pack-kubernetes</code>;</li>
+<li>third-party dataset importers.</li>
+</ul>
+<p>Add <code>lang</code> to schemas now, but grow language packs independently from the P0 platform work.</p>
+<h2 id="33-add-measurable-exit-criteria-to-every-version">3.3 Add measurable exit criteria to every version</h2>
+<p>Every milestone must contain:</p>
+<ul>
+<li>user-visible outcome;</li>
+<li>required commands;</li>
+<li>required documentation;</li>
+<li>security acceptance criteria;</li>
+<li>performance acceptance criteria;</li>
+<li>migration and compatibility implications;</li>
+<li>explicitly deferred items.</li>
+</ul>
+<hr />
+<h1 id="4-p0-implementation-plan-make-guardana-usable-by-real-companies">4. P0 implementation plan: make Guardana usable by real companies</h1>
+<p>This is the highest-priority section.</p>
+<hr />
+<h2 id="41-run-manifest-v2">4.1 Run Manifest v2</h2>
+<h3 id="problem">Problem</h3>
+<p>Saved runs are not yet a complete reproducibility and deployment evidence record.</p>
+<h3 id="required-model">Required model</h3>
+<p>Every run must include:</p>
+<pre><code class="language-yaml">schema_version: &quot;2&quot;
+run_id: &quot;uuid&quot;
+created_at: &quot;RFC3339&quot;
+started_at: &quot;RFC3339&quot;
+completed_at: &quot;RFC3339&quot;
+source:
+  kind: local | ci | scheduled | imported_trace | replay
+  provider: github | gitlab | jenkins | azure | local | other
+  run_url: null
+guardana:
+  version: &quot;x.y.z&quot;
+  commit: null
+  distribution_versions: {}
+target:
+  type: artifact | endpoint | mcp | trace | retriever | application
+  ref: &quot;stable target reference&quot;
+  fingerprint: &quot;sha256:...&quot;
+  capabilities: []
+deployment:
+  ai_system: null
+  environment: null
+  deployment_id: null
+  commit_sha: null
+  image_digest: null
+  model_digest: null
+  model_name: null
+  model_revision: null
+configuration:
+  profile_name: &quot;...&quot;
+  profile_digest: &quot;sha256:...&quot;
+  system_prompt_digest: null
+  tool_manifest_digest: null
+  retriever_digest: null
+  dataset_digest: null
+  adapter_digest: null
+execution:
+  seed: null
+  temperature: null
+  concurrency: 4
+  timeout_seconds: 30
+  request_budget: null
+  token_budget: null
+  cost_budget: null
+  duration_budget_seconds: null
+usage:
+  requests: 0
+  input_tokens: null
+  output_tokens: null
+  estimated_cost: null
+  wall_time_seconds: 0
+rules:
+  - id: &quot;...&quot;
+    version: &quot;...&quot;
+    digest: &quot;...&quot;
+    maturity: stable
+evaluators:
+  - id: &quot;...&quot;
+    version: &quot;...&quot;
+    digest: &quot;...&quot;
+    calibration:
+      dataset_digest: null
+      measured_at: null
+      brier: null
+      ece: null
+result_summary:
+  findings: 0
+  unverified: 0
+  errors: 0
+  skipped: 0
+  gate: pass | fail | indeterminate
+privacy:
+  evidence_mode: redacted | metadata_only | full
+  redaction_policy_digest: null
+</code></pre>
+<h3 id="required-code-changes">Required code changes</h3>
+<ul>
+<li>Add a first-class <code>RunManifest</code> model in <code>guardana-core</code>.</li>
+<li>Version its serialization independently from the CLI version.</li>
+<li>Include it in JSON, JUnit metadata, SARIF properties, and collector ingestion.</li>
+<li>Add JSON Schema files under <code>schemas/</code>.</li>
+<li>Add migrations for older saved-run documents.</li>
+<li>Make <code>diff</code> validate schema and migration status.</li>
+<li>Add <code>guardana run inspect &lt;file&gt;</code>.</li>
+</ul>
+<h3 id="acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>two runs can be reproduced or explicitly marked non-reproducible;</li>
+<li><code>diff</code> explains every incompatibility;</li>
+<li>secrets are not written by default;</li>
+<li>all timestamps are UTC;</li>
+<li>all fingerprints specify their algorithm;</li>
+<li>schema compatibility tests exist.</li>
+</ul>
+<hr />
+<h2 id="42-cost-and-execution-budgets">4.2 Cost and execution budgets</h2>
+<h3 id="add-commands">Add commands</h3>
+<pre><code class="language-bash">guardana plan scan .
+guardana plan probe --url ... --model ...
+guardana probe --max-requests 200
+guardana probe --max-input-tokens 250000
+guardana probe --max-output-tokens 100000
+guardana probe --max-cost 10
+guardana probe --max-duration 15m
+guardana probe --resume &lt;run-id&gt;
+</code></pre>
+<h3 id="required-behavior">Required behavior</h3>
+<p>Before execution, estimate:</p>
+<ul>
+<li>number of rules;</li>
+<li>number of scenarios;</li>
+<li>minimum and maximum requests;</li>
+<li>judge requests;</li>
+<li>expected repetitions;</li>
+<li>approximate tokens;</li>
+<li>approximate wall time;</li>
+<li>estimated cost where provider pricing is configured;</li>
+<li>potentially destructive or side-effecting checks.</li>
+</ul>
+<p>During execution:</p>
+<ul>
+<li>enforce hard limits;</li>
+<li>stop cleanly;</li>
+<li>persist partial evidence;</li>
+<li>distinguish <code>budget_exhausted</code> from rule errors;</li>
+<li>allow resume without silently rerunning completed deterministic checks.</li>
+</ul>
+<h3 id="add-profile-schema">Add profile schema</h3>
+<pre><code class="language-yaml">budgets:
+  max_requests: 200
+  max_input_tokens: 250000
+  max_output_tokens: 100000
+  max_cost: 10.00
+  currency: USD
+  max_duration: 15m
+  on_exhaustion: fail | indeterminate | stop
+</code></pre>
+<h3 id="acceptance-criteria-1">Acceptance criteria</h3>
+<ul>
+<li>a company can know the upper bound before probing a paid endpoint;</li>
+<li>budget exhaustion never appears as a security pass;</li>
+<li>the final report shows planned versus actual usage.</li>
+</ul>
+<hr />
+<h2 id="43-target-capability-discovery">4.3 Target capability discovery</h2>
+<p>Add:</p>
+<pre><code class="language-bash">guardana target inspect --url ... --model ...
+guardana target inspect --mcp ...
+</code></pre>
+<p>Inspect and report:</p>
+<ul>
+<li>chat;</li>
+<li>system messages;</li>
+<li>streaming;</li>
+<li>tool calls;</li>
+<li>structured output;</li>
+<li>image/audio/document input;</li>
+<li>usage metadata;</li>
+<li>finish reason;</li>
+<li>seed;</li>
+<li>log probabilities;</li>
+<li>token limits;</li>
+<li>context limits;</li>
+<li>authentication;</li>
+<li>rate-limit behavior;</li>
+<li>provider dialect;</li>
+<li>unsupported features.</li>
+</ul>
+<h3 id="design-rule">Design rule</h3>
+<p>“OpenAI-compatible” must not be treated as a guarantee of identical behavior.</p>
+<p>Every rule must declare required capabilities. The runner must:</p>
+<ul>
+<li>skip unsupported rules explicitly;</li>
+<li>include the reason in <code>observations</code>;</li>
+<li>never classify a capability mismatch as pass;</li>
+<li>allow strict mode to fail when required coverage is unavailable.</li>
+</ul>
+<hr />
+<h2 id="44-stable-exit-codes-and-automation-contract">4.4 Stable exit codes and automation contract</h2>
+<p>Document and test a stable exit-code table.</p>
+<p>Recommended:</p>
+<pre><code class="language-text">0 = run completed and policy passed
+1 = run completed and policy failed
+2 = result indeterminate or comparison impossible
+3 = invalid configuration or CLI usage
+4 = target unavailable/authentication failed
+5 = internal Guardana error
+6 = budget exhausted
+7 = partial run interrupted
+</code></pre>
+<p>Add <code>--exit-code-mode strict|legacy</code> during migration if required.</p>
+<p>Machine consumers must not parse human text to determine status.</p>
+<hr />
+<h2 id="45-privacy-redaction-and-safe-evidence-defaults">4.5 Privacy, redaction, and safe evidence defaults</h2>
+<h3 id="default-posture">Default posture</h3>
+<ul>
+<li>no telemetry;</li>
+<li>no account;</li>
+<li>no prompt or response body sent to a collector unless explicitly enabled;</li>
+<li>no API key or authorization header in logs;</li>
+<li>no full tool arguments stored unless configured;</li>
+<li>evidence is redacted by default;</li>
+<li>local full-evidence mode remains available.</li>
+</ul>
+<h3 id="add-profile-schema-1">Add profile schema</h3>
+<pre><code class="language-yaml">privacy:
+  evidence_mode: redacted   # metadata_only | redacted | full
+  redact:
+    secrets: true
+    emails: true
+    ip_addresses: false
+    custom_patterns: []
+  hash_identifiers: true
+  store_prompts: false
+  store_responses: false
+  store_tool_arguments: false
+  max_evidence_bytes: 16384
+</code></pre>
+<h3 id="required-implementation">Required implementation</h3>
+<ul>
+<li>central <code>EvidenceRedactor</code>;</li>
+<li>redaction before serialization and before reporter dispatch;</li>
+<li>tests proving sensitive fields cannot bypass redaction;</li>
+<li>separate local and collector evidence policies;</li>
+<li>an explicit warning when <code>full</code> evidence is enabled;</li>
+<li>report which fields were removed;</li>
+<li>avoid logging raw target responses at debug level by default.</li>
+</ul>
+<hr />
+<h2 id="46-safe-active-testing">4.6 Safe active testing</h2>
+<p>Dynamic security testing can create side effects.</p>
+<p>Add rule metadata:</p>
+<pre><code class="language-yaml">maturity: stable
+impact: passive | active | side_effecting
+destructive: false
+requires_confirmation: false
+estimated_requests: 3
+</code></pre>
+<p>Add execution modes:</p>
+<pre><code class="language-bash">guardana probe --safety passive
+guardana probe --safety active
+guardana probe --allow-side-effects
+</code></pre>
+<p>Defaults:</p>
+<ul>
+<li>production presets run only passive or explicitly approved checks;</li>
+<li>destructive checks never run by default;</li>
+<li>tool calls use mocks/sandbox targets unless the user explicitly opts into real actions;</li>
+<li>reports identify every action attempted and whether it was simulated, proposed, or executed.</li>
+</ul>
+<hr />
+<h2 id="47-production-grade-collector-baseline">4.7 Production-grade collector baseline</h2>
+<p>The collector is the most important P0 product gap.</p>
+<h3 id="required-domain-model">Required domain model</h3>
+<pre><code class="language-text">Organization
+ └─ Project
+     └─ AI System
+         ├─ Environments
+         ├─ Deployments
+         ├─ Assets
+         ├─ Policies
+         ├─ Runs
+         ├─ Findings
+         ├─ Waivers
+         └─ Integrations
+</code></pre>
+<p>Minimum entities:</p>
+<ul>
+<li><code>Organization</code></li>
+<li><code>User</code></li>
+<li><code>ServiceAccount</code></li>
+<li><code>Project</code></li>
+<li><code>AISystem</code></li>
+<li><code>Environment</code></li>
+<li><code>Deployment</code></li>
+<li><code>Asset</code></li>
+<li><code>Policy</code></li>
+<li><code>Run</code></li>
+<li><code>Finding</code></li>
+<li><code>FindingOccurrence</code></li>
+<li><code>Waiver</code></li>
+<li><code>AuditEvent</code></li>
+<li><code>ApiKey</code></li>
+<li><code>Integration</code></li>
+</ul>
+<h3 id="required-p0-collector-capabilities">Required P0 collector capabilities</h3>
+<ul>
+<li>PostgreSQL persistence;</li>
+<li>database migrations;</li>
+<li>API-key authentication for runners;</li>
+<li>local user authentication or OIDC-ready interface;</li>
+<li>organization/project isolation;</li>
+<li>minimum RBAC: owner, admin, member, viewer, runner;</li>
+<li>pagination;</li>
+<li>filtering;</li>
+<li>stable versioned API;</li>
+<li>health and readiness endpoints;</li>
+<li>audit log;</li>
+<li>configurable retention;</li>
+<li>backup and restore documentation;</li>
+<li>secure configuration through environment variables or mounted secrets;</li>
+<li>rate limiting;</li>
+<li>request-size limits;</li>
+<li>evidence redaction enforcement;</li>
+<li>TLS deployment documentation;</li>
+<li>disabled-by-default public registration;</li>
+<li>no default credentials;</li>
+<li>migration rollback or documented restore procedure.</li>
+</ul>
+<h3 id="minimum-finding-workflow">Minimum finding workflow</h3>
+<p>Statuses:</p>
+<pre><code class="language-text">open
+acknowledged
+in_progress
+resolved
+accepted_risk
+false_positive
+expired_waiver
+reopened
+</code></pre>
+<p>Fields:</p>
+<ul>
+<li>fingerprint;</li>
+<li>first seen;</li>
+<li>last seen;</li>
+<li>affected deployment;</li>
+<li>rule version;</li>
+<li>evaluator version;</li>
+<li>evidence;</li>
+<li>owner;</li>
+<li>status;</li>
+<li>remediation;</li>
+<li>external ticket;</li>
+<li>waiver;</li>
+<li>waiver expiry;</li>
+<li>resolution commit/deployment.</li>
+</ul>
+<h3 id="p0-ui-scope">P0 UI scope</h3>
+<p>Do not build a giant dashboard.</p>
+<p>Required pages only:</p>
+<ol>
+<li>sign-in;</li>
+<li>organization/project switcher;</li>
+<li>AI systems;</li>
+<li>runs;</li>
+<li>finding list;</li>
+<li>finding detail/evidence;</li>
+<li>deployment regression;</li>
+<li>policies;</li>
+<li>API keys;</li>
+<li>audit log/basic settings.</li>
+</ol>
+<h3 id="deployment-artifacts">Deployment artifacts</h3>
+<p>Add:</p>
+<pre><code class="language-text">deploy/docker-compose/
+deploy/helm/             # can land late P0 or early P1
+deploy/examples/nginx/
+deploy/examples/traefik/
+</code></pre>
+<p>Provide:</p>
+<ul>
+<li>Docker Compose with PostgreSQL;</li>
+<li>persistent volumes;</li>
+<li>health checks;</li>
+<li>upgrade steps;</li>
+<li>backup command;</li>
+<li>restore command;</li>
+<li>secret generation;</li>
+<li>reverse-proxy TLS examples.</li>
+</ul>
+<h3 id="maturity-labels">Maturity labels</h3>
+<ul>
+<li>current in-memory collector: <code>experimental</code>;</li>
+<li>persistence/auth release: <code>beta</code>;</li>
+<li>declare <code>stable</code> only after upgrade, backup, security, and multi-tenant tests.</li>
+</ul>
+<hr />
+<h2 id="48-containers-and-installation">4.8 Containers and installation</h2>
+<h3 id="add-official-images">Add official images</h3>
+<ul>
+<li><code>ghcr.io/guardana/guardana-cli:&lt;version&gt;</code></li>
+<li><code>ghcr.io/guardana/guardana-server:&lt;version&gt;</code></li>
+</ul>
+<p>Requirements:</p>
+<ul>
+<li>non-root user;</li>
+<li>read-only root filesystem where possible;</li>
+<li>minimal base;</li>
+<li>pinned digest in examples;</li>
+<li>OCI labels;</li>
+<li>SBOM;</li>
+<li>provenance attestation;</li>
+<li>vulnerability scan;</li>
+<li>multi-architecture if practical;</li>
+<li>no build tools in runtime image.</li>
+</ul>
+<h3 id="installation-paths-to-document">Installation paths to document</h3>
+<ul>
+<li><code>uvx</code>;</li>
+<li><code>pipx</code>;</li>
+<li>project dependency;</li>
+<li>Docker;</li>
+<li>air-gapped wheelhouse;</li>
+<li>self-hosted collector with Docker Compose;</li>
+<li>Kubernetes/Helm later in P0 or v0.9.</li>
+</ul>
+<hr />
+<h2 id="49-cicd-support">4.9 CI/CD support</h2>
+<h3 id="p0-required">P0 required</h3>
+<ol>
+<li>GitHub Actions — retain and harden.</li>
+<li>Generic Docker/CLI pipeline — provider-neutral.</li>
+<li>GitLab CI — official example/template.</li>
+<li>Jenkins — documented pipeline example.</li>
+<li>Azure DevOps — documented YAML example.</li>
+</ol>
+<h3 id="ci-requirements">CI requirements</h3>
+<ul>
+<li>save run JSON as artifact;</li>
+<li>save SARIF/JUnit;</li>
+<li>compare against accepted baseline;</li>
+<li>support advisory mode;</li>
+<li>support strict mode;</li>
+<li>expose stable exit codes;</li>
+<li>redact evidence;</li>
+<li>document secret injection;</li>
+<li>show safe target-test environment;</li>
+<li>avoid probing production on every pull request;</li>
+<li>allow nightly/deployment deep checks.</li>
+</ul>
+<h3 id="pipeline-tiers">Pipeline tiers</h3>
+<p>Document three recommended tiers:</p>
+<h4 id="pr-fast">PR fast</h4>
+<ul>
+<li>static scan;</li>
+<li>deterministic checks;</li>
+<li>no external judge;</li>
+<li>strict time budget;</li>
+<li>target duration under one minute for typical repositories.</li>
+</ul>
+<h4 id="deployment-standard">Deployment standard</h4>
+<ul>
+<li>endpoint capability inspection;</li>
+<li>key scenarios;</li>
+<li>selected judge-backed evaluations;</li>
+<li>saved run and diff;</li>
+<li>bounded requests/cost.</li>
+</ul>
+<h4 id="scheduled-deep">Scheduled deep</h4>
+<ul>
+<li>multi-turn;</li>
+<li>repeated runs;</li>
+<li>adaptive attacks later;</li>
+<li>RAG/agent scenarios;</li>
+<li>larger budget.</li>
+</ul>
+<hr />
+<h2 id="410-baseline-lifecycle">4.10 Baseline lifecycle</h2>
+<p>Current <code>diff</code> is valuable but teams need an operational baseline workflow.</p>
+<p>Add:</p>
+<pre><code class="language-bash">guardana baseline create run.json --output guardana-baseline.json
+guardana baseline verify guardana-baseline.json
+guardana baseline update before.json after.json
+guardana diff --baseline guardana-baseline.json current.json
+</code></pre>
+<p>Baseline metadata:</p>
+<ul>
+<li>approver;</li>
+<li>reason;</li>
+<li>created at;</li>
+<li>expires at;</li>
+<li>target fingerprint;</li>
+<li>environment;</li>
+<li>policy digest;</li>
+<li>accepted findings;</li>
+<li>signatures/checksum.</li>
+</ul>
+<p>Rules:</p>
+<ul>
+<li>baseline does not hide new occurrences;</li>
+<li>accepted-risk items expire;</li>
+<li>changed rule/evaluator versions are shown;</li>
+<li>a missing baseline never silently passes;</li>
+<li>baseline updates are reviewable in source control.</li>
+</ul>
+<hr />
+<h2 id="411-operational-diagnostics">4.11 Operational diagnostics</h2>
+<p>Add:</p>
+<pre><code class="language-bash">guardana doctor
+guardana doctor --server
+guardana config validate
+guardana config explain
+guardana run inspect
+</code></pre>
+<p><code>doctor</code> should check:</p>
+<ul>
+<li>package versions;</li>
+<li>plugin inventory;</li>
+<li>profile parsing;</li>
+<li>target connectivity;</li>
+<li>target capabilities;</li>
+<li>evaluator connectivity;</li>
+<li>collector connectivity;</li>
+<li>write permissions;</li>
+<li>TLS verification;</li>
+<li>database status for server;</li>
+<li>pending migrations;</li>
+<li>unsafe settings;</li>
+<li>evidence privacy mode.</li>
+</ul>
+<hr />
+<h2 id="412-result-and-api-schemas">4.12 Result and API schemas</h2>
+<p>Create:</p>
+<pre><code class="language-text">schemas/run-manifest-v2.schema.json
+schemas/finding-v2.schema.json
+schemas/profile-v2.schema.json
+schemas/collector-api/
+</code></pre>
+<p>Requirements:</p>
+<ul>
+<li>explicit schema version;</li>
+<li>generated typed models;</li>
+<li>compatibility tests;</li>
+<li>migration policy;</li>
+<li>unknown-field handling;</li>
+<li>documented nullability;</li>
+<li>stable fingerprint algorithm;</li>
+<li>OpenAPI for server;</li>
+<li>API client example.</li>
+</ul>
+<hr />
+<h2 id="413-release-and-software-supply-chain-hardening">4.13 Release and software-supply-chain hardening</h2>
+<p>For every release:</p>
+<ul>
+<li>signed Git tag;</li>
+<li>immutable version tags;</li>
+<li>PyPI Trusted Publishing;</li>
+<li>GitHub provenance attestations;</li>
+<li>CycloneDX or SPDX SBOM for each distribution and container;</li>
+<li>checksums;</li>
+<li>container signature;</li>
+<li>dependency vulnerability scan;</li>
+<li>release notes;</li>
+<li>migration notes;</li>
+<li>compatibility matrix;</li>
+<li>supported Python versions;</li>
+<li>supported server database versions;</li>
+<li>supported previous collector upgrade path.</li>
+</ul>
+<p>Do not publish only moving Action tags. Document:</p>
+<ul>
+<li>immutable SHA pin for high-security environments;</li>
+<li>immutable release tag;</li>
+<li>moving minor tag as convenience.</li>
+</ul>
+<hr />
+<h2 id="414-supported-version-policy">4.14 Supported-version policy</h2>
+<p>Add to <code>SECURITY.md</code> and <code>RELEASING.md</code>.</p>
+<p>Example:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Release line</th>
+<th>Security fixes</th>
+<th>Bug fixes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>latest minor</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>previous minor</td>
+<td>critical security fixes for 90 days</td>
+<td>no</td>
+</tr>
+<tr>
+<td>older</td>
+<td>no</td>
+<td>no</td>
+</tr>
+</tbody>
+</table></div>
+<p>Do not promise response SLAs unless maintainers can fulfill them. Use realistic language.</p>
+<hr />
+<h1 id="5-readmemd-complete-change-specification">5. README.md: complete change specification</h1>
+<h2 id="51-recommended-new-outline">5.1 Recommended new outline</h2>
+<ol>
+<li>Hero and one-sentence product definition.</li>
+<li>Maturity/status badge.</li>
+<li>What Guardana verifies.</li>
+<li>Who it is for.</li>
+<li>Five-minute quickstart.</li>
+<li>CI example.</li>
+<li>Collector example.</li>
+<li>Evidence model and honest verdicts.</li>
+<li>Supported targets and current limitations.</li>
+<li>Security/privacy defaults.</li>
+<li>Architecture.</li>
+<li>Current capability catalog.</li>
+<li>Roadmap summary.</li>
+<li>Design partners.</li>
+<li>Contributing/security/license.</li>
+</ol>
+<h2 id="52-suggested-hero-copy">5.2 Suggested hero copy</h2>
+<pre><code class="language-markdown"># Guardana
+
+**Open-source AI security verification from build to production.**
+
+Guardana scans AI artifacts, probes deployed models and agents, records
+reproducible security evidence, and detects regressions between releases.
+Run it locally, in CI/CD, as scheduled health checks, or with an optional
+self-hosted collector.
+
+- No account and no telemetry.
+- Offline static scanning.
+- Explicit findings, unverified checks, and execution errors.
+- Confidence and evaluator provenance for dynamic verdicts.
+- SARIF, JSON, JUnit, CI gates, and deployment comparison.
+</code></pre>
+<p>After the collector P0 milestone:</p>
+<pre><code class="language-markdown">&gt; Status: CLI and engine are beta. The self-hosted collector is beta and
+&gt; supports persistent storage, authenticated runners, projects, deployments,
+&gt; findings, and audit history. Review Known limitations before production use.
+</code></pre>
+<p>Before that milestone:</p>
+<pre><code class="language-markdown">&gt; Status: CLI and engine are early beta. The collector is experimental and
+&gt; is not yet intended for production team use.
+</code></pre>
+<h2 id="53-replace-why-guardana-exists">5.3 Replace “Why Guardana exists”</h2>
+<p>Use three subsections:</p>
+<h3 id="the-problem">The problem</h3>
+<p>AI systems have multiple security boundaries:</p>
+<ul>
+<li>model artifact and dependencies;</li>
+<li>prompts and templates;</li>
+<li>endpoint behavior;</li>
+<li>tools and credentials;</li>
+<li>retrieval and memory;</li>
+<li>deployment changes.</li>
+</ul>
+<h3 id="guardanas-approach">Guardana’s approach</h3>
+<ul>
+<li>deterministic evidence where possible;</li>
+<li>evaluator-graded semantic behavior where needed;</li>
+<li>no false green when a check did not run;</li>
+<li>repeatable run manifest;</li>
+<li>regression-first workflow.</li>
+</ul>
+<h3 id="where-guardana-fits">Where Guardana fits</h3>
+<p>Explain complementary relationship with:</p>
+<ul>
+<li>SAST/CVE/secrets tools;</li>
+<li>red-team frameworks;</li>
+<li>guardrails;</li>
+<li>observability;</li>
+<li>SIEM.</li>
+</ul>
+<h2 id="54-quickstart-rewrite">5.4 Quickstart rewrite</h2>
+<p>Show separate paths:</p>
+<h3 id="local-static-scan">Local static scan</h3>
+<pre><code class="language-bash">uvx --from guardana-cli guardana scan .
+</code></pre>
+<h3 id="inspect-and-test-an-endpoint">Inspect and test an endpoint</h3>
+<pre><code class="language-bash">guardana target inspect --url http://localhost:8000 --model my-model
+guardana plan probe --url http://localhost:8000 --model my-model
+guardana probe \
+  --url http://localhost:8000 \
+  --model my-model \
+  --preset pre-deploy \
+  --max-requests 100 \
+  --output run.json
+</code></pre>
+<h3 id="compare-a-release">Compare a release</h3>
+<pre><code class="language-bash">guardana diff accepted-run.json run.json
+</code></pre>
+<h3 id="ci">CI</h3>
+<p>Link to GitHub and GitLab examples instead of embedding a long workflow.</p>
+<h3 id="self-hosted-collector">Self-hosted collector</h3>
+<p>Show a short Docker Compose path only after persistence/auth exist.</p>
+<h2 id="55-add-before-probing-production">5.5 Add “Before probing production”</h2>
+<p>Prominently state:</p>
+<ul>
+<li>use staging where possible;</li>
+<li>active checks generate requests and cost;</li>
+<li>tool/action scenarios may create side effects;</li>
+<li>use budgets;</li>
+<li>use safe mode;</li>
+<li>do not enable full evidence collection without reviewing privacy;</li>
+<li>synthetic <code>monitor</code> is not passive traffic monitoring.</li>
+</ul>
+<h2 id="56-add-known-limitations">5.6 Add “Known limitations”</h2>
+<p>README must openly state:</p>
+<ul>
+<li>agent harness versus imported real traces;</li>
+<li>monitor type;</li>
+<li>text/multimodal support status;</li>
+<li>RAG coverage status;</li>
+<li>provider capability differences;</li>
+<li>probabilistic evaluator limits;</li>
+<li>collector maturity;</li>
+<li>extension trust model.</li>
+</ul>
+<h2 id="57-current-capabilities">5.7 Current capabilities</h2>
+<p>Do not embed a manually maintained 30+ row rule table in README.</p>
+<p>Use a compact generated summary and link to:</p>
+<ul>
+<li><code>FEATURES.md</code>;</li>
+<li>generated catalog;</li>
+<li>taxonomy coverage;</li>
+<li>current limitations.</li>
+</ul>
+<h2 id="58-roadmap-summary">5.8 Roadmap summary</h2>
+<p>Use the new order:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.7</td>
+<td>Company-ready foundation</td>
+</tr>
+<tr>
+<td>0.8</td>
+<td>Application-aware verification</td>
+</tr>
+<tr>
+<td>0.9</td>
+<td>Team security platform</td>
+</tr>
+<tr>
+<td>1.0</td>
+<td>Stable extension platform</td>
+</tr>
+<tr>
+<td>1.1</td>
+<td>Continuous production verification</td>
+</tr>
+<tr>
+<td>1.2</td>
+<td>Agent and protocol security</td>
+</tr>
+<tr>
+<td>1.3</td>
+<td>Multimodal and advanced assurance</td>
+</tr>
+</tbody>
+</table></div>
+<p>No duplicate version rows. No stale historical copy.</p>
+<hr />
+<h1 id="6-roadmapmd-replacement-instructions">6. ROADMAP.md: replacement instructions</h1>
+<h2 id="61-keep">6.1 Keep</h2>
+<ul>
+<li>evaluator-first thesis;</li>
+<li>honest result channels;</li>
+<li>cost as a security property;</li>
+<li>one engine across local/CI/health checks;</li>
+<li>open-source commercial boundary;</li>
+<li>non-goal of inline firewall;</li>
+<li>non-goal of generic code security;</li>
+<li>no broad misinformation claims;</li>
+<li>no regulatory logic in the engine.</li>
+</ul>
+<h2 id="62-change">6.2 Change</h2>
+<ul>
+<li>replace corpus/language-first current milestone with company readiness;</li>
+<li>move full VectorStore/RAG work from “deliberately deferred” to v0.8;</li>
+<li>move real trace ingestion from carried debt to v0.8;</li>
+<li>move repeated/statistical runs to v1.1;</li>
+<li>keep passive tap optional, but add imported trace support earlier;</li>
+<li>delay API freeze to after Trace and AI System models;</li>
+<li>add collector persistence/auth as a hard v0.7 exit criterion;</li>
+<li>add deployment/upgrade/security operations;</li>
+<li>add support matrix and lifecycle policy.</li>
+</ul>
+<h2 id="63-add-sections">6.3 Add sections</h2>
+<pre><code class="language-markdown">## Target users and journeys
+## Definition of company-ready
+## Current product maturity
+## v0.7 — Company-ready foundation
+## v0.8 — Application-aware verification
+## v0.9 — Team security platform
+## v1.0 — Stable extension platform
+## v1.1 — Continuous production verification
+## v1.2 — Agent and protocol security
+## v1.3 — Multimodal and advanced assurance
+## Community and curated-content lane
+## Research-gated features
+## Non-goals
+## Release exit criteria
+</code></pre>
+<h2 id="64-definition-of-company-ready">6.4 Definition of company-ready</h2>
+<p>Add this checklist to ROADMAP:</p>
+<ul>
+<li>[ ] official container images;</li>
+<li>[ ] stable result schema;</li>
+<li>[ ] reproducible run manifest;</li>
+<li>[ ] budgets and preflight;</li>
+<li>[ ] documented stable exit codes;</li>
+<li>[ ] privacy and redaction defaults;</li>
+<li>[ ] persistent collector;</li>
+<li>[ ] authenticated runner ingest;</li>
+<li>[ ] project/environment isolation;</li>
+<li>[ ] migrations, backup, restore, upgrade;</li>
+<li>[ ] GitHub, GitLab, generic CI;</li>
+<li>[ ] production deployment guide;</li>
+<li>[ ] supported-version policy;</li>
+<li>[ ] threat model;</li>
+<li>[ ] release SBOM and provenance;</li>
+<li>[ ] no known critical vulnerabilities;</li>
+<li>[ ] end-to-end installation test.</li>
+</ul>
+<hr />
+<h1 id="7-featuresmd-changes">7. FEATURES.md changes</h1>
+<p>FEATURES must describe <strong>only what ships now</strong>.</p>
+<p>Add metadata to every capability:</p>
+<ul>
+<li>maturity: experimental/beta/stable;</li>
+<li>supported target kinds;</li>
+<li>required capabilities;</li>
+<li>network required;</li>
+<li>judge required;</li>
+<li>side-effect potential;</li>
+<li>cost behavior;</li>
+<li>output/evidence type;</li>
+<li>known limitations.</li>
+</ul>
+<p>Add sections:</p>
+<pre><code class="language-markdown">## Product maturity
+## Supported deployment patterns
+## Supported targets and capability matrix
+## Result and evidence model
+## Privacy and data handling
+## Operational features
+## Collector capabilities
+## Known limitations
+## Generated rule catalog
+</code></pre>
+<p>Remove future promises from FEATURES. Link them to ROADMAP.</p>
+<p>Add a generated support matrix, for example:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th style="text-align:right">Local CLI</th>
+<th style="text-align:right">CI</th>
+<th style="text-align:right">Scheduled monitor</th>
+<th style="text-align:right">Collector</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Static artifact scan</td>
+<td style="text-align:right">yes</td>
+<td style="text-align:right">yes</td>
+<td style="text-align:right">optional</td>
+<td style="text-align:right">results only</td>
+</tr>
+<tr>
+<td>Live endpoint probe</td>
+<td style="text-align:right">yes</td>
+<td style="text-align:right">yes</td>
+<td style="text-align:right">yes</td>
+<td style="text-align:right">results only</td>
+</tr>
+<tr>
+<td>Persistent history</td>
+<td style="text-align:right">local files</td>
+<td style="text-align:right">CI artifacts</td>
+<td style="text-align:right">local files</td>
+<td style="text-align:right">beta after P0</td>
+</tr>
+<tr>
+<td>Real trace analysis</td>
+<td style="text-align:right">not yet</td>
+<td style="text-align:right">not yet</td>
+<td style="text-align:right">not yet</td>
+<td style="text-align:right">v0.8</td>
+</tr>
+<tr>
+<td>RAG target</td>
+<td style="text-align:right">limited</td>
+<td style="text-align:right">limited</td>
+<td style="text-align:right">limited</td>
+<td style="text-align:right">v0.8</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h1 id="8-docsindexmd-changes">8. docs/index.md changes</h1>
+<p>Reorganize documentation by persona and journey.</p>
+<p>Recommended structure:</p>
+<pre><code class="language-markdown"># Guardana documentation
+
+## Start here
+- Five-minute quickstart
+- Choose a deployment mode
+- Product maturity and limitations
+- Security and privacy defaults
+
+## Developers
+- Install
+- Scan a repository or model
+- Probe an endpoint
+- Compare runs
+- Write rules
+- Extend targets/evaluators
+
+## Platform and DevOps
+- CI/CD
+- Docker
+- Self-hosted collector
+- Kubernetes
+- Backups and upgrades
+- Air-gapped installation
+
+## Security teams
+- Threat model
+- Evidence and verdicts
+- Policies and baselines
+- Finding lifecycle
+- Taxonomy coverage
+- Safe active testing
+
+## Architecture
+- How it works
+- Packages
+- Run Manifest
+- AI System model
+- Trace model
+- Extension security
+
+## Reference
+- CLI
+- Configuration schema
+- JSON schemas
+- OpenAPI
+- Exit codes
+- Generated rule catalog
+</code></pre>
+<hr />
+<h1 id="9-new-documentation-files-to-add">9. New documentation files to add</h1>
+<p>Add these documents before or during P0.</p>
+<h2 id="p0-documents">P0 documents</h2>
+<pre><code class="language-text">docs/quickstart.md
+docs/product-status.md
+docs/known-limitations.md
+docs/security-model.md
+docs/threat-model.md
+docs/privacy-and-redaction.md
+docs/safe-testing.md
+docs/run-manifest.md
+docs/result-schema.md
+docs/exit-codes.md
+docs/budgets.md
+docs/target-capabilities.md
+docs/baselines.md
+docs/server/index.md
+docs/server/docker-compose.md
+docs/server/configuration.md
+docs/server/authentication.md
+docs/server/backup-restore.md
+docs/server/upgrades.md
+docs/server/security.md
+docs/ci/github-actions.md
+docs/ci/gitlab.md
+docs/ci/jenkins.md
+docs/ci/azure-devops.md
+docs/ci/generic.md
+docs/air-gapped.md
+docs/support-policy.md
+</code></pre>
+<h2 id="design-documents-before-p1-implementation">Design documents before P1 implementation</h2>
+<pre><code class="language-text">docs/design/ai-system.md
+docs/design/deployment-model.md
+docs/design/run-manifest-v2.md
+docs/design/trace-model.md
+docs/design/retrieval-model.md
+docs/design/side-effects.md
+docs/design/collector-domain-model.md
+docs/design/policy-as-code.md
+docs/design/extension-manifest.md
+docs/design/plugin-isolation.md
+</code></pre>
+<p>Use Architecture Decision Records:</p>
+<pre><code class="language-text">docs/adr/0001-run-manifest-v2.md
+docs/adr/0002-ai-system-domain-model.md
+docs/adr/0003-trace-and-opentelemetry.md
+docs/adr/0004-collector-persistence.md
+docs/adr/0005-extension-security.md
+</code></pre>
+<hr />
+<h1 id="10-existing-docs-required-changes">10. Existing docs: required changes</h1>
+<h2 id="101-docshow-it-worksmd">10.1 <code>docs/how-it-works.md</code></h2>
+<p>Change the product map from model files + served behavior to:</p>
+<pre><code class="language-text">AI System
+ ├─ Build assets
+ ├─ Configuration
+ ├─ Model endpoints
+ ├─ Retrieval
+ ├─ Tools and protocols
+ ├─ Runtime traces
+ └─ Deployments
+</code></pre>
+<p>Add:</p>
+<ul>
+<li>Run Manifest;</li>
+<li>evidence lifecycle;</li>
+<li>deployment comparison;</li>
+<li>collector relationship;</li>
+<li>privacy boundary;</li>
+<li>synthetic monitor clarification;</li>
+<li>future trace ingestion.</li>
+</ul>
+<p>Do not present the five current abstractions as permanently complete. State that <code>Trace</code>, <code>Deployment</code>, and <code>AISystem</code> are being added before 1.0.</p>
+<h2 id="102-docsarchitecturemd">10.2 <code>docs/architecture.md</code></h2>
+<p>Update package overview after implementation:</p>
+<pre><code class="language-text">guardana-core
+  target, trace, run, finding, policy, evidence, registry, runner
+
+guardana-rules
+  built-in rules and scenarios
+
+guardana-cli
+  scan, probe, monitor, diff, plan, doctor, target, baseline, run
+
+guardana-report
+  human, SARIF, JSON, JUnit, schema validation, redaction
+
+guardana-server
+  authenticated collector, persistence, projects, deployments,
+  findings, policies, waivers, audit history
+</code></pre>
+<p>Add architectural boundaries:</p>
+<ul>
+<li><code>guardana-core</code> never imports server;</li>
+<li>reporters receive already-redacted evidence;</li>
+<li>server never requires engine internals;</li>
+<li>schema package is stable independently;</li>
+<li>plugin code is untrusted unless allowlisted;</li>
+<li>target credentials never enter findings;</li>
+<li>collector tenancy is enforced at query and storage boundaries.</li>
+</ul>
+<p>Add a dependency diagram and data-flow diagram.</p>
+<h2 id="103-docsinstallmd">10.3 <code>docs/install.md</code></h2>
+<p>Add:</p>
+<ul>
+<li>support matrix;</li>
+<li>Docker install;</li>
+<li>air-gapped install;</li>
+<li>package pinning;</li>
+<li>plugin trust warning;</li>
+<li>installing with <code>--no-plugins</code>;</li>
+<li>upgrade path;</li>
+<li>uninstall;</li>
+<li>collector installation link;</li>
+<li>verification of checksums/signatures.</li>
+</ul>
+<h2 id="104-docsintegrationsmd">10.4 <code>docs/integrations.md</code></h2>
+<p>Rename to a high-level integration index and split provider-specific files.</p>
+<p>Add:</p>
+<ul>
+<li>GitLab;</li>
+<li>Jenkins;</li>
+<li>Azure DevOps;</li>
+<li>generic Docker;</li>
+<li>Kubernetes CronJob;</li>
+<li>artifact retention;</li>
+<li>baseline workflow;</li>
+<li>secrets handling;</li>
+<li>staging versus production testing;</li>
+<li>PR/deploy/nightly tiers.</li>
+</ul>
+<h2 id="105-docsprofilesmd">10.5 <code>docs/profiles.md</code></h2>
+<p>Extend schema with:</p>
+<pre><code class="language-yaml">schema_version: &quot;2&quot;
+name: production-health-check
+
+metadata:
+  project: payments-ai
+  ai_system: support-agent
+  environment: production
+
+rules:
+  include: [&quot;guardana.*&quot;]
+  exclude: []
+  minimum_maturity: beta
+  paths: []
+
+plugins:
+  mode: allowlist    # disabled | allowlist | all
+  allow:
+    - guardana-rules
+    - acme-guardana-pack
+
+execution:
+  safety: passive
+  concurrency: 4
+  timeout: 30s
+  retries: 2
+
+budgets:
+  max_requests: 100
+  max_duration: 10m
+  max_cost: 5.00
+  currency: USD
+
+privacy:
+  evidence_mode: redacted
+  store_prompts: false
+  store_responses: false
+  store_tool_arguments: false
+
+fail_on:
+  severity: high
+  min_confidence: 0.7
+  fail_on_inconclusive: true
+  fail_on_error: true
+  fail_on_skipped_required: true
+
+collector:
+  url_env: GUARDANA_SERVER_URL
+  api_key_env: GUARDANA_API_KEY
+  project_env: GUARDANA_PROJECT_ID
+
+baselines:
+  path: guardana-baseline.json
+  require_compatible: true
+</code></pre>
+<p>Add:</p>
+<ul>
+<li>JSON Schema;</li>
+<li><code>guardana config validate</code>;</li>
+<li>environment-variable interpolation rules;</li>
+<li>prohibition on inline secrets;</li>
+<li>config precedence;</li>
+<li>examples for dev, CI, pre-deploy, production health check.</li>
+</ul>
+<h2 id="106-docsusage-scanmd">10.6 <code>docs/usage-scan.md</code></h2>
+<p>Add:</p>
+<ul>
+<li>predictable performance;</li>
+<li>repository scope;</li>
+<li><code>.guardanaignore</code>;</li>
+<li>model cache directories;</li>
+<li>monorepo patterns;</li>
+<li>full versus changed-file mode;</li>
+<li>generated artifacts;</li>
+<li>result schema;</li>
+<li>exit codes;</li>
+<li>baseline use;</li>
+<li>safe plugin mode;</li>
+<li>large-model behavior.</li>
+</ul>
+<h2 id="107-docsusage-probemd">10.7 <code>docs/usage-probe.md</code></h2>
+<p>Add:</p>
+<ul>
+<li>target inspect;</li>
+<li>plan/budget;</li>
+<li>staging recommendation;</li>
+<li>provider capability matrix;</li>
+<li>rate limits;</li>
+<li>retry behavior;</li>
+<li>evidence storage;</li>
+<li>side effects;</li>
+<li>judge isolation;</li>
+<li>exit codes;</li>
+<li>partial run/resume;</li>
+<li>sample production-safe preset.</li>
+</ul>
+<h2 id="108-docsusage-monitormd">10.8 <code>docs/usage-monitor.md</code></h2>
+<p>State at the top:</p>
+<blockquote>
+<p>This command performs scheduled active synthetic verification. It does not inspect user traffic and is not an inline firewall.</p>
+</blockquote>
+<p>Add:</p>
+<ul>
+<li>state directory;</li>
+<li>last-known-good baseline;</li>
+<li>per-cycle budget;</li>
+<li>jitter;</li>
+<li>backoff;</li>
+<li>maintenance windows;</li>
+<li>collector reporting;</li>
+<li>alert webhooks;</li>
+<li>deployment fingerprint changes;</li>
+<li>restart behavior;</li>
+<li>health/readiness;</li>
+<li>running as systemd, Docker, and Kubernetes CronJob/Deployment.</li>
+</ul>
+<p>Consider whether <code>monitor</code> should remain a permanent name. Do not rename immediately unless compatibility impact is justified. The docs must remove ambiguity now.</p>
+<h2 id="109-docsusage-diffmd">10.9 <code>docs/usage-diff.md</code></h2>
+<p>Add:</p>
+<ul>
+<li>compatibility matrix;</li>
+<li>baseline lifecycle;</li>
+<li>evaluator/rule-version drift;</li>
+<li>deployment metadata;</li>
+<li>accepted findings;</li>
+<li>confidence/statistical limitations;</li>
+<li>exit code examples;</li>
+<li>why comparison can be indeterminate.</li>
+</ul>
+<h2 id="1010-docsextendingmd">10.10 <code>docs/extending.md</code></h2>
+<p>Add:</p>
+<ul>
+<li>extension maturity;</li>
+<li>API compatibility target;</li>
+<li>extension manifest;</li>
+<li>permissions;</li>
+<li>signatures;</li>
+<li>subprocess isolation roadmap;</li>
+<li>declarative packs as safer default;</li>
+<li>compatibility testing command;</li>
+<li>package namespace rules;</li>
+<li>semantic version requirements.</li>
+</ul>
+<h2 id="1011-docswriting-rulesmd">10.11 <code>docs/writing-rules.md</code></h2>
+<p>Require rule metadata:</p>
+<pre><code class="language-yaml">id: acme.agent.example
+version: 1.0.0
+maturity: experimental
+impact: active
+destructive: false
+target_kind: endpoint
+requires: [chat]
+estimated_requests: 3
+languages: [en]
+</code></pre>
+<p>Every rule must provide:</p>
+<ul>
+<li>positive fixture;</li>
+<li>negative fixture;</li>
+<li>inconclusive fixture where applicable;</li>
+<li>evidence contract;</li>
+<li>false-positive discussion;</li>
+<li>remediation;</li>
+<li>taxonomy mapping;</li>
+<li>estimated execution cost;</li>
+<li>side-effect classification;</li>
+<li>supported languages;</li>
+<li>known model/provider limitations.</li>
+</ul>
+<h2 id="1012-docsmodel-formatsmd">10.12 <code>docs/model-formats.md</code></h2>
+<p>Add:</p>
+<ul>
+<li>support maturity per format;</li>
+<li>parser safety guarantees;</li>
+<li>maximum size behavior;</li>
+<li>malformed-file behavior;</li>
+<li>compressed/archive handling;</li>
+<li>what is and is not verified;</li>
+<li>provenance status;</li>
+<li>link to generated reader coverage.</li>
+</ul>
+<hr />
+<h1 id="11-securitymd-changes">11. SECURITY.md changes</h1>
+<p>Current plugin warning is useful and should remain.</p>
+<p>Add the following sections:</p>
+<h2 id="111-supported-versions">11.1 Supported versions</h2>
+<p>State which releases receive security fixes.</p>
+<h2 id="112-threat-model">11.2 Threat model</h2>
+<p>Link to <code>docs/threat-model.md</code>.</p>
+<p>Cover:</p>
+<ul>
+<li>malicious scanned repository/model;</li>
+<li>malicious endpoint;</li>
+<li>malicious plugin;</li>
+<li>malicious YAML pack;</li>
+<li>compromised collector API key;</li>
+<li>cross-tenant collector access;</li>
+<li>evidence containing secrets;</li>
+<li>SSRF through target configuration;</li>
+<li>denial of service through huge artifacts/responses;</li>
+<li>unsafe tool execution;</li>
+<li>compromised update/package;</li>
+<li>dashboard XSS through evidence.</li>
+</ul>
+<h2 id="113-plugin-allowlist">11.3 Plugin allowlist</h2>
+<p><code>--no-plugins</code> currently removes built-ins as well as third-party entry points. Add a safer production model:</p>
+<pre><code class="language-bash">guardana --plugins disabled
+guardana --plugins builtins
+guardana --plugins allowlist
+guardana --plugin acme-pack
+</code></pre>
+<p>Built-in reviewed rules should be loadable without discovering arbitrary installed entry points.</p>
+<h2 id="114-server-security">11.4 Server security</h2>
+<p>Document:</p>
+<ul>
+<li>authentication;</li>
+<li>authorization;</li>
+<li>tenancy;</li>
+<li>API keys;</li>
+<li>key rotation;</li>
+<li>TLS;</li>
+<li>reverse proxy;</li>
+<li>database security;</li>
+<li>rate limiting;</li>
+<li>audit logs;</li>
+<li>evidence redaction;</li>
+<li>backup encryption;</li>
+<li>secure headers;</li>
+<li>CSRF if applicable;</li>
+<li>XSS-safe evidence rendering;</li>
+<li>CORS;</li>
+<li>webhook signing;</li>
+<li>outbound-network restrictions.</li>
+</ul>
+<h2 id="115-safe-testing">11.5 Safe testing</h2>
+<p>Warn that active probes may:</p>
+<ul>
+<li>consume tokens;</li>
+<li>trigger provider abuse systems;</li>
+<li>create tool actions;</li>
+<li>write to memory;</li>
+<li>access documents;</li>
+<li>alter MCP state.</li>
+</ul>
+<p>Document sandbox and staging recommendations.</p>
+<h2 id="116-disclosure-process">11.6 Disclosure process</h2>
+<p>Add:</p>
+<ul>
+<li>expected acknowledgment language without unrealistic SLA;</li>
+<li>CVE process if adopted;</li>
+<li>advisory publication;</li>
+<li>credit policy;</li>
+<li>encrypted-contact option if available.</li>
+</ul>
+<hr />
+<h1 id="12-claudemd-changes">12. CLAUDE.md changes</h1>
+<p>Update “What this project is” with the new product definition.</p>
+<p>Add project-law principles:</p>
+<ol>
+<li><strong>Company usability before coverage volume.</strong></li>
+<li><strong>No public claim without generated or cited evidence.</strong></li>
+<li><strong>No false green from unsupported capabilities, budget exhaustion, redaction failure, or missing coverage.</strong></li>
+<li><strong>No secret in configuration examples, logs, evidence, fixtures, or tests.</strong></li>
+<li><strong>Every persisted schema is versioned and migratable.</strong></li>
+<li><strong>Every server change considers tenancy and authorization.</strong></li>
+<li><strong>Every active rule declares impact and expected cost.</strong></li>
+<li><strong>No API freeze before Trace and AI System design is complete.</strong></li>
+<li><strong>Production installation requires upgrade and rollback documentation.</strong></li>
+<li><strong>Documentation is part of the acceptance criteria.</strong></li>
+</ol>
+<p>Add mandatory checks for server changes:</p>
+<pre><code class="language-bash">uv run pytest ...
+uv run guardana scan packages
+# plus:
+migration upgrade test
+migration downgrade/restore test
+tenant isolation test
+authorization matrix test
+redaction test
+OpenAPI compatibility test
+container security test
+</code></pre>
+<p>Add a rule:</p>
+<blockquote>
+<p>Do not implement broad corpora or new protocols when a P0 company-readiness issue is open, unless the change is isolated in a pack and does not delay P0.</p>
+</blockquote>
+<hr />
+<h1 id="13-contributingmd-changes">13. CONTRIBUTING.md changes</h1>
+<p>Add contribution lanes:</p>
+<ul>
+<li>engine;</li>
+<li>rule/scenario;</li>
+<li>target/provider;</li>
+<li>evaluator;</li>
+<li>reporter;</li>
+<li>collector;</li>
+<li>documentation;</li>
+<li>integration;</li>
+<li>curated pack.</li>
+</ul>
+<p>Add PR checklist:</p>
+<ul>
+<li>issue/design reference;</li>
+<li>user outcome;</li>
+<li>security impact;</li>
+<li>privacy impact;</li>
+<li>compatibility impact;</li>
+<li>schema/migration impact;</li>
+<li>performance impact;</li>
+<li>execution-cost impact;</li>
+<li>side-effect classification;</li>
+<li>tests;</li>
+<li>docs;</li>
+<li>changelog fragment;</li>
+<li>generated docs updated.</li>
+</ul>
+<p>Add labels:</p>
+<pre><code class="language-text">area:core
+area:cli
+area:rules
+area:report
+area:server
+area:docs
+area:integration
+area:extensions
+priority:p0
+priority:p1
+priority:p2
+maturity:experimental
+maturity:beta
+maturity:stable
+design-needed
+security-review
+breaking-change
+</code></pre>
+<hr />
+<h1 id="14-releasingmd-changes">14. RELEASING.md changes</h1>
+<p>Add a release checklist:</p>
+<ul>
+<li>canonical version updated automatically;</li>
+<li>changelog generated;</li>
+<li>generated rule/support docs updated;</li>
+<li>all schemas validated;</li>
+<li>migration upgrade test;</li>
+<li>migration backup/restore test;</li>
+<li>package build;</li>
+<li>container build;</li>
+<li>SBOM;</li>
+<li>vulnerability scan;</li>
+<li>provenance attestation;</li>
+<li>signatures/checksums;</li>
+<li>PyPI publish;</li>
+<li>GHCR publish;</li>
+<li>Action immutable tag;</li>
+<li>moving minor tag;</li>
+<li>docs/site publish;</li>
+<li>release smoke test from clean environment;</li>
+<li>air-gapped install smoke test where practical;</li>
+<li>upgrade from previous supported version;</li>
+<li>rollback instructions reviewed.</li>
+</ul>
+<p>Add release note sections:</p>
+<pre><code class="language-markdown">## User-visible changes
+## Security changes
+## Breaking changes
+## Schema/API changes
+## Database migrations
+## Upgrade instructions
+## Known limitations
+## Deprecated features
+</code></pre>
+<hr />
+<h1 id="15-examples-to-add">15. Examples to add</h1>
+<p>Create complete, runnable examples.</p>
+<pre><code class="language-text">examples/company-starter/
+  guardana.yaml
+  README.md
+  .guardanaignore
+
+examples/ci/github/
+examples/ci/gitlab/
+examples/ci/jenkins/
+examples/ci/azure-devops/
+
+examples/collector/docker-compose/
+  compose.yaml
+  .env.example
+  README.md
+
+examples/endpoint/openai-compatible/
+examples/endpoint/ollama/
+examples/endpoint/vllm/
+examples/endpoint/tgi/
+
+examples/baseline/
+examples/private-rule-pack/
+examples/plugin-allowlist/
+</code></pre>
+<p>Later:</p>
+<pre><code class="language-text">examples/trace/opentelemetry/
+examples/rag/
+examples/agent/
+examples/mcp/
+</code></pre>
+<p>All examples must run in CI or be syntax-validated.</p>
+<hr />
+<h1 id="16-github-repository-settings-and-files">16. GitHub repository settings and files</h1>
+<p>Add or verify:</p>
+<pre><code class="language-text">.github/ISSUE_TEMPLATE/bug.yml
+.github/ISSUE_TEMPLATE/feature.yml
+.github/ISSUE_TEMPLATE/rule.yml
+.github/ISSUE_TEMPLATE/provider.yml
+.github/ISSUE_TEMPLATE/design-partner.yml
+.github/pull_request_template.md
+.github/CODEOWNERS
+.github/dependabot.yml
+.github/SECURITY.md link/config
+.github/FUNDING.yml                 # only if applicable
+.github/workflows/codeql.yml
+.github/workflows/release.yml
+.github/workflows/container.yml
+.github/workflows/docs-consistency.yml
+.github/workflows/schema-compatibility.yml
+</code></pre>
+<p>Enable:</p>
+<ul>
+<li>private vulnerability reporting;</li>
+<li>branch protection;</li>
+<li>required reviews;</li>
+<li>signed release tags;</li>
+<li>dependency graph;</li>
+<li>Dependabot alerts;</li>
+<li>CodeQL where relevant;</li>
+<li>secret scanning;</li>
+<li>Discussions categories:
+<ul>
+<li>Help;</li>
+<li>Ideas;</li>
+<li>Rule proposals;</li>
+<li>Integrations;</li>
+<li>Design partners;</li>
+<li>Show and tell.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h1 id="17-package-level-implementation-changes">17. Package-level implementation changes</h1>
+<h2 id="171-guardana-core">17.1 <code>guardana-core</code></h2>
+<p>P0:</p>
+<ul>
+<li><code>RunManifest</code>;</li>
+<li>versioned schemas;</li>
+<li>execution budgets;</li>
+<li>usage accounting;</li>
+<li>target capability model;</li>
+<li>stable exit/gate status;</li>
+<li>redaction interfaces;</li>
+<li>rule maturity/impact/cost metadata;</li>
+<li>plugin selection/allowlist;</li>
+<li>baseline model;</li>
+<li>standardized errors;</li>
+<li>resume/checkpoint model.</li>
+</ul>
+<p>P1:</p>
+<ul>
+<li><code>AISystemRef</code>;</li>
+<li><code>DeploymentRef</code>;</li>
+<li><code>Trace</code>;</li>
+<li><code>Span</code>;</li>
+<li><code>ModelCall</code>;</li>
+<li><code>ToolCall</code>;</li>
+<li><code>ToolResult</code>;</li>
+<li><code>RetrievalEvent</code>;</li>
+<li><code>IdentityContext</code>;</li>
+<li><code>ApprovalEvent</code>;</li>
+<li><code>SideEffect</code>.</li>
+</ul>
+<h2 id="172-guardana-cli">17.2 <code>guardana-cli</code></h2>
+<p>Add:</p>
+<pre><code class="language-text">guardana plan
+guardana doctor
+guardana target inspect
+guardana config validate
+guardana config explain
+guardana baseline create
+guardana baseline verify
+guardana baseline update
+guardana run inspect
+guardana run migrate
+</code></pre>
+<p>Improve:</p>
+<ul>
+<li>stable structured errors;</li>
+<li>progress without leaking content;</li>
+<li><code>--quiet</code>;</li>
+<li><code>--non-interactive</code>;</li>
+<li><code>--output-dir</code>;</li>
+<li>explicit evidence mode;</li>
+<li>strict TLS by default;</li>
+<li>environment-variable references;</li>
+<li>shell-completion generation.</li>
+</ul>
+<h2 id="173-guardana-report">17.3 <code>guardana-report</code></h2>
+<p>Add:</p>
+<ul>
+<li>schema-versioned JSON;</li>
+<li>central redaction;</li>
+<li>evidence truncation;</li>
+<li>sanitized HTML if HTML reporting is added;</li>
+<li>SARIF properties for run/deployment/evaluator;</li>
+<li>JUnit distinction between fail/error/skipped/inconclusive;</li>
+<li>report validation command;</li>
+<li>signed/checksummed run artifacts optionally.</li>
+</ul>
+<h2 id="174-guardana-rules">17.4 <code>guardana-rules</code></h2>
+<p>Add metadata:</p>
+<ul>
+<li>rule version;</li>
+<li>maturity;</li>
+<li>impact;</li>
+<li>destructive;</li>
+<li>expected request count;</li>
+<li>supported languages;</li>
+<li>remediation;</li>
+<li>evidence type.</li>
+</ul>
+<p>Create rule-quality gates:</p>
+<ul>
+<li>positive;</li>
+<li>negative;</li>
+<li>inconclusive;</li>
+<li>cost;</li>
+<li>deterministic ordering;</li>
+<li>documentation;</li>
+<li>mapping;</li>
+<li>safe-mode behavior.</li>
+</ul>
+<p>Do not prioritize bulk prompt growth over P0 platform work.</p>
+<h2 id="175-guardana-server">17.5 <code>guardana-server</code></h2>
+<p>P0:</p>
+<ul>
+<li>PostgreSQL;</li>
+<li>migrations;</li>
+<li>auth;</li>
+<li>API keys;</li>
+<li>tenancy;</li>
+<li>domain entities;</li>
+<li>finding lifecycle;</li>
+<li>audit log;</li>
+<li>retention;</li>
+<li>backup/restore;</li>
+<li>OpenAPI;</li>
+<li>rate limits;</li>
+<li>secure dashboard rendering;</li>
+<li>health/readiness;</li>
+<li>Docker image.</li>
+</ul>
+<p>P1/P2:</p>
+<ul>
+<li>policy distribution;</li>
+<li>deployment regression;</li>
+<li>integrations;</li>
+<li>OIDC/SAML later;</li>
+<li>private runners;</li>
+<li>fleet views;</li>
+<li>cloud tenancy and billing only after self-hosted product is credible.</li>
+</ul>
+<hr />
+<h1 id="18-policy-as-code-direction">18. Policy-as-code direction</h1>
+<p>Extend <code>guardana.yaml</code> or introduce a separate policy document only if separation is needed.</p>
+<p>Support:</p>
+<pre><code class="language-yaml">policy:
+  required_rules:
+    - guardana.supply_chain.*
+  deny:
+    - severity: critical
+    - taxonomy: ASI03
+  require:
+    verified_ratio: 0.98
+    max_calibration_age: 30d
+    target_capabilities:
+      - chat
+  budgets:
+    max_cost: 10
+    max_duration: 15m
+  evidence:
+    mode: redacted
+  waivers:
+    require_expiry: true
+</code></pre>
+<p>Important:</p>
+<ul>
+<li>policy evaluation must work locally;</li>
+<li>collector may distribute policy but is not required;</li>
+<li>policy failures and execution failures are separate;</li>
+<li>compliance mappings remain data/extensions, not engine control flow.</li>
+</ul>
+<hr />
+<h1 id="19-finding-model-improvements">19. Finding model improvements</h1>
+<p>Add fields:</p>
+<pre><code class="language-yaml">fingerprint: &quot;stable&quot;
+occurrence_id: &quot;uuid&quot;
+rule:
+  id: &quot;...&quot;
+  version: &quot;...&quot;
+  maturity: &quot;stable&quot;
+target:
+  ref: &quot;...&quot;
+  fingerprint: &quot;...&quot;
+deployment:
+  id: null
+location:
+  path: null
+  line: null
+trajectory:
+  trace_id: null
+  span_id: null
+evidence:
+  type: artifact | response | tool_call | retrieval | side_effect | metadata
+  redacted: true
+verdict:
+  outcome: pass | fail | inconclusive
+  confidence: 0.92
+  evaluator_id: &quot;...&quot;
+  evaluator_version: &quot;...&quot;
+  rationale: &quot;...&quot;
+remediation:
+  summary: &quot;...&quot;
+  references: []
+lifecycle:
+  first_seen: &quot;...&quot;
+  last_seen: &quot;...&quot;
+</code></pre>
+<p>Fingerprint must avoid using unstable text such as raw model wording.</p>
+<hr />
+<h1 id="20-p1-application-aware-verification">20. P1: application-aware verification</h1>
+<p>Implement after P0.</p>
+<h2 id="201-common-trace-model">20.1 Common Trace model</h2>
+<p>A trace must represent:</p>
+<ul>
+<li>model calls;</li>
+<li>messages;</li>
+<li>tool offers;</li>
+<li>tool calls;</li>
+<li>tool results;</li>
+<li>retrieval queries;</li>
+<li>retrieved documents;</li>
+<li>identity and scopes;</li>
+<li>approvals;</li>
+<li>policy decisions;</li>
+<li>memory writes/reads;</li>
+<li>external side effects;</li>
+<li>agent handoffs.</li>
+</ul>
+<p>Sources:</p>
+<ul>
+<li>Guardana harness;</li>
+<li>JSONL import;</li>
+<li>OpenTelemetry GenAI;</li>
+<li>framework adapters;</li>
+<li>future SDKs.</li>
+</ul>
+<h2 id="202-opentelemetry">20.2 OpenTelemetry</h2>
+<p>Use OpenTelemetry GenAI conventions as the interoperability base.</p>
+<p>Do not create an isolated Guardana-only telemetry protocol.</p>
+<p>Provide:</p>
+<pre><code class="language-bash">guardana analyze-trace trace.jsonl
+guardana ingest-trace --otlp ...
+</code></pre>
+<h2 id="203-sink-aware-output-handling">20.3 Sink-aware output handling</h2>
+<p>Distinguish:</p>
+<pre><code class="language-text">dangerous output generated
+output reached sink
+sink executed output
+side effect confirmed
+</code></pre>
+<p>Initial sinks:</p>
+<ul>
+<li>SQL;</li>
+<li>shell;</li>
+<li>HTML/Markdown;</li>
+<li>template engine;</li>
+<li>URL fetch;</li>
+<li>file system;</li>
+<li>email/message;</li>
+<li>cloud API.</li>
+</ul>
+<h2 id="204-rag">20.4 RAG</h2>
+<p>Introduce:</p>
+<ul>
+<li><code>RetrieverTarget</code>;</li>
+<li><code>CorpusTarget</code>;</li>
+<li><code>EmbeddingTarget</code>;</li>
+<li><code>RAGApplicationTarget</code>.</li>
+</ul>
+<p>P1 scenarios:</p>
+<ul>
+<li>indirect prompt injection;</li>
+<li>cross-tenant retrieval;</li>
+<li>unauthorized document access;</li>
+<li>document poisoning;</li>
+<li>metadata poisoning;</li>
+<li>secret extraction;</li>
+<li>hidden instructions;</li>
+<li>user/tenant filter bypass;</li>
+<li>malicious-document precedence.</li>
+</ul>
+<h2 id="205-utility-regression">20.5 Utility regression</h2>
+<p>Add positive business tasks to profiles.</p>
+<p>Security improvement must be compared with legitimate-task success.</p>
+<p>Example:</p>
+<pre><code class="language-yaml">utility:
+  suite: tests/utility.yaml
+  minimum_pass_rate: 0.95
+</code></pre>
+<p>Reports should show:</p>
+<ul>
+<li>security success;</li>
+<li>utility success;</li>
+<li>change from baseline;</li>
+<li>trade-off.</li>
+</ul>
+<hr />
+<h1 id="21-p2-expansion">21. P2 expansion</h1>
+<h2 id="211-mcp">21.1 MCP</h2>
+<p>Deep tests:</p>
+<ul>
+<li>OAuth audience validation;</li>
+<li>token passthrough;</li>
+<li>confused deputy;</li>
+<li>scope enforcement;</li>
+<li>consent;</li>
+<li>tool poisoning;</li>
+<li>schema drift;</li>
+<li>rug pull;</li>
+<li>capability overclaim;</li>
+<li>malicious descriptions;</li>
+<li>injected tool results;</li>
+<li>argument exfiltration;</li>
+<li>sampling misuse;</li>
+<li>multi-user isolation;</li>
+<li>transport security;</li>
+<li>rate limiting.</li>
+</ul>
+<h2 id="212-multi-agenta2a">21.2 Multi-agent/A2A</h2>
+<p>Model:</p>
+<ul>
+<li>agent identity;</li>
+<li>agent card;</li>
+<li>delegation;</li>
+<li>credential scope;</li>
+<li>message origin;</li>
+<li>trust boundary;</li>
+<li>handoff;</li>
+<li>cascading action.</li>
+</ul>
+<p>Tests:</p>
+<ul>
+<li>impersonation;</li>
+<li>malicious delegation;</li>
+<li>privilege escalation;</li>
+<li>context leakage;</li>
+<li>circular loops;</li>
+<li>insecure inter-agent communication;</li>
+<li>cascading failures.</li>
+</ul>
+<h2 id="213-multimodal">21.3 Multimodal</h2>
+<p>Add carriers:</p>
+<ul>
+<li>image;</li>
+<li>PDF;</li>
+<li>HTML;</li>
+<li>OCR;</li>
+<li>audio;</li>
+<li>QR;</li>
+<li>metadata;</li>
+<li>tool-produced files.</li>
+</ul>
+<h2 id="214-statistical-verification">21.4 Statistical verification</h2>
+<p>Support:</p>
+<ul>
+<li>repeated runs;</li>
+<li>attack success rate;</li>
+<li>confidence interval;</li>
+<li>minimum sample count;</li>
+<li>sequential stopping;</li>
+<li>cost-aware execution;</li>
+<li>statistical deployment comparison.</li>
+</ul>
+<hr />
+<h1 id="22-commercial-boundary">22. Commercial boundary</h1>
+<p>Keep the trust-preserving boundary.</p>
+<h2 id="open-source">Open source</h2>
+<p>Must include:</p>
+<ul>
+<li>engine;</li>
+<li>built-in security rules;</li>
+<li>stable schemas;</li>
+<li>trace ingestion;</li>
+<li>policy engine;</li>
+<li>self-hosted collector;</li>
+<li>persistence;</li>
+<li>auth;</li>
+<li>basic RBAC;</li>
+<li>findings;</li>
+<li>deployment history;</li>
+<li>extension SDK;</li>
+<li>self-hosted dashboard;</li>
+<li>local and self-hosted use without an account.</li>
+</ul>
+<h2 id="managed-cloud-may-charge-for">Managed cloud may charge for</h2>
+<ul>
+<li>managed collector;</li>
+<li>hosted isolated runners;</li>
+<li>private networking/VPC;</li>
+<li>long retention;</li>
+<li>SSO/SAML/SCIM;</li>
+<li>enterprise support/SLA;</li>
+<li>fleet-scale operations;</li>
+<li>curated language and industry packs;</li>
+<li>threat-intelligence updates;</li>
+<li>managed private extension registry;</li>
+<li>compliance evidence workflows.</li>
+</ul>
+<p>Do not paywall:</p>
+<ul>
+<li>critical vulnerability classes;</li>
+<li>basic auth/persistence needed for safe self-hosting;</li>
+<li>result exports;</li>
+<li>local policies;</li>
+<li>security fixes.</li>
+</ul>
+<hr />
+<h1 id="23-metrics-to-add-to-project-governance">23. Metrics to add to project governance</h1>
+<h2 id="trustworthiness">Trustworthiness</h2>
+<ul>
+<li>false-positive rate;</li>
+<li>false-negative rate;</li>
+<li>Brier score;</li>
+<li>ECE;</li>
+<li>evaluator agreement;</li>
+<li>inconclusive ratio;</li>
+<li>calibration age;</li>
+<li>reproducibility ratio.</li>
+</ul>
+<h2 id="operational">Operational</h2>
+<ul>
+<li>time to first successful scan;</li>
+<li>p50/p95 static scan duration;</li>
+<li>PR preset duration;</li>
+<li>planned versus actual requests;</li>
+<li>planned versus actual cost;</li>
+<li>collector ingest throughput;</li>
+<li>migration success rate.</li>
+</ul>
+<h2 id="adoption">Adoption</h2>
+<ul>
+<li>active repositories;</li>
+<li>active AI systems;</li>
+<li>CI integrations;</li>
+<li>deployment comparisons;</li>
+<li>self-hosted collectors;</li>
+<li>external packs;</li>
+<li>external contributors.</li>
+</ul>
+<h2 id="security-outcome">Security outcome</h2>
+<ul>
+<li>regressions blocked before production;</li>
+<li>time to detection;</li>
+<li>time to resolution;</li>
+<li>expired waivers;</li>
+<li>deployments without a current verified run.</li>
+</ul>
+<p>Avoid using raw number of prompts or rules as the primary success metric.</p>
+<hr />
+<h1 id="24-definition-of-done-for-the-p0-company-ready-release">24. Definition of Done for the P0 company-ready release</h1>
+<p>The release is not company-ready until all of the following are true.</p>
+<h2 id="product">Product</h2>
+<ul>
+<li>[ ] clear AI-system positioning;</li>
+<li>[ ] no version/rule-count documentation drift;</li>
+<li>[ ] stable status/maturity language;</li>
+<li>[ ] known limitations published;</li>
+<li>[ ] five-minute quickstart works.</li>
+</ul>
+<h2 id="cli-and-engine">CLI and engine</h2>
+<ul>
+<li>[ ] Run Manifest v2;</li>
+<li>[ ] JSON Schema;</li>
+<li>[ ] <code>plan</code>;</li>
+<li>[ ] budgets;</li>
+<li>[ ] target inspection;</li>
+<li>[ ] stable exit codes;</li>
+<li>[ ] privacy/redaction;</li>
+<li>[ ] safe active-testing modes;</li>
+<li>[ ] baseline lifecycle;</li>
+<li>[ ] <code>doctor</code>;</li>
+<li>[ ] plugin allowlist;</li>
+<li>[ ] official containers.</li>
+</ul>
+<h2 id="collector">Collector</h2>
+<ul>
+<li>[ ] PostgreSQL;</li>
+<li>[ ] migrations;</li>
+<li>[ ] authentication;</li>
+<li>[ ] API keys;</li>
+<li>[ ] organization/project isolation;</li>
+<li>[ ] AI systems and deployments;</li>
+<li>[ ] runs and findings;</li>
+<li>[ ] basic finding workflow;</li>
+<li>[ ] audit log;</li>
+<li>[ ] retention;</li>
+<li>[ ] backup/restore;</li>
+<li>[ ] secure Docker Compose deployment;</li>
+<li>[ ] health/readiness;</li>
+<li>[ ] no default credential.</li>
+</ul>
+<h2 id="cicd">CI/CD</h2>
+<ul>
+<li>[ ] GitHub Action;</li>
+<li>[ ] GitLab template;</li>
+<li>[ ] generic container example;</li>
+<li>[ ] Jenkins example;</li>
+<li>[ ] Azure DevOps example;</li>
+<li>[ ] saved run artifacts;</li>
+<li>[ ] baseline/diff workflow;</li>
+<li>[ ] PR/deployment/nightly guidance.</li>
+</ul>
+<h2 id="security-and-operations">Security and operations</h2>
+<ul>
+<li>[ ] threat model;</li>
+<li>[ ] supported-version policy;</li>
+<li>[ ] plugin trust model;</li>
+<li>[ ] server security guide;</li>
+<li>[ ] safe-testing guide;</li>
+<li>[ ] redaction tests;</li>
+<li>[ ] tenant-isolation tests;</li>
+<li>[ ] release SBOM;</li>
+<li>[ ] provenance/signatures;</li>
+<li>[ ] upgrade documentation;</li>
+<li>[ ] restore-tested backup process.</li>
+</ul>
+<h2 id="quality">Quality</h2>
+<ul>
+<li>[ ] clean install smoke test;</li>
+<li>[ ] Docker smoke test;</li>
+<li>[ ] end-to-end scan/probe/collector test;</li>
+<li>[ ] previous-version upgrade test;</li>
+<li>[ ] generated-doc consistency gate;</li>
+<li>[ ] schema compatibility gate;</li>
+<li>[ ] performance gate;</li>
+<li>[ ] no critical known vulnerability.</li>
+</ul>
+<hr />
+<h1 id="25-suggested-issue-breakdown-and-dependency-order">25. Suggested issue breakdown and dependency order</h1>
+<p>Create a GitHub milestone: <strong>v0.7 Company-Ready Foundation</strong>.</p>
+<h2 id="phase-a--public-truth-and-design">Phase A — public truth and design</h2>
+<ol>
+<li><code>P0 DOC: Canonical version and generated capability truth</code></li>
+<li><code>P0 DOC: Rewrite README positioning and product status</code></li>
+<li><code>P0 DOC: Replace ROADMAP with company-readiness-first sequence</code></li>
+<li><code>P0 DESIGN: Run Manifest v2</code></li>
+<li><code>P0 DESIGN: Collector domain model</code></li>
+<li><code>P0 DESIGN: Threat model and privacy boundary</code></li>
+<li><code>P0 DESIGN: Stable exit codes and gate semantics</code></li>
+</ol>
+<h2 id="phase-b--enginecli-foundation">Phase B — engine/CLI foundation</h2>
+<ol start="8">
+<li><code>P0 CODE: Versioned Run Manifest</code></li>
+<li><code>P0 CODE: Usage accounting</code></li>
+<li><code>P0 CODE: Execution budgets</code></li>
+<li><code>P0 CODE: guardana plan</code></li>
+<li><code>P0 CODE: Target capability inspection</code></li>
+<li><code>P0 CODE: Central evidence redaction</code></li>
+<li><code>P0 CODE: Rule impact/maturity/cost metadata</code></li>
+<li><code>P0 CODE: Plugin allowlist</code></li>
+<li><code>P0 CODE: Baseline lifecycle</code></li>
+<li><code>P0 CODE: guardana doctor</code></li>
+<li><code>P0 CODE: Stable JSON schemas and migration</code></li>
+</ol>
+<h2 id="phase-c--collector">Phase C — collector</h2>
+<ol start="19">
+<li><code>P0 SERVER: PostgreSQL and migrations</code></li>
+<li><code>P0 SERVER: Authentication and runner API keys</code></li>
+<li><code>P0 SERVER: Organization/project tenancy</code></li>
+<li><code>P0 SERVER: AI System/environment/deployment</code></li>
+<li><code>P0 SERVER: Runs/findings persistence</code></li>
+<li><code>P0 SERVER: Finding lifecycle and waivers</code></li>
+<li><code>P0 SERVER: Audit log</code></li>
+<li><code>P0 SERVER: Retention</code></li>
+<li><code>P0 SERVER: Backup/restore</code></li>
+<li><code>P0 SERVER: Security hardening</code></li>
+<li><code>P0 SERVER: Minimal production UI</code></li>
+</ol>
+<h2 id="phase-d--packaging-and-integrations">Phase D — packaging and integrations</h2>
+<ol start="30">
+<li><code>P0 OPS: Official CLI container</code></li>
+<li><code>P0 OPS: Official server container</code></li>
+<li><code>P0 OPS: Docker Compose deployment</code></li>
+<li><code>P0 OPS: SBOM and provenance</code></li>
+<li><code>P0 CI: Harden GitHub Action</code></li>
+<li><code>P0 CI: GitLab template</code></li>
+<li><code>P0 CI: Generic Docker pipeline</code></li>
+<li><code>P0 DOC: Jenkins and Azure DevOps examples</code></li>
+<li><code>P0 DOC: Production deployment and upgrade guide</code></li>
+<li><code>P0 DOC: Air-gapped installation</code></li>
+</ol>
+<h2 id="phase-e--release-gate">Phase E — release gate</h2>
+<ol start="40">
+<li><code>P0 TEST: End-to-end company starter</code></li>
+<li><code>P0 TEST: Tenant isolation</code></li>
+<li><code>P0 TEST: Redaction</code></li>
+<li><code>P0 TEST: Migration and restore</code></li>
+<li><code>P0 TEST: Schema compatibility</code></li>
+<li><code>P0 TEST: Clean install and container smoke tests</code></li>
+<li><code>P0 RELEASE: v0.7 beta release checklist</code></li>
+</ol>
+<p>Do not start v0.8 implementation until design documents can be written in parallel without blocking the v0.7 release.</p>
+<hr />
+<h1 id="26-tasks-that-should-explicitly-wait">26. Tasks that should explicitly wait</h1>
+<p>Do not prioritize these before the company-ready release:</p>
+<ul>
+<li>10× corpus expansion inside the main repository;</li>
+<li>broad multilingual corpus;</li>
+<li>generalized misinformation scoring;</li>
+<li>universal poisoning detection;</li>
+<li>large compliance dashboard;</li>
+<li>inline guardrail proxy;</li>
+<li>full multimodal attack engine;</li>
+<li>adaptive attacker agents;</li>
+<li>A2A protocol support;</li>
+<li>cloud billing;</li>
+<li>complex executive analytics;</li>
+<li>marketplace;</li>
+<li>API freeze.</li>
+</ul>
+<p>They can be researched or developed in isolated packs, but must not delay P0.</p>
+<hr />
+<h1 id="27-recommended-first-claude-implementation-prompt">27. Recommended first Claude implementation prompt</h1>
+<p>Use this prompt after placing this document in the repository:</p>
+<pre><code class="language-text">Read GUARDANA_ENTERPRISE_READINESS_CHANGE_PLAN.md, CLAUDE.md, README.md,
+ROADMAP.md, FEATURES.md, SECURITY.md, CONTRIBUTING.md, RELEASING.md, and all
+docs under docs/.
+
+Work only on Phase A of the v0.7 Company-Ready Foundation milestone.
+
+1. Audit every current-version and rule-count statement.
+2. Establish one canonical generated source of truth.
+3. Rewrite README.md using the recommended product positioning, maturity
+   statement, quickstart structure, monitor clarification, known limitations,
+   and new roadmap summary.
+4. Replace ROADMAP.md with the company-readiness-first sequence while
+   preserving valid existing principles and current capability coverage.
+5. Update FEATURES.md and docs/index.md so current capabilities and future
+   plans are not mixed.
+6. Add design documents for Run Manifest v2, collector domain model, stable
+   exit codes, threat model, and privacy/redaction.
+7. Do not implement the feature code yet.
+8. Keep all factual current-capability claims generated or testable.
+9. Run the full repository gate and report every changed file, design decision,
+   unresolved question, and proposed Phase B issue.
+</code></pre>
+<p>After Phase A:</p>
+<pre><code class="language-text">Implement Phase B in dependency order. Create small reviewable commits or
+clearly separated change groups. Do not change public schemas without a
+version and migration. Do not store prompts, responses, credentials, or raw
+tool arguments by default. Every new command requires tests, reference docs,
+examples, stable exit behavior, and changelog entries.
+</code></pre>
+<hr />
+<h1 id="28-research-basis">28. Research basis</h1>
+<p>The direction in this plan is based on:</p>
+<ul>
+<li>the current Guardana README, roadmap, feature catalog, architecture, profile,
+integration, security, contribution, and release documentation;</li>
+<li>OWASP Top 10 for LLM Applications;</li>
+<li>OWASP Top 10 for Agentic Applications;</li>
+<li>NIST adversarial machine-learning taxonomy;</li>
+<li>OpenTelemetry GenAI semantic conventions;</li>
+<li>MCP security guidance;</li>
+<li>current capabilities and market positioning of tools including garak,
+Promptfoo, PyRIT, Giskard, HiddenLayer, and Lakera.</li>
+</ul>
+<p>The central conclusion is unchanged:</p>
+<blockquote>
+<p>Guardana should not race to become the project with the largest attack
+corpus. It should become the most trustworthy open-source verification and
+regression layer for real AI systems.</p>
+</blockquote>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/enterprise-readiness-plan.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

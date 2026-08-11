@@ -1,3 +1,10 @@
+---
+title: "Extension author tooling"
+nav_order: 70
+summary: "fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment"
+status: accepted
+---
+
 # What a third party needs before the API freezes: fixtures, measurement, a manifest
 
 **Status:** implemented in 0.18.0 · **Written:** 2026-08-11 · **Step five**

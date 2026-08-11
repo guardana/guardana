@@ -1,3 +1,10 @@
+---
+title: "guardana calibrate"
+nav_order: 250
+summary: "`guardana calibrate`: measure an evaluator's confidence against known outcomes, and carry the measurement into a run"
+status: stable
+---
+
 # `guardana calibrate` — measure the judge instead of trusting it
 
 A graded finding carries a confidence. **A confidence nobody checked is the same

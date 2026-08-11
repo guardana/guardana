@@ -1,3 +1,10 @@
+---
+title: "guardana run"
+nav_order: 200
+summary: "`guardana run inspect|migrate`: reading a saved run and its manifest"
+status: stable
+---
+
 # `guardana run` — reading a saved run
 
 A run saved with `--output` is not just a list of findings. It carries a **run

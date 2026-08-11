@@ -1,3 +1,10 @@
+---
+title: "Runs and findings"
+nav_order: 160
+summary: "the run's verdict, and following one finding across runs"
+status: accepted
+---
+
 # Design: runs and findings the collector can answer questions about
 
 **Status:** implemented in 0.9.0 · **Written:** 2026-08-05 · **Phase C, item 23**

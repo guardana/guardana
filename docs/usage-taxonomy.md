@@ -1,3 +1,10 @@
+---
+title: "guardana taxonomy"
+nav_order: 180
+summary: "`guardana taxonomy`: which framework entry a reference names, and what it corresponds to in another edition"
+status: stable
+---
+
 # `guardana taxonomy` — which framework entry a rule actually means
 
 Every Guardana rule maps to a public framework, because a finding nobody can look
@@ -92,6 +99,23 @@ A company mapping rules to its own control catalogue registers references throug
 the `guardana.taxonomies` entry point and then writes `taxonomy: [ACME-14]` in YAML
 like any built-in. Registration happens through an installed package rather than a
 string in a rule file, which is what keeps an unknown reference a load-time error
-instead of a rule that maps to nothing. See
-[`extending.md`](extending.md) and
+instead of a rule that maps to nothing.
+[`examples/custom_rule`](../examples/custom_rule/README.md) does exactly this — see
+`src/acme_rules/controls.py` and the `ACME-14` in `catalog/refusal.yaml`.
+
+Once the pack is installed, the listing says so:
+
+```
+ACME-CONTROLS — registered by an installed package
+  1 entry · no catalogue digest: a package registers references, not a catalogue file
+    ACME-14          Internal data does not leave the support boundary
+```
+
+**Your entries carry no digest, and that is deliberate.** A package registers
+references; a catalogue file is what gets hashed and pinned into a run manifest, so
+there is nothing here to pin and inventing a value would claim a provenance nobody
+has. In `--format json` the entry appears in the same list as the built-in
+catalogues with `"digest": null`, which is how a script tells the two apart.
+
+See [`extending.md`](extending.md) and
 [`design/taxonomy-editions.md`](design/taxonomy-editions.md).

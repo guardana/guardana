@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — Guardana documentation</title>
+<meta name="description" content="the five abstractions, the Registry, the core↔server boundary">
+<link rel="canonical" href="https://guardana.dev/docs/architecture.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html" aria-current="page">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Architecture</h1><p class="lede">the five abstractions, the Registry, the core↔server boundary</p><h2 id="packages">Packages</h2>
+<pre><code>guardana-core     Target / Rule / Evaluator / Finding / Profile,
+                   the Registry (discovery) and Runner (execution),
+                   plus threat-agnostic plumbing rules build on:
+                   `formats` (bounded model-file readers) and `testing`
+                   (doubles and artifact builders).
+                   No network I/O beyond what a Target itself performs.
+guardana-rules     Built-in rules (YAML + Python plugin), each mapped to
+                   OWASP / MITRE ATLAS / NIST.
+guardana-cli       The `guardana` command: scan, probe, monitor, init, rules,
+                   new-rule.
+guardana-report    Renderers: human, SARIF, JSON, JUnit.
+guardana-server    OPTIONAL collector. Ingests normalized Findings from many
+                   agents; list/trend view. A separate, separately-deployed
+                   service.
+</code></pre>
+<p>Each is <code>src/guardana/&lt;name&gt;</code> — a PEP 420 namespace package. No package
+directory has a bare <code>guardana/__init__.py</code>; only the subpackages
+(<code>guardana.core</code>, <code>guardana.rules</code>, etc.) do, so five distributions can
+contribute to the same <code>guardana.*</code> namespace without conflict.</p>
+<h2 id="the-five-abstractions">The five abstractions</h2>
+<h3 id="1-target--what-we-inspect">1. Target — what we inspect</h3>
+<p><code>guardana.core.target.Target</code> is a uniform interface over the thing under
+test, so a rule never hard-codes whether it's reading files or talking to a
+model:</p>
+<pre><code class="language-python">class TargetKind(StrEnum):
+    ARTIFACT = &quot;artifact&quot;
+    ENDPOINT = &quot;endpoint&quot;
+
+class Capability(StrEnum):
+    READ_FILES = &quot;read_files&quot;
+    CHAT = &quot;chat&quot;
+    PLANT_SYSTEM_PROMPT = &quot;plant_system_prompt&quot;
+    CALL_TOOLS = &quot;call_tools&quot;
+
+class Target(ABC):
+    kind: TargetKind
+    def capabilities(self) -&gt; set[Capability]: ...
+    @property
+    def ref(self) -&gt; str: ...   # stable id used in findings/reports
+</code></pre>
+<p>Every <code>RuleMeta</code> also carries a derived <strong><code>surface</code></strong> (<code>Surface.BUILD</code> for
+artifact rules, <code>Surface.RUNTIME</code> for endpoint rules) — the conceptual split
+between securing how a model is <em>built</em> and how it <em>behaves</em>. It needs no
+per-rule declaration; <code>guardana rules</code> groups by it and takes <code>--surface</code>.</p>
+<p>Built-ins: <code>ArtifactTarget</code> (walks a directory, exposing <code>iter_files(suffixes)</code>
+over model files, dependency manifests, and source, skipping <code>.git</code>,
+<code>.venv</code>, <code>node_modules</code>, etc., plus <code>python_source(path)</code> — a Python file read,
+parsed and indexed <strong>once per scan</strong> rather than once per rule, so scan cost
+grows with the target instead of with the rule count) and <code>EndpointTarget</code> (a live chat endpoint,
+exposing <code>chat(messages) -&gt; str</code>, with a pluggable <code>ChatTransport</code> so tests
+never hit the network). The transport is selected by a provider name —
+<code>openai</code> (the default, any OpenAI-compatible server), <code>ollama</code> (native
+<code>/api/chat</code>), or <code>tgi</code> (HF TGI <code>/generate</code>) — surfaced as <code>--provider</code> on
+<code>probe</code>/<code>monitor</code>; a genuinely custom backend ships a <code>Target</code> through the
+<code>guardana.targets</code> entry point instead. An OpenAI-compatible transport also
+implements the optional <code>ToolCallingTransport</code> protocol, so <code>EndpointTarget</code>
+advertises <code>CALL_TOOLS</code> and exposes <code>offer_tools(messages, tools)</code> — the seam
+the excessive-agency rule uses to observe which tools a model calls (<code>ollama</code>
+and <code>tgi</code> simply don't advertise the capability).</p>
+<p><code>ArtifactTarget</code> finds the files; <strong><code>guardana.core.formats</code> reads them</strong>.
+<code>read_gguf_metadata</code>, <code>read_safetensors_header</code> and <code>read_onnx_summary</code> are
+public, bounded, offline, deterministic and fail-closed, and they return <em>data,
+never a verdict</em> — which is the line that keeps threat knowledge in rules and
+binary parsing in the engine. It is the same move as <code>guardana.core.testing</code>:
+core ships plumbing so a third-party pack ships judgement. Full contract in
+<a href="model-formats.html"><code>model-formats.md</code></a>.</p>
+<p><strong>Skipped is not errored.</strong> The <code>Runner</code> keeps two outcomes apart that used to
+share a bucket: a rule the target cannot satisfy is <em>skipped</em> (normal), and a
+rule that raised is an <em>error</em> (a defect) recorded in <code>ScanResult.errors</code>, which
+fails the gate by default. <code>Registry.discover()</code> isolates each entry point for
+the same reason — one broken third-party pack must not leave you with no rules.</p>
+<p>A rule declares which capabilities it needs (<code>required_capabilities</code> in
+<code>RuleMeta</code>); the <code>Runner</code> skips a rule outright — no crash — when the
+target it's given can't satisfy them, e.g. an endpoint-only prompt-injection
+rule is skipped against an <code>ArtifactTarget</code>.</p>
+<h3 id="2-rule--what-to-look-for">2. Rule — what to look for</h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class RuleMeta:
+    id: str
+    title: str
+    severity: Severity
+    target_kind: TargetKind
+    taxonomy: tuple[TaxonomyRef, ...] = ()
+    required_capabilities: frozenset[Capability] = frozenset()
+    evaluator: str | None = None
+
+class Rule(ABC):
+    meta: RuleMeta
+    def run(self, target: Target, ctx: RuleContext) -&gt; Iterable[Finding]: ...
+</code></pre>
+<p>Two authoring paths, one contract: <strong>declarative YAML</strong> for &quot;send this
+corpus, grade with this evaluator&quot;, or a <strong>Python plugin</strong> (any <code>Rule</code>
+subclass) for logic YAML can't express. Declarative rules come in two
+shapes, both loaded by <code>load_yaml_rules</code>: single-turn <code>YamlRule</code> (a
+<code>prompts:</code> list, each graded independently) and multi-turn <code>ScenarioRule</code> (a
+<code>steps:</code> conversation graded per step and/or as a whole). See
+<a href="writing-rules.html"><code>writing-rules.md</code></a> for the full authoring guide.</p>
+<h3 id="3-evaluator--did-it-succeed-and-how-sure-are-we">3. Evaluator — did it succeed, and how sure are we</h3>
+<p>The differentiator. <code>guardana.core.evaluator.Evaluator</code> turns a model
+response into a verdict with a confidence and a rationale, instead of a
+bare true/false:</p>
+<pre><code class="language-python">class Evaluator(ABC):
+    id: str
+    def evaluate(self, exchange: Exchange, expectation: Expectation) -&gt; Verdict: ...
+
+@dataclass(frozen=True, slots=True)
+class Verdict:
+    outcome: Literal[&quot;pass&quot;, &quot;fail&quot;, &quot;inconclusive&quot;]
+    confidence: float
+    rationale: str
+    evaluator_id: str
+</code></pre>
+<p>An <code>Exchange</code> (<code>guardana.core.exchange</code>) is the graded conversation — the
+message sequence plus <code>reply_text</code> (the last assistant reply, <code>None</code> when
+there is nothing to grade) and <code>transcript</code> (the whole conversation, so a
+multi-turn scenario's &quot;across the conversation&quot; goal is gradable). Every
+built-in evaluator fails closed on <code>reply_text is None</code>: the verdict is
+<code>inconclusive</code>, never a silent pass.</p>
+<p>Shipped evaluators: <code>keyword</code> (cheap refusal-marker matching — honestly
+low-confidence, ~0.5–0.6), <code>canary</code> (near-perfect detection of a planted
+marker verbatim, ~0.9–0.99), <code>length</code> (grades a reply by length — a runaway
+answer to a divergence prompt is a lead, for the unbounded-consumption check),
+<code>llm_judge</code> (a versioned judging prompt sent to
+a judge model wired from the profile's <code>evaluators:</code> block; confidence is
+measured as agreement across <code>min_agreement</code> samples, and the prompt version
+is stamped into <code>evaluator_id</code> — <code>llm_judge@2025.1</code> — so grading stays
+reproducible as the rubric evolves), and <code>guard</code> (an opt-in external
+safety-classifier — see
+<a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>). A
+rule references an evaluator by its string <code>id</code>, resolved from the registry
+at run time; swapping which evaluator grades a rule never requires touching
+the rule itself.</p>
+<h3 id="4-report--finding--normalized-result">4. Report / Finding — normalized result</h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Finding:
+    rule_id: str
+    severity: Severity
+    title: str
+    taxonomy: tuple[TaxonomyRef, ...]
+    target_ref: str
+    evidence: Evidence
+    verdict: Verdict | None = None   # present for evaluator-graded (dynamic) checks
+</code></pre>
+<p>One shape regardless of which rule produced it. <code>guardana-report</code> renders a
+<code>ScanResult</code> — the findings, a rule-run/skip count, the <code>unverified</code>
+channel (checks that ran but could not reach a verdict — surfaced in every
+format, never dropped into a false all-clear), and <code>observations</code> (the
+components the run saw, taken from the target rather than from the rules, so a
+narrowed profile cannot shrink the inventory) — as <code>human</code>, <code>json</code>, <code>sarif</code>,
+or <code>junit</code> via the <code>Renderer</code> protocol
+(<code>render(result: ScanResult) -&gt; str</code>). <code>Severity</code> is an <code>IntEnum</code>
+(<code>INFO &lt; LOW &lt; MEDIUM &lt; HIGH &lt; CRITICAL</code>) so policies threshold with <code>&gt;=</code>.
+<code>TaxonomyRef</code> (<code>framework</code>, <code>id</code>, <code>title</code>) is how OWASP/MITRE/NIST mapping
+becomes a typed, filterable field rather than a comment.</p>
+<h3 id="5-profile--policy--what-to-run-and-when-to-fail">5. Profile / Policy — what to run and when to fail</h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Policy:
+    include: tuple[str, ...] = (&quot;*&quot;,)
+    exclude: tuple[str, ...] = ()
+    fail_on: FailOn = field(default_factory=FailOn)
+
+@dataclass(frozen=True, slots=True)
+class Profile:
+    name: str
+    policy: Policy
+    rule_config: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
+    evaluator_config: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
+    rule_paths: tuple[str, ...] = ()
+</code></pre>
+<p>Loaded from a <code>guardana.yaml</code> file by <code>load_profile</code>, or from a named preset
+(<code>ci</code>/<code>pre-training</code>/<code>monitor</code>) via <code>--preset</code>. See
+<a href="profiles.html"><code>profiles.md</code></a> for the full field-by-field schema and the presets.</p>
+<h2 id="the-registry--uniform-discovery">The Registry — uniform discovery</h2>
+<p><code>guardana.core.registry.Registry</code> is the one place that finds rules and
+evaluators, built-in or third-party, so nothing else in the engine
+hard-codes a list of them:</p>
+<pre><code class="language-python">_RULE_GROUP = &quot;guardana.rules&quot;
+_EVALUATOR_GROUP = &quot;guardana.evaluators&quot;
+_TARGET_GROUP = &quot;guardana.targets&quot;
+
+class Registry:
+    @classmethod
+    def discover(cls) -&gt; Self:
+        reg = cls()
+        for ep in entry_points(group=_RULE_GROUP):
+            _absorb(ep.load()(), reg.register_rule)
+        for ep in entry_points(group=_EVALUATOR_GROUP):
+            _absorb(ep.load()(), reg.register_evaluator)
+        for ep in entry_points(group=_TARGET_GROUP):
+            _absorb(ep.load()(), reg.register_target)
+        return reg
+</code></pre>
+<p><code>Registry.discover()</code> walks every installed package's <code>guardana.rules</code> and
+<code>guardana.evaluators</code> <a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry points</a>
+and calls each one (a zero-arg callable returning either a single <code>Rule</code>/
+<code>Evaluator</code> or an iterable of them — <code>_absorb</code> handles both shapes). A
+third-party package registered this way is discovered exactly like
+<code>guardana-rules</code>' own built-ins — there is no built-in/custom distinction at
+the registry level, only namespacing by <code>id</code> (<code>guardana.*</code> reserved for
+built-ins; use your own prefix, e.g. <code>acme.*</code>).</p>
+<p><code>Registry()</code> (the bare constructor, no entry-point scan) backs
+<code>guardana scan --no-plugins</code>: an empty registry that imports zero
+third-party code, for untrusted environments. See
+<a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for the trust model this exists for.</p>
+<p><strong>Declarative YAML rules are not entry points</strong> — they're parsed straight
+off disk by <code>load_yaml_rules(path)</code> and wired into the
+registry by whoever provides them (<code>guardana-rules</code>' <code>provide_rules()</code>
+walks its own <code>catalog/</code> directory via <code>importlib.resources</code>; a third-party
+package does the same over its own bundled YAML directory, or a user points
+at their own rules directory via <code>Registry.load_yaml_rule_dirs(paths)</code> — see
+<a href="writing-rules.html"><code>writing-rules.md</code></a>). <code>load_yaml_rule_dirs</code> never raises:
+a malformed rule file is recorded in the returned <code>RuleDirLoad.errors</code>
+instead of aborting the scan, so one bad custom rule can't take down a run.
+This is what backs the CLI's <code>--rules PATH</code> option (repeatable; also settable
+via <code>guardana.yaml</code>'s <code>rules.paths</code>) on <code>scan</code>, <code>probe</code>, and <code>monitor</code>.</p>
+<h3 id="current-entry-point-groups">Current entry-point groups</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Provides</th>
+<th>Wired into <code>Registry</code>?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.rules</code></td>
+<td>one <code>Rule</code>, or an iterable of <code>Rule</code>s</td>
+<td><strong>Yes</strong> — <code>Registry.discover()</code></td>
+</tr>
+<tr>
+<td><code>guardana.evaluators</code></td>
+<td>one <code>Evaluator</code>, or an iterable</td>
+<td><strong>Yes</strong> — <code>Registry.discover()</code></td>
+</tr>
+<tr>
+<td><code>guardana.targets</code></td>
+<td>one <code>Target</code> subclass, or an iterable</td>
+<td><strong>Yes</strong> — <code>Registry.discover()</code>. <code>Registry.targets()</code> exposes the discovered classes (types, not instances — targets are parameterized by a path/URL at construction time). The CLI itself still selects its built-in <code>ArtifactTarget</code>/<code>EndpointTarget</code> by path/URL; discovered custom targets are available to library/embedding use, not yet CLI-selectable — see <a href="extending.html#adding-a-target"><code>extending.md</code></a>.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="the-runner">The Runner</h2>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Runner:
+    registry: Registry
+    profile: Profile
+
+    def run(self, target: Target) -&gt; ScanResult: ...
+</code></pre>
+<p>For each registered rule: skip it if <code>target.kind</code> doesn't match
+<code>meta.target_kind</code>, or the profile's <code>Policy.matches(rule_id)</code> excludes it;
+skip it (recording it under <code>rules_skipped</code>) if the target can't satisfy
+<code>meta.required_capabilities</code>; otherwise run it, catching <code>RuleError</code> per
+rule so one bad rule can't abort the whole scan. Findings whose verdict is
+<code>inconclusive</code> are partitioned onto the result's <code>unverified</code> channel rather
+than counted as confirmed findings — or dropped. <code>gate(result, policy)</code> is
+the free function that turns a <code>ScanResult</code> into the pass/fail boolean CLI
+commands use for their exit code (see <a href="profiles.html#the-gate"><code>profiles.md</code></a>);
+<code>fail_on_inconclusive: true</code> makes the unverified channel gate too.</p>
+<h2 id="the-coreserver-boundary">The core↔server boundary</h2>
+<p><strong>Hard rule: <code>guardana-core</code> never imports <code>guardana-server</code>, directly or
+transitively.</strong> The only connection is one-directional and data-only:</p>
+<pre><code class="language-python">class Reporter(Protocol):
+    def submit(self, result: ScanResult, *, source: str) -&gt; None: ...
+</code></pre>
+<p><code>guardana.core.reporter.HttpReporter</code> (used by all three CLI commands via
+<code>--reporter server://&lt;url&gt;</code>) POSTs a <strong>versioned JSON envelope</strong> to whatever
+URL you give it — it doesn't know or care whether the receiving end is
+<code>guardana-server</code> or something else entirely:</p>
+<pre><code class="language-json">{
+  &quot;schema_version&quot;: 8,
+  &quot;source&quot;: &quot;&lt;path or url#model&gt;&quot;,
+  &quot;findings&quot;: [ ... serialized Findings ... ],
+  &quot;unverified&quot;: [ ... checks that ran but could not reach a verdict ... ],
+  &quot;summary&quot;: {&quot;rules_run&quot;: 6, &quot;rules_skipped&quot;: [], &quot;max_severity&quot;: null, &quot;unverified&quot;: 0}
+}
+</code></pre>
+<p><code>schema_version</code> (<code>guardana.core.reporter.ENVELOPE_SCHEMA_VERSION</code>, currently
+<code>8</code>) is what lets an agent and a collector be upgraded independently: a
+collector that doesn't understand a version rejects it outright rather than
+silently misreading a renamed field. The <code>unverified</code> channel is carried over
+the wire for the same reason it is surfaced locally — a check that could not be
+graded must never reach the collector as a false all-clear.</p>
+<p><code>guardana-server</code> itself is a small, independently-deployed FastAPI app
+(<code>guardana.server.app.create_app</code>) exposing <code>POST /findings</code>,
+<code>GET /findings</code>, and <code>GET /trend</code> over an in-memory (or pluggable) <code>Store</code>.
+It validates every submission with Pydantic models
+(<code>guardana.server.envelope.Submission</code>), so a malformed POST — or one with an
+unsupported <code>schema_version</code> — is rejected with <code>422</code> instead of poisoning
+<code>/findings</code> and <code>/trend</code>. An <strong>opt-in dashboard</strong>
+(<code>create_app(dashboard=True)</code> or <code>GUARDANA_DASHBOARD=1</code>, off by default) mounts a
+read-only page at <code>GET /</code> plus an aggregated <code>GET /stats</code> — a self-contained HTML
+page (no build step, offline; server-side aggregation in <code>guardana.server.stats</code>)
+that visualizes the store. It adds no write surface and no auth; the
+<code>Store</code> grows a <code>records()</code> seam (timestamped submissions) for the time-series.</p>
+<p>This boundary is intentional and load-bearing: all OSS value (every rule, every
+evaluator, every report format, every CLI mode) works fully offline with zero
+dependency on the collector. The collector is a strictly separable layer —
+self-hosted (<code>guardana-server</code>) or, later, a managed cloud — that can grow
+(dashboard, auth, persistence, fleet management, retention) without ever forking
+or depending-back-into the engine.</p>
+<h2 id="repository-layout">Repository layout</h2>
+<pre><code>guardana/
+├─ packages/
+│  ├─ guardana-core/   src/guardana/core/{target,rule,evaluator,report,profile,
+│  │                                      registry,runner,reporter,monitor,testing}
+│  ├─ guardana-rules/  src/guardana/rules/{supply_chain,prompt,output,training,agent,catalog}
+│  ├─ guardana-cli/    src/guardana/cli/{scan,probe,monitor,init,rules,new_rule}
+│  ├─ guardana-report/ src/guardana/report/{human,sarif,json_report,junit}
+│  └─ guardana-server/ (optional collector; separate deploy)
+├─ docs/               (this directory)
+├─ examples/           (sample profile + custom-rule package)
+├─ CLAUDE.md  CONTRIBUTING.md  CODE_OF_CONDUCT.md  SECURITY.md
+└─ pyproject.toml      (uv workspace, ruff, mypy, pytest)
+</code></pre>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/architecture.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,3 +1,10 @@
+---
+title: "Threat model"
+nav_order: 320
+summary: "what Guardana defends against, what it does not, and where the trust boundaries sit"
+status: stable
+---
+
 # Threat model
 
 What Guardana defends against, what it deliberately does not, and where the

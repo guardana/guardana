@@ -122,6 +122,10 @@ python_version = "3.11"
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = [
+    # `scripts/` first: `build_site.py` imports the `sitegen` package beside it, and
+    # a maintainer script the type checker cannot resolve is a script it silently
+    # stops checking.
+    "scripts",
     "packages/guardana-core/src",
     "packages/guardana-report/src",
     "packages/guardana-rules/src",
@@ -153,7 +157,26 @@ filterwarnings = [
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:Warning",
 ]
 
+[tool.uv]
+# `docs` is on by default so the site build and its `--check` gate run in the same
+# environment as everything else. A group here belongs to the *workspace root*,
+# which is not a published distribution — no wheel declares markdown-it-py, and
+# `test_declared_dependencies.py` plus `clean_install_check.py` are what keep that
+# true rather than this comment.
+default-groups = ["dev", "docs"]
+
 [dependency-groups]
+docs = [
+    # Renders docs/**.md into site/docs/**.html. Its own dependency is `mdurl` and
+    # nothing else, it is CommonMark-compliant, and it exposes the token stream —
+    # which is what lets the build rewrite every internal `.md` link into `.html`
+    # by walking links rather than by running a regex over prose. The alternative
+    # considered and rejected in `docs/design/documentation-site.md` was a static
+    # site generator: MkDocs or Docusaurus would bring a framework, a theme system
+    # and (for Docusaurus) a Node toolchain to render sixty files, and the half
+    # with actual value — the rule explorer — would still be custom work.
+    "markdown-it-py>=3.0",
+]
 dev = [
     "import-linter>=2.1",
     # Test-only, and deliberately not a runtime dependency of any distribution:

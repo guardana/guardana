@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy and redaction — Guardana documentation</title>
+<meta name="description" content="one redactor, one seam">
+<link rel="canonical" href="https://guardana.dev/docs/design/privacy-and-redaction.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html" aria-current="page">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: privacy, redaction and safe evidence<span class="status implemented">implemented</span></h1><p class="lede">one redactor, one seam</p><p><strong>Status:</strong> implemented in 0.7 · user-facing description in <a href="../privacy.html"><code>docs/privacy.md</code></a></p>
+<h2 id="the-problem">The problem</h2>
+<p>Guardana's evidence is, by construction, the most sensitive text in a deployment:
+the prompt that worked, the reply that leaked, the tool argument that carried a
+secret. Today that evidence is redacted <strong>by convention</strong> — rules are careful, and
+<code>Evidence</code> documents that it never carries the secret itself — but nothing
+enforces it centrally. A third-party rule can put anything in <code>Evidence.detail</code>,
+and it flows unmodified into the JSON report, the SARIF file, and the collector
+envelope.</p>
+<p>Convention held while every rule was ours. It does not survive an extension API.</p>
+<h2 id="design">Design</h2>
+<h3 id="one-redactor-at-one-seam">One redactor, at one seam</h3>
+<p>A single <code>EvidenceRedactor</code> applied <strong>after</strong> rules produce findings and <strong>before</strong>
+anything serializes or dispatches them. Not inside each rule: a policy applied in
+thirty places is a policy with thirty exceptions, and the one that matters is the
+one someone forgot.</p>
+<pre><code>rules → findings → [EvidenceRedactor] → renderers / reporter / collector
+                                      ↑
+                        the only path evidence takes out
+</code></pre>
+<p>The seam is enforced by a test that walks every serialization entry point and
+asserts it sits downstream of the redactor.</p>
+<h3 id="modes">Modes</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What is kept</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>metadata_only</code></td>
+<td>Which rule fired, where, what verdict. No text from the target at all.</td>
+</tr>
+<tr>
+<td><code>redacted</code> <em>(default)</em></td>
+<td>Evidence with secrets, credentials and configured patterns removed, bounded in size.</td>
+</tr>
+<tr>
+<td><code>full</code></td>
+<td>Everything, with a warning printed at run time and recorded in the manifest.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong><code>redacted</code> is the default, and <code>full</code> is loud.</strong> A tool that quietly stored
+model output would be a liability the first time someone ran it against a
+production support agent.</p>
+<h3 id="what-is-redacted-by-default">What is redacted by default</h3>
+<p>Secrets and credentials always. Emails by default. IP addresses not by default —
+they are frequently the finding. Custom patterns configurable. Identifiers hashed
+rather than dropped, so two occurrences of the same value stay comparable across
+runs without the value being stored.</p>
+<p>Prompts, responses and tool arguments are <strong>not stored</strong> by default, at any mode
+below <code>full</code>. The finding says what happened; the reproduction is the rule, which
+is public.</p>
+<h3 id="bounded-size">Bounded size</h3>
+<p><code>max_evidence_bytes</code> (default 16 KiB) applied at the same seam. Unbounded evidence
+is a denial-of-service against the collector and a memory risk locally — and a
+64 MiB model reply in a report helps nobody.</p>
+<h3 id="the-report-says-what-it-removed">The report says what it removed</h3>
+<p>A finding whose evidence was redacted or truncated says so, in a field. Silent
+redaction produces a second class of dishonest report: one that looks complete and
+is not. This is the same principle as <code>unverified</code> — the report must never imply
+it saw more than it did.</p>
+<h3 id="local-and-collector-policies-are-separate">Local and collector policies are separate</h3>
+<p>A team may keep full evidence locally and send only metadata to a central
+collector. One knob for both would force the strictest setting everywhere and get
+turned off entirely.</p>
+<h3 id="logging">Logging</h3>
+<p>No API key, authorization header or raw target response at any log level by
+default. Debug logging that dumps responses is how evidence escapes a policy that
+was correctly applied everywhere else.</p>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ul>
+<li>A test proving a finding constructed with a live-looking credential in
+<code>Evidence.detail</code> cannot reach any renderer, the reporter, or the collector
+envelope with the credential intact — asserted per output path, not once.</li>
+<li>A test that <code>full</code> mode warns, and that the manifest records the mode used.</li>
+<li>A test that truncation is reported rather than silent.</li>
+<li>A test that no log record at any level contains an API key.</li>
+<li>Fixtures use crafted, obviously-fake secrets built in code
+(<code>guardana.core.testing</code>), never a real-looking key pasted into a file.</li>
+</ul>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li>
+<p><strong>Does redaction belong in <code>guardana-core</code> or <code>guardana-report</code>?</strong> Answered:
+core. The collector reporter lives there too, and evidence must be redacted
+before <em>any</em> dispatch. What was not anticipated: the seam had to be the
+renderer <strong>factory</strong> rather than each renderer, because only the factory can
+guarantee that a format added later is covered.</p>
+<p>Also unanticipated: redaction changes a finding's fingerprint, which a baseline
+waiver matches on. Commands therefore redact once, early, before a baseline is
+written or applied — and the redactor is idempotent so the output seam can
+apply it again safely.</p>
+</li>
+<li>
+<p><strong>Should the redactor be pluggable?</strong> Answered: no. An enterprise will want its own patterns.
+A pluggable redactor is also a pluggable <em>un</em>-redactor — a third-party
+implementation that returns its input unchanged silently disables the whole
+policy. Leaning: patterns are configurable data, the redactor itself is not an
+entry point. Same reasoning that keeps <code>Capability</code> a closed vocabulary.</p>
+</li>
+<li>
+<p><strong>Hashing identifiers needs a per-run or per-project salt.</strong> Per-run makes
+values incomparable across runs, defeating the purpose; per-project needs
+somewhere to keep the salt. Decided with the collector schema.</p>
+</li>
+</ol>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/privacy-and-redaction.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

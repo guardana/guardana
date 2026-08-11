@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extending Guardana — Guardana documentation</title>
+<meta name="description" content="add a Rule, an Evaluator, or a Target; the entry-point contract">
+<link rel="canonical" href="https://guardana.dev/docs/extending.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html" aria-current="page">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Extending Guardana</h1><p class="lede">add a Rule, an Evaluator, or a Target; the entry-point contract</p><p>The engine (<code>guardana-core</code>) knows almost nothing about specific threats —
+it knows how to discover rules, run them against targets, and evaluate
+outcomes. All domain knowledge lives in <strong>rules</strong>, <strong>evaluators</strong>, and
+<strong>targets</strong>. Add coverage for a new threat, model category, or backend by
+adding one of these — never by patching the engine. Read
+<a href="architecture.html"><code>architecture.md</code></a> first for the shapes referenced below.</p>
+<p>Every extension point works identically whether it lives in this repo
+(upstreamed, shared) or in your own private package (kept internal) — same
+base classes, same discovery mechanism where discovery exists.</p>
+<h2 id="the-public-import-surface">The public import surface</h2>
+<p>Everything an extension implements or touches is re-exported at the top of
+<code>guardana.core</code>, so plugin code needs one import line:</p>
+<pre><code class="language-python">from guardana.core import (
+    Capability, Evaluator, Evidence, Finding, Registry, Rule, RuleContext,
+    RuleMeta, Runner, ScanResult, Severity, Target, TargetKind,
+)
+</code></pre>
+<p>The deeper module paths used elsewhere in these docs
+(<code>guardana.core.rule.Rule</code>, <code>guardana.core.target.Capability</code>, ...) remain
+valid — the re-exports are the same objects. The full list is
+<code>guardana.core.__all__</code>: <code>Capability</code>, <code>Evaluator</code>, <code>Evidence</code>,
+<code>Exchange</code>, <code>Expectation</code>, <code>FailOn</code>, <code>Finding</code>, <code>Policy</code>, <code>Profile</code>,
+<code>ProfileError</code>, <code>Provenance</code>, <code>Registry</code>, <code>Rule</code>, <code>RuleContext</code>, <code>RuleError</code>,
+<code>RuleLoadError</code>, <code>RuleMeta</code>, <code>Runner</code>, <code>ScanResult</code>, <code>Severity</code>, <code>Surface</code>,
+<code>Target</code>, <code>TargetKind</code>, <code>TaxonomyRef</code>, <code>Verdict</code>, and <code>__version__</code>.</p>
+<h2 id="adding-a-rule">Adding a Rule</h2>
+<p>See <a href="writing-rules.html"><code>writing-rules.md</code></a> for the full guide (YAML schema,
+Python plugin shape, and how <a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule"><code>examples/custom_rule/</code></a>
+ships one of each). Short version: implement <code>guardana.core.rule.Rule</code> (or
+drop a YAML file matching the catalog schema into a rule directory) and
+register it via the <code>guardana.rules</code> entry point in your package's
+<code>pyproject.toml</code>.</p>
+<h2 id="adding-an-evaluator">Adding an Evaluator</h2>
+<p>An <code>Evaluator</code> turns a model response (or artifact observation) into a
+<code>Verdict</code> — the &quot;did it succeed, and how sure are we&quot; judgment that's
+Guardana's core differentiator. Implement:</p>
+<pre><code class="language-python">from guardana.core.evaluator import Evaluator, Expectation, Verdict
+from guardana.core.exchange import Exchange
+
+class MyEvaluator(Evaluator):
+    id = &quot;acme.severity_classifier&quot;
+
+    def evaluate(self, exchange: Exchange, expectation: Expectation) -&gt; Verdict:
+        # exchange.reply_text is the model's last reply (None when there is no
+        # assistant text to grade — return &quot;inconclusive&quot; then, never &quot;pass&quot;).
+        # A blank reply is None too: a provider that answers with an empty string
+        # (a content filter, a tool-call-only turn) said nothing to grade, and the
+        # seam decides that once so every evaluator agrees;
+        # exchange.transcript is the whole conversation, for multi-turn goals.
+        # expectation carries whatever the rule declared under `expect:`.
+        if exchange.reply_text is None:
+            return Verdict(&quot;inconclusive&quot;, 0.0, &quot;no reply to grade&quot;, self.id)
+        ...
+        return Verdict(
+            outcome=&quot;fail&quot;,       # &quot;pass&quot; | &quot;fail&quot; | &quot;inconclusive&quot;
+            confidence=0.85,      # 0.0-1.0 — surfaced in every finding this grades
+            rationale=&quot;...&quot;,      # short, human-readable justification
+            evaluator_id=self.id,
+        )
+</code></pre>
+<p>The fail-closed convention above is project law, not a style choice: an
+evaluator that cannot actually grade returns <code>&quot;inconclusive&quot;</code> (surfaced on
+the run's <code>unverified</code> channel), never a confident all-clear.</p>
+<p>Register it the same way as a rule:</p>
+<pre><code class="language-toml">[project.entry-points.&quot;guardana.evaluators&quot;]
+my_evaluators = &quot;acme_rules:provide_evaluators&quot;
+</code></pre>
+<p>where <code>provide_evaluators()</code> returns an <code>Evaluator</code> instance or a list of
+them. A YAML rule references your evaluator by its string <code>id</code> in its
+<code>evaluator:</code> field, exactly as it would a built-in — swapping graders never
+touches the rule.</p>
+<p><a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule"><code>examples/custom_rule/</code></a> ships a complete, runnable
+one: <code>StrictRefusalClassifier</code> (id <code>acme.strict_refusal</code>, registered via the
+<code>guardana.evaluators</code> entry point) plus a YAML rule that grades with it, and
+tests proving it's discovered and used end-to-end — a package can mix built-in
+and custom evaluators freely, referencing either by id. For the built-in
+shapes, <code>guardana.core.evaluator.{keyword,canary,length,llm_judge,guard}</code> are
+five small one-file examples spanning cheap heuristic, exact marker match,
+reply-length lead, LLM-judge, and safety-classifier patterns. (<code>llm_judge</code> and <code>guard</code> need a
+model of their own and are wired from the profile's <code>evaluators:</code> block —
+see <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>.)</p>
+<h2 id="adding-a-target">Adding a Target</h2>
+<p>A <code>Target</code> is a uniform interface over the thing under test
+(<code>guardana.core.target.Target</code>), so a rule never hard-codes whether it
+talks to a file or a live model:</p>
+<pre><code class="language-python">from guardana.core.target import Capability, Target, TargetKind
+
+class MyTarget(Target):
+    kind = TargetKind.ARTIFACT   # or TargetKind.ENDPOINT
+
+    def capabilities(self) -&gt; set[Capability]:
+        return {Capability.READ_FILES}
+
+    @property
+    def ref(self) -&gt; str:
+        return &quot;...&quot;  # stable identifier used in findings/reports
+
+    # add whatever read/interaction surface your rules need, e.g. an
+    # iter_files()-style method (ArtifactTarget) or a chat()-style method
+    # (EndpointTarget) — there's no fixed interface beyond the base Target
+</code></pre>
+<p>Built-ins are <code>ArtifactTarget</code> (files: pickles, GGUF, ONNX, ML formats,
+requirements/lockfiles, manifests) and <code>EndpointTarget</code>
+(OpenAI-compatible / Ollama / vLLM / HF-TGI chat). A rule declares the
+capabilities it needs via <code>required_capabilities</code> in <code>RuleMeta</code>; the
+<code>Runner</code> skips a rule whose target can't satisfy them rather than crashing
+— so a new <code>Target</code> subclass is usable by any existing rule that only needs
+capabilities your target also provides (e.g. a new artifact-like target
+that provides <code>READ_FILES</code> can run all 19 build-time artifact rules unmodified).</p>
+<p><strong><code>guardana.targets</code> is discovered by <code>Registry.discover()</code></strong>, the same way
+as rules and evaluators (see
+<a href="architecture.html#current-entry-point-groups"><code>architecture.md</code></a>): register a
+<code>Target</code> subclass (the class itself, not an instance — targets are
+parameterized by a path/URL at construction time) via the <code>guardana.targets</code>
+entry point, and <code>registry.targets()</code> returns it. This is aimed at
+library/embedding use; the CLI's own target selection remains path/URL-based
+(<code>scan</code> always builds an <code>ArtifactTarget</code>, <code>probe</code>/<code>monitor</code> always build an
+<code>EndpointTarget</code> via <code>build_endpoint()</code>) — a discovered custom <code>Target</code> isn't
+yet CLI-selectable, only usable by code that drives a <code>Runner</code> directly.</p>
+<h2 id="the-entry-point-contract-rules-evaluators--targets">The entry-point contract (rules, evaluators &amp; targets)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Provides</th>
+<th>Loaded by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.rules</code></td>
+<td>one <code>Rule</code>, or an iterable of <code>Rule</code>s</td>
+<td><code>Registry.discover()</code></td>
+</tr>
+<tr>
+<td><code>guardana.evaluators</code></td>
+<td>one <code>Evaluator</code>, or an iterable</td>
+<td><code>Registry.discover()</code></td>
+</tr>
+<tr>
+<td><code>guardana.targets</code></td>
+<td>one <code>Target</code> subclass, or an iterable</td>
+<td><code>Registry.discover()</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>A package registers by adding to its <code>pyproject.toml</code>:</p>
+<pre><code class="language-toml">[project.entry-points.&quot;guardana.rules&quot;]
+my_rules = &quot;acme_rules:provide_rules&quot;
+
+[project.entry-points.&quot;guardana.evaluators&quot;]
+my_evaluators = &quot;acme_rules:provide_evaluators&quot;
+
+[project.entry-points.&quot;guardana.targets&quot;]
+my_targets = &quot;acme_rules:provide_targets&quot;
+</code></pre>
+<p><code>provide_rules()</code> / <code>provide_evaluators()</code> are zero-argument callables
+returning an instance or a list of instances. Any pip-installed package —
+ours or a third party's private one — is discovered identically; there is
+no built-in/custom distinction at the registry level, only namespacing by
+<code>id</code>. <code>guardana scan --no-plugins</code> (and the equivalent bare <code>Registry()</code>)
+disables entry-point discovery entirely — see
+<a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for why this exists and when to use it.</p>
+<h2 id="testing-your-extension">Testing your extension</h2>
+<p>Every public <code>Rule</code>, <code>Evaluator</code>, and <code>Target</code> should ship with tests: a
+rule needs a positive and a negative fixture (proving it fires on a bad
+input and stays silent on a good one — this is the project's main defense
+against the false-positive/false-negative failure mode dynamic checks are
+prone to); an evaluator needs a test per <code>outcome</code> it can produce; a target
+needs a test that <code>capabilities()</code> and its read/interaction surface behave.
+<a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule/tests"><code>examples/custom_rule/tests/</code></a> shows the
+pattern end-to-end for a rule package, including a discovery-proving test
+you can copy.</p>
+<p>For dynamic (endpoint) rules, <code>guardana.core.testing</code> ships transport test
+doubles — <code>ScriptedTransport</code> (canned replies, records requests),
+<code>RefusingTransport</code> (a well-behaved model that refuses everything),
+<code>EchoingTransport</code> (discloses its planted system prompt — the canary-leak
+fixture), <code>ToolCallingScriptedTransport</code> (calls the tools it was told to — the
+excessive-agency fixture), and <code>FailingTransport</code> (raises like an unreachable
+endpoint) — that plug into <code>EndpointTarget</code>'s <code>ChatTransport</code> seam, so both
+fixtures run against a scripted model with no network. Worked example:
+<a href="writing-rules.html#testing-a-dynamic-rule-without-a-model"><code>writing-rules.md</code></a>.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/extending.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

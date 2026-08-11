@@ -1,3 +1,10 @@
+---
+title: "Privacy and redaction"
+nav_order: 110
+summary: "one redactor, one seam"
+status: implemented
+---
+
 # Design: privacy, redaction and safe evidence
 
 **Status:** implemented in 0.7 · user-facing description in [`docs/privacy.md`](../privacy.md)

@@ -1,3 +1,10 @@
+---
+title: "Evidence and redaction"
+nav_order: 310
+summary: "evidence redaction, modes, and what Guardana keeps"
+status: stable
+---
+
 # Evidence, redaction and what Guardana keeps
 
 Guardana's evidence is by construction the most sensitive text in a deployment:

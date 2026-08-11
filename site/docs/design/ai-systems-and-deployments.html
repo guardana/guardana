@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI systems and deployments — Guardana documentation</title>
+<meta name="description" content="what was verified, where it runs, and which version of it">
+<link rel="canonical" href="https://guardana.dev/docs/design/ai-systems-and-deployments.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html" aria-current="page">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: AI systems, environments and deployments<span class="status implemented">implemented</span></h1><p class="lede">what was verified, where it runs, and which version of it</p><p><strong>Status:</strong> implemented in 0.9.0 · <strong>Written:</strong> 2026-08-05 · <strong>Phase C, item 22</strong></p>
+<h2 id="the-problem">The problem</h2>
+<p>A collector now knows <em>which project</em> a run belongs to. It does not know <strong>what was
+verified, where it runs, or which version of it</strong> — so a project's history is one
+undifferentiated stream in which last night's production check and a developer's
+laptop experiment sit side by side.</p>
+<p>That is the gap between &quot;we keep the evidence&quot; and &quot;we can answer a question with
+it&quot;. Every question a team actually asks needs this axis:</p>
+<ul>
+<li>did production get worse since Tuesday?</li>
+<li>is the staging deployment of the support agent verified at all?</li>
+<li>this finding — which commit introduced it?</li>
+</ul>
+<p>The engine has had the vocabulary since 0.7: <code>DeploymentRef</code> on the run manifest
+carries <code>ai_system</code>, <code>environment</code>, <code>deployment_id</code>, <code>commit_sha</code>, <code>image_digest</code>,
+<code>model_digest</code>, <code>model_name</code>, <code>model_revision</code>. <strong>Nothing has ever filled it in,
+and the envelope has never carried it.</strong> Both are recorded debt
+(<a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md"><code>ROADMAP.md</code></a>): &quot;deployment identifiers populated from CI&quot; and
+&quot;the collector envelope carrying the manifest — belongs with the collector work,
+not ahead of it&quot;. This is that work.</p>
+<p>It is also what the company-ready checklist entry &quot;project/<strong>environment</strong>
+isolation&quot; is still waiting on, and what keeps the collector's maturity at
+<code>experimental</code> after <a href="collector-tenancy.html">tenancy</a>.</p>
+<h2 id="what-must-not-get-harder">What must not get harder</h2>
+<p>Stated first, for the same reason it is stated first in the tenancy document: a
+boundary that lengthens the first run is a boundary fewer people ever get behind.</p>
+<ul>
+<li><strong>A local scan is untouched.</strong> No collector, no system, no environment, no flag.</li>
+<li><strong>Reporting into a collector gains no required argument.</strong> A run that declares
+nothing is stored against the project and against no system — recorded as
+unknown, never folded into a system somebody did not name.</li>
+<li><strong>Standing a collector up stays three commands.</strong> <code>bootstrap</code> is unchanged; AI
+systems, environments and deployments are <em>inferred from what a run declares</em>,
+not created by an administrator beforehand.</li>
+<li><strong>The evaluation path stays two variables.</strong> <code>GUARDANA_STORAGE=memory</code> with
+<code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code>.</li>
+</ul>
+<h2 id="six-decisions">Six decisions</h2>
+<h3 id="1-the-project-comes-from-the-key-the-system-and-environment-come-from-the-run">1. The project comes from the key; the system and environment come from the run</h3>
+<p>Tenancy settled that the project may only come from the credential, because a
+credential that does not bound the write is not a boundary. The obvious move is to
+apply the same rule one level down — and it is the wrong one.</p>
+<p>A single pipeline legitimately deploys to <code>dev</code>, <code>staging</code> and <code>production</code>.
+Sourcing the environment from the key would mean three credentials per project for
+every team, and the blast radius that buys is already bounded: the key names the
+project, and everything it can reach is inside it.</p>
+<p>So the run declares its system and environment, and the collector records them
+inside the project the key names. <strong>This is a labelling axis by default, not an
+authorization boundary</strong> — and the next decision is what makes that statement
+survivable.</p>
+<h3 id="2-a-key-may-pin-an-environment-and-then-it-is-a-boundary-in-both-directions">2. A key may pin an environment, and then it is a boundary in both directions</h3>
+<p><code>key create --project acme/web --environment production</code> produces a credential that
+<strong>writes only production runs and reads only production evidence</strong>. Unpinned keys
+behave as they do today: the whole project.</p>
+<p>Optional rather than mandatory, because the pin is a <em>narrowing</em>, and narrowing is
+the direction a credential should err in without being the direction everybody is
+forced into. The team that needs &quot;the dev pipeline must not be able to write
+production evidence&quot; gets it with one flag; the team with one pipeline and three
+environments is not made to manage three secrets to get started.</p>
+<p>Read <em>and</em> write, not write alone. A pin that bounded writes but let the same key
+read every environment would be the kind of half-boundary that reads as a whole one
+— and asymmetry is exactly what makes a security claim wrong in a way nobody
+notices until it matters.</p>
+<p><strong>A mismatch is a refusal.</strong> A pinned key that submits a run declaring a different
+environment gets <code>403</code>, never &quot;prefer the more specific one&quot; and never a silent
+rewrite. This is the rule the tenancy document already wrote for the day the
+envelope carries a tenant identifier; this is that day, one level down.</p>
+<p><strong>Silence is not a mismatch.</strong> A pinned key submitting a run that declares no
+environment labels it with the pin. The credential asserted the environment; the
+run did not contradict it. The alternative — storing it unlabelled — would let a
+pinned key write evidence into a place it cannot itself read, which is a blind spot
+manufactured by a security feature. It also means a pipeline behind a pinned key
+does not have to repeat <code>--environment</code> on every command.</p>
+<h3 id="3-systems-environments-and-deployments-are-inferred-and-a-mistake-is-visible">3. Systems, environments and deployments are inferred, and a mistake is visible</h3>
+<p>The alternative is requiring an administrator to create an AI system before a
+pipeline can report against it. That puts a human step between a pipeline and its
+first report, and pipelines that fail on a missing prerequisite get commented out,
+not fixed.</p>
+<p>So the collector creates what a run names. The cost is real: one typo
+(<code>--ai-system suport-agent</code>) creates a second system, and a dashboard showing two
+systems where there is one is a dashboard that lies quietly.</p>
+<p>The answer is not to refuse; it is to make the mistake <strong>visible</strong>.
+<code>guardana-collector system list</code> on a typo shows two entries and one of them is
+obviously wrong, which is the difference between a mistake somebody finds and one
+nobody does.</p>
+<p>An earlier draft of this document gave every inferred row an <code>unclaimed</code> flag,
+&quot;until a human or an API call adopts it&quot; — which is what the domain model leans
+towards. It is dropped, because <strong>this item ships no command that could ever clear
+it</strong>. Every row would be <code>unclaimed</code> forever, so the marking would distinguish
+nothing while looking like it distinguished something; and a column nothing can
+fill is the same defect as the <code>created_by</code> that tenancy removed from <code>store_key</code>.
+The flag arrives with the command that clears it.</p>
+<p>Adopting one — and the <em>merge</em> that a typo actually needs — is deliberately not in
+this item. Merging two systems moves evidence between identities, which is the same
+class of operation as deletion, and it belongs with retention (item 26) where that
+class is designed once. Until then a typo is corrected the way it is made: by
+running the pipeline with the right name, and reading the wrong one as the empty
+system it is.</p>
+<p><strong>Systems and environments are always resolved inside the key's project.</strong> Two
+projects may each have a <code>production</code> and a <code>support-agent</code>, and they are four
+rows. A lookup that matched on the name alone would be a cross-tenant read
+reintroduced one level down, by a query that looks innocent.</p>
+<h3 id="4-the-environment-vocabulary-is-open-and-normalized">4. The environment vocabulary is open, and normalized</h3>
+<p>Closing it to <code>dev | staging | production</code> would be wrong within a week: teams run
+<code>preview</code>, <code>canary</code>, <code>eu-prod</code>, <code>pr-1423</code>. Guardana's engine &quot;knows no regulation
+and no vendor&quot;, and it should not know somebody's deployment topology either.</p>
+<p>Open, therefore — but held to the same slug rules as an organization or a project,
+so <code>Production</code>, <code>production </code> and <code>production</code> are one environment rather than
+three. Normalization at the door, because the alternative is a dashboard whose
+grouping depends on who typed what.</p>
+<p>This is deliberately <em>not</em> the reasoning that keeps <code>Capability</code> closed. A typo'd
+capability makes a rule silently skip forever, which is a fail-open; a typo'd
+environment makes a visible extra row.</p>
+<h3 id="5-the-envelope-goes-to-v6-and-carries-only-the-deployment-block">5. The envelope goes to v6, and carries only the deployment block</h3>
+<p>Not the whole run manifest. The manifest is the <em>engine's</em> reproducibility record
+and it is versioned independently; folding it into the wire format would tie two
+schemas that were separated on purpose, and would send a collector rule digests and
+budget ceilings it has no question to ask of.</p>
+<p>v6 adds one optional object. A v5 agent keeps working against a v6 collector and
+reports less, which is honest: it could not observe more. The collector accepts
+2–6, as it accepts 2–5 today.</p>
+<p><code>HttpReporter</code> takes the deployment at construction rather than on <code>submit</code>,
+because <code>Reporter.submit</code> is a documented extension point and a third-party
+reporter should not stop satisfying the protocol over this. One reporter is built
+per run by the CLI, and <code>monitor</code> reuses one across repeated runs of the <em>same</em>
+target — so the constructor is the honest home for it either way.</p>
+<h3 id="6-detect-what-ci-states-never-invent-what-only-a-human-knows">6. Detect what CI states; never invent what only a human knows</h3>
+<p><code>commit_sha</code>, <code>image_digest</code> and the run URL are facts a pipeline already holds, and
+reading them from the environment beats asking a user to remember a flag —
+<code>detect_source()</code> already does exactly this for the source kind.</p>
+<p><code>ai_system</code> and <code>environment</code> are <strong>not</strong> detectable. A branch name is not an
+environment, and a repository name is not an AI system: a monorepo has several, and
+a repository deployed twice has one system in two environments. Guessing would
+produce a value a team would then build a dashboard on, which is the same mistake as
+an invented <code>estimated_cost</code> — and this project already refuses that one.</p>
+<p>So: declared by flag or <code>guardana.yaml</code>, detected never.</p>
+<h2 id="design">Design</h2>
+<h3 id="schema-migration-0004--labels-on-a-submission-not-three-new-tables">Schema, migration 0004 — labels on a submission, not three new tables</h3>
+<pre><code class="language-sql">alter table submissions
+    add column ai_system       text,
+    add column environment     text,
+    add column deployment_ref  text,
+    add column commit_sha      text,
+    add column image_digest    text,
+    add column model_digest    text,
+    add column model_name      text,
+    add column model_revision  text;
+
+alter table api_keys add column environment text;
+
+create index submissions_project_environment_idx
+    on submissions (project_id, environment, received_at desc);
+</code></pre>
+<p>The existing <code>(project_id, received_at desc)</code> index <strong>stays</strong>. A composite index led
+by <code>project_id, environment</code> cannot order by <code>received_at</code> for a query that
+constrains only the project, so an unpinned read — still the common one — would lose
+its ordering. Two indexes, each for a shape of read that actually happens.</p>
+<p><strong>Every added column is nullable, and null means &quot;the run did not say&quot;</strong> — never
+&quot;applies to everything&quot;. A scoped read filters on the environment only when the
+scope names one, so an unlabelled run stays visible to an unpinned key and invisible
+to a pinned one. That asymmetry is the point: a pinned key must not see evidence
+that never claimed to be about its environment. Nothing needs adopting, because
+every existing submission <em>is</em> a run that did not say.</p>
+<h4 id="why-no-ai_systems-environments-or-deployments-tables">Why no <code>ai_systems</code>, <code>environments</code> or <code>deployments</code> tables</h4>
+<p>The first draft of this document created all three. Reviewing it against the two
+defects this repository has already removed — <code>store_key</code>'s <code>created_by</code> and this
+document's own <code>unclaimed</code> flag — killed them, for the same reason both times: <strong>a
+row whose only columns are the name it was created from is a table pretending to be
+an entity.</strong></p>
+<p>Today a run declares a <em>slug</em> and nothing else. An <code>ai_systems</code> row would hold that
+slug and a <code>name</code> column nothing sets; an <code>environments</code> row would hold a slug and
+nothing at all. Neither has an owner, a policy, a lifecycle or a retention rule —
+those are items 24 and 26, and that is when each becomes a thing rather than a
+label.</p>
+<p>So an environment is a <strong>normalized name</strong>, an AI system is a <strong>normalized name</strong>,
+and both are answered by an aggregate query over the submissions that used them.
+The pin on a key is text for the same reason and one more: it is an <em>assertion by a
+credential</em>, true whether or not any run has yet used that environment, so making it
+a foreign key would mean creating a row to hold a name nobody has reported against.</p>
+<p><code>deployment_ref</code> is the run's <code>deployment_id</code> when it gave one, otherwise its
+<code>commit_sha</code>. A run with neither identifies no deployment, and inventing a surrogate
+would produce one &quot;deployment&quot; per run.</p>
+<p>When item 24 gives an AI system an owner and a lifecycle, the migration that
+promotes these labels to rows has <strong>real data to build them from</strong> — which is a
+better position than inventing empty rows now and backfilling meaning later.</p>
+<h3 id="the-scope-grows-a-second-optional-axis">The scope grows a second, optional axis</h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class TenantScope:
+    project_id: int | None = None
+    environment: str | None = None
+</code></pre>
+<p><code>Store</code>'s shape is untouched: the scope is already the first argument of every
+method, which is the property this change collects on. <code>PostgresStore</code> adds
+<code>and (%s::text is null or environment = %s)</code> to each read, and the in-memory store
+compares the label it was given. One axis added, no signature moved.</p>
+<p><code>Authenticated.scope</code> carries the key's environment pin; <code>TenantScope.unauthenticated()</code>
+is unchanged.</p>
+<h3 id="commands">Commands</h3>
+<pre><code class="language-bash">guardana scan . --ai-system support-agent --environment production
+guardana probe … --ai-system support-agent --environment staging --deployment-id 2026-08-05.3
+guardana-collector key create --project acme/web --name prod-ci --environment production
+guardana-collector system list [--project acme/web]        # marks the unclaimed ones
+guardana-collector environment list [--project acme/web]
+guardana-collector deployment list --system acme/web/support-agent
+</code></pre>
+<p>There is <strong>no <code>guardana.yaml</code> block</strong>, and this is a change from the first draft.
+An environment varies per invocation — the dev job and the prod job are different
+runs of the same repository — so a repository-level constant would be wrong for the
+field that matters most. Environment <em>variables</em> cover what a config file would
+have: a pipeline exports <code>GUARDANA_AI_SYSTEM</code> once and one job still passes
+<code>--environment production</code>. <code>monitor</code> takes the flags too: a scheduled check of
+production is exactly the run whose environment matters most.</p>
+<p><code>key list</code> shows the pin, because a credential whose reach is narrower than its
+neighbours' is a fact an operator has to be able to see without reading a database.</p>
+<h2 id="testing">Testing</h2>
+<p>Every isolation test takes the <code>database_url</code> fixture, so CI cannot record one that
+did not run as a pass.</p>
+<ul>
+<li>a pinned key writing another environment: <code>403</code>, and nothing stored</li>
+<li>a pinned key reading: sees its environment, and <strong>not</strong> the project's unlabelled runs</li>
+<li>an unpinned key: sees everything in its project, labelled or not</li>
+<li>two environments of one project, per entity, on both stores</li>
+<li>an environment pin cannot reach across a <em>project</em> either (the two scopes compose)</li>
+<li>a run declaring nothing still ingests, and is stored with three nulls</li>
+<li>a v5 agent against a v6 collector still ingests</li>
+<li>a v6 envelope against the <em>engine's</em> serializer — the real bytes, not a hand-written dict</li>
+<li>the same system name in two projects is two systems, and a lookup for one never
+finds the other</li>
+<li>a pinned key submitting a run that declares no environment stores it under the pin</li>
+<li><code>system list</code> and <code>environment list</code> show what runs created</li>
+<li><code>Production</code>, <code>production </code> and <code>production</code> are one environment</li>
+<li>migration 0004 up and down on a database with submissions, with the rows intact</li>
+<li>a deployment with neither <code>deployment_id</code> nor <code>commit_sha</code> records no deployment</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ul>
+<li>A pinned key reads and writes exactly one environment, proven per entity on both
+stores and over HTTP.</li>
+<li>An unlabelled run is stored as unlabelled and never as a default system.</li>
+<li>The envelope is v6, the collector accepts 2–6, and a v5 agent still reports.</li>
+<li><code>Reporter.submit</code>'s signature is unchanged.</li>
+<li>First run of a real collector is still three commands; reporting still requires no
+new flag.</li>
+</ul>
+<h2 id="what-this-item-deliberately-does-not-deliver">What this item deliberately does not deliver</h2>
+<ul>
+<li><strong><code>ai_systems</code> and <code>environments</code> as tables</strong>, because today they would be rows
+whose only column is the name they were created from — see above. They arrive with
+the owner and the lifecycle that make them entities (item 24).</li>
+<li><strong>Adopting or merging an inferred system</strong>, because moving evidence between
+identities is the same class of operation as deleting it (item 26).</li>
+<li><strong>Read-side roles</strong> — who may see which environment beyond what their key pins
+(item 24).</li>
+<li><strong>Deployment regression views</strong> in the collector: comparing two deployments is
+<code>guardana diff</code>'s question, and the collector does not run rules or comparisons.</li>
+<li><strong>Populating <code>configuration.*_digest</code></strong> — still the application-awareness work.</li>
+</ul>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li><strong>Should an unpinned read key see a pinned key's writes?</strong> It does, and that is
+the meaning of &quot;the pin narrows&quot;. If a team wants an environment nobody can read
+without pinning, that is a role, and it is item 24.</li>
+<li><strong><code>last_seen_at</code> on a deployment is a write on every ingest.</strong> One row, indexed
+by primary key, and it is what makes &quot;which deployments are still reporting&quot;
+answerable. Revisit if ingest volume ever makes it measurable.</li>
+<li><strong>A run that declares an environment but no AI system.</strong> Recorded as such. It is
+a real state — a shared endpoint checked per environment — and refusing it would
+force a fake system name into every such pipeline.</li>
+</ol>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/ai-systems-and-deployments.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

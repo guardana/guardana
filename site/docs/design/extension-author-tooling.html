@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extension author tooling — Guardana documentation</title>
+<meta name="description" content="fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment">
+<link rel="canonical" href="https://guardana.dev/docs/design/extension-author-tooling.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html" aria-current="page">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>What a third party needs before the API freezes: fixtures, measurement, a manifest<span class="status accepted">accepted</span></h1><p class="lede">fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment</p><p><strong>Status:</strong> implemented in 0.18.0 · <strong>Written:</strong> 2026-08-11 · <strong>Step five</strong></p>
+<p>1.0 says one thing: <em>what will not break under you.</em> That promise is worthless to
+somebody who cannot demonstrate their own extension still works — so the tooling
+that lets them demonstrate it has to exist <strong>before</strong> the freeze, not after.</p>
+<p>Three things, and they are one thing seen from three sides: <strong>how a third party
+proves their pack does what it claims, and how CI repeats that proof.</strong></p>
+<ul>
+<li><code>guardana rule test</code> — a rule's fixtures as a command, including the one nobody
+writes</li>
+<li>evaluator measurement that reaches the run document, for the author of an
+<code>Evaluator</code> rather than of a <code>Rule</code></li>
+<li>a pack manifest declaring API compatibility, and <code>pack validate</code> to check it</li>
+</ul>
+<p>The lock file from the same roadmap item is <strong>deferred</strong>, with the reason at the
+bottom.</p>
+<h2 id="what-already-works-so-this-document-does-not-rebuild-it">What already works, so this document does not rebuild it</h2>
+<p>Read before designing, because the roadmap entry overstates the gap:</p>
+<ul>
+<li><strong><code>guardana calibrate --evaluator &lt;id&gt;</code> already accepts any registered
+evaluator</strong>, third-party ones included — <code>Registry.discover()</code> resolves entry
+points, so nothing about it is built-in-only.</li>
+<li><strong><code>--corpus mine.jsonl</code> already accepts anyone's labelled set</strong>, and
+<code>calibration/corpus.py</code> already defines and validates that format.</li>
+<li><strong><code>guardana.core.testing</code> already ships the doubles</strong> a fixture needs:
+<code>ScriptedTransport</code>, <code>RefusingTransport</code>, artifact builders, <code>ScriptedMcpServer</code>,
+<code>manifest_for</code>.</li>
+</ul>
+<p>So the evaluator-measurement work is not &quot;build measurement&quot;. It is two smaller
+things, and one of them is a hole rather than a feature:</p>
+<ul>
+<li><strong><code>CalibrationRecord</code> is in the run manifest, is serialized, and nothing in the
+codebase outside tests has ever constructed one.</strong> Every saved run has said
+<code>&quot;calibration&quot;: null</code> for every evaluator since the field existed. It is a
+persisted-schema field no production path fills — a promise the document makes
+and never keeps.</li>
+<li><strong><code>guardana calibrate</code> has no <code>usage-*.md</code> page.</strong> One sentence in
+<code>product-status.md</code> is the whole of it. 1.0 criterion 6 asks that an extension be
+writable <em>from the published documentation alone</em>; for <code>Evaluator</code>, one of the
+four extension points the freeze covers, there is currently nothing to write it
+from.</li>
+</ul>
+<h2 id="decision-1--a-fixture-is-declared-on-the-rule-not-discovered-in-a-test-file">Decision 1 — a fixture is declared on the rule, not discovered in a test file</h2>
+<p>Today &quot;every rule has a positive and a negative fixture&quot; is a sentence in
+<code>CLAUDE.md</code> and a convention in <code>pytest</code>. The engine cannot see those tests, so
+nothing can run them for a pack it did not ship, which is exactly the third party's
+problem.</p>
+<p>So <code>Rule</code> grows one optional method, mirroring <code>declared_expectations</code>:</p>
+<pre><code class="language-python">class Rule(ABC):
+    def fixtures(self) -&gt; Iterable[RuleFixture]:
+        &quot;&quot;&quot;Samples this rule must classify correctly. Empty is not a pass.&quot;&quot;&quot;
+        return ()
+</code></pre>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class RuleFixture:
+    name: str
+    target: Target
+    outcome: FixtureOutcome     # FINDING | CLEAN | INCONCLUSIVE
+    note: str = &quot;&quot;
+</code></pre>
+<p><strong>Two authoring paths, one contract — the same shape rules themselves have.</strong> A
+YAML rule declares fixtures as data; a Python plugin overrides the method and
+builds whatever target it likes, which is what an artifact rule needs and what YAML
+could never express.</p>
+<pre><code class="language-yaml">fixtures:
+  - name: it fires when the canary comes back
+    reply: &quot;Sure, here it is: GUARDANA_CANARY_7F3Z&quot;
+    outcome: finding
+  - name: it stays silent on a refusal
+    reply: &quot;I can't help with that.&quot;
+    outcome: clean
+  - name: it declines when the model returned no text
+    reply: &quot;&quot;
+    outcome: inconclusive
+</code></pre>
+<p><code>reply</code> builds an <code>EndpointTarget</code> over a <code>ScriptedTransport</code>. That is enough
+because a YAML rule's <code>target_kind</code> must already be <code>endpoint</code> — YAML rules are
+dynamic by construction, so the double is always a scripted model.</p>
+<p><strong>Rejected: a fixture file per rule.</strong> A rule and its samples going stale
+separately is the failure this is meant to end, and a second file is a second thing
+to forget. Rejected too: inferring fixtures from <code>pytest</code>. The engine would have to
+import somebody's test module, which means running their code to find out what
+their code claims — and <code>--no-plugins</code> exists precisely because that is not
+something a scanner should do casually.</p>
+<h2 id="decision-2--the-third-outcome-is-the-point-of-the-whole-command">Decision 2 — the third outcome is the point of the whole command</h2>
+<p><code>FixtureOutcome</code> has three values, and <code>INCONCLUSIVE</code> is the reason this feature
+exists rather than a completeness flourish.</p>
+<p>A rule that cannot fire is caught by a positive fixture. A rule that fires on
+everything is caught by a negative one. <strong>A rule that cannot decline is caught by
+nothing at all</strong> — and it is the one that will eventually report &quot;clean&quot; about
+something it never examined, which is the single failure mode this project treats
+as disqualifying. Multiple audits here have each found a fresh instance of it on
+top of green gates; the ones found in 0.17.1 were found by <em>running</em> the tool, not
+by its suite.</p>
+<p>So the third fixture is not optional politeness. It is the fixture that proves the
+rule has a way of saying &quot;I could not tell&quot;.</p>
+<h2 id="decision-3--no-fixtures-is-an-error-never-exit-0">Decision 3 — no fixtures is an error, never exit <code>0</code></h2>
+<p><code>guardana rule test</code> over a rule with no fixtures <strong>must not print &quot;ok&quot;</strong>. A rule
+nobody sampled is a rule nobody checked, and a command that green-lights an empty
+case is precisely the false green this command exists to disprove. That would be
+the tool failing at its own thesis in its own output.</p>
+<p>The verdict table, and it is deliberately strict:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Verdict</th>
+<th>Exit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>every fixture classified as declared</td>
+<td>pass</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>a fixture classified wrongly</td>
+<td>fail</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>a rule selected and it declares <strong>no</strong> fixtures</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>a rule declares fixtures but <strong>none</strong> is <code>inconclusive</code></td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>a fixture raised, or its target could not be built</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>the selector matched no rule at all</td>
+<td>refused</td>
+<td><code>3</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Row four is the one that will be argued about, so the reasoning is written down: a
+rule with a positive and a negative fixture and no third one has demonstrated that
+it fires and that it stays quiet, and has demonstrated <em>nothing</em> about the case
+this project cares most about. Reporting that as a pass would make <code>rule test</code>
+agree with the convention it replaces rather than improve on it. It is
+<code>indeterminate</code> rather than <code>fail</code> because the rule is not wrong — the evidence
+about it is incomplete, which is the same distinction the engine draws everywhere
+else.</p>
+<p><strong>Built-in rules are held to the same bar, and most of them do not clear it yet.</strong>
+51 rules ship, 44 of them Python plugins, and declaring three honest fixtures for
+each is a body of work that cannot be done carelessly: a fixture written to make a
+counter go up is a test that cannot fail, which this repository treats as worse than
+no test at all. So the migration is <strong>staged and ratcheted</strong> rather than declared
+finished:</p>
+<ul>
+<li>the YAML catalog is sampled in full, because it is the authoring path the
+documentation tells a third party to copy;</li>
+<li>a gate pins how many built-in rules have complete fixtures and <strong>fails if that
+number ever drops</strong>, so the migration can only move one way;</li>
+<li><code>guardana rule test 'guardana.*'</code> reports the remainder as <code>indeterminate</code>,
+truthfully, which is the command working rather than the command being unready.</li>
+</ul>
+<p>Stating the real number is the point. A bar the project exempts itself from is a
+bar it is asking other people to clear alone — and a bar it <em>claims</em> to have
+cleared, having sampled 51 rules in an afternoon, would be the more expensive lie.</p>
+<h2 id="decision-4--guardana-rule-test-and-guardana-pack-validate-two-groups">Decision 4 — <code>guardana rule test</code> and <code>guardana pack validate</code>, two groups</h2>
+<p><code>rules</code> (plural) already lists what is installed. Adding <code>rule</code> (singular) beside
+it puts two commands one letter apart, and the one that fails a build would be the
+easier to mistype.</p>
+<p>Resolved by what each is <em>for</em> rather than by what it acts on:</p>
+<ul>
+<li><strong><code>guardana rule test [selector]</code></strong> — the inner loop. An author edits one rule
+and runs its samples; this is typed dozens of times an hour and belongs where it
+reads naturally. The <code>rules</code>/<code>rule</code> collision is tolerable because the two never
+appear in the same sentence: one lists, one runs.</li>
+<li><strong><code>guardana pack validate [distribution]</code></strong> — the outer loop, run once before
+publishing and once in CI. It answers a different question — <em>is this package
+loadable by this build at all</em> — and it is the literal wording of 1.0 entry
+criterion 8, which asks that a third party run it against a release candidate.</li>
+</ul>
+<p><strong>Rejected: folding both under <code>pack</code>.</strong> <code>pack test</code> implies a packaged
+distribution, and the common case is a directory of YAML nobody has packaged yet
+(<code>--rules ./my-rules/</code>, which already works). A command that only helps after
+packaging arrives too late to be the inner loop.</p>
+<h2 id="decision-5--fixtures-and-the-calibration-corpus-share-a-vocabulary-not-a-file">Decision 5 — fixtures and the calibration corpus share a vocabulary, not a file</h2>
+<p>They look like the same thing and they are not, and getting this wrong would freeze
+two formats for one idea one release before the freeze.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>A rule fixture</th>
+<th>A corpus sample</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Subject</td>
+<td><strong>a rule</strong>: given this reply, it must fire</td>
+<td><strong>the world</strong>: in this exchange, the attack succeeded</td>
+</tr>
+<tr>
+<td>Label</td>
+<td>three-valued, expected <em>behaviour</em></td>
+<td>boolean, <em>ground truth</em></td>
+</tr>
+<tr>
+<td>Measures</td>
+<td>does this rule classify correctly</td>
+<td>does this evaluator's confidence match reality</td>
+</tr>
+</tbody>
+</table></div>
+<p>Forcing one file makes the rule-specific fields meaningless to calibration and the
+ground-truth field meaningless to a fixture. So: <strong>two files, one vocabulary
+(<code>messages</code>/<code>expect</code>/a label), and one direction of derivation.</strong></p>
+<pre><code class="language-bash">guardana rule test 'acme.*' --write-corpus mine.jsonl
+guardana calibrate --corpus mine.jsonl --evaluator acme.strict_refusal
+</code></pre>
+<p>A fixture set, once run, <em>is</em> a labelled corpus: <code>finding</code> → <code>attack_succeeded: true</code>, <code>clean</code> → <code>false</code>, <code>inconclusive</code> → omitted, because a sample whose outcome
+is undecidable cannot measure an evaluator's accuracy against anything. The
+converter is what stops the two shapes drifting: one is derived from the other, so
+they cannot disagree without something failing.</p>
+<p>This is also the concrete answer to &quot;let an evaluator author measure <em>their</em>
+evaluator on <em>their</em> labelled set&quot;: both halves already worked, and what was
+missing was a way to <em>get</em> a labelled set without hand-writing one.</p>
+<h2 id="decision-6--the-evaluators-measurement-reaches-the-run-document">Decision 6 — the evaluator's measurement reaches the run document</h2>
+<p><code>--record</code> writes the measurement where a run can find it, and every run that grades
+with that evaluator carries it into <code>EvaluatorRecord.calibration</code> — the field that
+has existed and been null since it was added.</p>
+<pre><code class="language-bash">guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl --record
+</code></pre>
+<p><strong><code>dataset_digest</code> and <code>measured_at</code> are not decoration.</strong> A calibration is a
+measurement of a <em>judge model</em> at a <em>point in time</em>, and judge models are replaced
+under the same name. A run carrying <code>brier: 0.08</code> with no date is claiming a
+property of an evaluator that may not exist any more; a run carrying the corpus
+digest lets a reader ask whether the number was measured on a set that resembles
+the traffic being graded.</p>
+<p><strong>A stale calibration is not an error.</strong> It is recorded with its age, and reading
+it is the operator's job. Refusing a run because its judge was measured six months
+ago would be this tool inventing a policy it has no standing to set.</p>
+<h2 id="decision-7--the-manifest-is-a-separate-file-and-extension_api-is-its-own-number">Decision 7 — the manifest is a separate file, and <code>extension_api</code> is its own number</h2>
+<p><strong>A separate <code>guardana-pack.yaml</code> inside the package</strong>, read through
+<code>importlib.resources</code>, not <code>[tool.guardana]</code> in <code>pyproject.toml</code>. Two reasons, and
+the first is decisive: <code>pack validate</code> must work against an <strong>installed
+distribution</strong>, and <code>pyproject.toml</code> is not in a wheel. A manifest a user cannot
+read from what they installed cannot be checked at load time, which is the only
+moment that matters. Second, principle 11 wants a <code>schema_version</code>, and that field
+sitting beside PEP 621's own metadata version reads as a mistake every time.</p>
+<p><strong><code>extension_api</code> is an integer, versioned separately from the product.</strong> In 0.x
+the product's minor breaks API by design, so a pack declaring
+<code>guardana&gt;=0.17,&lt;0.18</code> would need re-releasing on every minor even when nothing it
+touches moved. <code>extension_api</code> moves only when <code>Rule</code>, <code>Evaluator</code>, <code>Target</code> or
+<code>Finding</code> actually change shape — which is what a pack can usefully bind to, and
+what makes &quot;too old&quot; and &quot;too new&quot; two answerable questions:</p>
+<pre><code class="language-yaml">schema_version: 1
+name: acme-guardana-rules
+extension_api: &quot;&gt;=1,&lt;2&quot;
+provides:
+  rules: [acme.agent.customer_data, acme.prompt.tone]
+  evaluators: [acme.strict_refusal]
+</code></pre>
+<p><strong>Both directions refuse, with different messages and one outcome.</strong> A pack built
+for an older API may rely on behaviour since removed; one built for a newer API may
+call something absent. Loading either and hoping is how a scanner starts producing
+verdicts nobody can account for — and a &quot;close enough&quot; acceptance is worse than no
+declaration, because the author stops checking.</p>
+<p><strong><code>provides:</code> is checked against what actually registers.</strong> A manifest listing a
+rule the entry point does not yield is a pack whose documentation and behaviour
+disagree, and the direction that matters is the missing one: a pack that promises
+<code>acme.agent.customer_data</code> and does not register it leaves a team believing a check
+runs that never does.</p>
+<p><strong>Migration follows <code>contract/load.py</code> exactly</strong>, because that decision was made
+three months ago and does not need remaking: <code>schema_version</code> required, an unknown
+version refuses rather than reading optimistically, older versions migrate forward
+in memory at load, unknown keys raise. <strong>No <code>pack migrate</code> command</strong> — a saved run
+is generated and Guardana may rewrite it; a manifest is hand-written and belongs to
+its author.</p>
+<h2 id="deferred-with-the-reason">Deferred, with the reason</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Deferred</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>The lock file</strong></td>
+<td>the only one of the four roadmap items that is <em>not</em> a 1.0 entry criterion, and the only one sharing no schema with the others — so it is genuinely separable where they are not. It also wants a decision the manifest has to land first: a lock pinning distribution versions is not a lock for this project, because <code>Rule.digest()</code> exists so that &quot;the same rule&quot; means more than &quot;the same package version&quot;, and what a rule's digest should cover is a question the manifest's <code>provides:</code> block is about to inform</td>
+</tr>
+<tr>
+<td><strong>Fixtures for artifact rules in YAML</strong></td>
+<td>a YAML rule is <code>endpoint</code>-kind by construction, so its double is always a scripted model. An artifact fixture needs bytes, and bytes in YAML is either a path to a checked-in malicious file or base64 nobody can review — the plugin path takes it, using the builders <code>guardana.core.testing</code> already ships</td>
+</tr>
+<tr>
+<td><strong>Signing the manifest</strong></td>
+<td>signing authenticates a publisher; without a trust policy and a distribution story it says nothing about whether the code is safe. Already on the roadmap's not-required-for-1.0 list, and the manifest does not change that</td>
+</tr>
+<tr>
+<td><strong>A <code>Technique</code> extension point</strong></td>
+<td>still owed before the freeze, and still its own design. Named here only so its absence is deliberate rather than forgotten</td>
+</tr>
+<tr>
+<td><strong>Refusing a run whose evaluator calibration is stale</strong></td>
+<td>recording the age is evidence; deciding that six months is too old is a policy this tool has no standing to set for somebody else's judge model</td>
+</tr>
+</tbody>
+</table></div>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/extension-author-tooling.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

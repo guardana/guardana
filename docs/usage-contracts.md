@@ -1,3 +1,10 @@
+---
+title: "Security contracts"
+nav_order: 100
+summary: "**security contracts**: your application's own invariants — tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink — as a versioned file the engine compiles into rules"
+status: stable
+---
+
 # Security contracts — your application's threat model, executable
 
 Built-in rules cover the risks everyone shares. What is dangerous in *your* system

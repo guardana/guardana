@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana probe — Guardana documentation</title>
+<meta name="description" content="guardana probe: adversarial checks against a live endpoint or agent, and an MCP server&#x27;s manifest and authorization surface">
+<link rel="canonical" href="https://guardana.dev/docs/usage-probe.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html" aria-current="page">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana probe</code> — one-shot dynamic checks against a live endpoint</h1><p class="lede"><code>guardana probe</code>: adversarial checks against a live endpoint or agent, and an MCP server's manifest <strong>and authorization surface</strong></p><p>Runs every <strong>endpoint</strong>-kind rule once against a live chat endpoint:
+direct prompt injection, jailbreak attempts (single-turn and multi-turn
+scenarios), indirect (RAG) injection, system-prompt leakage (via a planted
+canary), output-secret leakage, excessive tool-use agency (when the endpoint
+supports tool calling), and unbounded output (denial-of-wallet). Each dynamic
+finding carries a <code>Verdict</code> — <code>outcome</code>, <code>confidence</code>, <code>rationale</code>,
+<code>evaluator_id</code> — from the rule's configured Evaluator.</p>
+<p>By default the endpoint is OpenAI-compatible (<code>POST /v1/chat/completions</code> —
+Ollama's <code>/v1</code>, vLLM, llamafile, LM Studio, and friends). <code>--provider ollama</code>
+speaks Ollama's native <code>/api/chat</code> instead, and <code>--provider tgi</code> speaks
+Hugging Face TGI's <code>/generate</code>.</p>
+<pre><code class="language-bash">guardana probe --url &lt;base-url&gt; --model &lt;name&gt; [OPTIONS]
+</code></pre>
+<h2 id="flags">Flags</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--url TEXT</code></td>
+<td>—</td>
+<td>Base URL of the OpenAI-compatible endpoint. Required unless <code>--mcp</code> names an MCP server instead</td>
+</tr>
+<tr>
+<td><code>--model TEXT</code></td>
+<td>—</td>
+<td>Model name to send in each request. Required unless <code>--mcp</code> names an MCP server instead</td>
+</tr>
+<tr>
+<td><code>--api-key-env TEXT</code></td>
+<td>none</td>
+<td>Name of an environment variable holding the bearer API key</td>
+</tr>
+<tr>
+<td><code>--provider [openai|ollama|tgi]</code></td>
+<td><code>openai</code></td>
+<td>Endpoint wire protocol: OpenAI-compatible (default), Ollama's native <code>/api/chat</code>, or HF TGI's <code>/generate</code></td>
+</tr>
+<tr>
+<td><code>--adapter PATH</code></td>
+<td>none</td>
+<td>Adapter file mapping a <strong>guarded product endpoint</strong>'s custom request/response schema — see <a href="#probing-a-guarded-endpoint">Probing a guarded endpoint</a>. Overrides <code>--provider</code>.</td>
+</tr>
+<tr>
+<td><code>--system-prompt-file PATH</code></td>
+<td>none</td>
+<td>File containing the system prompt already deployed in front of the model, so non-canary rules probe the real configuration</td>
+</tr>
+<tr>
+<td><code>--profile PATH</code></td>
+<td>none (built-in default profile)</td>
+<td>Path to a <code>guardana.yaml</code> policy file</td>
+</tr>
+<tr>
+<td><code>--preset [ci|pre-training|monitor]</code></td>
+<td>none</td>
+<td>Named policy preset (mutually exclusive with <code>--profile</code>) — see <a href="profiles.html#named-presets---preset"><code>profiles.md</code></a></td>
+</tr>
+<tr>
+<td><code>--format [human|json|sarif|junit]</code></td>
+<td><code>human</code></td>
+<td>Output format</td>
+</tr>
+<tr>
+<td><code>--rules PATH</code></td>
+<td>none</td>
+<td>Directory or file of custom YAML rules; repeatable. Combined with the profile's <code>rules.paths</code> — see <a href="writing-rules.html"><code>writing-rules.md</code></a>. A malformed rule file is a warning, never an abort.</td>
+</tr>
+<tr>
+<td><code>--concurrency INTEGER</code></td>
+<td><code>4</code></td>
+<td>How many rules may query the model at once. The probe is almost entirely spent waiting on the model, so overlapping rules is the biggest speed-up available; results stay in rule order, so two runs match. Rate limits (429) are retried with backoff — lower this if an endpoint keeps refusing.</td>
+</tr>
+<tr>
+<td><code>--reporter TEXT</code></td>
+<td>none</td>
+<td>Forward findings to a collector, e.g. <code>server://https://collector.example.com</code></td>
+</tr>
+<tr>
+<td><code>--mcp TEXT</code></td>
+<td>none</td>
+<td>Examine an <strong>MCP server</strong> instead of a chat model — see <a href="#probing-an-mcp-server">Probing an MCP server</a></td>
+</tr>
+<tr>
+<td><code>--mcp-token-env TEXT</code></td>
+<td>none</td>
+<td>Name of an environment variable holding a bearer token for the MCP server</td>
+</tr>
+<tr>
+<td><code>--mcp-pin PATH</code></td>
+<td>none</td>
+<td>Approved MCP manifest to compare the live one against</td>
+</tr>
+<tr>
+<td><code>--write-mcp-pin PATH</code></td>
+<td>none</td>
+<td>Write the server's current manifest as approved, and exit without reporting</td>
+</tr>
+<tr>
+<td><code>--allow-exec</code></td>
+<td>off</td>
+<td>Permit <code>--mcp</code> to <strong>start</strong> an stdio server, which executes the code under examination</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="probing-an-mcp-server">Probing an MCP server</h2>
+<p><code>--mcp</code> points <code>probe</code> at a Model Context Protocol server rather than a chat
+endpoint. There is no model to talk to, so every chat rule is skipped by
+capability and says so; what runs instead is the manifest check and the eight
+authorization checks.</p>
+<pre><code class="language-bash">export MCP_TOKEN=…
+guardana probe \
+  --mcp https://mcp.example.com/mcp \
+  --mcp-token-env MCP_TOKEN
+</code></pre>
+<p><strong>Guardana never calls a tool on your server.</strong> Every observation is made with
+<code>server/discover</code>, <code>tools/list</code>, the <code>initialize</code> handshake where the server still
+expects one, and unauthenticated <code>GET</code>s of the two discovery documents. Calling a
+tool is a side effect on somebody's system — possibly a write, possibly a payment
+— and no verification result is worth finding that out by experiment.</p>
+<p><strong>Guardana declares no client capabilities</strong>, which is a safety property rather
+than an omission. Under the <code>2026-07-28</code> Multi Round-Trip Requests pattern a server
+asks for sampling, elicitation or a root listing by returning them in a result, and
+it <strong>MUST NOT</strong> ask for a capability the client did not declare. A client declaring
+none cannot be asked to run a model completion or to prompt a human on the server's
+behalf; a server that asks anyway gets an error, never an answer.</p>
+<h3 id="two-revisions-of-the-protocol-and-which-one-your-server-speaks">Two revisions of the protocol, and which one your server speaks</h3>
+<p>The specification revised on 2026-07-28 removed the <code>initialize</code> handshake and
+protocol-level sessions, and made every request carry its own version. Guardana
+speaks both that revision and <code>2025-11-25</code>, and settles which one applies before
+asking a server anything else:</p>
+<pre><code>$ guardana probe --mcp https://mcp.example.com/mcp --format json | jq .run.coverage.protocols
+{ &quot;mcp&quot;: &quot;2026-07-28&quot; }
+</code></pre>
+<p>The probe is one <code>server/discover</code> call — the method the newer revision requires
+and the older one has never heard of, which makes its <em>answer</em> identify the era.
+Guardana deliberately does not use the cheaper route the HTTP binding allows
+(send an ordinary request, read the body of a <code>400</code>): some servers built to the
+older revision will answer <code>tools/list</code> without a handshake, and a client that
+opened with one would take their manifest and record <code>2026-07-28</code> in the run
+manifest — a coverage claim about a revision that server has never heard of.</p>
+<p>Three consequences worth knowing:</p>
+<ul>
+<li><strong>The negotiated revision is in the run manifest</strong>, so <a href="usage-diff.html"><code>guardana diff</code></a>
+reports a server that moved between revisions as <em>the reach changed</em>, not as the
+system behaving differently.</li>
+<li><strong><code>guardana.mcp.session_binding</code> is silent on a server with no sessions.</strong> A
+conforming <code>2026-07-28</code> server mints none, so there is nothing to guess and
+nothing to authenticate with. A server that still offers an older revision
+alongside the new one is graded over that older one, because it is still handing
+sessions to every client that asks for them.</li>
+<li><strong>No revision in common is an outcome, never a pass.</strong> The authorization checks
+report <code>inconclusive</code> naming both version lists, and the manifest checks are
+skipped with the same sentence — which <code>fail_on.fail_on_skipped</code> turns into an
+indeterminate run.</li>
+</ul>
+<p><strong>The token never leaves the origin you named.</strong> MCP is the one protocol here
+where the server picks an address and the client fetches it, so every redirect hop
+is checked against the same guard as the first request — and a hop to a different
+scheme, host or port arrives with no <code>Authorization</code> and no <code>Mcp-Session-Id</code>. The
+alternative is a server under test answering <code>302</code> and being handed the credential
+of whoever is scanning it, which is the confused deputy these checks exist to look
+for. A redirect <em>within</em> one origin keeps the header, because a server pointing at
+its own path is ordinary.</p>
+<h3 id="the-manifest-and-pinning-it">The manifest, and pinning it</h3>
+<p>A tool declaration is fed to the agent's model as trusted context, so an
+instruction hidden in one is indirect prompt injection with an audience of one.
+Guardana scans the whole declaration — description, title, input and output
+schema, annotations — because a property description is read by the model exactly
+like the tool description.</p>
+<p>Drift is only detectable against something you approved:</p>
+<pre><code class="language-bash">guardana probe --mcp https://mcp.example.com/mcp \
+  --write-mcp-pin mcp.pin.json          # approve today's manifest
+guardana probe --mcp https://mcp.example.com/mcp \
+  --mcp-pin mcp.pin.json                # compare against it
+</code></pre>
+<p>The pin stores a digest per tool rather than the prose, so the file records <em>that</em>
+the manifest was approved and cannot be edited into agreement. Without <code>--mcp-pin</code>
+drift is reported <code>inconclusive</code>, never as a clean server.</p>
+<p>Pins written before this release are <code>schema_version 1</code> and cover <strong>descriptions
+only</strong>. They still load and still compare, and every run that uses one carries a
+note saying which drift it cannot see — re-approve with <code>--write-mcp-pin</code> to cover
+schemas too.</p>
+<h3 id="the-authorization-surface">The authorization surface</h3>
+<p>Eight checks, each testing an invariant the MCP specification states, and each
+saying plainly when it could not reach a verdict:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What it establishes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.mcp.unauthenticated_access</code></td>
+<td>The server answers a tool listing with no credential. <code>low</code> on a loopback or private address, <code>high</code> elsewhere</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.authorization_discovery</code></td>
+<td>A protected server publishes Protected Resource Metadata (RFC 9728) naming an authorization server, identifies <em>this</em> origin as its resource, and points at an authorization server that advertises PKCE</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.token_audience</code></td>
+<td>The server refuses a bearer token it could not have issued</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.session_binding</code></td>
+<td>Session ids are not a counter, are not shared, and do not authenticate a request on their own</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.scope_breadth</code></td>
+<td>The advertised scopes can express least privilege, and the challenge names the scope a request needs</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.discovery_target</code></td>
+<td>Every discovery address the server advertises is one a client may follow</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.issuer_identification</code></td>
+<td>The authorization server advertises <code>authorization_response_iss_parameter_supported</code>, without which a client cannot detect an authorization-server mix-up (RFC 9207)</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.cache_scope</code></td>
+<td>A tool listing the server gates behind a credential is not also declared <code>cacheScope: &quot;public&quot;</code>, which would invite any shared gateway to serve it to a caller the server would have refused</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Two of them need <code>--mcp-token-env</code> to say anything</strong>, and say so rather than
+going quiet: whether a session authenticates on its own cannot be tested without a
+credential to remove. A run without one reports those as <code>inconclusive</code> and names
+the flag.</p>
+<p><strong>What a silent <code>token_audience</code> does and does not mean.</strong> Guardana presents a
+token nobody could mistake for a credential — <code>alg: none</code>, an audience and issuer
+naming a reserved domain that never resolves, and a signature segment that says
+<code>guardana-probe-not-a-valid-signature</code> in words. A server that answers a tool
+listing while holding it validated nothing, and that is a finding. A server that
+rejects it has rejected <em>that token</em>; proving it validates audiences would need a
+correctly signed token minted for another service, which no scanner can honestly
+obtain. Against a server that requires no credential at all the check reports
+<code>inconclusive</code>, because a server that accepts everything demonstrates nothing.</p>
+<p><strong>Dynamic Client Registration is not reported as a defect.</strong> <code>2026-07-28</code>
+deprecates it in favour of Client ID Metadata Documents and keeps it legal for at
+least twelve months, and it remains the only registration route some authorization
+servers offer. Reporting a supported feature as a defect is a false red.</p>
+<p><strong>stdio servers are not graded on this.</strong> The specification says an stdio
+implementation should take credentials from the environment instead of following
+the authorization spec, so an stdio target does not declare the capability and all
+eight rules are <strong>skipped</strong> with their reason recorded. <code>fail_on.fail_on_skipped</code>
+turns that coverage hole into an indeterminate result; what never happens is six
+rules reporting nothing about a server they could not examine.</p>
+<p><strong>The credential never reaches a report.</strong> It is read from the environment rather
+than an argument — an argument is in every process list on the machine — and
+evidence records whether one was presented and what the server answered, never its
+value, at any privacy level.</p>
+<h3 id="cost">Cost</h3>
+<p>An MCP probe sends around a dozen requests: one <code>server/discover</code> to settle the
+revision, a listing without a credential (preceded by a handshake where the server
+still expects one), up to five discovery fetches, a listing with the forged token,
+and a handful of handshakes to sample session ids. Every one is
+counted, so <code>--max-requests</code> bounds it, and a run that hits the ceiling exits <code>6</code>
+with an <code>indeterminate</code> gate rather than reporting the checks it never reached as
+clean.</p>
+<p>Ask before you spend, with <a href="usage-plan.html"><code>guardana plan</code></a>:</p>
+<pre><code class="language-bash">guardana plan probe --mcp https://mcp.example.com/mcp
+</code></pre>
+<p>That contacts nothing. The ceiling it reports is higher than any run spends —
+each rule declares what it would cost <em>alone</em>, because a plan cannot know which
+one runs first and buys the shared observation — so treat it as the upper bound
+it is.</p>
+<h2 id="probing-a-guarded-endpoint">Probing a guarded endpoint</h2>
+<p><code>--provider</code> speaks the raw model wire (OpenAI/Ollama/TGI). But the thing you most
+want to test is often your <strong>guarded product endpoint</strong> — the model <em>plus</em> the API
+gateway, auth, and guardrails in front of it — and that has its own request and
+response schema. <code>--adapter &lt;file&gt;</code> maps it, so the probe drives the whole surface
+instead of bypassing it to the bare model.</p>
+<pre><code class="language-yaml"># wellness-adapter.yaml
+url: https://api.example.com/v1/wellness/chat   # optional; defaults to --url
+headers:
+  X-Api-Key: ${WELLNESS_API_KEY}                # ${ENV} is expanded; unset = error
+  Content-Type: application/json
+body:                                           # your endpoint's request shape;
+  message: &quot;{{prompt}}&quot;                         # {{prompt}} is where the probe goes
+  user_id_hash: &quot;guardana-probe&quot;
+  stream: false
+response_path: data.reply                       # dotted path to the reply text
+</code></pre>
+<pre><code class="language-bash">guardana probe --url https://api.example.com --model wellness --adapter wellness-adapter.yaml
+</code></pre>
+<p>For a <strong>multi-turn</strong> scenario (gradual jailbreak, indirect injection), give the
+body a <code>{{messages}}</code> slot to receive the full transcript as a <code>[{role, content}]</code>
+list, if your endpoint speaks multi-turn:</p>
+<pre><code class="language-yaml">body:
+  messages: &quot;{{messages}}&quot;     # the whole conversation, not just the last turn
+</code></pre>
+<p>Without a <code>{{messages}}</code> slot, every turn is folded into <code>{{prompt}}</code> as a labelled
+transcript — so a scenario's escalation reaches the endpoint instead of collapsing
+to the final message.</p>
+<p>The mapping is <strong>fail-closed</strong>: a <code>body</code> with no <code>{{prompt}}</code> or <code>{{messages}}</code>
+slot is rejected at load (the probe would otherwise send the same static request
+for every check and pass everything), and a <code>response_path</code> that does not resolve
+to a string is an error, never a blank reply graded as clean. A planted system
+prompt with no <code>{{system}}</code> slot is folded into the prompt rather than dropped, so
+a canary/leak check is never silently disarmed. Programmatically, the same mapping
+is <code>guardana.core.target.HttpAdapterTransport</code> / <code>AdapterConfig</code>.</p>
+<h2 id="how-canary-rules-work">How canary rules work</h2>
+<p>Rules that need <code>plant_system_prompt</code> (the system-prompt-leak canary rule and
+the indirect-injection scenario) run in their <strong>own</strong> probe pass, each against a dedicated endpoint
+target whose system prompt is your <code>--system-prompt-file</code> contents (if any)
+plus a Guardana-generated line embedding a <strong>fresh random canary token</strong>
+minted for that run — the static canary value in the rule's YAML only marks
+the rule as canary-capable and is never used for detection, so a model can't
+have been trained around it. All other
+endpoint rules run together in a single pass against your endpoint as
+configured. This means one <code>probe</code> invocation may issue multiple batches of
+requests — this is expected and is what lets an unmodifiable canary
+co-exist with your real system prompt.</p>
+<h2 id="example-invocation-and-output">Example invocation and output</h2>
+<pre><code class="language-console">$ guardana probe --url http://localhost:11434 --model llama3 --api-key-env OLLAMA_API_KEY
+✖ [CRITICAL] guardana.prompt.system_prompt_leak.canary — System prompt leakage via canary marker
+    Planted canary marker found in response.  (http://localhost:11434#llama3)
+✖ [HIGH] guardana.prompt.injection.ignore_previous — Prompt injection via instruction override
+    No refusal marker found; response likely complied.  (http://localhost:11434#llama3)
+
+2 finding(s); 8 rule(s) run, 0 skipped.
+</code></pre>
+<p>Every dynamic finding's evidence pairs with a verdict: run
+<code>--format json</code> to see <code>outcome</code>, <code>confidence</code>, and <code>rationale</code> per finding.</p>
+<p>A check that ran but could not reach a verdict — an unreachable judge, an
+empty model reply — is reported separately as <code>? [UNVERIFIED]</code> (the
+<code>unverified</code> key in JSON), never silently counted as a pass; set
+<code>fail_on_inconclusive: true</code> in your profile to make it fail the gate.</p>
+<h2 id="rules-graded-by-an-llm-judge">Rules graded by an LLM judge</h2>
+<p>The <code>llm_judge</code> and <code>guard</code> evaluators need a model of their own, wired from
+an <code>evaluators:</code> block in <code>guardana.yaml</code> — see
+<a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>. With
+no block configured, a rule that names one of them is <strong>skipped visibly</strong> in
+the run summary rather than silently passed.</p>
+<h2 id="exit-codes">Exit codes</h2>
+<p>Same policy gate as <code>scan</code> (see <a href="profiles.html"><code>profiles.md</code></a>): exits <code>1</code> if
+any finding at or above <code>fail_on.severity</code> also meets <code>fail_on.min_confidence</code>,
+else <code>0</code>.</p>
+<h2 id="forwarding-to-a-collector">Forwarding to a collector</h2>
+<pre><code class="language-bash">guardana probe --url http://localhost:11434 --model llama3 --reporter server://https://collector.example.com
+</code></pre>
+<h2 id="trying-it-without-a-live-model">Trying it without a live model</h2>
+<p><code>probe</code> needs a running OpenAI-compatible endpoint — if <code>--url</code> is
+unreachable, the command reports a clear connection error and exits
+non-zero rather than hanging. The fastest way to get one locally:</p>
+<pre><code class="language-bash">ollama serve &amp;
+ollama pull llama3
+guardana probe --url http://localhost:11434 --model llama3
+</code></pre>
+<p>Any other OpenAI-compatible local server (vLLM, HF-TGI, LM Studio, etc.)
+works the same way — just point <code>--url</code>/<code>--model</code> at it.</p>
+<h2 id="saving-a-run-for-comparison">Saving a run for comparison</h2>
+<p><code>--output &lt;path&gt;</code> writes the report to a file instead of stdout. With
+<code>--format json</code> that file is a versioned document <code>guardana diff</code> reads back, so
+you can ask whether the next run is worse than this one — see
+<a href="usage-diff.html"><code>usage-diff.md</code></a>.</p>
+<pre><code class="language-bash">guardana probe --url … --model …  --format json --output run.json
+</code></pre>
+<p>Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
+on the other end cannot parse that.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-probe.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP has two eras — Guardana documentation</title>
+<meta name="description" content="two revisions of MCP, and settling which one a server speaks before asking it anything">
+<link rel="canonical" href="https://guardana.dev/docs/design/mcp-protocol-eras.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html" aria-current="page">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>MCP has two eras, and a client that knows only one grades neither<span class="status accepted">accepted</span></h1><p class="lede">two revisions of MCP, and settling which one a server speaks before asking it anything</p><p><strong>Status:</strong> accepted, implemented — ships in the next release · <strong>Written:</strong> 2026-08-10 · <strong>Step four</strong></p>
+<h2 id="the-problem-stated-precisely">The problem, stated precisely</h2>
+<p>Guardana pins MCP <code>2025-11-25</code> and opens every conversation with <code>initialize</code>.
+The specification revised on 2026-07-28 removed that handshake. A server built to
+the current specification answers <code>initialize</code> with an error, so <code>probe --mcp</code>
+against it does not reach the manifest, does not reach the authorization surface,
+and reports six checks it could not run.</p>
+<p>That failure is loud, which is the one thing in its favour. It is still the item
+that goes first, because everything this project says about MCP — six invariants,
+a manifest pin, a threat model with the server as a separate actor — is said
+about a protocol revision that is now the <em>older</em> of two.</p>
+<p><a href="https://modelcontextprotocol.io/specification/2026-07-28/changelog">The changelog</a>
+is not drift at the margins:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Removed or replaced</th>
+<th>What the client used to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>initialize</code> / <code>notifications/initialized</code></td>
+<td>opened every conversation</td>
+</tr>
+<tr>
+<td>protocol sessions, <code>Mcp-Session-Id</code></td>
+<td>carried a session on each request; graded how it was minted</td>
+</tr>
+<tr>
+<td>server-initiated requests (<code>roots/list</code>, <code>sampling/createMessage</code>, <code>elicitation/create</code>)</td>
+<td>never sent, but the transport had to be ready to receive them</td>
+</tr>
+<tr>
+<td><code>ping</code>, <code>logging/setLevel</code>, <code>notifications/roots/list_changed</code></td>
+<td>unused</td>
+</tr>
+<tr>
+<td>the GET stream, <code>resources/subscribe</code>, <code>Last-Event-ID</code></td>
+<td>unused</td>
+</tr>
+</tbody>
+</table></div>
+<p>and what arrived is a different shape, not a renamed one: every request carries
+its own protocol version and client capabilities in <code>_meta</code>, servers <strong>MUST</strong>
+implement <code>server/discover</code>, every result carries a required <code>resultType</code>, and
+<code>tools/list</code> now carries <code>ttlMs</code> and <code>cacheScope</code>.</p>
+<h2 id="the-decision-speak-both-eras-and-settle-which-one-before-anything-else">The decision: speak both eras, and settle which one before anything else</h2>
+<p>There is no version of this that picks a side. A tool that only speaks
+<code>2026-07-28</code> cannot examine the servers in production today; one that only speaks
+<code>2025-11-25</code> cannot examine the ones being written now. Both eras stay reachable,
+and the run records which one it actually spoke.</p>
+<p>The specification's own terms are used verbatim, because inventing a synonym for a
+word the spec defines is how two readers end up meaning different things:</p>
+<ul>
+<li><strong>modern</strong> — version, identity and capabilities travel as per-request metadata
+(<code>2026-07-28</code> and later).</li>
+<li><strong>legacy</strong> — the conversation opens with an <code>initialize</code> handshake
+(<code>2025-11-25</code> and earlier).</li>
+<li><strong>dual-era</strong> — a server that answers both.</li>
+</ul>
+<h3 id="the-era-is-settled-by-serverdiscover-on-both-transports">The era is settled by <code>server/discover</code>, on both transports</h3>
+<p><code>server/discover</code> is a method that did not exist before <code>2026-07-28</code>, so it is
+the only question whose <em>answer</em> identifies the era rather than merely being
+consistent with one. The three outcomes are the specification's:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>The probe returns</th>
+<th>Conclusion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a result carrying <code>supportedVersions</code></td>
+<td>modern; choose a mutually supported version</td>
+</tr>
+<tr>
+<td><code>UnsupportedProtocolVersionError</code> (<code>-32022</code>) with <code>data.supported</code></td>
+<td>modern; choose from the list it named</td>
+</tr>
+<tr>
+<td>anything else, or nothing</td>
+<td>legacy; fall back to <code>initialize</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The <a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio#backward-compatibility">stdio binding</a>
+prescribes exactly this and forbids keying the fallback to one error code, since a
+legacy server answers an unknown method with whatever its SDK chose. The
+<a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#backward-compatibility">HTTP binding</a>
+permits a cheaper route — send a modern request and read the body of a <code>400</code> —
+and <strong>that route is rejected here</strong>, deliberately, at a cost of one request
+against a legacy server.</p>
+<p>The reason is a false claim, not a preference. The specification warns that some
+legacy servers do not check that a request arrived after <code>initialize</code> and will
+process an era-ambiguous method anyway. <code>tools/list</code> is era-ambiguous. A probe
+that opened with it would receive a tool list from a legacy server and record
+<code>mcp: 2026-07-28</code> in the run manifest — a coverage claim about a revision that
+server has never heard of, written into the document a later <code>diff</code> compares
+against. One request is cheaper than a manifest that lies.</p>
+<p>The probe is bought once per target per run and shared, like every other
+observation here, so the cost grows with the target and not with the rule count.</p>
+<h3 id="every-mismatch-is-an-outcome-never-a-pass">Every mismatch is an outcome, never a pass</h3>
+<p>If the client and the server share no version, there is no conversation to have.
+That is reported three ways and none of them is silence:</p>
+<ul>
+<li>the authorization observations record it as the reason the server could not be
+reached, so every invariant rule reports <code>inconclusive</code> naming both version
+lists;</li>
+<li><code>list_tools()</code> raises, so the manifest rules are recorded as skipped with the
+same sentence, which <code>fail_on_skipped</code> turns into an indeterminate run;</li>
+<li><code>protocols()</code> reports nothing, so the coverage fingerprint does not claim a
+revision was reached.</li>
+</ul>
+<h2 id="what-the-client-sends-and-what-it-deliberately-does-not">What the client sends, and what it deliberately does not</h2>
+<p>A modern request carries three <code>_meta</code> fields, of which the specification requires
+two:</p>
+<pre><code class="language-json">{
+  &quot;io.modelcontextprotocol/protocolVersion&quot;: &quot;2026-07-28&quot;,
+  &quot;io.modelcontextprotocol/clientInfo&quot;: {&quot;name&quot;: &quot;guardana&quot;, &quot;version&quot;: &quot;…&quot;},
+  &quot;io.modelcontextprotocol/clientCapabilities&quot;: {}
+}
+</code></pre>
+<p>On HTTP the version is mirrored into <code>MCP-Protocol-Version</code> and the method into
+<code>Mcp-Method</code>; a mismatch between header and body is a <code>HeaderMismatch</code> (<code>-32020</code>),
+so they are written from one value rather than two. <code>Mcp-Name</code> is required only
+for <code>tools/call</code>, <code>resources/read</code> and <code>prompts/get</code>, none of which Guardana ever
+sends.</p>
+<p><strong><code>clientCapabilities</code> is empty, and that is a safety property rather than an
+omission.</strong> Under Multi Round-Trip Requests a server asks for sampling,
+elicitation or roots by returning them in <code>inputRequests</code> — and it <strong>MUST NOT</strong>
+ask for a capability the client did not declare. A client declaring none cannot
+be asked to run a model completion or to prompt a human on the server's behalf.
+This is the same posture the engine already takes toward stdio: the scanner does
+not acquire abilities it has no reason to hold.</p>
+<p>An <code>input_required</code> result is therefore a non-conforming answer to every request
+Guardana makes, and it is raised rather than read. That matters more than it
+sounds: an <code>InputRequiredResult</code> has no <code>tools</code> key, and the reader that turns a
+reply into a manifest would otherwise have produced an empty tool list — a server
+asking a question, recorded as a server offering nothing.</p>
+<p><code>resultType</code> is handled per the specification: absent means <code>&quot;complete&quot;</code>, because
+that is what an older server sends; an unrecognised value is invalid and is
+raised rather than guessed past.</p>
+<h2 id="the-session-rules-made-revision-aware">The session rules, made revision-aware</h2>
+<p>A conforming <code>2026-07-28</code> server has no session, and <code>guardana.mcp.session_binding</code>
+grades sessions. Today it reports <code>inconclusive — the server issues no session id</code>
+against exactly the server that got it right, which under a policy that fails on
+indeterminate checks breaks the build of the team that upgraded.</p>
+<p><strong>Decision: on a server that offers no legacy revision, the rule is silent.</strong> Not
+skipped, not inconclusive — silent, which in this codebase means <em>the invariant
+holds</em>. It does hold, and it holds for a stronger reason than usual: the client
+sends no session id, the server mints none, and the mechanism the rule grades was
+removed from the protocol. There is no unasked question hiding in that silence.</p>
+<p><strong>Rejected: report it as inconclusive so the reason stays visible.</strong> The reason
+does stay visible, in the right place — <code>coverage.protocols</code> in the run manifest
+records the negotiated revision, and <code>diff</code> already reports a change in it as
+<em>reach changed</em> rather than as the system changing. An inconclusive verdict is
+for a question that could not be answered. This one was answered.</p>
+<p><strong>Rejected: skip the rule by capability.</strong> The 0.14 mechanism — an unrecorded
+evidence dimension becomes an undeclared capability, and the runner skips with a
+reason — is the right answer when a producer chose not to record something. Here
+nothing is missing. A skip would make <code>fail_on_skipped</code> fail a conforming server,
+which is the accusation this whole section exists to avoid.</p>
+<h3 id="the-hole-that-answer-would-have-left-and-how-it-is-closed">The hole that answer would have left, and how it is closed</h3>
+<p>A <strong>dual-era</strong> server is the interesting case, and the one a naive reading loses.
+It answers <code>server/discover</code>, so the era settles as modern, so sessions are
+vacuous — except that the same server still hands a session to every legacy
+client it serves, and if those ids are a counter, that is a live defect the
+modern conversation cannot see.</p>
+<p>So the test is not <em>which era did we negotiate</em> but <em>does this server still offer
+a legacy revision</em>. <code>supportedVersions</code> says so directly. When it does, the
+session observations are bought over the legacy era — the same requests as
+today — and the rule grades them exactly as before. Silence is reserved for a
+server that offers modern versions only.</p>
+<p><code>guardana.trace.session_as_identity</code> needs no change, and the argument is worth
+writing down rather than leaving to be re-derived. It grades a recorded identity,
+not a protocol: a step that changed something while presenting a session and no
+credential is a defect under every revision, and under <code>2026-07-28</code> it is a
+defect involving something the protocol no longer even provides. The rule cannot
+accuse a conforming server, because a conforming server produces no session for
+the trace to record.</p>
+<h2 id="two-new-checks-the-revision-creates">Two new checks the revision creates</h2>
+<p>Both are graded from documents and declarations the run already buys. Neither
+sends a request that was not already going out.</p>
+<h3 id="guardanamcpissuer_identification"><code>guardana.mcp.issuer_identification</code></h3>
+<blockquote>
+<p>MCP clients <strong>MUST</strong> apply the validation in RFC 9207 Section 2.4 before
+transmitting the authorization code to any token endpoint.</p>
+</blockquote>
+<p>The client half of that is Guardana's own obligation and not a check. The
+<em>server</em> half is: an authorization server that returns <code>iss</code> <strong>MUST</strong> advertise
+<code>authorization_response_iss_parameter_supported: true</code> in its metadata, and one
+that advertises nothing gives a client no way to detect that it is talking to the
+wrong authorization server at all. Mix-up is the attack; <code>iss</code> is the only
+defence the protocol offers against it, and its availability is a published field
+in a document <code>probe --mcp</code> already fetches.</p>
+<p>Reported <code>medium</code>. It is a <code>SHOULD</code> on the authorization server, which argues for
+less, and it disables a client <code>MUST</code>, which argues for more; the attack also
+needs a second, attacker-influenced authorization server in the picture, which is
+why it is not <code>high</code>. The specification says a future revision is expected to
+raise the server-side requirement to <code>MUST</code>, and this rule is what will already
+be measuring when it does.</p>
+<h3 id="guardanamcpcache_scope"><code>guardana.mcp.cache_scope</code></h3>
+<p><code>cacheScope: &quot;public&quot;</code> means <em>any shared gateway or caching proxy may store this
+and serve it to any user</em>. A server that declares it on a tool listing it refused
+to an unauthenticated caller has declared two incompatible things about the same
+document, and the specification's own security note describes the outcome: the
+result of an authenticated call may be served outside the authorization context
+that fetched it.</p>
+<p>The rule grades <strong>what the server declares</strong>, and only that. It does not attempt
+to show what an intermediary did, because a scanner that proved this by finding a
+cache would be reporting somebody else's infrastructure.</p>
+<p>Three boundaries, each chosen so that silence stays honest:</p>
+<ul>
+<li><strong>A legacy server is silent.</strong> The fields do not exist in that revision, so
+nothing was declared to anyone. Same argument as the session rules.</li>
+<li><strong>A missing <code>cacheScope</code> is silent.</strong> Only <code>&quot;public&quot;</code> authorises sharing, and
+an absent field is not an instruction to share with anyone. A client may still
+hold the answer for itself — which is the same privacy position as holding it for
+the length of one run. The specification does require the fields on a modern
+server, but a conformance gap that creates no exposure is not this rule's
+finding.</li>
+<li><strong>A server open to anonymous callers is silent.</strong> A public declaration on a
+document anyone may fetch is correct, and reporting it would put a finding on
+every unauthenticated development server there is — the same trap
+<code>token_audience</code> avoids for the same reason.</li>
+</ul>
+<h2 id="what-is-deliberately-not-built">What is deliberately not built</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Left out</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sending an MRTR retry (<code>inputResponses</code>, <code>requestState</code>)</td>
+<td>Guardana declares no client capabilities, so a conforming server can never ask it for input. Building the retry would mean declaring a capability in order to exercise the code that handles it</td>
+</tr>
+<tr>
+<td><code>subscriptions/listen</code></td>
+<td>a long-lived stream is a listener, and a scanner that holds one has a different safety posture and a request meter that cannot bound it. The rug-pull check wants a <em>schedule</em>, which is <code>monitor --mcp</code>, still deferred</td>
+</tr>
+<tr>
+<td>The tasks extension (<code>io.modelcontextprotocol/tasks</code>)</td>
+<td>an extension is opt-in on both sides; nothing Guardana sends can be answered with a task handle unless it declares support, and declaring support to test it is the same mistake as above</td>
+</tr>
+<tr>
+<td><code>x-mcp-header</code> mirroring</td>
+<td>it applies to <code>tools/call</code>, which Guardana does not send. Calling a tool to grade its header mirroring would execute the tool</td>
+</tr>
+<tr>
+<td>Grading <code>ttlMs</code> as a freshness policy</td>
+<td>how long a manifest may be cached is an operational choice, not a security invariant. <code>cacheScope</code> is graded because it names <em>who may hold it</em>, which is</td>
+</tr>
+<tr>
+<td>Deprecated-feature findings (Roots, Sampling, Logging, DCR, HTTP+SSE)</td>
+<td>the specification keeps them legal for twelve months. Reporting a supported feature as a defect is a false red, and Dynamic Client Registration is called out by name because it remains the only registration route some authorization servers offer</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="mcp-authorization-depth.html"><code>mcp-authorization-depth.md</code></a> — the six invariants,
+the honesty boundary they are placed against, and the four distinctions
+(identity is three claims; delegation has a direction and a boundary; consent is
+per client; a session is not an identity) that this revision leaves intact</li>
+<li><a href="trace-domain-model.html"><code>trace-domain-model.md</code></a> — why a session in a trace does
+not make the identity dimension instrumented</li>
+<li><a href="../usage-probe.html"><code>../usage-probe.md</code></a> — how to run it</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/mcp-protocol-eras.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

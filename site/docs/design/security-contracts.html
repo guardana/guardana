@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security contracts — Guardana documentation</title>
+<meta name="description" content="the application&#x27;s own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does">
+<link rel="canonical" href="https://guardana.dev/docs/design/security-contracts.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html" aria-current="page">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Security contracts, and the evidence matrix that decides whether one can be checked<span class="status implemented">implemented</span></h1><p class="lede">the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does</p><p><strong>Status:</strong> implemented in 0.17.0, corrected in 0.17.1 · <strong>Written:</strong> 2026-08-10 ·
+<strong>Step four</strong></p>
+<h2 id="two-halves-of-one-thing">Two halves of one thing</h2>
+<p>This document covers two roadmap items together because they are one mechanism
+seen from two ends:</p>
+<ul>
+<li><strong>the evidence matrix</strong> — what a recorded execution <em>can</em> answer, made visible
+and gateable rather than inferable from a skip note;</li>
+<li><strong>security contracts</strong> — what an application <em>must</em> be true of, written by the
+team that owns it, as data rather than as code.</li>
+</ul>
+<p>They meet at a single sentence, and it is the sentence this whole release is
+about:</p>
+<blockquote>
+<p><strong>A contract that requires evidence its producer never records is
+<code>indeterminate</code>. Never a pass, and never a finding either.</strong></p>
+</blockquote>
+<p>Not a pass, because nothing was checked. Not a finding, because accusing an
+application of a failure its instrumentation merely cannot describe is a false
+red, and a false red is not a safer error than a false green — it is the error
+that teaches a team to ignore the tool.</p>
+<h2 id="why-contracts-and-why-now">Why contracts, and why now</h2>
+<p>Guardana has three extension points and they cover three different questions.
+A <strong>rule</strong> is a test. An <strong>evaluator</strong> is judgement. A <strong>target</strong> is the system
+under test. What none of them expresses is the fourth question, which is the one
+that actually decides whether an AI application is safe:</p>
+<p><strong>what is this application allowed to do?</strong></p>
+<p>Which principals exist. Whose data is whose. Which actions need a human. Which
+boundary may never receive a credential. Which sink is simply off-limits.</p>
+<p>No public framework knows any of that, and no generic scanner can. OWASP can say
+<em>excessive agency is a risk</em>; it cannot say <em>the checkout agent may call
+<code>payments.refund</code> and nothing else</em>. That gap used to be answered with &quot;you can
+write a custom rule&quot;, and that answer stopped being a differentiator: policy
+libraries are now a mainstream red-team feature, and &quot;write Python&quot; is a worse
+offer than &quot;write a file your security reviewer can read&quot;.</p>
+<p>The roadmap's fifth thesis property already stated the position — <em>the
+application's threat model belongs to its owner</em>. This is that sentence made
+executable.</p>
+<p><strong>Deterministic first, and generated attacks never before the invariants are
+provable.</strong> An attack that &quot;seems to have worked&quot; against an invariant nobody
+wrote down is a screenshot, not evidence. The order is: state the invariant,
+prove it holds or does not on a real recorded execution, and only then start
+generating traffic aimed at breaking it.</p>
+<h2 id="decision-1--a-contract-is-a-third-entity-not-a-rule-and-not-a-profile">Decision 1 — a contract is a third entity, not a rule and not a profile</h2>
+<p><strong>Rejected: extend the profile.</strong> A <code>guardana.yaml</code> <em>selects</em> among checks that
+already exist and sets the bar they have to clear. A contract <em>creates</em> checks
+nobody shipped. Folding the second into the first means a typo in a severity
+threshold and a typo in a security invariant are the same class of event, in the
+same file, reviewed by the same glance — and it makes the profile a document that
+is simultaneously configuration and assertion. The profile stays the run's policy.</p>
+<p><strong>Rejected: a new kind of YAML rule.</strong> Superficially attractive, because YAML
+rules already exist and are already loaded from user directories. It fails on
+vocabulary and on audience. A YAML rule's vocabulary is <em>send this prompt, grade
+it with that evaluator</em>; a contract's vocabulary is the nouns of an application —
+tenants, boundaries, scopes, sinks, approvals. And a rule is written to be
+<em>shared</em>: the catalog, a pack, a registry one day. A contract is deliberately
+private to one application, lives in that application's repository, and is
+reviewed alongside the code that has to satisfy it. Two documents with opposite
+distribution stories should not be the same document.</p>
+<p><strong>Accepted: a separate document that compiles into ordinary rules.</strong></p>
+<pre><code>contract.yaml  ──load──▶  SecurityContract  ──compile──▶  Rule objects
+                             (data)                        (registered)
+</code></pre>
+<p>The contract is data all the way to the point where it becomes a <code>Rule</code>, and from
+that point on it is an ordinary rule. This is not a cosmetic choice; it is what
+buys the whole feature for almost nothing:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Already works, unchanged</th>
+<th>Because the compiled assertion is a <code>Rule</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>skipped when the target cannot satisfy a capability</td>
+<td><code>RuleMeta.required_capabilities</code></td>
+</tr>
+<tr>
+<td>evidence redaction</td>
+<td>the <code>Finding</code> goes through <code>EvidenceRedactor</code></td>
+</tr>
+<tr>
+<td>baselines and waivers</td>
+<td>findings have fingerprints</td>
+</tr>
+<tr>
+<td><code>diff</code> between two runs</td>
+<td>rules carry a digest, coverage carries a fingerprint</td>
+</tr>
+<tr>
+<td>the collector envelope</td>
+<td>normalized <code>Finding</code>, no new path</td>
+</tr>
+<tr>
+<td><code>--rules</code> include/exclude globs</td>
+<td>ids are namespaced <code>contract.&lt;name&gt;.&lt;assertion&gt;</code></td>
+</tr>
+<tr>
+<td><code>plan</code> costing</td>
+<td><code>estimated_requests</code> is 0; reading a file sends nothing</td>
+</tr>
+</tbody>
+</table></div>
+<p>The engine gains one loader and five assertion kinds. It gains no new execution
+path, no new report channel that reporters must learn, and no second definition
+of what a finding is.</p>
+<h3 id="what-the-id-looks-like-and-why-it-is-namespaced">What the id looks like, and why it is namespaced</h3>
+<p><code>contract.&lt;contract-name&gt;.&lt;assertion-id&gt;</code> — <code>guardana.*</code> stays reserved for
+built-ins, exactly as a third-party pack's ids do. A profile can exclude a whole
+contract with <code>contract.checkout.*</code>, and a baseline can waive one assertion
+without waiving the rest.</p>
+<h2 id="decision-2--assertions-do-not-get-an-evaluator">Decision 2 — assertions do not get an evaluator</h2>
+<p><strong>Rejected: a <code>contract</code> evaluator.</strong> An <code>Evaluator</code> turns a model <em>response</em>
+into a <code>Verdict</code>, and it exists because grading natural language is a matter of
+degree that needs a measured confidence. A contract assertion compares two values
+a producer already recorded. Its confidence is 1.0 by construction, and the
+comparison has no free parameters to calibrate.</p>
+<p>The concrete danger of routing it through an evaluator is worse than the
+redundancy: <code>evaluator:</code> is configurable, and a configurable evaluator can be
+pointed at <code>llm_judge</code>. A tenant boundary graded by a language model is precisely
+the inversion this release exists to prevent — the reason contracts come <em>before</em>
+generated attacks is that they are <strong>provable</strong>, and an evaluator seam is an
+invitation to make them merely plausible.</p>
+<p>What assertions do reuse is the <code>Verdict(&quot;inconclusive&quot;, 0.0, …)</code> shape when they
+decline, because declining is the same act everywhere in this codebase and should
+look the same in a report.</p>
+<h2 id="decision-3--the-contract-document-is-versioned-and-unknown-keys-are-fatal">Decision 3 — the contract document is versioned, and unknown keys are fatal</h2>
+<p>Principle 11: a document a user keeps is a contract, and a schema change without a
+version strands the evidence somebody relies on. A security contract is the most
+literal case of that in the whole project — the file <em>is</em> the team's threat model.</p>
+<pre><code class="language-yaml">schema_version: 1
+name: checkout-agent
+</code></pre>
+<ul>
+<li><code>schema_version</code> is <strong>required</strong>. Rejected: optional with a default of 1. A
+document with no version is exactly the document whose meaning you cannot pin
+later, and defaulting reads a future file as a past one.</li>
+<li>A version this build has never heard of is <strong>refused</strong>, never read
+optimistically — the same reasoning as <code>load_report</code>: a newer writer may have
+changed the meaning of a key this reader still recognises.</li>
+<li>Older versions migrate forward <strong>in memory, one step at a time</strong>, keyed by the
+version the document <em>is</em>. The table is empty at v1 because there is nothing
+behind it yet; the machinery and its refusal path exist and are tested, so the
+first migration is a table entry rather than an architecture.</li>
+<li><strong>No <code>contract migrate</code> command.</strong> <code>guardana run migrate</code> rewrites a <em>generated</em>
+document on disk. A contract is hand-written and owned by the team; a tool that
+rewrites it would be editing their source. When v2 arrives, the migration
+happens at load and the upgrade note tells them what to change.</li>
+<li><strong>Unknown keys raise at load.</strong> A misspelled <code>assertoins:</code> that loaded as an
+empty contract would produce a run that checks nothing and exits <code>0</code> — a gate
+you think you configured but did not, which is worse than no gate. Same
+treatment as <code>guardana.yaml</code>, for the same reason.</li>
+</ul>
+<h2 id="decision-4--five-assertion-kinds-each-provable-from-what-a-trace-already-carries">Decision 4 — five assertion kinds, each provable from what a trace already carries</h2>
+<p>Each one is deterministic, offline, and needs no field the domain model does not
+already have. The dimension each one needs is what connects this half of the
+release to the other half.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>The invariant</th>
+<th>Needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tenant_boundary</code></td>
+<td>one execution serves one tenant, and every document it retrieved belongs to that tenant</td>
+<td><code>retrieval</code></td>
+</tr>
+<tr>
+<td><code>approval_required</code></td>
+<td>an action matching a selector was preceded by a <em>granted</em> approval</td>
+<td><code>approval</code> + <code>effects</code></td>
+</tr>
+<tr>
+<td><code>allowed_scopes</code></td>
+<td>a hop across a named boundary exercised only scopes on the allow list</td>
+<td><code>delegation</code></td>
+</tr>
+<tr>
+<td><code>credential_boundary</code></td>
+<td>a named boundary never received a credential at all</td>
+<td><code>delegation</code></td>
+</tr>
+<tr>
+<td><code>forbidden_sink</code></td>
+<td>no side effect landed on a sink the application forbids</td>
+<td><code>effects</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong><code>tenant_boundary</code> is not a duplicate of <code>guardana.trace.cross_tenant_retrieval</code>.</strong>
+The built-in compares one retrieval's tenant against the documents that retrieval
+returned — a within-call check that needs no application knowledge. The contract
+asserts something only the application's owner can state: that the <em>whole
+execution</em> stays on one tenant. An agent that retrieves for tenant A, then
+retrieves for tenant B in the same run, is invisible to the built-in and is a
+finding here.</p>
+<p><strong><code>forbidden_sink</code> counts <code>attempted</code> as well as <code>executed</code>, by default.</strong> An
+agent that tried to open a shell and was stopped is a fact about the agent, and a
+contract saying &quot;never shell&quot; is violated by the attempt. <code>failed</code> is
+configurable but off by default: a failure is the system refusing, which is the
+opposite of a finding, and defaulting it on would report every working guardrail.</p>
+<p><strong>The taxonomy mapping belongs to the assertion <em>kind</em>, not to the author.</strong>
+Principle 5 requires every rule to map to a public framework, and a contract
+author should not have to know OWASP's numbering to write down that payments need
+approval. Each kind therefore carries a fixed mapping. Rejected: letting the
+document set <code>taxonomy:</code>. A mapping a team invents to make a report look complete
+is worse than no mapping, and the mapping is the part that has to survive somebody
+else's audit.</p>
+<h2 id="decision-5--the-meeting-point-unverifiable-is-indeterminate-unconditionally">Decision 5 — the meeting point: unverifiable is indeterminate, unconditionally</h2>
+<p>This is the part that is easiest to get wrong, and the mechanism that already
+existed gets it wrong on its own.</p>
+<p>A compiled assertion declares <code>required_capabilities</code>, so the runner already skips
+it when the producer does not record that dimension, with a reason. <strong>But a skip
+only reaches the gate through <code>fail_on_skipped</code>, which defaults to <code>false</code>.</strong> So
+the default path for &quot;the contract you wrote could not be checked at all&quot; is a
+run that exits <code>0</code>. That is a false green, and it is the one this release is
+specifically about.</p>
+<p>Why the default is nevertheless right for <em>built-in</em> rules: most skips are
+ordinary. A file rule against an endpoint, a tool-calling rule against a model
+nobody claimed could call tools — nobody asked for those, they simply do not
+apply. Turning every one of them into a red build would make the setting useless.</p>
+<p>So the distinction is not &quot;was a rule skipped&quot; but <strong>&quot;did the operator demand
+this coverage&quot;</strong>, and demanded coverage is unconditional:</p>
+<pre><code class="language-yaml"># guardana.yaml — the operator demands it directly
+trace:
+  require: [identity, approval, effects]
+</code></pre>
+<pre><code class="language-yaml"># contract.yaml — the operator demands it implicitly, by writing an assertion
+- id: payments-need-a-human
+  type: approval_required     # ⇒ requires `approval` and `effects`
+</code></pre>
+<p>Both produce the same thing: a set of <strong>required dimensions</strong>. One mechanism, two
+sources, checked once against what the trace declares. Anything required and not
+recorded is a <code>CoverageShortfall</code> on the result, and <code>gate_outcome</code> returns
+<code>INDETERMINATE</code> for a non-empty shortfall with no policy toggle in the path.</p>
+<p><strong>Rejected: a new <code>SkipReason</code> that the gate treats specially.</strong> It would put the
+same fact in two places — the skip list and the requirement check — and two
+representations of one fact eventually disagree. The skip stays exactly what it
+is (this rule did not run, here is the capability it needed); the shortfall is the
+separate statement that the run is not entitled to a verdict.</p>
+<p><strong>Rejected: recording the shortfall as a <code>CheckError</code>.</strong> It nearly fits —
+<code>fail_on_error</code> defaults to <code>true</code>, so it would block by default — and it is
+wrong for two reasons. An error means a check <em>malfunctioned</em>; a producer that
+does not emit approvals has malfunctioned in no way at all. And <code>fail_on_error</code>
+is a toggle, so &quot;unconditional&quot; would have been one line of YAML away from false.</p>
+<p><strong>Rejected: computing it in the CLI and not recording it.</strong> The run document
+would then be indeterminate for a reason it does not state, <code>diff</code> could not see
+it, and the collector would receive a verdict with no cause. A run whose
+conclusion is not in its own evidence is the failure this project has fixed
+twice already.</p>
+<h3 id="the-implied-demand-ends-where-the-assertion-does-corrected-in-0171">The implied demand ends where the assertion does <em>(corrected in 0.17.1)</em></h3>
+<p>The two sources are the same statement — <em>I am gating on this coverage</em> — but they
+are not owned by the same person, and 0.17.0 shipped as though they were. The
+implicit demand was computed from every applicable assertion before the policy said
+which rules would run, so <code>rules.exclude: [&quot;contract.checkout.*&quot;]</code> switched the
+assertions off and left their requirement standing. The run then went
+<code>indeterminate</code> for missing evidence that no surviving check would have read.</p>
+<p>Measured rather than reasoned about: the same trace, the same six rules run and
+seven skipped, exit <code>0</code> with the assertion deleted from the contract and exit <code>2</code>
+with the assertion present and its rule excluded. Identical work, opposite verdict.</p>
+<p>That is a <strong>false red</strong>, and this project owes it the same treatment as a false
+green. A tool that accuses a run of missing coverage nobody asked for gets its
+coverage demands turned off, and then it is protecting nothing. So the implication
+now lives and dies with the assertion: <code>wire_contracts</code> demands only the dimensions
+of assertions this run will actually check, using <code>refused_by_this_run</code> — the same
+predicate composed from the two things the runner's plan already consults, with a
+test asserting the predicate agrees with the plan the runner really builds rather
+than with a second reading of the same conditions.</p>
+<p><code>trace.require:</code> is deliberately untouched by this. It is a sentence the operator
+wrote, not an implication of a check, and a team paying for instrumentation is
+entitled to demand it arrive whether or not a rule currently wants it.</p>
+<p><strong>And the exclusion is printed.</strong> Subtracting the demand silently would leave
+<code>contracts: 1 assertion(s) apply to this execution</code> standing over a green report
+about a rule nothing ran — a true sentence about loading and a false one about
+grading. Recording it as evidence in the saved run needs a new <code>SkipReason</code> value,
+which is a persisted-schema change; the roadmap carries it with that reason.</p>
+<h3 id="ordering-against-a-finding">Ordering against a finding</h3>
+<p>A finding still outranks a shortfall: a run with both is <code>FAIL</code>. The finding is a
+fact somebody must act on, and reporting &quot;we could not tell&quot; instead would bury
+it. The shortfall joins the other question-left-open branches, above them in the
+sense that it needs no toggle.</p>
+<h2 id="decision-6--a-contract-can-say-not-mine-without-that-being-a-pass">Decision 6 — a contract can say &quot;not mine&quot; without that being a pass</h2>
+<p>A team with three agents has three contracts. Running the checkout contract
+against a support-agent trace must not print a green tick, because nothing about
+checkout was verified.</p>
+<pre><code class="language-yaml">applies_to:
+  ai_system: checkout-agent
+</code></pre>
+<p>Matched against <code>--ai-system</code>, which <code>analyze-trace</code> already takes and which the
+documentation already says is <strong>never guessed</strong>. That is exactly the right key:
+it is operator-supplied, explicit, and already recorded in the run manifest's
+deployment block.</p>
+<p>Three branches, and the third is the one that matters:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>applies_to.ai_system</code></th>
+<th><code>--ai-system</code></th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>absent</td>
+<td>anything</td>
+<td>applies — a contract that names no system is about whatever you point it at</td>
+</tr>
+<tr>
+<td><code>checkout-agent</code></td>
+<td><code>checkout-agent</code></td>
+<td>applies</td>
+</tr>
+<tr>
+<td><code>checkout-agent</code></td>
+<td><code>support-agent</code></td>
+<td><strong>not applicable</strong> — skipped, recorded, not counted as coverage, not a pass for those assertions</td>
+</tr>
+<tr>
+<td><code>checkout-agent</code></td>
+<td><em>not given</em></td>
+<td><strong>refused</strong> — the contract cannot know whether it applies, and a contract that cannot know must not report clean</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>NOT_APPLICABLE</code> is the first <code>SkipReason</code> whose <code>is_coverage_gap</code> is <code>False</code>, and
+the property was written in 0.7 for exactly this: <em>&quot;a future reason that is
+genuinely benign has somewhere to say so, instead of being quietly folded in with
+the ones that are not.&quot;</em> It is not a coverage gap because nothing was missing —
+the contract was about something else.</p>
+<p><strong>But a contract layer that graded <em>nothing</em> is a shortfall.</strong> If contracts were
+loaded and not one assertion applied to this trace, the run is <code>INDETERMINATE</code>.
+That is the wrong-file case — the CI job that points at the wrong trace, or the
+<code>--ai-system</code> value that drifted after a rename — and it is the only way the
+not-applicable state could otherwise become a silent green.</p>
+<p><strong>Rejected: skipping non-matching contracts at load.</strong> A typo in <code>applies_to</code>
+would then silently disable the contract, which is a fail-open with no trace of
+itself. Loading it and reporting it as not applicable keeps the mistake visible.</p>
+<h2 id="decision-7--trace-inspect-prints-a-matrix-and-never-a-percentage">Decision 7 — <code>trace inspect</code> prints a matrix, and never a percentage</h2>
+<p>The mechanism has existed since 0.14 and was visible only as a skip note on a run
+that had already happened. An operator could not gate on it, because they could
+not see what was missing until a rule was missed.</p>
+<pre><code>$ guardana trace inspect run.jsonl
+
+dimension      declared  records  needed by  unlocks
+messages       yes       12       3 rule(s)  -
+retrieval      yes        4       2 rule(s)  -
+approval       no         0       2 rule(s)  0 rule(s)   ← not instrumented
+memory         yes        2       0 rule(s)  -
+</code></pre>
+<p>Two columns rather than one, because the difference between them is a real and
+different failure. <strong><code>declared</code></strong> is what the producer says it emits; <strong><code>records</code></strong>
+is how many spans actually carry that dimension. A producer that declares
+<code>approval</code> and emits none is <em>gradable</em> — that is the &quot;recorded, absent&quot; state
+where a finding lives. A producer that declares nothing has told rules to stand
+down. Showing only the first would hide a header that lies; showing only the
+second would read an execution with nothing to approve as an instrumentation gap.</p>
+<p><strong>No single coverage percentage, and this is a rule rather than a preference.</strong>
+One number hides which dimension is missing, and which dimension is missing is the
+entire question. &quot;78% covered&quot; is compatible with having no identity evidence at
+all, and a team that gates on a number rather than on a name will ship the day the
+missing 22% is the 22% that mattered. The roadmap already refuses a universal AI
+risk score for the same reason; this is that decision applied one level down.</p>
+<p><strong><code>needed by</code> counts installed rules, not a fixed list.</strong> It is computed from the
+registry, so a rule pack a team installed is counted and the number cannot rot the
+way a hand-written table does. A dimension no installed rule needs says <code>0</code>, which
+is honest and immediately useful: <code>memory</code> is instrumented by several frameworks
+and has no capability mapped to it today, and the matrix says so out loud instead
+of leaving it looking covered.</p>
+<p><strong><code>unlocks</code> is a separate column because it answers a separate question, and one
+column answering both answered the wrong one.</strong> <code>needed by</code> is how many rules read
+the dimension; <code>unlocks</code> is how many would start running if it were the next thing
+instrumented — which is only the rules with nothing else missing. <code>approval</code> above
+is needed by two rules and unlocks neither, because both also want side effects. A
+team reading the single column budgeted a sprint of instrumentation and gained no
+check. Added in 0.17.1 after <code>guardana trace inspect</code> was run against a real
+adapter's output and the two numbers turned out to disagree.</p>
+<p><strong>It opens a file and no socket.</strong> Same input <code>analyze-trace</code> takes, no
+network, no run document written, exit <code>0</code> unless the file cannot be read. An
+operator inspects the evidence they already have before deciding what to require.</p>
+<h3 id="rejected-folding-this-into-analyze-trace---dry-run">Rejected: folding this into <code>analyze-trace --dry-run</code></h3>
+<p><code>analyze-trace</code> grades. A flag that makes a grading command not grade is a command
+with two personalities and one exit-code contract, and the coverage question is
+asked at a different moment by a different person — before writing a policy, not
+while gating a build.</p>
+<h2 id="what-this-does-not-do">What this does not do</h2>
+<p>Stated so nothing here implies otherwise.</p>
+<ul>
+<li>
+<p><strong>A satisfied contract is not a secure application.</strong> It says these invariants
+held in this recorded execution. The attacker's request may simply not be in the
+file, and <code>usage-analyze-trace.md</code> already says so about the built-ins.</p>
+</li>
+<li>
+<p><strong>No contract assertion sends anything.</strong> These grade a recording. The generated
+attacks that would try to <em>break</em> an invariant are the next step and are
+deliberately not in this one.</p>
+</li>
+<li>
+<p><strong>No regulation and no vendor appears in the engine.</strong> An assertion kind names
+tenants, scopes, boundaries and sinks — domain nouns, not framework names. The
+OWASP mapping is data on the kind, as every other mapping in this repository is.</p>
+</li>
+<li>
+<p><strong>No shipped framework adapter can carry four of the five kinds.</strong> Measured in
+0.17.1 against a real run from each, not against a fixture:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Producer</th>
+<th>Records</th>
+<th>Kinds it can grade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pydantic-ai 2.27.0</td>
+<td><code>messages</code>, <code>tools</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>llama-index-core 0.14.23</td>
+<td><code>messages</code>, <code>retrieval</code></td>
+<td><code>tenant_boundary</code></td>
+</tr>
+<tr>
+<td>crewai 1.15.14</td>
+<td><code>messages</code>, <code>handoff</code></td>
+<td>none</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>approval_required</code>, <code>allowed_scopes</code>, <code>credential_boundary</code> and <code>forbidden_sink</code>
+decline on all three, because no framework records approvals, delegations or side
+effects of its own accord. The declines are correct — that is
+<a href="#decision-5--the-meeting-point-unverifiable-is-indeterminate-unconditionally">decision 5</a>
+doing its job — but they mean <strong>contracts today serve a team that instruments its
+own agent</strong>, through the native dialect, an OpenTelemetry exporter it controls, or
+<code>--write-trace</code> output it fills in. The one measured success is the shape of the
+win: a two-tenant LlamaIndex run produced a <code>critical</code> <code>tenant_boundary</code> finding
+that no built-in rule could reach, because whether one execution may serve two
+customers is knowledge only the owning team has.</p>
+</li>
+</ul>
+<h2 id="deferred-with-the-reason">Deferred, with the reason</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Deferred</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Contract assertions over a live endpoint</strong></td>
+<td>every kind here reads recorded authority — a delegation's boundary, an approval's outcome. A live probe would have to <em>provoke</em> the action to observe it, which is generated attack traffic, and the stated order is invariants first</td>
+</tr>
+<tr>
+<td><strong>A contract-authored taxonomy mapping</strong></td>
+<td>a mapping a team invents to fill a column is worse than none, and the mapping is what has to survive somebody else's audit. If a real need appears it is an <em>additional</em> reference beside the kind's, never a replacement</td>
+</tr>
+<tr>
+<td><strong>Custom assertion kinds from a plugin</strong></td>
+<td>a sixth kind today is a pull request; an extension point for kinds is an API that 1.0 would freeze. It belongs with the pack manifest and <code>pack validate</code>, where compatibility is expressed, not bolted to the loader</td>
+</tr>
+<tr>
+<td><strong><code>tenant</code> on <code>Identity</code></strong></td>
+<td>the boundary check would be sharper if the acting principal carried a tenant, and adding a field to a frozen-at-1.0 type to serve one assertion is how a domain model acquires an escape hatch. Retrieval already carries the tenant on both sides, which is where the failure is observable</td>
+</tr>
+<tr>
+<td><strong>Requiring dimensions for <code>probe</code> and <code>scan</code></strong></td>
+<td><code>trace.require</code> is a statement about a <em>producer's</em> instrumentation. The equivalent for a live target is &quot;this provider must support tool calling&quot;, which is a different question with a different failure mode, and inventing one syntax for both before either has a user is how a schema acquires a shape nobody wanted</td>
+</tr>
+<tr>
+<td><strong>A shortfall for a dimension declared but never recorded</strong></td>
+<td>that is the gradable state, not a gap. Turning &quot;you instrumented approvals and this execution needed none&quot; into indeterminate would fire on every well-behaved run — the exact false red the honesty boundary exists to prevent</td>
+</tr>
+</tbody>
+</table></div>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/security-contracts.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

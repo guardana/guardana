@@ -1,3 +1,10 @@
+---
+title: "Audit, retention and deletion"
+nav_order: 180
+summary: "who did what, how long evidence is kept, and deleting on purpose"
+status: accepted
+---
+
 # Design: the audit log, retention, and deleting things on purpose
 
 **Status:** accepted · **Implemented in:** 0.11.0 · **Component:** collector

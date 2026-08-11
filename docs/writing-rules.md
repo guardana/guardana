@@ -1,3 +1,10 @@
+---
+title: "Writing rules"
+nav_order: 220
+summary: "author a rule as YAML or as a Python plugin"
+status: stable
+---
+
 # Writing rules
 
 A **rule** is a single security check: an identity, a taxonomy mapping, a

@@ -1,3 +1,10 @@
+---
+title: "guardana import-observations"
+nav_order: 110
+summary: "`guardana import-observations`: carry garak, promptfoo or your own harness's results in as unverified claims"
+status: stable
+---
+
 # `guardana import-observations` — carry another tool's results in as claims
 
 You ran garak. You ran promptfoo. You have an internal harness. Their results are real

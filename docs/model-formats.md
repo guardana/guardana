@@ -1,3 +1,10 @@
+---
+title: "Reading model formats"
+nav_order: 270
+summary: "the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract"
+status: stable
+---
+
 # Reading model formats — `guardana.core.formats`
 
 A rule that inspects a model file needs to read a binary format before it can

@@ -1,3 +1,10 @@
+---
+title: "guardana target inspect"
+nav_order: 160
+summary: "`guardana target inspect`: what an endpoint really supports"
+status: stable
+---
+
 # `guardana target inspect` — what an endpoint really supports
 
 "OpenAI-compatible" describes a URL shape, not behaviour. A gateway can accept a

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CI and pre-commit — Guardana documentation</title>
+<meta name="description" content="GitHub Action, pre-commit, and gating on deterioration">
+<link rel="canonical" href="https://guardana.dev/docs/integrations.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html" aria-current="page">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Integrations — CI and pre-commit</h1><p class="lede">GitHub Action, pre-commit, and gating on deterioration</p><p>Guardana ships ready-made ways to gate on AI/LLM risk without wiring anything by
+hand: a GitHub Action, copyable pipelines for GitLab, Jenkins and Azure DevOps, a
+one-line recipe for any CI that can run a container, and a pre-commit hook.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>What to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub Actions</td>
+<td>the composite action below — SARIF lands in code scanning</td>
+</tr>
+<tr>
+<td>GitLab CI</td>
+<td><a href="https://github.com/guardana/guardana/blob/main/deploy/ci/gitlab-ci.yml"><code>deploy/ci/gitlab-ci.yml</code></a>, includable from a remote URL</td>
+</tr>
+<tr>
+<td>Jenkins</td>
+<td><a href="https://github.com/guardana/guardana/blob/main/deploy/ci/Jenkinsfile"><code>deploy/ci/Jenkinsfile</code></a></td>
+</tr>
+<tr>
+<td>Azure DevOps</td>
+<td><a href="https://github.com/guardana/guardana/blob/main/deploy/ci/azure-pipelines.yml"><code>deploy/ci/azure-pipelines.yml</code></a></td>
+</tr>
+<tr>
+<td>anything else</td>
+<td><a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md">the generic container pipeline</a></td>
+</tr>
+<tr>
+<td>before the push</td>
+<td><a href="#pre-commit">pre-commit</a></td>
+</tr>
+</tbody>
+</table></div>
+<p>Everything except the Action and the hook runs the published image, so the
+version of Guardana in a pipeline is a tag somebody pinned rather than whatever
+<code>pip install</code> resolved this morning.
+<a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md"><code>deploy/ci/README.md</code></a> explains the three things a
+copied pipeline gets wrong — swallowing the exit code, publishing the report only
+on success, and forgetting that the platform wraps commands in a shell — and each
+of those is held by a test.</p>
+<h2 id="github-action">GitHub Action</h2>
+<p>The official composite action runs a scan and uploads the results to GitHub code
+scanning, so findings show up as annotated alerts on the exact source line.</p>
+<pre><code class="language-yaml"># .github/workflows/ai-security.yml
+name: AI security
+on: [push, pull_request]
+
+jobs:
+  guardana:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF
+    steps:
+      - uses: actions/checkout@v4
+      - uses: guardana/guardana@v0.18   # moving tag; pins to the latest 0.18.x
+        with:
+          path: .
+          # args: --preset ci --baseline guardana-baseline.yaml
+</code></pre>
+<p>Inputs (all optional):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code></td>
+<td><code>.</code></td>
+<td>Directory or single file to scan</td>
+</tr>
+<tr>
+<td><code>args</code></td>
+<td><em>(none)</em></td>
+<td>Extra <code>guardana scan</code> args (e.g. <code>--preset ci</code>, <code>--baseline guardana-baseline.yaml</code>)</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td><em>(latest)</em></td>
+<td>Pin a <code>guardana-cli</code> version</td>
+</tr>
+<tr>
+<td><code>sarif-file</code></td>
+<td><code>guardana.sarif</code></td>
+<td>Where the SARIF is written</td>
+</tr>
+<tr>
+<td><code>upload-sarif</code></td>
+<td><code>true</code></td>
+<td>Upload to GitHub code scanning</td>
+</tr>
+<tr>
+<td><code>fail-on-findings</code></td>
+<td><code>true</code></td>
+<td>Fail the job when the gate trips</td>
+</tr>
+</tbody>
+</table></div>
+<p>The SARIF is uploaded even when the gate fails, so alerts always land; set
+<code>fail-on-findings: false</code> to run it purely advisory.</p>
+<h2 id="failing-a-build-on-deterioration-not-just-on-findings">Failing a build on deterioration, not just on findings</h2>
+<p>The Action gates on what a scan finds <em>today</em>. To gate on whether today is worse
+than the last accepted run, save both runs and compare them:</p>
+<pre><code class="language-yaml">      - name: Scan and save this run
+        run: guardana scan . --format json --output current.json
+
+      - name: Compare against the last accepted run
+        run: guardana diff accepted.json current.json --preset ci
+</code></pre>
+<p>Keep <code>accepted.json</code> in the repository (or in your CI's artifact store) and
+refresh it when you deliberately accept a change. <code>guardana diff</code> exits <code>1</code> on a
+regression and <code>2</code> when the two runs cannot honestly be compared — treat <code>2</code>
+exactly like <code>1</code> until you have read the reason, because &quot;I could not compare
+these&quot; is not &quot;nothing got worse&quot;. See <a href="usage-diff.html"><code>usage-diff.md</code></a>.</p>
+<h2 id="gitlab-jenkins-azure-devops-and-anything-that-runs-a-container">GitLab, Jenkins, Azure DevOps, and anything that runs a container</h2>
+<p>The templates live in <a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md"><code>deploy/ci/</code></a> and are meant to be
+copied. The shortest form, which is also what the Jenkins and Azure templates
+run:</p>
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.9 \
+  scan /work --format junit &gt; guardana-junit.xml
+</code></pre>
+<p>The redirect is deliberate: the file is written by your shell, with your user's
+ownership, so the workspace can be mounted read-only and the image's non-root
+user never writes into a directory your CI owns. Publish <code>guardana-junit.xml</code> as
+the job's test report — GitLab, Jenkins and Azure all read JUnit natively — and
+let the exit code fail the build.</p>
+<p>GitLab can include the job rather than copy it:</p>
+<pre><code class="language-yaml">include:
+  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v0.18/deploy/ci/gitlab-ci.yml&quot;
+
+guardana:
+  variables:
+    GUARDANA_PATH: &quot;models/&quot;
+    GUARDANA_ARGS: &quot;--preset ci --baseline guardana-baseline.yaml&quot;
+</code></pre>
+<h2 id="pre-commit">pre-commit</h2>
+<p>Guardana installs straight from PyPI as a pre-commit hook — scan before anything
+leaves the machine. Add to your <code>.pre-commit-config.yaml</code>:</p>
+<pre><code class="language-yaml">repos:
+  - repo: local
+    hooks:
+      - id: guardana
+        name: Guardana AI security scan
+        entry: guardana scan .
+        language: python
+        additional_dependencies: [&quot;guardana-cli&quot;]
+        pass_filenames: false
+        # Runs on push (heavier) rather than every commit:
+        stages: [pre-push]
+</code></pre>
+<p>A single-file target is supported too, so a filename-passing hook works — but for
+a whole-repo gate <code>pass_filenames: false</code> with an explicit path is simplest. Use
+<code>--baseline guardana-baseline.yaml</code> (see <a href="usage-scan.html#baselining-existing-findings">usage-scan.md</a>)
+to turn the gate on for an existing repo without fixing the whole backlog first.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/integrations.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

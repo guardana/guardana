@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**Documentation on guardana.dev, generated from the prose and the registry.**
+`scripts/build_site.py` renders `docs/**.md` plus `docs/generated/rules.json` into
+`site/docs/` — 190 pages, no build step in Cloudflare, nothing hand-edited. The
+header's **Docs** link finally points at documentation instead of at the GitHub
+README, which is the open item `site/README.md` has carried since the domain was
+parked. Reasoning and the alternatives that lost:
+[`docs/design/documentation-site.md`](docs/design/documentation-site.md).
+
+The page worth building is the **rule explorer**. Every rule has a page — severity,
+surface, impact, declared request budget, required capabilities, the goal its own
+expectation states, and its framework mapping with the edition spelled out — and
+every filter is a *pre-rendered page*: by family, surface, severity, impact, cost,
+framework, and each of the 52 framework entries. It is the one page a competitor
+cannot copy without also having the rules, and because it is generated it cannot go
+stale the way this project's landing page once did.
+
+**Filtering is navigation because `script-src 'none'` is a product claim.** The site
+tells visitors a security vendor's own pages run nothing and reach nothing, and that
+is checkable in devtools rather than asserted in prose — so the filter space is
+rendered ahead of time instead of being scripted. A test reads the built pages and
+refuses a script tag, an inline handler or a `javascript:` URL anywhere; a second
+pins `connect-src 'none'`. Free-text search over the prose is the one thing this
+cannot do, and the design document says it is the only reason worth revisiting the
+policy for.
+
+- **Frontmatter on every documentation page** (`title`, `nav_order`, `summary`,
+  `status`) and **a build that refuses a page without it**. Inferring a title from a
+  filename or a first heading is free and silently reorders the navigation the day
+  somebody retitles a page.
+- **`docs/generated/rules.json`**, emitted by `generate_docs.py` from the same
+  registry walk that writes `rule-catalog.md` — one walk, two renderings, and a test
+  comparing them, so the explorer cannot drift from the catalogue.
+- **Every internal link checked after rendering, anchors included.**
+  `test_docs_consistency.py` checks `.md` targets in markdown; what ships is HTML,
+  where the target has been rewritten and every anchor regenerated. That check found
+  four links in the shipped documentation pointing at an anchor that did not exist.
+
+### Fixed
+
+**A saved run's `deployment` block was written on every run and read back on none.**
+`manifest_to_dict` serialized all eight fields — which AI system, which environment,
+which deployment, commit, image digest, model digest, model name, model revision —
+and `manifest_from_dict` never rebuilt them. `guardana run inspect --format json`
+therefore re-rendered a run against production as a run against nothing, and any
+consumer holding a loaded manifest lost what the evidence was about.
+
+Same shape as the `calibration` defect 0.18.1 fixed, and it survived for the same
+reason: the serializer's tests assert what it writes, the loader's tests assert what
+it reads, and both were right about their own half. **No gate went through both
+doors in one trip, so now one does** — `test_manifest_round_trip.py` enumerates the
+fields off the dataclass, writes, reads, and compares each one; then deletes every
+key the document carries in turn and requires the reader to notice.
+
+**`guardana taxonomy` listed the built-in catalogues and called it what is
+installed.** The command runs discovery first, and its own comment says a listing
+showing only the built-ins "would tell them their pack is not installed when it is"
+— and then it printed only the built-ins. A company that registered its own control
+catalogue ran the one command that confirms what is installed and was told, in
+effect, that it is not. Package-registered references now appear in their own
+section, and in `--format json` with `"digest": null`, because a package registers
+references rather than a catalogue file and inventing a digest would claim a
+provenance nobody has.
+
+It survived because **nothing had ever registered through `guardana.taxonomies`**.
+The group has been documented in `README.md`, `FEATURES.md` and
+`docs/usage-taxonomy.md` while `entry_points(group="guardana.taxonomies")` returned
+an empty list — precisely the state `guardana.targets` was in when 0.18.0 shipped
+`pack validate` accusing every pack with a target. `examples/custom_rule` now
+registers a control catalogue and maps a YAML rule to `ACME-14`, so the reference
+resolves only because discovery registered the taxonomy first. All four entry-point
+groups now have a real registrant; there is no fifth.
+
 ## [0.18.1] - 2026-08-11 — six things the audit of 0.18.0 found
 
 Audited by running the release rather than reading it. Three of the six could only

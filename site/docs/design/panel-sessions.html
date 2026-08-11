@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel sessions — Guardana documentation</title>
+<meta name="description" content="signing in to the panel with a read key, and why the cookie cannot write">
+<link rel="canonical" href="https://guardana.dev/docs/design/panel-sessions.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html" aria-current="page">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: signing in to the panel, without inventing a user model<span class="status accepted">accepted</span></h1><p class="lede">signing in to the panel with a read key, and why the cookie cannot write</p><p><strong>Status:</strong> accepted · <strong>Implemented in:</strong> 0.11.0 · <strong>Component:</strong> collector</p>
+<h2 id="the-problem">The problem</h2>
+<p>The read-only dashboard <strong>refuses to mount</strong> on a collector that requires API keys,
+and the refusal is correct: it is a browser page whose panels fetch <code>/stats</code>, and a
+browser has nowhere to put a bearer token, so every panel would load empty. A
+capability that cannot work must not look present.</p>
+<p>The result is that the panel exists only in the evaluation mode nobody should
+deploy — which makes it a demo rather than a feature.</p>
+<h2 id="the-decision-sign-in-with-a-read-key-keep-it-in-an-httponly-cookie">The decision: sign in with a read key, keep it in an httpOnly cookie</h2>
+<p>There are no users in this collector and inventing them here would mean a password
+store, a reset flow and a session table before anything renders. There is already
+a credential that names exactly one project and one scope: the <strong>read-scoped API
+key</strong>.</p>
+<pre><code>POST   /session   { &quot;token&quot;: &quot;gdn_…&quot; }   → 204, sets `guardana_session`
+DELETE /session                          → 204, clears it
+</code></pre>
+<p>The cookie is <code>HttpOnly</code> (script cannot read it), <code>SameSite=Strict</code> (a third-party
+page cannot cause it to be sent), and <code>Secure</code> whenever the request arrived over
+HTTPS. It carries the token itself rather than a session id, because a session id
+needs a table, an expiry sweeper and a revocation path — and the token already has
+all three: <code>key revoke</code> ends the session, and an expired key ends it on its own.</p>
+<h2 id="the-rule-that-makes-this-safe">The rule that makes this safe</h2>
+<p><strong>The cookie authenticates reads and nothing else.</strong> <code>POST /findings</code> accepts a
+bearer header only. Without that rule a page on another origin could make a
+signed-in operator's browser submit findings — and while <code>SameSite=Strict</code> already
+prevents the request, a control that depends on one browser flag is a control that
+fails the day somebody adds an exception for a proxy.</p>
+<p>So the cookie is only consulted by the guard for <code>read</code>-scoped routes. It is a
+property of <em>which dependency reads it</em>, not of what the browser sends, and a test
+holds it: presenting a session cookie to ingest is refused exactly as if nothing
+had been presented.</p>
+<h2 id="what-the-panel-gets-and-what-it-does-not">What the panel gets, and what it does not</h2>
+<p>Signing in gives the browser exactly what the key gives: <strong>one project</strong>, and the
+environment the key is pinned to when it is pinned. The panel shows that project
+and cannot widen it — the scope on every storage call is the same one the ingest
+path uses, so a signed-in browser cannot reach further than a <code>curl</code> with the same
+key.</p>
+<p>There is no &quot;remember me&quot;, no refresh, and no idle timeout. The cookie is a
+session cookie: closing the browser ends it. Anything longer needs the key's own
+expiry, which is where a lifetime belongs.</p>
+<h2 id="what-this-deliberately-does-not-include">What this deliberately does not include</h2>
+<ul>
+<li><strong>No user accounts, no passwords, no OIDC.</strong> Those arrive with RBAC in the
+team-platform milestone, and they replace this rather than extend it.</li>
+<li><strong>No CSRF token.</strong> Every route the cookie can reach is a <code>GET</code> that changes
+nothing, and <code>SameSite=Strict</code> covers the rest. The moment a cookie-reachable
+route changes state, this paragraph stops being true and a token is required —
+which is exactly why the read-only rule above is enforced in code rather than
+written down as guidance.</li>
+<li><strong>No sign-in page styling beyond the panel's own.</strong> It is one form.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/panel-sessions.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

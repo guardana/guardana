@@ -1,3 +1,10 @@
+---
+title: "guardana probe"
+nav_order: 70
+summary: "`guardana probe`: adversarial checks against a live endpoint or agent, and an MCP server's manifest **and authorization surface**"
+status: stable
+---
+
 # `guardana probe` — one-shot dynamic checks against a live endpoint
 
 Runs every **endpoint**-kind rule once against a live chat endpoint:

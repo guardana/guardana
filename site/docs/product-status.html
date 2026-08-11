@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product status — Guardana documentation</title>
+<meta name="description" content="read first: maturity per component, and the limitations you should know before adopting">
+<link rel="canonical" href="https://guardana.dev/docs/product-status.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html" aria-current="page">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Product status and known limitations</h1><p class="lede"><strong>read first</strong>: maturity per component, and the limitations you should know before adopting</p><p>What is ready, what is not, and what Guardana deliberately does not do. Read this
+before adopting it for anything that matters.</p>
+<p>A security tool that overstates its own readiness has already failed at its job,
+so this page is maintained as carefully as the code.</p>
+<h2 id="maturity-by-component">Maturity by component</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Maturity</th>
+<th>What that means in practice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Engine + built-in rules</td>
+<td><strong>beta</strong></td>
+<td>Stable enough to gate a build on. The public Python API still moves between minor releases.</td>
+</tr>
+<tr>
+<td><code>guardana scan</code></td>
+<td><strong>beta</strong></td>
+<td>Deterministic, offline, no false-positive theatre. The most mature part of the product.</td>
+</tr>
+<tr>
+<td><code>guardana probe</code></td>
+<td><strong>beta</strong></td>
+<td>Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers — the last of those on both its tool manifest and its authorization surface, and never by calling a tool. Verdict quality depends on the evaluator you configure.</td>
+</tr>
+<tr>
+<td><code>guardana monitor</code></td>
+<td><strong>beta</strong></td>
+<td>Scheduled <strong>active</strong> verification. Not passive traffic inspection, not inline.</td>
+</tr>
+<tr>
+<td><code>guardana diff</code></td>
+<td><strong>beta</strong></td>
+<td>Compares two saved runs. The saved-run format is versioned and will gain fields in 0.7.</td>
+</tr>
+<tr>
+<td>Collector (<code>guardana-server</code>)</td>
+<td><strong>beta</strong></td>
+<td>PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. No finding lifecycle, audit log or retention controls.</td>
+</tr>
+<tr>
+<td>Extension API</td>
+<td><strong>unstable by design</strong></td>
+<td>Frozen at 1.0, and deliberately not before — see below.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="known-limitations">Known limitations</h2>
+<p>Stated plainly, because finding these out after adoption is worse than reading
+them now.</p>
+<h3 id="the-agent-harness-is-ours-not-yours">The agent harness is ours, not yours</h3>
+<p>Trajectory rules measure a model's agentic judgement by playing the harness around
+it: Guardana offers the tools, hands back the results, and never executes
+anything. That is a genuine test of the model's judgement — and it is <strong>not</strong> a
+test of <em>your</em> agent, with your framework, your prompts and your tool
+implementations.</p>
+<p>Grading a trace exported from your running agent is a different input, which
+<code>Trajectory</code> was shaped to accept. It is designed for, not built. <strong>Application-awareness milestone.</strong></p>
+<h3 id="monitor-is-scheduled-not-passive"><code>monitor</code> is scheduled, not passive</h3>
+<p>It re-runs checks on an interval. It does not observe production traffic, cannot
+see what your real users are doing, and is not an inline control. A passive
+out-of-band tap is researched and deferred — the hard constraint is zero impact on
+model latency.</p>
+<h3 id="the-collector-holds-evidence-and-does-not-yet-manage-it">The collector holds evidence, and does not yet manage it</h3>
+<p>It persists, authenticates, and isolates one project from another — and one
+environment from another when a key is created with <code>--environment</code>. What it does
+not have is everything that happens <em>after</em> a finding arrives: no lifecycle
+(nothing is acknowledged, owned or resolved), no waivers, no audit log, no
+retention controls, and no restore-tested backup procedure. Its dashboard also
+only mounts on a collector that requires no key, because a browser has nowhere to
+put a bearer token.</p>
+<p>Read it as durable, safely shared storage for evidence. Do not yet read it as the
+place a team runs its triage.</p>
+<h3 id="rag-coverage-is-a-slice-not-a-story">RAG coverage is a slice, not a story</h3>
+<p><code>scenario.indirect_injection</code> tests the shape of retrieval-time injection through
+a scripted context. There is no live retriever target, so cross-tenant retrieval,
+document poisoning and tenant-filter bypass are <strong>not</strong> tested against your actual
+vector store. <strong>Application-awareness milestone.</strong></p>
+<h3 id="text-only">Text only</h3>
+<p>No image, PDF, audio or document carriers. Injection through an image or a PDF an
+agent reads is a real attack class and is <strong>not covered</strong>. <strong>v1.3.</strong></p>
+<h3 id="openai-compatible-is-not-a-guarantee">&quot;OpenAI-compatible&quot; is not a guarantee</h3>
+<p>Providers differ in system-message handling, tool-call formats, streaming, finish
+reasons and usage metadata. A rule that needs a capability a provider does not
+support is skipped and reported as skipped — never as a pass. Capability
+inspection that tells you this <em>before</em> a run is <strong>v0.7</strong>.</p>
+<h3 id="probabilistic-verdicts-have-probabilistic-limits">Probabilistic verdicts have probabilistic limits</h3>
+<p>A judge-graded verdict is a measurement with error. <code>guardana calibrate</code> reports
+Brier score and expected calibration error so you can see how much to trust it,
+and a policy can gate on confidence. A recorded calibration can go stale without
+anything noticing — re-measure after changing judge models.</p>
+<h3 id="plugins-are-code-you-install">Plugins are code you install</h3>
+<p>Entry-point discovery imports installed packages. A malicious Guardana pack is a
+malicious Python package, with everything that implies. <code>--no-plugins</code> disables
+discovery — but also the built-ins, which makes safe mode expensive. A plugin
+allowlist is <strong>v0.7</strong>; a declarative pack format that executes no Python is
+<strong>v1.0</strong>. See the <a href="threat-model.html">threat model</a>.</p>
+<h3 id="no-cost-estimation-yet">No cost estimation yet</h3>
+<p>A probe against a paid endpoint has no pre-flight estimate and no hard budget.
+<code>guardana plan</code> and <code>--max-requests</code>/<code>--max-cost</code>/<code>--max-duration</code> are <strong>v0.7</strong>.
+Until then, probe staging endpoints or ones you control the quota for.</p>
+<h2 id="what-guardana-deliberately-does-not-do">What Guardana deliberately does not do</h2>
+<ul>
+<li><strong>Inline blocking.</strong> It verifies and gates; it is never in the request path.</li>
+<li><strong>General code security.</strong> SAST, generic secrets and CVE scanning are well served
+elsewhere.</li>
+<li><strong>Compliance certification.</strong> The engine reports what it observed; mapping to a
+framework belongs in an extension, because frameworks change dates and wording
+and the engine must not age with someone else's calendar.</li>
+<li><strong>Attack volume for its own sake.</strong> Other tools send more attacks. Guardana's job
+is knowing which ones worked.</li>
+<li><strong>Autonomous attacks against production.</strong> Every active check is something you
+asked for, bounded by a policy you wrote.</li>
+</ul>
+<h2 id="how-to-read-a-guardana-result">How to read a Guardana result</h2>
+<p>Four channels, because &quot;nothing to report&quot; has four meanings:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Meaning</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>findings</code></td>
+<td>A check ran and found something</td>
+<td>Fix it, or waive it with a reason</td>
+</tr>
+<tr>
+<td><code>unverified</code></td>
+<td>A check ran and honestly could not reach a verdict</td>
+<td>Investigate why — a judge outage, an empty reply, a capability gap</td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td>A check <strong>never ran</strong></td>
+<td>Treat as a broken gate, not as a clean result</td>
+</tr>
+<tr>
+<td><code>coverage shortfall</code></td>
+<td>Evidence you <strong>demanded</strong> was not available — a dimension your policy requires, or one your security contract needs</td>
+<td>Instrument the producer, or stop demanding it. No <code>fail_on_*</code> setting makes this a pass</td>
+</tr>
+</tbody>
+</table></div>
+<p>A run that reports zero findings and three errors has not told you the system is
+clean. It has told you it could not look.</p>
+<h2 id="where-to-go-next">Where to go next</h2>
+<ul>
+<li><a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">Roadmap</a> — what is coming, in what order, with exit criteria</li>
+<li><a href="threat-model.html">Threat model</a> — what Guardana defends against and what it does not</li>
+<li><a href="safe-testing.html">Safe testing</a> — before you point it at anything that matters</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/FEATURES.md">Features</a> — everything that ships today</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/product-status.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

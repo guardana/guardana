@@ -1,3 +1,10 @@
+---
+title: "Exit codes"
+nav_order: 190
+summary: "the exit-status contract every command honours"
+status: stable
+---
+
 # Exit codes
 
 Machine consumers should never have to parse human output to find out what

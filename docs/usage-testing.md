@@ -1,3 +1,10 @@
+---
+title: "In your test suite"
+nav_order: 50
+summary: "`guardana.testing.assert_secure`: verification as an ordinary `pytest` assertion, plus the LangChain adapter"
+status: stable
+---
+
 # Guardana in your test suite
 
 `guardana.testing.assert_secure` runs Guardana from inside an ordinary `pytest`

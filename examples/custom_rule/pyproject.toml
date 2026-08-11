@@ -17,6 +17,9 @@ acme = "acme_rules:provide_evaluators"
 [project.entry-points."guardana.targets"]
 acme = "acme_rules:provide_targets"
 
+[project.entry-points."guardana.taxonomies"]
+acme = "acme_rules:provide_taxonomies"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

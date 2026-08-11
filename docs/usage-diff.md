@@ -1,3 +1,10 @@
+---
+title: "guardana diff"
+nav_order: 140
+summary: "`guardana diff`: compare two saved runs, fail on deterioration"
+status: stable
+---
+
 # `guardana diff` — is this worse than last time?
 
 `scan`, `probe` and `monitor` all answer *how is it now*. This one answers the

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana run — Guardana documentation</title>
+<meta name="description" content="guardana run inspect|migrate: reading a saved run and its manifest">
+<link rel="canonical" href="https://guardana.dev/docs/usage-run.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html" aria-current="page">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana run</code> — reading a saved run</h1><p class="lede"><code>guardana run inspect|migrate</code>: reading a saved run and its manifest</p><p>A run saved with <code>--output</code> is not just a list of findings. It carries a <strong>run
+manifest</strong>: what was examined, by which software, under which configuration and
+limits, at what cost, and how it was gated. That is what makes a run evidence
+rather than a screenshot — and what <code>guardana diff</code> compares.</p>
+<pre><code class="language-bash">guardana scan . --format json --output run.json
+guardana run inspect run.json
+</code></pre>
+<pre><code class="language-text">run 0191d4c2-8f1a-7c3e-9b21-6f0a2d8e4c11
+  started:   2026-08-02 09:14:02+00:00
+  completed: 2026-08-02 09:14:03+00:00
+  source:    ci (github)
+  guardana:  0.7.0
+  target:    artifact .
+  profile:   ci
+  gate:      pass
+  findings:  0 (0 unverified, 0 waived, 0 error(s))
+  rules run: 19 (0 skipped)
+  requests:  0
+  tokens:    in not recorded, out not recorded
+  wall time: 0.42
+  evidence:  full
+</code></pre>
+<p><code>--format json</code> prints the manifest itself, for anything that would rather parse
+than read.</p>
+<p><code>requests: 0</code> above is a <strong>measurement</strong> — a file scan sends nothing. Tokens are
+<code>not recorded</code> because there was no model to report them. The next section is
+about why those two are printed differently.</p>
+<h2 id="what-a-run-costs">What a run costs</h2>
+<p><code>usage</code> carries what the run actually spent: requests sent, tokens in and out,
+and wall time.</p>
+<p>The counting happens on the <strong>target</strong>, not on the transport, so every request to
+a model is counted whatever transport is in use — a custom adapter, a scripted
+double in a test, or one of the built-ins. A target that does not meter itself
+(anything you wrote yourself, unless you override <code>Target.usage()</code>) reports
+nothing rather than zero.</p>
+<p>Token counts depend on the provider. The built-in OpenAI, Ollama and TGI paths
+read them from the response; a transport that does not implement the optional
+<code>UsageReportingTransport</code> protocol leaves them unknown. Where only <em>some</em>
+requests reported tokens, the manifest carries the sum <strong>and</strong>
+<code>requests_missing_token_counts</code>, so the number is never mistaken for the whole
+bill. See <a href="writing-rules.html"><code>docs/writing-rules.md</code></a> for the protocol.</p>
+<h2 id="what-not-recorded-means">What &quot;not recorded&quot; means</h2>
+<p>It means <strong>nobody measured this</strong>, and it is deliberately not printed as <code>0</code>.
+A file scan that sends zero requests and a run from a version that never counted
+requests are different facts; only one of them lets you budget the next run. The
+same distinction runs through the whole document: <code>null</code> is always &quot;not known&quot;,
+never &quot;not applicable&quot; and never zero.</p>
+<h2 id="what-a-run-could-check">What a run could check</h2>
+<p><code>coverage</code> is the other half of the promise <code>rules_run</code> started. A run whose corpus
+was trimmed, whose evaluator stopped being installed, whose target lost a capability
+or whose MCP server answered an older protocol revision reports fewer findings — and
+subtracting two lists reads every one of those as an improvement.</p>
+<p>So the manifest carries one fingerprint over all of it, plus the framework
+catalogues that were installed, each pinned by digest. That is what lets a report be
+read years later without asking which edition of a framework was in use: <code>LLM07</code>
+means System Prompt Leakage in <code>OWASP-LLM-2025</code> and Misinformation in
+<code>OWASP-LLM-2026</code>, and the run says which one it held. <code>guardana diff</code> compares the
+fingerprint and reports a difference as <em>the reach changed</em>, separately from what
+was found. A run that recorded none is reported as <strong>unknown reach</strong>, never as equal
+reach.</p>
+<h2 id="older-runs-still-load">Older runs still load</h2>
+<p>A run written by 0.6 uses schema version 1, and one written by 0.12 uses version 2.
+<code>guardana diff</code> and <code>guardana run inspect</code> <strong>migrate them forward in memory</strong> as they
+read them, one step at a time, so upgrading Guardana does not strand the evidence you
+already have.</p>
+<p>What an older version never recorded arrives as an explicit unknown rather than as a
+default — version 1 has no usage, no execution settings and <strong>no gate verdict</strong>;
+version 2 has no coverage fingerprint and no declared trial counts; version 3 could not
+name a <code>trace</code> target, because that kind did not exist. Recomputing any
+of them during migration would apply today's build to another build's run, which is
+exactly what storing them as fields exists to prevent. <code>inspect</code> says so at the
+bottom of its output, and <code>diff</code> adds a note.</p>
+<p>One thing <em>is</em> recovered: the <strong>title</strong> of a framework reference, which version 3
+onward records beside its framework and id. It is looked up from the installed catalogue for
+the exact <code>(framework, id)</code> pair the document already carries, so nothing is guessed
+and no reference is remapped — a <code>LLM07</code> recorded under <code>OWASP-LLM-2025</code> stays System
+Prompt Leakage. A reference from a rule pack this build does not have stays
+titleless, because nothing here knows what it was called.</p>
+<p>To rewrite an old file on disk at the current schema:</p>
+<pre><code class="language-bash">guardana run migrate old-run.json --output new-run.json
+guardana run migrate old-run.json          # in place
+</code></pre>
+<p>This is a convenience, not a requirement. Nothing needs migrating to be compared.</p>
+<p><strong>A migration that cannot carry a field refuses, and writes nothing.</strong> The
+default destination is the file itself, so a half-done migration would overwrite
+the only copy of the evidence. In 0.7.0 a version-1 run that never recorded its
+target kind was migrated into the literal string <code>&quot;None&quot;</code> — a document that fails
+this schema, written over the original, with exit <code>0</code>. Every unit test around
+migration passed, because they asserted on the objects the migration loaded and
+the objects were fine; what was published was the file. There is now a test that
+validates the <em>artifact</em>, parametrised over every field a version-1 run could be
+missing.</p>
+<h2 id="the-document">The document</h2>
+<p>The saved-run schema lives at
+<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v5.schema.json"><code>schemas/run-v5.schema.json</code></a>, identified by
+<code>https://guardana.dev/schemas/run/v5.schema.json</code>. The version is in the
+identifier, so a consumer can tell which contract it is holding before parsing
+anything; it changes whenever the change is not backwards-compatible. A test
+validates what Guardana writes against that file, so the schema cannot drift
+away from the tool.</p>
+<p>Every superseded version stays published — <code>run-v2</code> and <code>run-v3</code> are still in
+<a href="https://github.com/guardana/guardana/tree/main/schemas"><code>schemas/</code></a> — because a saved run has to keep validating against the schema
+it was written to. Version 4 exists for one reason: it permits a <code>trace</code> target kind.
+Widening version 3's enum in place was the alternative, and it would have changed a
+contract under a name that promised it had not.</p>
+<p>Top level:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema_version</code></td>
+<td><code>5</code>. Stated once, for the whole document.</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td>the manifest — everything below</td>
+</tr>
+<tr>
+<td><code>findings</code> / <code>unverified</code> / <code>waived</code> / <code>errors</code> / <code>observations</code></td>
+<td>the channels</td>
+</tr>
+</tbody>
+</table></div>
+<p>Inside <code>run</code>:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code>, <code>created_at</code>, <code>started_at</code>, <code>completed_at</code></td>
+<td>which run is this, and when</td>
+</tr>
+<tr>
+<td><code>migrated_from</code></td>
+<td>which older schema it came from, or <code>null</code></td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>who started it — a laptop, CI, a schedule</td>
+</tr>
+<tr>
+<td><code>guardana</code></td>
+<td>which software produced it</td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td>what was examined, with a fingerprint and the fields that fingerprint covers</td>
+</tr>
+<tr>
+<td><code>deployment</code></td>
+<td>which deployment of which AI system this verifies</td>
+</tr>
+<tr>
+<td><code>configuration</code></td>
+<td>which settings produced it, <strong>by digest</strong></td>
+</tr>
+<tr>
+<td><code>execution</code></td>
+<td>what limits it ran under</td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td>what it actually consumed</td>
+</tr>
+<tr>
+<td><code>rules</code> / <code>evaluators</code></td>
+<td>what did the checking, with digests, declared trial counts and calibration</td>
+</tr>
+<tr>
+<td><code>coverage</code></td>
+<td>what the run was <em>able</em> to check: one fingerprint, the framework catalogues it mapped against by digest, and any protocol versions the target negotiated</td>
+</tr>
+<tr>
+<td><code>result_summary</code></td>
+<td>the counts, the gate, and whether the run was cut short</td>
+</tr>
+<tr>
+<td><code>privacy</code></td>
+<td>which evidence policy was in force</td>
+</tr>
+</tbody>
+</table></div>
+<p>Three conventions hold everywhere in it:</p>
+<p><strong>Timestamps are UTC, RFC 3339.</strong> A local-time timestamp in an evidence record is
+a bug waiting for a timezone.</p>
+<p><strong>Digests name their algorithm</strong> — <code>sha256:…</code>, never a bare hex string, so a
+digest can be migrated when the algorithm moves.</p>
+<p><strong>The target fingerprint says what it covers.</strong> <code>target.fingerprint_inputs</code> lists
+the fields the digest was computed from. A digest of a URL and a model name
+identifies a <em>declared</em> target; it attests nothing about the weights behind it,
+and the document says so rather than leaving a reader to assume the stronger
+reading.</p>
+<h2 id="field-names-borrowed-on-purpose">Field names borrowed on purpose</h2>
+<p><code>usage.input_tokens</code> and <code>usage.output_tokens</code> are the OpenTelemetry GenAI
+convention's <a href="https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/"><code>gen_ai.usage.input_tokens</code> /
+<code>gen_ai.usage.output_tokens</code></a>
+without the namespace; <code>execution.seed</code> and <code>execution.temperature</code> match
+<code>gen_ai.request.*</code>. If you already collect those, the manifest needs no
+translation.</p>
+<p>The SARIF output carries the same facts in SARIF's own vocabulary: <code>runs[].invocations[0]</code>
+with <code>startTimeUtc</code>, <code>endTimeUtc</code>, <code>exitCode</code>, <code>exitCodeDescription</code> and
+<code>executionSuccessful</code>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="usage-diff.html"><code>usage-diff.md</code></a> — comparing two saved runs</li>
+<li><a href="usage-scan.html"><code>usage-scan.md</code></a> and <a href="usage-probe.html"><code>usage-probe.md</code></a> — producing them</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-run.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP authorization depth — Guardana documentation</title>
+<meta name="description" content="what a live MCP server&#x27;s authorization surface can be asked with one credential">
+<link rel="canonical" href="https://guardana.dev/docs/design/mcp-authorization-depth.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html" aria-current="page">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>MCP in depth: what a client can prove about a server it does not run<span class="status accepted">accepted</span></h1><p class="lede">what a live MCP server's authorization surface can be asked with one credential</p><p><strong>Status:</strong> accepted, implemented — ships in the next release · <strong>Written:</strong> 2026-08-09 · <strong>Step two</strong></p>
+<h2 id="the-problem-stated-precisely">The problem, stated precisely</h2>
+<p>Guardana has spoken to a live MCP server since 0.5, and what it says to one is
+<code>initialize</code> followed by <code>tools/list</code>. That reads the manifest — the text an
+agent's model is handed as trusted context — and compares it against a pin. It is
+a real check and it catches a real attack, and it is also the <em>only</em> thing
+Guardana knows how to ask.</p>
+<p>Everything an MCP deployment gets wrong in production sits one layer below the
+manifest. A server accepts a token minted for a different service. A session id
+is a counter. A proxy forwards the client's credential to an API that reads it as
+its own. The scopes on offer are <code>*</code>. None of that is visible in a tool
+description, and none of it is covered by anything Guardana ships.</p>
+<p>Two things make this the right work to do now rather than later:</p>
+<ul>
+<li><strong>The controls are settled.</strong> OAuth 2.1, PKCE, audience-bound tokens, no token
+passthrough. These are <code>MUST</code>s in a published specification, not a research
+position, and they did not move between the two most recent revisions.</li>
+<li><strong>The target already exists.</strong> <code>McpServerTarget</code> connects, negotiates and
+reports what it negotiated. This is depth on something Guardana has, not a new
+kind of thing to build.</li>
+</ul>
+<p>It also has to happen before the domain model, because identity, delegation,
+consent and approval are exactly the fields <code>Trace</code> will freeze at 1.0, and
+principle 14 says the model lands after the domain is met rather than before.
+Meeting them here is the point.</p>
+<p><strong>What this is not:</strong> a scanner that counts CVEs against MCP server versions.
+That is a listed non-goal, it ages badly, and it is well served elsewhere. Every
+finding below is <em>this invariant does not hold on the server in front of you</em>.</p>
+<h2 id="the-honesty-boundary-decided-first">The honesty boundary, decided first</h2>
+<p>The most important decision in this document is not which checks to write. It is
+which claims a client is entitled to make, because an MCP client sees one side of
+a two-sided protocol and most of the interesting failures happen on the other.</p>
+<p>Three categories, and every check below is placed in one of them explicitly.</p>
+<p><strong>Observable.</strong> The server's answer settles the question. A server that returns a
+tool list to a request carrying no credential requires no credential; there is
+nothing further to establish.</p>
+<p><strong>Observable in one direction only.</strong> The failure is provable, the success is
+not. Presenting a token this server cannot have issued and getting a <code>200</code> proves
+the token was not validated. Getting a <code>401</code> proves only that <em>this</em> token was
+rejected — it says nothing about a correctly signed token minted for a different
+audience, which is the attack. So the rule's title carries the narrow claim it
+actually tests, and its silence means only that the narrow claim held.</p>
+<p><strong>Not observable.</strong> Token passthrough happens between the MCP server and an
+upstream API. A client watching the server's replies cannot see it, and no
+sequence of requests makes it visible. A check here would be a guess wearing a
+verdict's clothes, so there is no check here — there is a documented gap.</p>
+<p>The rule this produces, and it governs the whole file: <strong>a check that lands in
+the second category never reports a pass; it reports nothing found and says what
+it looked at.</strong> A check with no observable form is deferred in writing rather
+than approximated.</p>
+<h3 id="the-trap-this-avoids-named">The trap this avoids, named</h3>
+<p>A server that requires no authentication at all will reject nothing, because
+there is nothing to reject. Run the audience check against it and it answers
+every request happily — which is not evidence of missing audience validation,
+because there is no audience to validate against.</p>
+<p>Read carelessly, that produces a critical finding on every unauthenticated
+development server. Read carelessly the other way — &quot;it answered, so it must be
+fine&quot; — it produces a pass on a server nobody authenticated. The correct answer
+is neither: when the unauthenticated probe already succeeded, the audience check
+is <strong>inconclusive</strong>, and the missing-authentication rule is the one that speaks.</p>
+<h2 id="the-decision-the-target-observes-the-rule-judges">The decision: the target observes, the rule judges</h2>
+<p><code>McpServerTarget</code> gains one new observation method. It performs the probes once
+per run, caches them, and returns plain data. The rules read that data and decide
+what it means.</p>
+<pre><code class="language-python">class McpServerTarget(Target):
+    def list_tools(self) -&gt; tuple[McpTool, ...]: ...          # today
+    def authorization(self) -&gt; McpAuthorizationView: ...      # new, cached
+</code></pre>
+<p>Two reasons, both structural.</p>
+<p><strong>Cost grows with the target, not the rule count</strong> (principle 2). Six rules
+asking six times would send six handshakes. One cached observation is one
+handshake, and adding a seventh rule that reads it costs nothing.</p>
+<p><strong>Protocol knowledge belongs in a target; judgement belongs in a rule.</strong> How to
+find a Protected Resource Metadata document is a fact about MCP, the same kind of
+fact as how to phrase an Ollama chat request — and <code>EndpointTarget</code> has held that
+kind of knowledge since 0.1. Whether a <code>scopes_supported</code> list is too broad is a
+security opinion, and opinions live in rules where a profile can exclude them and
+a taxonomy mapping can answer for them.</p>
+<p><code>McpAuthorizationView</code> is a record of observations, never of conclusions: the
+status and headers of an unauthenticated request, the metadata documents as
+fetched, the session ids collected, the status of the request that carried a
+foreign token. No field on it is named after a vulnerability.</p>
+<h3 id="the-capability-and-why-stdio-must-skip-rather-than-pass">The capability, and why stdio must skip rather than pass</h3>
+<p>The authorization specification says, in as many words, that implementations
+using an stdio transport <strong>SHOULD NOT</strong> follow it and should take credentials
+from the environment instead. An stdio server has no HTTP status, no
+<code>WWW-Authenticate</code> header and no session id, and grading one against rules
+written for OAuth would be grading a bicycle on its emissions.</p>
+<p>So a new capability, <code>INSPECT_AUTHORIZATION</code>, is declared <strong>only by an MCP target
+speaking streamable HTTP</strong>. Against an stdio server the six rules below are
+skipped by the runner, each carrying its reason, and <code>fail_on.fail_on_skipped</code>
+turns that coverage hole into an indeterminate result for anyone who wants it
+that way. What must not happen is the alternative: six rules finding nothing on a
+target they could not examine, and a report that reads clean.</p>
+<h2 id="the-six-invariants">The six invariants</h2>
+<p>Each one names the requirement it tests, what makes it fire, and — the part that
+matters more — what makes it decline to answer.</p>
+<h3 id="1-guardanamcpunauthenticated_access">1. <code>guardana.mcp.unauthenticated_access</code></h3>
+<p><em>The server answers a tool listing presented with no credential.</em></p>
+<p>Authorization is <code>OPTIONAL</code> in MCP, so this is not a specification violation on
+its own; it is a fact about a deployment, and it is the fact every other check
+here depends on. Severity follows reachability: a server on a loopback address is
+reported at <code>low</code> with that stated, because an unauthenticated server on
+<code>127.0.0.1</code> is how everybody develops, and crying <code>high</code> at it teaches people to
+ignore the rule. A server on a routable address that hands its tool manifest to
+an anonymous caller is <code>high</code>.</p>
+<p>Declines to answer: never. This one is always observable.</p>
+<h3 id="2-guardanamcpauthorization_discovery">2. <code>guardana.mcp.authorization_discovery</code></h3>
+<p><em>A protected server does not publish an authorization surface a conforming client
+can use.</em></p>
+<p>Four <code>MUST</code>s from the specification, checked in order:</p>
+<ul>
+<li>MCP servers <strong>MUST</strong> implement OAuth 2.0 Protected Resource Metadata
+(<a href="https://datatracker.ietf.org/doc/html/rfc9728">RFC 9728</a>), and <strong>MUST</strong>
+publish it either through <code>resource_metadata</code> in the <code>WWW-Authenticate</code> header
+of a <code>401</code> or at the well-known URI.</li>
+<li>The metadata document <strong>MUST</strong> include <code>authorization_servers</code> with at least
+one entry.</li>
+<li>The document's <code>resource</code> <strong>MUST</strong> be the canonical URI of this server. A
+document naming somebody else's resource makes audience binding decorative:
+clients will request tokens for the wrong audience, correctly.</li>
+<li>The authorization server's metadata <strong>MUST</strong> advertise
+<code>code_challenge_methods_supported</code>; the specification says a client that does
+not find it <strong>MUST refuse to proceed</strong>, so a deployment missing it is one no
+conforming client can use.</li>
+</ul>
+<p>Declines to answer: when the server needed no credential (rule 1 fired), there is
+no protected resource and this rule reports nothing. When a metadata document
+could not be fetched — a timeout, a body that is not JSON — the finding is
+<code>inconclusive</code> naming the address, never a clean surface.</p>
+<h3 id="3-guardanamcptoken_audience">3. <code>guardana.mcp.token_audience</code></h3>
+<p><em>The server answers a request bearing a token it could not have issued.</em></p>
+<blockquote>
+<p>MCP servers <strong>MUST</strong> validate that access tokens were issued specifically for
+them as the intended audience […] MCP servers <strong>MUST</strong> only accept tokens
+specifically intended for themselves and <strong>MUST</strong> reject tokens that do not
+include them in the audience claim.</p>
+</blockquote>
+<p>Guardana presents a token that is unmistakably not a credential: an unsigned JWT
+whose audience and issuer both name <code>https://guardana.invalid/</code>, whose subject is
+<code>guardana-probe</code>, and whose signature segment says so in words. If the server
+answers a <code>tools/list</code> with it, it validated nothing.</p>
+<p>This is the one-directional case named above, and the rule is titled for what it
+proves. Silence means the server rejected <em>this</em> token. It is not a certificate
+of audience validation, the documentation says so, and no report will imply
+otherwise.</p>
+<p>Declines to answer: <code>inconclusive</code> when the unauthenticated probe already
+succeeded, because a server that accepts everything cannot demonstrate anything
+about tokens.</p>
+<h3 id="4-guardanamcpsession_binding">4. <code>guardana.mcp.session_binding</code></h3>
+<p><em>The session id is predictable, or the session is accepted as authentication.</em></p>
+<blockquote>
+<p>MCP servers that implement authorization <strong>MUST</strong> verify all inbound requests.
+MCP Servers <strong>MUST NOT</strong> use sessions for authentication. […] MCP servers
+<strong>MUST</strong> use secure, non-deterministic session IDs.</p>
+</blockquote>
+<p>Two observations, one rule, because they are two halves of one property — who
+this connection belongs to.</p>
+<p><em>Predictability</em> is measured over a handful of handshakes: ids that increment,
+ids that share a long common prefix and differ in a counter, ids short enough to
+enumerate. Nothing here is a randomness test — a scanner claiming to measure
+entropy from four samples would be inventing a number — it looks for structure,
+and it says which structure it found.</p>
+<p><em>Session as authentication</em> needs a credential, and it is the reason
+<code>--mcp-token-env</code> exists. Establish a session with the operator's credential,
+then send one request carrying the session id and <strong>not</strong> the credential. A
+server that answers is authenticating by session, which the specification
+forbids in a sentence.</p>
+<p>Declines to answer: without a credential the second half is <code>inconclusive</code> and
+says which flag would settle it. On a server that issues no session id at all,
+both halves report nothing and the evidence says the server is stateless.</p>
+<h3 id="5-guardanamcpscope_breadth">5. <code>guardana.mcp.scope_breadth</code></h3>
+<p><em>The advertised scopes cannot express least privilege.</em></p>
+<p>The specification's own list of common mistakes includes publishing every
+possible scope in <code>scopes_supported</code> and using wildcard or omnibus scopes — <code>*</code>,
+<code>all</code>, <code>full-access</code>. A token minted against those has a blast radius equal to
+the whole server, and revoking it costs the user every workflow at once. Also
+checked: a <code>401</code> that carries no <code>scope</code> parameter, which the specification
+<code>SHOULD</code>s and which is what lets a client ask for less than everything.</p>
+<p>Declines to answer: no metadata, nothing to read, nothing reported.</p>
+<h3 id="6-guardanamcpdiscovery_target">6. <code>guardana.mcp.discovery_target</code></h3>
+<p><em>The server points its client at an address a client must not follow.</em></p>
+<p>Discovery is the one place in MCP where the server hands the client a URL and the
+client fetches it. The specification devotes a section to what that enables:
+cloud metadata endpoints at <code>169.254.169.254</code>, internal services on loopback
+ports, <code>javascript:</code> and <code>file:</code> schemes where a URL is opened rather than
+fetched, plain <code>http://</code> for an authorization server that <strong>MUST</strong> be HTTPS.</p>
+<p>This rule is the one that also protects Guardana. The check and the guard are the
+same code path: the target refuses to fetch a discovery URL that is not
+<code>https://</code> (or loopback <code>http://</code>), that resolves into a private, loopback or
+link-local range, or that carries a scheme a client must reject — and the refusal
+<em>is</em> the finding. A scanner that followed the URL to prove it was dangerous would
+be the confused deputy it is looking for.</p>
+<h2 id="the-catalogue-owasp-mcp-top-10-as-data">The catalogue: OWASP MCP Top 10 as data</h2>
+<p>OWASP publishes an <a href="https://owasp.org/www-project-mcp-top-10/">MCP Top 10</a>,
+currently at <strong>v0.1, Phase 3 — Beta Release and Pilot Testing</strong>, with the next
+revision expected in October 2026. Its entries carry the edition in their own
+identifiers — <code>MCP01:2025</code> — which is exactly the identity model step one landed,
+so it registers as a seventh catalogue file and nothing in the engine changes:</p>
+<pre><code class="language-yaml">scheme: OWASP-MCP
+edition: &quot;2025&quot;
+version: &quot;0.1&quot;
+title: OWASP MCP Top 10 (beta)
+source: https://owasp.org/www-project-mcp-top-10/
+</code></pre>
+<p>A beta document is one that moves, and <code>version</code> plus the catalogue digest is how
+a run says which revision it was mapped against. When v0.2 renames an entry — and
+MCP06 has already been rendered two ways in two places OWASP publishes — it is a
+new catalogue file, not an edit, because the old digest is pinned in saved runs.</p>
+<p><code>test_every_catalogue_carries_a_digest_over_its_content</code> pins the installed set,
+so it grows from six frameworks to seven. That edit is the point of the test:
+adding a framework is a decision somebody makes on purpose.</p>
+<h3 id="rejected-a-crosswalk-from-mcp-entries-to-llm-and-asi-entries">Rejected: a crosswalk from MCP entries to LLM and ASI entries</h3>
+<p>Tempting, because <code>MCP03 Tool Poisoning</code> and <code>ASI04 Agentic Supply Chain</code> clearly
+overlap. Rejected on two grounds. The mechanism is spelled <code>supersedes</code> and means
+<em>this edition relative to an earlier edition of the same scheme</em>; pointing it at
+another framework would overload one field with two meanings. And the
+relationship between two frameworks' categories is a mapping opinion that changes
+per rule — the honest expression of it already exists and is used everywhere
+else: a rule carries both references.</p>
+<h2 id="the-manifest-pin-grows-to-the-whole-declaration">The manifest pin grows to the whole declaration</h2>
+<p>Today's pin digests each tool's <code>description</code>. A server can therefore change a
+tool's <code>inputSchema</code> — add a parameter, widen an enum, rewrite a property
+description that the model reads as instruction — and the pin stays green. Schema
+drift beyond the pinned manifest is on the roadmap for exactly this reason.</p>
+<p><code>McpTool</code> gains the rest of the declaration (<code>title</code>, <code>inputSchema</code>,
+<code>outputSchema</code>, <code>annotations</code>), the digest covers all of it, and the marker scan
+that today reads descriptions reads property descriptions too — a hidden
+instruction is a hidden instruction wherever the model will read it.</p>
+<p><strong>Pin schema v1 → v2, and a v1 pin keeps working while saying what it covers.</strong>
+This is principle 11 and principle 10 meeting in one file. A v1 pin holds
+description digests only; a v2 build that read it and reported &quot;no drift&quot; would be
+claiming coverage the document cannot support. So a v1 pin compares descriptions,
+and every run that uses one carries a note saying schemas are not covered and
+which command re-approves it. Refusing to read v1 at all was the alternative and
+is worse: it breaks a working setup at upgrade time, which teaches people to pin
+the old version.</p>
+<h2 id="cost-the-meter-counts-what-actually-went-out">Cost: the meter counts what actually went out</h2>
+<p>One MCP session makes two JSON-RPC calls, <code>initialize</code> and <code>tools/list</code>. The
+meter records one. Measured, not inferred:</p>
+<pre><code>JSON-RPC calls actually made: ['initialize', 'tools/list']
+requests the meter reports: 1
+</code></pre>
+<p><code>McpServerTarget</code> also never overrode <code>apply_budgets</code>, so the base class refuses
+any ceiling — which means <code>probe --mcp --max-requests 5</code> does not overspend
+today, it refuses to start. That is the fail-closed direction and it was fine
+while a run cost two calls that nobody would budget.</p>
+<p>It stops being fine here. The observations above add an unauthenticated probe, up
+to three metadata fetches, a foreign-token probe and several handshakes, and a
+ceiling has to mean something. So metering moves into the transport seam: every
+JSON-RPC call and every metadata fetch reserves before it is sent and records
+after it returns, <code>apply_budgets</code> is implemented, and <code>--max-requests 5</code> sends
+five requests and never six. The same defect and the same fix as
+<code>probe --max-requests 5</code> sending ten, which 0.12 corrected on the chat path.</p>
+<h2 id="credentials-redaction-and-what-guardana-never-does">Credentials, redaction, and what Guardana never does</h2>
+<p><code>--mcp-token-env NAME</code> reads the credential from the environment, never from the
+command line, for the reason <code>--api-key-env</code> already exists: an argument is in
+every process list on the machine. Only <code>Authorization: Bearer</code> is supported,
+because that is what the specification requires of a conforming client; a server
+using a bespoke header is not doing MCP authorization, and supporting it is a
+separate decision rather than a convenience.</p>
+<p>The credential is a secret and goes nowhere near a report. Evidence records
+whether a credential was presented and what the server answered — never the
+value, at any privacy level, on the same seam that removes secrets from every
+other channel.</p>
+<p><strong>Guardana never calls a tool on an MCP server.</strong> Every observation in this
+document is made with <code>initialize</code>, <code>tools/list</code>, and unauthenticated <code>GET</code>s of
+metadata documents. Calling a tool is a side effect on somebody's system —
+possibly a write, possibly a payment — and no verification result is worth
+finding that out by experiment.</p>
+<h2 id="rejected-options">Rejected options</h2>
+<p><strong>Taking the official MCP SDK.</strong> It would supply the authorization flow whole.
+Rejected for the reason the client is hand-rolled in the first place: a security
+scanner's dependency tree is part of its own attack surface, and principle 6 puts
+a new dependency in front of a justification rather than a green CI. What the
+checks need is a handful of HTTP requests and a JSON parser.</p>
+<p><strong>Completing an OAuth flow to obtain a real token.</strong> It would turn the
+one-directional audience check into a two-directional one. It requires a browser,
+a user, a consent screen and a redirect listener, all inside a tool that runs in
+CI with no human present — and the token it produced would be a real credential
+in a scanner's memory. The one-directional check plus a stated limit is worth
+more than a flow nobody can run unattended.</p>
+<p><strong>Registering a client on the advertised authorization server</strong> to test
+<code>redirect_uri</code> validation and the confused-deputy preconditions. It is the only
+way to test them, and it is a <em>write to a third party's system</em> performed by a
+tool whose whole proposition is that it is safe to point at production.</p>
+<p><strong>A rule per specification <code>MUST</code>.</strong> Fourteen rules, most firing together on the
+same misconfiguration, each needing its own triage decision. The six above are
+grouped by the question an operator answers, not by the sentence in the document.</p>
+<h2 id="deliberately-deferred-with-the-reason">Deliberately deferred, with the reason</h2>
+<p>Each of these is in scope for step two on the roadmap and is not built. Each is
+deferred because the honest version of it cannot be produced, not because it is
+large — and each leaves a stated gap rather than a silent one.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Deferred</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Token passthrough to an upstream API</strong></td>
+<td>It happens between the server and a service Guardana is not talking to. No sequence of client requests makes it observable. Accepting a foreign-audience token is its precondition and <em>is</em> checked; the passthrough itself needs the trace work</td>
+</tr>
+<tr>
+<td><strong>Confused deputy, in full</strong></td>
+<td>The preconditions — a static client id toward a third party, per-client consent storage — live on the server's back side. The only client-side proof requires registering a client on somebody's authorization server, which is a write to a third party. The observable slice (PKCE, discovery targets, scope breadth) is built</td>
+</tr>
+<tr>
+<td><strong>Sampling misuse</strong></td>
+<td>A server that abuses <code>sampling/createMessage</code> issues a request <em>to the client</em>, over a stream the client holds open and answers. Guardana's client sends a request and reads a reply. Changing that is a transport-contract change third-party transports implement — the same reason <code>finish_reason</code> was deferred out of step one, and worth doing beside the trace work rather than as a passenger here</td>
+</tr>
+<tr>
+<td><strong>Multi-user data isolation</strong></td>
+<td>Proving user A's session cannot reach user B's data needs two credentials <em>and</em> knowledge of which data belongs to whom. Guardana has neither and cannot ask for the second. The one-credential half — a session accepted as authentication — is a specification <code>MUST NOT</code> and is built</td>
+</tr>
+<tr>
+<td><strong>Shadow servers (<code>MCP09</code>)</strong></td>
+<td>Finding MCP servers nobody registered is a discovery problem on a network, not a verification problem on a target. Guardana verifies what it is pointed at</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="what-this-teaches-the-domain-model">What this teaches the domain model</h2>
+<p>Principle 14 says <code>Trace</code> lands before 1.0 freezes anything, and step two comes
+first so the model is shaped by fields that were met rather than imagined. Four
+of them showed up here, and each arrived with a distinction that a naive schema
+would have flattened:</p>
+<ul>
+<li><strong>Identity is not one field.</strong> There is the credential the client presented,
+the audience the token names, and the resource the server claims to be. The
+interesting failures are precisely where those three disagree.</li>
+<li><strong>Delegation has a direction and a boundary.</strong> The token a server receives and
+the token it uses upstream are different tokens, and a model with one
+<code>credential</code> field per call cannot represent the failure where they are the
+same one.</li>
+<li><strong>Consent is per client, not per user.</strong> The confused-deputy attack works
+because a consent decision recorded against a user was read as a decision about
+a client.</li>
+<li><strong>A session is not an identity</strong>, and a model that lets a session id stand in
+for one bakes in the thing the specification forbids.</li>
+</ul>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="taxonomy-editions.html"><code>taxonomy-editions.md</code></a> — the identity model the MCP
+catalogue registers under, and why its edition is part of its name.</li>
+<li><a href="../usage-probe.html"><code>../usage-probe.md</code></a> — how an operator runs this.</li>
+<li><a href="../safe-testing.html"><code>../safe-testing.md</code></a> — impact levels, and why nothing
+here calls a tool.</li>
+<li><code>ROADMAP.md</code>, <em>Step two — MCP, in depth</em>.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/mcp-authorization-depth.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

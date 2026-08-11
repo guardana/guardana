@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profiles — guardana.yaml — Guardana documentation</title>
+<meta name="description" content="the guardana.yaml policy file: which rules run, what fails the build">
+<link rel="canonical" href="https://guardana.dev/docs/profiles.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html" aria-current="page">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Profiles — <code>guardana.yaml</code></h1><p class="lede">the <code>guardana.yaml</code> policy file: which rules run, what fails the build</p><p>A profile is a YAML file that picks which rules run and what makes the run
+fail. Every command that runs the engine (<code>scan</code>, <code>probe</code>, <code>monitor</code>) takes
+one via <code>--profile PATH</code>; without it, a built-in default profile applies
+(<code>include: [&quot;*&quot;]</code>, <code>fail_on.severity: high</code>, <code>fail_on.min_confidence: 0.0</code>).</p>
+<p>Generate a starter file:</p>
+<pre><code class="language-bash">guardana init                # writes ./guardana.yaml
+guardana init my-profile.yaml
+</code></pre>
+<p><code>init</code>'s template:</p>
+<pre><code class="language-yaml">name: default
+rules:
+  include: [&quot;guardana.*&quot;]
+fail_on:
+  severity: high
+  min_confidence: 0.0
+</code></pre>
+<h2 id="full-schema">Full schema</h2>
+<pre><code class="language-yaml">name: pre-deploy               # free-form label, shown nowhere but reports/logs
+
+rules:
+  include: [&quot;guardana.*&quot;, &quot;acme.*&quot;]   # glob patterns; rule matches if it matches
+                                      # any include AND no exclude
+  exclude: [&quot;guardana.output.*&quot;]     # optional; defaults to []
+  paths: [&quot;./team-rules&quot;]            # optional; directories/files of custom
+                                      # YAML rules to load — see writing-rules.md
+  paths_exclude: [&quot;data/*&quot;, &quot;archive&quot;]  # optional; globs (matched relative to the
+                                         # scan root) of files/dirs to skip. A
+                                         # `.guardanaignore` file at the root adds
+                                         # more, one glob per line.
+
+fail_on:
+  severity: high                # one of: info | low | medium | high | critical
+                                 # (case-insensitive); defaults to &quot;high&quot;
+  min_confidence: 0.7           # 0.0-1.0; defaults to 0.0
+  fail_on_inconclusive: false   # true: unverified checks also fail the gate
+  fail_on_error: true           # false: a check that could not run stops blocking
+
+trace:                          # only ever governs `analyze-trace` / `trace inspect`
+  require: [identity, approval, effects]   # optional; evidence this run demands. A
+                                            # producer that does not record one of
+                                            # these makes the run indeterminate —
+                                            # with no fail_on_* in front of it
+
+contracts:                      # optional; security contracts to load, files or
+  - ./contracts/checkout.yaml   # directories — see usage-contracts.md
+
+evaluators:                     # config-wired evaluators — see the section below
+  llm_judge:
+    endpoint: &quot;http://localhost:11434&quot;   # any OpenAI-compatible server
+    model: &quot;llama3&quot;
+    api_key_env: &quot;JUDGE_API_KEY&quot;         # optional; env var holding the key
+    prompt_version: &quot;2025.1&quot;             # optional; versioned judging rubric
+    min_agreement: 3                     # optional; samples per verdict (default 1)
+  guard:                                 # optional safety-classifier evaluator
+    endpoint: &quot;http://localhost:8000&quot;
+    model: &quot;llama-guard-3&quot;
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>string</td>
+<td><code>&quot;custom&quot;</code></td>
+<td>A label for the profile (informational only)</td>
+</tr>
+<tr>
+<td><code>rules.include</code></td>
+<td>list of glob patterns</td>
+<td><code>[&quot;*&quot;]</code></td>
+<td>A rule's <code>id</code> must match at least one pattern here to run</td>
+</tr>
+<tr>
+<td><code>rules.exclude</code></td>
+<td>list of glob patterns</td>
+<td><code>[]</code></td>
+<td>A rule's <code>id</code> matching any of these is dropped, even if included</td>
+</tr>
+<tr>
+<td><code>rules.paths</code></td>
+<td>list of paths</td>
+<td><code>[]</code></td>
+<td>Directories (or single files) of custom declarative YAML rules to load, in addition to anything passed via the repeatable <code>--rules PATH</code> flag on <code>scan</code>/<code>probe</code>/<code>monitor</code>. A malformed rule file is reported as a warning and skipped — it never aborts the run. See <a href="writing-rules.html"><code>writing-rules.md</code></a>.</td>
+</tr>
+<tr>
+<td><code>fail_on.severity</code></td>
+<td><code>info|low|medium|high|critical</code></td>
+<td><code>high</code></td>
+<td>The minimum severity a finding needs to be eligible to fail the gate</td>
+</tr>
+<tr>
+<td><code>fail_on.min_confidence</code></td>
+<td>float <code>0.0</code>–<code>1.0</code></td>
+<td><code>0.0</code></td>
+<td>For findings that carry a <code>Verdict</code> (dynamic checks), the minimum confidence required to count toward the gate. Static findings have no verdict and always count once their severity threshold is met.</td>
+</tr>
+<tr>
+<td><code>fail_on.fail_on_inconclusive</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>When <code>true</code>, a check that ran but could not reach a verdict (reported on the <code>unverified</code> channel) also fails the gate — the strict posture for a hard CI gate.</td>
+</tr>
+<tr>
+<td><code>fail_on.fail_on_error</code></td>
+<td>bool</td>
+<td><strong><code>true</code></strong></td>
+<td>A check that could not run <em>at all</em> — a plugin that failed to import, a custom rule file that would not load, a rule that raised — fails the gate. Note the default is the opposite of <code>fail_on_inconclusive</code>, and deliberately so: <code>inconclusive</code> is a verdict (the check ran and honestly could not tell), while an error means the check never happened while the result looked as though it had. Set <code>false</code> only if you would rather ship than fix the broken check.</td>
+</tr>
+<tr>
+<td><code>trace.require</code></td>
+<td>list of dimension names</td>
+<td><code>[]</code></td>
+<td>Evidence a trace run demands: <code>messages</code>, <code>tools</code>, <code>retrieval</code>, <code>memory</code>, <code>identity</code>, <code>delegation</code>, <code>consent</code>, <code>policy</code>, <code>approval</code>, <code>effects</code>, <code>handoff</code>. A producer that does not record one makes the run <strong><code>indeterminate</code>, unconditionally</strong> — no <code>fail_on_*</code> governs it, because you asked for this coverage by name. An unknown dimension raises at load. Governs traces only: a shared config carrying it does not affect <code>scan</code> or <code>probe</code>. See <a href="usage-trace-inspect.html"><code>usage-trace-inspect.md</code></a>.</td>
+</tr>
+<tr>
+<td><code>contracts</code></td>
+<td>list of paths</td>
+<td><code>[]</code></td>
+<td>Security contracts to load — files, or directories of <code>.yaml</code>/<code>.yml</code>. Added to anything passed via the repeatable <code>--contract PATH</code> flag. Unlike a malformed <em>rule</em> file, a contract that will not load is a hard error: it is your own threat model, and a silently absent one is a gate you think you have. See <a href="usage-contracts.html"><code>usage-contracts.md</code></a>.</td>
+</tr>
+<tr>
+<td><code>evaluators</code></td>
+<td>mapping</td>
+<td><code>{}</code></td>
+<td>Config blocks for evaluators that need a model of their own, keyed by evaluator id — <code>llm_judge</code> and <code>guard</code> today. <code>probe</code> and <code>monitor</code> build and register them from this block at startup; see the next section. With no block, a rule naming that evaluator is skipped <strong>visibly</strong>, never silently passed.</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>include</code>/<code>exclude</code> are matched with shell-style globbing (<code>fnmatch</code>) against
+the rule's <code>id</code>, so namespacing rules (<code>guardana.*</code> for built-ins, <code>acme.*</code>
+for a company's own) lets one profile mix and match cleanly — see
+<a href="https://github.com/guardana/guardana/blob/main/examples/guardana.yaml"><code>examples/guardana.yaml</code></a> for a profile that
+includes both.</p>
+<h2 id="the-gate">The gate</h2>
+<p>A run's exit code is <code>1</code> (fails) if <strong>any</strong> finding satisfies both:</p>
+<ol>
+<li><code>finding.severity &gt;= fail_on.severity</code>, and</li>
+<li>either the finding has no <code>verdict</code> (a static check — no confidence to
+gate on) <strong>or</strong> <code>finding.verdict.confidence &gt;= fail_on.min_confidence</code>.</li>
+</ol>
+<p>Otherwise the run exits <code>0</code>. This is the same logic behind <code>scan</code>, <code>probe</code>,
+and each <code>monitor</code> cycle's gate check.</p>
+<p>Checks that could not reach a verdict are reported on the separate
+<code>unverified</code> channel and do <strong>not</strong> fail the gate by default; set
+<code>fail_on.fail_on_inconclusive: true</code> to make them count.</p>
+<p><strong>One thing no <code>fail_on</code> switch governs: coverage you demanded and did not get.</strong>
+A dimension named in <code>trace.require</code>, or needed by an assertion you wrote in a
+security contract, that the producer does not record makes the run <code>indeterminate</code>
+(exit <code>2</code>) with nothing to turn off. Every other branch above is behind a switch,
+correctly — they cover checks nobody specifically asked for. This one you asked for
+by name, and <code>fail_on_skipped</code> defaulting to off would otherwise turn &quot;your
+contract could not be checked&quot; into exit <code>0</code>. The saved run records which demand
+went unmet under <code>run.coverage.shortfall</code>.</p>
+<h2 id="config-wired-evaluators-llm_judge-and-guard">Config-wired evaluators: <code>llm_judge</code> and <code>guard</code></h2>
+<p>Two built-in evaluators grade with a model of their own, so they only become
+available once the <code>evaluators:</code> block tells Guardana where that model lives.
+<code>probe</code> and <code>monitor</code> read the block at startup and register the evaluators
+alongside the always-available <code>keyword</code>, <code>canary</code>, and <code>length</code>.</p>
+<p>Both blocks share the endpoint keys:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Required</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>endpoint</code></td>
+<td>yes</td>
+<td>Base URL of an OpenAI-compatible server — a local vLLM or Ollama (<code>/v1</code>) keeps grading fully offline</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>yes</td>
+<td>Model name to send</td>
+</tr>
+<tr>
+<td><code>api_key_env</code></td>
+<td>no</td>
+<td>Env var holding the bearer API key, if the server needs one</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>llm_judge</code> — an LLM judge with a versioned rubric — additionally takes:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prompt_version</code></td>
+<td><code>&quot;2025.1&quot;</code></td>
+<td>Which judging-prompt version to use; stamped into each finding's <code>evaluator_id</code> (<code>llm_judge@2025.1</code>) so results stay reproducible as the rubric evolves</td>
+</tr>
+<tr>
+<td><code>min_agreement</code></td>
+<td><code>1</code></td>
+<td>Samples per verdict. With more than one, confidence is the fraction of samples agreeing — a measured, judge-aware number instead of a flat constant. A reply with no parseable PASS/FAIL verdict fails closed at reduced confidence.</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>guard</code> — an external safety classifier (Llama Guard / Granite Guardian
+style) — takes only the endpoint keys. It is <strong>opt-in on purpose</strong> and grades
+at conservative confidence: open-weight guards miss a large share of unsafe
+content, so Guardana never uses one as an always-on all-clear.</p>
+<p>A typo in any of these keys is a <code>ProfileError</code> at load time, and a rule that
+names an unconfigured evaluator is skipped visibly in the run summary — the
+gate never quietly weakens.</p>
+<h2 id="rule-specific-configuration">Rule-specific configuration</h2>
+<p><code>rule_config</code> (a top-level key, keyed by rule id) is threaded into a rule's
+<code>RuleContext</code> at run time, letting a rule read profile-supplied
+configuration values via <code>ctx.get(key, default)</code>. None of the built-in
+rules currently read anything from it, but the mechanism is there for rules
+(built-in or custom) that need tunable parameters.</p>
+<h2 id="named-presets---preset">Named presets: <code>--preset</code></h2>
+<p>For the common moments you run Guardana, a built-in preset saves you from writing
+a <code>guardana.yaml</code> at all. A preset tunes only the <em>failure bar</em> — which security
+layer runs is already decided by the command (<code>scan</code> runs the build-time rules,
+<code>probe</code>/<code>monitor</code> the runtime rules), so a preset never has to filter by layer.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Preset</th>
+<th>Fails on</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ci</code></td>
+<td>HIGH</td>
+<td>The dev machine and CI — the standard gate.</td>
+</tr>
+<tr>
+<td><code>pre-training</code></td>
+<td>MEDIUM</td>
+<td>The training server: stricter, so leads (an unpinned dataset, a provenance gap) block a run before it consumes bad data.</td>
+</tr>
+<tr>
+<td><code>monitor</code></td>
+<td>HIGH <strong>and</strong> inconclusive</td>
+<td>A live monitor, so its own checks going dark (a downed judge, empty replies) is itself an alert.</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-bash">guardana scan .          --preset ci            # linter-style gate in CI
+guardana scan ./data     --preset pre-training  # strict pre-run gate on the training box
+guardana monitor --url … --model … --preset monitor
+</code></pre>
+<p><code>--preset</code> and <code>--profile</code> are mutually exclusive — pass one or the other. When
+you need finer control (per-rule config, custom rule directories, a wired judge),
+write an explicit <code>guardana.yaml</code> as shown above; you can still ship as many
+differently-named profile <em>files</em> as you like and select one with <code>--profile</code>.</p>
+<h2 id="budgets--a-ceiling-on-what-a-run-may-spend"><code>budgets:</code> — a ceiling on what a run may spend</h2>
+<pre><code class="language-yaml">budgets:
+  max_requests: 200
+  max_input_tokens: 250000
+  max_output_tokens: 100000
+  max_duration: 15m        # number with s / m / h; a bare number is seconds
+</code></pre>
+<p>Every ceiling is optional, and <code>probe</code> takes the same four as flags
+(<code>--max-requests</code>, <code>--max-input-tokens</code>, <code>--max-output-tokens</code>,
+<code>--max-duration</code>), which win over the file. A flag sets only the ceiling it
+names — it never clears one the profile configured.</p>
+<p>Ceilings are checked <strong>before each request</strong>, so <code>max_requests: 200</code> means 200
+requests were sent and never 201. Token and duration ceilings can only be checked
+once a request has been answered, so they stop the <em>next</em> one.</p>
+<p><strong>The ceiling belongs to the run, not to a pass of it.</strong> <code>probe</code> runs each
+canary-planting rule against a target of its own — the marker has to be in that
+rule's system prompt and in no other — and every one of those passes shares one
+meter. Otherwise <code>max_requests: 200</code> would buy 200 requests as many times as there
+are canary rules installed, and adding one would quietly raise the bill. A
+<code>monitor</code> cycle is a run of its own, so the ceiling applies per cycle: a single
+total over a loop with no end is not a ceiling anybody could set.</p>
+<p>A run that hits a ceiling stops, keeps the findings it already produced, records
+<code>stopped_by: budget_exhausted</code> in its manifest, and exits <code>6</code>. It never passes the
+gate, and <a href="usage-diff.html"><code>guardana diff</code></a> will not read its smaller finding count
+as an improvement.</p>
+<p>A budget nothing can enforce is refused before the first request, with exit <code>3</code> —
+a token ceiling on a transport that reports no token counts, or any ceiling on a
+target that does not meter itself. A ceiling the user believes in and nothing
+watches is worse than no ceiling.</p>
+<p>Use <a href="usage-plan.html"><code>guardana plan</code></a> to find out whether a budget fits, before
+paying for the answer.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/profiles.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -13,7 +13,13 @@ from typing import Any
 from guardana.core.gate import GateOutcome
 from guardana.core.manifest.coverage import CoverageRecord, TaxonomyCatalogRecord
 from guardana.core.manifest.fingerprint import digest_of
-from guardana.core.manifest.identity import RunSource, SourceKind, TargetIdentity, ToolInfo
+from guardana.core.manifest.identity import (
+    DeploymentRef,
+    RunSource,
+    SourceKind,
+    TargetIdentity,
+    ToolInfo,
+)
 from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.records import (
     CalibrationRecord,
@@ -144,6 +150,32 @@ def _target(raw: object) -> TargetIdentity:
         fingerprint=_optional_text(block, "fingerprint"),
         fingerprint_inputs=tuple(str(v) for v in inputs) if isinstance(inputs, list) else (),
         capabilities=tuple(str(v) for v in capabilities) if isinstance(capabilities, list) else (),
+    )
+
+
+def _deployment(raw: object) -> DeploymentRef:
+    """Read which deployment this run verified, leaving anything unrecorded null.
+
+    An absent block and an absent field are the same answer — "not known" — which
+    is what `DeploymentRef` already documents every null to mean. A laptop run has
+    no commit sha, and a reader must be able to tell that from a commit of zeroes.
+
+    Written since the manifest existed and read since 0.19.0: `manifest_to_dict`
+    serialized all eight fields and nothing rebuilt them, so `run inspect --format
+    json` re-rendered a run against production as a run against nothing, and any
+    consumer holding a loaded manifest lost the AI system, the environment and the
+    model digest the evidence was about.
+    """
+    block = raw if isinstance(raw, dict) else {}
+    return DeploymentRef(
+        ai_system=_optional_text(block, "ai_system"),
+        environment=_optional_text(block, "environment"),
+        deployment_id=_optional_text(block, "deployment_id"),
+        commit_sha=_optional_text(block, "commit_sha"),
+        image_digest=_optional_text(block, "image_digest"),
+        model_digest=_optional_text(block, "model_digest"),
+        model_name=_optional_text(block, "model_name"),
+        model_revision=_optional_text(block, "model_revision"),
     )
 
 
@@ -378,6 +410,7 @@ def manifest_from_dict(raw: object, *, migrated_from: int | None = None) -> RunM
         source=_source(block.get("source")),
         guardana=_tool(block.get("guardana")),
         target=_target(block.get("target")),
+        deployment=_deployment(block.get("deployment")),
         configuration=_configuration(block.get("configuration")),
         execution=_execution(block.get("execution")),
         usage=_usage(block.get("usage")),

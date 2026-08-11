@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana target inspect — Guardana documentation</title>
+<meta name="description" content="guardana target inspect: what an endpoint really supports">
+<link rel="canonical" href="https://guardana.dev/docs/usage-target.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html" aria-current="page">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana target inspect</code> — what an endpoint really supports</h1><p class="lede"><code>guardana target inspect</code>: what an endpoint really supports</p><p>&quot;OpenAI-compatible&quot; describes a URL shape, not behaviour. A gateway can accept a
+<code>tools</code> array and never call anything; a proxy can drop the system message. Either
+one turns a rule into a check that runs, proves nothing, and reports a pass.</p>
+<pre><code class="language-bash">guardana target inspect --url https://api.example.com --model gpt-4o-mini
+</code></pre>
+<pre><code class="language-text">endpoint https://api.example.com#gpt-4o-mini
+
+  ✓ chat: supported — replied with text
+  ✓ plant_system_prompt: supported — the system message reached the model
+  ? call_tools: unknown — the endpoint accepted the tools array but returned no
+    tool call: the model may have declined, or the gateway may be ignoring tools
+  ✓ usage_metadata: supported — the endpoint reports token counts
+
+⚠ declared but not confirmed: call_tools
+  rules relying on these would run and prove nothing, which reads as a pass
+
+4 rule(s) cannot run against this target:
+    • guardana.agent.credential_exfiltration
+    ...
+
+This inspection cost 3 request(s).
+</code></pre>
+<h2 id="declared-versus-verified">Declared versus verified</h2>
+<p>A target <em>declares</em> capabilities from what its client can do. Inspection reports
+what the endpoint actually <strong>demonstrated</strong>. The gap between the two is the point
+of the command:</p>
+<ul>
+<li><strong>supported</strong> — a probe confirmed it.</li>
+<li><strong>unsupported</strong> — a probe showed it is not there.</li>
+<li><strong>unknown</strong> — the probe ran and settled nothing. Never folded into
+&quot;unsupported&quot;: &quot;it does not do this&quot; and &quot;we could not find out&quot; call for
+different decisions.</li>
+</ul>
+<p>Anything declared and not confirmed is listed under <em>declared but not confirmed</em>,
+including the unknowns. A capability nobody could demonstrate is one no rule
+should be trusted to exercise.</p>
+<h2 id="failing-a-pipeline-on-missing-coverage">Failing a pipeline on missing coverage</h2>
+<pre><code class="language-bash">guardana target inspect --url ... --model ... --require chat,call_tools
+</code></pre>
+<p>Exits <code>2</code> if any named capability was not confirmed — indeterminate, because
+nothing was established about the system under test, only about the pipe to it.</p>
+<h2 id="skipped-rules-now-say-why">Skipped rules now say why</h2>
+<p>A run records, for each rule that did not execute, the reason and the capability
+that was missing:</p>
+<pre><code class="language-json">&quot;rules_skipped&quot;: [
+  {
+    &quot;rule_id&quot;: &quot;guardana.agent.tool_argument_scope&quot;,
+    &quot;reason&quot;: &quot;missing_capability&quot;,
+    &quot;missing&quot;: [&quot;call_tools&quot;],
+    &quot;detail&quot;: &quot;https://api.example.com#gpt-4o-mini does not support call_tools, ...&quot;
+  }
+]
+</code></pre>
+<p>A bare list of ids could not tell a rule that never applied from one the provider
+cannot support. Most skips are ordinary, so they do not fail the gate by default.
+When you are paying for coverage you expect to get, turn that on:</p>
+<pre><code class="language-yaml">fail_on:
+  fail_on_skipped: true
+</code></pre>
+<p>The run then reports <code>indeterminate</code> rather than passing — a real finding still
+outranks it, because a fact somebody has to fix should not be buried under a
+warning about coverage.</p>
+<h2 id="what-it-costs">What it costs</h2>
+<p>Three requests, stated in the output. An inspection is cheap next to a probe, and
+a team paying per token is entitled to know the price of every command.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="usage-plan.html"><code>usage-plan.md</code></a> — what a full run would cost</li>
+<li><a href="usage-probe.html"><code>usage-probe.md</code></a> — the run itself</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-target.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,3 +1,10 @@
+---
+title: "Profiles — guardana.yaml"
+nav_order: 210
+summary: "the `guardana.yaml` policy file: which rules run, what fails the build"
+status: stable
+---
+
 # Profiles — `guardana.yaml`
 
 A profile is a YAML file that picks which rules run and what makes the run

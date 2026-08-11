@@ -1,3 +1,10 @@
+---
+title: "Finding lifecycle and waivers"
+nav_order: 170
+summary: "statuses, waivers that expire, and why this is not a second `baseline`"
+status: accepted
+---
+
 # Design: the finding lifecycle, and waivers that expire
 
 **Status:** accepted · **Implemented in:** 0.11.0 · **Component:** collector

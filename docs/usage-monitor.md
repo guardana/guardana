@@ -1,3 +1,10 @@
+---
+title: "guardana monitor"
+nav_order: 150
+summary: "`guardana monitor`: scheduled re-verification"
+status: stable
+---
+
 # `guardana monitor` — a long-running sampling observer
 
 Runs the same endpoint rules as `probe`, but repeatedly, on an interval,

@@ -1,3 +1,10 @@
+---
+title: "Collector persistence"
+nav_order: 130
+summary: "collector persistence and migrations"
+status: implemented
+---
+
 # Design: collector persistence and migrations
 
 **Status:** implemented in 0.8 · **Written:** 2026-08-03 · **Phase C, item 19**

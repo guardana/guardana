@@ -1,3 +1,10 @@
+---
+title: "Security contracts"
+nav_order: 30
+summary: "the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does"
+status: implemented
+---
+
 # Security contracts, and the evidence matrix that decides whether one can be checked
 
 **Status:** implemented in 0.17.0, corrected in 0.17.1 · **Written:** 2026-08-10 ·

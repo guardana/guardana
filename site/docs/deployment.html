@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deploying the collector — Guardana documentation</title>
+<meta name="description" content="running the collector in production: Compose, TLS, upgrades, what to watch, and what it does not give you yet">
+<link rel="canonical" href="https://guardana.dev/docs/deployment.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html" aria-current="page">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Deploying the collector in production<span class="status beta">beta</span></h1><p class="lede">running the collector in production: Compose, TLS, upgrades, what to watch, and what it does not give you yet</p><p>Everything Guardana does on a laptop or in CI works without this page. The
+collector is the optional part: one place where many pipelines' runs and findings
+land, so a team can ask &quot;is production worse than last week&quot; and get an answer
+from evidence rather than from memory.</p>
+<p>This is how to run one you can keep — and how to upgrade it without a surprise.
+The images and their tags are <a href="https://github.com/guardana/guardana/blob/main/deploy/docker/README.md"><code>deploy/docker/README.md</code></a>;
+what the collector does and deliberately does not do is
+<a href="usage-collector.html"><code>usage-collector.md</code></a>.</p>
+<h2 id="what-you-are-deploying">What you are deploying</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>What it is</th>
+<th>Durable?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>db</code></td>
+<td>PostgreSQL 16</td>
+<td><strong>yes</strong> — the <code>guardana-data</code> volume is the only state that matters</td>
+</tr>
+<tr>
+<td><code>collector</code></td>
+<td>the HTTP API pipelines report to</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>migrate</code></td>
+<td>a one-shot command, run on purpose</td>
+<td>no</td>
+</tr>
+</tbody>
+</table></div>
+<p>Two decisions are baked into <a href="https://github.com/guardana/guardana/blob/main/deploy/docker-compose.yml"><code>deploy/docker-compose.yml</code></a>
+and are worth understanding before you change them.</p>
+<p><strong>No credential has a default.</strong> Every secret is <code>${VAR:?}</code>, so Compose refuses to
+start rather than fall back to something guessable. This is the same rule the
+collector applies to its own storage — it will not start without being told where
+to keep submissions — because the unsafe configuration must never be the one you
+get by not deciding.</p>
+<p><strong>Migrations are not run on start.</strong> A rolling deploy would otherwise briefly run
+two versions of the code against one schema, and the operator undoing that at
+three in the morning wants one instruction (<code>rollback</code>), not a restart with a
+different environment variable. <code>/readyz</code> fails while a migration is pending, so a
+half-upgraded collector never quietly serves traffic.</p>
+<h2 id="standing-one-up">Standing one up</h2>
+<pre><code class="language-bash">cp deploy/env.example deploy/.env
+$EDITOR deploy/.env                    # it has no defaults; fill them in
+
+docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
+docker compose -f deploy/docker-compose.yml up -d
+docker compose -f deploy/docker-compose.yml run --rm collector \
+  bootstrap --org acme --project web   # prints the key, once
+</code></pre>
+<p><code>bootstrap</code> creates the organization, the project and the first API key together.
+Store the key immediately: only a digest is kept, and there is no command that
+prints it again — a credential a system can re-read is a credential that leaks
+through every path that reads it.</p>
+<p>Check what you have:</p>
+<pre><code class="language-bash">curl -fsS http://127.0.0.1:8000/healthz    # the process answers
+curl -fsS http://127.0.0.1:8000/readyz     # storage reachable, schema current
+</code></pre>
+<p>They are separate on purpose. <code>/healthz</code> is liveness. <code>/readyz</code> is the one that
+fails while a migration is pending or the database is unreachable — point an
+orchestrator's readiness probe at it, and alert on it rather than on <code>/healthz</code>.</p>
+<h2 id="put-tls-in-front-of-it">Put TLS in front of it</h2>
+<p>The collector publishes on <strong>loopback</strong>. Ingest carries API keys and evidence, so
+a public interface without TLS is a credential leak with extra steps. Terminate
+TLS with whatever you already run:</p>
+<pre><code class="language-nginx">server {
+    listen 443 ssl;
+    server_name collector.example.com;
+    ssl_certificate     /etc/letsencrypt/live/collector.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/collector.example.com/privkey.pem;
+
+    # Submissions are small, but a run with a lot of evidence is not tiny.
+    client_max_body_size 32m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+</code></pre>
+<p>Caddy needs two lines for the same thing:</p>
+<pre><code class="language-caddyfile">collector.example.com {
+    reverse_proxy 127.0.0.1:8000
+}
+</code></pre>
+<p>Then point pipelines at the public name — the URL keeps its own scheme, and a
+bare <code>host:port</code> is refused rather than guessed:</p>
+<pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…     # a masked/secret CI variable
+guardana scan . --ai-system support-agent --environment production \
+  --reporter server://https://collector.example.com
+</code></pre>
+<h2 id="upgrading">Upgrading</h2>
+<pre><code class="language-bash">docker compose -f deploy/docker-compose.yml pull
+docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
+docker compose -f deploy/docker-compose.yml up -d
+</code></pre>
+<p>In that order, and never with the middle step skipped. What protects you if it
+goes wrong is built into the migration runner: every migration ships a rollback,
+each runs in its own committed transaction under an advisory lock, and the runner
+<strong>refuses</strong> a migration edited after it was applied, one numbered below the
+highest applied, or a database written by a newer build than the one you are
+running. So a collector pointed at a database from the future stops rather than
+writing into it.</p>
+<p>To undo one step:</p>
+<pre><code class="language-bash">docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate rollback --steps 1
+docker compose -f deploy/docker-compose.yml status   # or: guardana-collector status
+</code></pre>
+<p>Roll the <em>image</em> back to the matching tag at the same time. A collector older
+than its schema is exactly the situation <code>/readyz</code> and the version check exist to
+stop, and they will stop it.</p>
+<p><strong>Pin the image to a minor tag</strong> (<code>:0.9</code>) rather than <code>latest</code>. You want fixes
+without a schema you did not plan for; <code>latest</code> gives you both.</p>
+<h2 id="backups-and-restoring-one">Backups, and restoring one</h2>
+<p>The <code>guardana-data</code> volume is the only state that matters, and the only backup
+that counts is one you have restored. This procedure is <strong>exercised by the test
+suite</strong> (<code>packages/guardana-server/tests/test_backup_restore.py</code>) — the same
+programs with the same flags, restored into a database that never held the data,
+and then read back through the same scoped store the server uses.</p>
+<p>Take one:</p>
+<pre><code class="language-bash">set -a; . deploy/.env; set +a
+docker compose -f deploy/docker-compose.yml exec -T db \
+  pg_dump -U &quot;$POSTGRES_USER&quot; -d &quot;$POSTGRES_DB&quot; --format=custom \
+  &gt; &quot;guardana-$(date -u +%Y-%m-%d).dump&quot;
+</code></pre>
+<p>Restore it — into an <strong>empty</strong> database, which is what a rebuild on a new machine
+actually looks like:</p>
+<pre><code class="language-bash">docker compose -f deploy/docker-compose.yml stop collector     # nothing writes mid-restore
+
+docker compose -f deploy/docker-compose.yml exec -T db psql -U &quot;$POSTGRES_USER&quot; -d postgres \
+  -c &quot;drop database if exists \&quot;$POSTGRES_DB\&quot; with (force)&quot; \
+  -c &quot;create database \&quot;$POSTGRES_DB\&quot;&quot;
+
+docker compose -f deploy/docker-compose.yml exec -T db \
+  pg_restore -U &quot;$POSTGRES_USER&quot; -d &quot;$POSTGRES_DB&quot; --clean --if-exists \
+  &lt; guardana-2026-08-05.dump
+
+docker compose -f deploy/docker-compose.yml start collector
+curl -fsS http://127.0.0.1:8000/readyz     # storage reachable, schema current
+</code></pre>
+<p>Three things this procedure is deliberate about:</p>
+<p><strong>Run <code>pg_dump</code> inside the database container.</strong> Not because it is tidier —
+because the client tools and the server then cannot drift apart. <code>pg_dump</code> 17
+against PostgreSQL 16 produces a dump that <code>pg_restore</code> cannot load back into 16:
+it carries <code>SET transaction_timeout</code>, a parameter 16 has never heard of, and the
+restore ends with &quot;errors ignored&quot; and a non-zero exit. That is a backup that
+looks fine every day and fails on the one day it matters. If you do run the tools
+on the host, install the client matching your server's major version.</p>
+<p><strong>Restore into an empty database.</strong> Restoring over the live one passes even when
+the dump is half-written, because the data was already there. The test does the
+same thing for the same reason.</p>
+<p><strong>Check <code>/readyz</code>, not <code>/healthz</code>.</strong> A restore that dropped the migration history
+leaves a collector that answers requests and cannot be upgraded — <code>/readyz</code> is the
+endpoint that reads storage and schema state, and the test asserts the restored
+database reports the same applied migrations as the original.</p>
+<p>Keep the dump somewhere your <code>deploy/.env</code> is not. A backup stored beside the
+credentials for the system it came from is one theft, not two.</p>
+<h2 id="what-to-watch">What to watch</h2>
+<p>Two limits are on by default and worth knowing before a fleet meets them:
+<code>GUARDANA_MAX_BODY_BYTES</code> (8 MiB, answering <code>413</code>) and
+<code>GUARDANA_RATE_LIMIT_PER_MINUTE</code> (120 per caller, answering <code>429</code> with
+<code>Retry-After</code>). The rate limiter counts <strong>per worker process</strong> — for a global
+limit, rate-limit at the proxy that already terminates TLS.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/readyz</code></td>
+<td>the only endpoint that knows about storage and pending migrations</td>
+</tr>
+<tr>
+<td>container restarts</td>
+<td>a collector that cannot reach its database exits rather than serving half a service</td>
+</tr>
+<tr>
+<td><code>guardana-collector status</code></td>
+<td>which migrations are applied, and whether any are pending</td>
+</tr>
+<tr>
+<td>disk on the <code>guardana-data</code> volume</td>
+<td>there is <strong>no retention yet</strong>: submissions accumulate until you remove them</td>
+</tr>
+</tbody>
+</table></div>
+<p>That last row is a real limitation, not a footnote. Until retention lands, size
+the volume for the runs you keep and watch it like any other database.</p>
+<h2 id="what-this-deployment-does-not-give-you-yet">What this deployment does not give you yet</h2>
+<p>Being explicit, because a deployment guide that oversells is worse than none:</p>
+<ul>
+<li><strong>no finding lifecycle and no waivers in the collector</strong> — accepted risk lives
+in <code>guardana baseline</code> next to the code, which is the right place for it today;</li>
+<li><strong>no audit log</strong> — who created a key, who read what, is not recorded;</li>
+<li><strong>no retention or deletion</strong> — nothing removes old submissions;</li>
+<li><strong>no user accounts</strong> — the read-only panel signs in with a read-scoped API key
+rather than with a person's identity, so &quot;who looked at this&quot; is answerable only
+down to the credential;</li>
+<li><strong>no Kubernetes manifests</strong> — the image, the environment variables and the two
+probes are all a Deployment needs, but we do not ship one we have not exercised.</li>
+</ul>
+<p>These are the collector's open items on the
+<a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">roadmap</a>, and none of them is
+worked around silently: each is absent, and says so.</p>
+<h2 id="running-it-without-compose">Running it without Compose</h2>
+<p>The image is the unit; Compose is a convenience:</p>
+<pre><code class="language-bash">docker run -d --name guardana-collector \
+  -e GUARDANA_DATABASE_URL=&quot;postgresql://guardana:…@db.internal:5432/guardana&quot; \
+  -p 127.0.0.1:8000:8000 \
+  ghcr.io/guardana/guardana-collector:0.9
+</code></pre>
+<p>Or without a container at all — <code>pip install &quot;guardana-server[serve]&quot;</code>, then
+<code>guardana-collector migrate</code> and <code>guardana-collector serve</code>. The ASGI server is an
+extra rather than a dependency, so a site that already runs gunicorn points it at
+<code>guardana.server:create_app()</code> instead.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/deployment.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

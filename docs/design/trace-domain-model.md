@@ -1,3 +1,10 @@
+---
+title: "The Trace domain model"
+nav_order: 10
+summary: "the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact"
+status: implemented
+---
+
 # The `Trace` domain model: grading an execution somebody else recorded
 
 **Status:** implemented in 0.14.0 · **Written:** 2026-08-09 · **Step three**

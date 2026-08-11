@@ -420,27 +420,6 @@ team platform, runs beside this and gates none of it.
   reports the rest as `indeterminate`, truthfully. Writing 46 sets in an afternoon
   would mean writing them to move a counter, and a fixture written for that reason is
   a test that cannot fail — which this repository treats as worse than none.
-- **Documentation generated onto guardana.dev, from a source a build can read.**
-  `docs/` is 31 hand-written markdown files and 4 generated ones, and the header's
-  **Docs** link still points at the GitHub README. The design is written
-  ([design](docs/design/documentation-site.md)) and the shape it settles is the part
-  worth stating here: **prose stays markdown with YAML frontmatter, facts stay
-  generated from the registry as JSON, and nothing moves into YAML wholesale.** Prose
-  in YAML is prose in a worse container — it loses diff readability in review and buys
-  exactly one thing markdown already has a convention for, which is metadata for the
-  nav. `scripts/generate_docs.py` gains a JSON emitter beside its markdown one, and a
-  `scripts/build_site.py` renders both to plain HTML at build time; `wrangler.jsonc`
-  stays a static-assets Worker with no build step of its own.
-
-  Two decisions inside it that are not tooling choices. The interactivity worth
-  building is a **generated rule explorer** — filter 51 rules by framework, surface,
-  impact and cost — rather than a docs theme, because the theme is commodity and the
-  explorer is the one page a competitor cannot copy without also having the rules.
-  And `site/_headers` sets `script-src 'none'` as a *product claim*, so the first
-  release pre-renders every view and keeps it; relaxing to `script-src 'self'` under
-  `/docs/*` is what free-text search would cost, and `connect-src 'none'` is not
-  negotiable in either case.
-
 - **RAG as a live target (`LLM09:2026`).** `RetrieverTarget`, `CorpusTarget`,
   `EmbeddingTarget`: retrieval-time injection, unauthorized document access,
   document and metadata poisoning, tenant-filter bypass. Cross-tenant retrieval
@@ -519,6 +498,10 @@ one.
 | **A public extension registry** | a registry is meaningful once a pack has a manifest, a compatibility range, a lock file and a stated trust model. Publishing before those exist is asking people to install code on a promise |
 | **A catalogue may be a subset** | `OWASP-ML-2023` holds the entries rules map to, not all ten. A catalogue may be a subset; it may never invent an entry |
 | **Third-party catalogues have no digest to pin** | a pack registers *references* through an entry point, not a catalogue file, so a run records its refs and not a provenance nobody can produce |
+| **`provides.taxonomies` in a pack manifest** | a pack can register a control catalogue and its manifest cannot say so, which leaves `pack validate` blind to a whole category — and a taxonomy-only pack cannot write a valid manifest at all, since `provides:` must list something. The fix is pack schema **v2** with an in-memory 1→2 migration, and `guardana.taxonomies` added to the groups `pack validate` discovers by. That is a versioned contract change on a schema released in 0.18.0, which deserves its own change rather than a ride-along in a documentation release |
+| **Free-text search across the documentation prose** | it is the one thing pre-rendering cannot do, and the only reason worth relaxing `script-src 'none'` to `'self'` under `/docs/*`. The explorer answers the four questions a reader actually arrives with by navigation; searching *prose* is a different need, and the policy is a claim visitors check rather than a default to spend on a nice-to-have. If it is ever taken, `connect-src 'none'` is not part of the trade — there is a test |
+| **Versioned documentation, one tree per release** | worth doing after 1.0, when the compatibility contract makes "the 1.2 docs" a meaningful thing to read. Before then every version's docs describe a moving API, and a version switcher offers a reader a choice with no right answer |
+| **A `guardana docs` command rendering a *local* explorer** | `rules.json` makes it cheap, and it is the extension story told once more: a team with private packs could render an explorer over their own rules under the same evidence semantics. It is a *feature* rather than a website, so it belongs with the pack tooling and gets its own tests, not a flag bolted onto the site build |
 
 ## Milestone: team security platform
 

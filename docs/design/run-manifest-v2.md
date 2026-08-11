@@ -1,3 +1,10 @@
+---
+title: "Run manifest v2"
+nav_order: 90
+summary: "the reproducible run record"
+status: implemented
+---
+
 # Design: Run Manifest v2
 
 **Status:** implemented in 0.7 · **Supersedes:** the `run` block introduced in 0.6

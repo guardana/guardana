@@ -1,3 +1,10 @@
+---
+title: "Safe active testing"
+nav_order: 40
+summary: "before you point an active check at anything that matters"
+status: stable
+---
+
 # Safe active testing
 
 `guardana scan` reads files and cannot break anything. `guardana probe` and

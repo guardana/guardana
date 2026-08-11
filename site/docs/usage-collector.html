@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The collector — Guardana documentation</title>
+<meta name="description" content="the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness">
+<link rel="canonical" href="https://guardana.dev/docs/usage-collector.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html" aria-current="page">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>The collector — tenants, persistence, migrations, and what a database does not fix<span class="status beta">beta</span></h1><p class="lede">the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness</p><p>The collector (<code>guardana-server</code>) aggregates findings from many agents. It is
+<strong>optional in every direction</strong>: the engine never imports it, no feature needs it,
+and nothing is sent anywhere unless a run is given <code>--reporter</code>.</p>
+<blockquote>
+<p><strong>Maturity: beta.</strong> It keeps what it is given, <strong>requires an API key</strong> for every
+route that carries a finding, isolates one <strong>project</strong> from another, and records
+what each run verified and where — with an optional <strong>environment pin</strong> that
+makes a credential reach exactly one environment in both directions. Findings carry a <strong>lifecycle</strong> and waivers
+that expire, every state change is <strong>audited</strong>, and <strong>retention</strong> is a policy an
+operator applies. Still ahead of it: RBAC and human identities.</p>
+</blockquote>
+<h2 id="standing-one-up-three-commands">Standing one up: three commands</h2>
+<pre><code class="language-bash">export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
+guardana-collector migrate
+guardana-collector bootstrap --org acme --project web   # prints the key, once
+guardana-collector serve                                # http://127.0.0.1:8000
+</code></pre>
+<p><code>bootstrap</code> creates the organization, the project and the first key together,
+because a security boundary that adds four commands to the first run is a boundary
+that makes a tool nobody starts. The granular commands below exist for the second
+team, not for the first one.</p>
+<p><code>serve</code> binds <strong>loopback</strong> unless told otherwise: <code>--host 0.0.0.0</code> is a decision,
+so it is one you type. It needs an ASGI server, which is an extra
+(<code>pip install &quot;guardana-server[serve]&quot;</code>) rather than a dependency — a deployment
+already running gunicorn or hypercorn should not be made to carry a second one,
+and any of them can run the app directly:</p>
+<pre><code class="language-bash">gunicorn -k uvicorn.workers.UvicornWorker 'guardana.server:create_app()'
+uvicorn 'guardana.server:create_app' --factory        # what serve does for you
+</code></pre>
+<p>Or as a container, where the same three commands are three <code>docker run</code>s:</p>
+<pre><code class="language-bash">docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
+  ghcr.io/guardana/guardana-collector:0.18 migrate
+docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
+  ghcr.io/guardana/guardana-collector:0.18 bootstrap --org acme --project web
+docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
+  ghcr.io/guardana/guardana-collector:0.18
+</code></pre>
+<p>The image's default command is <code>serve --host 0.0.0.0 --port 8000</code>, and it does
+<strong>not</strong> migrate on start — see
+<a href="https://github.com/guardana/guardana/blob/main/deploy/docker/README.md"><code>deploy/docker/README.md</code></a> for why, and for the
+health and readiness endpoints an orchestrator should use.</p>
+<p>Then point a run at it:</p>
+<pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…
+guardana scan . --reporter server://https://collector.example.com
+</code></pre>
+<h2 id="what-a-run-says-it-verified">What a run says it verified</h2>
+<pre><code class="language-bash">guardana scan . --ai-system support-agent --environment production
+guardana probe … --ai-system support-agent --environment staging --deployment-id 2026-08-05.3
+</code></pre>
+<p>or, for a pipeline that would otherwise repeat itself on every step:</p>
+<pre><code class="language-bash">export GUARDANA_AI_SYSTEM=support-agent
+export GUARDANA_ENVIRONMENT=production      # a flag still wins over the variable
+</code></pre>
+<p>Without this a project's history is one undifferentiated stream, and &quot;did
+production get worse since Tuesday&quot; has no answer in it.</p>
+<p><strong>The commit is read from whatever CI this is</strong> — <code>GITHUB_SHA</code>, <code>CI_COMMIT_SHA</code>,
+<code>GIT_COMMIT</code>, <code>BUILD_SOURCEVERSION</code> — because the answer that matters is the one
+nobody had to remember to pass. <strong>The environment and the AI system are never
+guessed.</strong> A branch is not an environment and a repository is not an AI system: a
+monorepo has several systems, and one repository deployed twice is one system in
+two environments. A guessed value is one a team would build a dashboard on.</p>
+<p>Nothing is created in advance. The collector records the names a run used, and</p>
+<pre><code class="language-bash">guardana-collector system list [--project acme/web]
+guardana-collector environment list [--project acme/web]
+guardana-collector deployment list [--ai-system support-agent]
+</code></pre>
+<p>read them back. Requiring an administrator to register a system first would put a
+human step between a pipeline and its first report, and a pipeline that fails on a
+missing prerequisite gets commented out rather than fixed. The cost is that a typo
+creates a second system — and the listing is what makes that mistake visible
+rather than silent. Correct it by running the pipeline with the right name; the
+wrong one stays as the empty system it is.</p>
+<p><code>Production</code>, <code>production </code> and <code>production</code> are one environment: names are folded
+and stripped at the door, so grouping does not depend on who typed what.</p>
+<h2 id="pinning-a-key-to-one-environment">Pinning a key to one environment</h2>
+<pre><code class="language-bash">guardana-collector key create --project acme/web --name prod-ci --environment production
+</code></pre>
+<p>A pinned key <strong>writes and reads only that environment</strong>. A run declaring a
+different one is refused with <code>403</code> — never &quot;prefer the more specific one&quot;, never a
+silent relabel. A run declaring <em>nothing</em> is stored under the pin, because the
+credential asserted the environment and the run did not contradict it; storing it
+unlabelled would let a pinned key write evidence into a place it cannot itself
+read.</p>
+<p>Read <em>and</em> write, not write alone: a pin that bounded writes while letting the same
+key read every environment would be a half-boundary that reads as a whole one.</p>
+<p>It is <strong>optional</strong>, and that is the trade. One pipeline legitimately deploys to
+dev, staging and production, and sourcing the environment from the key would mean
+three credentials per project for every team — while the blast radius is already
+bounded, because the key names the project. Pin the credential that must not be
+able to write production evidence; leave the rest unpinned.</p>
+<p>An unpinned key sees the whole project, labelled runs and unlabelled ones alike. A
+<em>pinned</em> key does not see unlabelled runs: they belong to the project and to no
+environment, and folding them into every one would let a laptop run appear as
+production evidence.</p>
+<h2 id="reading-back-what-the-collector-holds">Reading back what the collector holds</h2>
+<pre><code class="language-bash">guardana-collector run list [--project acme/web] [--environment production]
+guardana-collector finding list [--project acme/web] [--environment production]
+</code></pre>
+<p><code>run list</code> is the time axis: when a run arrived, which system and environment it
+was about, its <strong>gate</strong>, and where it came from. The gate is the fact a collector
+without it cannot supply — findings alone cannot tell a failing run from one whose
+findings a baseline waived. A run whose agent did not say prints <code>unknown</code>, never
+blank and never <code>pass</code>.</p>
+<p><code>finding list</code> groups every sighting by the identity the engine computes — the rule
+and where it was found, never the evaluator's rationale, which moves on every
+re-run — and shows how many runs saw it, first and last. That is the &quot;has this been
+there since Tuesday, or is it new&quot; question.</p>
+<p><strong>Runs, not sightings.</strong> One run's rule can report the same identity several times
+— <code>malicious_dependency</code> names three bad packages in a single <code>requirements.txt</code>,
+and the identity is the rule plus the path — so counting rows would answer &quot;how
+often was this printed&quot; while the column claims to answer the other question. A
+finding a single scan reported three times reads <code>1 runs</code>.</p>
+<p><strong>A retried job is stored once.</strong> The same run id in the same project is accepted
+with <code>200</code> and <code>&quot;duplicate&quot;: true</code> instead of being stored again: a retry is not a
+failure and must not turn a pipeline red, and counting it twice would make a
+regression answer from a duplicate. An agent older than 0.9 sends no run id,
+identifies nothing, and is stored every time — which is honest, not clever.</p>
+<h2 id="triage-what-somebody-decided-about-a-finding">Triage: what somebody decided about a finding</h2>
+<p>A finding is an entity, not just a pile of sightings. It carries a status, an
+owner, and — when a team accepts the risk — a waiver with a name, a reason and a
+date it lapses.</p>
+<pre><code class="language-bash">guardana-collector finding list --project acme/web [--status open]
+guardana-collector finding status 1854bc20 --project acme/web --status acknowledged --owner konrad
+guardana-collector finding waive  1854bc20 --project acme/web \
+  --approver konrad --reason &quot;vendor fix due in September&quot; --expires 2026-09-30
+</code></pre>
+<p>Identities are <code>sha256:…</code>, so every command takes a <strong>unique prefix</strong>, like git.
+An ambiguous one is refused with the candidates listed and nothing is changed:
+acting on the wrong finding is worse than being asked to type four more
+characters.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open</code></td>
+<td>seen; nobody has said anything, or a waiver lapsed</td>
+</tr>
+<tr>
+<td><code>acknowledged</code></td>
+<td>a human has read it</td>
+</tr>
+<tr>
+<td><code>in_progress</code></td>
+<td>somebody is fixing it</td>
+</tr>
+<tr>
+<td><code>resolved</code></td>
+<td>believed fixed</td>
+</tr>
+<tr>
+<td><code>false_positive</code></td>
+<td>the rule is wrong here</td>
+</tr>
+<tr>
+<td><code>accepted_risk</code></td>
+<td>waived, with an approver, a reason and a date</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>A <code>resolved</code> finding reopens when it is seen again.</strong> This is the transition
+the whole model exists for: a fix that did not hold must not stay green because
+somebody once ticked a box. A <code>false_positive</code> stays one — the identity <em>is</em> the
+rule plus the location, so it really is the same judgement — and an
+<code>accepted_risk</code> stays accepted until its date.</p>
+<p><strong>A waiver expires, and the expiry is applied when you read it.</strong> The collector
+runs no scheduler, so nothing has to happen for a lapsed waiver to stop waiving:
+the finding lists as <code>open</code> again and says which waiver ran out. Backdating is
+allowed and announced, because recording a decision that has already run out is a
+legitimate thing to do and a surprise is not.</p>
+<h3 id="this-is-not-guardana-baseline-and-does-not-replace-it">This is not <code>guardana baseline</code>, and does not replace it</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>guardana baseline</code></th>
+<th>collector waiver</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Changes the build's exit code</td>
+<td><strong>yes</strong></td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>Lives</td>
+<td>next to the code, in git</td>
+<td>in the collector, shared by the team</td>
+</tr>
+<tr>
+<td>Answers</td>
+<td>&quot;should this pipeline fail today&quot;</td>
+<td>&quot;did anybody decide anything about this&quot;</td>
+</tr>
+</tbody>
+</table></div>
+<p>The collector never tells an agent what to do. A gate that asked a server whether
+to fail would be a gate that fails open when the network does — so if you want a
+build to stop failing, that is still <code>guardana baseline</code>
+(<a href="usage-baseline.html">usage-baseline.md</a>). Exporting a project's collector waivers
+<em>as</em> a baseline file is a natural next step and is deliberately not here yet.</p>
+<h2 id="the-audit-log">The audit log</h2>
+<pre><code class="language-bash">guardana-collector audit list [--project acme/web] [--limit 50]
+</code></pre>
+<p>State changes only: keys created and revoked, tenants created and renamed,
+findings triaged, schema migrated and rolled back, anything deleted. Reads are not
+recorded — a log that grows with every dashboard refresh is a log nobody reads.</p>
+<p><strong>Every row says what kind of actor it was, and the difference matters:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Example</th>
+<th>Worth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key</code></td>
+<td><code>key:prod-ci (id 4)</code></td>
+<td><strong>verified</strong> — the credential was presented and matched</td>
+</tr>
+<tr>
+<td><code>cli</code></td>
+<td><code>cli:konrad@ops-1</code></td>
+<td><strong>asserted</strong> — an operator with database access said so</td>
+</tr>
+</tbody>
+</table></div>
+<p>A CLI actor is the operating-system user, taken from the environment rather than
+typed, and <code>--actor</code> overrides it for a shared operations account. It is not
+authentication: anybody who can reach the database can write any name. It is
+recorded anyway, because &quot;what happened, roughly when, by which route&quot; is the
+question a log usually answers — and labelling an assertion as proof would be the
+same false green this tool refuses in a verdict. Real identities arrive with users
+and RBAC.</p>
+<p><code>api_keys.created_by</code> is filled by the same actor, and a stored submission now
+records <strong>which key wrote it</strong>.</p>
+<p>One event can never be recorded: rolling back the migration that created the log
+removes the log. The command says so on stderr rather than failing after the fact.</p>
+<h2 id="retention-keeping-less-on-purpose">Retention: keeping less, on purpose</h2>
+<pre><code class="language-bash">guardana-collector retention set   --project acme/web --keep-days 90
+guardana-collector retention show  --project acme/web
+guardana-collector retention apply --project acme/web --dry-run
+guardana-collector retention apply --project acme/web
+</code></pre>
+<p>Per <strong>project</strong>, because the tenant is the project everywhere else here and a
+policy at a different granularity is one that eventually deletes somebody else's
+evidence. A project nobody has told keeps everything, and <code>apply</code> <strong>refuses</strong>
+without a policy rather than falling back to a default — deleting on a default is
+a collector that removes evidence because nobody said not to.</p>
+<p><strong>Applying is a command, never a background job.</strong> There is no scheduler in the
+collector, so &quot;what deleted my evidence&quot; is answerable from the audit log rather
+than from source. Run it yourself, or from a cron you wrote.</p>
+<p>Two things retention deliberately does not touch:</p>
+<ul>
+<li><strong>The audit log.</strong> A log pruned by the policy it describes cannot answer
+questions about the pruning.</li>
+<li><strong>Triage.</strong> A tracked finding outlives its occurrences: its status and waiver
+stay, and the sighting count falls to zero. Otherwise a finding that reappears
+after a prune arrives as new and somebody re-decides what they already decided.</li>
+</ul>
+<h2 id="deleting-a-project-an-organization-or-a-typo">Deleting a project, an organization, or a typo</h2>
+<pre><code class="language-bash">guardana-collector project delete --project acme/web --yes
+guardana-collector org delete --slug acme --yes
+guardana-collector system merge --project acme/web --from suport-agent --into support-agent
+</code></pre>
+<p><code>--yes</code> is required on both deletions, and deleting an organization <strong>refuses
+while it still holds projects</strong>: cascading two levels of tenancy from one word is
+exactly the command somebody runs at three in the morning in a shell they thought
+was pointed elsewhere. Delete the projects first, one at a time.</p>
+<p>The record of a deletion is filed under the <em>organization</em>, because audit events
+cascade from a project — an event about a deleted project, filed under that
+project, would be deleted by the deletion it describes.</p>
+<p><code>system merge</code> is the one operation here that edits the past rather than removing
+it. It exists because the alternative is a permanent second AI system created by
+one keystroke, which is what makes people stop trusting an inventory.</p>
+<h2 id="organizations-and-projects">Organizations and projects</h2>
+<p><strong>The tenant is the project.</strong> An organization is what a project belongs to and
+what gets named; isolation runs along the project, because that is the line a team
+draws for itself — <code>web</code> and <code>api</code> are not the same body of evidence even when one
+department pays for both.</p>
+<pre><code class="language-bash">guardana-collector org create --slug acme --name &quot;Acme Inc&quot;
+guardana-collector org list                             # marks the adopted one
+guardana-collector org rename --slug adopted --to acme
+guardana-collector project create --org acme --slug web --name &quot;Web app&quot;
+guardana-collector project list [--org acme]
+guardana-collector project rename --project acme/web --to api
+</code></pre>
+<p><strong>The project comes from the key, never from the envelope.</strong> If the envelope named
+it, the runner would declare where it writes — and a credential that does not bound
+the write is not a boundary at all. It is also why the envelope stays at v5 and why
+nothing in the engine changed: an agent and a collector upgrade independently, and
+no fleet has to move in step with a collector. The cost is real and accepted: a
+team with ten projects needs ten keys in CI.</p>
+<p><strong>There is no command that deletes an organization or a project</strong>, and the foreign
+keys are <code>on delete restrict</code>. Removing tenant data is retention, and it deserves
+to be designed there rather than smuggled in here.</p>
+<p><strong>Renaming is safe.</strong> A key hangs off a project's identity, not its name, so
+<code>project rename</code> does not invalidate anything.</p>
+<h3 id="what-migration-0003-did-to-a-collector-that-already-had-data">What migration <code>0003</code> did to a collector that already had data</h3>
+<p>It <strong>adopted</strong> it rather than refusing to run. Refusing is the most faithful to &quot;a
+decision, never a default&quot;, but it stops an upgrade half-way, and that is exactly
+the pressure that produces workarounds.</p>
+<p>Every pre-tenancy submission and every pre-tenancy key landed in one organization
+called <code>adopted</code> — named for what happened, because a thing called <code>default</code> is a
+thing nobody chose. Three conditions make that honest rather than convenient:</p>
+<ul>
+<li>it is created <strong>only when there is something to adopt</strong>, so a fresh install gets
+no tenant it never asked for;</li>
+<li><strong>old keys keep working</strong>, because adoption must not be a silent invalidation of
+a fleet of credentials;</li>
+<li><strong>it can be renamed</strong>, because a name a migration invented must not be permanent.</li>
+</ul>
+<p><code>org list</code> marks it and says where it came from, so an administrator who upgraded
+without reading a changelog still finds out where their history went.</p>
+<p><strong>Rolling <code>0003</code> back refuses when two tenants would be merged.</strong> Dropping the
+tenant column on a database serving two teams folds their evidence into one
+undifferentiated pile, so the down migration counts the tenants across the
+submissions <em>and</em> the keys first and raises rather than doing it.</p>
+<h2 id="limits-how-much-one-caller-may-send-and-how-often">Limits: how much one caller may send, and how often</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>What it bounds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GUARDANA_MAX_BODY_BYTES</code></td>
+<td><code>8388608</code> (8 MiB)</td>
+<td>one request body; over it answers <code>413</code></td>
+</tr>
+<tr>
+<td><code>GUARDANA_RATE_LIMIT_PER_MINUTE</code></td>
+<td><code>120</code></td>
+<td>requests per caller per rolling minute; over it answers <code>429</code> with <code>Retry-After</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>0</code> turns a limit off and is something somebody types. A value that is not a
+number is refused <strong>at start-up</strong> rather than treated as &quot;no limit&quot;: a typo must
+not silently remove a control.</p>
+<p>The size check counts bytes off the wire rather than trusting <code>Content-Length</code> — a
+header is a claim, and a chunked request need not make one. Liveness and readiness
+are never rate limited: a readiness probe answered <code>429</code> is a rolling deploy that
+stalls, which is a self-inflicted outage caused by a control meant to prevent one.</p>
+<p><strong>The rate limiter lives in the process.</strong> A deployment running four workers has
+four times the limit, and there is no shared counter. That is stated rather than
+implied, because a limit somebody believes is global and is not is worse than one
+they know to put a reverse proxy in front of. For a real global limit, rate-limit
+at the proxy that already terminates your TLS.</p>
+<p>An unauthenticated caller is charged by peer address, an authenticated one by its
+credential — so one noisy agent cannot spend a whole fleet's allowance.</p>
+<h2 id="choosing-where-submissions-go">Choosing where submissions go</h2>
+<p>There is no default, on purpose. A store nobody chose is a store somebody
+deploys, and the ephemeral one loses everything on restart.</p>
+<pre><code class="language-bash"># Durable. What a team should run.
+export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
+
+# Ephemeral, and you had to say so. For evaluating Guardana on a laptop.
+export GUARDANA_STORAGE=memory
+</code></pre>
+<p>With neither set, the collector refuses to start and says which to set. This is
+the same rule as &quot;no default credentials&quot;, one layer down: the unsafe
+configuration must not be the one you get by not deciding.</p>
+<h2 id="api-keys">API keys</h2>
+<p>Every route that carries a finding needs one. Keys live in the database, so a
+collector with no database cannot authenticate anybody — and refuses to be built
+rather than serving openly.</p>
+<pre><code class="language-bash">guardana-collector key create --project acme/web --name github-actions   # ingest only
+guardana-collector key create --project acme/web --name dashboard --scope read
+guardana-collector key create --project acme/web --name ci --expires-in-days 90
+guardana-collector key list [--project acme/web]              # prefixes, never secrets
+guardana-collector key revoke &lt;prefix&gt;
+</code></pre>
+<p><strong><code>--project</code> is required, and this command does not guess</strong> even when exactly one
+project exists. Issuing a credential against a tenant nobody named has the same
+shape as a default credential, and <code>bootstrap</code> already covers the case where there
+is only one.</p>
+<pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…                                # never a flag: see below
+guardana scan . --reporter server://https://collector.example.com
+curl -H &quot;Authorization: Bearer gdn_…&quot; https://collector.example.com/findings
+</code></pre>
+<p><strong>Two scopes, not one.</strong> <code>ingest</code> writes runs; <code>read</code> browses them. A CI job needs
+to write and never to browse, and a single scope covering both would make every
+pipeline credential a full read of every finding the organisation has recorded.
+<code>key create</code> therefore defaults to <code>ingest</code> alone.</p>
+<p><strong>The agent reads its key from <code>GUARDANA_COLLECTOR_TOKEN</code></strong>, not from a flag. A
+credential on a command line lands in shell history, in <code>ps</code>, and in the echoed
+command of most CI logs — the same reason <code>probe</code> takes <code>--api-key-env</code> rather
+than <code>--api-key</code>. A collector that rejects a submission says so as a warning
+naming the status, because a whole fleet quietly failing to report while a
+dashboard shows stale data as current is the failure that matters.</p>
+<p><strong><code>--reporter</code> takes the collector's URL, not a route.</strong> The reporter appends the
+ingest path itself, so <code>server://https://collector.example.com</code> is the whole thing
+a pipeline needs to know. A URL that already carries a path is left alone, for a
+deployment behind a reverse proxy that maps one.</p>
+<p><strong>The URL keeps its own scheme</strong>, <code>http://</code> or <code>https://</code> — <code>server://</code> says
+&quot;send this to a collector&quot; and does not decide how. A bare <code>host:port</code> is
+refused before the run starts, with a <code>3</code> and a message naming both forms,
+because guessing would mean either sending evidence over plaintext to a remote
+host or breaking every local evaluation, and neither is a guess worth making on
+somebody's behalf.</p>
+<p><strong>Shown once.</strong> There is no command and no endpoint that returns a key after it is
+created — a credential a system can re-read is a credential that leaks through
+every path that reads it. Only a digest is stored: a stolen backup of a collector
+database must not also be a set of working credentials for the thing that produced
+its contents.</p>
+<p><strong>Absence is refusal.</strong> A fresh collector has no keys and accepts nothing. That is
+the behaviour, not an oversight: a system reading &quot;no credentials configured&quot; as
+&quot;no credentials required&quot; is the shape of every default-admin incident there has
+ever been. <code>key list</code> says so plainly on an empty collector.</p>
+<p>Every failure — unknown key, malformed key, revoked, expired — answers with the
+same <code>401</code> and the same sentence. Saying which one would turn the endpoint into a
+way to enumerate valid prefixes. A key that <em>is</em> valid and lacks the scope gets
+<code>403</code> instead, because that is a different fact and a pipeline retrying its
+credentials forever is not the right outcome.</p>
+<h3 id="the-dashboard-signs-in-with-a-read-key">The dashboard signs in with a read key</h3>
+<p><code>GUARDANA_DASHBOARD=1</code> mounts a read-only page. It used to refuse to mount on a
+collector that requires keys — correctly, because a browser has nowhere to put a
+bearer token and every panel would have loaded empty. Now the browser signs in:</p>
+<pre><code class="language-bash">guardana-collector key create --project acme/web --name panel --scope read
+# then open the collector and paste the key once
+</code></pre>
+<p>The key goes into an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie the page itself cannot
+read; <code>key revoke</code> ends the session, and an expiring key ends it on its own. There
+are no user accounts — those arrive with RBAC and replace this.</p>
+<p><strong>The cookie authenticates reads and nothing else.</strong> Ingest takes a bearer header
+only, so a page on another origin cannot make a signed-in browser submit findings.
+That is enforced in the guard rather than left to <code>SameSite</code>, because a control
+that rests on one browser flag fails the day somebody adds an exception for a
+proxy (<a href="design/panel-sessions.html">design</a>).</p>
+<p>A signed-in browser sees exactly what the key sees: one project, and one
+environment when the key is pinned to one. It cannot reach further than a <code>curl</code>
+with the same key.</p>
+<h3 id="a-database-outage-is-not-a-rejected-key">A database outage is not a rejected key</h3>
+<p>If the collector cannot reach its database while checking a key, it answers <code>503</code>,
+not <code>401</code>. A fleet told its credentials were rejected goes and rotates credentials
+that were fine — and the agent-side warning talks about matching schema versions,
+which is advice about the wrong thing entirely. Nothing is leaked by the
+distinction: <code>/readyz</code> already tells any caller whether the database is reachable.</p>
+<h3 id="running-without-any-of-it">Running without any of it</h3>
+<p><code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code> (or <code>allow_unauthenticated=True</code> when building
+the app in code) accepts a collector anyone who can reach the port can read and
+write. It exists for evaluating Guardana on a laptop, and it has to be typed:
+combined with choosing the ephemeral store, that is two explicit switches for the
+toy configuration and none for the real one.</p>
+<h2 id="migrations">Migrations</h2>
+<pre><code class="language-bash">guardana-collector status      # what is applied, what is pending
+guardana-collector migrate     # apply everything pending
+guardana-collector rollback    # undo the most recent (--steps N for more)
+</code></pre>
+<p>Exit codes match <a href="exit-codes.html">the table the rest of the tool uses</a>: <code>0</code> did
+what was asked, <code>1</code> the database said no, <code>3</code> the command was pointed at nothing.</p>
+<p><strong>Every migration ships a rollback</strong>, checked when the migration set is loaded
+rather than when it is needed. A schema change that cannot be undone is an upgrade
+nobody will risk, and &quot;we will write the rollback if we need it&quot; is a decision
+made under exactly the pressure that produces bad rollbacks.</p>
+<p><strong>Each migration runs in one transaction</strong>, together with the row that records it.
+One that fails half-way leaves the database as it found it, rather than in a state
+no version describes.</p>
+<p><strong>A Postgres advisory lock covers the whole run</strong>, so two replicas starting
+together cannot both apply the same version.</p>
+<h3 id="three-things-the-runner-refuses">Three things the runner refuses</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Refused</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a migration edited after it was applied</td>
+<td>two databases now disagree about what version four <em>is</em>, and nothing else would ever notice. The checksum is recorded when it is applied and checked every time after. Add a new migration instead</td>
+</tr>
+<tr>
+<td>a migration numbered below the highest applied one</td>
+<td>a rebase accident. Applying only what comes after would skip it on that database forever, while every other database has it</td>
+</tr>
+<tr>
+<td>a database holding a migration this build does not ship</td>
+<td>it was written by a newer Guardana, and an older collector would write rows the newer schema does not describe</td>
+</tr>
+<tr>
+<td>rolling back <code>0003</code> on a database holding two tenants</td>
+<td>dropping the tenant column would merge two teams' evidence into one undifferentiated pile. The only refusal tied to a single migration, because only this one can destroy an isolation boundary</td>
+</tr>
+</tbody>
+</table></div>
+<p>Rolling back <code>0004</code> needs no refusal: it drops labels, which loses information and
+merges no tenants, and the submissions themselves stay.</p>
+<h2 id="health-and-readiness-are-two-questions">Health and readiness are two questions</h2>
+<pre><code class="language-bash">curl -s localhost:8000/healthz   # the process is running. Touches no database
+curl -s localhost:8000/readyz    # the schema this build expects is the one present
+</code></pre>
+<p><code>/readyz</code> returns <code>503</code> while a migration is pending, so a rolling deploy does not
+send traffic at a schema that is not there yet — and returns <code>503</code> again after a
+rollback, which is the direction that matters during an incident.</p>
+<p>Under <code>GUARDANA_STORAGE=memory</code> it reports <code>&quot;storage&quot;: &quot;memory&quot;</code> rather than a
+plain &quot;ready&quot;. A fleet view that cannot tell durable from ephemeral will read one
+as the other, and the ephemeral one is the one that forgets.</p>
+<h2 id="applying-migrations">Applying migrations</h2>
+<p><code>guardana-collector migrate</code> is the supported path. <code>GUARDANA_MIGRATE_ON_START=1</code>
+makes the server migrate before serving, which is what a single-node Docker
+Compose wants and what a rolling deploy should not have: migrating on boot means
+two versions of the code briefly run against one schema.</p>
+<h2 id="running-one-locally">Running one locally</h2>
+<pre><code class="language-bash">docker compose -f deploy/docker-compose.dev.yml up -d
+export GUARDANA_DATABASE_URL=postgresql://guardana:guardana@127.0.0.1:55439/guardana_test
+uv run guardana-collector migrate
+uv run guardana-collector bootstrap --org acme --project web    # prints the key once
+uv run --with uvicorn guardana-collector serve
+</code></pre>
+<p>(<code>--with uvicorn</code> because the ASGI server is an extra and this repository does not
+carry it as a development dependency.)</p>
+<p>Then point a run at it:</p>
+<pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…
+guardana scan . --reporter server://http://127.0.0.1:8000
+</code></pre>
+<p>To look at nothing but the dashboard, skip all of it — <code>GUARDANA_STORAGE=memory</code>
+with <code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code> still starts a collector with a working
+page, no database, no organization and no key.</p>
+<p>A collector that is unreachable never changes a gate's exit code — the scan
+already ran and its verdict stands on its own. A collector that <em>rejects</em> a
+submission is different and says so, because a whole fleet silently failing to
+report while a dashboard shows stale data as current is the failure that matters.</p>
+<h2 id="contributing-to-the-collector">Contributing to the collector</h2>
+<p>Its tests need a real PostgreSQL. Without one they <strong>skip</strong>, so changing a rule
+does not require running a database. Setting <code>GUARDANA_REQUIRE_POSTGRES=1</code> turns
+that skip into a failure, and CI sets it — because &quot;the isolation test did not
+run&quot; reading as a green build is the same fail-open this project refuses
+everywhere else, relocated into the test suite.</p>
+<pre><code class="language-bash">docker compose -f deploy/docker-compose.dev.yml up -d
+uv run pytest packages/guardana-server
+</code></pre>
+<p>Every assertion about storage runs against <strong>both</strong> the in-memory store and
+PostgreSQL, from one parametrised contract test. Two implementations tested apart
+become two implementations that behave differently, and the one nobody runs
+locally is the one that behaves differently in production. The cross-tenant tests
+run against both for the same reason, and a further test walks the <code>Store</code>
+protocol and fails on any method that does not take a tenant scope first.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="design/collector-domain-model.html"><code>design/collector-domain-model.md</code></a> — the model the next items build</li>
+<li><a href="design/collector-persistence.html"><code>design/collector-persistence.md</code></a> — why persistence is shaped the way it is</li>
+<li><a href="design/collector-tenancy.html"><code>design/collector-tenancy.md</code></a> — the organization/project boundary that is being built next</li>
+<li><a href="architecture.html#the-coreserver-boundary"><code>architecture.md</code></a> — why the engine never imports this</li>
+<li><a href="privacy.html"><code>privacy.md</code></a> — evidence is redacted by the agent before it is sent</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-collector.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

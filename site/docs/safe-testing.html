@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Safe active testing — Guardana documentation</title>
+<meta name="description" content="before you point an active check at anything that matters">
+<link rel="canonical" href="https://guardana.dev/docs/safe-testing.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html" aria-current="page">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html" aria-current="page">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Safe active testing</h1><p class="lede">before you point an active check at anything that matters</p><p><code>guardana scan</code> reads files and cannot break anything. <code>guardana probe</code> and
+<code>guardana monitor</code> send real requests to a real system, and that deserves a page
+of its own before you point either at something that matters.</p>
+<h2 id="what-an-active-run-actually-does">What an active run actually does</h2>
+<p>It sends adversarial prompts to your endpoint and grades the replies. Concretely,
+that means it:</p>
+<ul>
+<li><strong>consumes tokens</strong>, which on a paid endpoint costs money;</li>
+<li><strong>may trip abuse detection</strong> — a burst of jailbreak attempts looks exactly like a
+burst of jailbreak attempts to a provider's safety systems;</li>
+<li><strong>writes to agent memory</strong> where a rule tests memory poisoning, because that is
+the check;</li>
+<li><strong>reads whatever your tools return</strong>, including production data if your tools
+reach production;</li>
+<li><strong>changes MCP server state</strong> if a tool you exposed has side effects.</li>
+</ul>
+<p><code>probe --mcp</code> is narrower than that, deliberately. Against an MCP server Guardana
+speaks only <code>server/discover</code>, <code>tools/list</code>, the <code>initialize</code> handshake where the
+server still expects one, and unauthenticated <code>GET</code>s of the two authorization
+discovery documents — it <strong>never calls a tool</strong>, because a tool call is a side
+effect on somebody's system and no verification result is worth finding that out by
+experiment. It also <strong>declares no client capabilities</strong>, so a server following the
+<code>2026-07-28</code> Multi Round-Trip Requests pattern cannot ask it to run a model
+completion or to prompt a human on the server's behalf: a server may only ask for
+a capability the client declared, and Guardana declares none. It also refuses to fetch a discovery address that points
+into the network running the scan or at the cloud metadata endpoint, and reports
+the refusal as a finding rather than following it to be sure.</p>
+<h2 id="what-guardana-never-does">What Guardana never does</h2>
+<p><strong>Guardana does not execute your tools.</strong> When a rule offers a model a
+<code>delete_file</code> tool, the call is answered by a double — a scripted stand-in that
+returns text. Nothing is deleted. This is not a setting; it is how the trajectory
+engine is built, and it is why a security test can safely offer a destructive tool.</p>
+<p><strong>Guardana is never in the request path.</strong> It does not proxy, intercept or block
+your users' traffic. If something needs to be stopped in production, Guardana is
+the wrong layer.</p>
+<p><strong>Guardana sends nothing anywhere else.</strong> No telemetry, no account, no phone-home.
+The only network traffic is to the target you configured — plus your judge and your
+collector, if you configured those.</p>
+<h2 id="the-gap-that-remains-stated-plainly">The gap that remains, stated plainly</h2>
+<p>Guardana simulates the tool. <strong>Your deployment might not.</strong> If the model under test
+is wired to real tools by its own application — and it is a production agent, so it
+probably is — then a prompt Guardana sends can cause that application to take a
+real action. Guardana did not execute the tool; the system under test did.</p>
+<p>This is why the recommendation is not &quot;Guardana is safe&quot; but:</p>
+<blockquote>
+<p><strong>Probe staging.</strong> Probe production only when you understand what its tools do.</p>
+</blockquote>
+<h2 id="practical-guidance">Practical guidance</h2>
+<p><strong>Use a staging deployment with the same configuration.</strong> Same model, same system
+prompt, same tool manifest, non-production credentials and data. A security verdict
+from staging transfers; a production incident does not.</p>
+<p><strong>Point tools at a sandbox.</strong> If you must exercise a production-shaped agent, give
+it tool endpoints that write to a scratch environment.</p>
+<p><strong>Bound the run.</strong> Concurrency is bounded (<code>--concurrency</code>, default 4 for probe)
+and rate limits are retried with backoff rather than hammered. Request, token, cost
+and duration budgets arrive in <strong>v0.7</strong> — until then, size the run by choosing a
+profile, not by hoping.</p>
+<p><strong>Run deep checks on a schedule, not on every pull request.</strong> A fast static gate
+belongs in a PR. Endpoint probing belongs at deployment time and nightly. This
+keeps cost predictable and stops a noisy check from blocking every merge.</p>
+<p><strong>Watch the evidence.</strong> Findings can quote model output, which can quote your data.
+Evidence is redacted by default; enabling full evidence is a decision to make
+deliberately — see <a href="design/privacy-and-redaction.html">privacy and redaction</a>.</p>
+<h2 id="reading-a-result-honestly">Reading a result honestly</h2>
+<p>A probe that reports zero findings has <strong>not</strong> told you the model is safe. It has
+told you that these checks, with this evaluator, at this confidence, did not find
+these problems on this run. A model is a probabilistic system: the same prompt can
+land differently next time.</p>
+<p>That is the whole reason <code>guardana diff</code> exists — a single run is a snapshot, and
+the question worth gating on is whether the snapshot got worse.</p>
+<h2 id="coming-in-v07">Coming in v0.7</h2>
+<p>Rules will declare their impact, so a policy can select by it:</p>
+<pre><code class="language-yaml">impact: passive | active | side_effecting
+destructive: false
+estimated_requests: 3
+</code></pre>
+<p>with <code>--safety passive|active</code> and an explicit <code>--allow-side-effects</code>, destructive
+checks never running by default, and every attempted action reported as
+<strong>simulated</strong>, <strong>proposed</strong> or <strong>executed</strong>. See the <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">roadmap</a>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="threat-model.html">Threat model</a> — including what a hostile endpoint can do to Guardana</li>
+<li><a href="product-status.html">Product status</a> — what is and is not covered</li>
+<li><a href="usage-probe.html"><code>docs/usage-probe.md</code></a> · <a href="usage-monitor.html"><code>docs/usage-monitor.md</code></a></li>
+</ul>
+<h2 id="declared-impact-and-what-a-run-permits-07">Declared impact, and what a run permits (0.7)</h2>
+<p>Every rule declares how far it reaches, and every run declares how far it is
+willing to let a rule reach.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Impact</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>passive</code></td>
+<td>reads only — a file scan, or reading a tool manifest</td>
+</tr>
+<tr>
+<td><code>active</code></td>
+<td>sends prompts to a model: costs money, appears in the target's logs</td>
+</tr>
+<tr>
+<td><code>side_effecting</code></td>
+<td>may cause the target to <em>act</em> — call a real tool, write to a real memory store</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-bash">guardana probe --url ... --model ... --safety passive   # send nothing
+guardana probe --url ... --model ...                    # active, the default
+guardana probe --url ... --model ... --safety side-effecting
+</code></pre>
+<p><code>active</code> is the default because sending prompts is what a probe is for; a passive
+default would make the ordinary command do nothing. <code>guardana scan</code> is passive
+whatever this says — a file scan sends nothing.</p>
+<p><strong>Nothing Guardana ships is <code>side_effecting</code> today, and that is a statement about
+today rather than about the checks.</strong> The agent rules drive Guardana's own harness
+with its own tool doubles, so when a model &quot;calls&quot; a tool nothing outside the
+process happens. The level is reserved for the case that changes it — evaluating a
+trace from <em>your</em> agent, where the tools are real — because declaring it now would
+label a risk that does not exist yet and devalue the label for when it does.</p>
+<h3 id="destructive-is-a-separate-switch">Destructive is a separate switch</h3>
+<pre><code class="language-bash">guardana probe ... --allow-destructive
+</code></pre>
+<p>A rule that can destroy or alter something the target owns never runs without
+this, <strong>whatever the impact ceiling says</strong>. Two independent switches rather than a
+fourth impact level, so raising one can never reach the other by accident.</p>
+<p>Nothing shipped is destructive, and a test asserts it: if a built-in ever sets the
+flag, that is a decision argued in a pull request rather than discovered by a user
+whose <code>--allow-destructive</code> did something they did not expect.</p>
+<h3 id="a-rule-refused-for-safety-is-reported-not-dropped">A rule refused for safety is reported, not dropped</h3>
+<p>It appears in <code>rules_skipped</code> with <code>reason: unsafe_mode</code> and a sentence naming the
+flag that would permit it. A check that did not happen is a coverage gap whatever
+the reason — and here the fix is a flag rather than a different provider, which is
+what the reader needs to know.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/safe-testing.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana taxonomy — Guardana documentation</title>
+<meta name="description" content="guardana taxonomy: which framework entry a reference names, and what it corresponds to in another edition">
+<link rel="canonical" href="https://guardana.dev/docs/usage-taxonomy.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html" aria-current="page">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana taxonomy</code> — which framework entry a rule actually means</h1><p class="lede"><code>guardana taxonomy</code>: which framework entry a reference names, and what it corresponds to in another edition</p><p>Every Guardana rule maps to a public framework, because a finding nobody can look
+up is a finding nobody can answer for. This command shows what those mappings can
+name: which catalogues are installed, what each entry is called, and what an entry
+recorded years ago corresponds to today.</p>
+<h2 id="why-an-edition-is-part-of-a-reference">Why an edition is part of a reference</h2>
+<p>OWASP published the 2026 edition of the LLM Top 10 on 3 August 2026, and it did not
+renumber into empty space:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Short id</th>
+<th>2025 edition</th>
+<th>2026 edition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLM05</code></td>
+<td>Improper Output Handling</td>
+<td>Data and Model Poisoning</td>
+</tr>
+<tr>
+<td><code>LLM06</code></td>
+<td>Excessive Agency</td>
+<td>Unbounded Consumption</td>
+</tr>
+<tr>
+<td><code>LLM07</code></td>
+<td>System Prompt Leakage</td>
+<td>Misinformation</td>
+</tr>
+<tr>
+<td><code>LLM08</code></td>
+<td>Vector and Embedding Weaknesses</td>
+<td>Hidden Context Exposure</td>
+</tr>
+<tr>
+<td><code>LLM09</code></td>
+<td>Misinformation</td>
+<td>Vector and Embedding Weaknesses</td>
+</tr>
+<tr>
+<td><code>LLM10</code></td>
+<td>Unbounded Consumption</td>
+<td>Improper Output Handling</td>
+</tr>
+</tbody>
+</table></div>
+<p>So a reference names its edition. In a rule that is <code>LLM07:2025</code>, and a bare <code>LLM07</code>
+is a <strong>load-time error</strong> listing the editions that define it — never a guess,
+because guessing would silently decide what your rule claims to an auditor:</p>
+<pre><code>$ guardana taxonomy LLM01
+error: taxonomy id 'LLM01' does not say which edition it means; write one of: LLM01:2025, LLM01:2026
+</code></pre>
+<p>A framework that publishes no editions keeps its bare ids. <code>AML.T0051</code> and
+<code>supply-chain</code> are written exactly as before, and so is a reference your own
+catalogue registers.</p>
+<h2 id="list-what-is-installed">List what is installed</h2>
+<pre><code class="language-bash">guardana taxonomy
+</code></pre>
+<pre><code>OWASP-LLM-2026 — OWASP Top 10 for Large Language Model Applications
+  10 entries · digest sha256:7a30d74e1feb0…
+  https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/
+    LLM01:2026       Prompt Injection
+    LLM02:2026       Sensitive Information Disclosure
+    …
+</code></pre>
+<p>The digest is the one every run pins in its manifest (<code>run.coverage.taxonomies</code>).
+That is what makes a report readable in three years: it says which edition was
+installed, and exactly which revision of it, without anybody having to remember.</p>
+<h2 id="explain-one-reference">Explain one reference</h2>
+<pre><code class="language-bash">guardana taxonomy LLM07:2025
+</code></pre>
+<pre><code>LLM07:2025  System Prompt Leakage
+  framework: OWASP-LLM-2025
+  rank:      7
+  corresponds to:
+    LLM08:2026 Hidden Context Exposure (broader) — renamed and widened past the
+    system prompt to tool schemas, retrieved content and credentials embedded in context
+</code></pre>
+<p>Note what it does <em>not</em> say. <code>LLM07:2025</code> does not correspond to <code>LLM07:2026</code>, which
+is Misinformation. The crosswalk is data with an explicit relation on every pair —
+<code>exact</code>, <code>broader</code>, <code>narrower</code> or <code>related</code> — because the 2026 edition redrew its
+categories as well as re-ranking them, so most pairs are not equivalences.</p>
+<p><code>--format json</code> prints the same thing for a script, with <code>scheme</code>, <code>edition</code> and
+<code>framework</code> as separate fields.</p>
+<h2 id="what-this-never-does">What this never does</h2>
+<p><strong>It never rewrites stored evidence.</strong> A saved run, a baseline and a collector row
+keep the reference they were written with, forever: a <code>LLM07</code> recorded under
+<code>OWASP-LLM-2025</code> is read as System Prompt Leakage by every later build, whatever
+that short id means in an edition installed today. A correspondence is computed in
+memory when you ask for one, and that is the only place it exists.</p>
+<p><strong>It never remaps a rule.</strong> Where the semantics genuinely overlap a rule carries
+both editions — the canary system-prompt check is <code>LLM07:2025</code> <em>and</em> <code>LLM08:2026</code> —
+and <code>guardana rules</code> prints both.</p>
+<h2 id="registering-your-own-framework">Registering your own framework</h2>
+<p>A company mapping rules to its own control catalogue registers references through
+the <code>guardana.taxonomies</code> entry point and then writes <code>taxonomy: [ACME-14]</code> in YAML
+like any built-in. Registration happens through an installed package rather than a
+string in a rule file, which is what keeps an unknown reference a load-time error
+instead of a rule that maps to nothing.
+<a href="https://github.com/guardana/guardana/blob/main/examples/custom_rule/README.md"><code>examples/custom_rule</code></a> does exactly this — see
+<code>src/acme_rules/controls.py</code> and the <code>ACME-14</code> in <code>catalog/refusal.yaml</code>.</p>
+<p>Once the pack is installed, the listing says so:</p>
+<pre><code>ACME-CONTROLS — registered by an installed package
+  1 entry · no catalogue digest: a package registers references, not a catalogue file
+    ACME-14          Internal data does not leave the support boundary
+</code></pre>
+<p><strong>Your entries carry no digest, and that is deliberate.</strong> A package registers
+references; a catalogue file is what gets hashed and pinned into a run manifest, so
+there is nothing here to pin and inventing a value would claim a provenance nobody
+has. In <code>--format json</code> the entry appears in the same list as the built-in
+catalogues with <code>&quot;digest&quot;: null</code>, which is how a script tells the two apart.</p>
+<p>See <a href="extending.html"><code>extending.md</code></a> and
+<a href="design/taxonomy-editions.html"><code>design/taxonomy-editions.md</code></a>.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-taxonomy.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

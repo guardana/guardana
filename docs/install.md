@@ -1,3 +1,10 @@
+---
+title: "Installing"
+nav_order: 30
+summary: "installing the CLI"
+status: stable
+---
+
 # Installing Guardana
 
 Guardana requires **Python 3.11+**.

@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub repository setup — Guardana documentation</title>
+<meta name="description" content="One-time GitHub repository configuration: branch protection, environments and the settings a release depends on.">
+<link rel="canonical" href="https://guardana.dev/docs/maintainers/github-setup.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html" aria-current="page">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>GitHub repository setup (maintainers)</h1><p class="lede">One-time GitHub repository configuration: branch protection, environments and the settings a release depends on.</p><p>A one-time checklist to make <code>github.com/guardana/guardana</code> a first-class
+open-source repo: healthy triage, clean contributions, and a supply chain a
+security tool can stand behind. Files that live in the repo (issue/PR templates,
+<code>CODEOWNERS</code>, <code>dependabot.yml</code>, <code>.github/release.yml</code>) are already committed —
+this covers the settings that live in <strong>GitHub's UI</strong>, which a checkout can't
+carry. Do these once after the first push; revisit the labels and environment
+protection as the project grows.</p>
+<p>Related: <a href="https://github.com/guardana/guardana/blob/main/RELEASING.md"><code>../../RELEASING.md</code></a> (cutting a release),
+<a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md"><code>../../CONTRIBUTING.md</code></a> (the contributor rules these
+settings enforce).</p>
+<h2 id="1-repo-basics--settings--general">1. Repo basics — Settings → General</h2>
+<ul>
+<li><strong>Description:</strong> &quot;Security verification for self-hosted and self-built AI —
+one rule engine for your laptop, CI, and a served model.&quot;</li>
+<li><strong>Website:</strong> <code>https://guardana.dev</code></li>
+<li><strong>Topics:</strong> <code>ai-security</code>, <code>llm-security</code>, <code>prompt-injection</code>, <code>mlsecops</code>,
+<code>security-scanner</code>, <code>owasp-llm</code>, <code>supply-chain-security</code>, <code>python</code>, <code>cli</code>,
+<code>sarif</code> — topics are how people discover the repo.</li>
+<li><strong>Features:</strong> Issues ✅ · Discussions ✅ (the issue-template chooser links to
+it) · Projects (optional) · Wiki ❌ (docs live in <code>docs/</code>).</li>
+</ul>
+<h2 id="2-merge-settings--settings--general--pull-requests">2. Merge settings — Settings → General → Pull Requests</h2>
+<p>This is where the project's <strong>single-commit-PR law</strong> (see <code>CONTRIBUTING.md</code>)
+stops being a request and becomes mechanically enforced:</p>
+<ul>
+<li><strong>Allow squash merging</strong> ✅ — and set the default squash commit message to
+<strong>&quot;Pull request title and description&quot;</strong> so the squashed commit is the
+conventional-commit PR title.</li>
+<li><strong>Allow merge commits</strong> ❌ and <strong>Allow rebase merging</strong> ❌ — squash-only means
+every PR lands as exactly one commit no matter how the contributor's branch
+looked.</li>
+<li><strong>Automatically delete head branches</strong> ✅ — keeps the fork/branch list clean.</li>
+<li><strong>Always suggest updating pull request branches</strong> ✅.</li>
+</ul>
+<h2 id="3-protect-main--settings--rules--rulesets-or-branch-protection">3. Protect <code>main</code> — Settings → Rules → Rulesets (or Branch protection)</h2>
+<p>Target branch <code>main</code>. Enable:</p>
+<ul>
+<li><strong>Require a pull request before merging</strong> — with <strong>1 approval</strong> (a solo
+maintainer can set 0 and rely on required status checks; raise it the moment a
+second maintainer exists).</li>
+<li><strong>Require status checks to pass</strong> — add the CI jobs once they've run once so
+the names appear: the <code>test</code> matrix (<strong>3.11</strong>, <strong>3.12</strong>, <strong>3.13</strong>) and
+<strong><code>example-plugin</code></strong>. Tick <strong>Require branches to be up to date</strong>.</li>
+<li><strong>Require conversation resolution before merging</strong> ✅.</li>
+<li><strong>Require linear history</strong> ✅ (pairs with squash-only).</li>
+<li><strong>Block force pushes</strong> ✅ and <strong>Restrict deletions</strong> ✅.</li>
+<li>Signed commits are optional; if you enable it, document it in <code>CONTRIBUTING.md</code>
+so contributors aren't surprised.</li>
+</ul>
+<h2 id="4-labels--issues--labels">4. Labels — Issues → Labels</h2>
+<p>The <a href="https://github.com/guardana/guardana/blob/main/.github/release.yml"><code>.github/release.yml</code></a> release-note categories
+key off these, so keep the names in sync. A small, purposeful set beats a big
+one:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Colour idea</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bug</code></td>
+<td>red</td>
+<td>A defect</td>
+</tr>
+<tr>
+<td><code>feature</code></td>
+<td>green</td>
+<td>New capability</td>
+</tr>
+<tr>
+<td><code>rule</code></td>
+<td>teal</td>
+<td>A new/changed detection rule</td>
+</tr>
+<tr>
+<td><code>security</code></td>
+<td>dark red</td>
+<td>Security-relevant work (surfaces in release notes)</td>
+</tr>
+<tr>
+<td><code>documentation</code></td>
+<td>blue</td>
+<td>Docs only</td>
+</tr>
+<tr>
+<td><code>breaking</code></td>
+<td>black</td>
+<td>A backwards-incompatible change (drives a minor bump pre-1.0)</td>
+</tr>
+<tr>
+<td><code>dependencies</code></td>
+<td>grey</td>
+<td>Dependency bumps (excluded from release notes)</td>
+</tr>
+<tr>
+<td><code>good first issue</code></td>
+<td>purple</td>
+<td>Newcomer-friendly — GitHub surfaces these specially</td>
+</tr>
+<tr>
+<td><code>help wanted</code></td>
+<td>teal</td>
+<td>Maintainer would welcome a PR</td>
+</tr>
+<tr>
+<td><code>needs-triage</code></td>
+<td>yellow</td>
+<td>Not yet assessed</td>
+</tr>
+<tr>
+<td><code>duplicate</code> / <code>wontfix</code> / <code>invalid</code></td>
+<td>grey</td>
+<td>Triage outcomes</td>
+</tr>
+</tbody>
+</table></div>
+<p>You can apply these in bulk with the GitHub CLI, e.g.
+<code>gh label create rule --color 1abc9c --description &quot;A detection rule&quot;</code>.</p>
+<h2 id="5-security--settings--security--advisories">5. Security — Settings → Security &amp; Advisories</h2>
+<p>A tool that scans other people's supply chains must be exemplary about its own:</p>
+<ul>
+<li><strong>Private vulnerability reporting</strong> ✅ — this is the &quot;GitHub Security Advisory&quot;
+channel <code>SECURITY.md</code> points at. Turn it on so the &quot;Report a vulnerability&quot;
+button appears.</li>
+<li><strong>Dependabot alerts</strong> ✅ and <strong>Dependabot security updates</strong> ✅ — the committed
+<code>dependabot.yml</code> only schedules <em>version</em> updates; the alert/auto-fix side is
+a UI toggle.</li>
+<li><strong>Secret scanning</strong> ✅ and <strong>Push protection</strong> ✅ — refuses a push that
+contains a detected credential. (Guardana has its own <code>detect-private-key</code>
+pre-commit hook and a secret-scanning rule; this is the server-side backstop.)</li>
+<li><strong>Code scanning (CodeQL)</strong> — optional now; a good v0.2 addition. Our <code>ruff</code>
+<code>S</code>/bandit rules already lint for common issues in CI.</li>
+</ul>
+<h2 id="6-the-pypi-release-environment--settings--environments">6. The <code>pypi</code> release environment — Settings → Environments</h2>
+<p><a href="https://github.com/guardana/guardana/blob/main/.github/workflows/release.yml"><code>release.yml</code></a> publishes from an
+environment named <strong><code>pypi</code></strong> using OIDC trusted publishing (no stored token).
+Create that environment and add a <strong>required reviewer</strong> (yourself/the
+maintainers team). Then a <code>v*</code> tag push pauses for a human click before anything
+reaches PyPI — a deliberate gate so an accidental or malicious tag can't publish
+unattended. Configure a <strong>PyPI Trusted Publisher</strong> for each of the five packages
+first (see <code>RELEASING.md</code> → first-time PyPI setup).</p>
+<h2 id="6a-make-the-container-packages-public--once-after-the-first-release">6a. Make the container packages public — once, after the first release</h2>
+<p>The release workflow pushes two images to <code>ghcr.io</code>. <strong>A package created by a
+workflow is private, whatever the repository's visibility is</strong>, so the very
+command the documentation tells users to run —</p>
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.11 scan /work
+</code></pre>
+<p>— answers <code>unauthorized</code> until somebody changes it. There is no REST API for
+this; it is a one-time click per package:</p>
+<ol>
+<li>Organization → <strong>Packages</strong> → <code>guardana</code> → <strong>Package settings</strong></li>
+<li><strong>Danger Zone → Change visibility → Public</strong></li>
+<li>Repeat for <code>guardana-collector</code></li>
+<li>While there, <strong>Manage Actions access</strong> → add the <code>guardana/guardana</code>
+repository with <strong>Write</strong>, so later releases keep pushing to the same package</li>
+</ol>
+<p>Check it from a machine with no credentials, because &quot;it works for me&quot; here means
+&quot;I am logged in&quot;:</p>
+<pre><code class="language-bash">docker logout ghcr.io
+docker run --rm ghcr.io/guardana/guardana:0.11 --version
+</code></pre>
+<p>This is the failure mode this project keeps meeting from a different direction: a
+green release workflow, a documented command, and a user who cannot run it.</p>
+<h2 id="7-discussions--set-up-categories">7. Discussions — set up categories</h2>
+<p>The bug/feature templates deliberately route questions away from Issues and into
+Discussions. Seed the default categories: <strong>Q&amp;A</strong> (answerable), <strong>Ideas</strong>,
+<strong>Show and tell</strong>, <strong>Announcements</strong> (post-only — link releases here).</p>
+<h2 id="8-actions-permissions--settings--actions--general">8. Actions permissions — Settings → Actions → General</h2>
+<ul>
+<li><strong>Workflow permissions:</strong> &quot;Read repository contents&quot; by default; the release
+job requests <code>id-token: write</code> explicitly in its YAML, which is the minimum
+for OIDC publishing.</li>
+<li><strong>Fork pull request workflows:</strong> require approval for first-time contributors
+— the default, and the right one for a public repo.</li>
+</ul>
+<h2 id="9-verify--insights--community-standards">9. Verify — Insights → Community Standards</h2>
+<p>GitHub grades the repo against a checklist (README, Code of Conduct, Contributing,
+License, Issue templates, PR template). Every item should already be green from
+the committed files — this page is the quick confirmation that nothing regressed.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/maintainers/github-setup.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

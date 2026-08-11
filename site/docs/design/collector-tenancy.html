@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collector tenancy — Guardana documentation</title>
+<meta name="description" content="organizations, projects, and the scope on every query">
+<link rel="canonical" href="https://guardana.dev/docs/design/collector-tenancy.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html" aria-current="page">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: collector tenancy — organizations and projects<span class="status implemented">implemented</span></h1><p class="lede">organizations, projects, and the scope on every query</p><p><strong>Status:</strong> implemented in 0.9.0 · <strong>Written:</strong> 2026-08-04 · <strong>Phase C, item 21</strong></p>
+<h2 id="the-problem">The problem</h2>
+<p>Every API key a collector issues can read every finding the collector holds.
+Persistence (item 19) and authentication (item 20) made the collector something a
+team can keep and something a stranger cannot write to, but they did not make it
+something <em>two</em> teams can share. One instance therefore serves one team, which is
+why its maturity label is still <code>experimental</code> and why &quot;project/environment
+isolation&quot; is still unticked on the company-ready checklist.</p>
+<p>Principle 12 says tenancy is part of the definition of done rather than a later
+hardening pass, so the isolation tests are written with the feature and not after
+it.</p>
+<h2 id="what-must-not-get-harder">What must not get harder</h2>
+<p>Stated first, because a security boundary added carelessly is how a tool that
+anybody could run becomes a tool only its authors run.</p>
+<ul>
+<li><strong>A local scan is untouched.</strong> <code>pip install guardana &amp;&amp; guardana scan .</code> does
+not involve a collector, an organization or a key, and nothing here changes
+that. The engine still never imports the server.</li>
+<li><strong>The envelope stays at v5.</strong> An agent sends exactly what it sends today, so no
+fleet has to be upgraded in step with a collector. This is a direct consequence
+of taking the project from the key rather than from the envelope.</li>
+<li><strong>Evaluating the collector on a laptop stays two variables.</strong>
+<code>GUARDANA_STORAGE=memory</code> with <code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code> still starts a
+collector with a working dashboard and no database, no organization and no key.</li>
+<li><strong>Standing a real collector up gains one command, not four.</strong>
+<code>guardana-collector bootstrap --org acme --project web</code> creates the
+organization, the project and the first key together and prints the key once.
+The granular <code>org create</code> / <code>project create</code> / <code>key create --project</code> commands
+exist for the second team, not for the first run.</li>
+</ul>
+<p>The full first-run path gains exactly one line, the last one:</p>
+<pre><code class="language-bash">docker compose -f deploy/docker-compose.dev.yml up -d
+export GUARDANA_DATABASE_URL=postgresql://…
+guardana-collector migrate
+guardana-collector bootstrap --org acme --project web   # prints the key, once
+uvicorn 'guardana.server:create_app' --factory
+</code></pre>
+<p><code>bootstrap</code> refuses when that organization and project already exist, naming
+<code>key create</code> instead. A command that quietly succeeds the second time is a command
+somebody runs twice in a script and never notices issued two credentials.</p>
+<h2 id="four-decisions">Four decisions</h2>
+<h3 id="1-a-database-with-data-is-adopted-not-refused">1. A database with data is adopted, not refused</h3>
+<p>The alternatives were refusing to migrate until an administrator names an
+organization, and leaving the tenant column empty so pre-tenancy rows become
+invisible.</p>
+<p>The third is worst: the rows still exist, they vanish from every view, and the
+team reads that as data loss. Refusing is the most faithful to &quot;a decision, never
+a default&quot;, but it stops an upgrade half-way, and that is exactly the pressure
+that produces workarounds — the same argument that makes every migration ship a
+rollback.</p>
+<p>Adoption creates no leak, and that is what settles it. Every pre-tenancy row and
+every pre-tenancy key lands in the <em>same</em> project, which is where they already
+were together; an organization created afterwards is invisible to the old keys.</p>
+<p>Three conditions make adoption honest rather than convenient:</p>
+<ul>
+<li><strong>The organization is called <code>adopted</code>, not <code>default</code>.</strong> The name states what
+happened: this is where migration <code>0003</code> put the rows that predate tenancy. A
+thing called <code>default</code> is a thing nobody chose.</li>
+<li><strong>It is created only when there is something to adopt.</strong> On an empty database
+the migration creates no organization at all, so a fresh install does not get a
+tenant it never asked for.</li>
+<li><strong>It can be renamed.</strong> <code>org rename</code> and <code>project rename</code> exist because a name
+the migration invented must not be permanent.</li>
+</ul>
+<p>The adoption condition covers <strong>submissions or api_keys</strong>, not submissions alone.
+A collector that has issued keys but received no runs is a real state, and
+<code>api_keys.project_id</code> is <code>not null</code> — so keying adoption off submissions alone
+would fail the migration on exactly that database.</p>
+<h3 id="2-the-scope-is-the-first-argument-of-every-store-method">2. The scope is the first argument of every <code>Store</code> method</h3>
+<p>The alternative was a per-request repository — <code>store.for_project(id)</code> returning
+an object that carries the scope. It has one genuine advantage: a method cannot
+be added without a scope, because the scope lives in the constructor. It also has
+a failure mode this does not: an object holding a tenant can be stored in a module
+global and reused by the next request.</p>
+<p>So the scope goes in the signature, and the missing property is bought with a
+test rather than with a shape:</p>
+<pre><code class="language-python">class Store(Protocol):
+    def add(self, scope: TenantScope, submission: Submission) -&gt; None: ...
+    def submissions(self, scope: TenantScope, source: str | None = None,
+                    limit: int | None = None) -&gt; list[Submission]: ...
+    def trend(self, scope: TenantScope) -&gt; dict[str, int]: ...
+    def records(self, scope: TenantScope, source: str | None = None,
+                limit: int | None = None) -&gt; list[StoredSubmission]: ...
+</code></pre>
+<p><code>test_no_store_method_is_unscoped</code> walks the protocol's public methods and asserts
+each takes <code>scope: TenantScope</code> first. Whoever adds a fifth method without one
+sees red — the same trade this repository makes everywhere else, where a promise
+that could rot becomes a gate that cannot.</p>
+<p><code>TenantScope</code> is a type rather than a bare <code>int</code>, because <code>submissions(scope, source, limit)</code> with three positional primitives is a mistake waiting for a
+distracted afternoon.</p>
+<h3 id="3-the-project-comes-from-the-key-never-from-the-envelope">3. The project comes from the key, never from the envelope</h3>
+<p>If the envelope named the project, the runner would declare where it writes, and a
+credential that does not bound the write is not a boundary at all. Taking it from
+the key also means the envelope does not move to v6: an agent and a collector
+still upgrade independently, and nothing in <code>guardana-core</code> changes.</p>
+<p>The cost is real and is accepted: a team with ten projects needs ten keys in CI.
+That is the same reasoning that gave keys two scopes instead of one, and it is the
+direction a credential should err in.</p>
+<p>A rule for whoever revisits this: if the envelope ever carries a project
+identifier, a mismatch with the key must be a <strong>refusal</strong>, never &quot;prefer the more
+specific one&quot;. Anything else re-opens the hole this decision closes.</p>
+<h3 id="4-unknown-project-on-ingest-stops-being-reachable">4. &quot;Unknown project on ingest&quot; stops being reachable</h3>
+<p>Decision 3 removes the question. The project is read from the authenticated key,
+and <code>api_keys.project_id</code> has a foreign key onto <code>projects</code>, so a submission
+cannot name a project that does not exist.</p>
+<p>What remains is a deleted project with a surviving key, and the answer is <code>on delete restrict</code> plus <strong>no delete command in this item</strong>. Removing tenant data is
+retention (item 26) and deserves to be designed there rather than smuggled in
+here. The domain model's related question — a <code>Deployment</code> created but marked
+unclaimed — belongs to item 22, where deployments arrive.</p>
+<h2 id="design">Design</h2>
+<h3 id="schema-migration-0003">Schema, migration 0003</h3>
+<pre><code class="language-sql">create table organizations (
+    id          bigserial    primary key,
+    slug        text         not null unique,
+    name        text         not null,
+    created_at  timestamptz  not null default now()
+);
+
+create table projects (
+    id               bigserial    primary key,
+    organization_id  bigint       not null references organizations (id) on delete restrict,
+    slug             text         not null,
+    name             text         not null,
+    created_at       timestamptz  not null default now(),
+    unique (organization_id, slug)
+);
+
+alter table submissions add column project_id bigint references projects (id) on delete restrict;
+alter table api_keys    add column project_id bigint references projects (id) on delete restrict;
+</code></pre>
+<p>Adoption runs only when there is something to adopt, then both columns become
+<code>not null</code> — so no row can exist without a tenant, and a scoped query cannot
+silently fail to return one.</p>
+<p>Indexes are replaced rather than added. Every read now filters on <code>project_id</code>
+first, which makes <code>submissions_received_at_idx</code> and <code>submissions_source_idx</code> dead
+weight paid for on every insert:</p>
+<pre><code class="language-sql">drop index submissions_received_at_idx;
+drop index submissions_source_idx;
+create index submissions_project_received_idx on submissions (project_id, received_at desc);
+create index submissions_project_source_idx   on submissions (project_id, source);
+</code></pre>
+<p><code>trend()</code> now joins <code>findings</code> to <code>submissions</code> to filter by tenant, and this
+composite index is what keeps that join driven by the submission side. Principle 2
+— cost grows with the target, not with the rule count — applies to the collector's
+queries as much as to a scan.</p>
+<h3 id="the-rollback-refuses-to-merge-two-tenants">The rollback refuses to merge two tenants</h3>
+<p><code>0003.down.sql</code> drops the tenant columns, which on a database serving two teams
+would silently merge their evidence into one undifferentiated pile. So it checks
+first and raises:</p>
+<pre><code class="language-sql">do $$
+begin
+    if (select count(distinct project_id) from submissions) &gt; 1
+       or (select count(distinct project_id) from api_keys) &gt; 1 then
+        raise exception 'refusing to roll back tenancy: this database holds data for more '
+                        'than one project, and dropping the tenant column would merge them';
+    end if;
+end $$;
+</code></pre>
+<p>This is a fourth entry in the table of things the migration runner refuses,
+alongside an edited migration, a renumbered one, and a database written by a newer
+build. Unlike those three it is specific to one migration, which is the right
+place for it: only this migration can destroy an isolation boundary.</p>
+<p>The down file also <strong>restores the two indexes it dropped</strong>. A rollback that leaves
+the database missing what the previous migration created is a rollback that only
+half went backwards, and the next reader pays for it in query plans nobody
+associates with a schema change.</p>
+<h3 id="the-unauthenticated-mode-has-a-scope-that-cannot-touch-a-database">The unauthenticated mode has a scope that cannot touch a database</h3>
+<p>A collector running <code>GUARDANA_STORAGE=memory</code> with authentication explicitly
+disabled has no organizations, no projects and no keys — and it must keep working,
+because that is the path somebody evaluating Guardana takes first.</p>
+<p><code>TenantScope.unauthenticated()</code> is that scope. The in-memory store treats it as an
+ordinary tenant; <strong><code>PostgresStore</code> raises <code>UnscopedQueryError</code> on it</strong>, on read and
+on write alike. A scope that belongs to nobody must not be able to reach durable
+evidence, and making that structural beats making it a rule someone has to
+remember.</p>
+<p>Two paths reach it, and both are tested rather than reasoned about:</p>
+<ul>
+<li><code>guard()</code> returns no identity only when there is no database URL, so a collector
+with a database can never fall into this scope;</li>
+<li><code>create_app(store=…)</code> leaves <code>database_url</code> unset, and already refuses to build
+unless the caller passes <code>allow_unauthenticated=True</code>. That refusal is what
+stops an embedder handing in a <code>PostgresStore</code> and getting an unauthenticated,
+unscoped collector.</li>
+</ul>
+<h3 id="identity-carries-the-tenant">Identity carries the tenant</h3>
+<p><code>authenticate()</code> reads <code>project_id</code> alongside the scopes, and <code>Authenticated</code>
+gains it. The app derives the scope from the identity, so no handler chooses a
+tenant:</p>
+<pre><code class="language-python">scope = identity.scope if identity is not None else TenantScope.unauthenticated()
+</code></pre>
+<h3 id="commands">Commands</h3>
+<p>A new <code>tenancy.py</code> holds the domain — <code>TenantScope</code>, organizations, projects, and
+resolving a <code>org/project</code> reference — beside <code>auth.py</code>, which already holds keys.
+<code>cli.py</code> becomes a package so each command group stays one short file:
+<code>cli/schema.py</code> (migrate, status, rollback), <code>cli/keys.py</code>, <code>cli/tenants.py</code>.</p>
+<pre><code class="language-bash">guardana-collector bootstrap --org acme --project web   # org + project + first key
+guardana-collector org create --slug acme --name &quot;Acme Inc&quot;
+guardana-collector org list                             # marks the adopted one
+guardana-collector org rename --slug adopted --to acme
+guardana-collector project create --org acme --slug web --name &quot;Web app&quot;
+guardana-collector project list [--org acme]
+guardana-collector project rename --project acme/web --to api
+guardana-collector key create --project acme/web --name github-actions
+guardana-collector key list [--project acme/web]
+</code></pre>
+<p><code>key create</code> requires <code>--project</code> and does not guess when exactly one exists.
+Issuing a credential against a tenant nobody named is the same shape as a default
+credential. On a collector with no organizations it says what to run instead of
+what went wrong.</p>
+<p><code>org list</code> marks the adopted organization for what it is, so an administrator who
+upgraded without reading a changelog still finds out where their history went.</p>
+<h2 id="testing">Testing</h2>
+<p>Every isolation test takes the <code>database_url</code> fixture, so it cannot quietly not
+run: without a database it skips, and <code>GUARDANA_REQUIRE_POSTGRES=1</code> — which CI
+sets — turns that skip into a failure.</p>
+<ul>
+<li>the <code>Store</code> contract, parametrised over both implementations, with a scope on
+every call</li>
+<li><strong>cross-tenant read</strong>: write under project A, read under B — <code>submissions</code>,
+<code>trend</code> and <code>records</code> each return nothing, on both stores</li>
+<li><strong>cross-tenant write</strong>: two keys, two projects; each sees only its own after
+both have written</li>
+<li>both of the above <strong>between two organizations</strong> and <strong>between two projects of
+one organization</strong></li>
+<li>over HTTP, not only at the store: key A posts, key B gets, and gets nothing</li>
+<li><code>PostgresStore</code> refuses <code>TenantScope.unauthenticated()</code></li>
+<li>no <code>Store</code> method is unscoped (protocol introspection)</li>
+<li><code>0003</code> on a database with submissions <strong>and</strong> keys: both adopted, and the
+pre-existing key still authenticates afterwards</li>
+<li><code>0003</code> on a database with keys and no submissions: adopted</li>
+<li><code>0003</code> on an empty database: no organization is created</li>
+<li><code>0003</code> rollback with one project: succeeds</li>
+<li><code>0003</code> rollback with two projects: refuses, and the message says why</li>
+<li><code>bootstrap</code> creates all three and prints the key once</li>
+<li><code>key create</code> without <code>--project</code>, and on a collector with no organizations:
+usage error naming the next command</li>
+<li>an unauthenticated collector still ingests, reads and renders its dashboard</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ul>
+<li>Cross-tenant read and write fail, per entity, as tests, on both stores.</li>
+<li>Migration up and down on a database with data.</li>
+<li>No query without a scope, enforced by a test rather than by review.</li>
+<li>The envelope stays at v5 and <code>guardana-core</code> is unchanged.</li>
+<li>First run of a real collector is three commands.</li>
+<li>The engine still does not import the collector (<code>lint-imports</code>).</li>
+</ul>
+<h2 id="what-this-item-deliberately-does-not-deliver">What this item deliberately does not deliver</h2>
+<p>The maturity label stays <code>experimental</code>. The checklist entry is
+&quot;project/environment <strong>isolation</strong>&quot;, environments arrive in item 22, and a
+checklist that moves to match what shipped is not a checklist.</p>
+<p>Also out of scope, each with its own item: human roles and browser sessions (the
+dashboard still refuses to mount on an authenticated collector), the audit log
+(25), deletion and retention (26), environments and deployments (22).</p>
+<h2 id="two-things-the-code-changed-about-this-design">Two things the code changed about this design</h2>
+<p>Recorded rather than edited into the argument above, because a document that only
+ever describes what happened teaches nobody what was reconsidered.</p>
+<p><strong><code>organizations.adopted</code> is a column.</strong> The design promises <code>org list</code> marks the
+adopted organization, and recognising it by the slug <code>adopted</code> stops working the
+second somebody runs <code>org rename</code> — which this same document introduces, for
+exactly the reason that a name a migration invented must not be permanent. So the
+fact is recorded as a fact.</p>
+<p><strong>The rollback counts tenants across the union of both tables.</strong> The SQL sketched
+above counts <code>submissions</code> and <code>api_keys</code> separately, which sees &quot;one and one&quot; on a
+database whose runs are in one project and whose key belongs to another — two
+tenants, merged by a rollback that thought it was safe.</p>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li><strong>An organization-scoped key</strong>, so one CI credential can write to several
+projects. It is a real request from a monorepo, and it is also how a leaked
+credential stops being contained. Waiting for someone to ask, and for the role
+model in item 24.</li>
+<li><strong>Recording which key wrote a submission.</strong> One column, obviously useful, and
+it is the first row of the audit log rather than a field on storage — so it
+lands with item 25 and its retention question.</li>
+<li><strong>The in-memory store's bound is shared across tenants</strong>, so one noisy tenant
+could evict another's. It cannot happen today, because the unauthenticated mode
+has exactly one scope. If that ever changes, the bound has to become per-scope.</li>
+</ol>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/collector-tenancy.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

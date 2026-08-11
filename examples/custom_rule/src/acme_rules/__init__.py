@@ -20,8 +20,10 @@ from guardana.core.evaluator import Evaluator
 from guardana.core.rule import Rule
 from guardana.core.rule.yaml_rule import load_yaml_rules
 from guardana.core.target import Target
+from guardana.core.taxonomy import TaxonomyRef
 
 from acme_rules.approved_model import ApprovedModelRule
+from acme_rules.controls import ACME_14
 from acme_rules.hardcoded_secret import HardcodedAcmeKeyRule
 from acme_rules.prompt_library_target import AcmePromptLibraryTarget
 from acme_rules.refusal_classifier import StrictRefusalClassifier
@@ -40,6 +42,23 @@ def provide_targets() -> list[type[Target]]:
     of not registering it, with no example able to notice.
     """
     return [AcmePromptLibraryTarget]
+
+
+def provide_taxonomies() -> list[TaxonomyRef]:
+    """Entry point target for `guardana.taxonomies`: Acme's own control catalogue.
+
+    The fourth group, and the last one nothing registered. It was documented in
+    `README.md`, `FEATURES.md` and `docs/usage-taxonomy.md` while
+    `entry_points(group="guardana.taxonomies")` returned an empty list — the exact
+    state `guardana.targets` was in one release earlier, when `pack validate`
+    shipped accusing every pack with a target of not registering it and nothing
+    could notice. A documented seam with no user is a seam nobody has run.
+
+    `refusal.yaml` writes `taxonomy: [ACME-14]`, so this is load-bearing rather
+    than decorative: the reference resolves only because discovery registers
+    taxonomies before it loads rules.
+    """
+    return [ACME_14]
 
 
 def _load_catalog_rules() -> list[Rule]:

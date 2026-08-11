@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finding lifecycle and waivers — Guardana documentation</title>
+<meta name="description" content="statuses, waivers that expire, and why this is not a second baseline">
+<link rel="canonical" href="https://guardana.dev/docs/design/finding-lifecycle-and-waivers.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html" aria-current="page">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: the finding lifecycle, and waivers that expire<span class="status accepted">accepted</span></h1><p class="lede">statuses, waivers that expire, and why this is not a second <code>baseline</code></p><p><strong>Status:</strong> accepted · <strong>Implemented in:</strong> 0.11.0 · <strong>Component:</strong> collector</p>
+<h2 id="the-problem">The problem</h2>
+<p>The collector records every sighting of a finding and nothing about what anybody
+decided. <code>finding list</code> can say a problem has been seen by nine runs since
+Tuesday; it cannot say that someone looked at it, that it is being fixed, that it
+is a false positive, or that the team accepted the risk until the end of the
+quarter. So a team triages in a spreadsheet, and the collector — the one place
+with the history — is the one place that does not know the answer.</p>
+<p>That is also how a scanner produces alert fatigue: re-litigating the same finding
+every run is what makes people stop reading the output.</p>
+<h2 id="the-model">The model</h2>
+<p><code>Finding</code> becomes an entity. The identity that groups occurrences is the one the
+engine has computed since 0.6 (<code>guardana.core.diff.finding_identity</code>) and already
+sends on every occurrence, so the collector does not invent a second notion of
+&quot;the same finding&quot; in a package that cannot import the first.</p>
+<pre><code>tracked_findings   (project_id, identity)  ← the entity: status, owner, waiver
+findings           (submission_id, …)      ← the occurrences, unchanged
+</code></pre>
+<p><strong>The occurrence table keeps its name.</strong> Renaming <code>findings</code> to
+<code>finding_occurrences</code> reads better and would touch every query in the collector at
+once, for a clarity a comment gives for free. The new table's name says which one
+it is.</p>
+<p><strong>The entity holds only what the sightings cannot say</strong>: status, owner, waiver,
+first and last seen. Severity, title and location stay where they are, computed by
+aggregating occurrences — a copy on the entity is a second source of truth that
+drifts the first time a rule's severity changes.</p>
+<h2 id="statuses">Statuses</h2>
+<p>A closed set of six, and no free text:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Means</th>
+<th>Set by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open</code></td>
+<td>seen, nobody has said anything</td>
+<td>ingest (first sighting), or a lapse</td>
+</tr>
+<tr>
+<td><code>acknowledged</code></td>
+<td>a human has read it</td>
+<td><code>finding status</code></td>
+</tr>
+<tr>
+<td><code>in_progress</code></td>
+<td>somebody is fixing it</td>
+<td><code>finding status</code></td>
+</tr>
+<tr>
+<td><code>resolved</code></td>
+<td>believed fixed</td>
+<td><code>finding status</code></td>
+</tr>
+<tr>
+<td><code>false_positive</code></td>
+<td>the rule is wrong here</td>
+<td><code>finding status</code></td>
+</tr>
+<tr>
+<td><code>accepted_risk</code></td>
+<td>waived, with an approver, a reason and a date</td>
+<td><code>finding waive</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="what-a-new-sighting-does">What a new sighting does</h3>
+<ul>
+<li><code>resolved</code> → <strong>reopens</strong> to <code>open</code>. A fix that did not hold must not stay
+green because somebody once ticked a box; this is the single most important
+transition in the model.</li>
+<li><code>false_positive</code> → stays. The identity is the rule plus the location, so the
+same identity really is the same judgement; reopening it every run would make
+the status useless and teach people to ignore the list.</li>
+<li><code>accepted_risk</code> → stays <strong>until the waiver expires</strong> (below).</li>
+<li>anything else → unchanged, <code>last_seen_at</code> moves.</li>
+</ul>
+<h2 id="waivers-expire-and-expiry-is-evaluated-when-you-read">Waivers expire, and expiry is evaluated when you read</h2>
+<p>A waiver carries three things, all required: <strong>who approved it</strong>, <strong>why</strong>, and
+<strong>when it lapses</strong>. There is no indefinite waiver — accepted risk that never comes
+back is a permanently disabled check with better manners.</p>
+<p><strong>Expiry is computed at read time, never by a job.</strong> The collector has no
+scheduler, and a status that only becomes correct when a cron runs is a status
+that is quietly wrong between runs. A waiver whose date has passed reports the
+finding as <code>open</code>, with the lapse stated, and nothing had to run for that to be
+true.</p>
+<h2 id="this-is-not-a-second-definition-of-accepted-risk">This is not a second definition of accepted risk</h2>
+<p><code>guardana baseline</code> already waives findings, with an approver, a reason and an
+expiry. The fields here are deliberately the same, and so is the rule that an
+expired waiver stops waiving. What differs is <strong>scope, and it is stated in both
+places</strong>:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>guardana baseline</code></th>
+<th>collector waiver</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Changes the build's exit code</td>
+<td><strong>yes</strong></td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>Lives</td>
+<td>next to the code, in git</td>
+<td>in the collector, shared by the team</td>
+</tr>
+<tr>
+<td>Answers</td>
+<td>&quot;should this pipeline fail today&quot;</td>
+<td>&quot;did anybody decide anything about this&quot;</td>
+</tr>
+</tbody>
+</table></div>
+<p>The collector never tells an agent what to do — an agent that asked a server
+whether to fail would be a gate with a network dependency, and a gate that fails
+open when the network does. Deferred, and worth doing: exporting a project's
+collector waivers <strong>as</strong> a baseline file, so a decision recorded centrally can be
+applied locally without being retyped.</p>
+<h2 id="addressing-a-finding-on-the-command-line">Addressing a finding on the command line</h2>
+<p>Identities are <code>sha256:…</code> and nobody types those. Every command takes a <strong>unique
+prefix</strong>, like git. An ambiguous prefix is refused with the candidates listed —
+never resolved to the first match, because acting on the wrong finding is worse
+than being asked to type four more characters.</p>
+<h2 id="migration">Migration</h2>
+<p><code>0006</code> creates <code>tracked_findings</code> and back-fills it from what is already stored:
+<code>select distinct project_id, identity from findings join submissions …</code>, every row
+<code>open</code>, first and last seen taken from the occurrences. A collector that has been
+running for months therefore arrives with its history intact rather than an empty
+triage list.</p>
+<p>The down migration drops the table, which loses statuses and waivers — stated in
+the migration itself, because that is a real cost and the operator should meet it
+before running the command, not after.</p>
+<h2 id="what-this-deliberately-does-not-include">What this deliberately does not include</h2>
+<ul>
+<li><strong>No comments or discussion.</strong> That is a ticket system's job, and every team
+already has one.</li>
+<li><strong>No per-status permissions.</strong> There are no users yet; a key that may read may
+also triage, which is honest for a collector whose credentials are per project.
+RBAC lands with the team-platform milestone.</li>
+<li><strong>No notification on reopen.</strong> Webhooks are their own item; inventing a
+half-integration here would be the thing people have to work around later.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/finding-lifecycle-and-waivers.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,3 +1,10 @@
+---
+title: "Enterprise-readiness plan"
+nav_order: 210
+summary: "The original plan for making Guardana deployable by a company. Superseded by ROADMAP.md, kept because it records what the constraints were at the time."
+status: superseded
+---
+
 # Guardana: Enterprise-Readiness Change Plan
 
 **Status:** superseded by [`ROADMAP.md`](../../ROADMAP.md) · **Written:** 2026-08-02 against 0.6

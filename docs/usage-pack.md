@@ -1,3 +1,10 @@
+---
+title: "guardana pack validate"
+nav_order: 240
+summary: "`guardana pack validate`: the manifest declaring which extension API your pack needs and what it provides"
+status: stable
+---
+
 # `guardana pack validate` — can this build load your pack, and does it do what it says
 
 1.0 promises that `Rule`, `Evaluator` and `Target` will not break under you. A

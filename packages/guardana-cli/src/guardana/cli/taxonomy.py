@@ -12,6 +12,7 @@ edition it names, and the correspondence is computed in memory when asked for.
 """
 
 import json
+from collections import defaultdict
 from enum import StrEnum
 from typing import Annotated
 
@@ -23,6 +24,7 @@ from guardana.core.taxonomy import (
     TaxonomyRef,
     catalogs,
     correspondents,
+    known_refs,
     resolve,
 )
 
@@ -66,33 +68,77 @@ def taxonomy(
     _explain(reference, format)
 
 
+def _registered_outside_a_catalog() -> list[tuple[str, tuple[TaxonomyRef, ...]]]:
+    """Group the references an installed package registered that no catalogue file holds.
+
+    The listing did discovery and then printed `catalogs()`, which is built-ins
+    only — so a company that installed their own control catalogue ran the one
+    command that confirms what is installed and was told it was not. Nothing had
+    ever registered through `guardana.taxonomies`, so the gap between the comment
+    above and the code below had no way to be noticed.
+
+    Reported in their own section and without a digest rather than folded in beside
+    the built-ins: a package registers *references*, not a catalogue file, so there
+    is nothing to pin, and inventing a digest would claim a provenance nobody has
+    in the field a report is checked against years later.
+    """
+    catalogued = {(ref.framework, ref.id) for catalog in catalogs() for ref in catalog.refs}
+    grouped: defaultdict[str, list[TaxonomyRef]] = defaultdict(list)
+    for ref in known_refs():
+        if (ref.framework, ref.id) not in catalogued:
+            grouped[ref.framework].append(ref)
+    return [(framework, tuple(refs)) for framework, refs in sorted(grouped.items())]
+
+
+def _catalogs_as_json() -> list[dict[str, object]]:
+    """Every installed catalogue, then every reference registered without one.
+
+    One list rather than two keys, so a script that already walks catalogues picks
+    the new entries up. `digest` is `null` on exactly the ones a package
+    registered, which is how a consumer tells them apart without a flag.
+    """
+    listed: list[dict[str, object]] = [
+        {
+            "scheme": c.scheme,
+            "edition": c.edition,
+            "framework": c.framework,
+            "title": c.title,
+            "version": c.version,
+            "source": c.source,
+            "published": c.published,
+            "digest": c.digest,
+            "entries": [
+                {"reference": r.reference, "id": r.id, "rank": r.rank, "title": r.title}
+                for r in c.refs
+            ],
+        }
+        for c in catalogs()
+    ]
+    listed += [
+        {
+            "scheme": refs[0].scheme,
+            "edition": refs[0].edition,
+            "framework": framework,
+            "title": "",
+            "version": None,
+            "source": None,
+            "published": None,
+            "digest": None,
+            "entries": [
+                {"reference": r.reference, "id": r.id, "rank": r.rank, "title": r.title}
+                for r in refs
+            ],
+        }
+        for framework, refs in _registered_outside_a_catalog()
+    ]
+    return listed
+
+
 def _list_catalogs(format: TaxonomyFormat) -> None:
-    installed = catalogs()
     if format == TaxonomyFormat.json:
-        typer.echo(
-            json.dumps(
-                [
-                    {
-                        "scheme": c.scheme,
-                        "edition": c.edition,
-                        "framework": c.framework,
-                        "title": c.title,
-                        "version": c.version,
-                        "source": c.source,
-                        "published": c.published,
-                        "digest": c.digest,
-                        "entries": [
-                            {"reference": r.reference, "id": r.id, "rank": r.rank, "title": r.title}
-                            for r in c.refs
-                        ],
-                    }
-                    for c in installed
-                ],
-                indent=2,
-            )
-        )
+        typer.echo(json.dumps(_catalogs_as_json(), indent=2))
         return
-    for catalog in installed:
+    for catalog in catalogs():
         typer.echo(f"\n{catalog.framework} — {catalog.title}")
         typer.echo(f"  {len(catalog.refs)} entries · digest {catalog.digest}")
         if catalog.version:
@@ -100,6 +146,14 @@ def _list_catalogs(format: TaxonomyFormat) -> None:
         if catalog.source:
             typer.echo(f"  {catalog.source}")
         for ref in catalog.refs:
+            typer.echo(f"    {ref.reference:16} {ref.title}")
+    for framework, refs in _registered_outside_a_catalog():
+        typer.echo(f"\n{framework} — registered by an installed package")
+        typer.echo(
+            f"  {len(refs)} entr{'y' if len(refs) == 1 else 'ies'} · no catalogue digest: "
+            f"a package registers references, not a catalogue file"
+        )
+        for ref in refs:
             typer.echo(f"    {ref.reference:16} {ref.title}")
 
 

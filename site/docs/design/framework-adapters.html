@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Framework adapters — Guardana documentation</title>
+<meta name="description" content="the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing">
+<link rel="canonical" href="https://guardana.dev/docs/design/framework-adapters.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html" aria-current="page">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Framework adapters: translators into the model, and the field they found missing<span class="status implemented">implemented</span></h1><p class="lede">the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing</p><p><strong>Status:</strong> accepted, implemented — ships in the next release · <strong>Written:</strong> 2026-08-10 · <strong>Step four</strong></p>
+<h2 id="the-problem-stated-precisely">The problem, stated precisely</h2>
+<p><code>Trace</code> landed in 0.14.0 as the model for an execution Guardana did not conduct.
+Its shape was decided by two inputs — a JSONL dialect written for it, and the
+OpenTelemetry GenAI semantic conventions read against the published registry.
+Two inputs, one of which Guardana wrote itself, is not enough evidence to freeze
+an API on. 1.0 entry criterion 2 says so in as many words: three unrelated
+inputs, <strong>at least two of them independent framework adapters</strong>.</p>
+<p>This step supplies them, and it is the last one that may still change the shape.
+Principle 14 is explicit that freezing the wrong model is worse than freezing
+late, so an adapter that cannot express what its framework records is not an
+adapter problem — it is a finding about the model, and the finding below is
+exactly that.</p>
+<p>There is a second, more immediate reason. Six rules require <code>CALL_TOOLS</code>, and the
+one adapter that shipped could not offer tools, so every team probing a LangChain
+model got six skips and a coverage note. A skip is honest; six of them, on the
+checks that grade agency, is a hole. Closing it is the highest-value item in this
+step and it goes first.</p>
+<h2 id="what-an-adapter-is-and-the-two-shapes-it-takes">What an adapter is, and the two shapes it takes</h2>
+<p>The 0.12 contract stands unchanged and is restated because everything below obeys
+it: <strong>the framework is never imported</strong>, an object that does not fit is refused
+when the target is built, no runtime dependency is added, and a reply this build
+cannot read is an <code>EndpointError</code> rather than an empty string.</p>
+<p>What is new is that there are now two things an adapter can do, and no framework
+does both equally well:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Shape</th>
+<th>What it does</th>
+<th>What it needs from the framework</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Driver</strong> — <code>*_target()</code></td>
+<td>wraps the object as an <code>EndpointTarget</code> so <code>probe</code> sends prompts to it</td>
+<td>a text-in/text-out call that takes plain Python types</td>
+</tr>
+<tr>
+<td><strong>Translator</strong> — <code>*_trace()</code></td>
+<td>turns the framework's own record of a run into a <code>Trace</code></td>
+<td>an accessible record of what happened</td>
+</tr>
+</tbody>
+</table></div>
+<p>The driver verifies the application by <em>asking it questions</em>. The translator
+grades the answers it already gave. They are complementary, and criterion 2 asks
+for the second — which is why this document leads with translation and treats
+driving as the part that happens to be free when a framework's entry point takes
+a <code>str</code>.</p>
+<h2 id="what-these-frameworks-actually-expose">What these frameworks actually expose</h2>
+<p>Every shape below was read by installing the library in a throwaway environment
+and printing its dataclasses, not from memory or documentation. The versions are
+recorded because a mapping written against a moving surface should say which
+surface it met.</p>
+<p><strong>pydantic-ai 2.27.0.</strong> <code>AgentRunResult.all_messages()</code> returns an alternating
+list of <code>ModelRequest</code> and <code>ModelResponse</code>, each carrying <code>parts</code> with an
+explicit <code>part_kind</code> discriminator: <code>system-prompt</code>, <code>instruction</code>,
+<code>user-prompt</code>, <code>text</code>, <code>thinking</code>, <code>tool-call</code>, <code>tool-return</code>, <code>retry-prompt</code>,
+<code>file</code>. <code>ModelResponse</code> also carries <code>model_name</code>, <code>provider_name</code>, <code>usage</code> and
+<code>finish_reason</code>. This is the closest thing to <code>Trace</code> anybody else has built, and
+the mapping is nearly one to one.</p>
+<p><strong>llama-index-core 0.14.23.</strong> <code>Response</code> carries <code>response</code>, <code>source_nodes</code> and
+<code>metadata</code>; each <code>NodeWithScore</code> carries <code>node_id</code>, <code>score</code>, <code>metadata</code> and
+<code>get_content()</code>. <code>BaseRetriever.retrieve()</code> and <code>BaseQueryEngine.query()</code> both
+accept a plain <code>str</code>. <code>LLM.chat()</code> does <strong>not</strong> — it requires the framework's own
+<code>ChatMessage</code>, and a dict raises <code>AttributeError</code>. So LlamaIndex is reachable
+without an import through retrieval, and only through retrieval.</p>
+<p><strong>crewai 1.15.14.</strong> <code>CrewOutput</code> carries <code>raw</code>, <code>tasks_output</code> and <code>token_usage</code>.
+Every <code>TaskOutput</code> carries <code>description</code>, <code>name</code>, <code>raw</code>, <code>messages</code> (plain dicts)
+and — the field this step turns on — <strong><code>agent: str</code></strong>, non-optional, naming which
+agent produced that output.</p>
+<p><strong>langchain-core 1.5.3.</strong> <code>convert_to_openai_tool</code> accepts a plain OpenAI-shaped
+<code>dict</code>, so <code>bind_tools</code> needs no framework type. <code>convert_to_messages</code> accepts a
+whole conversation as dicts including <code>{&quot;role&quot;: &quot;assistant&quot;, &quot;tool_calls&quot;: [...]}</code>
+and <code>{&quot;role&quot;: &quot;tool&quot;, &quot;tool_call_id&quot;: ...}</code> — the <code>(role, content)</code> tuple form the
+0.12 adapter used cannot express either, and raises <code>KeyError: 'tool_call_id'</code>.
+<code>AIMessage.tool_calls</code> is a list of plain dicts.</p>
+<h2 id="the-finding-the-model-cannot-say-who-acted">The finding: the model cannot say who acted</h2>
+<p>CrewAI names an agent on every task output. OpenTelemetry has carried
+<code>gen_ai.agent.name</code> and <code>gen_ai.agent.id</code> since the conventions settled, and
+<a href="trace-domain-model.html"><code>trace-domain-model.md</code></a> lists them in its own table of
+what Guardana reads. <strong>It did not read them.</strong> There is no field on <code>Span</code> to
+read them into, and no rule could have noticed, because a rule cannot miss a
+field that does not exist.</p>
+<p>A single-agent trace does not care. A multi-agent one is unreadable without it: a
+crew of three agents over twenty steps has two handoffs and eighteen spans whose
+actor is recorded by the producer and dropped by us. <code>Handoff</code> records the
+transition, not the actor — asking it who ran step eleven is asking a doorway who
+is in the room.</p>
+<p>Three ways out were considered.</p>
+<p><strong>Put the agent name in <code>Span.name</code>.</strong> Rejected. <code>name</code> is what the step <em>did</em>;
+CrewAI's natural name for a task is its description. Overloading one string with
+two facts is the escape hatch the model was built without, wearing a different
+hat — and a rule that had to parse an actor out of a free-text name would be
+reading a convention, not a field.</p>
+<p><strong>Reuse <code>Identity</code>.</strong> Rejected, and it is the same mistake <code>SessionRef</code> exists to
+prevent. An agent name is not a credential, an audience or a claimed resource. A
+crew whose agents are named would suddenly satisfy the <code>IDENTITY</code> dimension and
+<code>session_as_identity</code> would stop declining on traces that carry no authentication
+at all. Naming is not authenticating.</p>
+<p><strong>Add <code>Span.agent: AgentRef | None</code>.</strong> Taken. Two fields, <code>name</code> and <code>id</code>,
+matching what OTel carries and what CrewAI reports, in its own file like every
+other concept here. It costs a schema version, which is the point of having had a
+migration seam at v1 rather than the reason not to use it.</p>
+<h3 id="the-rule-that-makes-it-load-bearing">The rule that makes it load-bearing</h3>
+<p>A field with no reader is decoration, so the field arrives with the check it
+enables: <strong><code>guardana.trace.handoff_authority_expansion</code></strong> — an agent handing work
+to another agent <em>with more scope than it was itself carrying</em>. The delegating
+agent's authority is on its <code>Delegation</code>; the authority crossing the boundary is
+<code>Handoff.carried_scopes</code>; <code>Span.agent</code> is what ties the two to the same actor
+across spans. Without the field the rule cannot be written, which is the test of
+whether a field belongs.</p>
+<p>It declines without <code>HANDOFF</code> and <code>DELEGATION</code> both, and it declines when
+<code>carried_scopes</code> is <code>None</code> — &quot;we did not record what crossed&quot; is not &quot;nothing
+crossed&quot;, exactly as <code>Consent</code> already reads its own tri-state.</p>
+<h3 id="trace-v1--trace-v2">trace-v1 → trace-v2</h3>
+<p><code>TRACE_SCHEMA_VERSION</code> becomes 2. <code>schemas/trace-v2.schema.json</code> is published and
+<code>trace-v1.schema.json</code> stays published, because a schema is a contract with
+whoever already built against it.</p>
+<p><code>migrate_header</code> grows its first real step. A v1 header carries no <code>agent</code> on any
+span and migrating it means exactly that — the field is absent, not empty, and a
+v1 trace read by a v2 build declares the same dimensions it always did. The
+migration invents nothing, which is the only kind of migration that is safe to
+run on somebody's evidence.</p>
+<p>A v2 document read by a v1 build is still refused loudly by the check that has
+been there since v1. That is the half of versioning that protects the reader who
+did not upgrade.</p>
+<h2 id="what-each-adapter-declares-and-why-never-more">What each adapter declares, and why never more</h2>
+<p>This is where an adapter can do the most damage, and the rule is one sentence:
+<strong>an adapter declares a dimension only when the framework actually reports it.</strong></p>
+<p>The temptation is precisely the opposite. Declaring <code>APPROVAL</code> would make
+<code>unapproved_side_effect</code> run instead of skip, and a run with more rules executing
+looks better in a report. It is a false green with extra steps: the rule would
+grade an absence the framework was never able to record, and fire on every
+well-governed application whose instrumentation is quieter than ours. The
+<a href="trace-domain-model.html">capability mechanism</a> only works if the declaration is
+true.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Declares</th>
+<th>Because</th>
+<th>Silent on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>pydantic-ai</strong></td>
+<td><code>MESSAGES</code>, <code>TOOLS</code></td>
+<td>typed parts, tool calls and tool returns are in <code>all_messages()</code></td>
+<td>everything authorization-shaped</td>
+</tr>
+<tr>
+<td><strong>llama-index</strong></td>
+<td><code>MESSAGES</code>, <code>RETRIEVAL</code></td>
+<td><code>source_nodes</code> is a real retrieval record with per-document identity and score</td>
+<td>tools, identity, approvals, effects</td>
+</tr>
+<tr>
+<td><strong>crewai</strong></td>
+<td><code>MESSAGES</code>, <code>HANDOFF</code></td>
+<td>task outputs name their agent, and consecutive tasks are the handoff</td>
+<td>tools (the framework runs them out of band), everything authorization-shaped</td>
+</tr>
+</tbody>
+</table></div>
+<p>Three adapters, three different halves of the model, and none of them able to
+answer for the other two. That is a better proof that the shape generalises than
+three adapters that all populate the same fields would have been.</p>
+<p><strong><code>RETRIEVAL</code> becomes a capability.</strong> <code>Dimension.RETRIEVAL</code> had no entry in
+<code>TraceTarget</code>'s dimension table, because nothing needed it. <code>Capability.READ_RETRIEVAL</code>
+is added with the rule below, through the same table, so a producer that does not
+record retrieval stops the retrieval rule from running exactly as it stops the
+others.</p>
+<h3 id="two-traps-the-frameworks-set-and-how-each-is-refused">Two traps the frameworks set, and how each is refused</h3>
+<p><strong>A session id is not an identity, and a run id is not either.</strong> PydanticAI hands
+out <code>conversation_id</code> and <code>run_id</code>. <code>conversation_id</code> maps to
+<code>Span.conversation_id</code>; <code>run_id</code> becomes the trace id. Neither becomes an
+<code>Identity</code>, and neither makes <code>IDENTITY</code> instrumented.</p>
+<p><strong>CrewAI's &quot;delegation&quot; is not <code>Delegation</code>.</strong> CrewAI calls agent-to-agent task
+passing delegation, and <code>Agent.allow_delegation</code> is about that. Guardana's
+<code>Delegation</code> is an authorization hop: who acts, on whose authority, across which
+boundary, with which credential. Mapping one onto the other would make every crew
+with <code>allow_delegation=True</code> declare the <code>DELEGATION</code> dimension and hand
+<code>credential_passthrough</code> a trace with no credentials in it. CrewAI's delegation
+is a <code>Handoff</code>. The word is the same and the concept is not, which is the most
+common way a translator lies.</p>
+<h2 id="tool-calling-and-why-the-capability-is-probed-rather-than-assumed">Tool calling, and why the capability is probed rather than assumed</h2>
+<p><code>bind_tools</code> exists on every LangChain chat model and raises <code>NotImplementedError</code>
+on the ones that cannot do it. So neither branch of the obvious check is right:
+<code>hasattr</code> says yes for a model that will refuse, and assuming refusal skips six
+rules against models that would have worked.</p>
+<p>The adapter therefore <strong>binds a probe tool once, at construction</strong>, and reports
+<code>CALL_TOOLS</code> only if that succeeded. Binding sends nothing — it returns a bound
+runnable — so the check costs no request and no token, and it happens before the
+run rather than on the first prompt of a probe, which is the same rule the 0.12
+adapter already followed for <code>invoke</code>.</p>
+<p>A model that refuses keeps working for every text rule, and <code>guardana target inspect</code> says tool calling is unavailable rather than leaving an operator to
+infer it from six skips. <code>fail_on_skipped</code> still turns those skips into an
+indeterminate result for anyone who wants it that way.</p>
+<p>The conversation moves from <code>(role, content)</code> tuples to dicts for the reason
+measured above: the tuple form cannot carry a tool call or a tool result, so an
+agentic rule replaying its own history through it would raise mid-run. Text-only
+behaviour is unchanged, which the existing tests pin.</p>
+<p><strong>A tool double is offered, never executed.</strong> <code>ToolSpec</code> carries a name and a
+description, and the OpenAI-shaped dict built from it declares an empty parameter
+object. Guardana offers tools to see what a model <em>asks for</em>; it does not run
+them, and a framework's real tool is never bound in its place.</p>
+<h2 id="retrieval-the-deterministic-slice-without-a-live-target">Retrieval: the deterministic slice, without a live target</h2>
+<p>The roadmap's RAG item asks for <code>RetrieverTarget</code>, <code>CorpusTarget</code> and
+<code>EmbeddingTarget</code>. They are not here — see the deferral table — but one check
+does not need them, and the model was built for it in 0.14: <code>Retrieval</code> carries a
+<code>tenant</code>, and so does every <code>RetrievedDocument</code>, specifically so a disagreement
+between the two is expressible.</p>
+<p><strong><code>guardana.trace.cross_tenant_retrieval</code></strong> — a retrieval performed for one
+tenant returned a document belonging to another. Deterministic, no judgement, no
+request. <code>LLM09:2026</code>, <code>ASI06:2026</code>, <code>LLM02:2026</code>.</p>
+<p>Declines: without <code>RETRIEVAL</code>; and on any retrieval where the query tenant or
+every document tenant is absent, because a comparison with one side missing is
+not a comparison. That decline is not a formality — a corpus that records no
+tenant at all is the common case, and reporting &quot;no cross-tenant retrieval found&quot;
+over it would be the exact false green this project exists to refuse.</p>
+<p>Retrieval-time <em>injection</em> stays deferred for the reason
+<a href="trace-domain-model.html"><code>trace-domain-model.md</code></a> already gave: without a sink,
+&quot;the agent then did something&quot; is a judgement, and a judged rule shipped without
+calibration is the opposite of what this project sells.</p>
+<h2 id="cost">Cost</h2>
+<p>Principle 2 holds unchanged. A translator walks the framework's record once and
+builds a <code>Trace</code>; the rules then read spans already in memory, so the seventh
+rule over a trace costs a pass and not a re-read. The tool-calling probe is one
+<code>bind_tools</code> call at construction — no request, no token, no network.</p>
+<p>Binary content is described and not carried, as the model requires: a PydanticAI
+<code>FilePart</code> becomes a <code>Blob</code> with its media type, size and digest, and the bytes
+are dropped before anything can put them in an evidence field.</p>
+<h2 id="rejected-options">Rejected options</h2>
+<p><strong>A common <code>FrameworkAdapter</code> base class.</strong> Tempting, and it would have forced
+three genuinely different surfaces into one shape whose least common denominator
+is <code>str</code>. The adapters share a contract, not an interface; the contract is
+enforced by tests that every adapter must pass, which is where a shared
+expectation belongs when the implementations have nothing structural in common.</p>
+<p><strong>Importing the frameworks in tests only.</strong> It would make the fixtures obviously
+faithful, and it would put four fast-moving stacks — crewai alone installs 135
+packages — into a security tool's test environment, where any of them could break
+a release. The shapes were verified by running the real libraries during design,
+which is where that evidence belongs; the tests use doubles built from what was
+observed, and this document records the versions so the next reader can repeat
+the check rather than trust it.</p>
+<p><strong>A <code>crewai_target()</code> driver.</strong> <code>Crew.kickoff(inputs=...)</code> takes a dict whose keys
+are the placeholders of that specific crew's task templates. A driver would have
+to guess them, and a guess that misses produces a crew answering a prompt nobody
+sent — a probe that grades the wrong conversation while reporting confidently.
+Deferred with that reason rather than shipped with a <code>input_key</code> parameter nobody
+can set correctly without reading their own templates.</p>
+<p><strong>Deriving <code>EFFECTS</code> from tool names.</strong> A framework that records <code>send_email</code>
+running is not a framework that records an email being sent. <code>ToolExecution.mutates</code>
+is a tri-state for this reason and <code>None</code> stays <code>None</code>.</p>
+<h2 id="deliberately-deferred-with-the-reason">Deliberately deferred, with the reason</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Deferred</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>RetrieverTarget</code>, <code>CorpusTarget</code>, <code>EmbeddingTarget</code></strong></td>
+<td>A live retriever is a target that <em>sends</em> — its own budget surface, its own safety ceiling, its own threat model for who owns the corpus being written to. Folding three targets into the release that changes the trace schema would give neither its own tests. The deterministic trace-side check ships here so the model's <code>tenant</code> fields are exercised rather than asserted</td>
+</tr>
+<tr>
+<td><strong>Retrieval-time injection, tenant-filter bypass, document and metadata poisoning</strong></td>
+<td>Each needs either a live retriever to send to or the sink-aware work to say what &quot;the agent obeyed&quot; means. Stated as a gap rather than approximated with a judged rule</td>
+</tr>
+<tr>
+<td><strong>A <code>crewai_target()</code> driver</strong></td>
+<td><code>kickoff()</code> takes the crew's own template placeholders; see the rejection above</td>
+</tr>
+<tr>
+<td><strong>A LlamaIndex <code>LLM</code> driver</strong></td>
+<td><code>LLM.chat()</code> refuses a plain dict and requires the framework's <code>ChatMessage</code>, so driving a LlamaIndex model means importing LlamaIndex. The query engine is reachable without one and is the surface a RAG application actually deploys</td>
+</tr>
+<tr>
+<td><strong>Tool calling through PydanticAI and CrewAI</strong></td>
+<td>Both own their tool loop: an <code>Agent</code> calls its tools itself rather than reporting what it would call, so there is no seam to offer a double into. Their adapters translate the loop after the fact, which is what the trace rules grade</td>
+</tr>
+<tr>
+<td><strong>Grading an adapter-built trace with the driven-run evaluators</strong></td>
+<td>Unchanged from 0.14: <code>as_trajectory</code> makes it possible, and an evaluator calibrated on runs Guardana drove has not been measured on traces it did not</td>
+</tr>
+<tr>
+<td><strong>A stable target ref for an in-process trace</strong></td>
+<td><code>TraceTarget.ref</code> is <code>source#trace_id</code>, and a framework's run id changes every run, so <code>diff</code> sees a new target each time. This is the same property a file-based trace already has, and fixing it means deciding what identifies &quot;the same execution twice&quot; — an <code>AISystem</code> question, not an adapter one</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="what-this-leaves-for-10">What this leaves for 1.0</h2>
+<p>Entry criterion 2 is met: raw JSONL, the OpenTelemetry conventions, and three
+independent framework adapters, of which two are structurally unlike the first
+input and unlike each other.</p>
+<p>Criterion 1 — no framework-specific escape hatch — survived contact with three
+frameworks and cost one field. <code>Span.agent</code> is a named concept with a reader, not
+a bag; there is still no <code>attributes</code> dict on <code>Span</code>, and the fact that CrewAI
+forced a <em>field</em> rather than a <em>bag</em> is the evidence that the constraint is doing
+its job.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="trace-domain-model.html"><code>trace-domain-model.md</code></a> — the model these translate
+into, and the honesty boundary every one of them obeys.</li>
+<li><a href="../integrations.html"><code>../integrations.md</code></a> — how a team wires an adapter up.</li>
+<li><a href="../usage-analyze-trace.html"><code>../usage-analyze-trace.md</code></a> — grading a trace an
+adapter wrote.</li>
+<li><code>ROADMAP.md</code>, <em>Next — the adapters, as translators into the model</em>.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/framework-adapters.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

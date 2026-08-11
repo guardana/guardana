@@ -7,9 +7,13 @@ build without asking anybody to remember which edition was installed.
 """
 
 import json
+from collections.abc import Iterator
 
+import pytest
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
+from guardana.core.taxonomy import TaxonomyRef, register
+from guardana.core.taxonomy._builtin import index as _taxonomy_registry
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -81,3 +85,57 @@ def test_the_catalogue_listing_is_machine_readable() -> None:
     assert catalogues["MITRE-ATLAS"]["version"] == "5.6.0"
     assert catalogues["OWASP-LLM-2026"]["edition"] == "2026"
     assert len(catalogues["OWASP-LLM-2026"]["entries"]) == 10
+
+
+@pytest.fixture
+def acme_control() -> Iterator[TaxonomyRef]:
+    """Register one reference the way an installed pack does, then take it back.
+
+    Global by nature — a taxonomy registry is process-wide, because a rule resolves
+    its mapping against whatever is installed — so the removal is the fixture's
+    whole job.
+    """
+    ref = TaxonomyRef("ACME-CONTROLS-1", "ACME-14", "Model change control")
+    register(ref)
+    yield ref
+    _taxonomy_registry.forget("ACME-14")
+
+
+def test_the_listing_shows_a_reference_an_installed_package_registered(
+    acme_control: TaxonomyRef,
+) -> None:
+    """The listing did discovery and then printed the built-ins, which are not the same set.
+
+    A company that installs its own control catalogue runs this command to confirm
+    the pack is there and was told, in effect, that it is not. Nothing had ever
+    registered through `guardana.taxonomies`, so the one command that would have
+    shown the gap had nothing to show it with.
+    """
+    result = runner.invoke(app, ["taxonomy"])
+
+    assert result.exit_code == 0, result.output
+    assert "ACME-CONTROLS-1" in result.output
+    assert "ACME-14" in result.output
+    assert "Model change control" in result.output
+
+
+def test_a_package_registered_reference_carries_no_catalogue_digest(
+    acme_control: TaxonomyRef,
+) -> None:
+    """Visible, and not pretending to provenance it has not got.
+
+    A digest is what a run manifest pins so a report stays checkable years later.
+    A package registers references rather than a catalogue file, so there is
+    nothing to hash — and `null` is how a script tells the two apart without a
+    flag being invented for it.
+    """
+    listing = {
+        entry["framework"]: entry
+        for entry in json.loads(runner.invoke(app, ["taxonomy", "--format", "json"]).output)
+    }
+
+    assert listing["ACME-CONTROLS-1"]["digest"] is None
+    assert listing["ACME-CONTROLS-1"]["entries"] == [
+        {"reference": "ACME-14", "id": "ACME-14", "rank": None, "title": "Model change control"}
+    ]
+    assert listing["OWASP-LLM-2026"]["digest"] is not None

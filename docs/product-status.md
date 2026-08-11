@@ -1,3 +1,10 @@
+---
+title: "Product status"
+nav_order: 10
+summary: "**read first**: maturity per component, and the limitations you should know before adopting"
+status: stable
+---
+
 # Product status and known limitations
 
 What is ready, what is not, and what Guardana deliberately does not do. Read this

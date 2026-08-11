@@ -1,3 +1,10 @@
+---
+title: "AI systems and deployments"
+nav_order: 150
+summary: "what was verified, where it runs, and which version of it"
+status: implemented
+---
+
 # Design: AI systems, environments and deployments
 
 **Status:** implemented in 0.9.0 · **Written:** 2026-08-05 · **Phase C, item 22**

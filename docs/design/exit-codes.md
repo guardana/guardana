@@ -1,3 +1,10 @@
+---
+title: "Exit codes and gate semantics"
+nav_order: 120
+summary: "why the codes are what they are"
+status: implemented
+---
+
 # Design: stable exit codes and gate semantics
 
 **Status:** implemented in 0.7 · the table lives in [`docs/exit-codes.md`](../exit-codes.md)

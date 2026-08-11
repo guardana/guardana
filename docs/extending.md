@@ -1,3 +1,10 @@
+---
+title: "Extending Guardana"
+nav_order: 260
+summary: "add a Rule, an Evaluator, or a Target; the entry-point contract"
+status: stable
+---
+
 # Extending Guardana
 
 The engine (`guardana-core`) knows almost nothing about specific threats —

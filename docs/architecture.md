@@ -1,3 +1,10 @@
+---
+title: "Architecture"
+nav_order: 330
+summary: "the five abstractions, the Registry, the core↔server boundary"
+status: stable
+---
+
 # Architecture
 
 ## Packages

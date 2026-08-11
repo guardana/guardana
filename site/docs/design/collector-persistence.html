@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collector persistence — Guardana documentation</title>
+<meta name="description" content="collector persistence and migrations">
+<link rel="canonical" href="https://guardana.dev/docs/design/collector-persistence.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html" aria-current="page">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: collector persistence and migrations<span class="status implemented">implemented</span></h1><p class="lede">collector persistence and migrations</p><p><strong>Status:</strong> implemented in 0.8 · <strong>Written:</strong> 2026-08-03 · <strong>Phase C, item 19</strong></p>
+<h2 id="the-problem">The problem</h2>
+<p><code>guardana-server</code> keeps submissions in a bounded in-memory deque. A team that
+runs it loses every finding on restart, and the store is the default — so nobody
+has to choose it, which means somebody will run it in production without knowing
+they chose anything.</p>
+<p>Everything the collector is <em>for</em> — history, ownership, regression between
+deployments, an audit trail — needs somewhere to live. Persistence is therefore
+the first item of Phase C, and migrations have to exist before the first row is
+written: principle 11 says a persisted schema is versioned and migratable, and a
+migration bolted on after there is data to lose is a migration nobody trusts.</p>
+<h2 id="scope-deliberately-narrow">Scope, deliberately narrow</h2>
+<p>This item delivers <strong>the migration machinery plus today's schema</strong>. Organizations,
+projects, API keys and the AI-system model arrive as migrations <code>0002</code> and later,
+in items 20–22.</p>
+<p>That ordering is not laziness. It is the only way the migration path gets
+exercised the way the acceptance criteria demand — <em>up and down on a database
+with data in it</em> — rather than against an empty database where every migration
+trivially works.</p>
+<p>Two things this explicitly does <strong>not</strong> deliver, stated so the presence of a
+database is not read as the presence of either:</p>
+<ul>
+<li><strong>No tenancy.</strong> Every row is global until item 21.</li>
+<li><strong>No authentication.</strong> Ingest is still unauthenticated until item 20.</li>
+</ul>
+<p>The collector's maturity label stays <code>experimental</code> until both land. A database
+does not make a service safe to expose.</p>
+<h2 id="design">Design</h2>
+<h3 id="layout">Layout</h3>
+<pre><code>packages/guardana-server/src/guardana/server/
+  db/
+    settings.py      where the connection string comes from, and what happens without one
+    connection.py    the pool
+    migrations.py    discover, checksum, apply, roll back
+    sql/
+      0001_submissions.up.sql
+      0001_submissions.down.sql
+  postgres_store.py  the `Store` protocol, over psycopg3
+  cli.py             guardana-collector migrate | rollback | status
+</code></pre>
+<p><code>Store</code> (the protocol) is untouched. Two implementations behind one interface is
+what the protocol was for, and a contract test runs the same assertions against
+both so they cannot drift.</p>
+<h3 id="the-migration-runner">The migration runner</h3>
+<p>Numbered SQL files, applied in order, recorded in a table.</p>
+<pre><code class="language-sql">create table schema_migrations (
+    version     integer      primary key,
+    name        text         not null,
+    checksum    text         not null,
+    applied_at  timestamptz  not null default now()
+);
+</code></pre>
+<p>Five rules, each earning its place:</p>
+<p><strong>Every migration ships a down file.</strong> A missing <code>.down.sql</code> is a load error, not
+a warning. A migration that cannot be undone is an upgrade nobody will risk, and
+&quot;we will write the rollback if we need it&quot; is a decision made under exactly the
+pressure that produces bad rollbacks.</p>
+<p><strong>One transaction per migration, including its own bookkeeping row.</strong> A migration
+that fails half-way leaves the database as it found it, rather than in a state no
+version describes.</p>
+<p><strong>A Postgres advisory lock around the whole run.</strong> Two replicas starting at once
+must not both apply <code>0007</code>. The lock makes concurrent migration safe rather than
+merely unlikely.</p>
+<p><strong>The checksum of an applied migration is verified, and a mismatch refuses.</strong>
+Editing a migration that has already run somewhere means two databases disagree
+about what version <code>0004</code> means, and nothing would ever notice. This is the same
+argument as a versioned document: what somebody's database already contains is a
+contract.</p>
+<p><strong>A gap is refused.</strong> An unapplied migration numbered below the highest applied
+version is a rebase accident, and applying only what comes after it would skip
+that migration on that database forever.</p>
+<h3 id="health-and-readiness-are-separate-endpoints">Health and readiness are separate endpoints</h3>
+<ul>
+<li><code>GET /healthz</code> — the process is running. Touches no database.</li>
+<li><code>GET /readyz</code> — connects, compares <code>schema_migrations</code> against the files on
+disk, and returns <code>503</code> while anything is pending.</li>
+</ul>
+<p>Separate because a rolling deploy must not send traffic at a schema that is not
+there yet. A single endpoint answering both questions makes the <em>deploy</em> the
+thing that decides whether a half-migrated database receives writes.</p>
+<h3 id="migrations-are-applied-by-a-command-not-by-starting-the-server">Migrations are applied by a command, not by starting the server</h3>
+<p><code>guardana-collector migrate</code> is the documented path, and readiness holds traffic
+back until it has run. <code>GUARDANA_MIGRATE_ON_START=1</code> exists for a single-node
+Docker Compose, where the ceremony buys nothing.</p>
+<h3 id="choosing-a-store-is-a-decision-never-a-default">Choosing a store is a decision, never a default</h3>
+<p><code>create_app()</code> resolves storage in this order:</p>
+<ol>
+<li>an explicit <code>store=</code> argument — tests and embedders,</li>
+<li><code>GUARDANA_DATABASE_URL</code> → PostgreSQL,</li>
+<li><code>GUARDANA_STORAGE=memory</code> → the in-memory store, and the dashboard says so,</li>
+<li>otherwise <strong>refuse to start</strong>, naming both options.</li>
+</ol>
+<p>An ephemeral store that is the default is an ephemeral store that reaches
+production. Making the choice explicit costs one environment variable and removes
+a class of incident that only shows up as &quot;where did last week go&quot;.</p>
+<p>This is the same principle as &quot;no default credentials&quot;, one layer down: the unsafe
+configuration must not be the one you get by not deciding.</p>
+<h3 id="the-schema-at-0001">The schema at 0001</h3>
+<p>Exactly what the envelope carries today, normalised into two tables:</p>
+<pre><code class="language-sql">create table submissions (
+    id              bigserial    primary key,
+    received_at     timestamptz  not null,
+    source          text         not null,
+    schema_version  integer      not null,
+    rules_run       integer      not null default 0,
+    rules_executed  text[]       not null default '{}',
+    rules_skipped   jsonb        not null default '[]',
+    max_severity    text,
+    unverified      integer      not null default 0,
+    error_count     integer      not null default 0,
+    errors          jsonb        not null default '[]'
+);
+
+create table findings (
+    id                  bigserial primary key,
+    submission_id       bigint    not null references submissions(id) on delete cascade,
+    channel             text      not null,   -- findings | unverified
+    position            integer   not null,
+    rule_id             text      not null,
+    severity            text      not null,
+    title               text      not null,
+    target_ref          text      not null,
+    evidence_summary    text      not null,
+    evidence_detail     text,
+    taxonomy            jsonb     not null default '[]',
+    verdict_outcome     text,
+    verdict_confidence  double precision,
+    verdict_rationale   text,
+    verdict_evaluator   text
+);
+</code></pre>
+<p><code>channel</code> rather than two tables, because <code>unverified</code> is the same shape and the
+distinction is a property of the finding, not of its storage. <code>position</code> preserves
+the order the agent sent, so a round trip returns what was submitted.</p>
+<p>The <code>errors</code> and <code>rules_skipped</code> channels are stored as <code>jsonb</code>: they are read as
+whole documents and never filtered on, and modelling them as tables now would be
+inventing structure ahead of a query that wants it.</p>
+<h3 id="dependencies">Dependencies</h3>
+<p>One new production dependency on <code>guardana-server</code> only: <code>psycopg[binary]&gt;=3.2</code>.</p>
+<p><code>guardana-core</code> is untouched, and the import-linter contract still forbids the
+engine from importing the collector. Justification for the dependency: talking to
+PostgreSQL requires a PostgreSQL driver, psycopg3 is the maintained one, and the
+alternative — an ORM — would add a second large dependency and a query layer the
+collector has no use for.</p>
+<h2 id="testing">Testing</h2>
+<p>Tests that need a database are marked <code>postgres</code> and take a session fixture.
+Without a database they <strong>skip loudly</strong>; with <code>GUARDANA_REQUIRE_POSTGRES=1</code> set,
+the skip becomes a failure. CI sets it and runs a <code>postgres:16</code> service container.</p>
+<p>That asymmetry is the point. Item 21's cross-tenant tests are the ones that must
+never be quietly absent, and &quot;the isolation test did not run&quot; reading as green is
+the same fail-open this project rejects everywhere else — just relocated into the
+test suite.</p>
+<p>Coverage:</p>
+<ul>
+<li>migrate up on an empty database; the tables exist</li>
+<li>migrate up twice; the second is a no-op</li>
+<li>migrate down; the tables are gone and <code>schema_migrations</code> is empty</li>
+<li><strong>insert rows, migrate forward, assert the rows survived</strong> — the acceptance
+criterion, and the one an empty-database test cannot make</li>
+<li>an applied migration whose file was edited is refused, naming the version</li>
+<li>a migration file with no down file is refused at load</li>
+<li>two runners racing apply each migration exactly once</li>
+<li><code>/readyz</code> fails while a migration is pending and passes after</li>
+<li><code>/healthz</code> answers without a database at all</li>
+<li>the <code>Store</code> contract test, parametrised over both implementations</li>
+<li><code>create_app()</code> with no database and no explicit choice refuses to start</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ul>
+<li><code>guardana-collector migrate</code>, <code>rollback</code> and <code>status</code> work against a real
+PostgreSQL, and each is tested.</li>
+<li>A submission survives a process restart.</li>
+<li>Readiness fails while migrations are pending.</li>
+<li>No configuration produces a running collector that silently forgets data.</li>
+<li>The engine still does not import the collector (<code>lint-imports</code>).</li>
+</ul>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li><strong>Retention of <code>findings</code> rows on <code>submissions</code> delete</strong> is <code>cascade</code> here.
+Item 26 (retention) may want the submission gone and an aggregate kept; that
+is a decision for retention, not for storage, and cascade is the honest
+default until it is made.</li>
+<li><strong>Whether <code>rules_skipped</code> stays <code>jsonb</code>.</strong> Item 21 gives coverage gaps a
+tenant, and a fleet view that filters on skip reason would want a table. Left
+as a document until there is a query.</li>
+</ol>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/collector-persistence.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

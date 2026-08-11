@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana trace inspect — Guardana documentation</title>
+<meta name="description" content="guardana trace inspect: which evidence dimensions a producer really records, and which ones your policy requires">
+<link rel="canonical" href="https://guardana.dev/docs/usage-trace-inspect.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html" aria-current="page">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1><code>guardana trace inspect</code> — what a recorded execution can answer</h1><p class="lede"><code>guardana trace inspect</code>: which evidence dimensions a producer really records, and which ones your policy requires</p><p>Grading a trace tells you whether invariants held. This tells you which questions
+the file can answer <em>at all</em> — before a run, before a policy, before a pipeline
+discovers it the hard way.</p>
+<p>It opens one file and no socket. It writes no run document, reaches no network,
+and exits <code>0</code> unless the file cannot be read.</p>
+<pre><code class="language-bash">guardana trace inspect run.jsonl
+</code></pre>
+<pre><code>read 3 span(s) from run.jsonl as guardana (producer: checkout-agent)
+
+dimension   declared  records  required  needed by  unlocks
+messages    yes       1        -         0 rule(s)  -
+tools       no        0        -         1 rule(s)  1 rule(s)
+retrieval   yes       1        -         1 rule(s)  -
+memory      no        0        -         0 rule(s)  0 rule(s)
+identity    yes       1        -         2 rule(s)  -
+delegation  yes       2        -         2 rule(s)  -
+consent     no        0        -         1 rule(s)  1 rule(s)
+policy      no        0        -         1 rule(s)  1 rule(s)
+approval    no        0        -         1 rule(s)  1 rule(s)
+effects     yes       2        -         1 rule(s)  -
+handoff     no        0        -         1 rule(s)  1 rule(s)
+
+note: tools, memory, consent, policy, approval, handoff are not recorded at all,
+so the rules needing them do not run — their silence is not evidence that nothing
+happened
+</code></pre>
+<h2 id="reading-the-columns">Reading the columns</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Column</th>
+<th>What it says</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>declared</code></td>
+<td>whether the <strong>producer states it emits this dimension</strong>. This is the load-bearing one: a dimension that is not declared stops every rule needing it from running, because their silence would otherwise be read as evidence</td>
+</tr>
+<tr>
+<td><code>records</code></td>
+<td>how many records of that dimension this particular execution carries</td>
+</tr>
+<tr>
+<td><code>required</code></td>
+<td>whether your profile's <code>trace.require:</code> demands it (see below)</td>
+</tr>
+<tr>
+<td><code>needed by</code></td>
+<td>how many <strong>installed</strong> rules read that dimension — counted from the registry, so a rule pack you installed is included</td>
+</tr>
+<tr>
+<td><code>unlocks</code></td>
+<td>how many of those would <strong>start running</strong> if this were the next thing you instrumented. <code>-</code> where the producer already records it</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong><code>declared</code> and <code>records</code> are two different facts, and the difference matters.</strong></p>
+<ul>
+<li><code>declared: yes</code>, <code>records: 0</code> — the producer emits approvals and this execution
+had nothing to approve. <strong>Gradable.</strong> This is where a finding lives: a rule can
+say &quot;an action happened and no approval preceded it&quot;.</li>
+<li><code>declared: no</code>, <code>records: 0</code> — the producer never emits approvals. <strong>Not
+gradable.</strong> Nothing here can tell an unapproved payment from a well-governed one
+that this framework simply does not describe.</li>
+</ul>
+<p>A report that collapsed the two would make those indistinguishable, which is the
+single inference <a href="design/trace-domain-model.html">the trace design</a> exists to refuse.</p>
+<p><strong>There is no coverage percentage, and there never will be.</strong> One number is
+compatible with having no identity evidence whatsoever, and a team that gates on a
+number rather than on a name ships the day the missing part is the part that
+mattered.</p>
+<p><code>needed by: 0</code> is honest and useful: <code>memory</code> is emitted by several frameworks and
+no shipped rule requires it yet, so recording it buys nothing today.</p>
+<p><strong><code>needed by</code> and <code>unlocks</code> differ wherever a rule wants two dimensions, and the
+difference is the part worth reading.</strong> <code>guardana.trace.unapproved_side_effect</code>
+needs approvals <em>and</em> side effects, so against a producer that records neither it is
+<code>needed by</code> both and <code>unlocks</code> by neither: instrumenting approvals alone would be
+work that buys no new check. One column used to answer both questions, and it
+answered the wrong one — a team budgeting instrumentation read <code>approval: 1 rule</code>
+and got nothing for the effort.</p>
+<h2 id="gating-on-it-tracerequire">Gating on it: <code>trace.require</code></h2>
+<p>A profile can <em>demand</em> dimensions. A run whose producer does not record one is
+<strong><code>indeterminate</code>, never a pass</strong> — and there is no <code>fail_on_*</code> in front of it,
+because you asked for this coverage explicitly.</p>
+<pre><code class="language-yaml"># guardana.yaml
+name: production-traces
+trace:
+  require: [identity, approval, effects]
+</code></pre>
+<pre><code class="language-bash">guardana trace inspect run.jsonl --profile guardana.yaml
+</code></pre>
+<pre><code>error: this profile requires approval, which this producer does not record —
+`guardana analyze-trace` on this file is indeterminate, never a pass
+</code></pre>
+<p>That is the command's real job: <strong>you find out before the pipeline does.</strong> The
+same profile through <code>guardana analyze-trace</code> exits <code>2</code>, and the saved run records
+which dimension was missing under <code>run.coverage.shortfall</code>.</p>
+<p><code>trace.require</code> governs traces and nothing else. A shared <code>guardana.yaml</code> carrying
+it does not affect <code>guardana scan</code> or <code>guardana probe</code> — demanding that a file scan
+record approvals is a category error, and reading it as one would be a gate that
+can never pass.</p>
+<h2 id="machine-readable-output">Machine-readable output</h2>
+<pre><code class="language-bash">guardana trace inspect run.jsonl --format json
+</code></pre>
+<pre><code class="language-json">{
+  &quot;trace_id&quot;: &quot;run-0001&quot;,
+  &quot;source&quot;: &quot;run.jsonl&quot;,
+  &quot;dialect&quot;: &quot;guardana&quot;,
+  &quot;producer&quot;: &quot;checkout-agent&quot;,
+  &quot;spans&quot;: 3,
+  &quot;truncated&quot;: null,
+  &quot;dimensions&quot;: [
+    {
+      &quot;dimension&quot;: &quot;approval&quot;,
+      &quot;declared&quot;: false,
+      &quot;records&quot;: 0,
+      &quot;required&quot;: true,
+      &quot;licenses&quot;: [&quot;guardana.trace.unapproved_side_effect&quot;],
+      &quot;unlocks&quot;: []
+    }
+  ]
+}
+</code></pre>
+<p><code>unlocks</code> is empty there even though <code>approval</code> is required and missing, because the
+one rule needing approvals needs side effects too and this producer records neither.
+<code>licenses</code> keeps its original meaning — every rule that reads the dimension — so a
+consumer written against the older shape is unaffected.</p>
+<h2 id="options">Options</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--dialect guardana|otel</code></td>
+<td>force the reader; detected from the file's first record otherwise</td>
+</tr>
+<tr>
+<td><code>--profile PATH</code> / <code>--preset NAME</code></td>
+<td>resolve <code>trace.require:</code> so the <code>required</code> column and the verdict line mean something</td>
+</tr>
+<tr>
+<td><code>--format human|json</code></td>
+<td>the table, or the same facts named rather than aligned</td>
+</tr>
+<tr>
+<td><code>--rules PATH</code></td>
+<td>include custom YAML rules when counting what each dimension is needed by; repeatable</td>
+</tr>
+<tr>
+<td><code>--plugins</code>, <code>--allow-plugin</code></td>
+<td>the usual plugin-trust controls</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="filling-a-gap">Filling a gap</h2>
+<p>If your framework does not emit a dimension you need, <code>guardana analyze-trace --write-trace out.jsonl</code> rewrites the file in Guardana's native dialect so the
+missing pieces can be added by hand or by your own exporter. See
+<a href="usage-analyze-trace.html"><code>usage-analyze-trace.md</code></a>.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="usage-analyze-trace.html"><code>usage-analyze-trace.md</code></a> — grading the execution</li>
+<li><a href="usage-contracts.html"><code>usage-contracts.md</code></a> — security contracts, which demand
+dimensions implicitly by asserting things that need them</li>
+<li><a href="design/trace-domain-model.html"><code>design/trace-domain-model.md</code></a> — why absence is
+never read as evidence</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-trace-inspect.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

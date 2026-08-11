@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exit codes and gate semantics — Guardana documentation</title>
+<meta name="description" content="why the codes are what they are">
+<link rel="canonical" href="https://guardana.dev/docs/design/exit-codes.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html" aria-current="page">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: stable exit codes and gate semantics<span class="status implemented">implemented</span></h1><p class="lede">why the codes are what they are</p><p><strong>Status:</strong> implemented in 0.7 · the table lives in <a href="../exit-codes.html"><code>docs/exit-codes.md</code></a></p>
+<h2 id="the-problem">The problem</h2>
+<p>Guardana's exit codes are stable in practice and undocumented in contract. Today:
+<code>0</code> clean, <code>1</code> gate failed, <code>2</code> used for three unrelated things — a bad baseline
+file, an unreachable endpoint, and an impossible comparison. A CI pipeline that
+wants to treat &quot;the endpoint was down&quot; differently from &quot;the model got worse&quot;
+cannot, and the only alternative is parsing human-readable output, which is not an
+interface anyone should build on.</p>
+<h2 id="design">Design</h2>
+<pre><code class="language-text">0  run completed, policy passed
+1  run completed, policy failed
+2  result indeterminate, or a comparison could not be made
+3  invalid configuration or CLI usage
+4  target unavailable or authentication failed
+5  internal Guardana error
+6  budget exhausted
+7  run interrupted, partial evidence written
+</code></pre>
+<h3 id="decisions">Decisions</h3>
+<p><strong>Every non-zero code is a non-pass.</strong> Nothing in the table means &quot;probably fine&quot;.
+A CI job that treats any non-zero as a failure is <em>correct</em> by default and gets
+finer control only if it asks for it. This is the whole point: the safe reading is
+the default reading.</p>
+<p><strong><code>2</code> never means &quot;nothing found&quot;.</strong> It means &quot;the question was not answered&quot;.
+Indeterminate and clean must not share a code, or a broken setup reads as a green
+build — the failure mode this project exists to prevent.</p>
+<p><strong><code>6</code> is separate from <code>1</code>.</strong> A budget stopping a run is not a security verdict.
+Merging them would let an under-budgeted pipeline report a security failure that
+never happened, and — worse in the other direction — let a team &quot;fix&quot; a failing
+gate by lowering the budget until the run stops early.</p>
+<p><strong><code>4</code> is separate from <code>5</code>.</strong> An unreachable endpoint is the user's environment; an
+internal error is our bug. Conflating them sends bug reports to the wrong place and
+hides real defects in a category people learn to ignore.</p>
+<p><strong><code>3</code> is usage, not policy.</strong> A malformed <code>guardana.yaml</code> must not look like a
+policy failure, or a typo in a config file reads as a security finding.</p>
+<p><strong><code>7</code> is honest partiality.</strong> Ctrl-C or a timeout with evidence already written is
+neither a pass nor a completed failure. The partial run is kept, and the code says
+it is partial.</p>
+<h3 id="migration--decided-against-a-transitional-mode">Migration — decided against a transitional mode</h3>
+<p>This proposed <code>--exit-code-mode legacy|strict</code> for one minor. That is <strong>not</strong> what
+shipped: the whole table landed in 0.7 as a single breaking change, announced in
+the changelog.</p>
+<p>The reason is that the flag would have made the same command mean different
+things for two users of the same version, for a full release cycle, and every
+tool reading those codes would have had to know which mode produced them. Weighed
+against that, the actual exposure is small: <code>0</code> and <code>1</code> are unchanged, and
+everything that moved, moved <em>between non-zero codes</em>. No pipeline turns green by
+accident, which is the only direction that would have justified the cost.</p>
+<h3 id="what-must-be-tested">What must be tested</h3>
+<ul>
+<li>one test per code, asserting the exact integer — a code nobody tests is a code
+that drifts;</li>
+<li>a test that no command can exit <code>0</code> while <code>errors</code> is non-empty and the policy
+says <code>fail_on_error</code>;</li>
+<li>a test that budget exhaustion produces <code>6</code> and never <code>0</code> or <code>1</code>;</li>
+<li>a test that the documented table in <code>docs/exit-codes.md</code> matches the constants in
+code, so the documentation cannot drift from the behaviour.</li>
+</ul>
+<h3 id="open-question--resolved">Open question — resolved</h3>
+<p><code>diff</code> reuses the table. It has no target to be unavailable, so <code>4</code> never occurs
+there, and it uses <code>2</code> for both &quot;these runs cannot be compared&quot; and &quot;one of them
+never finished&quot;. An unused code is better than a second table.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/exit-codes.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

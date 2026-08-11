@@ -26,6 +26,7 @@ dev = [
     { name = "ruff", specifier = ">=0.16.1" },
     { name = "types-jsonschema", specifier = ">=4.23" },
 ]
+docs = [{ name = "markdown-it-py", specifier = ">=3.0" }]
 
 [[package]]
 name = "annotated-doc"

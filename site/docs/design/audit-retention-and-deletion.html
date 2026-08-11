@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit, retention and deletion — Guardana documentation</title>
+<meta name="description" content="who did what, how long evidence is kept, and deleting on purpose">
+<link rel="canonical" href="https://guardana.dev/docs/design/audit-retention-and-deletion.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html" aria-current="page">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Design: the audit log, retention, and deleting things on purpose<span class="status accepted">accepted</span></h1><p class="lede">who did what, how long evidence is kept, and deleting on purpose</p><p><strong>Status:</strong> accepted · <strong>Implemented in:</strong> 0.11.0 · <strong>Component:</strong> collector</p>
+<h2 id="the-problem">The problem</h2>
+<p>Two gaps that look separate and are not.</p>
+<p><strong>Nothing records who did what.</strong> A collector holds a team's security evidence and
+its credentials, and it cannot answer &quot;who created this key&quot;, &quot;who waived that
+finding&quot;, or &quot;who rolled the schema back at 3am&quot;. <code>api_keys.created_by</code> has
+existed since 0.8 with nothing filling it — a column nobody writes is a promise
+the code does not keep.</p>
+<p><strong>Nothing can be deleted.</strong> Every foreign key is <code>on delete restrict</code> and there is
+no command to remove an organization, a project, or an old submission. That is
+deliberate — deletion before an audit log is deletion nobody can account for — but
+it means the disk grows forever and a project created by a typo is permanent.</p>
+<p>They belong together because deletion is the operation an audit log exists for.</p>
+<h2 id="the-audit-log">The audit log</h2>
+<p>One table, append-only by convention and by the absence of any command that writes
+to it other than by recording an action.</p>
+<pre><code>audit_events(occurred_at, organization_id, project_id, actor, actor_kind, action, subject, detail)
+</code></pre>
+<p><strong>What is recorded: state changes, never reads.</strong> Creating and revoking a key,
+creating and renaming a tenant, triaging a finding, applying and rolling back a
+migration, deleting anything. Listing findings is not recorded — a read log on a
+dashboard refresh is volume without an answer, and volume is how a log stops being
+read.</p>
+<h3 id="the-actor-and-what-it-is-worth">The actor, and what it is worth</h3>
+<p>Two kinds, and the difference is stated in every row rather than implied:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>actor_kind</code></th>
+<th>Example</th>
+<th>Worth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key</code></td>
+<td><code>key:prod-ci (id 4)</code></td>
+<td><strong>verified</strong> — the credential was presented and matched</td>
+</tr>
+<tr>
+<td><code>cli</code></td>
+<td><code>cli:konrad@ops-1</code></td>
+<td><strong>asserted</strong> — the operator ran a command on a machine with database access</td>
+</tr>
+</tbody>
+</table></div>
+<p>A CLI actor is the operating-system user, taken from the environment rather than
+typed, and overridable with <code>--actor</code>. It is not proof of anything: anyone who can
+reach the database can write any name. Recording it anyway is right, because the
+question an audit log usually answers is &quot;what happened, and roughly when, and by
+which route&quot; — but calling it authentication would be the same false green this
+project refuses everywhere else, so the column says which kind it is and the
+documentation says what that means.</p>
+<p>Real identity for humans arrives with users and RBAC, in the team-platform
+milestone. Until then this is a log of actions, honestly labelled.</p>
+<h3 id="which-key-wrote-this-submission">Which key wrote this submission</h3>
+<p><code>submissions.api_key_id</code> answers the open question from the tenancy design. It is
+nullable: a submission that arrived on an unauthenticated evaluation collector has
+no key, and inventing one would be worse than the null.</p>
+<h2 id="retention">Retention</h2>
+<p>Per <strong>project</strong>, not per organization. The tenant is the project everywhere else in
+this collector, and a retention policy at a different granularity than the tenant
+is one that eventually deletes somebody else's evidence.</p>
+<pre><code class="language-bash">guardana-collector retention set   --project acme/web --keep-days 90
+guardana-collector retention apply --project acme/web [--dry-run]
+</code></pre>
+<p><strong>Applying is a command, never a background job.</strong> The collector has no scheduler,
+and adding one to delete data would make &quot;what removed my evidence&quot; answerable
+only by reading source. An operator runs it, or a cron they wrote runs it, and
+either way the audit log has a row for it.</p>
+<p><code>--dry-run</code> prints what would go and deletes nothing. A destructive command whose
+first run is the real one is a command people run once and regret.</p>
+<p><strong>Retention never deletes audit events.</strong> A log that is pruned by the same policy
+as the data it describes cannot answer questions about the pruning. They are kept
+until an organization is deleted, and then they go with it.</p>
+<p><strong>A tracked finding outlives its occurrences.</strong> Retention removes submissions and
+their findings; the entity, its status and its waiver stay, with the sighting count
+falling to zero. Deleting the triage along with the evidence would mean a finding
+that reappears after a retention run arrives as new, and somebody re-decides
+something they already decided.</p>
+<h2 id="deleting-a-project-or-an-organization">Deleting a project or an organization</h2>
+<pre><code class="language-bash">guardana-collector project delete acme/web --yes
+guardana-collector org delete acme --yes
+</code></pre>
+<p>Both refuse without <code>--yes</code>, and both print what will go before doing it. An
+organization refuses while it still has projects — cascading through two levels of
+tenancy from one word is exactly the operation somebody performs at 3am with a
+shell they thought was pointed elsewhere.</p>
+<p><code>on delete restrict</code> stays everywhere. Deletion is done by these commands, in a
+transaction, in an order that leaves nothing orphaned, and the constraint is what
+guarantees a future code path cannot delete a tenant by forgetting one of its
+tables.</p>
+<h2 id="merging-two-systems-after-a-typo">Merging two systems after a typo</h2>
+<p>Deferred in the AI-systems design, and it belongs here because it is the same
+class of operation: moving evidence between identities.</p>
+<pre><code class="language-bash">guardana-collector system merge --project acme/web --from suport-agent --into support-agent
+</code></pre>
+<p>Relabels the submissions and records the move. It is the only &quot;edit the past&quot;
+operation in the collector, and it exists because the alternative — a permanent
+second system created by one keystroke — is what makes people stop trusting the
+inventory.</p>
+<h2 id="what-this-deliberately-does-not-include">What this deliberately does not include</h2>
+<ul>
+<li><strong>No log shipping, no syslog, no SIEM format.</strong> <code>audit list</code> and the table are
+the interface; a team that wants events elsewhere reads them out. Inventing a
+format nobody asked for is how integrations rot.</li>
+<li><strong>No per-row signatures or hash chaining.</strong> They protect against an attacker who
+already has database write access, and at that point the collector has bigger
+problems. Stated so nobody reads &quot;audit log&quot; as &quot;tamper-evident audit log&quot;.</li>
+<li><strong>No retention of <em>runs</em> separately from submissions.</strong> A run is a submission
+here; when they become separate entities, this policy grows a second knob.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/audit-retention-and-deletion.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

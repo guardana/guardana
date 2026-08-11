@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threat model — Guardana documentation</title>
+<meta name="description" content="what Guardana defends against, what it does not, and where the trust boundaries sit">
+<link rel="canonical" href="https://guardana.dev/docs/threat-model.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack validate</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html" aria-current="page">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">proposed</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Threat model</h1><p class="lede">what Guardana defends against, what it does not, and where the trust boundaries sit</p><p>What Guardana defends against, what it deliberately does not, and where the
+trust boundaries sit. A security tool without a stated threat model is asking to
+be trusted on vibes.</p>
+<p><strong>Status:</strong> first published for v0.7. Reviewed each minor release.</p>
+<h2 id="the-shape-of-the-system">The shape of the system</h2>
+<pre><code>┌─ your machine / CI runner ──────────────────────────────┐
+│  guardana CLI                                           │
+│    ├─ reads: repositories, model files, config, profiles│
+│    ├─ loads: built-in rules, third-party plugins ⚠      │
+│    ├─ talks to: the target under test ⚠                 │
+│    └─ writes: reports, saved runs                       │
+└──────────────────────┬──────────────────────────────────┘
+                       │ optional, redacted envelope
+┌──────────────────────▼──────────────────────────────────┐
+│  guardana-server (self-hosted collector)                │
+│    ├─ authenticated ingest from runners                 │
+│    ├─ persistence, tenancy, audit                       │
+│    └─ dashboard ⚠ renders attacker-influenced evidence  │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
+<p>⚠ marks a boundary where untrusted input crosses into Guardana.</p>
+<h2 id="assets">Assets</h2>
+<ol>
+<li><strong>The credentials Guardana is given</strong> — API keys for the target endpoint, the
+judge, the collector.</li>
+<li><strong>The evidence it collects</strong> — prompts that worked, replies that leaked, tool
+arguments. Frequently the most sensitive text in a deployment.</li>
+<li><strong>The verdict itself.</strong> An attacker who can make Guardana report &quot;clean&quot; has
+defeated the control, without touching the model.</li>
+<li><strong>The machine it runs on</strong> — a CI runner with repository write access is a
+valuable target in its own right.</li>
+</ol>
+<h2 id="threats-and-where-we-stand">Threats, and where we stand</h2>
+<h3 id="t1--a-malicious-repository-or-model-file-under-scan">T1 — A malicious repository or model file under scan</h3>
+<p><strong>Scenario:</strong> someone runs <code>guardana scan</code> over a repository containing a crafted
+pickle, a zip bomb, a 40 GB &quot;model&quot;, or a file designed to exploit a parser.</p>
+<p><strong>Stance:</strong> scanning must never execute what it reads. Model-format readers are
+bounded and fail closed: size caps, member caps, recursion caps, and a read that
+fails becomes an <code>errors</code> entry rather than an exception or a silent skip. Pickle
+is parsed at the opcode level, never unpickled.</p>
+<p><strong>Residual risk:</strong> a parser bug is still a parser bug. Readers are fuzz-worthy and
+not yet fuzzed — tracked for v0.7.</p>
+<h3 id="t2--a-malicious-or-hostile-target-endpoint">T2 — A malicious or hostile target endpoint</h3>
+<p><strong>Scenario:</strong> the endpoint under test returns a 10 GB response, hangs forever,
+returns crafted content designed to exploit the evaluator, or is not the endpoint
+the user thought it was. <strong>And, since MCP authorization discovery, it chooses an
+address that Guardana then fetches</strong> — which turns the target from something that
+answers into something that can aim the scanner.</p>
+<p><strong>Stance:</strong> responses are size-bounded and timed out; a hang is an error, not a
+pass. Model output is treated as untrusted throughout — it is never executed, and
+since v0.7 it is redacted before it reaches any output path.</p>
+<p>The address a target <em>chooses</em> is a different question from the address an
+operator <em>types</em>, and they are answered differently.</p>
+<ul>
+<li><strong>Chosen by the target — refused, and the refusal is a finding.</strong> MCP discovery
+is the one place where the server supplies a URL and the client is expected to
+fetch it: <code>resource_metadata</code> in a <code>WWW-Authenticate</code> challenge, then the
+authorization servers named in that document. Guardana will not follow one that
+resolves to a link-local, multicast or reserved address (<code>169.254.169.254</code>
+first among them), one that reaches into the network running the scan while the
+server under test is outside it, one served over plain <code>http</code> when the target is
+not local, or one whose scheme a client must reject. It does not fetch the
+address to confirm the address is dangerous — that would be performing the
+attack in order to report it — and <code>guardana.mcp.discovery_target</code> reports the
+refusal. Loopback and private addresses are permitted when the server under test
+is itself local, because that is how every development setup works and a guard
+that fires on all of them is a guard people switch off.</li>
+<li><strong>Chosen by the target, and permitted — but it travels alone.</strong> Not every hop a
+server names is dangerous; a redirect to its own path is ordinary, and one to
+another public host may be too. What must not travel with it is the operator's
+credential. <code>urllib</code> copies every request header onto a redirected request, so a
+permitted hop used to hand the bearer token from <code>--mcp-token-env</code> to whatever
+origin the server named — the same confused deputy as the address, aimed at the
+credential. A hop to a different scheme, host or port now carries no
+<code>Authorization</code> and no <code>Mcp-Session-Id</code>.</li>
+<li><strong>Typed by the operator — unrestricted, deliberately.</strong> <code>--url</code> and <code>--mcp</code> go
+where they are pointed, including at internal and loopback addresses. That is
+not an oversight and it is not pending work: scanning an internal endpoint is the
+normal case for this tool, and an allowlist would make the tool refuse its own
+primary use while stopping nobody who can already edit the command line. The
+boundary that matters is who chose the address, and Guardana enforces it there.</li>
+</ul>
+<p><strong>Residual risk:</strong> DNS rebinding across the check. A discovery host is resolved
+when it is validated and connected to by name afterwards, so a domain that answers
+differently between the two calls is not caught. Pinning the resolved address needs
+a custom opener on every request path; it is recorded here rather than implied to
+be solved. Guardana also still fetches whatever the <em>operator</em> points it at, per
+the position above.</p>
+<h3 id="t3--a-malicious-plugin-or-rule-pack">T3 — A malicious plugin or rule pack</h3>
+<p><strong>Scenario:</strong> <code>pip install</code> of a package that registers a <code>guardana.rules</code> entry
+point and runs arbitrary code on discovery.</p>
+<p><strong>Stance:</strong> this is the sharpest edge in the product, and it is <strong>not currently
+mitigated beyond documentation</strong>. Entry-point discovery imports installed
+packages; a malicious one runs with the user's privileges. <code>--no-plugins</code> disables
+discovery entirely — but it also disables the built-in rules, which makes the safe
+mode expensive enough that nobody uses it.</p>
+<p><strong>v0.7:</strong> a plugin allowlist (<code>--plugins disabled|builtins|allowlist</code>) so reviewed
+built-ins load without discovering arbitrary installed packages, plus an extension
+manifest declaring what a pack needs. <strong>v1.0:</strong> a declarative pack format that
+executes no Python at all, and subprocess isolation for those that do.</p>
+<p><strong>Until then:</strong> treat installing a Guardana pack exactly like installing any other
+Python package into your environment — because that is what it is. <code>SECURITY.md</code>
+says so.</p>
+<h3 id="t4--evidence-containing-secrets">T4 — Evidence containing secrets</h3>
+<p><strong>Scenario:</strong> a rule finds a leaked API key, records it as evidence, and the
+report is committed to a repository or uploaded to a collector.</p>
+<p><strong>Stance:</strong> evidence is redacted, and after v0.7 centrally rather than by
+convention (see <a href="design/privacy-and-redaction.html">privacy design</a>). Prompts and
+responses are not stored by default; <code>full</code> evidence mode warns loudly.</p>
+<p><strong>Residual risk:</strong> a third-party rule that writes a secret into a field the
+redactor does not know about. Mitigated by redacting at one seam every output path
+goes through, rather than trusting rules.</p>
+<h3 id="t5--a-compromised-collector-api-key">T5 — A compromised collector API key</h3>
+<p><strong>Scenario:</strong> a CI secret leaks; the holder can write findings to the collector.</p>
+<p><strong>Stance (v0.7):</strong> keys are scoped to a project, revocable, hashed at rest, shown
+once. A runner key can <strong>write runs, not read other projects</strong> — so a leaked CI
+key does not become a read of the whole fleet's findings.</p>
+<p><strong>Residual risk:</strong> a write-capable key can poison history with fabricated clean
+runs. Audit log records the key used; detecting a fabricated <em>pass</em> is harder than
+detecting a fabricated <em>finding</em>, and is an open problem.</p>
+<h3 id="t6--cross-tenant-access-in-the-collector">T6 — Cross-tenant access in the collector</h3>
+<p><strong>Scenario:</strong> one organization reads another's findings by guessing an id.</p>
+<p><strong>Stance (v0.7):</strong> tenancy enforced at the query boundary, not in handlers; no
+unscoped query exists. Tested per entity, both read and write.</p>
+<h3 id="t7--stored-xss-through-evidence-in-the-dashboard">T7 — Stored XSS through evidence in the dashboard</h3>
+<p><strong>Scenario:</strong> a model's reply contains a script tag; it lands in evidence; the
+dashboard renders it.</p>
+<p><strong>Stance:</strong> evidence is attacker-influenced text by definition. It is escaped and
+sanitized on render, and the dashboard ships a restrictive CSP. Tested with a
+crafted payload.</p>
+<h3 id="t8--denial-of-service-through-huge-inputs">T8 — Denial of service through huge inputs</h3>
+<p><strong>Scenario:</strong> a 40 GB file, a 5 GB model response, a report with a million
+findings posted to the collector.</p>
+<p><strong>Stance:</strong> size caps in readers, response caps in transports, request-size and
+rate limits on ingest, bounded submission counts in storage.</p>
+<h3 id="t9--unsafe-active-testing-against-production">T9 — Unsafe active testing against production</h3>
+<p><strong>Scenario:</strong> a probe against a production agent calls a real tool, writes to real
+memory, sends a real email.</p>
+<p><strong>Stance:</strong> tool calls go to doubles; Guardana never executes a real tool. After
+v0.7, rules declare <code>impact</code> and destructive checks require an explicit
+<code>--allow-side-effects</code>. Documented in <a href="safe-testing.html">safe testing</a>.</p>
+<p><strong>Residual risk:</strong> a <em>model</em> wired to real tools by its own deployment can take
+actions Guardana merely prompted. Probing staging is the recommendation, and the
+README says so before the quickstart.</p>
+<h3 id="t10--a-compromised-guardana-release">T10 — A compromised Guardana release</h3>
+<p><strong>Scenario:</strong> a malicious version is published to PyPI.</p>
+<p><strong>Stance:</strong> trusted publishing via OIDC (no long-lived token), signed tags, and
+from v0.7: SBOM, provenance attestations, checksums and container signatures.
+Documented immutable pins for high-security environments, not just the moving tag.</p>
+<h2 id="explicit-non-goals">Explicit non-goals</h2>
+<ul>
+<li>Guardana is <strong>not an inline control</strong>. It does not sit in the request path and
+cannot block an attack in production.</li>
+<li>Guardana <strong>does not protect the model from its own users</strong> at run time. It tells
+you what a model does when attacked; a guardrail is a different product.</li>
+<li>Guardana <strong>does not verify the correctness of a model's outputs</strong> beyond
+security-relevant behaviour.</li>
+</ul>
+<h2 id="reporting">Reporting</h2>
+<p>Vulnerabilities in Guardana itself: see <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a>. Private
+vulnerability reporting is enabled on the repository.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.18.1 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/threat-model.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,11 +1,13 @@
-# `site/` — the guardana.dev landing page
+# `site/` — guardana.dev
 
-One static page. No build step, no framework, no JavaScript — just `index.html`
-plus `_headers`, which Cloudflare reads for the security headers, and two files
-published for machines rather than people:
+The landing page and the documentation site. No framework and no JavaScript
+anywhere: `index.html` is hand-written, `docs/` is generated, and `_headers` —
+which Cloudflare reads for the security headers — applies to both.
 
 | File | What it is | Where it comes from |
 |---|---|---|
+| `index.html` | the landing page | hand-written; its counts are rewritten by `scripts/sync_site.py` |
+| `docs/` | the documentation site: every page of `docs/`, plus a page per rule and per filter | **generated** by `scripts/build_site.py` — never edit it, the whole tree is deleted and rewritten |
 | `llms.txt` | the [llms.txt](https://llmstxt.org) documentation map, so a model asking what this project is gets the docs rather than this page's markup | **generated** by `scripts/generate_llms_txt.py` from `docs/index.md` — never edit it |
 | `og.png` | the 1200×630 card a link preview shows in Slack, X and LinkedIn | rendered from `scripts/og_card.html`, deliberately and by hand (see below) |
 
@@ -127,7 +129,7 @@ waiting to discover one in the pixels. The same test reads the PNG's own header,
 a card re-rendered at a different size cannot sit beside meta tags claiming the old
 one.
 
-## What is still hand-maintained
+## What is still hand-maintained on the landing page
 
 The illustrative rule list, the terminal demo's finding lines, and the prose. A
 landing page may show six checks out of forty — it may not state a total that is
@@ -138,5 +140,39 @@ transcript in the page against what the command actually prints — that transcr
 had drifted to numbers no build produced, which is this file's own warning happening
 one element over.
 
-The **Docs** link in the header still points at the GitHub README, from when the
-domain was parked. Point it at the documentation site when there is one.
+## The documentation site
+
+```bash
+uv run python scripts/build_site.py            # rewrite site/docs/
+uv run python scripts/build_site.py --check    # exit 1 if stale, change nothing
+```
+
+`docs/**.md` plus `docs/generated/rules.json` become `site/docs/**.html`.
+`release.py` runs the build; `test_documentation_site.py` runs `--check` and reads
+the rendered pages, so a page edited without rebuilding turns the suite red rather
+than waiting for a release. Reasoning and the alternatives that lost:
+[`docs/design/documentation-site.md`](../docs/design/documentation-site.md).
+
+**Nothing in `site/docs/` is hand-edited.** The tree is deleted and rewritten on
+every build, so an edit there is silently lost — which is the honest outcome, since
+the markdown is the source. Prose lives in `docs/`, and every page carries four
+lines of YAML frontmatter (`title`, `nav_order`, `summary`, `status`) that the build
+**refuses to guess**: a title inferred from a filename reorders the navigation the
+day somebody retitles a page, and nothing would notice.
+
+**The rule explorer is the reason this exists.** Every rule gets a page, and every
+filter — family, surface, severity, impact, cost, framework, framework entry — is a
+*pre-rendered page* rather than a script, because the `script-src 'none'` above is a
+claim a visitor can check rather than a default nobody chose. It is generated from
+the registry, so it cannot go stale the way this page's rule count did.
+
+Two consequences worth stating, because both are choices:
+
+- **Free-text search over the prose is the one thing this cannot do.** It would
+  need `script-src 'self'` under `/docs/*`. The design document says that is the
+  only reason worth taking it, and that `connect-src 'none'` stays either way —
+  which `test_documentation_site.py` now pins.
+- **`/docs/*` loads no font from Google, unlike the landing page.** One request on
+  one page is a trade; the same request on a hundred and ninety pages is a security
+  project's documentation telling a third party who is reading it. The documentation
+  uses system fonts and carries the identity in its palette and layout instead.
