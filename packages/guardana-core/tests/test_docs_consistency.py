@@ -164,7 +164,7 @@ def test_the_collector_page_does_not_overstate_the_environment_boundary() -> Non
     assert "A pinned key **writes and reads only that environment**" in page
 
 
-@pytest.mark.parametrize("script", ["generate_docs.py", "sync_site.py"])
+@pytest.mark.parametrize("script", ["generate_docs.py", "sync_site.py", "generate_llms_txt.py"])
 def test_generated_truth_is_current(script: str) -> None:
     """The generated fragments and the landing page's counts match the registry.
 

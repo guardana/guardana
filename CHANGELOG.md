@@ -26,6 +26,36 @@ claim for prose is the wrong direction for this repository.
 
 ### Added
 
+**`llms.txt` on guardana.dev, generated from the documentation map.** A model asked
+what this project is could previously only read the landing page's markup;
+[`/llms.txt`](https://guardana.dev/llms.txt) hands it the documentation instead —
+the summary, the honest-verdict property, and every page with the sentence that
+describes it, as raw markdown URLs rather than rendered HTML.
+
+It is **generated from `docs/index.md`**, which is the part worth stating: that file
+is already the curated map, already describes every page, and every link in it is
+already checked against the filesystem. So a page added to the docs appears here for
+free, one removed disappears, and the hand-written second list — the shape of every
+stale claim this repository has had to fix — never exists.
+`scripts/generate_llms_txt.py --check` joins `sync_site.py` and `generate_docs.py` in
+the freshness test and in `release.py`.
+
+**A share card, and the Open Graph tags to point at it.** Links to guardana.dev
+rendered as bare URLs in Slack, X and LinkedIn: `og:image`, `og:url` and
+`twitter:card` were absent, and a crawler resolves nothing against the page it
+fetched. `site/og.png` is rendered from `scripts/og_card.html`, which is committed
+beside it so the card can be re-rendered rather than reverse-engineered.
+
+**The card states no rule count on purpose.** A number rendered into a PNG is a claim
+no gate here can read, and this repository has now had that number go stale on the
+landing page, in the README and in the GitHub repository description. So the image
+carries the four verbs and the licence, and the test refuses a count in the card's
+*source* rather than waiting to find one in the pixels. It also reads the PNG's own
+header, so a card re-rendered at a different size cannot sit beside meta tags
+claiming the old dimensions, and it refuses a `.assetsignore` that would exclude
+either file from the deploy — the opposite of the mistake that once published
+`site/README.md`.
+
 **A design document for a documentation site on guardana.dev**
 ([`docs/design/documentation-site.md`](docs/design/documentation-site.md)), closing
 the open item at the end of `site/README.md`. It argues that the interactivity worth

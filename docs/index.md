@@ -12,6 +12,7 @@ detail below.
 
 ## Start here
 
+- [`../README.md`](../README.md) — what Guardana is, the quickstart, and what it checks
 - [`product-status.md`](product-status.md) — **read first**: maturity per component, and the limitations you should know before adopting
 - [`how-it-works.md`](how-it-works.md) — what Guardana is, how the engine works, the two rule layers, the four verbs, and how extensions plug in
 - [`install.md`](install.md) — installing the CLI

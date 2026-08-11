@@ -1,0 +1,91 @@
+# Guardana
+
+> Open-source AI security verification. One rule engine scans model artifacts, probes live endpoints and MCP servers, and grades agent executions that already happened — on a laptop, in CI, and next to a served model. It runs offline, needs no account, and sends nothing anywhere except to the target you name.
+
+Version 0.17.1, Apache-2.0. 51 built-in rules: 19 static ones that need no model and no network, and 32 that grade a live system or a recorded run. Every rule maps to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).
+
+The distinguishing property is what happens when a check cannot reach a verdict. Guardana reports four separate outcomes — a finding, an unverified check, a check that errored, and evidence that was demanded and not available — and none of them is silently a pass. A run that could not establish something says so and exits non-zero.
+
+This file is generated from the documentation map; do not edit it by hand.
+
+## Start here
+
+- [../README.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/README.md): what Guardana is, the quickstart, and what it checks
+- [product-status.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/product-status.md): **read first**: maturity per component, and the limitations you should know before adopting
+- [how-it-works.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/how-it-works.md): what Guardana is, how the engine works, the two rule layers, the four verbs, and how extensions plug in
+- [install.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/install.md): installing the CLI
+- [safe-testing.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/safe-testing.md): before you point an active check at anything that matters
+
+## For developers
+
+- [usage-testing.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-testing.md): `guardana.testing.assert_secure`: verification as an ordinary `pytest` assertion, plus the LangChain adapter
+- [usage-scan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-scan.md): `guardana scan`: static, offline, CI-friendly
+- [usage-probe.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-probe.md): `guardana probe`: adversarial checks against a live endpoint or agent, and an MCP server's manifest **and authorization surface**
+- [usage-analyze-trace.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-analyze-trace.md): `guardana analyze-trace`: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect
+- [usage-trace-inspect.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-trace-inspect.md): `guardana trace inspect`: which evidence dimensions a producer really records, and which ones your policy requires
+- [usage-contracts.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-contracts.md): **security contracts**: your application's own invariants — tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink — as a versioned file the engine compiles into rules
+- [usage-import-observations.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-import-observations.md): `guardana import-observations`: carry garak, promptfoo or your own harness's results in as unverified claims
+- [usage-doctor.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-doctor.md): `guardana doctor`, `config validate|explain`
+- [usage-baseline.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-baseline.md): `guardana baseline`: accepted risk that expires
+- [usage-diff.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-diff.md): `guardana diff`: compare two saved runs, fail on deterioration
+- [usage-monitor.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-monitor.md): `guardana monitor`: scheduled re-verification
+- [usage-target.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-target.md): `guardana target inspect`: what an endpoint really supports
+- [usage-plan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-plan.md): `guardana plan`: what a run would cost, before it costs anything
+- [usage-taxonomy.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-taxonomy.md): `guardana taxonomy`: which framework entry a reference names, and what it corresponds to in another edition
+- [exit-codes.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/exit-codes.md): the exit-status contract every command honours
+- [usage-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-run.md): `guardana run inspect|migrate`: reading a saved run and its manifest
+- [profiles.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/profiles.md): the `guardana.yaml` policy file: which rules run, what fails the build
+- [writing-rules.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/writing-rules.md): author a rule as YAML or as a Python plugin
+- [extending.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/extending.md): add a Rule, an Evaluator, or a Target; the entry-point contract
+- [model-formats.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/model-formats.md): the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract
+
+## For platform and CI teams
+
+- [integrations.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/integrations.md): GitHub Action, pre-commit, and gating on deterioration
+- [../deploy/ci/README.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/deploy/ci/README.md): GitLab, Jenkins, Azure DevOps and the generic container pipeline
+- [../deploy/docker/README.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/deploy/docker/README.md): the official container images: tags, mounts, exit codes, and what the collector image deliberately does not do on start
+- [usage-diff.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-diff.md): the baseline-and-compare workflow
+- [deployment.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/deployment.md): running the collector in production: Compose, TLS, upgrades, what to watch, and what it does not give you yet
+- [usage-collector.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-collector.md): the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness
+
+## For security teams
+
+- [privacy.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/privacy.md): evidence redaction, modes, and what Guardana keeps
+- [threat-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/threat-model.md): what Guardana defends against, what it does not, and where the trust boundaries sit
+- [safe-testing.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/safe-testing.md): side effects, staging, and reading a result honestly
+- [architecture.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/architecture.md): the five abstractions, the Registry, the core↔server boundary
+
+## Reference — generated from the registry, never typed by hand
+
+- [generated/rule-summary.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/rule-summary.md): counts by surface, target kind and severity
+- [generated/rule-catalog.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/rule-catalog.md): every built-in rule and what it maps to
+- [generated/evaluator-catalog.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/evaluator-catalog.md): every evaluator
+- [generated/taxonomy-coverage.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/taxonomy-coverage.md): which framework entries are covered
+
+## Project direction
+
+- [FEATURES.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/FEATURES.md): everything that ships out of the box
+- [ROADMAP.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/ROADMAP.md): where the project is headed, what's deferred, and the non-goals
+
+## Optional
+
+- [design/trace-domain-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/trace-domain-model.md): the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
+- [design/framework-adapters.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/framework-adapters.md): the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing
+- [design/security-contracts.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/security-contracts.md): the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does
+- [design/mcp-protocol-eras.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/mcp-protocol-eras.md): two revisions of MCP, and settling which one a server speaks before asking it anything
+- [design/mcp-authorization-depth.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/mcp-authorization-depth.md): what a live MCP server's authorization surface can be asked with one credential
+- [design/taxonomy-editions.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/taxonomy-editions.md): why a reference is scheme + edition + id, and never a bare `LLM07`
+- [design/documentation-site.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/documentation-site.md): a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way
+- [design/run-manifest-v2.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/run-manifest-v2.md): the reproducible run record
+- [design/collector-domain-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/collector-domain-model.md): persistence, tenancy and the finding lifecycle
+- [design/privacy-and-redaction.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/privacy-and-redaction.md): one redactor, one seam
+- [design/exit-codes.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/exit-codes.md): why the codes are what they are
+- [design/collector-persistence.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/collector-persistence.md): collector persistence and migrations
+- [design/collector-tenancy.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/collector-tenancy.md): organizations, projects, and the scope on every query
+- [design/ai-systems-and-deployments.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/ai-systems-and-deployments.md): what was verified, where it runs, and which version of it
+- [design/collector-runs-and-findings.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/collector-runs-and-findings.md): the run's verdict, and following one finding across runs
+- [design/finding-lifecycle-and-waivers.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/finding-lifecycle-and-waivers.md): statuses, waivers that expire, and why this is not a second `baseline`
+- [design/audit-retention-and-deletion.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/audit-retention-and-deletion.md): who did what, how long evidence is kept, and deleting on purpose
+- [design/panel-sessions.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/panel-sessions.md): signing in to the panel with a read key, and why the cookie cannot write
+- [RELEASING.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/RELEASING.md): versioning (SemVer, lockstep), the release runbook, tags, and PyPI publishing.
+- [maintainers/github-setup.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/maintainers/github-setup.md): one-time GitHub repository configuration.

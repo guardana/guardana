@@ -1,0 +1,77 @@
+<!doctype html>
+<!--
+  Source for site/og.png — the image a link preview shows in Slack, X, LinkedIn.
+
+  Rendered once, deliberately, and the PNG is committed:
+
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+      --disable-gpu --screenshot=site/og.png --window-size=1200,630 \
+      --default-background-color=00000000 scripts/og_card.html
+
+  A browser is a build dependency nobody should need to run a release, so this is
+  not wired into release.py. Re-render it when the wording changes, not on a
+  schedule.
+
+  **It states no rule count, and that is the point.** A number baked into a PNG is
+  a claim no test can read — the exact failure this repository has now had on the
+  landing page, in the README and in the GitHub repository description. What is
+  here instead is the four verbs and the licence, which do not move between
+  releases.
+
+  Fonts are the stack the page falls back to, not the webfont: a headless render
+  has no network, and a card that silently rendered in Times because the font
+  request failed would ship looking broken.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1200px;height:630px}
+  body{
+    background:#12141A; color:#E6E9EF;
+    font-family:"IBM Plex Sans",-apple-system,"Helvetica Neue",Arial,sans-serif;
+    display:flex; flex-direction:column; justify-content:space-between;
+    padding:72px 76px; position:relative; overflow:hidden;
+  }
+  /* One accent, bled off the corner — the brand violet from the site's --brand. */
+  body::after{
+    content:""; position:absolute; right:-180px; top:-180px; width:620px; height:620px;
+    background:radial-gradient(circle, rgba(124,107,255,.28) 0%, rgba(124,107,255,0) 68%);
+  }
+  .row{display:flex; align-items:center; gap:18px}
+  .mark{font-size:52px; line-height:1}
+  .name{font-size:52px; font-weight:700; letter-spacing:-.02em}
+  h1{
+    font-size:62px; font-weight:600; line-height:1.14; letter-spacing:-.022em;
+    max-width:19ch; margin-top:30px;
+  }
+  h1 em{font-style:normal; color:#9F8DFF}
+  .verbs{
+    display:flex; gap:12px; font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    font-size:23px; color:#8892A4;
+  }
+  .verbs b{color:#E6E9EF; font-weight:500}
+  .foot{display:flex; align-items:flex-end; justify-content:space-between}
+  .foot .lic{
+    font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    font-size:20px; color:#8892A4; text-align:right; line-height:1.5;
+  }
+</style>
+</head>
+<body>
+  <div class="row"><span class="mark">🛡️</span><span class="name">Guardana</span></div>
+
+  <h1>Security gates for the AI you <em>run yourself</em>.</h1>
+
+  <div class="foot">
+    <div class="verbs">
+      <b>scan</b><span>·</span><b>probe</b><span>·</span><b>monitor</b><span>·</span><b>diff</b>
+    </div>
+    <div class="lic">
+      open source, Apache-2.0<br>
+      offline · no account · no telemetry
+    </div>
+  </div>
+</body>
+</html>

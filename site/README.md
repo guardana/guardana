@@ -1,7 +1,13 @@
 # `site/` — the guardana.dev landing page
 
 One static page. No build step, no framework, no JavaScript — just `index.html`
-plus `_headers`, which Cloudflare reads for the security headers.
+plus `_headers`, which Cloudflare reads for the security headers, and two files
+published for machines rather than people:
+
+| File | What it is | Where it comes from |
+|---|---|---|
+| `llms.txt` | the [llms.txt](https://llmstxt.org) documentation map, so a model asking what this project is gets the docs rather than this page's markup | **generated** by `scripts/generate_llms_txt.py` from `docs/index.md` — never edit it |
+| `og.png` | the 1200×630 card a link preview shows in Slack, X and LinkedIn | rendered from `scripts/og_card.html`, deliberately and by hand (see below) |
 
 Preview locally:
 
@@ -99,6 +105,27 @@ to **32**, one element below a version the tooling faithfully rewrote every time
 If you reword a claim, update the pattern in `scripts/sync_site.py` and
 `test_landing_page.py` in the same change. That is the moment the check either
 survives or silently stops existing.
+
+## Re-rendering the share card
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+  --disable-gpu --screenshot=site/og.png --window-size=1200,630 --hide-scrollbars \
+  scripts/og_card.html
+```
+
+Deliberately **not** wired into `release.py`: a browser is a build dependency nobody
+should need in order to cut a release, and the card has no reason to change on a
+release schedule. Re-render it when the wording changes.
+
+**The card states no rule count, and that is the point.** A number rendered into a
+PNG is a claim no gate in this repository can read — which is how the number went
+stale on this page, in the README and in the GitHub repository description. So the
+image carries the four verbs and the licence, and
+`test_site_sharing_and_llms_txt.py` refuses a count in `og_card.html` rather than
+waiting to discover one in the pixels. The same test reads the PNG's own header, so
+a card re-rendered at a different size cannot sit beside meta tags claiming the old
+one.
 
 ## What is still hand-maintained
 

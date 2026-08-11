@@ -131,6 +131,9 @@ def main(argv: list[str]) -> None:
     # staleness one element over. Run after the bump so both land in one commit.
     _run(["uv", "run", "python", "scripts/sync_site.py", *(["--check"] if dry_run else [])])
     _run(["uv", "run", "python", "scripts/generate_docs.py", *(["--check"] if dry_run else [])])
+    # `llms.txt` states the version and the rule counts, so it goes stale on exactly
+    # the same schedule as the page beside it.
+    _run(["uv", "run", "python", "scripts/generate_llms_txt.py", *(["--check"] if dry_run else [])])
 
     _roll_changelog(version, dry_run)
 
