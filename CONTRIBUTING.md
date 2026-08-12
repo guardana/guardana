@@ -59,6 +59,28 @@ dependency, an import or an entry point:
 uv run python scripts/clean_install_check.py   # ~40s: five packages, empty venv
 ```
 
+And one more, whenever you touch anything a third-party pack depends on — the
+`Rule`/`Evaluator`/`Target` contracts, the entry-point groups, the pack manifest:
+
+```bash
+uv run --isolated --no-cache \
+  --with ./packages/guardana-core --with ./packages/guardana-rules \
+  --with ./examples/custom_rule --with pytest pytest examples/custom_rule/tests -q
+```
+
+`examples/custom_rule/` is a real third-party package, deliberately kept out of the
+main test environment — installing its `acme.*` rules there would skew the dogfood
+scan — so `uv run pytest` cannot see it. It is the only place a third party's entry
+points and a third party's manifest are both real, and it has caught two things
+nothing else could.
+
+**`--no-cache` is load-bearing.** Without it uv serves a wheel it built earlier for
+that directory, and the data files inside — the pack manifest, the YAML rules — are
+exactly what these changes touch. `--refresh` and `--refresh-package` do not help;
+both were measured and both returned the stale wheel. You want to see a line saying
+`Building acme-guardana-rules` in the output. If it is not there, you are testing
+what you built last time.
+
 It installs the five distributions into an empty environment and runs the
 commands the documentation tells people to type. Everything above it passes in an
 environment where an undeclared module happens to be installed for some other

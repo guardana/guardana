@@ -47,6 +47,13 @@ schema 1 manifest that names `taxonomies:` is refused: a key invented after the
 version that names it is a manifest whose own `schema_version` no longer describes
 it.
 
+**A Product Hunt link on the landing page, drawn rather than fetched.** Their
+official badge is an `<img>` from `api.producthunt.com`, and the site's
+`img-src 'self' data:` refuses it. The mark is inline SVG instead, because relaxing
+a policy visitors can check — and that `docs/design/documentation-site.md` treats as
+a product claim — to render one badge is a bad trade. A test fails if anybody ever
+takes the other route.
+
 ### Fixed
 
 **A pinned MCP manifest recorded which server it was approved for, and the reader
