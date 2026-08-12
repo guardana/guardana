@@ -91,6 +91,14 @@
   .btn-1:hover{background:#2A2E36}
   .btn-2{background:transparent; color:var(--ink); border-color:var(--rule)}
   .btn-2:hover{border-color:var(--muted)}
+  /* Product Hunt, drawn here rather than fetched. Their official badge is an
+     <img> from api.producthunt.com, and `img-src 'self' data:` would block it —
+     relaxing the policy to render one badge would spend a claim visitors can
+     check on a link that works perfectly well without it. */
+  .btn-ph{background:transparent; color:var(--ink); border-color:#DA552F;
+    display:inline-flex; align-items:center; gap:9px}
+  .btn-ph:hover{background:#DA552F; color:#fff}
+  .btn-ph svg{width:18px; height:18px; flex:none}
   .btn:focus-visible,.top nav a:focus-visible,.brand:focus-visible,.foot a:focus-visible{outline:2px solid var(--brand); outline-offset:3px}
 
   /* ---- terminal: the one dark artifact, the proof ---- */
@@ -202,6 +210,10 @@
         <div class="cta">
           <a class="btn btn-1" href="https://github.com/guardana/guardana/blob/main/docs/index.md">Read the docs</a>
           <a class="btn btn-2" href="https://github.com/marketplace/actions/guardana-ai-security-scan">Add to CI</a>
+          <a class="btn btn-ph" href="https://www.producthunt.com/products/guardana?launch=guardana" rel="noopener">
+            <svg viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 6.6h4.1a3.4 3.4 0 0 1 0 6.8H10V6.6zm0 6.8V18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
+            <span>Product Hunt</span>
+          </a>
         </div>
       </div>
 
@@ -440,6 +452,7 @@
     <a href="https://pypi.org/project/guardana-cli/">PyPI</a>
     <a href="https://github.com/marketplace/actions/guardana-ai-security-scan">Marketplace</a>
     <a href="https://github.com/guardana/guardana/releases">Releases</a>
+    <a href="https://www.producthunt.com/products/guardana?launch=guardana" rel="noopener">Product Hunt</a>
     <span class="sep">Security verification for self-hosted AI.</span>
   </div>
 </footer>

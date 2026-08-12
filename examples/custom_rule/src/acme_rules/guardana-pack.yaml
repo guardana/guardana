@@ -15,7 +15,7 @@
 # not register leaves a team believing something runs that does not, which is a
 # false green arriving through documentation instead of through code.
 
-schema_version: 1
+schema_version: 2
 name: acme-guardana-rules
 
 # The extension API, versioned separately from Guardana's own version number. Pin
@@ -40,3 +40,11 @@ provides:
     - acme.strict_refusal
   targets:
     - AcmePromptLibraryTarget
+  # The fourth group, and the reason this file is schema 2. A pack registers a
+  # *catalogue*, so this names the framework rather than each control in it —
+  # `ACME-CONTROLS`, not `ACME-CONTROLS:ACME-14`. `refusal.yaml` writes
+  # `taxonomy: [ACME-14]`, which resolves only because the entry point below
+  # registers this catalogue before any rule is loaded; declaring it here is what
+  # lets `pack validate` notice if that ever stops being true.
+  taxonomies:
+    - ACME-CONTROLS

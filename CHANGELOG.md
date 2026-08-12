@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-12 — the pack author's last mile, and every persisted document read back
+
+### Added
+
+**`guardana pack lock` — a pin over what a check *is*, not over what its package is
+called.** The last open item of the extension-author tooling, and the reason it
+waited: a lock over distribution versions is not a lock for this project.
+`Rule.digest()` has existed since 0.6 precisely so that "the same rule" means more
+than "the same package version" — a pack can sharpen a corpus, widen a prompt set or
+swap an evaluator inside one patch release, and every one of those changes what a
+run tests while the version string says nothing moved.
+
+So three things are pinned three ways, and the file says which is which: rules by
+their hashed declaration, evaluators and targets by id (Python has no declaration to
+hash, and inventing a digest from a class name would claim a detection it does not
+have), catalogues by a digest over the references a pack registers. The distribution
+version sits beside all of it as the coarse pin covering what none of the others can.
+`guardana pack lock --check` is the CI half, and it never writes: a check that
+created the file it was asked to compare against would pass on every first run.
+
+Drift is reported in both directions. A rule that vanished is coverage a team still
+believes they have; one that appeared is a check nobody reviewed running against
+production. Extensions from a package that declares no manifest are recorded as
+`unlocked` and said out loud, because a lock silent about them would read as a fully
+pinned repository that is not one.
+
+**Pack manifest schema 2: `provides.taxonomies`.** `guardana.taxonomies` has been
+one of the four extension groups since 0.1 and got its first registrant in 0.19.0 —
+but a pack could register a control catalogue and its manifest had **nowhere to say
+so**, which left `pack validate` blind to a whole category. A pack shipping *only* a
+catalogue could not write a valid manifest at all: `provides:` had to list something,
+and none of the three things it could list were what that pack shipped. It was also
+never discovered, because the group was missing from the list discovery walks.
+
+A schema 1 manifest still loads, migrated forward **in memory** and never by
+rewriting the author's file, and `pack validate` now prints that it happened. A
+schema 1 manifest that names `taxonomies:` is refused: a key invented after the
+version that names it is a manifest whose own `schema_version` no longer describes
+it.
+
+### Fixed
+
+**A pinned MCP manifest recorded which server it was approved for, and the reader
+threw that field away.** Pointing `--mcp-pin` at another server's file — a
+copy-paste, a wrong path in CI, a repository holding pins for several servers —
+produced a full comparison against a manifest nobody had approved for that server.
+Where the tool names lined up it produced a **clean pass**: a rug-pull check
+reporting "nothing changed" about a server nobody ever approved, which is the exact
+false green that check exists to make impossible. A pin whose server does not match
+the target, or which names no server at all, is now `inconclusive` — never a finding,
+because the server may be perfectly intact, and never a pass.
+
+**A re-read run said the target metered nothing.** `load_report` rebuilt seven of
+`ScanResult`'s nine channels and silently defaulted `usage` and `protocols`, so a run
+that made 42 requests and negotiated MCP `2026-07-28` came back claiming no target
+counted and no protocol was spoken. Both are recorded in the manifest and are now
+read back from it.
+
+**A dead property and two unexercised branches in the documentation-site
+generator.** `Page.depth` was used by nothing; `render.split_heading`'s
+link-in-a-heading branch and `build._tables`' substitution had no test between them.
+The first is gone, the other two are covered — including the fact that wrapping
+tables by substituting on `<table>` is safe *only* because the parser escapes raw
+HTML, which nothing had written down.
+
+### Changed
+
+**Every versioned document now has a round-trip gate, and the list is read off the
+source.** Nine persisted schemas shipped and exactly one was gated that way. The
+other eight were covered the way the failing one had been — the writer's tests
+asserting what it wrote, the reader's asserting what it read, both correct about
+their own half and neither able to see a field that fell between them. That is how
+`calibration` was lost in 0.18 and `deployment` in 0.19, and how `usage` above was
+lost in this one.
+
+Each gate writes a document, reads it back, compares every field walked off the
+dataclass, and then **deletes each key in turn and requires the reader to notice** —
+a key whose removal changes nothing is a key nothing reads. A meta-gate parses the
+source for `*_SCHEMA_VERSION` constants, so a new persisted document arrives failing
+until its gate exists. The collector envelope is walked across the package boundary
+it lives on, engine to collector and into both stores.
+
 ## [0.19.1] - 2026-08-11 — the gate lied about itself
 
 **`v0.19.0` was tagged and never published.** Its CI was red on an import-ordering

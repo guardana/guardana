@@ -3,10 +3,26 @@ from guardana.core.pack.discover import (
     check_pack,
     check_packs,
     installed_manifests,
+    installed_packs,
 )
-from guardana.core.pack.load import MANIFEST_NAME, PACK_SCHEMA_VERSION, load_manifest
+from guardana.core.pack.load import MANIFEST_NAME, load_manifest
+from guardana.core.pack.lock import (
+    LOCK_NAME,
+    LOCK_SCHEMA_VERSION,
+    Drift,
+    DriftKind,
+    Installed,
+    Lock,
+    LockedPack,
+    catalogue_digest,
+    compare,
+    lock_from_dict,
+    lock_of,
+    lock_to_dict,
+)
 from guardana.core.pack.model import (
     EXTENSION_API_VERSION,
+    PACK_SCHEMA_VERSION,
     ApiRange,
     PackError,
     PackManifest,
@@ -14,14 +30,27 @@ from guardana.core.pack.model import (
 
 __all__ = [
     "EXTENSION_API_VERSION",
+    "LOCK_NAME",
+    "LOCK_SCHEMA_VERSION",
     "MANIFEST_NAME",
     "PACK_SCHEMA_VERSION",
     "ApiRange",
+    "Drift",
+    "DriftKind",
+    "Installed",
+    "Lock",
+    "LockedPack",
     "PackCheck",
     "PackError",
     "PackManifest",
+    "catalogue_digest",
     "check_pack",
     "check_packs",
+    "compare",
     "installed_manifests",
+    "installed_packs",
     "load_manifest",
+    "lock_from_dict",
+    "lock_of",
+    "lock_to_dict",
 ]

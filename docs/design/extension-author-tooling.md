@@ -7,7 +7,8 @@ status: accepted
 
 # What a third party needs before the API freezes: fixtures, measurement, a manifest
 
-**Status:** implemented in 0.18.0 · **Written:** 2026-08-11 · **Step five**
+**Status:** implemented in 0.18.0; the lock file and pack schema 2 in 0.20.0 ·
+**Written:** 2026-08-11 · **Step five**
 
 1.0 says one thing: *what will not break under you.* That promise is worthless to
 somebody who cannot demonstrate their own extension still works — so the tooling
@@ -22,8 +23,9 @@ proves their pack does what it claims, and how CI repeats that proof.**
   `Evaluator` rather than of a `Rule`
 - a pack manifest declaring API compatibility, and `pack validate` to check it
 
-The lock file from the same roadmap item is **deferred**, with the reason at the
-bottom.
+The lock file from the same roadmap item was deferred here and **landed in 0.20.0**,
+once `provides:` was complete enough to inform what a lock should pin — see
+"Decision 8" below.
 
 ## What already works, so this document does not rebuild it
 
@@ -258,13 +260,26 @@ touches moved. `extension_api` moves only when `Rule`, `Evaluator`, `Target` or
 what makes "too old" and "too new" two answerable questions:
 
 ```yaml
-schema_version: 1
+schema_version: 2
 name: acme-guardana-rules
 extension_api: ">=1,<2"
 provides:
   rules: [acme.agent.customer_data, acme.prompt.tone]
   evaluators: [acme.strict_refusal]
+  taxonomies: [ACME-CONTROLS]
 ```
+
+**Schema 2 (0.20.0) added `taxonomies:`, and it closed a hole rather than adding a
+convenience.** `guardana.taxonomies` is one of the four extension groups, so a pack
+could register a control catalogue and its manifest had nowhere to say so — leaving
+`pack validate` blind to a whole category. A pack shipping *only* a catalogue could
+not write a valid manifest at all: `provides:` had to list something, and none of
+the three things it could list were what that pack shipped. It was also not
+discovered, because the group was missing from the list `pack validate` walks.
+
+The unit is the **framework**, not the entry. A pack registers a catalogue, and a
+team shipping two hundred controls would otherwise maintain two hundred lines that
+say one thing.
 
 **Both directions refuse, with different messages and one outcome.** A pack built
 for an older API may rely on behaviour since removed; one built for a newer API may
@@ -285,11 +300,46 @@ in memory at load, unknown keys raise. **No `pack migrate` command** — a saved
 is generated and Guardana may rewrite it; a manifest is hand-written and belongs to
 its author.
 
+## Decision 8 — the lock pins what a check *is*, at three different strengths
+
+**Implemented in 0.20.0.** The question this deferred until `provides:` was complete:
+what does a lock for *this* project pin?
+
+Not distribution versions. `Rule.digest()` exists precisely because "the same rule"
+has to mean more than "the same package version" — a pack can sharpen a corpus,
+widen a prompt set or swap an evaluator inside one patch release, and every one of
+those changes what a run tests while the version string says nothing moved. A
+comparison against last week's run would then hand the customer the wrong culprit,
+which is the exact failure `digest()` was added to prevent, arriving one layer
+earlier.
+
+So three strengths, and the file says which is which rather than presenting one
+confidence:
+
+| What | Pinned by | What it cannot see |
+|---|---|---|
+| rules | `Rule.digest()` — the declaration, hashed | the Python behind a rule whose declaration did not move |
+| evaluators, targets | id only | anything: an `Evaluator` has no declaration to hash, and a digest invented from a class name would claim a detection it does not have |
+| catalogues | a digest over the references the pack registers | a catalogue's *file* provenance, which a pack registering refs through an entry point does not have |
+
+The distribution version is recorded beside all of it as the coarse pin covering
+what none of the above can.
+
+**`unlocked:` is a field, not an omission.** An extension registered by a package
+that declares no manifest cannot be attributed to a pack, so it is listed and said
+out loud. A lock that quietly left it out would report a fully pinned repository
+that is running something nobody declared — which is the same false green as a
+manifest promising a check it does not register, one level further out.
+
+**Drift is reported in both directions.** A rule that vanished is coverage a team
+still believes they have; one that appeared is a check nobody reviewed running
+against production. Reporting only the first would make the lock a floor rather
+than a pin.
+
 ## Deferred, with the reason
 
 | Deferred | Reason |
 |---|---|
-| **The lock file** | the only one of the four roadmap items that is *not* a 1.0 entry criterion, and the only one sharing no schema with the others — so it is genuinely separable where they are not. It also wants a decision the manifest has to land first: a lock pinning distribution versions is not a lock for this project, because `Rule.digest()` exists so that "the same rule" means more than "the same package version", and what a rule's digest should cover is a question the manifest's `provides:` block is about to inform |
 | **Fixtures for artifact rules in YAML** | a YAML rule is `endpoint`-kind by construction, so its double is always a scripted model. An artifact fixture needs bytes, and bytes in YAML is either a path to a checked-in malicious file or base64 nobody can review — the plugin path takes it, using the builders `guardana.core.testing` already ships |
 | **Signing the manifest** | signing authenticates a publisher; without a trust policy and a distribution story it says nothing about whether the code is safe. Already on the roadmap's not-required-for-1.0 list, and the manifest does not change that |
 | **A `Technique` extension point** | still owed before the freeze, and still its own design. Named here only so its absence is deliberate rather than forgotten |

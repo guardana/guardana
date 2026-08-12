@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>guardana pack validate — Guardana documentation</title>
-<meta name="description" content="guardana pack validate: the manifest declaring which extension API your pack needs and what it provides">
+<title>guardana pack — Guardana documentation</title>
+<meta name="description" content="guardana pack validate and guardana pack lock: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks">
 <link rel="canonical" href="https://guardana.dev/docs/usage-pack.html">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 <link rel="stylesheet" href="docs.css">
@@ -47,7 +47,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
-<li><a href="usage-pack.html" aria-current="page">guardana pack validate</a></li>
+<li><a href="usage-pack.html" aria-current="page">guardana pack</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
@@ -99,7 +99,7 @@
 </ul>
 </nav>
 <main>
-<h1><code>guardana pack validate</code> — can this build load your pack, and does it do what it says</h1><p class="lede"><code>guardana pack validate</code>: the manifest declaring which extension API your pack needs and what it provides</p><p>1.0 promises that <code>Rule</code>, <code>Evaluator</code> and <code>Target</code> will not break under you. A
+<h1><code>guardana pack validate</code> — can this build load your pack, and does it do what it says</h1><p class="lede"><code>guardana pack validate</code> and <code>guardana pack lock</code>: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks</p><p>1.0 promises that <code>Rule</code>, <code>Evaluator</code> and <code>Target</code> will not break under you. A
 promise is only worth something if you can check whether <em>this</em> build keeps it for
 <em>your</em> package — so a pack declares what it needs and what it provides, and this
 command answers both questions.</p>
@@ -114,7 +114,7 @@ command answers both questions.</p>
 <h2 id="the-manifest">The manifest</h2>
 <p><code>guardana-pack.yaml</code>, <strong>inside your package directory</strong> — not at your repository
 root:</p>
-<pre><code class="language-yaml">schema_version: 1
+<pre><code class="language-yaml">schema_version: 2
 name: acme-guardana-rules
 extension_api: &quot;&gt;=1,&lt;2&quot;
 
@@ -127,7 +127,14 @@ provides:
     - acme.prompt.overreach
   evaluators:
     - acme.strict_refusal
+  targets:
+    - AcmeWarehouseTarget
+  taxonomies:
+    - ACME-CONTROLS
 </code></pre>
+<p><code>provides:</code> names all four extension groups. <code>taxonomies:</code> lists <strong>framework
+names</strong>, not individual controls — a pack registers a catalogue, and a team shipping
+two hundred controls would otherwise maintain two hundred lines that say one thing.</p>
 <p>It goes inside the package because <code>pack validate</code> runs against an <strong>installed
 distribution</strong>, and <code>pyproject.toml</code> is not in a wheel. A manifest a user cannot
 read from what they installed cannot be checked at the only moment that matters —
@@ -208,8 +215,140 @@ nothing being wrong.</p>
 <p><code>schema_version</code> is required, and a version this build has never heard of is refused
 rather than read optimistically. Older versions migrate forward in memory at load.
 Unknown keys raise.</p>
+<p><strong>Schema 2 added <code>provides.taxonomies</code>.</strong> A schema 1 manifest still loads — it
+simply declares no catalogues, which is what it meant, since the group did not exist
+for it to name. <code>pack validate</code> says so where it happened:</p>
+<pre><code>✓ acme-guardana-rules (extension_api &gt;=1,&lt;2) — 7 declared · read as schema 1, migrated to 2 in memory
+</code></pre>
+<p>A schema 1 manifest that <em>does</em> name <code>taxonomies:</code> is refused. A key invented after
+the version that names it is a manifest whose own <code>schema_version</code> no longer
+describes it, and an older build reading the same file would drop the key silently.</p>
 <p><strong>There is no <code>pack migrate</code> command, deliberately.</strong> A saved run is generated and
 Guardana may rewrite it; a manifest is hand-written and belongs to you.</p>
+<h2 id="guardana-pack-lock--pin-what-a-check-is"><code>guardana pack lock</code> — pin what a check <em>is</em></h2>
+<p>A version pin is not a pin for this project. A pack can sharpen a corpus, widen a
+prompt set or swap an evaluator inside one patch release; every one of those changes
+what a run tests while the version string says nothing moved, and the next
+comparison would blame the model for it.</p>
+<pre><code class="language-bash">guardana pack lock                # write ./guardana-lock.yaml
+guardana pack lock --check        # in CI: fail if the build has drifted
+</code></pre>
+<pre><code class="language-yaml">schema_version: 1
+extension_api: 1
+packs:
+  - name: acme-guardana-rules
+    distribution: acme-guardana-rules
+    version: 0.3.1
+    rules:
+      acme.agent.customer_data: 7ac9df6f3a247391
+    evaluators: [acme.strict_refusal]
+    targets: [AcmeWarehouseTarget]
+    taxonomies:
+      ACME-CONTROLS: &quot;sha256:1c4f…&quot;
+unlocked: []
+</code></pre>
+<p><strong>Three things are pinned three different ways, and the file says which is which:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>What</th>
+<th>Pinned by</th>
+<th>Why not more</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rules</td>
+<td><code>Rule.digest()</code> — the declaration, hashed</td>
+<td>a sharpened corpus is visible; the Python behind it is not</td>
+</tr>
+<tr>
+<td>evaluators, targets</td>
+<td>id only</td>
+<td>an <code>Evaluator</code> is Python and has no declaration to hash; inventing a digest from a class name would claim to detect a change it cannot see</td>
+</tr>
+<tr>
+<td>catalogues</td>
+<td>a digest over the references the pack registers</td>
+<td>a third-party catalogue has no <em>file</em> to pin, but what it registered is content</td>
+</tr>
+<tr>
+<td>everything else</td>
+<td>the distribution version beside it</td>
+<td>the coarse pin, and the only one that covers an implementation whose declaration did not move</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>unlocked:</code> lists extensions registered by a package that declares <strong>no manifest</strong>.
+They are recorded and not attributed to a pack, and the command says so on stderr —
+a lock that stayed silent about them would read as a fully pinned repository that
+is not one.</p>
+<h3 id="what-counts-as-drift">What counts as drift</h3>
+<p>Both directions, always. A rule that vanished is coverage a team still believes they
+have; one that appeared is a check nobody reviewed running against production.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pack_missing</code></td>
+<td>locked and not installed</td>
+</tr>
+<tr>
+<td><code>pack_unlocked</code></td>
+<td>installed and the lock does not mention it</td>
+</tr>
+<tr>
+<td><code>version_changed</code></td>
+<td>same digests, different package version</td>
+</tr>
+<tr>
+<td><code>removed</code> / <code>added</code></td>
+<td>an id left or arrived</td>
+</tr>
+<tr>
+<td><code>changed</code></td>
+<td>a digest moved — it is not the same check any more</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Verdict</th>
+<th>Exit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the build matches the lock</td>
+<td>pass</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>the build has drifted</td>
+<td>fail</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>nothing installed declares a manifest, so there is nothing to pin</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>the lock could not be read</td>
+<td>refused</td>
+<td><code>3</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>--check</code> never writes. A check that created the file it was asked to compare
+against would pass on every first run, which is the one run nobody looks at.</p>
 <h2 id="guardanas-own-pack-has-one">Guardana's own pack has one</h2>
 <p><code>guardana-rules</code> ships a manifest and goes through this same door. Its <code>provides:</code>
 block is <em>generated</em> from the registry — 56 ids is too many to hand-maintain, and a

@@ -56,11 +56,6 @@ class Page:
         """Where the page is served from, for a canonical link."""
         return "/docs/" + self.output.as_posix()
 
-    @property
-    def depth(self) -> int:
-        """How many directories deep the page is, for relative asset links."""
-        return len(self.relative.parts) - 1
-
 
 def read_pages(docs: Path) -> list[Page]:
     """Read every markdown file under `docs/`, refusing one that does not describe itself."""

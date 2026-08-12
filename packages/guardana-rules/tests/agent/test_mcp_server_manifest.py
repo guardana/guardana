@@ -88,7 +88,15 @@ def test_a_description_changed_after_approval_is_a_rug_pull(tmp_path: Path) -> N
 def test_an_added_or_removed_tool_is_reported(tmp_path: Path) -> None:
     pin = tmp_path / "mcp.pin.json"
     pin.write_text(
-        json.dumps({"schema_version": 1, "server": "x", "tools": {"gone": "deadbeef"}}),
+        # The server this pin names has to be the one being probed, or the comparison
+        # is refused before it starts — see `test_mcp_pin_round_trip.py`.
+        json.dumps(
+            {
+                "schema_version": 1,
+                "server": "https://mcp.example/api",
+                "tools": {"gone": "deadbeef"},
+            }
+        ),
         encoding="utf-8",
     )
 

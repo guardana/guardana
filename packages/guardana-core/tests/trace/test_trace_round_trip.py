@@ -9,9 +9,10 @@ the tri-states, which is where a lossy writer would hurt.
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from _roundtrip import Document, lost_fields, undemonstrative_fields, unread_keys
 from guardana.core.trace import (
     AgentRef,
     Approval,
@@ -46,6 +47,7 @@ from guardana.core.trace import (
     ToolExecution,
     ToolStatus,
     Trace,
+    TraceLoadError,
     TraceTruncation,
     read_trace,
     serialize_trace,
@@ -55,10 +57,39 @@ from jsonschema import Draft202012Validator
 _SCHEMA_PATH = Path(__file__).resolve().parents[4] / "schemas" / "trace-v2.schema.json"
 _NOW = datetime(2026, 8, 9, 10, 0, tzinfo=UTC)
 
+_THE_READING_NOT_THE_TRACE = frozenset(
+    {
+        "trace.provenance.source",
+        "trace.provenance.dialect",
+        "trace.provenance.document_digest",
+        "trace.unreadable",
+    }
+)
+"""Four fields that describe *this reading of this file*, not the trace inside it.
+
+Where a file was found, which dialect it turned out to be, what its bytes hash to
+and how many of its records this reader could not parse are all answers about the
+read. Carrying them in the document would let a file assert its own provenance,
+which is the one claim a reader must never take from the thing it is reading.
+
+Named rather than skipped by omission: everything else in `Trace` — the producer's
+own identity included — has to survive, and a fifth name cannot join this list
+without someone writing down why.
+"""
+
 
 def _validator() -> Draft202012Validator:
     schema: dict[str, Any] = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
     return Draft202012Validator(schema)
+
+
+def _read_records(records: Document, tmp: Path) -> Trace:
+    path = tmp / "mutated.jsonl"
+    path.write_text(
+        "".join(f"{json.dumps(record)}\n" for record in cast("list[Any]", records)),
+        encoding="utf-8",
+    )
+    return read_trace(path).trace
 
 
 def _full_trace() -> Trace:
@@ -255,17 +286,50 @@ def test_every_written_record_validates_against_the_published_schema() -> None:
 
 
 def test_a_written_trace_reads_back_as_the_trace_it_was(tmp_path: Path) -> None:
+    """Every field walked off the dataclass, not listed — a list is what the next field escapes."""
     original = _full_trace()
     path = tmp_path / "written.jsonl"
     path.write_text(serialize_trace(original), encoding="utf-8")
-    read = read_trace(path).trace
-    assert read.trace_id == original.trace_id
-    assert read.instrumented == original.instrumented
-    assert read.truncated == original.truncated
-    assert read.attributes == original.attributes
-    assert read.provenance.producer == original.provenance.producer
-    assert read.provenance.producer_version == original.provenance.producer_version
-    assert read.spans == original.spans
+
+    lost = lost_fields(original, read_trace(path).trace, "trace", exempt=_THE_READING_NOT_THE_TRACE)
+
+    assert not lost, "fields a written trace loses on the way back:\n  " + "\n  ".join(lost)
+
+
+def test_no_key_of_a_written_trace_can_be_deleted_without_the_reader_noticing(
+    tmp_path: Path,
+) -> None:
+    """Compared against the whole document read back, never against the trace that wrote it.
+
+    Against the original, a key the reader ignores looks read: the two differ, but
+    they differ for the deleted key's neighbours. That mistake is what let a dropped
+    block survive the gate written to catch it, one schema over.
+    """
+    records = [json.loads(line) for line in serialize_trace(_full_trace()).splitlines()]
+
+    ignored = unread_keys(
+        records,
+        lambda doc: _read_records(doc, tmp_path),
+        root="trace",
+        refusal=TraceLoadError,
+    )
+
+    assert not ignored, (
+        "keys a trace carries that make no difference to what is read back — either "
+        "nothing reads them, or the fixture leaves them at the reader's default:\n  "
+        + "\n  ".join(ignored)
+    )
+
+
+def test_the_fixture_occupies_every_field_a_trace_has() -> None:
+    """What makes the two assertions above mean anything.
+
+    An empty field reads back empty whether or not anything reads it, so a field
+    added to `Trace` and forgotten here would sail through both gates above.
+    """
+    empty = undemonstrative_fields(_full_trace(), "trace", _THE_READING_NOT_THE_TRACE)
+
+    assert not empty, f"fields the trace fixture leaves empty, so nothing is proved: {empty}"
 
 
 def test_the_scope_tri_state_survives_the_round_trip(tmp_path: Path) -> None:

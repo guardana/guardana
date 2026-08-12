@@ -113,6 +113,7 @@ convention = "pep257"
     "SLF001",   # tests may reach into the private surface they are pinning down
 ]
 "examples/custom_rule/tests/**" = ["S101", "D", "PLR2004"]
+"scripts/tests/**" = ["S101", "D", "PLR2004", "SLF001"]
 # Maintainer scripts are CLIs — print() is their user interface, not stray debug output.
 "scripts/*.py" = ["T201"]
 # Same reason: `guardana-collector` is a console entry point, and stdout is what it
@@ -137,6 +138,9 @@ mypy_path = [
     "packages/guardana-cli/src",
     "packages/guardana-server/src",
     "examples/custom_rule/src",
+    # Same reason as pytest's `pythonpath` below: the round-trip helpers are imported
+    # by gates in several suites, so the type checker has to resolve them too.
+    "packages/guardana-core/tests",
 ]
 # Deliberately-insecure demo inputs: not project source, and not type-checked.
 exclude = ["examples/vulnerable-model"]
@@ -147,11 +151,23 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "-q -ra --strict-markers --strict-config"
+# The round-trip machinery (`_roundtrip`, `_documents`) is shared by gates in three
+# distributions' test suites, including the collector's — the envelope is written by
+# the engine and read by the collector, which is the one schema whose two halves live
+# in different packages. Made importable here rather than through a second
+# `conftest.py`: two files named `conftest` in one repository is a duplicate module
+# for mypy, and the helper has to sit beside the tests that import it.
+pythonpath = ["packages/guardana-core/tests", "scripts"]
 # The example plugin is deliberately NOT collected here: installing it would put
 # its `acme.*` rules into every `Registry.discover()` call and make the dogfood
 # scan non-representative. CI runs its tests in a dedicated job instead, which is
 # also the only honest way to prove third-party entry-point discovery works.
-testpaths = ["packages"]
+testpaths = ["packages", "scripts/tests"]
+# The site generator's own tests live beside it rather than under `packages/`, and
+# not for tidiness: the dogfood scan reads `packages/`, where `sitegen` is neither an
+# installed distribution nor a local module — so a test importing it made Guardana
+# flag Guardana for an undeclared dependency. The rule was right; the file was in the
+# wrong tree.
 xfail_strict = true
 filterwarnings = [
     "error",

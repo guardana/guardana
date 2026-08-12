@@ -38,6 +38,7 @@ from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from guardana.core.taxonomy import OWASP_LLM01_2025
+from guardana.core.usage import TargetUsage
 from guardana.report import get_renderer
 
 _STARTED = datetime(2026, 7, 31, 9, 12, 44, tzinfo=UTC)
@@ -53,7 +54,14 @@ def _manifest(result: ScanResult) -> RunManifest:
         target=TargetIdentity(kind=TargetKind.ENDPOINT, ref="http://localhost:11434#llama3"),
         configuration=ConfigurationRef(profile_name="ci"),
         execution=ExecutionSettings(concurrency=4, timeout_seconds=30),
-        usage=RunUsage(requests=7, wall_time_seconds=42.0),
+        # Taken from the result the way `_run_meta` takes it, rather than typed
+        # independently. A manifest saying seven requests beside a result saying the
+        # target never metered is not a run any build produces — and until 0.20 the
+        # reader dropped the result's copy, so the two could disagree and this file's
+        # equality assertion still passed.
+        usage=RunUsage(
+            requests=result.usage.requests if result.usage else None, wall_time_seconds=42.0
+        ),
         rules=(RuleRecord(id="guardana.prompt.injection", digest="aaaabbbbccccdddd"),),
         result_summary=summarize(result, GateOutcome.FAIL),
     )
@@ -89,6 +97,7 @@ def _full_result() -> ScanResult:
         observations=(
             Observation(ObservationKind.MODEL, "llama3", "model.gguf", {"format": "gguf"}),
         ),
+        usage=TargetUsage(requests=7),
     )
 
 

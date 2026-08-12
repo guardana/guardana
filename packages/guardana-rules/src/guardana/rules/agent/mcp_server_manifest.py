@@ -65,12 +65,43 @@ class _Pin:
 
     version: int
     tools: Mapping[str, str]
+    server: str | None
+    """Which server this manifest was approved for, as the pin records it.
+
+    Read rather than discarded, because a pin compared against the wrong server is
+    the one input that makes every verdict this rule produces meaningless — and
+    silently so. Two servers with overlapping tool names compare clean against each
+    other's pin, which is a rug-pull check reporting "nothing changed" about a
+    server nobody ever approved.
+    """
 
     def digest_of_tool(self, tool: McpTool) -> str:
         """Digest a live tool the same way this pin's version recorded it."""
         if self.version == _DESCRIPTIONS_ONLY:
             return _legacy_digest(tool.description)
         return declaration_digest(tool)
+
+    def describes(self, ref: str) -> str | None:
+        """Say why this pin cannot speak for `ref`, or `None` when it can.
+
+        A pin that names no server is refused rather than assumed to match: every
+        pin Guardana has ever written records one, so an absent name means the file
+        was hand-made or edited, and "assume it is the right one" is the reading
+        that turns this check into a rubber stamp.
+        """
+        if self.server is None:
+            return (
+                "the pinned manifest does not say which server it was approved for, so "
+                "it cannot be told apart from another server's pin — re-approve with "
+                "`guardana probe --mcp … --write-mcp-pin`"
+            )
+        if self.server != ref:
+            return (
+                f"the pinned manifest was approved for {self.server!r} and this run "
+                f"probed {ref!r}, so drift cannot be compared — point --mcp-pin at this "
+                f"server's approved manifest"
+            )
+        return None
 
 
 class McpServerManifestRule(Rule):
@@ -156,6 +187,13 @@ class McpServerManifestRule(Rule):
             pinned = _load_pin(Path(pin_path))
         except (OSError, ValueError) as exc:
             yield self._unverified(ref, f"the pinned manifest at {pin_path} is unusable: {exc}")
+            return
+        mismatch = pinned.describes(ref)
+        if mismatch is not None:
+            # Never a finding: the server may be perfectly intact, and saying it
+            # drifted on the strength of somebody else's approved manifest would be
+            # a confident answer to a question this run cannot ask.
+            yield self._unverified(ref, mismatch)
             return
         if pinned.version == _DESCRIPTIONS_ONLY:
             # An older pin still compares, and still says what it cannot compare.
@@ -245,9 +283,11 @@ def _load_pin(path: Path) -> _Pin:
     tools = document.get("tools")
     if not isinstance(tools, dict):
         raise ValueError("a pinned manifest needs a 'tools' object")  # noqa: TRY004
+    server = document.get("server")
     return _Pin(
         version=version,
         tools={name: digest for name, digest in tools.items() if isinstance(digest, str)},
+        server=server if isinstance(server, str) and server else None,
     )
 
 

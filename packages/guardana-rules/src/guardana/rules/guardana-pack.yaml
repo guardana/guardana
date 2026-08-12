@@ -13,7 +13,7 @@
 # Documentation: docs/usage-pack.md
 # Reasoning:     docs/design/extension-author-tooling.md
 
-schema_version: 1
+schema_version: 2
 name: guardana-rules
 
 # Versioned separately from the product: in 0.x the product's minor breaks API

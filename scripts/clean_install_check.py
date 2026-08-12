@@ -215,6 +215,19 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
             0,
             expect=("guardana-rules", "extension API implemented by this build: 1"),
         ),
+        # The lock is written from installed metadata, which is precisely what an
+        # editable checkout and a real wheel disagree about: the distribution behind a
+        # module and its version both come from the installed distribution's metadata,
+        # and the PEP 420 namespace makes the naive lookup answer with the wrong one
+        # of five. A lock that pinned the built-in rules to the wrong package, at a
+        # version that could not be read, would look entirely fine until somebody
+        # opened the file — so this opens it.
+        Check(
+            "a lock pins the installed pack by its own distribution and version",
+            [python, "-c", _LOCK_SCRIPT],
+            0,
+            expect=("distribution: guardana-rules", "lock ready"),
+        ),
         # A rule's fixtures are data too, and an unsampled rule must never read as
         # a pass — so this asserts the honest verdict rather than a green one.
         Check(
@@ -249,6 +262,22 @@ _TRACE_FILE = """\
 Hand-written on purpose: this file is what a *third party* would produce against the
 published `trace-v2` schema, so a reader that quietly stopped accepting the documented
 shape would still pass a check that round-tripped Guardana's own writer.
+"""
+
+_LOCK_SCRIPT = """
+from guardana.core.pack import installed_packs, lock_of
+from guardana.core.pack.lock import Installed
+from guardana.core.registry import Registry
+
+packs = installed_packs()
+assert packs, "no installed pack declares a manifest"
+registry = Registry.discover()
+lock = lock_of(packs, Installed(rules={r.meta.id: r.digest() for r in registry.rules()}))
+(builtin,) = [p for p in lock.packs if p.name == "guardana-rules"]
+print("distribution:", builtin.distribution)
+assert builtin.version, "the lock recorded no version for the pack shipping the built-ins"
+assert builtin.rules, "the lock pinned no rules"
+print("lock ready")
 """
 
 _CONTRACT_SCRIPT = """

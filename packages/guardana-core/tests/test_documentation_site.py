@@ -124,6 +124,33 @@ def test_the_policy_still_forbids_reaching_any_host() -> None:
     assert "frame-ancestors 'none'" in headers
 
 
+def test_the_landing_page_loads_no_image_from_a_host_the_policy_forbids() -> None:
+    """The badge test, and it is a policy test wearing a badge's clothes.
+
+    Every third-party badge worth linking to — Product Hunt's included — ships as an
+    `<img>` from the vendor's own CDN, and `img-src 'self' data:` blocks it. The
+    tempting fix is one host in the header; the honest one is to draw the mark
+    inline, which is what `.btn-ph` does. This fails if anybody ever takes the other
+    route, because a policy visitors can check is worth more than a rendered badge.
+    """
+    page = (_repo() / "site" / "index.html").read_text(encoding="utf-8")
+    headers = (_repo() / "site" / "_headers").read_text(encoding="utf-8")
+
+    remote = [src for src in _HREF.findall(page) if src.startswith(("http://", "https://"))]
+    assert "img-src 'self' data:" in headers
+    assert not [src for src in remote if "<img" in page[: page.index(src)][-200:]], (
+        "the landing page loads an image from another host, which `img-src 'self' "
+        "data:` refuses — so it renders as a broken image, or the header was widened"
+    )
+
+
+def test_the_landing_page_links_to_the_product_hunt_launch() -> None:
+    """A launch page nobody can reach from the product is a launch page nobody reaches."""
+    page = (_repo() / "site" / "index.html").read_text(encoding="utf-8")
+
+    assert "https://www.producthunt.com/products/guardana?launch=guardana" in page
+
+
 def test_the_landing_page_sends_readers_to_the_documentation_site() -> None:
     """The open item `site/README.md` carried from when the domain was parked."""
     page = (_repo() / "site" / "index.html").read_text(encoding="utf-8")

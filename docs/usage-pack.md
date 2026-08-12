@@ -1,7 +1,7 @@
 ---
-title: "guardana pack validate"
+title: "guardana pack"
 nav_order: 240
-summary: "`guardana pack validate`: the manifest declaring which extension API your pack needs and what it provides"
+summary: "`guardana pack validate` and `guardana pack lock`: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks"
 status: stable
 ---
 
@@ -30,7 +30,7 @@ extension API implemented by this build: 1
 root:
 
 ```yaml
-schema_version: 1
+schema_version: 2
 name: acme-guardana-rules
 extension_api: ">=1,<2"
 
@@ -43,7 +43,15 @@ provides:
     - acme.prompt.overreach
   evaluators:
     - acme.strict_refusal
+  targets:
+    - AcmeWarehouseTarget
+  taxonomies:
+    - ACME-CONTROLS
 ```
+
+`provides:` names all four extension groups. `taxonomies:` lists **framework
+names**, not individual controls — a pack registers a catalogue, and a team shipping
+two hundred controls would otherwise maintain two hundred lines that say one thing.
 
 It goes inside the package because `pack validate` runs against an **installed
 distribution**, and `pyproject.toml` is not in a wheel. A manifest a user cannot
@@ -102,8 +110,85 @@ nothing being wrong.
 rather than read optimistically. Older versions migrate forward in memory at load.
 Unknown keys raise.
 
+**Schema 2 added `provides.taxonomies`.** A schema 1 manifest still loads — it
+simply declares no catalogues, which is what it meant, since the group did not exist
+for it to name. `pack validate` says so where it happened:
+
+```
+✓ acme-guardana-rules (extension_api >=1,<2) — 7 declared · read as schema 1, migrated to 2 in memory
+```
+
+A schema 1 manifest that *does* name `taxonomies:` is refused. A key invented after
+the version that names it is a manifest whose own `schema_version` no longer
+describes it, and an older build reading the same file would drop the key silently.
+
 **There is no `pack migrate` command, deliberately.** A saved run is generated and
 Guardana may rewrite it; a manifest is hand-written and belongs to you.
+
+## `guardana pack lock` — pin what a check *is*
+
+A version pin is not a pin for this project. A pack can sharpen a corpus, widen a
+prompt set or swap an evaluator inside one patch release; every one of those changes
+what a run tests while the version string says nothing moved, and the next
+comparison would blame the model for it.
+
+```bash
+guardana pack lock                # write ./guardana-lock.yaml
+guardana pack lock --check        # in CI: fail if the build has drifted
+```
+
+```yaml
+schema_version: 1
+extension_api: 1
+packs:
+  - name: acme-guardana-rules
+    distribution: acme-guardana-rules
+    version: 0.3.1
+    rules:
+      acme.agent.customer_data: 7ac9df6f3a247391
+    evaluators: [acme.strict_refusal]
+    targets: [AcmeWarehouseTarget]
+    taxonomies:
+      ACME-CONTROLS: "sha256:1c4f…"
+unlocked: []
+```
+
+**Three things are pinned three different ways, and the file says which is which:**
+
+| What | Pinned by | Why not more |
+|---|---|---|
+| rules | `Rule.digest()` — the declaration, hashed | a sharpened corpus is visible; the Python behind it is not |
+| evaluators, targets | id only | an `Evaluator` is Python and has no declaration to hash; inventing a digest from a class name would claim to detect a change it cannot see |
+| catalogues | a digest over the references the pack registers | a third-party catalogue has no *file* to pin, but what it registered is content |
+| everything else | the distribution version beside it | the coarse pin, and the only one that covers an implementation whose declaration did not move |
+
+`unlocked:` lists extensions registered by a package that declares **no manifest**.
+They are recorded and not attributed to a pack, and the command says so on stderr —
+a lock that stayed silent about them would read as a fully pinned repository that
+is not one.
+
+### What counts as drift
+
+Both directions, always. A rule that vanished is coverage a team still believes they
+have; one that appeared is a check nobody reviewed running against production.
+
+| Kind | Meaning |
+|---|---|
+| `pack_missing` | locked and not installed |
+| `pack_unlocked` | installed and the lock does not mention it |
+| `version_changed` | same digests, different package version |
+| `removed` / `added` | an id left or arrived |
+| `changed` | a digest moved — it is not the same check any more |
+
+| Situation | Verdict | Exit |
+|---|---|---|
+| the build matches the lock | pass | `0` |
+| the build has drifted | fail | `1` |
+| nothing installed declares a manifest, so there is nothing to pin | **indeterminate** | `2` |
+| the lock could not be read | refused | `3` |
+
+`--check` never writes. A check that created the file it was asked to compare
+against would pass on every first run, which is the one run nobody looks at.
 
 ## Guardana's own pack has one
 

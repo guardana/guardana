@@ -15,7 +15,16 @@ from importlib import metadata, resources
 from guardana.core.pack.load import MANIFEST_NAME, load_manifest
 from guardana.core.pack.model import EXTENSION_API_VERSION, PackError, PackManifest
 
-_ENTRY_POINT_GROUPS = ("guardana.rules", "guardana.evaluators", "guardana.targets")
+_ENTRY_POINT_GROUPS = (
+    "guardana.rules",
+    "guardana.evaluators",
+    "guardana.targets",
+    # The fourth group, added with pack schema 2. Left out, a package whose only
+    # Guardana entry point was a control catalogue was not discovered at all — so
+    # its manifest was never read, and `pack validate` reported nothing about it
+    # rather than reporting it as unvalidated.
+    "guardana.taxonomies",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +38,62 @@ class PackCheck:
     def ok(self) -> bool:
         """Whether this pack is loadable and describes itself accurately."""
         return not self.problems
+
+
+def installed_packs() -> list[tuple[str, str, PackManifest]]:
+    """Every installed pack as `(distribution, version, manifest)`.
+
+    The distribution is resolved from the module the entry point names, because that
+    is the only direction that works: `guardana` is a PEP 420 namespace shared by
+    five distributions, so the package a manifest sits in does not name its
+    distribution and the reverse lookup is the one importlib offers.
+
+    A module whose distribution cannot be resolved is still returned, with an empty
+    version. Dropping it would remove a pack from the lock for a metadata problem,
+    and a pack silently missing from a lock is a pack running unpinned.
+    """
+    owners = _distributions_by_module()
+    return [
+        (owners.get(module, module), _version(owners.get(module, module)), manifest)
+        for module, manifest in _pack_modules()
+        if manifest is not None
+    ]
+
+
+def _distributions_by_module() -> dict[str, str]:
+    """Which distribution advertised each extension module, taken from the entry point.
+
+    **Not from `packages_distributions()`.** `guardana` is a PEP 420 namespace shared
+    by five distributions, so a top-level-name lookup answers with whichever of them
+    sorts first — a lock would then pin every built-in rule to the wrong package and
+    read a version that has nothing to do with the code it is pinning. The entry
+    point already knows which distribution declared it.
+    """
+    owners: dict[str, str] = {}
+    for group in _ENTRY_POINT_GROUPS:
+        for entry_point in metadata.entry_points(group=group):
+            module = entry_point.value.split(":", 1)[0].strip()
+            name = getattr(getattr(entry_point, "dist", None), "name", None)
+            if module and name:
+                owners.setdefault(module, str(name))
+    return owners
+
+
+def _version(distribution: str) -> str:
+    """Return the installed version, or an empty string when the metadata cannot say.
+
+    Empty rather than omitted: a pack whose version cannot be read is still pinned by
+    the digests of what it registers, and dropping it from the lock over a metadata
+    problem would leave it running unpinned.
+    """
+    try:
+        return metadata.version(distribution)
+    except metadata.PackageNotFoundError:
+        return ""
+
+
+def _pack_modules() -> list[tuple[str, PackManifest | None]]:
+    return [(package, _manifest_in(package)) for package in sorted(_extension_packages())]
 
 
 def installed_manifests() -> list[PackManifest]:
@@ -47,8 +112,7 @@ def installed_manifests() -> list[PackManifest]:
     for two contracts producing one rule id; this reports it, in `check_packs`, and
     validates both.
     """
-    found = [_manifest_in(package) for package in sorted(_extension_packages())]
-    return [manifest for manifest in found if manifest is not None]
+    return [manifest for _module, manifest in _pack_modules() if manifest is not None]
 
 
 def check_packs(manifests: Sequence[PackManifest], registered: Iterable[str]) -> list[PackCheck]:

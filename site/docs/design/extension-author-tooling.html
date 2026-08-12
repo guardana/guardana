@@ -47,7 +47,7 @@
 <li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
 <li><a href="../writing-rules.html">Writing rules</a></li>
 <li><a href="../usage-rule-test.html">guardana rule test</a></li>
-<li><a href="../usage-pack.html">guardana pack validate</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
 <li><a href="../usage-calibrate.html">guardana calibrate</a></li>
 <li><a href="../extending.html">Extending Guardana</a></li>
 <li><a href="../model-formats.html">Reading model formats</a></li>
@@ -99,7 +99,8 @@
 </ul>
 </nav>
 <main>
-<h1>What a third party needs before the API freezes: fixtures, measurement, a manifest<span class="status accepted">accepted</span></h1><p class="lede">fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment</p><p><strong>Status:</strong> implemented in 0.18.0 · <strong>Written:</strong> 2026-08-11 · <strong>Step five</strong></p>
+<h1>What a third party needs before the API freezes: fixtures, measurement, a manifest<span class="status accepted">accepted</span></h1><p class="lede">fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment</p><p><strong>Status:</strong> implemented in 0.18.0; the lock file and pack schema 2 in 0.20.0 ·
+<strong>Written:</strong> 2026-08-11 · <strong>Step five</strong></p>
 <p>1.0 says one thing: <em>what will not break under you.</em> That promise is worthless to
 somebody who cannot demonstrate their own extension still works — so the tooling
 that lets them demonstrate it has to exist <strong>before</strong> the freeze, not after.</p>
@@ -112,8 +113,9 @@ writes</li>
 <code>Evaluator</code> rather than of a <code>Rule</code></li>
 <li>a pack manifest declaring API compatibility, and <code>pack validate</code> to check it</li>
 </ul>
-<p>The lock file from the same roadmap item is <strong>deferred</strong>, with the reason at the
-bottom.</p>
+<p>The lock file from the same roadmap item was deferred here and <strong>landed in 0.20.0</strong>,
+once <code>provides:</code> was complete enough to inform what a lock should pin — see
+&quot;Decision 8&quot; below.</p>
 <h2 id="what-already-works-so-this-document-does-not-rebuild-it">What already works, so this document does not rebuild it</h2>
 <p>Read before designing, because the roadmap entry overstates the gap:</p>
 <ul>
@@ -356,13 +358,24 @@ the product's minor breaks API by design, so a pack declaring
 touches moved. <code>extension_api</code> moves only when <code>Rule</code>, <code>Evaluator</code>, <code>Target</code> or
 <code>Finding</code> actually change shape — which is what a pack can usefully bind to, and
 what makes &quot;too old&quot; and &quot;too new&quot; two answerable questions:</p>
-<pre><code class="language-yaml">schema_version: 1
+<pre><code class="language-yaml">schema_version: 2
 name: acme-guardana-rules
 extension_api: &quot;&gt;=1,&lt;2&quot;
 provides:
   rules: [acme.agent.customer_data, acme.prompt.tone]
   evaluators: [acme.strict_refusal]
+  taxonomies: [ACME-CONTROLS]
 </code></pre>
+<p><strong>Schema 2 (0.20.0) added <code>taxonomies:</code>, and it closed a hole rather than adding a
+convenience.</strong> <code>guardana.taxonomies</code> is one of the four extension groups, so a pack
+could register a control catalogue and its manifest had nowhere to say so — leaving
+<code>pack validate</code> blind to a whole category. A pack shipping <em>only</em> a catalogue could
+not write a valid manifest at all: <code>provides:</code> had to list something, and none of
+the three things it could list were what that pack shipped. It was also not
+discovered, because the group was missing from the list <code>pack validate</code> walks.</p>
+<p>The unit is the <strong>framework</strong>, not the entry. A pack registers a catalogue, and a
+team shipping two hundred controls would otherwise maintain two hundred lines that
+say one thing.</p>
 <p><strong>Both directions refuse, with different messages and one outcome.</strong> A pack built
 for an older API may rely on behaviour since removed; one built for a newer API may
 call something absent. Loading either and hoping is how a scanner starts producing
@@ -379,6 +392,55 @@ version refuses rather than reading optimistically, older versions migrate forwa
 in memory at load, unknown keys raise. <strong>No <code>pack migrate</code> command</strong> — a saved run
 is generated and Guardana may rewrite it; a manifest is hand-written and belongs to
 its author.</p>
+<h2 id="decision-8--the-lock-pins-what-a-check-is-at-three-different-strengths">Decision 8 — the lock pins what a check <em>is</em>, at three different strengths</h2>
+<p><strong>Implemented in 0.20.0.</strong> The question this deferred until <code>provides:</code> was complete:
+what does a lock for <em>this</em> project pin?</p>
+<p>Not distribution versions. <code>Rule.digest()</code> exists precisely because &quot;the same rule&quot;
+has to mean more than &quot;the same package version&quot; — a pack can sharpen a corpus,
+widen a prompt set or swap an evaluator inside one patch release, and every one of
+those changes what a run tests while the version string says nothing moved. A
+comparison against last week's run would then hand the customer the wrong culprit,
+which is the exact failure <code>digest()</code> was added to prevent, arriving one layer
+earlier.</p>
+<p>So three strengths, and the file says which is which rather than presenting one
+confidence:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>What</th>
+<th>Pinned by</th>
+<th>What it cannot see</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rules</td>
+<td><code>Rule.digest()</code> — the declaration, hashed</td>
+<td>the Python behind a rule whose declaration did not move</td>
+</tr>
+<tr>
+<td>evaluators, targets</td>
+<td>id only</td>
+<td>anything: an <code>Evaluator</code> has no declaration to hash, and a digest invented from a class name would claim a detection it does not have</td>
+</tr>
+<tr>
+<td>catalogues</td>
+<td>a digest over the references the pack registers</td>
+<td>a catalogue's <em>file</em> provenance, which a pack registering refs through an entry point does not have</td>
+</tr>
+</tbody>
+</table></div>
+<p>The distribution version is recorded beside all of it as the coarse pin covering
+what none of the above can.</p>
+<p><strong><code>unlocked:</code> is a field, not an omission.</strong> An extension registered by a package
+that declares no manifest cannot be attributed to a pack, so it is listed and said
+out loud. A lock that quietly left it out would report a fully pinned repository
+that is running something nobody declared — which is the same false green as a
+manifest promising a check it does not register, one level further out.</p>
+<p><strong>Drift is reported in both directions.</strong> A rule that vanished is coverage a team
+still believes they have; one that appeared is a check nobody reviewed running
+against production. Reporting only the first would make the lock a floor rather
+than a pin.</p>
 <h2 id="deferred-with-the-reason">Deferred, with the reason</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -388,10 +450,6 @@ its author.</p>
 </tr>
 </thead>
 <tbody>
-<tr>
-<td><strong>The lock file</strong></td>
-<td>the only one of the four roadmap items that is <em>not</em> a 1.0 entry criterion, and the only one sharing no schema with the others — so it is genuinely separable where they are not. It also wants a decision the manifest has to land first: a lock pinning distribution versions is not a lock for this project, because <code>Rule.digest()</code> exists so that &quot;the same rule&quot; means more than &quot;the same package version&quot;, and what a rule's digest should cover is a question the manifest's <code>provides:</code> block is about to inform</td>
-</tr>
 <tr>
 <td><strong>Fixtures for artifact rules in YAML</strong></td>
 <td>a YAML rule is <code>endpoint</code>-kind by construction, so its double is always a scripted model. An artifact fixture needs bytes, and bytes in YAML is either a path to a checked-in malicious file or base64 nobody can review — the plugin path takes it, using the builders <code>guardana.core.testing</code> already ships</td>

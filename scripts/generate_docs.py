@@ -30,6 +30,7 @@ sys.path.insert(0, str(_REPO / "packages" / "guardana-rules" / "src"))
 from guardana.core import __version__  # noqa: E402
 from guardana.core.evaluator.guard import GuardEvaluator  # noqa: E402
 from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator  # noqa: E402
+from guardana.core.pack import PACK_SCHEMA_VERSION  # noqa: E402
 from guardana.core.rule.base import Rule  # noqa: E402
 from guardana.core.severity import Severity  # noqa: E402
 from guardana.core.surface import Surface  # noqa: E402
@@ -303,7 +304,7 @@ def _pack_manifest(rules: list[Rule]) -> str:
         "# Documentation: docs/usage-pack.md\n"
         "# Reasoning:     docs/design/extension-author-tooling.md\n"
         "\n"
-        "schema_version: 1\n"
+        f"schema_version: {PACK_SCHEMA_VERSION}\n"
         "name: guardana-rules\n"
         "\n"
         "# Versioned separately from the product: in 0.x the product's minor breaks API\n"

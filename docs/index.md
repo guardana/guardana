@@ -47,7 +47,7 @@ detail below.
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
 - [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin
 - [`usage-rule-test.md`](usage-rule-test.md) — `guardana rule test`: a rule's positive, negative and **inconclusive** fixtures, run as a command
-- [`usage-pack.md`](usage-pack.md) — `guardana pack validate`: the manifest declaring which extension API your pack needs and what it provides
+- [`usage-pack.md`](usage-pack.md) — `guardana pack validate` and `guardana pack lock`: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks
 - [`usage-calibrate.md`](usage-calibrate.md) — `guardana calibrate`: measure an evaluator's confidence against known outcomes, and carry the measurement into a run
 - [`extending.md`](extending.md) — add a Rule, an Evaluator, or a Target; the entry-point contract
 - [`model-formats.md`](model-formats.md) — the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract

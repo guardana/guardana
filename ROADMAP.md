@@ -406,15 +406,16 @@ team platform, runs beside this and gates none of it.
 > **Outcome:** Guardana can verify an AI *application*: what it retrieves, what it
 > does with the output, and what a single run is entitled to claim.
 
-- **A lock file, so a CI run with private packs is reproducible.** The half of the
-  developer-tooling item still open — `rule test`, evaluator measurement and the pack
-  manifest landed in 0.18.0
-  ([design](docs/design/extension-author-tooling.md)). It is the only one of the four
-  that is *not* a 1.0 entry criterion and the only one sharing no schema with the
-  others, which is why it separated cleanly. A lock covering distribution versions is
-  not a lock for this project: `Rule.digest()` exists so that "the same rule" means
-  more than "the same package version", and what a lock should pin is a question the
-  manifest's `provides:` block now informs.
+**Why the lock shipped in 0.20.0 rather than waiting.** It was the one item of the
+four in [extension author tooling](docs/design/extension-author-tooling.md) that is
+*not* a 1.0 entry criterion, and it went anyway for a reason that belongs written
+down: it is the piece a third party needs **before** they can usefully run a release
+candidate against their pack, which criterion 8 asks them to do. Pinning by
+`Rule.digest()` also needed `provides:` to be complete first, and completing it —
+pack schema 2, so a pack can declare the catalogue it registers — landed in the same
+release. Split across two, the manifest would have described four extension groups
+while the lock pinned three.
+
 - **Fixtures for the other 46 built-in rules.** 51 ship and 5 are fully sampled. A
   gate pins that number so it can only rise, and `guardana rule test 'guardana.*'`
   reports the rest as `indeterminate`, truthfully. Writing 46 sets in an afternoon
@@ -495,10 +496,13 @@ one.
 | **Multi-user data isolation** | proving user A cannot reach user B's data needs two credentials *and* knowledge of whose data is whose. Guardana has neither and cannot ask for the second |
 | **Shadow MCP servers (`MCP09:2025`)** | finding servers nobody registered is network discovery, not verification of a target |
 | **A universal AI risk score** | every component of a single number would have to have defensible semantics, and none of the interesting ones do. `critical findings`, `indeterminate checks`, `coverage loss`, `attack success rate` and `utility regression` each answer a question; `8.4/10` answers none of them and hides which dimension is missing |
+| **Lock drift checked by `scan` and `probe`** | a lock is a statement about the *build*, and CI answers it once with `pack lock --check`. Re-verifying it inside every run would add work to a command whose cost is supposed to grow with the target and not with what is installed — and a scan that failed for a reason having nothing to do with the target is a scan people learn to pass with a flag |
+| **The lock recorded in the run manifest** | the run already records every rule it executed *with its digest*, which is the same fact for the rules that ran. Carrying the whole lock as well is a field on a shipped schema, so run schema v6 and a migration, to restate what `rules:` says and add what did not run |
+| **A digest for an evaluator** | an `Evaluator` is Python and has no declaration to hash. A digest invented from its class name or its module would claim to detect a change it cannot see, which is worse than the id it is pinned by today — the distribution version beside it is the honest cover |
+| **Signing the lock** | the same trade as signing the manifest: signing authenticates a publisher, and without a trust policy and a distribution story it says nothing about whether the code is safe |
 | **A public extension registry** | a registry is meaningful once a pack has a manifest, a compatibility range, a lock file and a stated trust model. Publishing before those exist is asking people to install code on a promise |
 | **A catalogue may be a subset** | `OWASP-ML-2023` holds the entries rules map to, not all ten. A catalogue may be a subset; it may never invent an entry |
 | **Third-party catalogues have no digest to pin** | a pack registers *references* through an entry point, not a catalogue file, so a run records its refs and not a provenance nobody can produce |
-| **`provides.taxonomies` in a pack manifest** | a pack can register a control catalogue and its manifest cannot say so, which leaves `pack validate` blind to a whole category — and a taxonomy-only pack cannot write a valid manifest at all, since `provides:` must list something. The fix is pack schema **v2** with an in-memory 1→2 migration, and `guardana.taxonomies` added to the groups `pack validate` discovers by. That is a versioned contract change on a schema released in 0.18.0, which deserves its own change rather than a ride-along in a documentation release |
 | **Free-text search across the documentation prose** | it is the one thing pre-rendering cannot do, and the only reason worth relaxing `script-src 'none'` to `'self'` under `/docs/*`. The explorer answers the four questions a reader actually arrives with by navigation; searching *prose* is a different need, and the policy is a claim visitors check rather than a default to spend on a nice-to-have. If it is ever taken, `connect-src 'none'` is not part of the trade — there is a test |
 | **Versioned documentation, one tree per release** | worth doing after 1.0, when the compatibility contract makes "the 1.2 docs" a meaningful thing to read. Before then every version's docs describe a moving API, and a version switcher offers a reader a choice with no right answer |
 | **A `guardana docs` command rendering a *local* explorer** | `rules.json` makes it cheap, and it is the extension story told once more: a team with private packs could render an explorer over their own rules under the same evidence semantics. It is a *feature* rather than a website, so it belongs with the pack tooling and gets its own tests, not a flag bolted onto the site build |

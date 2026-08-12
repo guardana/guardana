@@ -20,6 +20,8 @@ from guardana.core.manifest.load import (
     migrate_v3,
     migrate_v4,
 )
+from guardana.core.manifest.model import RunManifest
+from guardana.core.manifest.usage import RunUsage
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Evidence, Finding
@@ -30,6 +32,7 @@ from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
 from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
+from guardana.core.usage import TargetUsage
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
 _MIGRATIONS = {1: migrate_v1, 2: migrate_v2, 3: migrate_v3, 4: migrate_v4}
@@ -99,7 +102,7 @@ def load_report(path: Path) -> RunReport:
         manifest = manifest_from_dict(raw.get("run"))
     except ManifestLoadError as exc:
         raise ReportLoadError(f"{path}: {exc}") from exc
-    return RunReport(manifest=manifest, result=_result(raw, path))
+    return RunReport(manifest=manifest, result=_result(raw, manifest, path))
 
 
 def _check_version(raw: dict[str, Any], path: Path) -> int | None:
@@ -127,7 +130,7 @@ def _check_version(raw: dict[str, Any], path: Path) -> int | None:
     )
 
 
-def _result(raw: dict[str, Any], path: Path) -> ScanResult:
+def _result(raw: dict[str, Any], manifest: RunManifest, path: Path) -> ScanResult:
     run = raw.get("run")
     summary = run.get("result_summary") if isinstance(run, dict) else None
     rules_run: tuple[str, ...] = ()
@@ -150,6 +153,34 @@ def _result(raw: dict[str, Any], path: Path) -> ScanResult:
         # moment anybody loaded it — which is what `diff` and `run inspect` do.
         coverage_shortfall=_coverage_shortfall(run, path),
         stopped_by=stopped_by,
+        # The last two channels are recorded in the manifest rather than beside the
+        # findings, so they are read back from there. Defaulting them instead — which
+        # is what this reader did until 0.20 — made a re-read run say the target
+        # metered nothing and negotiated no protocol, about a run that did both.
+        usage=_target_usage(manifest.usage),
+        protocols=dict(manifest.coverage.protocols),
+    )
+
+
+def _target_usage(usage: RunUsage) -> TargetUsage | None:
+    """Restore what the targets metered, keeping "nobody counted" apart from "it was free".
+
+    `requests is None` is the manifest's way of saying no target counted, and it is
+    the one distinction that must survive: a run nobody metered must not read as a
+    run that cost nothing, or a budget set from it is a ceiling over part of the run.
+
+    `requests_missing_token_counts` degrades to zero for a document that never
+    recorded it, because `TargetUsage` has no way to say "unknown" there. The
+    manifest keeps the unknown and stays the authority; this is a mirror of it, and
+    every document this build writes records the field alongside `requests`.
+    """
+    if usage.requests is None:
+        return None
+    return TargetUsage(
+        requests=usage.requests,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        requests_missing_token_counts=usage.requests_missing_token_counts or 0,
     )
 
 

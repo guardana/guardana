@@ -10,11 +10,17 @@ a manifest is hand-written and belongs to its author.
 """
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import yaml
-from guardana.core.pack.model import ApiRange, PackError, PackManifest
+from guardana.core.pack.model import (
+    PACK_SCHEMA_VERSION,
+    ApiRange,
+    PackError,
+    PackManifest,
+)
 
 MANIFEST_NAME = "guardana-pack.yaml"
 """The file a pack ships *inside its package directory*, not at the repo root.
@@ -24,10 +30,16 @@ MANIFEST_NAME = "guardana-pack.yaml"
 installed cannot be checked at the only moment that matters.
 """
 
-PACK_SCHEMA_VERSION = 1
-
 _ALLOWED_KEYS = frozenset({"schema_version", "name", "description", "extension_api", "provides"})
-_ALLOWED_PROVIDES_KEYS = frozenset({"rules", "evaluators", "targets"})
+_ALLOWED_PROVIDES_KEYS = frozenset({"rules", "evaluators", "targets", "taxonomies"})
+_V1_PROVIDES_KEYS = frozenset({"rules", "evaluators", "targets"})
+"""What `provides:` could name at schema 1 — three groups out of the four that exist.
+
+Kept as its own set rather than derived, because the v1→v2 migration has to refuse a
+v1 manifest that names `taxonomies:`. Widening the check to the current keys would
+accept a document that declares a key its own version had not invented, which is a
+manifest whose `schema_version` no longer describes it.
+"""
 
 _RANGE = re.compile(r"^>=\s*(\d+)\s*,\s*<\s*(\d+)$")
 
@@ -41,7 +53,8 @@ def load_manifest(path: Path) -> PackManifest:
     if not isinstance(raw, dict):
         raise PackError(f"invalid pack manifest {path}: the file must be a mapping")
     _reject_unknown(raw, _ALLOWED_KEYS, "pack manifest", path)
-    _check_version(raw, path)
+    declared = _check_version(raw, path)
+    raw = _migrated(raw, declared, path)
     provides = _provides(raw.get("provides"), path)
     return PackManifest(
         name=_require_str(raw, "name", path),
@@ -50,11 +63,15 @@ def load_manifest(path: Path) -> PackManifest:
         rules=provides.get("rules", ()),
         evaluators=provides.get("evaluators", ()),
         targets=provides.get("targets", ()),
+        taxonomies=provides.get("taxonomies", ()),
         description=str(raw.get("description", "")),
+        schema_version=PACK_SCHEMA_VERSION,
+        migrated_from=declared if declared != PACK_SCHEMA_VERSION else None,
     )
 
 
-def _check_version(raw: dict[str, Any], path: Path) -> None:
+def _check_version(raw: dict[str, Any], path: Path) -> int:
+    """Return the version this manifest declares, refusing one this build cannot read."""
     version = raw.get("schema_version")
     if version is None:
         raise PackError(
@@ -62,14 +79,57 @@ def _check_version(raw: dict[str, Any], path: Path) -> None:
             f"you keep, so it has to say which version it is (this build writes "
             f"{PACK_SCHEMA_VERSION})"
         )
-    if not isinstance(version, int) or version > PACK_SCHEMA_VERSION:
+    if not isinstance(version, int) or isinstance(version, bool) or version > PACK_SCHEMA_VERSION:
         raise PackError(
             f"invalid pack manifest {path}: schema_version {version!r} is newer than this "
             f"build reads ({PACK_SCHEMA_VERSION}). A document this build cannot read is "
             f"not one it may read optimistically"
         )
-    # Only version 1 exists. When 2 lands, migrate 1 -> 2 here, in memory, chained —
-    # never by rewriting the author's file.
+    if version < _OLDEST_READABLE:
+        raise PackError(
+            f"invalid pack manifest {path}: schema_version {version!r} is not a version "
+            f"this build has ever written (the oldest is {_OLDEST_READABLE})"
+        )
+    return version
+
+
+def _migrated(raw: dict[str, Any], version: int, path: Path) -> dict[str, Any]:
+    """Carry an older manifest forward in memory, one version at a time.
+
+    Chained the way `manifest/load.py` chains, so a manifest three versions behind
+    passes through every step rather than needing a direct migration written for
+    each pair. **In memory only** — there is no `pack migrate`: a saved run is
+    generated and Guardana may rewrite it, and a manifest is hand-written and
+    belongs to its author.
+    """
+    document = raw
+    while version < PACK_SCHEMA_VERSION:
+        document = _MIGRATIONS[version](document, path)
+        version += 1
+    return document
+
+
+def _migrate_v1_to_v2(raw: dict[str, Any], path: Path) -> dict[str, Any]:
+    """Carry a schema 1 manifest to schema 2, which knows the fourth extension group.
+
+    A v1 manifest simply declares no catalogues, which is what it meant — the group
+    it could not name is the group it could not have shipped a declaration for. What
+    this must not do is *accept* `taxonomies:` on a document claiming version 1: a
+    key invented after the version that names it is a manifest whose own
+    `schema_version` no longer describes it, and reading it anyway would make the
+    version a decoration.
+    """
+    provides = raw.get("provides")
+    if isinstance(provides, dict):
+        _reject_unknown(provides, _V1_PROVIDES_KEYS, "schema 1 provides", path)
+    return raw
+
+
+_MIGRATIONS: dict[int, Callable[[dict[str, Any], Path], dict[str, Any]]] = {
+    1: _migrate_v1_to_v2,
+}
+
+_OLDEST_READABLE = min(_MIGRATIONS) if _MIGRATIONS else PACK_SCHEMA_VERSION
 
 
 def _api_range(raw: object, path: Path) -> ApiRange:
