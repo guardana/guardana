@@ -1,7 +1,7 @@
 """The two questions every persisted schema has to answer, asked once.
 
 `test_manifest_round_trip.py` established the shape in 0.19 for one document out of
-nine, and the shape is the point rather than the document: a field written and never
+twelve, and the shape is the point rather than the document: a field written and never
 read passes every gate this repository has, because the writer's tests and the
 reader's tests are each right about their own half. The 0.18 audit found
 `calibration` that way; 0.19 found `deployment` the same way one release later.

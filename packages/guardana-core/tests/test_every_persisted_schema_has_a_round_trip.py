@@ -1,10 +1,11 @@
 """No persisted schema ships without a gate that walks it in both directions.
 
-Nine versioned documents existed when the tenth audit started, and exactly one of
-them had a round-trip gate. The other eight were covered the way the failing one had
+Twelve versioned documents existed when the tenth audit started, and exactly one of
+them had a round-trip gate. The other eleven were covered the way the failing one had
 been: the writer's tests asserted what it wrote and the reader's asserted what it
 read, both correct about their own half, neither able to see a field that fell
-between them. Two defects were found that way in two consecutive releases.
+between them. Two defects were found that way in two consecutive releases, and a
+third in the audit that wrote this file.
 
 So the list is **read off the source**, not written here. A new
 `*_SCHEMA_VERSION` constant is a new document somebody will keep, and it arrives

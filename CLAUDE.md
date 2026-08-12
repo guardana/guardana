@@ -186,16 +186,27 @@ uv run mypy --strict .         # types — whole repo, tests included
 uv run lint-imports            # architecture: the engine must not import the collector
 uv run pytest --cov            # tests + the 90% branch-coverage gate
 uv run guardana scan packages  # dogfood: must stay at zero findings
-uv run --isolated --with ./packages/guardana-core --with ./packages/guardana-rules \
+uv run --isolated --no-cache \
+  --with ./packages/guardana-core --with ./packages/guardana-rules \
   --with ./examples/custom_rule --with pytest pytest examples/custom_rule/tests -q
 ```
+
+**`--no-cache` is not optional, and it is not a speed trade.** Without it uv serves
+a previously built wheel for `./examples/custom_rule`, and the data files inside it
+— `guardana-pack.yaml`, the YAML rules — are exactly what a change to the extension
+contract touches. Neither `--refresh` nor `--refresh-package` picks that up; both
+were measured and both returned the stale wheel. This gate has now produced a false
+green **twice**: a pushed tag in 0.20.0 whose CI was red on the very tests this
+command had just reported passing.
 
 The last one is the third-party extension story, and it is **isolated from the
 main test environment on purpose** — installing `acme.*` into it would skew the
 dogfood scan. That isolation is also why `uv run pytest` cannot see it: a change
 to a rule-authoring contract can be green everywhere locally and still break the
 one package that stands in for everybody else's. It caught a bare `taxonomy:
-[LLM06]` in the example's own YAML that every other gate passed over.
+[LLM06]` in the example's own YAML that every other gate passed over, and in 0.20.0
+it caught the example's own "what is registered" set omitting the fourth extension
+group — a false *red* accusing a manifest of promising what it does register.
 
 (`--cov` is not in `addopts` on purpose: it would make a single-file run like
 `uv run pytest packages/guardana-core/tests/test_runner.py` fail the coverage

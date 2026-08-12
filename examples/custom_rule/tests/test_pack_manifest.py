@@ -94,6 +94,17 @@ def test_a_prompt_library_that_is_not_there_lists_nothing_rather_than_raising() 
 
 
 def _registered_ids() -> set[str]:
-    return {rule.meta.id for rule in acme_rules.provide_rules()} | {
-        evaluator.id for evaluator in acme_rules.provide_evaluators()
-    }
+    """Every id this pack's entry points register, in the vocabulary the manifest uses.
+
+    All four groups. Taxonomies are compared by **framework**, which is the unit a
+    pack registers and the unit `provides.taxonomies` declares — and leaving them out
+    is not a detail: this set is what `check_pack` is asked to believe, so a group
+    missing from it accuses the manifest of promising something it does register.
+    That is the false red `guardana.targets` produced for a whole release, and the
+    fourth group had exactly the same hole waiting in it.
+    """
+    return (
+        {rule.meta.id for rule in acme_rules.provide_rules()}
+        | {evaluator.id for evaluator in acme_rules.provide_evaluators()}
+        | {ref.framework for ref in acme_rules.provide_taxonomies()}
+    )

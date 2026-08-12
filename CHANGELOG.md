@@ -65,6 +65,22 @@ that made 42 requests and negotiated MCP `2026-07-28` came back claiming no targ
 counted and no protocol was spoken. Both are recorded in the manifest and are now
 read back from it.
 
+**The example pack's own tests built "what is registered" from three extension groups
+out of four**, so once its manifest declared the control catalogue it registers,
+`check_pack` accused it of promising something it does register. A false red, which
+this project treats exactly as seriously as a false green: a validator that accuses a
+pack of a fault it does not have is a validator somebody turns off. It is the same
+hole `guardana.targets` had for a release, in the same file, one group over.
+
+**The gate that should have caught that returned green locally, because uv served a
+stale wheel.** `uv run --isolated --with ./examples/custom_rule` rebuilds nothing when
+it holds a cached wheel for that directory, and the data files inside it — the pack
+manifest, the YAML rules — are precisely what a change to the extension contract
+touches. `--refresh` and `--refresh-package` were both measured and both returned the
+stale wheel; only `--no-cache` rebuilds. The documented gate in `CLAUDE.md` and the CI
+job now carry it, with the reason. Second time a cache has made this repository's
+local gate disagree with CI, after the `.ruff_cache` entry in 0.19.0.
+
 **A dead property and two unexercised branches in the documentation-site
 generator.** `Page.depth` was used by nothing; `render.split_heading`'s
 link-in-a-heading branch and `build._tables`' substitution had no test between them.
@@ -75,8 +91,8 @@ HTML, which nothing had written down.
 ### Changed
 
 **Every versioned document now has a round-trip gate, and the list is read off the
-source.** Nine persisted schemas shipped and exactly one was gated that way. The
-other eight were covered the way the failing one had been — the writer's tests
+source.** Twelve persisted schemas shipped and exactly one was gated that way. The
+other eleven were covered the way the failing one had been — the writer's tests
 asserting what it wrote, the reader's asserting what it read, both correct about
 their own half and neither able to see a field that fell between them. That is how
 `calibration` was lost in 0.18 and `deployment` in 0.19, and how `usage` above was

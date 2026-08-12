@@ -149,9 +149,14 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
+      # `--no-cache`: uv otherwise serves a previously built wheel for the example,
+      # and the data files inside it — the pack manifest, the YAML rules — are what a
+      # change to the extension contract touches. `--refresh` does not pick that up.
+      # This job is the only one that sees a third party's manifest and entry points
+      # both real, so a stale wheel here is a green build about code nobody ran.
       - name: Run the example plugin's own tests against an installed Guardana
         run: >
-          uv run --isolated
+          uv run --isolated --no-cache
           --with ./packages/guardana-core
           --with ./packages/guardana-rules
           --with ./examples/custom_rule
