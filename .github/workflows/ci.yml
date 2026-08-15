@@ -142,12 +142,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      # No cache here, and that is the job's whole point: every step below runs
+      # `--no-cache` because uv otherwise serves a previously built wheel for an
+      # example, and the metadata inside it — the entry points a third party is
+      # discovered through — is exactly what these tests exist to check. Asking
+      # setup-uv to manage a cache nothing writes to leaves it pruning a directory
+      # that was never created, which it now fails the job over.
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.13"
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       # `--no-cache`: uv otherwise serves a previously built wheel for the example,
       # and the data files inside it — the pack manifest, the YAML rules — are what a
