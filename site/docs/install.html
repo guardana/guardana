@@ -138,8 +138,8 @@ separate install: <code>pip install guardana-server</code>.</p>
 <h2 id="run-it-as-a-container">Run it as a container</h2>
 <p>For a pipeline that runs containers rather than Python, both halves are published
 to the GitHub Container Registry on every release:</p>
-<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.20 scan /work
-docker run --rm ghcr.io/guardana/guardana-collector:0.20 --help
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.21 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:0.21 --help
 </code></pre>
 <p>Three tags: the exact version, the moving minor (what the commands above pin),
 and <code>latest</code>. Pin the moving minor in CI so fixes arrive and the rule set does
@@ -174,7 +174,7 @@ trust — or run with <code>--no-plugins</code> to disable all code-plugin disco
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.20.0 · Apache-2.0</span>
+<span>Guardana 0.21.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/install.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

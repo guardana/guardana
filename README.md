@@ -158,7 +158,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.20   # moving tag → latest 0.20.x
+      - uses: guardana/guardana@v0.21   # moving tag → latest 0.21.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -276,7 +276,8 @@ the project's [principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
 | **0.17** | The evidence matrix made visible and gateable — `guardana trace inspect`, and a policy that can *require* dimensions — plus **security contracts**: the application's own invariants (tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink) as a versioned file the engine compiles into rules. A contract that could not be checked is `indeterminate`, never a pass, and no policy setting can turn that off |
 | **0.18** | What a third party needs before the API freezes: `guardana rule test` running a rule's positive, negative and **inconclusive** fixtures; a versioned pack manifest and `guardana pack validate`, refusing an extension API this build cannot honour in **both** directions; and an evaluator's measured calibration carried into the run document rather than left null |
 | **0.19** | Documentation generated onto guardana.dev from this repository's own prose and its own registry, with a **rule explorer** whose every filter is a pre-rendered page — because `script-src 'none'` is a claim a visitor checks, not a default. Plus a round-trip gate on the run manifest, which found the `deployment` block written on every run and read back on none |
-| **0.20** *(current)* | The pack author's last mile: `guardana pack lock` pins every installed extension by what it **is** — rules by their hashed declaration, so a sharpened corpus is visible where a version pin says nothing moved — and manifest schema 2 lets a pack declare the control catalogue it registers, which nothing could say before. Plus a round-trip gate on **every** persisted schema, which found a re-read run claiming its target metered nothing, and an approved MCP manifest whose server field the reader discarded |
+| **0.20** | The pack author's last mile: `guardana pack lock` pins every installed extension by what it **is** — rules by their hashed declaration, so a sharpened corpus is visible where a version pin says nothing moved — and manifest schema 2 lets a pack declare the control catalogue it registers, which nothing could say before. Plus a round-trip gate on **every** persisted schema, which found a re-read run claiming its target metered nothing, and an approved MCP manifest whose server field the reader discarded |
+| **0.21** *(current)* | An agent can write its own trace and say **who** approved what: `approver_kind` makes "a person agreed" and "the agent's own gate allowed it" two different facts, so a contract demanding human oversight stops being satisfied by an auxiliary LLM auto-approving `rm -rf`. Plus a file that says where it ends, so a producer killed mid-session no longer reads as one that finished with nothing to report — and a run in which every check declined stops exiting `0` |
 | **next** | RAG as a live target — a retriever that *sends* has its own budget surface and its own answer to who owns the corpus — then sink-aware output handling |
 | **1.0** | A compatibility contract — the point where a third-party rule pack is a safe investment. Not a feature count: it says what will not break under you |
 

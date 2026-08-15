@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-15 — an agent that writes its own trace, and says who approved what
+
 ### Added
 
 **A trace can now be written one span at a time, by the agent that is producing it.**

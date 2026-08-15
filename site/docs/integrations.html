@@ -160,7 +160,7 @@ jobs:
       security-events: write   # required to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.20   # moving tag; pins to the latest 0.20.x
+      - uses: guardana/guardana@v0.21   # moving tag; pins to the latest 0.21.x
         with:
           path: .
           # args: --preset ci --baseline guardana-baseline.yaml
@@ -237,7 +237,7 @@ the job's test report — GitLab, Jenkins and Azure all read JUnit natively — 
 let the exit code fail the build.</p>
 <p>GitLab can include the job rather than copy it:</p>
 <pre><code class="language-yaml">include:
-  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v0.20/deploy/ci/gitlab-ci.yml&quot;
+  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v0.21/deploy/ci/gitlab-ci.yml&quot;
 
 guardana:
   variables:
@@ -267,7 +267,7 @@ to turn the gate on for an existing repo without fixing the whole backlog first.
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.20.0 · Apache-2.0</span>
+<span>Guardana 0.21.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/integrations.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
