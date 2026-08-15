@@ -21,13 +21,14 @@ first-class producer.
 
 import json
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 from typing import IO
 
 from guardana.core.trace import _native
-from guardana.core.trace._parse import TraceLoadError
+from guardana.core.trace._parse import TraceLoadError, text_tuple
 from guardana.core.trace.effect import EffectStatus, SideEffect, SinkKind
 from guardana.core.trace.model import TRACE_SCHEMA_VERSION, Dimension
 from guardana.core.trace.presence import dimensions_of
@@ -36,7 +37,7 @@ from guardana.core.trace.sinks import SinkMap
 from guardana.core.trace.span import Span
 from guardana.core.trace.tool import ToolExecution, ToolStatus
 
-__all__ = ["SinkMap", "TraceWriteError", "TraceWriter", "open_trace"]
+__all__ = ["SinkMap", "TraceWriteError", "TraceWriter", "open_trace", "resume_trace"]
 
 _EFFECT_STATUS = {
     ToolStatus.SUCCEEDED: EffectStatus.EXECUTED,
@@ -78,13 +79,82 @@ def open_trace(  # noqa: PLR0913 — one keyword per fact the header records
     rather than a finished file.
     """
     declared = frozenset(instrumented)
+    _refuse_effects_without_sinks(declared, sinks)
+    header = _header(
+        declared,
+        trace_id=trace_id,
+        producer=producer,
+        producer_version=producer_version,
+        recorded_at=recorded_at,
+        attributes=attributes,
+    )
+    return TraceWriter(_opened(path, "w"), header, declared, sinks, session_scope=True)
+
+
+def resume_trace(  # noqa: PLR0913 — the same keywords `open_trace` takes, by design
+    path: Path,
+    *,
+    trace_id: str,
+    producer: str,
+    instrumented: Iterable[Dimension],
+    producer_version: str | None = None,
+    sinks: SinkMap | None = None,
+    recorded_at: datetime | None = None,
+    attributes: Mapping[str, str] | None = None,
+) -> "TraceWriter":
+    """Create the file on a session's first event, and continue it on every later one.
+
+    `open_trace` assumes one process holds the file for the whole session. A large
+    family of agents does not work that way: each hook fires a separate command, so the
+    header, the spans and the footer are written by processes that never meet. Opening
+    for writing on each of those leaves one span per session under a header claiming
+    the rest.
+
+    Takes the same keywords as `open_trace` so a hook script can call it unconditionally
+    with one set of arguments, and refuses the two ways continuing goes wrong: a
+    producer whose declaration changed halfway through a session, and a file that has
+    already signed off.
+    """
+    declared = frozenset(instrumented)
+    _refuse_effects_without_sinks(declared, sinks)
+    existing = _existing_trace(path)
+    if existing is None:
+        header = _header(
+            declared,
+            trace_id=trace_id,
+            producer=producer,
+            producer_version=producer_version,
+            recorded_at=recorded_at,
+            attributes=attributes,
+        )
+        return TraceWriter(_opened(path, "w"), header, declared, sinks)
+    existing.refuse_unless_continuable(path, trace_id, declared)
+    handle = _opened(path, "a")
+    if not existing.ends_with_newline:
+        handle.write("\n")
+    return TraceWriter(handle, None, declared, sinks, spans=existing.spans)
+
+
+def _refuse_effects_without_sinks(declared: frozenset[Dimension], sinks: SinkMap | None) -> None:
     if Dimension.EFFECTS in declared and sinks is None:
         raise TraceWriteError(
             "this producer declares it records effects and passed no sink map, so a tool "
             "call could not be turned into an effect. The engine knows no vendor and "
             "cannot know which of your tools reaches a shell — pass sinks=SinkMap(...)"
         )
-    header = {
+
+
+def _header(  # noqa: PLR0913 — one parameter per fact the header records
+    declared: frozenset[Dimension],
+    *,
+    trace_id: str,
+    producer: str,
+    producer_version: str | None,
+    recorded_at: datetime | None,
+    attributes: Mapping[str, str] | None,
+) -> dict[str, object]:
+    """Build the first record: the version, the identity, and both promises."""
+    return {
         _native.VERSION_KEY: TRACE_SCHEMA_VERSION,
         "trace_id": trace_id,
         "producer": {
@@ -100,12 +170,106 @@ def open_trace(  # noqa: PLR0913 — one keyword per fact the header records
         "terminated": True,
         **({"attributes": dict(attributes)} if attributes else {}),
     }
-    return TraceWriter(_opened(path), header, declared, sinks)
 
 
-def _opened(path: Path) -> IO[str]:
+@dataclass(frozen=True, slots=True)
+class _ExistingTrace:
+    """What one pass over a file already on disk says about continuing it.
+
+    Counted rather than parsed. Only the first and last records are read as JSON; the
+    spans between them are lines, because the count is all a footer needs and parsing
+    every one of them on every hook invocation would make a session quadratic in its
+    own length.
+    """
+
+    header: Mapping[str, object]
+    spans: int
+    closed: bool
+    ends_with_newline: bool
+
+    def refuse_unless_continuable(
+        self, path: Path, trace_id: str, declared: frozenset[Dimension]
+    ) -> None:
+        """Refuse a file this session has no business appending to."""
+        if self.closed:
+            raise TraceWriteError(
+                f"{path} already carries a footer, so it claims to be complete; appending "
+                f"a span now would make that claim false"
+            )
+        if self.header.get("terminated") is not True:
+            raise TraceWriteError(
+                f"{path} was not written by a producer that promised a footer, so the "
+                f"sign-off this would add is one no reader accepts. Start a new file rather "
+                f"than continuing a hand-written or converted one"
+            )
+        if self.header.get("trace_id") != trace_id:
+            raise TraceWriteError(
+                f"{path} records trace_id {self.header.get('trace_id')!r} and this session is "
+                f"{trace_id!r} — two executions in one file are not one execution"
+            )
+        recorded = frozenset(str(d) for d in text_tuple(self.header, "instrumented"))
+        if recorded != frozenset(str(d) for d in declared):
+            raise TraceWriteError(
+                f"{path} declares instrumented {sorted(recorded)} and this call declares "
+                f"{sorted(str(d) for d in declared)} — half a session graded under one "
+                f"declaration and half under another is not one run"
+            )
+
+
+def _existing_trace(path: Path) -> _ExistingTrace | None:
+    """Read what is already there, or `None` when this is the session's first event."""
     try:
-        return path.open("w", encoding="utf-8")
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError) as exc:
+        raise TraceWriteError(f"{path} could not be read to continue it: {exc}") from exc
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    header = _readable(path, lines[0], "header")
+    if _native.VERSION_KEY not in header:
+        raise TraceWriteError(
+            f"{path} does not open with a native trace header, so there is nothing here to "
+            f"continue (an OpenTelemetry export is converted with --write-trace, not appended to)"
+        )
+    return _ExistingTrace(
+        header=header,
+        spans=len(lines) - 1,
+        closed=_signed_off(lines[-1]) if len(lines) > 1 else False,
+        ends_with_newline=text.endswith("\n"),
+    )
+
+
+def _signed_off(line: str) -> bool:
+    """Whether the file's last record is a footer.
+
+    Read leniently, unlike the header. A last line that does not parse is the torn
+    write this whole shape exists to survive — a process killed mid-append — and it is
+    certainly not a sign-off. Refusing there would cost every span of the rest of the
+    session to recover one that was already lost.
+    """
+    try:
+        parsed = json.loads(line)
+    except ValueError:
+        return False
+    return isinstance(parsed, dict) and _native.FOOTER_KEY in parsed
+
+
+def _readable(path: Path, line: str, what: str) -> Mapping[str, object]:
+    """Parse one record, refusing a file whose shape cannot be established."""
+    try:
+        parsed = json.loads(line)
+    except ValueError as exc:
+        raise TraceWriteError(f"{path}: its {what} is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise TraceWriteError(f"{path}: its {what} is not a JSON object")
+    return parsed
+
+
+def _opened(path: Path, mode: str) -> IO[str]:
+    try:
+        return path.open(mode, encoding="utf-8")
     except OSError as exc:
         raise TraceWriteError(f"{path} could not be opened for writing: {exc}") from exc
 
@@ -117,21 +281,35 @@ class TraceWriter:
     header has not been written yet is a state no caller should be able to hold.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 — a handle, a header, two promises and two lifetimes
         self,
         handle: IO[str],
-        header: Mapping[str, object],
+        header: Mapping[str, object] | None,
         instrumented: frozenset[Dimension],
         sinks: SinkMap | None,
+        *,
+        spans: int = 0,
+        session_scope: bool = False,
     ) -> None:
-        """Take an opened file, and write the header before anything else can happen."""
+        """Take an opened file, and write the header before anything else can happen.
+
+        `header` is `None` when the file already carries one, and `spans` is then how
+        many another process already wrote — a footer counting only this invocation's
+        spans would read as records lost on the way here.
+
+        `session_scope` says whether leaving a `with` block ends the *session* or only
+        this writer's use of the file. It is the one real difference between a producer
+        that holds the file for hours and one whose every event is a separate process.
+        """
         self._handle = handle
         self._instrumented = instrumented
         self._sinks = sinks
-        self._spans = 0
+        self._spans = spans
+        self._session_scope = session_scope
         self._unmapped: set[str] = set()
         self._closed = False
-        self._append(header)
+        if header is not None:
+            self._append(header)
 
     @property
     def unmapped_tools(self) -> frozenset[str]:
@@ -146,8 +324,8 @@ class TraceWriter:
         """Record one span, refusing anything a reader would drop or grade wrongly."""
         if self._closed:
             raise TraceWriteError(
-                "this trace is closed and its footer already claims the file is complete; "
-                "appending a span now would make that claim false"
+                "this writer is closed; open the file again if the session is still going, "
+                "and never after a footer, which claims the file is complete"
             )
         self._refuse_undeclared(span)
         record = span_of(self._with_effects(span))
@@ -155,11 +333,23 @@ class TraceWriter:
         self._append(record)
         self._spans += 1
 
-    def close(self) -> None:
-        """Write the footer, which is what tells a reader the session ended on purpose."""
+    def finish(self) -> None:
+        """Sign the session off: write the footer, then release the file.
+
+        Separate from `close` because they are different claims. Releasing a file is
+        housekeeping; a footer says *this execution is complete, and nothing after this
+        point is missing*. A writer that signed off whenever it let go of the file would
+        make every event of an out-of-process session look like the end of one.
+        """
         if self._closed:
             return
         self._append({_native.FOOTER_KEY: TRACE_SCHEMA_VERSION, "spans": self._spans})
+        self.close()
+
+    def close(self) -> None:
+        """Release the file without claiming the session ended."""
+        if self._closed:
+            return
         self._closed = True
         self._handle.close()
 
@@ -173,17 +363,17 @@ class TraceWriter:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """Close on a clean exit, and leave the file unterminated on an exception.
+        """Sign off on a clean exit of a session-scoped writer; otherwise just let go.
 
-        Which is the truth about that session. A writer that tidied up after a crash
-        would produce a file claiming to be complete over an execution nobody saw the
-        end of — the exact thing `terminated` exists to prevent.
+        An exception never signs off, which is the truth about that session: a writer
+        that tidied up after a crash would produce a file claiming to be complete over
+        an execution nobody saw the end of. Neither does leaving the block of a resumed
+        writer, because there the block is one event and not the session.
         """
-        if exc_type is None:
-            self.close()
+        if exc_type is None and self._session_scope:
+            self.finish()
         else:
-            self._closed = True
-            self._handle.close()
+            self.close()
 
     def _refuse_undeclared(self, span: Span) -> None:
         """Refuse a block whose dimension this producer did not declare.

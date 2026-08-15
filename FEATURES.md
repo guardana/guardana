@@ -405,10 +405,22 @@ it as human oversight satisfies a contract demanding a person while nobody ever 
 action. Contracts keep their existing `approvers: ["human:*"]` syntax, which now globs
 structure instead of a string somebody typed.
 
-[`examples/hermes_integrator/`](examples/hermes_integrator/) is the worked example, and
-it exists to show that distinction on a real agent: Hermes auto-approves low-risk
-dangerous commands with an auxiliary LLM, so the same `rm -rf` passes a
-human-oversight contract when a person answered the prompt and fails when the model did.
+**A producer that is not a process** uses `resume_trace` instead: it creates a session's
+file on the first event and continues it on every later one, so an agent whose hooks are
+commands rather than callbacks can record across processes that never meet. Signing off
+is a separate act from closing there, because the block a hook runs in is one event and
+not the session.
+
+Two worked examples, one in each shape.
+[`examples/hermes_integrator/`](examples/hermes_integrator/) is a plugin, and it shows
+the approver distinction on a real agent: Hermes auto-approves low-risk dangerous
+commands with an auxiliary LLM, so the same `rm -rf` passes a human-oversight contract
+when a person answered the prompt and fails when the model did.
+[`examples/shell_hook_integrator/`](examples/shell_hook_integrator/) is a command spawned
+per event, with the correlation store an out-of-process integrator cannot do without —
+and writing it is what produced `resume_trace` and two crash-case fixes: a line torn off
+mid-write no longer costs the whole file, and a record this build cannot interpret makes
+a rule decline rather than pass.
 
 ### A saved run is evidence, not a screenshot (`guardana run`)
 

@@ -152,6 +152,46 @@ Write the span when the call **finishes**, not when it starts. A span records wh
 happened; a span written at the start would record an intention, and an effect that
 never landed is not a consequence.
 
+## If your agent's hooks are commands, not callbacks
+
+A large family of agents spawns a process per hook event and pipes it a JSON payload.
+Nothing survives between events — no writer, no variable, no open file — so `open_trace`
+is the wrong door: it opens for writing, which truncates, leaving one span per session
+under a header claiming the rest.
+
+`resume_trace` takes the same keywords and behaves as one call for every event:
+
+```python
+from guardana.core.trace import resume_trace
+
+writer = resume_trace(path, trace_id=session, producer="acme-hook",
+                      instrumented=[...], sinks=SinkMap(...))
+```
+
+It creates the file on the session's first event and continues it on every later one.
+It refuses a producer whose `instrumented` changed halfway through a session, a second
+session writing into the first one's file, and a file that has already signed off.
+
+Two things change in this shape, and both are worth knowing before you start:
+
+**Signing off is a separate act from closing.** `close()` releases the file; `finish()`
+writes the footer and then releases it. Leaving a `with resume_trace(...)` block only
+closes, because the block is one event and not the session. Exactly one hook — your
+agent's session-end event — calls `finish()`, and if you skip it every session reads as
+`unterminated`. That is correct rather than broken, and it means every rule that found
+nothing declines instead of passing.
+
+**You need a correlation store.** An approval arrives in one process and the effect it
+authorised in the next, and there is no variable to hold it in. A small file beside the
+trace, keyed by whatever id both events carry, is enough — see
+[`examples/shell_hook_integrator/`](../examples/shell_hook_integrator/), where it is
+about thirty lines. This is the part of an out-of-process integration to get right.
+
+One more rule for a hook that is a command: **write nothing to stdout.** That is the
+channel the agent parses for a directive, so even a diagnostic belongs on stderr. A
+recorder that can change what the agent does is inline enforcement wearing a hook's
+clothes.
+
 ## Ending the session, and admitting when you did not
 
 A file being appended to by a live agent cannot go back and amend its header, so a
@@ -201,8 +241,12 @@ first-class producer with no Python anywhere. If the writer's refusals are usefu
 you, take them; if you write your own emitter, take the four rules in
 [the format reference](usage-analyze-trace.md#the-native-format) instead.
 
-**Not somebody else's problem to keep working.** A worked example lives in
-[`examples/`](../examples/), pinned to the upstream version it was written against. It
-is an example rather than an integration this project carries: a later release of that
-framework may break it, and it deliberately stays out of CI, because a green build here
-must never depend on somebody else's release.
+**Not somebody else's problem to keep working.** Two worked examples live in
+[`examples/`](../examples/), each pinned to the upstream version it was written against
+and each in one of the two shapes above:
+[`hermes_integrator/`](../examples/hermes_integrator/) is a plugin holding the file for
+a whole session, and [`shell_hook_integrator/`](../examples/shell_hook_integrator/) is a
+command the agent spawns per event. They are examples rather than integrations this
+project carries — a later release of that framework may break either — and neither
+imports the agent it integrates with, which is what lets their tests run in CI without a
+green build here depending on somebody else's release.

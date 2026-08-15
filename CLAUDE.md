@@ -193,6 +193,10 @@ uv run --isolated --no-cache \
   --with ./packages/guardana-core --with ./packages/guardana-rules \
   --with ./examples/hermes_integrator --with pytest \
   pytest examples/hermes_integrator/tests -q
+uv run --isolated --no-cache \
+  --with ./packages/guardana-core --with ./packages/guardana-rules \
+  --with ./examples/shell_hook_integrator --with pytest \
+  pytest examples/shell_hook_integrator/tests -q
 ```
 
 **`--no-cache` is not optional, and it is not a speed trade.** Without it uv serves
@@ -212,11 +216,15 @@ own YAML that every other gate passed over, and in 0.20.0 it caught the example'
 "what is registered" set omitting the fourth extension group — a false *red* accusing a
 manifest of promising what it does register.
 
-`hermes_integrator` is the same idea for the *producer* contract: it registers through a
-third party's entry-point group and writes a trace with the public writer, so a change to
-the writer or the trace format shows up as somebody else's integration breaking.
-Its tests never import `hermes-agent`, which is what keeps it runnable in CI — checking
-it against the real Hermes is a manual step documented in its README.
+The two integrator examples are the same idea for the *producer* contract, in the two
+shapes a producer comes in: `hermes_integrator` registers through a third party's
+entry-point group and holds the file for a whole session, and `shell_hook_integrator` is
+a command the agent spawns per event, appending to a file three processes share. A change
+to the writer or the trace format shows up as somebody else's integration breaking, and
+the second one is the only gate that exercises `resume_trace` across real process
+boundaries. Neither imports the agent it integrates with — the payloads are copied from
+upstream documentation — which is what keeps them runnable in CI; checking either against
+the real thing is a manual step documented in its README.
 
 (`--cov` is not in `addopts` on purpose: it would make a single-file run like
 `uv run pytest packages/guardana-core/tests/test_runner.py` fail the coverage

@@ -28,6 +28,7 @@ def trace_of(
     *spans: Span,
     records: Iterable[Dimension] = _ALL_DIMENSIONS,
     truncated: TraceTruncation | None = None,
+    unreadable: int = 0,
 ) -> Trace:
     """Build a trace whose producer records `records` — everything, unless a test narrows it."""
     return Trace(
@@ -36,6 +37,7 @@ def trace_of(
         provenance=Provenance(producer="acme", source="acme.jsonl", dialect="guardana"),
         instrumented=frozenset(records),
         truncated=truncated,
+        unreadable=unreadable,
     )
 
 

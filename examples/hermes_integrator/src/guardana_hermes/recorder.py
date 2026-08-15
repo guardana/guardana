@@ -205,7 +205,7 @@ class SessionRecorder:
         """Sign the file off, which is what tells a reader the session really ended."""
         writer = self._writers.pop(session_id or "unknown", None)
         if writer is not None:
-            writer.close()
+            writer.finish()
 
 
 def _arguments(args: object) -> str | None:

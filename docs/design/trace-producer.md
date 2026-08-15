@@ -1,7 +1,7 @@
 ---
 title: "Producing a trace"
 nav_order: 15
-summary: "why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, and what the model has to gain before an integrator can record human approval honestly"
+summary: "why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, what the model needs before an integrator can record human approval honestly, and why a producer that is not a process changed the contract"
 status: accepted
 ---
 
@@ -267,6 +267,46 @@ which is what makes the case in decision 3 unwritable rather than merely detecta
 `trace.unmapped_tools` names the tools that fell through the sink map, so the gap is
 visible at the end of a run rather than at the end of an audit.
 
+## Decision 6 — the same contract for a producer that is not a process
+
+Everything above assumes one process holds the file for the whole session. Writing the
+second worked example proved that assumption wrong for a whole family of agents: a
+shell-hook integrator is spawned per event, so the header, the spans and the footer are
+written by processes that never meet, and `open_trace` would truncate the file on every
+one of them. That family was expected to turn up in some *other* agent; it turned out to
+be a second seam on the first one.
+
+`resume_trace` takes the same keywords `open_trace` takes — so a hook script calls it
+unconditionally with one set of arguments — and creates the file on the session's first
+event, continues it on every later one, and refuses the three ways continuing goes
+wrong: a producer whose `instrumented` changed halfway through (half a session graded
+under one declaration and half under another is not one run), a second session writing
+into the first one's file, and a file that has already signed off.
+
+**Signing off stops being the same act as letting go of the file.** `close()` releases
+the handle; `finish()` writes the footer and then releases it. A writer that signed off
+whenever it closed would make the first tool call of every out-of-process session look
+like the end of one. `open_trace`'s `with` block is the session, so a clean exit
+finishes it; `resume_trace`'s block is one *event*, so leaving it only closes.
+
+Two consequences the second example forced, and both are the crash case:
+
+**A torn line does not cost the rest of the file.** A process killed mid-append leaves a
+partial record. The reader refused the whole file over that, so a crashed producer's
+trace — the case `unterminated` exists for — could not be graded at all. A native record
+that will not parse is now counted as unreadable, reported with its line number, and the
+execution around it still grades. The header is the exception: a file whose header
+cannot be read is a file whose shape cannot be established.
+
+**An unreadable record makes a rule decline.** `truncated` said where a file stopped and
+said nothing about a record that arrived and could not be interpreted, so a signed-off
+file with a torn line in the middle graded clean. It is the same claim — part of this
+execution was not looked at — arriving through the one channel that stayed open.
+
+**The counting is per line, not per record.** `resume_trace` parses the first record and
+the last one and counts the rest, because the footer needs a number and re-parsing every
+span on every hook invocation would make a session quadratic in its own length.
+
 ## What this is not
 
 **Not a second SDK.** Guardana's contract is the published, versioned file format
@@ -296,5 +336,6 @@ example's README with the version and the date it was checked.
 |---|---|
 | Detecting a dimension declared and never written, across sessions | needs a producer's history, which is the fleet-history work in the same milestone. One session cannot tell a quiet hour from a hook that never fires |
 | Rotation, size limits and multi-file sessions | a session that outgrows a file is a real operational problem and it is orthogonal to every decision here: the header/footer contract composes with a rotation scheme without changing. Deciding it now, with no producer running, would be inventing a shape from imagination |
+| Two processes appending to one session at the same moment | `resume_trace` is safe across processes that take turns, which is what a hook chain does; it is not a lock. An agent that fires two hooks concurrently for one session would interleave two lines, and the honest fix is a lock in the producer rather than one invented here for a caller nobody has |
 | A structured approver for `consent` and `policy_decisions` | the same automated-versus-human distinction exists there, and it does not carry the same weight: a consent is by definition the subject's, and a policy decision is by definition automated. Adding a kind to both would be symmetry for its own sake |
-| Async and thread-safe writing | an agent framework that calls hooks from several threads needs it, and none of the two worked examples does yet. A lock is easy to add and impossible to remove; the honest order is a real caller first |
+| Async and thread-safe writing | an agent framework that calls hooks from several threads needs it, and neither worked example does. A lock is easy to add and impossible to remove; the honest order is a real caller first |

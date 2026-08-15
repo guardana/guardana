@@ -81,7 +81,12 @@ from guardana.core.trace.serialize import serialize_trace
 from guardana.core.trace.sinks import SinkMap
 from guardana.core.trace.span import ModelCall, Span, SpanKind
 from guardana.core.trace.tool import ToolDeclaration, ToolExecution, ToolStatus
-from guardana.core.trace.writer import TraceWriteError, TraceWriter, open_trace
+from guardana.core.trace.writer import (
+    TraceWriteError,
+    TraceWriter,
+    open_trace,
+    resume_trace,
+)
 
 from guardana.core.trace._parse import TraceLoadError  # isort: skip — the error the readers raise
 
@@ -144,5 +149,6 @@ __all__ = [
     "open_trace",
     "read_observations",
     "read_trace",
+    "resume_trace",
     "serialize_trace",
 ]

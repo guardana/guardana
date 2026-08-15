@@ -1,0 +1,22 @@
+[project]
+name = "guardana-trace-hook"
+version = "0.1.0"
+description = "Example integrator: record an agent's shell-hook events as a Guardana trace, one process per event."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = ["Typing :: Typed"]
+dependencies = ["guardana-core"]
+
+# The agent spawns this by name; there is no entry-point group, because a shell hook is
+# a command and not a plugin. That is the whole structural difference from the
+# in-process example next door.
+[project.scripts]
+guardana-trace-hook = "guardana_trace_hook:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guardana_trace_hook"]

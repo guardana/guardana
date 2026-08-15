@@ -522,6 +522,33 @@ def test_a_rule_that_found_nothing_in_a_truncated_trace_declines_rather_than_pas
     assert "incomplete" in inconclusive(results)[0].evidence.summary
 
 
+@pytest.mark.parametrize("rule", _RULES, ids=lambda r: r.meta.id)
+def test_a_rule_that_found_nothing_beside_an_unreadable_record_declines(rule: Rule) -> None:
+    """A step this build could not interpret is a step nobody looked at.
+
+    The file is complete, so `truncated` says nothing — and the record the rule needed
+    may be exactly the one that would not parse. Reading a whole-file pass off a
+    partially-read file is the same false green truncation already closes, arriving
+    through the one channel that stayed open.
+    """
+    trace = trace_of(span("s1"), unreadable=1)
+    results = graded(rule, trace)
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+    assert "could not read" in inconclusive(results)[0].evidence.summary
+
+
+def test_a_rule_that_found_something_beside_an_unreadable_record_reports_it() -> None:
+    """The evidence is real; a record nobody could parse cannot un-happen it."""
+    trace = trace_of(
+        span("s1", tool=ToolExecution(name="http", arguments=f'{{"k":"{_KEY}"}}')),
+        unreadable=2,
+    )
+    results = graded(SecretInToolArgumentRule(), trace)
+    assert len(findings(results)) == 1
+    assert inconclusive(results) == ()
+
+
 def test_a_rule_that_found_something_in_a_truncated_trace_reports_it() -> None:
     """The evidence is real; the part that was cut cannot un-happen it."""
     trace = trace_of(

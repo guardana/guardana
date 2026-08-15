@@ -196,6 +196,12 @@ If the header says `truncated`, or the file exceeds a read ceiling, then a rule 
 nothing reports `inconclusive`, because the step it needed may be in the part that is
 missing.
 
+A record this build could not interpret — a line torn off by a producer that was
+killed mid-write, or one over a size ceiling — has the same effect and is reported
+separately, by line number. It does not cost the rest of the file: the execution around
+it still grades, and a rule that found nothing in it declines rather than passing,
+because the step it needed may be exactly the record that would not parse.
+
 When *every* rule ends up there, the run exits `2`. A trace cut short before anything
 gradable happened is a run that established nothing, which is the same outcome as a
 trace no rule could read at all — it just arrives with a full rule count in front of

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producing a trace — Guardana documentation</title>
-<meta name="description" content="why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, and what the model has to gain before an integrator can record human approval honestly">
+<meta name="description" content="why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, what the model needs before an integrator can record human approval honestly, and why a producer that is not a process changed the contract">
 <link rel="canonical" href="https://guardana.dev/docs/design/trace-producer.html">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 <link rel="stylesheet" href="../docs.css">
@@ -101,7 +101,7 @@
 </ul>
 </nav>
 <main>
-<h1>Producing a trace: the writer, the declaration, and the approving actor<span class="status accepted">accepted</span></h1><p class="lede">why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, and what the model has to gain before an integrator can record human approval honestly</p><p><strong>Status:</strong> accepted, implemented — ships in the next release · <strong>Written:</strong>
+<h1>Producing a trace: the writer, the declaration, and the approving actor<span class="status accepted">accepted</span></h1><p class="lede">why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, what the model needs before an integrator can record human approval honestly, and why a producer that is not a process changed the contract</p><p><strong>Status:</strong> accepted, implemented — ships in the next release · <strong>Written:</strong>
 2026-08-15 · <strong>Continuous verification, item 1</strong></p>
 <h2 id="the-problem-stated-precisely">The problem, stated precisely</h2>
 <p><a href="../usage-analyze-trace.html"><code>analyze-trace</code></a> grades an execution somebody else
@@ -359,6 +359,38 @@ hook gave them, and the writer fills in the effect that a recorded tool call imp
 which is what makes the case in decision 3 unwritable rather than merely detectable.
 <code>trace.unmapped_tools</code> names the tools that fell through the sink map, so the gap is
 visible at the end of a run rather than at the end of an audit.</p>
+<h2 id="decision-6--the-same-contract-for-a-producer-that-is-not-a-process">Decision 6 — the same contract for a producer that is not a process</h2>
+<p>Everything above assumes one process holds the file for the whole session. Writing the
+second worked example proved that assumption wrong for a whole family of agents: a
+shell-hook integrator is spawned per event, so the header, the spans and the footer are
+written by processes that never meet, and <code>open_trace</code> would truncate the file on every
+one of them. That family was expected to turn up in some <em>other</em> agent; it turned out to
+be a second seam on the first one.</p>
+<p><code>resume_trace</code> takes the same keywords <code>open_trace</code> takes — so a hook script calls it
+unconditionally with one set of arguments — and creates the file on the session's first
+event, continues it on every later one, and refuses the three ways continuing goes
+wrong: a producer whose <code>instrumented</code> changed halfway through (half a session graded
+under one declaration and half under another is not one run), a second session writing
+into the first one's file, and a file that has already signed off.</p>
+<p><strong>Signing off stops being the same act as letting go of the file.</strong> <code>close()</code> releases
+the handle; <code>finish()</code> writes the footer and then releases it. A writer that signed off
+whenever it closed would make the first tool call of every out-of-process session look
+like the end of one. <code>open_trace</code>'s <code>with</code> block is the session, so a clean exit
+finishes it; <code>resume_trace</code>'s block is one <em>event</em>, so leaving it only closes.</p>
+<p>Two consequences the second example forced, and both are the crash case:</p>
+<p><strong>A torn line does not cost the rest of the file.</strong> A process killed mid-append leaves a
+partial record. The reader refused the whole file over that, so a crashed producer's
+trace — the case <code>unterminated</code> exists for — could not be graded at all. A native record
+that will not parse is now counted as unreadable, reported with its line number, and the
+execution around it still grades. The header is the exception: a file whose header
+cannot be read is a file whose shape cannot be established.</p>
+<p><strong>An unreadable record makes a rule decline.</strong> <code>truncated</code> said where a file stopped and
+said nothing about a record that arrived and could not be interpreted, so a signed-off
+file with a torn line in the middle graded clean. It is the same claim — part of this
+execution was not looked at — arriving through the one channel that stayed open.</p>
+<p><strong>The counting is per line, not per record.</strong> <code>resume_trace</code> parses the first record and
+the last one and counts the rest, because the footer needs a number and re-parsing every
+span on every hook invocation would make a session quadratic in its own length.</p>
 <h2 id="what-this-is-not">What this is not</h2>
 <p><strong>Not a second SDK.</strong> Guardana's contract is the published, versioned file format
 (<code>schemas/trace-v3.schema.json</code>). Everything here is a convenience over it, and a team
@@ -396,12 +428,16 @@ example's README with the version and the date it was checked.</p>
 <td>a session that outgrows a file is a real operational problem and it is orthogonal to every decision here: the header/footer contract composes with a rotation scheme without changing. Deciding it now, with no producer running, would be inventing a shape from imagination</td>
 </tr>
 <tr>
+<td>Two processes appending to one session at the same moment</td>
+<td><code>resume_trace</code> is safe across processes that take turns, which is what a hook chain does; it is not a lock. An agent that fires two hooks concurrently for one session would interleave two lines, and the honest fix is a lock in the producer rather than one invented here for a caller nobody has</td>
+</tr>
+<tr>
 <td>A structured approver for <code>consent</code> and <code>policy_decisions</code></td>
 <td>the same automated-versus-human distinction exists there, and it does not carry the same weight: a consent is by definition the subject's, and a policy decision is by definition automated. Adding a kind to both would be symmetry for its own sake</td>
 </tr>
 <tr>
 <td>Async and thread-safe writing</td>
-<td>an agent framework that calls hooks from several threads needs it, and none of the two worked examples does yet. A lock is easy to add and impossible to remove; the honest order is a real caller first</td>
+<td>an agent framework that calls hooks from several threads needs it, and neither worked example does. A lock is easy to add and impossible to remove; the honest order is a real caller first</td>
 </tr>
 </tbody>
 </table></div>

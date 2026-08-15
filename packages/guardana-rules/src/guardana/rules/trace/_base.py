@@ -44,12 +44,17 @@ class TraceRule(Rule):
         return 0
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Grade the trace, and decline rather than pass when the trace is incomplete.
+        """Grade the trace, and decline rather than pass over a trace read in part.
 
-        A rule that **found** something in a truncated trace reports it — the evidence
-        is real, and the part that was cut cannot un-happen it. A rule that found
-        nothing reports `inconclusive`, because the step it needed may have been in the
-        part that is missing.
+        A rule that **found** something reports it — the evidence is real, and neither
+        a cut nor an unparseable record can un-happen it. A rule that found nothing
+        declines, because the step it needed may have been in the part that is missing.
+
+        Two ways a file is read in part, and they are different facts. `truncated` is
+        the producer or the reader saying where it stopped. `unreadable` is a record
+        that arrived and could not be interpreted — a line torn off by a crashed
+        producer, or one over a ceiling — which leaves `truncated` empty and the file
+        just as partial.
 
         The type check is the belt to the capability's braces, and it returns rather
         than asserting because an `assert` vanishes under `python -O`.
@@ -59,10 +64,18 @@ class TraceRule(Rule):
         trace = target.trace
         found = list(self.examine(trace))
         yield from found
-        if not found and trace.truncated is not None:
+        if found:
+            return
+        if trace.truncated is not None:
             yield self.unverified(
                 trace,
                 f"the trace is incomplete ({trace.truncated}), so {self.claim}",
+            )
+        elif trace.unreadable:
+            yield self.unverified(
+                trace,
+                f"this build could not read {trace.unreadable} record(s) of the trace, "
+                f"so {self.claim}",
             )
 
     @abstractmethod

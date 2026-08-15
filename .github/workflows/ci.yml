@@ -175,3 +175,15 @@ jobs:
           --with ./examples/hermes_integrator
           --with pytest
           pytest examples/hermes_integrator/tests -q
+
+      # The out-of-process shape, which is the one that proves the recording surface is
+      # general: separate processes per event, appending to one file. Same rule about
+      # dependencies — the payloads are copied, so nothing here installs somebody's agent.
+      - name: Run the shell-hook example's own tests against an installed Guardana
+        run: >
+          uv run --isolated --no-cache
+          --with ./packages/guardana-core
+          --with ./packages/guardana-rules
+          --with ./examples/shell_hook_integrator
+          --with pytest
+          pytest examples/shell_hook_integrator/tests -q

@@ -51,6 +51,24 @@ integrator typed by hand. A contract's `approvers` list now globs `kind:approver
 every contract already written keeps working and now means what it says, and an older
 file spelling the convention into the name is read as the structure it always stood for.
 
+**A producer that is not a process.** `resume_trace` creates a session's file on its
+first event and continues it on every later one, so an agent whose hooks are *commands*
+rather than callbacks can record: the header, the spans and the footer are written by
+processes that never meet, and `open_trace` would truncate the file on each of them.
+Signing off became a separate act from letting go of the file — `finish()` writes the
+footer, `close()` releases the handle — because a writer that signed off whenever it
+closed would make the first tool call of every out-of-process session look like the end
+of one.
+
+Two things the crash case forced with it, both of which were false greens on their own:
+**a line torn off by a producer killed mid-write no longer costs the whole file** — the
+reader refused it outright, so a crashed producer's trace, the case `unterminated` exists
+for, could not be graded at all; it is now counted as unreadable, reported by line
+number, and the execution around it still grades. And **an unreadable record now makes a
+rule decline**: `truncated` says where a file stopped and said nothing about a record
+that arrived and could not be interpreted, so a signed-off file with a torn line in the
+middle graded clean.
+
 **`examples/hermes_integrator/`** is the guide's proof: a Hermes plugin that records each
 agent session as a trace, written against `hermes-agent` 0.19.0 and verified by loading
 it through Hermes' own plugin manager. It exists to demonstrate one distinction. Hermes

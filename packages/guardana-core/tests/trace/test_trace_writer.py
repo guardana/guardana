@@ -157,11 +157,11 @@ def test_the_footer_counts_what_was_written(tmp_path: Path) -> None:
     assert _records(path)[-1] == {"guardana_trace_end": 3, "spans": 2}
 
 
-def test_a_span_written_after_close_is_refused(tmp_path: Path) -> None:
-    """The file has already claimed to be complete; appending would make that a lie."""
+def test_a_span_written_after_the_writer_let_go_of_the_file_is_refused(tmp_path: Path) -> None:
+    """There is no handle left to append through, and the next one may have signed off."""
     path = tmp_path / "trace.jsonl"
     writer = _writer(path)
-    writer.close()
+    writer.finish()
 
     with pytest.raises(TraceWriteError, match="closed"):
         writer.span(_refund_span())
@@ -314,12 +314,12 @@ def test_identity_is_a_dimension_like_any_other(tmp_path: Path) -> None:
         trace.span(_refund_span(identity=Identity(actor="a", claimed_resource="https://x/")))
 
 
-def test_closing_twice_does_not_write_a_second_footer(tmp_path: Path) -> None:
-    """An integrator that closes and also uses `with` would otherwise sign off twice."""
+def test_signing_off_twice_does_not_write_a_second_footer(tmp_path: Path) -> None:
+    """An integrator that finishes and also uses `with` would otherwise sign off twice."""
     path = tmp_path / "trace.jsonl"
     writer = _writer(path)
-    writer.close()
-    writer.close()
+    writer.finish()
+    writer.finish()
 
     assert [record for record in _records(path) if "guardana_trace_end" in record] == [
         {"guardana_trace_end": 3, "spans": 0}

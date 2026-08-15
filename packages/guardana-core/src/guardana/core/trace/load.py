@@ -105,11 +105,19 @@ def _read_native(path: Path, digest: str) -> TraceRead:
         if isinstance(raw, _Overflow):
             truncated = TraceTruncation.READ_LIMIT
             break
-        record = mapping_of(_parse(raw, number), f"record {number}")
         if header is None:
+            record = mapping_of(_parse(raw, number), f"record {number}")
             version = _native.version_of(record)
             header = _native.NativeHeader(_native.migrate_header(record))
             continue
+        parsed = _parsed_span(raw, number)
+        if parsed is None:
+            unreadable.append(
+                UnreadableRecord(number, f"record {number} is not a JSON object this build reads")
+            )
+            encountered += 1
+            continue
+        record = parsed
         if footer is not None:
             raise TraceLoadError(
                 f"{path} record {number} comes after the trace's footer, so the file claims "
@@ -149,6 +157,23 @@ def _read_native(path: Path, digest: str) -> TraceRead:
         ),
         unreadable=tuple(unreadable),
     )
+
+
+def _parsed_span(raw: str, number: int) -> dict[str, object] | None:
+    """Parse one span record, or `None` when this line cannot be interpreted at all.
+
+    The header refuses; a span is counted. A producer appending to a live file can be
+    killed mid-write, which leaves a partial line — the expected way for a session to
+    end rather than an accident — and refusing the file over it would throw away every
+    step that *was* recorded to punish the one that was not. The record is reported as
+    unreadable, which is a channel the reader has had since it existed, and it counts
+    toward the footer's total so a torn write does not read as a record lost in transit.
+    """
+    try:
+        parsed: object = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _read_footer(

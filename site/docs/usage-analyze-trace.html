@@ -324,6 +324,11 @@ half.</p>
 <strong>found</strong> something still reports it — the evidence is real — and a rule that found
 nothing reports <code>inconclusive</code>, because the step it needed may be in the part that is
 missing.</p>
+<p>A record this build could not interpret — a line torn off by a producer that was
+killed mid-write, or one over a size ceiling — has the same effect and is reported
+separately, by line number. It does not cost the rest of the file: the execution around
+it still grades, and a rule that found nothing in it declines rather than passing,
+because the step it needed may be exactly the record that would not parse.</p>
 <p>When <em>every</em> rule ends up there, the run exits <code>2</code>. A trace cut short before anything
 gradable happened is a run that established nothing, which is the same outcome as a
 trace no rule could read at all — it just arrives with a full rule count in front of

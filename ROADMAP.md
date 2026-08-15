@@ -309,6 +309,7 @@ code were things the documentation already described correctly while the code di
 something else — the failure mode a green gate is least able to see.
 
 
+
 ## Where this sits, and what the neighbours do better
 
 Checked 2026-08-02 against DeepEval, Ragas, DeepTeam and promptfoo, and revisited
@@ -739,7 +740,7 @@ Three constraints held:
   action is allowed is inline enforcement wearing a library's clothes, and stays a
   non-goal below.
 
-#### The integrator guide, and the second example that is still owed
+#### The integrator guide, and two examples that differ
 
 [`docs/writing-an-integrator.md`](docs/writing-an-integrator.md) answers *how do I make
 the agent I already run produce a trace Guardana can grade?*, and
@@ -765,15 +766,25 @@ that a seam nobody has run is a seam nobody has read:
   a shell-script bridge over the same hook manager. The second is the out-of-process
   shape this file expected to have to find in a *different* agent.
 
-**The second example is still owed, and it proves something the first cannot.** One
-example lets the contract be written around it; the second is what shows the recording
-surface is general — the same argument that put three unrelated inputs into 1.0 entry
-criterion 2. What this release deliberately did *not* do is promise which agent it will
-be: the previous candidate's seam had never been read at source, and committing to an
-unbounded read of somebody else's repository is how a milestone acquires a dependency
-nobody scoped. The honest order is one example that genuinely works, then a second chosen
-for being structurally different — state on disk rather than callbacks in a process —
-with its seam read before it is named here.
+**The second example is [`examples/shell_hook_integrator/`](examples/shell_hook_integrator/),
+and it proved what the first could not.** One example lets the contract be written around
+it; the second is what shows the recording surface is general — the same argument that
+put three unrelated inputs into 1.0 entry criterion 2. So it is the other *shape*: a
+command the agent spawns per event, where nothing survives between events and the header,
+the spans and the footer are written by processes that never meet.
+
+Writing it changed the engine three times, which is the whole return on insisting the
+second one be structurally different rather than a second agent of the same kind:
+`resume_trace`, because opening for writing truncates the file on every event; a line
+torn off by a producer killed mid-write no longer costing the whole file, because that is
+the case `unterminated` exists for and it could not be graded at all; and an unreadable
+record making a rule decline, because `truncated` said nothing about a record that
+arrived and could not be read.
+
+**The candidate this file used to name is not the one.** `openclaw` on PyPI is an
+installer for a binary — eleven files, no agent — so its seam still cannot be read
+without running somebody's compiled artifact, and it is dropped rather than promised
+again. The two shapes are what mattered, and both now exist.
 
 **These are examples, not integrations we carry.** Each pins the upstream version it was
 written against and its date, and states that a later release may break it. A green build
@@ -791,7 +802,7 @@ for the agent we have never heard of.
 
 | Deferred | Reason |
 |---|---|
-| **A writer that appends to a file another process started** | the shell-hook shape needs it: each hook invocation is its own process, so "open, write header, append" truncates the file every time. It needs the header read back and the existing spans counted per invocation, and that cost belongs measured against a real out-of-process integrator rather than guessed at — which is the second example's job |
+| **Two processes appending to one session at the same moment** | `resume_trace` is safe across processes that take turns, which is what a hook chain does, and it is not a lock. An agent firing two hooks concurrently for one session would interleave two lines; the honest fix is a lock in the producer rather than one invented here for a caller nobody has |
 | **Detecting a dimension declared and never written** | not decidable inside one session: an agent that made no tool calls genuinely produced no effects, and refusing to close that file would fire on every quiet hour of a correctly instrumented deployment. It is a fact about a producer's history, so it sits with the fleet history below, beside the already-deferred "a rule that declines on every target" |
 | **Rotation, size limits and multi-file sessions** | a session that outgrows a file is real and orthogonal: the header/footer contract composes with any rotation scheme without changing. Deciding it with no producer running would be inventing a shape from imagination |
 | **Async and thread-safe writing** | a framework calling hooks from several threads needs it and the worked example does not. A lock is easy to add and impossible to remove; the honest order is a real caller first |

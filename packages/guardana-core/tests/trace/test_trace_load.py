@@ -130,11 +130,22 @@ def test_an_empty_file_is_refused_rather_than_read_as_an_empty_trace(tmp_path: P
         read_trace(path)
 
 
-def test_a_record_that_is_not_json_is_refused_by_line_number(tmp_path: Path) -> None:
+def test_a_record_that_is_not_json_is_reported_by_line_number(tmp_path: Path) -> None:
+    """Reported rather than refused, and never dropped in silence.
+
+    This refused the whole file until a writer made a torn last line the expected way
+    for a crashed session to end. The point it was written for is unchanged: a step
+    nobody can interpret has to be visible with its line number, because a reader that
+    skipped it quietly would grade an execution that never happened.
+    """
     path = tmp_path / "broken.jsonl"
     path.write_text(json.dumps(_HEADER) + "\nnot json\n", encoding="utf-8")
-    with pytest.raises(TraceLoadError, match="record 2"):
-        read_trace(path)
+
+    read = read_trace(path)
+
+    assert read.trace.spans == ()
+    assert read.trace.unreadable == 1
+    assert read.unreadable[0].line == 2
 
 
 def test_a_file_that_is_not_utf8_is_refused(tmp_path: Path) -> None:
@@ -231,3 +242,47 @@ def test_the_header_migration_hands_the_reader_a_current_version_document() -> N
 
     assert migrated["guardana_trace"] == TRACE_SCHEMA_VERSION
     assert migrated["trace_id"] == "t-1"
+
+
+def test_one_record_torn_by_a_crash_does_not_cost_the_whole_file(tmp_path: Path) -> None:
+    """A producer killed mid-append leaves a partial line, and the rest is still evidence.
+
+    Refusing the file was the behaviour until a writer made this an expected way for a
+    session to end. `UnreadableRecord` has existed since the reader did, for exactly
+    this: a step nobody can interpret is reported, never silently dropped and never
+    allowed to take the execution around it with it.
+    """
+    path = tmp_path / "torn.jsonl"
+    path.write_text(
+        f"{json.dumps(_HEADER)}\n"
+        f"{json.dumps({'span_id': 's1', 'kind': 'model_call', 'name': 'chat'})}\n"
+        f'{{"span_id": "s2", "kind": "tool_ex\n'
+        f"{json.dumps({'span_id': 's3', 'kind': 'model_call', 'name': 'chat'})}\n",
+        encoding="utf-8",
+    )
+
+    read = read_trace(path, Dialect.GUARDANA)
+
+    assert [span.span_id for span in read.trace.spans] == ["s1", "s3"]
+    assert read.trace.unreadable == 1
+    assert "line 3" in read.unreadable[0].reason or read.unreadable[0].line == 3
+
+
+def test_a_header_this_build_cannot_parse_still_refuses_the_file(tmp_path: Path) -> None:
+    """A record can be lost; the record saying what the file *is* cannot be guessed at."""
+    path = tmp_path / "torn-header.jsonl"
+    path.write_text('{"guardana_trace": 1, "trace_id": "t\n', encoding="utf-8")
+
+    with pytest.raises(TraceLoadError, match="JSON"):
+        read_trace(path, Dialect.GUARDANA)
+
+
+def test_a_record_that_is_not_an_object_is_counted_rather_than_refusing_the_file(
+    tmp_path: Path,
+) -> None:
+    path = _write(tmp_path, _HEADER, {"span_id": "s1", "kind": "model_call", "name": "c"}, [1, 2])
+
+    read = read_trace(path, Dialect.GUARDANA)
+
+    assert [span.span_id for span in read.trace.spans] == ["s1"]
+    assert read.trace.unreadable == 1
