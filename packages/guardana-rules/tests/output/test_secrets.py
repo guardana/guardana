@@ -94,6 +94,34 @@ def test_clean_output_no_findings() -> None:
     assert findings == []
 
 
+class _SaysNothing:
+    """A model that answers every prompt with an empty message.
+
+    Not hypothetical: an Azure content filter returns exactly this, and so does a
+    rate-limited gateway. `Exchange.reply_text` already treats a blank turn as
+    silence for every evaluator; this rule reads the raw string and never asked.
+    """
+
+    def send(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+    ) -> str:
+        return ""
+
+
+def test_a_reply_that_never_arrived_is_unverified_not_a_clean_output() -> None:
+    """ "No secret in the output" needs an output. Nothing was inspected here."""
+    target = EndpointTarget("http://x", "m", transport=_SaysNothing())
+
+    findings = list(OutputSecretsRule().run(target, RuleContext()))
+
+    assert findings
+    assert all(f.verdict is not None and f.verdict.outcome == "inconclusive" for f in findings)
+
+
 def test_git_sha_not_flagged() -> None:
     target = EndpointTarget("http://x", "m", transport=_LeaksGitSha())
     findings = list(OutputSecretsRule().run(target, RuleContext()))

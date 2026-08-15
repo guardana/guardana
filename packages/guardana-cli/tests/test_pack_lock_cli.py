@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 from guardana.cli.main import app
 from guardana.core.pack.lock import LOCK_SCHEMA_VERSION
+from guardana.core.pack.model import EXTENSION_API_VERSION
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -88,6 +89,41 @@ def test_a_pack_the_lock_names_and_this_build_lacks_fails_the_check(tmp_path: Pa
 
     assert result.exit_code == 1, result.output
     assert "pack_missing" in result.output
+
+
+def test_a_lock_taken_against_another_extension_contract_is_refused(tmp_path: Path) -> None:
+    """The field is required on read for exactly this comparison, and was never made.
+
+    `extension_api` is the one thing in the file that says which `Rule` shape the
+    digests beside it were computed from. A build implementing a different one
+    cannot compare them — `Rule.digest()` covers the fields of `RuleMeta`, and the
+    contract moving is what changes those fields. The released build read the number,
+    dropped it, and reported "1 pack(s) match" over a lock taken from another
+    contract entirely.
+
+    Refused rather than reported as drift: every rule would come back `changed` with
+    a reason that names the wrong cause, and the fix is the same one line either way.
+    """
+    path = _lock(tmp_path)
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["extension_api"] = EXTENSION_API_VERSION + 1
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+
+    result = runner.invoke(app, ["pack", "lock", str(path), "--check"])
+
+    assert result.exit_code == 3, result.output
+    assert "extension_api" in result.output
+
+
+def test_a_lock_taken_against_this_contract_still_checks_clean(tmp_path: Path) -> None:
+    """The inversion, so the refusal above cannot be satisfied by refusing every lock."""
+    path = _lock(tmp_path)
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert document["extension_api"] == EXTENSION_API_VERSION
+
+    result = runner.invoke(app, ["pack", "lock", str(path), "--check"])
+
+    assert result.exit_code == 0, result.output
 
 
 def test_an_unreadable_lock_is_refused_rather_than_treated_as_empty(tmp_path: Path) -> None:

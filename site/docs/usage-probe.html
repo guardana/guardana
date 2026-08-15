@@ -446,6 +446,11 @@ the run summary rather than silently passed.</p>
 <p>Same policy gate as <code>scan</code> (see <a href="profiles.html"><code>profiles.md</code></a>): exits <code>1</code> if
 any finding at or above <code>fail_on.severity</code> also meets <code>fail_on.min_confidence</code>,
 else <code>0</code>.</p>
+<p><strong>Except when nothing was graded at all</strong>, which exits <code>2</code>. An endpoint that answers
+every request with an empty message is reachable, well-formed and useless to grade:
+each rule runs, each evaluator declines, and the finding count is zero for a reason
+that has nothing to do with the model being sound. See
+<a href="exit-codes.html"><code>exit-codes.md</code></a>.</p>
 <h2 id="forwarding-to-a-collector">Forwarding to a collector</h2>
 <pre><code class="language-bash">guardana probe --url http://localhost:11434 --model llama3 --reporter server://https://collector.example.com
 </code></pre>

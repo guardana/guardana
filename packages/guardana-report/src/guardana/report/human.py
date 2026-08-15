@@ -43,12 +43,20 @@ class HumanRenderer:
 def _nothing_found(result: ScanResult) -> str:
     """Say what "no findings" means here — a tick only when it means an all-clear.
 
-    Four ways a clean report is not a clean result, ordered by how completely each
+    Five ways a clean report is not a clean result, ordered by how completely each
     one invalidates the run. The tick is what people scroll for and what job summaries
     grep for, so every one of these is a line that denies it in words.
     """
     if not result.rules_run:
         return "⚠ 0 rules ran — nothing was checked (this is not an all-clear)."
+    if result.verified_nothing:
+        # Every rule ran and every one of them declined — an endpoint answering with
+        # an empty message, a trace cut short. The count above is not zero, which is
+        # the only reason this needs a line of its own.
+        return (
+            f"⚠ No findings, but not one of the {result.rules_run_count} check(s) that "
+            "ran could reach a verdict (this is not an all-clear)."
+        )
     if result.coverage_shortfall:
         return (
             f"⚠ No findings, but {len(result.coverage_shortfall)} piece(s) of demanded "

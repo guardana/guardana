@@ -306,6 +306,12 @@ Same policy gate as `scan` (see [`profiles.md`](profiles.md)): exits `1` if
 any finding at or above `fail_on.severity` also meets `fail_on.min_confidence`,
 else `0`.
 
+**Except when nothing was graded at all**, which exits `2`. An endpoint that answers
+every request with an empty message is reachable, well-formed and useless to grade:
+each rule runs, each evaluator declines, and the finding count is zero for a reason
+that has nothing to do with the model being sound. See
+[`exit-codes.md`](exit-codes.md).
+
 ## Forwarding to a collector
 
 ```bash

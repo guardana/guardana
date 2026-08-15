@@ -123,6 +123,46 @@ def test_an_unreadable_expiry_is_refused_not_treated_as_permanent(tmp_path: Path
         read_baseline(path)
 
 
+def test_a_misspelled_waiver_key_is_refused_rather_than_read_around(tmp_path: Path) -> None:
+    """The same mistake one letter earlier, failing in the opposite direction.
+
+    `expries:` leaves the value unparsed and the waiver permanent — the outcome the
+    test above exists to prevent, reached by a route that test cannot see. Measured
+    on the released build: `baseline verify` reported the waiver "still active" and
+    exited `0`, and a scan waived a hardcoded secret whose acceptance had lapsed
+    seven months earlier.
+
+    Every other hand-written document here refuses an unknown key — profile, YAML
+    rule, trace span, contract assertion, pack manifest. This was the one that read
+    around it, and it is the one document whose whole job is to stop a gate firing.
+    """
+    path = _write(
+        tmp_path,
+        {"version": 2, "waivers": [{"fingerprint": "abc", "expries": "2026-01-01"}]},
+    )
+
+    with pytest.raises(BaselineError, match="expries"):
+        read_baseline(path)
+
+
+def test_the_waiver_that_typo_was_meant_to_be_loads_and_lapses(tmp_path: Path) -> None:
+    """The inversion, so the refusal above cannot be satisfied by refusing everything."""
+    path = _write(
+        tmp_path,
+        {"version": 2, "waivers": [{"fingerprint": "abc", "expires": "2026-01-01"}]},
+    )
+
+    assert read_baseline(path).active(_TODAY) == frozenset()
+
+
+def test_a_misspelled_top_level_key_is_refused(tmp_path: Path) -> None:
+    """`waiverz:` waives nothing and says nothing — a gate somebody thinks they set."""
+    path = _write(tmp_path, {"version": 2, "waiverz": [{"fingerprint": "abc"}]})
+
+    with pytest.raises(BaselineError, match="waiverz"):
+        read_baseline(path)
+
+
 def test_load_baseline_excludes_expired_waivers(tmp_path: Path) -> None:
     """The compatibility shim must not be the place the expiry gets forgotten."""
     path = _write(

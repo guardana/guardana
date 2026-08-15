@@ -185,7 +185,15 @@ have; one that appeared is a check nobody reviewed running against production.
 | the build matches the lock | pass | `0` |
 | the build has drifted | fail | `1` |
 | nothing installed declares a manifest, so there is nothing to pin | **indeterminate** | `2` |
-| the lock could not be read | refused | `3` |
+| the lock could not be read, or was taken against another `extension_api` | refused | `3` |
+
+**A lock from a different extension contract is refused rather than compared.**
+`extension_api` is what says which `Rule` shape the digests beside it were computed
+from, and `Rule.digest()` covers the fields of `RuleMeta` — so a contract that moved
+is exactly what makes two digests incomparable even when they are equal. Reported as
+drift it would flag every rule as `changed` with a detail naming the wrong cause; the
+answer to all of them is one line, so the command says that line. Regenerate the
+lock.
 
 `--check` never writes. A check that created the file it was asked to compare
 against would pass on every first run, which is the one run nobody looks at.

@@ -159,6 +159,12 @@ If the header says `truncated`, or the file exceeds a read ceiling, then a rule 
 nothing reports `inconclusive`, because the step it needed may be in the part that is
 missing.
 
+When *every* rule ends up there, the run exits `2`. A trace cut short before anything
+gradable happened is a run that established nothing, which is the same outcome as a
+trace no rule could read at all — it just arrives with a full rule count in front of
+it. This matters more the more traces are produced by a live recorder, because a
+session that ends when the process does is `unterminated` by construction.
+
 ## Options
 
 | Option | Meaning |

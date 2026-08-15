@@ -238,6 +238,19 @@ string, and so does a turn that carried only tool calls — and the alternative 
 `canary` reporting a confident pass because the marker was not in a reply that
 contained nothing.
 
+**The same answer covers a model that did nothing.** A run in which the model
+neither spoke nor reached for a tool leaves `tool_calls` empty exactly like a model
+that judged the task needed none, and only one of those demonstrated judgement — so
+the `tool_call` evaluator, `guardana.agent.excessive_tool_use` and
+`guardana.output.secrets` all decline rather than reporting restraint they never
+observed.
+
+**And a run in which *nothing* reached a verdict is `indeterminate`, with no switch
+in front of it.** Zero rules running has always been that; every rule running and
+every one declining is the same fact reached by a different route, and it is what an
+endpoint that stopped answering produces. `fail_on_inconclusive` stays opt-in for
+the ordinary case, where some checks went dark and others did not.
+
 ### Measured confidence, not asserted confidence
 
 Every dynamic finding carries a confidence — and `guardana.core.calibration`

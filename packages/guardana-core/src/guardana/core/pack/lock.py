@@ -213,6 +213,32 @@ def lock_from_dict(raw: object, source: str) -> Lock:
     )
 
 
+def incomparable(locked: Lock, installed: Lock) -> str | None:
+    """Why these two locks cannot be compared at all, or None when they can.
+
+    Asked before `compare`, because this is not a difference between two builds —
+    it is the two builds not sharing the vocabulary a difference would be expressed
+    in. `Rule.digest()` covers the fields of `RuleMeta`, and `extension_api` moving
+    is precisely what changes those fields, so a digest taken under one contract and
+    one taken under another are not the same measurement even when they are equal.
+
+    This is the comparison `_api` refuses a lock without the field *for*. It was
+    required on read from the first release and read by nothing, so a lock taken
+    against another contract reported every pack as matching.
+
+    Reported as a refusal rather than as drift: every rule would come back `changed`
+    with a detail naming the wrong cause, and the answer to all of them is the one
+    sentence below.
+    """
+    if locked.extension_api != installed.extension_api:
+        return (
+            f"the lock was taken against extension_api {locked.extension_api} and this "
+            f"build implements {installed.extension_api}, so what it pins was measured "
+            f"under a different contract — regenerate it with `guardana pack lock`"
+        )
+    return None
+
+
 def compare(locked: Lock, installed: Lock) -> tuple[Drift, ...]:
     """Every way what is installed differs from what was locked.
 

@@ -131,6 +131,33 @@ class ScanResult:
         """How many rules ran. Derived, never stored, so it cannot drift from the names."""
         return len(self.rules_run)
 
+    @property
+    def verified_nothing(self) -> bool:
+        """Whether this run reached no conclusion at all, about anything.
+
+        A rule concludes by finding something, by finding something a baseline
+        accepted, or by running and leaving no `unverified` entry behind. A rule
+        that ran and could only decline concluded nothing — and a run made entirely
+        of those established exactly as much as a run that executed no rule.
+
+        Which is the point: `rules_run` being empty is already an unconditional
+        `indeterminate`, and it counts *executions*. An endpoint that answers every
+        request with an empty message makes every rule execute and none of them
+        grade, so the run passes that guard with a full count and a verdict it did
+        not earn.
+
+        Deliberately not the same question as `fail_on_inconclusive`, which is a
+        preference about *some* checks going dark and stays opt-in. This one is the
+        whole run, and no toggle stands in front of it.
+        """
+        declined = {f.rule_id for f in self.unverified}
+        concluded = (
+            {f.rule_id for f in self.findings}
+            | {f.rule_id for f in self.waived}
+            | (set(self.rules_run) - declined)
+        )
+        return not concluded
+
     def max_severity(self) -> Severity | None:
         """Return the worst severity found, or None on a clean result."""
         if not self.findings:

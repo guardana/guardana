@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+**A run in which every check declined reported `pass` and exited `0`.** Found by
+running the released 0.20.0 against an endpoint that answers every request with an
+empty message — a rate-limited gateway, a content filter and a wrong model name all
+produce exactly that. Twenty-three checks, every one of them reporting it could not
+grade, and the saved run recorded `gate: pass` for a collector to store.
+
+The engine has had an unconditional guard for this since 0.7 — "nothing was
+verified, so a pass would be a confident all-clear on a target nothing looked at" —
+and it counted **executions**: a rule that ran and declined cleared it exactly like a
+rule that ran and concluded. It now asks whether anything reached a verdict.
+`fail_on_inconclusive` is unchanged and still opt-in, because it answers a different
+question: *some* checks going dark is a preference, and a run with nothing to show
+is not one. A run where at least one check concluded still exits `0`.
+
+Three checks were also awarding a pass for silence, which is why the guard above had
+something to clear in the first place:
+
+- `guardana.output.secrets` scanned a blank reply, found no secret in it, and
+  reported a clean output. `Exchange.reply_text` has treated a blank turn as silence
+  for every evaluator since 0.12; this rule reads the raw string and never asked.
+- `guardana.agent.excessive_tool_use` read "no destructive tool was called" off a
+  reply that carried no text and no call at all. Restraint and silence leave the
+  same trace, and only one of them is a model demonstrating judgement.
+- the `tool_call` evaluator — and so `guardana.agent.tool_argument_scope` — graded a
+  run in which the model never said or did anything as "stayed within the tools the
+  task called for".
+
+The same false green is closed in the report itself: the human renderer had four
+ways of denying its own tick and now has a fifth, and JUnit no longer renders a
+suite of nothing but `<skipped>` as `failures="0" errors="0"`, which every dashboard
+draws green.
+
+**SARIF called an invocation successful over a run whose coverage was demanded and
+missing.** Found while closing the above, and older than it. `executionSuccessful`
+exists — in its own words — to stop a viewer reading an empty result list as a clean
+run, and it asked about two of the four reasons a run is not entitled to a verdict:
+a check that could not run, and a run cut short. A dimension named in
+`trace.require`, or one a security contract assertion needs, is the one channel with
+no `fail_on_*` switch in front of it anywhere else in this codebase, and in SARIF —
+the format a code-scanning dashboard reads — it produced `executionSuccessful: true`
+with no results. Both that and the run-verified-nothing case are now false, each
+with a notification saying which evidence was missing, because a red mark with no
+reason is a channel people learn to skip.
+
+**A one-letter typo in a baseline turned a lapsed waiver into a permanent one.**
+`expries:` instead of `expires:` — the key was read as absent, the waiver never
+lapsed, `guardana baseline verify` reported it "still active" and exited `0`, and a
+scan went on waiving a hardcoded secret whose acceptance had run out seven months
+earlier. Unknown keys are now refused, at the top level and inside a waiver.
+
+Every other hand-written document here already refused them: a profile, a YAML rule,
+a trace span, a contract assertion and a pack manifest all name the key and stop. The
+baseline is the one document whose whole job is to stop a gate firing, and it was the
+one reading around a typo — while the loader immediately below it refuses an
+unreadable *date* for precisely this reason, in a comment saying so.
+
+**`guardana pack lock --check` never compared `extension_api`.** The field is
+required on read, with a stated reason — "a lock that does not say which contract it
+was taken against cannot be compared against a build that implements a different
+one" — and nothing compared it. A lock taken against another extension contract
+reported "1 pack(s) match" and exited `0`. It is now refused with exit `3` and one
+sentence, rather than reported as drift: `Rule.digest()` covers the fields of
+`RuleMeta`, so a moving contract would flag every rule as `changed` with a detail
+naming the wrong cause.
+
+**The gate that reads the persisted-schema inventory off the source could not see
+the baseline.** It looked for constants named `*_SCHEMA_VERSION`; the baseline's is
+`BASELINE_VERSION`, so the one document with no round-trip test was also the one
+document invisible to the test that exists to notice that — for four releases, while
+the 1.0 entry criteria named it as a published schema in writing. The inventory is
+now every module-level `*VERSION` constant, and each is either gated or recorded as
+not-a-document with a reason. The baseline has its round-trip gate.
+
 ## [0.20.0] - 2026-08-12 — the pack author's last mile, and every persisted document read back
 
 ### Added

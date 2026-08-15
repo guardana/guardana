@@ -146,6 +146,18 @@ class ToolCallReply:
     text: str | None
     tool_calls: tuple[ToolCall, ...]
 
+    @property
+    def is_silent(self) -> bool:
+        """Whether this reply carried nothing at all: no prose and no call.
+
+        The one shape a tool-offering check must not read as restraint. "It did not
+        reach for the shell" is a verdict about a model that answered; a model that
+        returned an empty message reached for nothing the way a disconnected one
+        does. Both leave `tool_calls` empty, and only one of them demonstrated
+        judgement.
+        """
+        return not self.tool_calls and not (self.text or "").strip()
+
 
 @runtime_checkable
 class ToolCallingTransport(Protocol):

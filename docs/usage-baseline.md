@@ -68,6 +68,23 @@ finding is fixed by not seeing it, and a check that did not run produces exactly
 that absence. Until 0.7.1 one broken rule deleted the waiver, the reason and the
 approver, printed "is fixed", and exited `0`.
 
+## A typo is refused, never read around
+
+Unknown keys raise — at the top level and inside a waiver. The reason is one letter
+long:
+
+```yaml
+waivers:
+  - fingerprint: 705c242957abe403
+    expries: 2026-01-01      # refused since 0.21.0
+```
+
+Read around, that waiver has no expiry and never lapses, `verify` reports it "still
+active", and the finding stays waived indefinitely. It is the one mistake this file
+is least able to survive, and until 0.21.0 it was the one mistake this file did not
+catch — while the parser beside it already refused an unreadable *date* for exactly
+that reason.
+
 ## Versions
 
 Version 1 baselines still load — their waivers have no expiry and are reported as

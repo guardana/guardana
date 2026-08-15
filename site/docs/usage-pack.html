@@ -341,12 +341,19 @@ have; one that appeared is a check nobody reviewed running against production.</
 <td><code>2</code></td>
 </tr>
 <tr>
-<td>the lock could not be read</td>
+<td>the lock could not be read, or was taken against another <code>extension_api</code></td>
 <td>refused</td>
 <td><code>3</code></td>
 </tr>
 </tbody>
 </table></div>
+<p><strong>A lock from a different extension contract is refused rather than compared.</strong>
+<code>extension_api</code> is what says which <code>Rule</code> shape the digests beside it were computed
+from, and <code>Rule.digest()</code> covers the fields of <code>RuleMeta</code> — so a contract that moved
+is exactly what makes two digests incomparable even when they are equal. Reported as
+drift it would flag every rule as <code>changed</code> with a detail naming the wrong cause; the
+answer to all of them is one line, so the command says that line. Regenerate the
+lock.</p>
 <p><code>--check</code> never writes. A check that created the file it was asked to compare
 against would pass on every first run, which is the one run nobody looks at.</p>
 <h2 id="guardanas-own-pack-has-one">Guardana's own pack has one</h2>

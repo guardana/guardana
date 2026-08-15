@@ -144,6 +144,18 @@ rule that errored, or a run cut short — and exits <code>2</code>. The command 
 finding is fixed by not seeing it, and a check that did not run produces exactly
 that absence. Until 0.7.1 one broken rule deleted the waiver, the reason and the
 approver, printed &quot;is fixed&quot;, and exited <code>0</code>.</p>
+<h2 id="a-typo-is-refused-never-read-around">A typo is refused, never read around</h2>
+<p>Unknown keys raise — at the top level and inside a waiver. The reason is one letter
+long:</p>
+<pre><code class="language-yaml">waivers:
+  - fingerprint: 705c242957abe403
+    expries: 2026-01-01      # refused since 0.21.0
+</code></pre>
+<p>Read around, that waiver has no expiry and never lapses, <code>verify</code> reports it &quot;still
+active&quot;, and the finding stays waived indefinitely. It is the one mistake this file
+is least able to survive, and until 0.21.0 it was the one mistake this file did not
+catch — while the parser beside it already refused an unreadable <em>date</em> for exactly
+that reason.</p>
 <h2 id="versions">Versions</h2>
 <p>Version 1 baselines still load — their waivers have no expiry and are reported as
 such. A file from a <em>newer</em> version is refused rather than read optimistically:

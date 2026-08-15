@@ -137,6 +137,21 @@ class _Inconclusive(Rule):
         )
 
 
+class _Clean(Rule):
+    """Runs, reads the target, finds nothing. The conclusion that leaves no trace."""
+
+    meta = RuleMeta(
+        "guardana.clean.demo",
+        "clean",
+        Severity.HIGH,
+        TargetKind.ARTIFACT,
+        required_capabilities=frozenset({Capability.READ_FILES}),
+    )
+
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        return ()
+
+
 def test_inconclusive_finding_is_unverified_not_a_finding(tmp_path: Path) -> None:
     # The check ran but could not reach a verdict: it must be visible (unverified),
     # never dropped into silence and never counted as a confirmed finding.
@@ -149,12 +164,25 @@ def test_inconclusive_finding_is_unverified_not_a_finding(tmp_path: Path) -> Non
 
 
 def test_gate_does_not_fail_on_inconclusive_by_default(tmp_path: Path) -> None:
-    result = _runner(_Inconclusive()).run(ArtifactTarget(tmp_path))
+    # Beside a rule that did conclude, on purpose: `fail_on_inconclusive` is about
+    # *some* checks going dark, and a run where every one of them did is
+    # indeterminate on its own evidence whatever this switch says.
+    result = _runner(_Inconclusive(), _Clean()).run(ArtifactTarget(tmp_path))
     assert gate(result, Policy(fail_on=FailOn(severity=Severity.HIGH))) is False
 
 
-def test_gate_fails_on_inconclusive_when_opted_in(tmp_path: Path) -> None:
+def test_gate_fails_when_every_rule_that_ran_could_only_decline(tmp_path: Path) -> None:
+    # An endpoint answering every request with an empty message: each rule runs and
+    # none of them grades. `rules_run` counts executions, so the run used to clear
+    # the "nothing was verified" guard with a full count and be recorded `gate: pass`.
     result = _runner(_Inconclusive()).run(ArtifactTarget(tmp_path))
+
+    assert result.rules_run_count == 1
+    assert gate(result, Policy(fail_on=FailOn(severity=Severity.CRITICAL))) is True
+
+
+def test_gate_fails_on_inconclusive_when_opted_in(tmp_path: Path) -> None:
+    result = _runner(_Inconclusive(), _Clean()).run(ArtifactTarget(tmp_path))
     policy = Policy(fail_on=FailOn(severity=Severity.HIGH, fail_on_inconclusive=True))
     assert gate(result, policy) is True
 

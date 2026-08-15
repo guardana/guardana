@@ -152,10 +152,19 @@ fine&quot;. A CI job that treats any non-zero as a failure is <em>correct</em> b
 gets finer control only if it asks for it — the safe reading is the default
 reading.</p>
 <p><strong><code>2</code> never means &quot;nothing was found&quot;.</strong> It means the question was not answered:
-no rule ran, a check could not run under <code>fail_on_error</code>, one side of a comparison
-never finished, or <strong>coverage the operator demanded was not there</strong> — a dimension
-named in <code>trace.require</code>, or one an assertion in a security contract needs. If
-indeterminate and clean shared a code, a broken setup would read as a green build.</p>
+no rule ran, <strong>no rule that ran reached a verdict</strong>, a check could not run under
+<code>fail_on_error</code>, one side of a comparison never finished, or <strong>coverage the operator
+demanded was not there</strong> — a dimension named in <code>trace.require</code>, or one an assertion
+in a security contract needs. If indeterminate and clean shared a code, a broken
+setup would read as a green build.</p>
+<p>The second of those is worth stating on its own, because it is the one that looks
+like a completed run. An endpoint answering every request with an empty message — a
+rate-limited gateway, a content filter, a wrong model name — makes every rule
+execute and every evaluator decline. The rule count is full, the finding count is
+zero, and nothing was established. That is <code>2</code>, and no <code>fail_on_*</code> switches it off:
+<code>fail_on_inconclusive</code> decides what to do when <em>some</em> checks go dark, which is a
+preference, and a run with nothing at all to show is not one. One check reaching a
+verdict is enough to make <code>0</code> honest again.</p>
 <p>That last case is the only one no <code>fail_on_*</code> setting can switch off, and
 deliberately: every other branch covers checks nobody specifically asked for, while
 this one was asked for by name. <code>fail_on_skipped</code> defaults to off, so without it the
@@ -186,6 +195,15 @@ AI system than the one under test. <code>baseline create</code>, <code>baseline 
 <code>scan --write-baseline</code> produce <code>2</code> when a check did not run, because a snapshot
 taken over a rule that never ran is missing whatever it would have found.</p>
 <p>An unused code is better than a second table.</p>
+<h3 id="changed-in-0210">Changed in 0.21.0</h3>
+<p><strong>A run where every check declined now exits <code>2</code> instead of <code>0</code>.</strong> The guard for
+&quot;nothing was verified&quot; counted rules that <em>ran</em>, and a rule that ran and could not
+grade cleared it exactly like one that ran and concluded. Measured against a live
+endpoint returning an empty message: twenty-three checks, every one of them
+reporting it could not grade, exit <code>0</code>, and <code>gate: pass</code> written into the saved run.</p>
+<p>A pipeline that was green because its endpoint had stopped answering will now be
+red. That is the change working, and it is the only situation it affects — a run
+with a single concluded check is unaffected.</p>
 <h3 id="fixed-in-071">Fixed in 0.7.1</h3>
 <p>Two commands did not honour the table it took 0.7 to write.</p>
 <ul>

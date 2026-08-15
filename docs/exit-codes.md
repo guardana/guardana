@@ -32,10 +32,20 @@ gets finer control only if it asks for it — the safe reading is the default
 reading.
 
 **`2` never means "nothing was found".** It means the question was not answered:
-no rule ran, a check could not run under `fail_on_error`, one side of a comparison
-never finished, or **coverage the operator demanded was not there** — a dimension
-named in `trace.require`, or one an assertion in a security contract needs. If
-indeterminate and clean shared a code, a broken setup would read as a green build.
+no rule ran, **no rule that ran reached a verdict**, a check could not run under
+`fail_on_error`, one side of a comparison never finished, or **coverage the operator
+demanded was not there** — a dimension named in `trace.require`, or one an assertion
+in a security contract needs. If indeterminate and clean shared a code, a broken
+setup would read as a green build.
+
+The second of those is worth stating on its own, because it is the one that looks
+like a completed run. An endpoint answering every request with an empty message — a
+rate-limited gateway, a content filter, a wrong model name — makes every rule
+execute and every evaluator decline. The rule count is full, the finding count is
+zero, and nothing was established. That is `2`, and no `fail_on_*` switches it off:
+`fail_on_inconclusive` decides what to do when *some* checks go dark, which is a
+preference, and a run with nothing at all to show is not one. One check reaching a
+verdict is enough to make `0` honest again.
 
 That last case is the only one no `fail_on_*` setting can switch off, and
 deliberately: every other branch covers checks nobody specifically asked for, while
@@ -74,6 +84,18 @@ AI system than the one under test. `baseline create`, `baseline update` and
 taken over a rule that never ran is missing whatever it would have found.
 
 An unused code is better than a second table.
+
+### Changed in 0.21.0
+
+**A run where every check declined now exits `2` instead of `0`.** The guard for
+"nothing was verified" counted rules that *ran*, and a rule that ran and could not
+grade cleared it exactly like one that ran and concluded. Measured against a live
+endpoint returning an empty message: twenty-three checks, every one of them
+reporting it could not grade, exit `0`, and `gate: pass` written into the saved run.
+
+A pipeline that was green because its endpoint had stopped answering will now be
+red. That is the change working, and it is the only situation it affects — a run
+with a single concluded check is unaffected.
 
 ### Fixed in 0.7.1
 

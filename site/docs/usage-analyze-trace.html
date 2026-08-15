@@ -273,6 +273,11 @@ half.</p>
 <strong>found</strong> something still reports it — the evidence is real — and a rule that found
 nothing reports <code>inconclusive</code>, because the step it needed may be in the part that is
 missing.</p>
+<p>When <em>every</em> rule ends up there, the run exits <code>2</code>. A trace cut short before anything
+gradable happened is a run that established nothing, which is the same outcome as a
+trace no rule could read at all — it just arrives with a full rule count in front of
+it. This matters more the more traces are produced by a live recorder, because a
+session that ends when the process does is <code>unterminated</code> by construction.</p>
 <h2 id="options">Options</h2>
 <div class="table-wrap"><table>
 <thead>

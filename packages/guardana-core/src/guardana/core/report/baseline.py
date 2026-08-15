@@ -9,6 +9,7 @@ the one place the engine deliberately does not fail on a finding, so it is kept
 deliberately narrow and loud about malformed input.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -22,6 +23,17 @@ if TYPE_CHECKING:  # imported lazily below; the report package is downstream of 
 
 _REASON_PLACEHOLDER = "accepted — REPLACE THIS with why this finding is acceptable"
 _APPROVER_PLACEHOLDER = "REPLACE THIS with who accepted it"
+
+_TOP_LEVEL_KEYS = frozenset({"version", "waivers"})
+_WAIVER_KEYS = frozenset({"fingerprint", "rule", "location", "reason", "approved_by", "expires"})
+"""What a baseline may contain. Anything else is refused rather than ignored.
+
+`_expiry` below refuses an unreadable *date* because a typo'd one that silently
+became a permanent waiver is the mistake that field exists to prevent. A typo in
+the *key* reaches the same permanent waiver a letter earlier, and reading around it
+is how `expries:` turned a lapsed acceptance into one with no end — reported as
+"still active" by the command whose job is to say otherwise.
+"""
 BASELINE_VERSION = 2
 """Version 2 adds an approver and an expiry to each waiver.
 
@@ -119,6 +131,7 @@ def read_baseline(path: Path) -> Baseline:
         return Baseline(version=BASELINE_VERSION)
     if not isinstance(raw, dict):
         raise BaselineError(f"invalid baseline {path}: the top level must be a mapping")
+    _refuse_unknown(raw.keys(), _TOP_LEVEL_KEYS, "baseline", path)
     entries = raw.get("waivers", [])
     if not isinstance(entries, list):
         raise BaselineError(f"invalid baseline {path}: 'waivers' must be a list")
@@ -132,9 +145,28 @@ def read_baseline(path: Path) -> Baseline:
     return Baseline(waivers=tuple(_waiver(entry, path) for entry in entries), version=version)
 
 
+def _refuse_unknown(
+    present: Iterable[object], allowed: frozenset[str], what: str, path: Path
+) -> None:
+    """Raise on any key this build does not know, naming the keys.
+
+    Refused rather than ignored, because the two ways this file can be wrong point
+    in opposite directions: an unknown key at the top level waives nothing, and an
+    unknown key inside a waiver waives forever.
+    """
+    unknown = sorted(str(key) for key in present if key not in allowed)
+    if unknown:
+        raise BaselineError(
+            f"invalid baseline {path}: unknown {what} key(s): {', '.join(unknown)} — "
+            f"a misspelled key is read as absent, and an absent 'expires' is a waiver "
+            f"that never lapses"
+        )
+
+
 def _waiver(entry: object, path: Path) -> Waiver:
     if not isinstance(entry, dict) or not isinstance(entry.get("fingerprint"), str):
         raise BaselineError(f"invalid baseline {path}: every waiver needs a string 'fingerprint'")
+    _refuse_unknown(entry.keys(), _WAIVER_KEYS, "waiver", path)
     return Waiver(
         fingerprint=entry["fingerprint"],
         rule=str(entry.get("rule") or ""),

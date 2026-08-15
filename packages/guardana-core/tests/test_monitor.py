@@ -9,6 +9,13 @@ _WATCHED = ("guardana.ep.rule0", "guardana.ep.rule1")
 rules, so a rule appearing only in the later cycle would be a change of plan
 rather than the change of behaviour these tests are about."""
 
+_STEADY = "guardana.ep.steady"
+"""A rule that keeps reaching a conclusion, in every cycle that blinds another one.
+
+Not decoration. A cycle where *every* rule declined is `indeterminate` on its own
+evidence, so without this the gate would raise the alert and these tests would be
+pinning the gate instead of the change detector they are named for."""
+
 
 def _result(*severities: Severity) -> ScanResult:
     findings = tuple(
@@ -125,7 +132,7 @@ def _unverified(count: int) -> ScanResult:
         )
         for i in range(count)
     )
-    return ScanResult((), rules_run=_WATCHED, rules_skipped=(), unverified=ungraded)
+    return ScanResult((), rules_run=(*_WATCHED, _STEADY), rules_skipped=(), unverified=ungraded)
 
 
 def test_alerts_when_unverified_count_rises_above_baseline() -> None:
@@ -157,7 +164,7 @@ def _cycle(
     rule: str = "guardana.ep.watched",
     severity: Severity | None = None,
     outcome: str = "fail",
-    ran: tuple[str, ...] = ("guardana.ep.watched",),
+    ran: tuple[str, ...] = ("guardana.ep.watched", _STEADY),
 ) -> ScanResult:
     """One monitored cycle: at most one finding, so counts stay flat while state moves."""
     if severity is None:
@@ -221,8 +228,8 @@ def test_alerts_when_a_proven_problem_stops_being_gradable() -> None:
 def test_alerts_when_a_rule_stops_running_mid_watch() -> None:
     """A monitored model whose checks quietly stop is the failure this whole channel exists for."""
     alerts = _watch(
-        _cycle(ran=("guardana.ep.watched", "guardana.ep.other")),
-        _cycle(ran=("guardana.ep.watched",)),
+        _cycle(ran=("guardana.ep.watched", "guardana.ep.other", _STEADY)),
+        _cycle(ran=("guardana.ep.watched", _STEADY)),
         policy=_lenient(),
     )
 

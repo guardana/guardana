@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 from guardana.core.gate import GateOutcome, exit_code_for
 from guardana.core.manifest import RunManifest
-from guardana.core.report import CheckError, Finding, ScanResult, split_ref
+from guardana.core.report import CheckError, CoverageShortfall, Finding, ScanResult, split_ref
 from guardana.core.severity import Severity
 
 _LEVEL = {
@@ -115,13 +115,31 @@ def _invocation(result: ScanResult, manifest: RunManifest | None) -> dict[str, o
     """Build `runs[].invocations[0]` — SARIF's own place for how the run itself went.
 
     `executionSuccessful` is what stops a viewer reading an empty result list as
-    a clean run, so it is false whenever a check could not run or the run was cut
-    short. The timestamps and exit code come from the manifest when there is one;
-    SARIF marks them optional, and inventing them would be worse than omitting.
+    a clean run, so it is false for **every** reason a run is not entitled to a
+    verdict — the same four the gate uses. It asked about two of them for three
+    releases: a run whose demanded coverage was missing, and a run in which not one
+    check reached a verdict, both reported a successful invocation over an empty
+    result list, which is precisely the shape this field exists to deny.
+
+    The timestamps and exit code come from the manifest when there is one; SARIF
+    marks them optional, and inventing them would be worse than omitting.
     """
+    unmet = [_coverage_notification(gap) for gap in result.coverage_shortfall]
+    nothing_verified = (
+        [_nothing_verified_notification(result.rules_run_count)] if result.verified_nothing else []
+    )
     invocation: dict[str, object] = {
-        "executionSuccessful": not result.errors and result.stopped_by is None,
-        "toolExecutionNotifications": [_notification(e) for e in result.errors],
+        "executionSuccessful": not (
+            result.errors
+            or result.stopped_by is not None
+            or result.coverage_shortfall
+            or result.verified_nothing
+        ),
+        "toolExecutionNotifications": [
+            *(_notification(e) for e in result.errors),
+            *unmet,
+            *nothing_verified,
+        ],
     }
     if manifest is None:
         return invocation
@@ -174,4 +192,30 @@ def _notification(error: CheckError) -> dict[str, object]:
         "level": "error",
         "message": {"text": f"{error.source} did not run ({error.stage}): {error.reason}"},
         "descriptor": {"id": f"guardana.check_error.{error.stage}"},
+    }
+
+
+def _coverage_notification(gap: CoverageShortfall) -> dict[str, object]:
+    """Say which demanded evidence was missing, not only that the run failed.
+
+    A viewer told an invocation was unsuccessful and not told why has a red mark and
+    no next step, which is how a channel stops being read.
+    """
+    return {
+        "level": "error",
+        "message": {"text": f"{gap.name} was demanded and not available: {gap.detail}"},
+        "descriptor": {"id": f"guardana.coverage_shortfall.{gap.kind}"},
+    }
+
+
+def _nothing_verified_notification(ran: int) -> dict[str, object]:
+    return {
+        "level": "error",
+        "message": {
+            "text": (
+                f"{ran} check(s) ran and not one of them reached a verdict, so this run "
+                f"established nothing"
+            )
+        },
+        "descriptor": {"id": "guardana.coverage_shortfall.nothing_verified"},
     }

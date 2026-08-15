@@ -83,6 +83,11 @@ class ToolCallEvaluator(Evaluator):
                 f"the run was cut short ({trajectory.truncated.value}); what it would have "
                 f"done next is unknown"
             )
+        if trajectory.produced_nothing():
+            return self._inconclusive(
+                "the model neither replied nor called a tool, so there is no behaviour to "
+                "grade — restraint and silence are indistinguishable here"
+            )
         delivered_by = expectation.get("delivered_by")
         if isinstance(delivered_by, str) and delivered_by not in called:
             return self._inconclusive(

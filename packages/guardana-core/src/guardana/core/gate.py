@@ -66,10 +66,16 @@ def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them woul
     defaulting to off would otherwise turn "your contract could not be checked" into
     exit `0`.
 
-    **Everything else that leaves a question open is `INDETERMINATE`** — no rule
-    ran at all, a check could not run under `fail_on_error`, a check ran and could
-    not grade under `fail_on_inconclusive`, or a check the target could not
-    support was skipped under `fail_on_skipped`.
+    **A run that reached no conclusion is `INDETERMINATE`, with no toggle either.**
+    No rule ran at all, or every rule that ran could only decline: both are the same
+    fact — nothing was established — and the second is what a model answering with
+    an empty message produces. `fail_on_inconclusive` stays the switch for *some*
+    checks going dark, which is a preference; a run with nothing to show is not.
+
+    **Everything else that leaves a question open is `INDETERMINATE`** — a check
+    could not run under `fail_on_error`, a check ran and could not grade under
+    `fail_on_inconclusive`, or a check the target could not support was skipped
+    under `fail_on_skipped`.
     """
     if result.stopped_by is not None:
         return GateOutcome.INDETERMINATE
@@ -84,9 +90,12 @@ def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them woul
     if result.coverage_shortfall:
         return GateOutcome.INDETERMINATE
     # Nothing was verified, so a pass would be a confident all-clear on a target
-    # nothing looked at — a misconfigured include/exclude, an empty registry, or
-    # a target no installed rule applies to.
-    if not result.rules_run:
+    # nothing looked at — a misconfigured include/exclude, an empty registry, a
+    # target no installed rule applies to, or an endpoint that stopped answering.
+    # This used to read `not result.rules_run`, which counts executions: a model
+    # replying with an empty message to all of them ran every rule, graded none,
+    # and was recorded as `gate: pass`.
+    if result.verified_nothing:
         return GateOutcome.INDETERMINATE
     if result.errors and threshold.fail_on_error:
         return GateOutcome.INDETERMINATE

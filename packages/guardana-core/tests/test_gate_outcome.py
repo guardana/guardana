@@ -46,6 +46,50 @@ def test_a_run_that_ran_no_rules_is_indeterminate_not_failed() -> None:
     assert gate_outcome(_result(rules_run=()), Policy()) is GateOutcome.INDETERMINATE
 
 
+def test_a_run_where_every_rule_declined_is_indeterminate_not_a_pass() -> None:
+    """The same fact as an empty `rules_run`, and it used to reach the opposite verdict.
+
+    An endpoint that answers every request with an empty message makes each rule run
+    and none of them grade. Counting executions, that is a full run; counting
+    conclusions, nothing was established about anything — and the saved run recorded
+    `gate: pass` over twenty-three checks that all declined.
+    """
+    result = _result(unverified=(_finding(outcome="inconclusive"),))
+
+    assert gate_outcome(result, Policy()) is GateOutcome.INDETERMINATE
+
+
+def test_one_rule_that_concluded_is_enough_to_be_entitled_to_a_verdict() -> None:
+    """The other direction, so the rule above cannot be satisfied by failing everything.
+
+    `fail_on_inconclusive` stays the switch for *some* checks going dark. This is
+    only about a run that reached no conclusion at all.
+    """
+    result = _result(
+        rules_run=(_RULE, "guardana.demo.other"),
+        unverified=(_finding(outcome="inconclusive"),),
+    )
+
+    assert gate_outcome(result, Policy()) is GateOutcome.PASS
+
+
+def test_a_rule_that_both_found_and_declined_has_concluded() -> None:
+    """A rule reporting one finding and one ungradable check answered its question once."""
+    finding = Finding(_RULE, Severity.LOW, "t", (), "ref", Evidence(summary="s"))
+    result = _result(findings=(finding,), unverified=(_finding(outcome="inconclusive"),))
+
+    # Below the failure bar, so the findings loop does not decide this one.
+    assert gate_outcome(result, Policy(fail_on=FailOn(severity=Severity.HIGH))) is GateOutcome.PASS
+
+
+def test_a_waived_finding_is_a_conclusion_somebody_accepted() -> None:
+    """A baseline moves a finding, it does not un-answer the question that produced it."""
+    waived = Finding(_RULE, Severity.HIGH, "t", (), "ref", Evidence(summary="s"))
+    result = _result(waived=(waived,), unverified=(_finding(outcome="inconclusive"),))
+
+    assert gate_outcome(result, Policy()) is GateOutcome.PASS
+
+
 def test_a_check_that_could_not_run_is_indeterminate() -> None:
     result = _result(errors=(CheckError(source=_RULE, stage="run", reason="boom"),))
     assert gate_outcome(result, Policy()) is GateOutcome.INDETERMINATE

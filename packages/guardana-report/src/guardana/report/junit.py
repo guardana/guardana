@@ -65,9 +65,28 @@ class JUnitRenderer:
                 f"      <error message={message}>{escape(gap.detail)}</error>\n"
                 f"    </testcase>"
             )
+        # And once more, for the run as a whole. Every declined check above is a
+        # `<skipped>`, which is the honest word for one of them — and a suite of
+        # nothing but skips renders green on every dashboard that reads this file.
+        # A run where not one check reached a verdict is the same fact as unmet
+        # coverage: nothing was established, and it must not look like it was.
+        if result.verified_nothing:
+            detail = (
+                f"{result.rules_run_count} check(s) ran and not one of them reached a "
+                f"verdict, so this run established nothing"
+            )
+            cases.append(
+                '    <testcase name="guardana.run" classname="guardana.coverage">\n'
+                f'      <error message="nothing was verified">{escape(detail)}</error>\n'
+                "    </testcase>"
+            )
         body = "\n".join(cases)
         skipped = len(result.unverified) + len(result.waived)
-        errors = len(result.errors) + len(result.coverage_shortfall)
+        errors = (
+            len(result.errors)
+            + len(result.coverage_shortfall)
+            + (1 if result.verified_nothing else 0)
+        )
         return (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<testsuite name="guardana" tests="{result.rules_run_count}" '

@@ -9,7 +9,15 @@ one used to be invisible, which is what let a crashed rule read as a clean one.
 import json
 from xml.etree.ElementTree import fromstring
 
-from guardana.core.report import CheckError, ScanResult
+from guardana.core.report import (
+    CheckError,
+    CoverageShortfall,
+    Evidence,
+    Finding,
+    ScanResult,
+    ShortfallKind,
+)
+from guardana.core.severity import Severity
 from guardana.core.testing import manifest_for
 from guardana.report import HumanRenderer, JsonRenderer, JUnitRenderer, SarifRenderer
 
@@ -72,3 +80,43 @@ def test_sarif_reports_a_successful_invocation_when_nothing_errored() -> None:
     run = json.loads(SarifRenderer().render(_CLEAN))["runs"][0]
     assert run["invocations"][0]["executionSuccessful"] is True
     assert run["invocations"][0]["toolExecutionNotifications"] == []
+
+
+def test_sarif_does_not_call_the_run_successful_when_demanded_coverage_was_missing() -> None:
+    """The one channel with no `fail_on_*` in front of it, and SARIF said the run succeeded.
+
+    `executionSuccessful` exists to stop a viewer reading an empty result list as a
+    clean run, and it asked about two of the four reasons a run is not entitled to a
+    verdict. A dimension an operator named in `trace.require` — or one their security
+    contract needs — is an `indeterminate` verdict everywhere else in this codebase.
+    """
+    gap = CoverageShortfall(
+        kind=ShortfallKind.MISSING_DIMENSION,
+        name="approval",
+        detail="this producer records no approvals",
+    )
+    result = ScanResult((), ("guardana.demo",), (), coverage_shortfall=(gap,))
+
+    invocation = json.loads(SarifRenderer().render(result))["runs"][0]["invocations"][0]
+
+    assert invocation["executionSuccessful"] is False
+    assert any(
+        "approval" in note["message"]["text"] for note in invocation["toolExecutionNotifications"]
+    ), "a viewer told the run failed must be able to see why"
+
+
+def test_sarif_does_not_call_the_run_successful_when_every_check_declined() -> None:
+    """The third format, the same fact: a full rule count and not one verdict."""
+    ungradable = Finding(
+        "guardana.demo",
+        Severity.HIGH,
+        "could not grade",
+        (),
+        "http://x#m",
+        Evidence(summary="no model reply to inspect"),
+    )
+    result = ScanResult((), ("guardana.demo",), (), unverified=(ungradable,))
+
+    invocation = json.loads(SarifRenderer().render(result))["runs"][0]["invocations"][0]
+
+    assert invocation["executionSuccessful"] is False

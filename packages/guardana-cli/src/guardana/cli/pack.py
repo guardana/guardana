@@ -35,6 +35,7 @@ from guardana.core.pack.lock import (
     Lock,
     catalogue_digest,
     compare,
+    incomparable,
     lock_from_dict,
     lock_of,
     lock_to_dict,
@@ -163,6 +164,11 @@ def lock(
     except (PackError, OSError, yaml.YAMLError) as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
+
+    refusal = incomparable(locked, present)
+    if refusal is not None:
+        typer.echo(f"error: {refusal}", err=True)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
     drift = compare(locked, present)
     for entry in drift:

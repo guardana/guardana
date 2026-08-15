@@ -60,6 +60,22 @@ class Trajectory:
         """Return the set of tool names the model invoked."""
         return frozenset(call.name for call in self.calls())
 
+    def produced_nothing(self) -> bool:
+        """Whether the model contributed nothing observable to this run.
+
+        Not "it called no tools" — that is how a sound model answers a task that
+        needed none, and it is a pass. This is a run in which the model neither
+        said anything nor reached for anything at any step: a rate-limited gateway,
+        a content filter, a wrong model name. There is no behaviour here to grade,
+        and "the run stayed within the tools it was offered" is true of it only in
+        the way it is true of a run that never happened.
+
+        The counterpart to `Exchange.reply_text` returning None for a blank turn.
+        That seam covers every evaluator reading text; this covers the one that
+        reads a run.
+        """
+        return not any(step.invocations or (step.text or "").strip() for step in self.steps)
+
     def render(self) -> str:
         """Render the run as readable lines — the evidence a human reads on a finding.
 

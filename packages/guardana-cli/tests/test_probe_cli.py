@@ -8,6 +8,7 @@ from guardana.cli._probe_run import _with_random_canary
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.evaluator.base import Expectation
+from guardana.core.gate import GateOutcome
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import load_report
@@ -16,7 +17,12 @@ from guardana.core.rule.scenario_rule import ScenarioRule, ScenarioStep
 from guardana.core.runner import Runner
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
-from guardana.core.testing import EchoingTransport, FailingTransport, RefusingTransport
+from guardana.core.testing import (
+    EchoingTransport,
+    FailingTransport,
+    RefusingTransport,
+    ScriptedTransport,
+)
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -75,6 +81,43 @@ def test_probe_leaking_canary_exits_one(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert result.exit_code == 1, result.output
     assert "system_prompt_leak" in result.output
+
+
+def test_probe_of_a_model_that_answers_nothing_exits_indeterminate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An endpoint replying with an empty message to everything verified nothing.
+
+    Not a hypothetical: a rate-limited gateway, a content filter and a wrong model
+    name all produce it. Every rule runs, every evaluator declines for want of a
+    reply, and the run used to print "0 finding(s)", exit `0`, and record `gate:
+    pass` in a document a collector then stores.
+    """
+    monkeypatch.setattr(endpoint_module, "transport_factory", lambda: ScriptedTransport(""))
+    saved = tmp_path / "run.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "probe",
+            "--url",
+            "http://fake",
+            "--model",
+            "m",
+            "--format",
+            "json",
+            "--output",
+            str(saved),
+        ],
+    )
+
+    assert result.exit_code == int(ExitCode.INDETERMINATE), result.output
+    report = load_report(saved)
+    assert report.result.findings == ()
+    assert report.result.unverified, "the checks must still be reported, not just counted"
+    # The verdict outlives the process: a collector reads this document, and `pass`
+    # is what it used to store about a run that established nothing.
+    assert report.manifest.result_summary.gate is GateOutcome.INDETERMINATE
 
 
 def test_probe_rejects_invalid_format(monkeypatch: pytest.MonkeyPatch) -> None:

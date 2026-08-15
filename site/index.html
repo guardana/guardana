@@ -400,7 +400,7 @@
       <ul class="checks">
         <li><strong>A budget that can't be used as an excuse.</strong> A run that hits its ceiling exits <code>6</code>, keeps what it found, and never passes — and a comparison refuses to read the missing findings as an improvement.</li>
         <li><strong>Exit codes as a contract.</strong> Eight documented meanings, pinned by a test against the docs. Nothing to parse out of human text.</li>
-        <li><strong>Unknown is never zero.</strong> A check that couldn't grade, a capability the provider didn't confirm, a cost nobody measured — each is its own outcome, never a pass.</li>
+        <li><strong>Unknown is never zero.</strong> A check that couldn't grade, a capability the provider didn't confirm, a cost nobody measured — each is its own outcome, never a pass. And when <em>nothing</em> reached a verdict — an endpoint answering every request with an empty message runs every rule and grades none — the run exits <code>2</code> with a full rule count behind it, because a green build is not something silence earns.</li>
       </ul>
     </div>
   </section>
