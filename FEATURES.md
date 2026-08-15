@@ -422,6 +422,25 @@ and writing it is what produced `resume_trace` and two crash-case fixes: a line 
 mid-write no longer costs the whole file, and a record this build cannot interpret makes
 a rule decline rather than pass.
 
+### Noise is measured, not asserted (the proving ground)
+
+The dogfood scan keeps Guardana at zero findings against its own source. It cannot say
+anything about false alarms, because this repository does not look like the ones people
+point a scanner at — and an organisation that excludes a noisy scanner has created an
+organisation-level fail-open, which makes the false-alarm rate a security property here.
+
+So there is a second ground, built in code so review reads one labelled list rather than
+a directory of files: a small AI application where every file is either a **plant**
+naming the rule that must fire on it, a **decoy** saying why it looks like a finding and
+is not, or a recorded **gap** — a hole this build genuinely does not see, written down
+instead of left out, with a test that fails the day it closes. An alarm anywhere
+unlabelled fails the gate and names the rule that raised it.
+
+The decoys are near-misses on purpose: AWS's own documented example key, a docstring
+warning against `trust_remote_code=True`, a `.env.example`, a credential read from the
+environment, a commit sha, a base64 image, a test fixture's obviously fabricated token,
+a plaintext URL nothing fetches. Easy negatives measure nothing.
+
 ### A saved run is evidence, not a screenshot (`guardana run`)
 
 `--output run.json` writes a **run manifest** alongside the findings: what was

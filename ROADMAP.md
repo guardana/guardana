@@ -308,6 +308,13 @@ separately. Three of the fourteen defects an adversarial review found in finishe
 code were things the documentation already described correctly while the code did
 something else — the failure mode a green gate is least able to see.
 
+**And noise is measured rather than asserted, as of 0.21.0.** The dogfood scan proves
+Guardana finds nothing in Guardana, which says nothing about false alarms: this
+repository does not look like the ones people point a scanner at. A second ground, built
+in code, labels every file as a plant, a decoy or a recorded gap, so recall and
+precision both fail loudly and by name. An organisation that excludes a noisy scanner
+has an organisation-level fail-open, which puts the false-alarm rate in the same
+category as performance here.
 
 
 ## Where this sits, and what the neighbours do better

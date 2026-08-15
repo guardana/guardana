@@ -69,6 +69,19 @@ rule decline**: `truncated` says where a file stopped and said nothing about a r
 that arrived and could not be interpreted, so a signed-off file with a torn line in the
 middle graded clean.
 
+**A false-alarm gate, on a repository that looks like somebody's.** The dogfood scan
+proves Guardana finds nothing in Guardana and says nothing about noise, because this
+repository does not look like the ones people point a scanner at — and a team that
+excludes a noisy scanner has an organisation-level fail-open. `proving_ground.py` builds
+a small AI application in code where every file is labelled: seven **plants** naming the
+rule that must fire, fifteen **decoys** saying why each looks like a finding and is not
+(AWS's documented example key, a docstring warning against `trust_remote_code=True`, a
+test fixture's fabricated token, a plaintext URL nothing fetches), and an alarm on
+anything unlabelled fails the gate by name. Building it found one real coverage limit —
+a plaintext URL reaching a fetch through a module constant is not seen — which is
+recorded as a labelled **gap** rather than left out, with a test that fails the day it
+closes so the label gets moved.
+
 **`examples/hermes_integrator/`** is the guide's proof: a Hermes plugin that records each
 agent session as a trace, written against `hermes-agent` 0.19.0 and verified by loading
 it through Hermes' own plugin manager. It exists to demonstrate one distinction. Hermes
