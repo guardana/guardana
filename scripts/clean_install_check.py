@@ -184,6 +184,16 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
         # reaches the network — the scripted server ships in `guardana.core.testing`
         # — but everything else is the production path, including the decision that
         # records which revision a server agreed to.
+        # The writer is a public seam a wheel could fail to carry, and its refusals
+        # are the product rather than the ergonomics: an unmapped mutating tool must
+        # not be recorded as harmless, a session nobody signed off must not read as
+        # finished, and a machine's approval must not satisfy a demand for a person.
+        Check(
+            "a producer writes a trace, continues it across processes, and refuses a bad span",
+            [python, "-c", _WRITER_SCRIPT],
+            0,
+            expect=("writer ready",),
+        ),
         Check(
             "the MCP client speaks both revisions and records the one it agreed to",
             [python, "-c", _MCP_ERAS_SCRIPT],
@@ -376,6 +386,83 @@ if not reported:
     raise SystemExit("a counter for session ids went unreported on the handshake era")
 
 print("eras ready")
+"""
+
+
+_WRITER_SCRIPT = """
+import json
+import tempfile
+from pathlib import Path
+
+from guardana.core.trace import (
+    Approval,
+    ApproverKind,
+    Dialect,
+    Dimension,
+    SinkKind,
+    SinkMap,
+    Span,
+    SpanKind,
+    ToolExecution,
+    ToolStatus,
+    TraceTruncation,
+    TraceWriteError,
+    open_trace,
+    read_trace,
+    resume_trace,
+)
+
+sinks = SinkMap({"refund": SinkKind.PAYMENT}, default=SinkKind.OTHER)
+declared = [Dimension.TOOLS, Dimension.APPROVAL, Dimension.EFFECTS]
+call = Span(
+    span_id="s1",
+    kind=SpanKind.TOOL_EXECUTION,
+    name="refund",
+    tool=ToolExecution(name="refund", status=ToolStatus.SUCCEEDED, mutates=True),
+    approvals=(Approval.granted_by_automation("policy", action="refund"),),
+)
+
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / "session.jsonl"
+    with open_trace(path, trace_id="t", producer="clean-install", instrumented=declared,
+                    sinks=sinks) as trace:
+        trace.span(call)
+    read = read_trace(path, Dialect.GUARDANA).trace
+    effect = read.spans[0].effects[0]
+    approval = read.spans[0].approvals[0]
+    assert read.truncated is None, read.truncated
+    assert effect.sink is SinkKind.PAYMENT, effect
+    assert approval.approver_kind is ApproverKind.AUTOMATED, approval
+    assert approval.approver_ref == "automated:policy", approval
+    assert json.loads(path.read_text().splitlines()[-1])["spans"] == 1
+
+    # A second process continuing the same session, and one that never signed off.
+    across = Path(directory) / "across.jsonl"
+    for step in range(2):
+        with resume_trace(across, trace_id="t", producer="clean-install",
+                          instrumented=declared, sinks=sinks) as trace:
+            trace.span(Span(span_id=f"s{step}", kind=SpanKind.TOOL_EXECUTION, name="refund",
+                            tool=ToolExecution(name="refund", mutates=True)))
+    unfinished = read_trace(across, Dialect.GUARDANA).trace
+    assert len(unfinished.spans) == 2, unfinished.spans
+    assert unfinished.truncated is TraceTruncation.UNTERMINATED, unfinished.truncated
+    resume_trace(across, trace_id="t", producer="clean-install", instrumented=declared,
+                 sinks=sinks).finish()
+    assert read_trace(across, Dialect.GUARDANA).trace.truncated is None
+
+    # The refusal the whole writer exists for: a mutating tool nobody mapped.
+    refused = Path(directory) / "refused.jsonl"
+    try:
+        with open_trace(refused, trace_id="t", producer="clean-install",
+                        instrumented=declared, sinks=sinks) as trace:
+            trace.span(Span(span_id="s1", kind=SpanKind.TOOL_EXECUTION, name="terminal",
+                            tool=ToolExecution(name="terminal", mutates=True)))
+    except TraceWriteError as exc:
+        assert "terminal" in str(exc), exc
+    else:
+        raise SystemExit("an unmapped mutating tool was recorded as harmless")
+
+print("writer ready")
 """
 
 
