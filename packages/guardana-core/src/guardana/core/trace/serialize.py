@@ -342,6 +342,9 @@ def _approval(approval: Approval) -> dict[str, Any]:
             "action": approval.action,
             "outcome": str(approval.outcome),
             "approver": approval.approver,
+            "approver_kind": (
+                str(approval.approver_kind) if approval.approver_kind is not None else None
+            ),
             "requested_at": _time(approval.requested_at),
             "decided_at": _time(approval.decided_at),
         }

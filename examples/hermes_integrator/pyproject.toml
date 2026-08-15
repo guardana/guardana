@@ -1,0 +1,23 @@
+[project]
+name = "guardana-hermes-integrator"
+version = "0.1.0"
+description = "Example integrator: record a Hermes agent session as a Guardana trace."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = ["Typing :: Typed"]
+dependencies = ["guardana-core"]
+
+# Hermes discovers pip-installed plugins through this group and calls `register(ctx)`
+# on the module the entry point names. `hermes-agent` is deliberately NOT a dependency:
+# this package must be installable and testable without it, and pinning somebody else's
+# agent would make a green build here depend on their release.
+[project.entry-points."hermes_agent.plugins"]
+guardana = "guardana_hermes"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guardana_hermes"]

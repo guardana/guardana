@@ -5,7 +5,7 @@ from enum import StrEnum
 
 from guardana.core.trace.span import Span, SpanKind
 
-TRACE_SCHEMA_VERSION = 2
+TRACE_SCHEMA_VERSION = 3
 """Version of the trace document, moved independently of the CLI.
 
 A trace is a document a user keeps and a third party writes, so principle 11
@@ -16,6 +16,12 @@ trap for every reader, including ours.
 v2 adds `Span.agent`, because a multi-agent execution records which agent performed
 each step and v1 had nowhere to put it. A v1 file still reads: the migration says
 the field is absent, which is what it was.
+
+v3 adds `Approval.approver_kind`, so "a person agreed" and "the agent's own gate
+allowed it" stop being one field, and `terminated` on the header, so a producer can
+promise a footer and have its absence read as truncation. Both are additions an
+older file simply lacks, and both mean in the older file exactly what they meant
+before: an unrecorded kind, and a file nobody promised to finish.
 """
 
 
@@ -56,6 +62,13 @@ class TraceTruncation(StrEnum):
     PRODUCER_LIMIT = "producer_limit"
     READ_LIMIT = "read_limit"
     UNTERMINATED = "unterminated"
+    RECORDS_LOST = "records_lost"
+    """The file ended properly and carries fewer spans than its footer counted.
+
+    Which is a different accident from the one above: the producer finished, and
+    something between it and here dropped lines. Reported apart from `UNTERMINATED`
+    because they point at different systems to go and look at.
+    """
 
 
 @dataclass(frozen=True, slots=True)

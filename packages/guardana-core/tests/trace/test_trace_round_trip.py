@@ -1,6 +1,6 @@
 """The published schema and the reader cannot disagree if a round trip has to validate.
 
-`schemas/trace-v2.schema.json` is a contract a third party writes against, so it is
+`schemas/trace-v3.schema.json` is a contract a third party writes against, so it is
 tested rather than described. Two directions: what `serialize_trace` writes satisfies the
 schema line by line, and what it writes reads back as the trace it started as — including
 the tri-states, which is where a lossy writer would hurt.
@@ -17,6 +17,7 @@ from guardana.core.trace import (
     AgentRef,
     Approval,
     ApprovalOutcome,
+    ApproverKind,
     Blob,
     Consent,
     ContentPart,
@@ -54,7 +55,7 @@ from guardana.core.trace import (
 )
 from jsonschema import Draft202012Validator
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[4] / "schemas" / "trace-v2.schema.json"
+_SCHEMA_PATH = Path(__file__).resolve().parents[4] / "schemas" / "trace-v3.schema.json"
 _NOW = datetime(2026, 8, 9, 10, 0, tzinfo=UTC)
 
 _THE_READING_NOT_THE_TRACE = frozenset(
@@ -217,6 +218,7 @@ def _full_trace() -> Trace:
                         action="refund",
                         outcome=ApprovalOutcome.NOT_REQUESTED,
                         approver="nobody",
+                        approver_kind=ApproverKind.HUMAN,
                         requested_at=_NOW,
                         decided_at=_NOW,
                     ),
@@ -352,13 +354,24 @@ def test_the_schema_refuses_a_record_that_is_neither_a_header_nor_a_span() -> No
 @pytest.mark.parametrize(
     "record",
     [
-        {"guardana_trace": 3, "trace_id": "t"},
+        {"guardana_trace": 4, "trace_id": "t"},
+        {"guardana_trace": 2, "trace_id": "t"},
         {"guardana_trace": 1, "trace_id": "t"},
-        {"guardana_trace": 2, "trace_id": "t", "instrumented": ["aproval"]},
+        {"guardana_trace": 3, "trace_id": "t", "instrumented": ["aproval"]},
         {"span_id": "s", "agent": {"id": "a-1"}},
         {"span_id": "s", "aprovals": []},
         {"span_id": "s", "effects": [{"sink": "telepathy", "action": "x"}]},
         {"span_id": "s", "approvals": [{"action": "x", "outcome": "maybe"}]},
+        {
+            "span_id": "s",
+            "approvals": [
+                {"action": "x", "outcome": "granted", "approver_kind": "hooman", "approver": "a"}
+            ],
+        },
+        {
+            "span_id": "s",
+            "approvals": [{"action": "x", "outcome": "granted", "approver_kind": "human"}],
+        },
         {"span_id": "s", "policy_decisions": [{"action": "x", "outcome": "shrug"}]},
     ],
 )

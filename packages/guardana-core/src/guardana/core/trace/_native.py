@@ -31,6 +31,7 @@ from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.authorization import (
     Approval,
     ApprovalOutcome,
+    ApproverKind,
     Consent,
     PolicyDecision,
     PolicyOutcome,
@@ -56,9 +57,19 @@ VERSION_KEY = "guardana_trace"
 
 _E = TypeVar("_E", bound=StrEnum)
 
+FOOTER_KEY = "guardana_trace_end"
+"""The key that makes the last record a sign-off rather than a span.
+
+A file being appended to by a live agent cannot go back and amend its header, so
+"this session ended" has to arrive at the end. It is opt-in from the header, because
+reading every footerless file as truncated would turn every trace written before this
+existed into a decline.
+"""
+
 _HEADER_KEYS = frozenset(
-    {VERSION_KEY, "trace_id", "producer", "instrumented", "truncated", "attributes"}
+    {VERSION_KEY, "trace_id", "producer", "instrumented", "truncated", "attributes", "terminated"}
 )
+_FOOTER_KEYS = frozenset({FOOTER_KEY, "spans"})
 _SPAN_KEYS = frozenset(
     {
         "span_id",
@@ -94,7 +105,7 @@ class NativeHeader:
     def __init__(self, raw: Mapping[str, Any]) -> None:
         """Read and validate the header, refusing a version this build cannot read."""
         reject_unknown_keys(raw, _HEADER_KEYS, "trace header")
-        self.version = _version_of(raw)
+        self.version = version_of(raw)
         self.trace_id = text_of(raw, "trace_id", "trace header")
         producer = mapping_of(raw.get("producer", {}), "trace header.producer")
         self.producer = optional_text(producer, "name") or "unknown"
@@ -103,9 +114,38 @@ class NativeHeader:
         self.instrumented = _dimensions(raw)
         self.truncated = _truncation(raw)
         self.attributes = string_map(raw, "attributes")
+        self.terminated = optional_bool(raw, "terminated") is True
+        """Whether this producer promised a footer, so its absence means truncation."""
 
 
-def _version_of(raw: Mapping[str, Any]) -> int:
+class NativeFooter:
+    """The last record of a file whose header promised one.
+
+    It carries a count rather than only a full stop. A footer saying nothing but "I
+    finished" would certify a file whose middle a log shipper had eaten — a fresh
+    false green produced by the mechanism installed to remove one.
+    """
+
+    def __init__(self, raw: Mapping[str, Any], declared_version: int) -> None:
+        """Read the footer, refusing one that does not describe this file."""
+        reject_unknown_keys(raw, _FOOTER_KEYS, "trace footer")
+        declared = raw.get(FOOTER_KEY)
+        if declared != declared_version:
+            raise TraceLoadError(
+                f"the trace footer declares {FOOTER_KEY} {declared!r} while the header declares "
+                f"schema version {declared_version} — one file cannot be two versions"
+            )
+        spans = raw.get("spans")
+        if isinstance(spans, bool) or not isinstance(spans, int) or spans < 0:
+            raise TraceLoadError(
+                f"the trace footer must carry 'spans' as the number of span records the "
+                f"producer wrote, and carries {spans!r} — without it the footer is a full "
+                f"stop rather than a claim that nothing went missing"
+            )
+        self.spans = spans
+
+
+def version_of(raw: Mapping[str, Any]) -> int:
     """Read the schema version, refusing both an absent one and one from the future.
 
     A missing version is an error rather than a default of 1: guessing is how an
@@ -138,11 +178,14 @@ def migrate_header(raw: Mapping[str, Any]) -> Mapping[str, Any]:
     a migration that needed to change a field could not have. A seam whose output
     nothing consumes is a seam nobody would notice was broken.
 
-    One step so far. v2 added a per-span field, so a v1 header carries forward
-    unchanged apart from the version it now declares; the spans need no step because
-    an added field is absent in v1 and absent is what it means.
+    Two steps so far, and neither touches the header: v2 added a per-span field and v3
+    added a per-approval one, so a header carries forward unchanged apart from the
+    version it now declares. The spans need no step because an added field is absent in
+    the older file and absent is what it means — except `approver`, where the older
+    spelling carries a meaning, and `_approver` reads it in both files rather than
+    rewriting one into the other.
     """
-    version = _version_of(raw)
+    version = version_of(raw)
     migrated = dict(raw)
     for step in range(version, TRACE_SCHEMA_VERSION):
         migrate = _MIGRATIONS.get(step)
@@ -158,7 +201,15 @@ def _migrate_1_to_2(raw: dict[str, Any]) -> dict[str, Any]:
     return raw
 
 
-_MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {1: _migrate_1_to_2}
+def _migrate_2_to_3(raw: dict[str, Any]) -> dict[str, Any]:
+    """v3 added `Approval.approver_kind`, which is per-approval. The header is unchanged."""
+    return raw
+
+
+_MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    1: _migrate_1_to_2,
+    2: _migrate_2_to_3,
+}
 
 
 def _dimensions(raw: Mapping[str, Any]) -> frozenset[Dimension]:
@@ -421,13 +472,53 @@ def _policy(raw: object) -> PolicyDecision:
     )
 
 
+_APPROVER_KINDS = {str(kind): kind for kind in ApproverKind}
+
+
+def _approver(raw: Mapping[str, Any]) -> tuple[str | None, ApproverKind | None]:
+    """Read who granted an approval, and whether they are a person.
+
+    Refused rather than fallen back on, unlike every other enum here, for the reason
+    `instrumented` refuses: there is no honest default for "is this human oversight".
+    A misspelled `persson` read as an unrecorded kind would quietly turn a contract
+    demanding a human into one satisfied by the agent's own gate.
+
+    An older file spells the kind into the name — `human:alice`, the convention
+    `docs/usage-contracts.md` has documented since contracts shipped — so that prefix
+    is read as the structure it always stood for. An explicit `approver_kind` wins,
+    and a name whose prefix names nothing known is just a name.
+    """
+    approver = optional_text(raw, "approver")
+    declared = raw.get("approver_kind")
+    if declared is not None:
+        if not isinstance(declared, str) or declared not in _APPROVER_KINDS:
+            raise TraceLoadError(
+                f"an approval's approver_kind is {declared!r}; known kinds are "
+                f"{', '.join(sorted(_APPROVER_KINDS))}"
+            )
+        if approver is None:
+            raise TraceLoadError(
+                f"an approval records approver_kind {declared!r} and no approver — a claim "
+                f"that somebody approved, minus the somebody"
+            )
+        return approver, _APPROVER_KINDS[declared]
+    if approver is None:
+        return None, None
+    prefix, separator, name = approver.partition(":")
+    if separator and name and prefix in _APPROVER_KINDS:
+        return name, _APPROVER_KINDS[prefix]
+    return approver, None
+
+
 def _approval(raw: object) -> Approval:
     if not isinstance(raw, dict):
         return Approval(action="unknown", outcome=ApprovalOutcome.UNKNOWN)
+    approver, approver_kind = _approver(raw)
     return Approval(
         action=optional_text(raw, "action") or "unknown",
         outcome=_enum(raw, "outcome", ApprovalOutcome, ApprovalOutcome.UNKNOWN),
-        approver=optional_text(raw, "approver"),
+        approver=approver,
+        approver_kind=approver_kind,
         requested_at=optional_time(raw, "requested_at"),
         decided_at=optional_time(raw, "decided_at"),
     )

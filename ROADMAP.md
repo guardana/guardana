@@ -690,7 +690,7 @@ recording never carried.
 second file carries three blocks the first does not, and declares them:
 
 ```jsonl
-{"guardana_trace": 2, …, "instrumented": ["messages","tools","identity","approval","effects"]}
+{"guardana_trace": 3, …, "instrumented": ["messages","tools","identity","approval","effects"]}
 {"span_id": "s2", "kind": "tool_execution", "name": "refund",
  "identity":  {"actor": "support-agent"},
  "approvals": [{"action": "refund", "outcome": "not_requested"}],
@@ -704,81 +704,98 @@ authorization half. The industry is instrumenting agents heavily and instrumenti
 them for the other question — so the traces are being produced and these dimensions
 are being left out of them.
 
-### 1. The authorization half, emitted rather than hand-written
+### 1. The authorization half, emitted rather than hand-written *(shipped)*
 
-Today the path is `--write-trace` and an editor: convert an export, add the blocks,
-grade the result. That proves the model works and does not survive contact with a
-system that runs a thousand executions an hour.
+Was: `--write-trace` and an editor — convert an export, add the blocks, grade the
+result. That proved the model works and did not survive contact with a system running a
+thousand executions an hour.
 
-What closes it is a recording surface: a framework-neutral way for an application to
-state *this action was approved, by this principal*, *this policy returned deny*,
-*this credential crossed this boundary*, *this effect executed and cannot be undone*
-— and to declare in `instrumented` that it records them, since a dimension declared
-and empty is gradable while a dimension undeclared stands the rules down.
+`guardana.core.trace.open_trace` closes it. A producer writes its header once, appends
+one span per event, and signs the file off when the session ends; the trace format gained
+`terminated` plus a counted footer (so a session that died is `unterminated` rather than
+clean) and `approver_kind` (so a person and a policy engine stop being one field).
+Reasoning, rejected options and the measurement:
+[`docs/design/trace-producer.md`](docs/design/trace-producer.md). Usage:
+[`docs/writing-an-integrator.md`](docs/writing-an-integrator.md).
 
-Three constraints, each already stated elsewhere in this file:
+**The measurement moved the plan, which is why it was taken.** Four hand-built traces of
+one unapproved refund, graded by the released 0.20.0, put the leak somewhere other than
+where this file said: an inflated `approval` declaration does *not* pass — the rule
+declines and the contract assertion fires — while an inflated **`effects`** declaration
+is the clean exit `0`. The dimensions that drive a rule's loop are the dangerous ones;
+the ones a loop merely consults already fail closed. So the writer derives an effect from
+every recorded tool call through the integrator's sink map, rather than checking a
+declaration after the fact.
 
-- It changes **what every adapter promises**, which is why the finer instrumentation
-  declaration in the deferred table above is the same piece of work, and why this
-  gets a design document before it gets code.
-- It must not become a second SDK. Guardana's contract is a **published, versioned
-  file format** (`schemas/trace-v2.schema.json`). Anything shipped here is a
-  convenience over that format and never the only door in — a team emitting JSONL
-  from Go or TypeScript stays a first-class producer.
-- It records what happened; it does not decide anything. A helper that *asks*
-  Guardana whether an action is allowed is inline enforcement wearing a library's
-  clothes, and that is a non-goal below.
+Three constraints held:
 
-#### What the engine has to gain first
+- it changed **what every adapter promises**, which is why the finer instrumentation
+  declaration in the deferred table above is the same piece of work, and why this got a
+  design document before it got code;
+- it is not a second SDK. The contract is the **published, versioned file format**
+  (`schemas/trace-v3.schema.json`); the writer is a convenience over it and a team
+  emitting JSONL from Go or TypeScript stays a first-class producer;
+- it records what happened and decides nothing. A helper that *asks* Guardana whether an
+  action is allowed is inline enforcement wearing a library's clothes, and stays a
+  non-goal below.
 
-`serialize_trace` renders a finished `Trace` in one call. That is right for
-converting an export and wrong for a producer, because a producer emits one event at
-a time inside a session that may run for hours and never fits in memory. Five gaps,
-each of which is a false-green risk rather than a convenience:
+#### The integrator guide, and the second example that is still owed
 
-| Gap | Why it is not cosmetic |
-|---|---|
-| **Append-only writing** | a long-running agent cannot buffer a session. The header is written once, spans are appended, and a file that stops mid-session is `truncated: unterminated` — a reason the model already carries, and the difference between "nothing happened after this" and "we stopped looking" |
-| **Validation at write time** | unknown keys are refused on *read* today, so a producer with a typo learns about it when somebody finally grades the file. By then the run it was supposed to cover is gone. The writer refuses at the source |
-| **A declaration that cannot be inflated** | `instrumented` is a promise. An integrator that declares `approval` while its hook never supplies one makes the approval rules run and pass on empty — the exact inversion this dimension exists to prevent. The writer holds the declaration against what is actually written |
-| **The approving actor, structurally** | an agent framework's own gate returning "approved" is a *policy decision by an automated component*, not a human approval. Recording it as `human:*` would satisfy `approval_required` while no person ever saw the action. This distinction is the first thing the integrator guide has to say, and the model has to make saying it easier than not |
-| **Tool-to-sink mapping owned by the integrator** | the engine cannot know that a framework's `terminal` tool is a shell — it knows no vendor, by principle 1. The integrator declares it, and a tool with no declared sink is an effect of *unknown* kind, never the absence of an effect |
+[`docs/writing-an-integrator.md`](docs/writing-an-integrator.md) answers *how do I make
+the agent I already run produce a trace Guardana can grade?*, and
+[`examples/hermes_integrator/`](examples/hermes_integrator/) is the proof that it is
+followable — a Hermes plugin, written against `hermes-agent` 0.19.0, verified by loading
+it through Hermes' own plugin manager and grading what came out.
 
-#### The integrator guide, and two examples that must differ
+It earns its place on one distinction. Hermes has three approval surfaces and the third
+is an auxiliary LLM auto-approving low-risk dangerous commands, so the same `rm -rf`
+passes a contract demanding a person when somebody answered the prompt and fails when the
+model did. That is `approver_kind` paying for itself on a real agent rather than on a
+fixture.
 
-The deliverable is documentation plus proof: a `docs/writing-an-integrator.md`
-beside [`writing-rules.md`](docs/writing-rules.md), answering one question — *how do
-I make the agent I already run produce a trace Guardana can grade?* — and **two
-worked examples under `examples/`**.
+**Reading it at source corrected this entry twice**, which is the argument for the rule
+that a seam nobody has run is a seam nobody has read:
 
-Two, and not one, for a specific reason: **one example lets the contract be written
-around it.** The second is what proves the recording surface is general, which is the
-same argument that put three unrelated inputs into 1.0 entry criterion 2. So they
-have to be structurally different, not two agents of the same shape. The candidates
-are the two self-hosted agents people are actually running:
+- the approval signal is **not** `pre_tool_call`. That hook is a *block* gate — a policy
+  decision by software. Approvals fire a separate observer pair,
+  `pre_approval_request` / `post_approval_response`, which upstream documents as unable
+  to veto or pre-answer an approval. Conflating a guardrail with an approval is precisely
+  the error the model now makes hard to write down;
+- Hermes has **two** integration shapes, not one: an in-process Python plugin surface and
+  a shell-script bridge over the same hook manager. The second is the out-of-process
+  shape this file expected to have to find in a *different* agent.
 
-- **[Hermes](https://github.com/NousResearch/hermes-agent)** (Nous Research, MIT) —
-  in-process hooks. Its plugin surface registers `pre_tool_call` (a directive
-  returning `block`/`approve`, carrying `tool_name`, `args`, `session_id`,
-  `tool_call_id`), `post_tool_call` (adding `result`, `status`, `duration_ms`) and
-  `post_llm_call`, which supplies six of the eleven dimensions — including the two
-  that matter most here, **approval and effect**. Read from its own documentation,
-  which also states the hook systems' purpose as "tool interception, metrics,
-  guardrails".
-- **OpenClaw** (MIT, self-hosted, shell and browser and messaging surfaces, memory
-  kept as files on disk) — the *other* shape: state on disk rather than callbacks in
-  the process. Its actual seam has not been read at source yet, and this entry says
-  so rather than promising a mapping nobody has checked.
+**The second example is still owed, and it proves something the first cannot.** One
+example lets the contract be written around it; the second is what shows the recording
+surface is general — the same argument that put three unrelated inputs into 1.0 entry
+criterion 2. What this release deliberately did *not* do is promise which agent it will
+be: the previous candidate's seam had never been read at source, and committing to an
+unbounded read of somebody else's repository is how a milestone acquires a dependency
+nobody scoped. The honest order is one example that genuinely works, then a second chosen
+for being structurally different — state on disk rather than callbacks in a process —
+with its seam read before it is named here.
 
-**These are examples, not integrations we carry.** Each pins the upstream version it
-was written against and its date, states that a later release may break it, and stays
-out of CI — a green build here must never depend on somebody else's release. A
-distribution per agent, or a catalogue of them, is a different product with different
-economics, and it is in the non-goals below.
+**These are examples, not integrations we carry.** Each pins the upstream version it was
+written against and its date, and states that a later release may break it. A green build
+here must never depend on somebody else's release — a rule about dependencies rather than
+about directories: the Hermes example never imports Hermes, so its tests run in CI and
+pin *this* repository's writer API from outside, while checking it against the real agent
+stays a manual step recorded in its README. A distribution per agent, or a catalogue of
+them, is a different product with different economics, and it is in the non-goals below.
 
 What the project keeps is the part that does not age: the published, versioned trace
-format, the honest declaration of what a producer records, and a guide anybody can
-follow for the agent we have never heard of.
+format, the honest declaration of what a producer records, and a guide anybody can follow
+for the agent we have never heard of.
+
+#### Deferred out of this piece, with the reason
+
+| Deferred | Reason |
+|---|---|
+| **A writer that appends to a file another process started** | the shell-hook shape needs it: each hook invocation is its own process, so "open, write header, append" truncates the file every time. It needs the header read back and the existing spans counted per invocation, and that cost belongs measured against a real out-of-process integrator rather than guessed at — which is the second example's job |
+| **Detecting a dimension declared and never written** | not decidable inside one session: an agent that made no tool calls genuinely produced no effects, and refusing to close that file would fire on every quiet hour of a correctly instrumented deployment. It is a fact about a producer's history, so it sits with the fleet history below, beside the already-deferred "a rule that declines on every target" |
+| **Rotation, size limits and multi-file sessions** | a session that outgrows a file is real and orthogonal: the header/footer contract composes with any rotation scheme without changing. Deciding it with no producer running would be inventing a shape from imagination |
+| **Async and thread-safe writing** | a framework calling hooks from several threads needs it and the worked example does not. A lock is easy to add and impossible to remove; the honest order is a real caller first |
+| **A structured approver for consent and policy decisions** | the same human-versus-automated distinction exists there and does not carry the same weight — a consent is by definition the subject's, and a policy decision is by definition automated. Adding a kind to both would be symmetry for its own sake |
 
 ### 2. An OTLP receiver, out of band and never in the path
 

@@ -95,17 +95,19 @@ where the original already belongs, and keep it out of a repository.
 ## The native format
 
 JSONL. The first line is a header; every later line is one span. The published schema is
-[`schemas/trace-v2.schema.json`](../schemas/trace-v2.schema.json), and each line
-validates against it independently. A v1 file still reads: v2 added `agent` to a span,
-so a v1 span simply does not carry one.
+[`schemas/trace-v3.schema.json`](../schemas/trace-v3.schema.json), and each line
+validates against it independently. Older files still read: v2 added `agent` to a span
+and v3 added `approver_kind` to an approval, so an older record simply does not carry
+one.
 
 ```jsonl
-{"guardana_trace": 2, "trace_id": "t-42", "producer": {"name": "acme-harness", "version": "2.1"}, "instrumented": ["messages", "tools", "identity", "delegation", "consent", "policy", "approval", "effects"]}
+{"guardana_trace": 3, "trace_id": "t-42", "producer": {"name": "acme-harness", "version": "2.1"}, "instrumented": ["messages", "tools", "identity", "delegation", "consent", "policy", "approval", "effects"], "terminated": true}
 {"span_id": "s1", "kind": "model_call", "name": "chat gpt-4o", "agent": {"name": "support-agent"}, "messages": [{"role": "user", "parts": [{"type": "text", "content": "refund order 12"}]}], "consents": [{"client": "support-agent", "granted": true, "scopes": ["orders:read"], "subject": "u-9"}]}
 {"span_id": "s2", "kind": "tool_execution", "name": "refund", "tool": {"name": "refund", "arguments": "{\"order\": 12}", "mutates": true}, "identity": {"actor": "support-agent", "session": {"id": "sess-1", "protocol": "mcp"}}, "delegations": [{"actor": "support-agent", "boundary": "agent->billing-mcp", "credential": {"kind": "bearer", "digest": "sha256:…", "audience": ["https://billing.internal/"]}, "scopes": ["orders:read", "orders:refund"]}], "effects": [{"sink": "payment", "action": "refund", "target": "order/12", "status": "executed", "reversible": false}], "approvals": [{"action": "refund", "outcome": "not_requested"}]}
+{"guardana_trace_end": 3, "spans": 2}
 ```
 
-Four rules of the format, each with a reason:
+Six rules of the format, each with a reason:
 
 **`instrumented` is what licenses a finding.** List the dimensions your producer really
 records. Leave one out and its rules do not run — which is the safe direction. If you
@@ -123,6 +125,41 @@ put a token in. Nothing here reaches a report at any privacy level.
 **`scopes: []` and no `scopes` key are different facts.** `[]` means the client was
 granted nothing; omitting it means nobody recorded what was granted. The first is
 checkable, the second makes the rule decline.
+
+**An approval says whether a *person* granted it.** `approver_kind` is `human` or
+`automated`, and there is no member for "unrecorded" — that is the field being absent. A
+framework's own gate returning "approved" is `automated`; recording it as `human` would
+satisfy a contract demanding human oversight while nobody ever saw the action. A
+contract's `approvers` list globs `kind:approver` (so `human:*` keeps working, and now
+means it), and an older file spelling the convention into the name — `"human:alice"` —
+is read as the structure it always stood for.
+
+**A file that is still being appended to says so.** See below.
+
+### Saying where the file ends
+
+A producer that appends to a live file cannot go back and amend its header, so a
+session that died mid-run is otherwise indistinguishable from one that finished with
+nothing to report — and every rule that found nothing reports a pass over an execution
+it saw half of.
+
+Set `"terminated": true` in the header and write a final
+`{"guardana_trace_end": 3, "spans": N}` record. Then:
+
+| The file | Reads as |
+|---|---|
+| header promises, footer present, count matches | complete |
+| header promises, no footer | `truncated: unterminated` — the run is still going, or the producer died |
+| header promises, footer counts more spans than the file carries | `truncated: records_lost` — something between the producer and here dropped lines |
+| header promises nothing | complete, exactly as every file written before this existed |
+
+The promise is opt-in on purpose. Reading every footerless file as truncated would
+convert every trace anybody already has into a decline, which is a migration rather
+than a safety improvement. A footer in a file whose header did not promise one is
+refused: half a promise is worse than neither.
+
+[`guardana.core.trace.open_trace`](writing-an-integrator.md) writes all of this for
+you, and refuses the files that would grade clean over something real.
 
 ### Versioning
 

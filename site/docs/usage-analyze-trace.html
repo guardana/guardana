@@ -46,6 +46,7 @@
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
@@ -73,6 +74,7 @@
 </ul>
 <h2>Design documents</h2><ul>
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
@@ -180,14 +182,16 @@ contains them too, in a form that is easier to read than the one it came from. W
 where the original already belongs, and keep it out of a repository.</p>
 <h2 id="the-native-format">The native format</h2>
 <p>JSONL. The first line is a header; every later line is one span. The published schema is
-<a href="https://github.com/guardana/guardana/blob/main/schemas/trace-v2.schema.json"><code>schemas/trace-v2.schema.json</code></a>, and each line
-validates against it independently. A v1 file still reads: v2 added <code>agent</code> to a span,
-so a v1 span simply does not carry one.</p>
-<pre><code class="language-jsonl">{&quot;guardana_trace&quot;: 2, &quot;trace_id&quot;: &quot;t-42&quot;, &quot;producer&quot;: {&quot;name&quot;: &quot;acme-harness&quot;, &quot;version&quot;: &quot;2.1&quot;}, &quot;instrumented&quot;: [&quot;messages&quot;, &quot;tools&quot;, &quot;identity&quot;, &quot;delegation&quot;, &quot;consent&quot;, &quot;policy&quot;, &quot;approval&quot;, &quot;effects&quot;]}
+<a href="https://github.com/guardana/guardana/blob/main/schemas/trace-v3.schema.json"><code>schemas/trace-v3.schema.json</code></a>, and each line
+validates against it independently. Older files still read: v2 added <code>agent</code> to a span
+and v3 added <code>approver_kind</code> to an approval, so an older record simply does not carry
+one.</p>
+<pre><code class="language-jsonl">{&quot;guardana_trace&quot;: 3, &quot;trace_id&quot;: &quot;t-42&quot;, &quot;producer&quot;: {&quot;name&quot;: &quot;acme-harness&quot;, &quot;version&quot;: &quot;2.1&quot;}, &quot;instrumented&quot;: [&quot;messages&quot;, &quot;tools&quot;, &quot;identity&quot;, &quot;delegation&quot;, &quot;consent&quot;, &quot;policy&quot;, &quot;approval&quot;, &quot;effects&quot;], &quot;terminated&quot;: true}
 {&quot;span_id&quot;: &quot;s1&quot;, &quot;kind&quot;: &quot;model_call&quot;, &quot;name&quot;: &quot;chat gpt-4o&quot;, &quot;agent&quot;: {&quot;name&quot;: &quot;support-agent&quot;}, &quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;parts&quot;: [{&quot;type&quot;: &quot;text&quot;, &quot;content&quot;: &quot;refund order 12&quot;}]}], &quot;consents&quot;: [{&quot;client&quot;: &quot;support-agent&quot;, &quot;granted&quot;: true, &quot;scopes&quot;: [&quot;orders:read&quot;], &quot;subject&quot;: &quot;u-9&quot;}]}
 {&quot;span_id&quot;: &quot;s2&quot;, &quot;kind&quot;: &quot;tool_execution&quot;, &quot;name&quot;: &quot;refund&quot;, &quot;tool&quot;: {&quot;name&quot;: &quot;refund&quot;, &quot;arguments&quot;: &quot;{\&quot;order\&quot;: 12}&quot;, &quot;mutates&quot;: true}, &quot;identity&quot;: {&quot;actor&quot;: &quot;support-agent&quot;, &quot;session&quot;: {&quot;id&quot;: &quot;sess-1&quot;, &quot;protocol&quot;: &quot;mcp&quot;}}, &quot;delegations&quot;: [{&quot;actor&quot;: &quot;support-agent&quot;, &quot;boundary&quot;: &quot;agent-&gt;billing-mcp&quot;, &quot;credential&quot;: {&quot;kind&quot;: &quot;bearer&quot;, &quot;digest&quot;: &quot;sha256:…&quot;, &quot;audience&quot;: [&quot;https://billing.internal/&quot;]}, &quot;scopes&quot;: [&quot;orders:read&quot;, &quot;orders:refund&quot;]}], &quot;effects&quot;: [{&quot;sink&quot;: &quot;payment&quot;, &quot;action&quot;: &quot;refund&quot;, &quot;target&quot;: &quot;order/12&quot;, &quot;status&quot;: &quot;executed&quot;, &quot;reversible&quot;: false}], &quot;approvals&quot;: [{&quot;action&quot;: &quot;refund&quot;, &quot;outcome&quot;: &quot;not_requested&quot;}]}
+{&quot;guardana_trace_end&quot;: 3, &quot;spans&quot;: 2}
 </code></pre>
-<p>Four rules of the format, each with a reason:</p>
+<p>Six rules of the format, each with a reason:</p>
 <p><strong><code>instrumented</code> is what licenses a finding.</strong> List the dimensions your producer really
 records. Leave one out and its rules do not run — which is the safe direction. If you
 omit the field entirely, Guardana derives it from what is present, and derivation can only
@@ -201,6 +205,53 @@ put a token in. Nothing here reaches a report at any privacy level.</p>
 <p><strong><code>scopes: []</code> and no <code>scopes</code> key are different facts.</strong> <code>[]</code> means the client was
 granted nothing; omitting it means nobody recorded what was granted. The first is
 checkable, the second makes the rule decline.</p>
+<p><strong>An approval says whether a <em>person</em> granted it.</strong> <code>approver_kind</code> is <code>human</code> or
+<code>automated</code>, and there is no member for &quot;unrecorded&quot; — that is the field being absent. A
+framework's own gate returning &quot;approved&quot; is <code>automated</code>; recording it as <code>human</code> would
+satisfy a contract demanding human oversight while nobody ever saw the action. A
+contract's <code>approvers</code> list globs <code>kind:approver</code> (so <code>human:*</code> keeps working, and now
+means it), and an older file spelling the convention into the name — <code>&quot;human:alice&quot;</code> —
+is read as the structure it always stood for.</p>
+<p><strong>A file that is still being appended to says so.</strong> See below.</p>
+<h3 id="saying-where-the-file-ends">Saying where the file ends</h3>
+<p>A producer that appends to a live file cannot go back and amend its header, so a
+session that died mid-run is otherwise indistinguishable from one that finished with
+nothing to report — and every rule that found nothing reports a pass over an execution
+it saw half of.</p>
+<p>Set <code>&quot;terminated&quot;: true</code> in the header and write a final
+<code>{&quot;guardana_trace_end&quot;: 3, &quot;spans&quot;: N}</code> record. Then:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>The file</th>
+<th>Reads as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>header promises, footer present, count matches</td>
+<td>complete</td>
+</tr>
+<tr>
+<td>header promises, no footer</td>
+<td><code>truncated: unterminated</code> — the run is still going, or the producer died</td>
+</tr>
+<tr>
+<td>header promises, footer counts more spans than the file carries</td>
+<td><code>truncated: records_lost</code> — something between the producer and here dropped lines</td>
+</tr>
+<tr>
+<td>header promises nothing</td>
+<td>complete, exactly as every file written before this existed</td>
+</tr>
+</tbody>
+</table></div>
+<p>The promise is opt-in on purpose. Reading every footerless file as truncated would
+convert every trace anybody already has into a decline, which is a migration rather
+than a safety improvement. A footer in a file whose header did not promise one is
+refused: half a promise is worse than neither.</p>
+<p><a href="writing-an-integrator.html"><code>guardana.core.trace.open_trace</code></a> writes all of this for
+you, and refuses the files that would grade clean over something real.</p>
 <h3 id="versioning">Versioning</h3>
 <p><code>guardana_trace</code> is the schema version. A version this build cannot read is <strong>refused</strong>,
 not read as v1 — reading it anyway would drop the fields we do not know and grade what was

@@ -98,7 +98,7 @@ def test_the_schema_version_in_each_schema_matches_the_code() -> None:
         MANIFEST_SCHEMA_VERSION
     )
     assert (
-        _schema("trace-v2.schema.json")["$defs"]["header"]["properties"][  # type: ignore[index]
+        _schema("trace-v3.schema.json")["$defs"]["header"]["properties"][  # type: ignore[index]
             "guardana_trace"
         ]["const"]
         == TRACE_SCHEMA_VERSION
@@ -121,22 +121,32 @@ def test_the_superseded_run_schemas_stay_pinned_to_the_versions_they_describe() 
         )
 
 
-def test_the_superseded_trace_schema_stays_pinned_to_the_version_it_describes() -> None:
-    """The same promise on the trace side: a v1 file keeps a v1 contract to validate against.
+@pytest.mark.parametrize(
+    ("version", "added_later"),
+    [(1, ("span", "agent")), (2, ("approval", "approver_kind"))],
+)
+def test_a_superseded_trace_schema_stays_pinned_to_the_version_it_describes(
+    version: int, added_later: tuple[str, str]
+) -> None:
+    """The same promise on the trace side: an older file keeps its own contract.
 
     A third party writing a trace exporter built against `trace-v1`, and editing that
     file to describe v2 would move the contract under them while the name said it had
-    not moved.
+    not moved. Each entry also names the field the *next* version added, because a
+    pinned `const` with a widened body is the same drift wearing the right number.
     """
+    name = f"trace-v{version}.schema.json"
     assert (
-        _schema("trace-v1.schema.json")["$defs"]["header"]["properties"][  # type: ignore[index]
-            "guardana_trace"
-        ]["const"]
-        == 1
+        _schema(name)["$defs"]["header"]["properties"]["guardana_trace"]["const"]  # type: ignore[index]
+        == version
     )
-    assert (
-        "agent"
-        not in (
-            _schema("trace-v1.schema.json")["$defs"]["span"]["properties"]  # type: ignore[index]
+    where, field = added_later
+    if where == "span":
+        assert field not in _schema(name)["$defs"]["span"]["properties"]  # type: ignore[index]
+    else:
+        assert (
+            field
+            not in _schema(name)["$defs"]["span"]["properties"]["approvals"][  # type: ignore[index]
+                "items"
+            ]["properties"]
         )
-    )

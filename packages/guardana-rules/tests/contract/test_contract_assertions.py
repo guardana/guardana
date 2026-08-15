@@ -221,6 +221,41 @@ def test_approval_required_fires_when_the_agent_approved_its_own_action() -> Non
     assert len(findings(graded(rule, trace))) == 1
 
 
+def test_approval_required_reads_a_structured_human_approver_as_the_convention_it_replaces() -> (
+    None
+):
+    """`approvers: ["human:*"]` predates `approver_kind` and every contract in the field has it.
+
+    So a producer that records the kind structurally has to satisfy the contract its
+    users already wrote. If it did not, upgrading a producer would turn a passing
+    invariant red with nothing about the system changed.
+    """
+    rule = rule_of({**_REFUND, "approvers": ["human:*"]})
+    trace = trace_of(
+        span("s0", approvals=(Approval.granted_by_human("alice", action="payment.refund"),)),
+        span("s1", effects=(_payment(),)),
+    )
+
+    assert findings(graded(rule, trace)) == ()
+    assert inconclusive(graded(rule, trace)) == ()
+
+
+def test_approval_required_fires_when_a_machine_granted_it_under_a_persons_name() -> None:
+    """The whole reason the kind is structural: same name, and only one of them is oversight.
+
+    A framework's own gate configured with an operator's name would have satisfied
+    `human:*` by text. It is the same approver string as the passing test above.
+    """
+    rule = rule_of({**_REFUND, "approvers": ["human:*"]})
+    trace = trace_of(
+        span("s0", approvals=(Approval.granted_by_automation("alice", action="payment.refund"),)),
+        span("s1", effects=(_payment(),)),
+    )
+
+    (finding,) = findings(graded(rule, trace))
+    assert "automated:alice" in finding.evidence.summary
+
+
 # --- allowed_scopes --------------------------------------------------------
 
 

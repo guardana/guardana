@@ -89,10 +89,10 @@ class ApprovalRequiredRule(ContractRule[ApprovalRequired]):
             return
         approvers = self.assertion.approvers
         if not approvers or any(
-            a.approver is not None and matches_any(a.approver, approvers) for a in matching
+            a.approver_ref is not None and matches_any(a.approver_ref, approvers) for a in matching
         ):
             return
-        unnamed = [a for a in matching if a.approver is None]
+        unnamed = [a for a in matching if a.approver_ref is None]
         if unnamed:
             yield self.unverified(
                 trace,
@@ -106,7 +106,7 @@ class ApprovalRequiredRule(ContractRule[ApprovalRequired]):
             trace,
             f"{self.source_note()} requires {effect.action!r} to be approved by "
             f"{' or '.join(approvers)}; it was approved by "
-            f"{', '.join(sorted({a.approver for a in matching if a.approver}))}",
+            f"{', '.join(sorted({a.approver_ref for a in matching if a.approver_ref}))}",
             span=span,
         )
 

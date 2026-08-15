@@ -34,6 +34,7 @@ from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.authorization import (
     Approval,
     ApprovalOutcome,
+    ApproverKind,
     Consent,
     PolicyDecision,
     PolicyOutcome,
@@ -77,8 +78,10 @@ from guardana.core.trace.observations import (
 )
 from guardana.core.trace.retrieval import Retrieval, RetrievedDocument
 from guardana.core.trace.serialize import serialize_trace
+from guardana.core.trace.sinks import SinkMap
 from guardana.core.trace.span import ModelCall, Span, SpanKind
 from guardana.core.trace.tool import ToolDeclaration, ToolExecution, ToolStatus
+from guardana.core.trace.writer import TraceWriteError, TraceWriter, open_trace
 
 from guardana.core.trace._parse import TraceLoadError  # isort: skip — the error the readers raise
 
@@ -91,6 +94,7 @@ __all__ = [
     "AgentRef",
     "Approval",
     "ApprovalOutcome",
+    "ApproverKind",
     "Blob",
     "Consent",
     "ContentPart",
@@ -121,6 +125,7 @@ __all__ = [
     "SessionRef",
     "SideEffect",
     "SinkKind",
+    "SinkMap",
     "Span",
     "SpanKind",
     "ToolDeclaration",
@@ -130,10 +135,13 @@ __all__ = [
     "TraceLoadError",
     "TraceRead",
     "TraceTruncation",
+    "TraceWriteError",
+    "TraceWriter",
     "UnreadableRecord",
     "detect_dialect",
     "detect_observation_dialect",
     "evidence_matrix",
+    "open_trace",
     "read_observations",
     "read_trace",
     "serialize_trace",

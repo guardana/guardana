@@ -365,6 +365,51 @@ into a gate, and `trace inspect --profile` tells you whether that gate would pas
 before a pipeline finds out. It opens one file, writes no run document, and reaches
 no network.
 
+### Producing a trace, without inflating what it claims (`guardana.core.trace.open_trace`)
+
+Grading a recorded execution has always assumed the recording exists. It mostly does
+not: the OpenTelemetry GenAI conventions have no field for approvals, delegations or
+side effects, so a trace shaped for reliability is silent about exactly the half that
+carries a verdict. `open_trace` is the seam for closing that from inside the agent — a
+writer that puts the header down before the first span, appends and flushes each one,
+and signs the file off when the session really ends. It is a convenience over the
+published format, never the only door in: a team emitting the same JSONL from Go stays a
+first-class producer. See [`docs/writing-an-integrator.md`](docs/writing-an-integrator.md).
+
+What it refuses is the point, and each refusal is a measured false green rather than a
+matter of taste — the four traces are in
+[`docs/design/trace-producer.md`](docs/design/trace-producer.md):
+
+- **an effect for every recorded tool call**, through a sink map the integrator owns,
+  because a producer that declares `effects` and writes none gets `✓ No findings.` and
+  exit `0` over an execution that moved money. A mutating tool nobody mapped is refused
+  rather than filed under `other`, which no rule treats as consequential;
+- **a block for a dimension nobody declared**, because a reader drops those in silence —
+  so one typo in a declaration list removes a producer's whole authorization coverage
+  while every other signal looks normal;
+- **a span this build could not read back**, checked through the real parser before the
+  line reaches the file, so a producer with a typo finds out now rather than when
+  somebody finally grades the run it was supposed to cover.
+
+**A file can also say where it ends.** A header declaring `terminated` promises a footer
+carrying a span count; a missing footer reads as `unterminated` and a count that does not
+match reads as `records_lost`. Before this, a producer that died mid-session left a file
+indistinguishable from one that finished with nothing to report, and every rule that
+found nothing reported a pass over an execution it saw half of. The promise is opt-in, so
+every trace written before it exists reads exactly as it did.
+
+**An approval says whether a person granted it.** `approver_kind` is `human` or
+`automated`, with no member for "unrecorded" — that is the field being absent. An agent
+framework's own gate returning "approved" is a policy decision by software, and recording
+it as human oversight satisfies a contract demanding a person while nobody ever saw the
+action. Contracts keep their existing `approvers: ["human:*"]` syntax, which now globs
+structure instead of a string somebody typed.
+
+[`examples/hermes_integrator/`](examples/hermes_integrator/) is the worked example, and
+it exists to show that distinction on a real agent: Hermes auto-approves low-risk
+dangerous commands with an auxiliary LLM, so the same `rm -rf` passes a
+human-oversight contract when a person answered the prompt and fails when the model did.
+
 ### A saved run is evidence, not a screenshot (`guardana run`)
 
 `--output run.json` writes a **run manifest** alongside the findings: what was

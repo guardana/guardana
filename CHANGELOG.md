@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+**A trace can now be written one span at a time, by the agent that is producing it.**
+`serialize_trace` renders a finished trace in one call, which is right for converting an
+export and wrong for a producer: a live agent cannot buffer a session that runs for
+hours, and a file that stops mid-session has to say so rather than look finished.
+`guardana.core.trace.open_trace` writes the header first, appends and flushes each span,
+and signs the file off on a clean exit. Reasoning and rejected options:
+[`docs/design/trace-producer.md`](docs/design/trace-producer.md); how to use it:
+[`docs/writing-an-integrator.md`](docs/writing-an-integrator.md).
+
+Three of its refusals close a measured false green rather than tidying an API, and the
+measurement corrected the plan. Four hand-built traces of the same unapproved refund,
+graded by the released 0.20.0, put the leak somewhere other than where the roadmap said:
+a producer that declares it records `approval` and never writes one does **not** pass —
+the rule declines and a contract assertion reports a finding. A producer that declares
+`effects` and never writes one gets `✓ No findings.` and exit `0` over an execution that
+moved money, because the effect-shaped rules iterate the effects and an empty list is a
+loop that does not run. So the writer derives an effect from a recorded tool call
+through the integrator's sink map, refuses an unmapped tool the producer itself marked
+`mutates: true`, refuses a block for a dimension nobody declared, and reads every span
+back through the real parser before it reaches the file.
+
+**A trace can say where it ends.** `TraceTruncation.UNTERMINATED` has been in the model
+since 0.14 and nothing has ever produced it: the header is written first and cannot be
+amended, so a crashed producer left a file indistinguishable from a finished one, and
+every rule that found nothing reported a pass over an execution it saw half of. A header
+may now declare `"terminated": true` and close with a
+`{"guardana_trace_end": 3, "spans": N}` record. A missing footer reads as
+`unterminated`; a count that does not match reads as the new `records_lost`, because a
+footer that only said "I finished" would certify a file whose middle a log shipper had
+dropped. The promise is opt-in: a file that declares nothing reads exactly as it always
+did, since turning every existing trace into a decline would be a migration rather than
+a safety improvement.
+
+**An approval says whether a *person* granted it.** `Approval.approver_kind` is `human`
+or `automated` — and has no member for "unrecorded", which is the field being absent. An
+agent framework's own gate returning "approved" is a policy decision by software;
+recording it as human oversight satisfied an `approvers: ["human:*"]` contract while
+nobody ever saw the action, and that convention was a glob over a free string an
+integrator typed by hand. A contract's `approvers` list now globs `kind:approver`, so
+every contract already written keeps working and now means what it says, and an older
+file spelling the convention into the name is read as the structure it always stood for.
+
+**`examples/hermes_integrator/`** is the guide's proof: a Hermes plugin that records each
+agent session as a trace, written against `hermes-agent` 0.19.0 and verified by loading
+it through Hermes' own plugin manager. It exists to demonstrate one distinction. Hermes
+has three approval surfaces, and the third is an auxiliary LLM auto-approving low-risk
+commands; the same `rm -rf` approved at a terminal passes a contract demanding a person
+and the one approved by the model does not. It is an example rather than an integration
+this project carries — pinned, dated, and deliberately out of CI, because a green build
+here must never depend on somebody else's release.
+
+### Changed
+
+**The trace schema is v3** ([`schemas/trace-v3.schema.json`](schemas/trace-v3.schema.json)),
+adding `approver_kind` to an approval and `terminated` plus the footer record to the
+file. v1 and v2 files read unchanged, and `trace-v2.schema.json` stays published and
+pinned: a third party writing against it keeps the contract they built on.
+
 ### Fixed
 
 **A run in which every check declined reported `pass` and exited `0`.** Found by

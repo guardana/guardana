@@ -12,17 +12,21 @@ producer that does not emit them, and both must stop the consent rule from runni
 """
 
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from guardana.core.fingerprint import digest_of
 from guardana.core.trace import _native, otel
 from guardana.core.trace._parse import TraceLoadError, mapping_of
 from guardana.core.trace.limits import MAX_RECORD_BYTES, MAX_SPANS, MAX_TRACE_BYTES
-from guardana.core.trace.model import Dimension, Provenance, Trace, TraceTruncation
-from guardana.core.trace.span import Span
+from guardana.core.trace.model import Provenance, Trace, TraceTruncation
+from guardana.core.trace.presence import dimensions_present
+
+if TYPE_CHECKING:  # the presence table moved out, so a span is only named here
+    from guardana.core.trace.span import Span
 
 
 class Dialect(StrEnum):
@@ -87,26 +91,41 @@ def read_trace(path: Path, dialect: Dialect | None = None) -> TraceRead:
 
 def _read_native(path: Path, digest: str) -> TraceRead:
     header: _native.NativeHeader | None = None
+    footer: _native.NativeFooter | None = None
+    version = 0
     spans: list[Span] = []
     unreadable: list[UnreadableRecord] = []
+    encountered = 0
     truncated: TraceTruncation | None = None
     for number, raw in enumerate(_records(path), start=1):
         if isinstance(raw, _TooLong):
             unreadable.append(UnreadableRecord(number, raw.reason))
+            encountered += header is not None
             continue
         if isinstance(raw, _Overflow):
             truncated = TraceTruncation.READ_LIMIT
             break
         record = mapping_of(_parse(raw, number), f"record {number}")
         if header is None:
+            version = _native.version_of(record)
             header = _native.NativeHeader(_native.migrate_header(record))
+            continue
+        if footer is not None:
+            raise TraceLoadError(
+                f"{path} record {number} comes after the trace's footer, so the file claims "
+                f"to be complete and carries spans nobody counted"
+            )
+        if _native.FOOTER_KEY in record:
+            footer = _read_footer(path, record, header, version)
             continue
         if len(spans) >= MAX_SPANS:
             truncated = TraceTruncation.READ_LIMIT
             break
+        encountered += 1
         spans.append(_native.span_from(record))
     if header is None:
         raise TraceLoadError(f"{path} has no records, so there is no trace to analyse")
+    truncated = truncated or _incompleteness(header, footer, encountered)
     return TraceRead(
         trace=Trace(
             trace_id=header.trace_id,
@@ -122,7 +141,7 @@ def _read_native(path: Path, digest: str) -> TraceRead:
             # Declared wins over derived: a producer that says it records approvals is
             # believed, so a run of theirs with no approval anywhere is a finding rather
             # than a coverage hole. Derivation is the fallback and can only reduce.
-            instrumented=header.instrumented or _derive(spans),
+            instrumented=header.instrumented or dimensions_present(spans),
             truncated=header.truncated or truncated,
             unreadable=len(unreadable),
             schema_version=header.version,
@@ -130,6 +149,41 @@ def _read_native(path: Path, digest: str) -> TraceRead:
         ),
         unreadable=tuple(unreadable),
     )
+
+
+def _read_footer(
+    path: Path, record: Mapping[str, object], header: _native.NativeHeader, version: int
+) -> _native.NativeFooter:
+    """Read the sign-off, refusing one the header never promised.
+
+    Refused rather than accepted as a bonus, because a footer is a claim about the
+    whole file and half a promise is the shape of the defects this repository keeps
+    finding: a build that took the footer here and ignored it elsewhere would report
+    the same file two ways depending on which reader saw it.
+    """
+    if not header.terminated:
+        raise TraceLoadError(
+            f"{path} ends with a {_native.FOOTER_KEY} record and its header does not declare "
+            f"'terminated': true, so nothing licenses reading a missing footer as truncation"
+        )
+    return _native.NativeFooter(record, version)
+
+
+def _incompleteness(
+    header: _native.NativeHeader, footer: _native.NativeFooter | None, encountered: int
+) -> TraceTruncation | None:
+    """Whether a file that promised a footer kept the promise, and kept its records.
+
+    Only a producer that opted in is judged here. Reading every footerless file as
+    truncated would convert every trace written before this existed — and every one an
+    operator hand-edits — into a decline, which is not a safety improvement but a
+    migration nobody agreed to.
+    """
+    if not header.terminated:
+        return None
+    if footer is None:
+        return TraceTruncation.UNTERMINATED
+    return TraceTruncation.RECORDS_LOST if footer.spans != encountered else None
 
 
 def _read_otel(path: Path, digest: str) -> TraceRead:
@@ -169,7 +223,7 @@ def _read_otel(path: Path, digest: str) -> TraceRead:
                 dialect=str(Dialect.OTEL),
                 document_digest=digest,
             ),
-            instrumented=_derive(spans),
+            instrumented=dimensions_present(spans),
             truncated=truncated,
             unreadable=len(unreadable) + unread_content,
         ),
@@ -181,53 +235,6 @@ def _read_otel(path: Path, digest: str) -> TraceRead:
             for _ in range(unread_content)
         ),
     )
-
-
-def _derive(spans: list[Span]) -> frozenset[Dimension]:
-    """Work out what a producer records from what it actually recorded.
-
-    Presence implies instrumentation; absence never implies anything. That asymmetry
-    is the whole point: derivation can only ever *reduce* what runs.
-
-    **A session id does not make identity instrumented.** It is the one derivation
-    worth spelling out, because an OpenTelemetry MCP span carries `mcp.session.id` and
-    nothing else identity-shaped — and treating that as identity coverage would let
-    the session-as-authentication rule accuse a properly authenticated deployment of
-    the thing its instrumentation simply never mentioned.
-    """
-    return frozenset(
-        dimension for dimension, present in _PRESENCE for span in spans if present(span)
-    )
-
-
-def _records_identity(span: Span) -> bool:
-    """Whether this span records an identity — which a session id alone does not.
-
-    The one derivation worth its own function, because it is the trap. An
-    OpenTelemetry MCP span carries `mcp.session.id` and nothing else identity-shaped,
-    and treating that as identity coverage would let the session-as-authentication rule
-    accuse a properly authenticated deployment of the thing its instrumentation simply
-    never mentioned.
-    """
-    identity = span.identity
-    return identity is not None and (
-        identity.credential is not None or identity.claimed_resource is not None
-    )
-
-
-_PRESENCE: tuple[tuple[Dimension, Callable[[Span], bool]], ...] = (
-    (Dimension.MESSAGES, lambda s: bool(s.messages or s.system_instructions)),
-    (Dimension.TOOLS, lambda s: s.tool is not None or bool(s.tool_offers)),
-    (Dimension.RETRIEVAL, lambda s: s.retrieval is not None),
-    (Dimension.MEMORY, lambda s: s.memory is not None),
-    (Dimension.HANDOFF, lambda s: s.handoff is not None),
-    (Dimension.IDENTITY, _records_identity),
-    (Dimension.DELEGATION, lambda s: bool(s.delegations)),
-    (Dimension.CONSENT, lambda s: bool(s.consents)),
-    (Dimension.POLICY, lambda s: bool(s.policy_decisions)),
-    (Dimension.APPROVAL, lambda s: bool(s.approvals)),
-    (Dimension.EFFECTS, lambda s: bool(s.effects)),
-)
 
 
 @dataclass(frozen=True, slots=True)

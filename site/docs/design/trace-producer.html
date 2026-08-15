@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Producing a trace — Guardana documentation</title>
+<meta name="description" content="why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, and what the model has to gain before an integrator can record human approval honestly">
+<link rel="canonical" href="https://guardana.dev/docs/design/trace-producer.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html" aria-current="page">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Producing a trace: the writer, the declaration, and the approving actor<span class="status accepted">accepted</span></h1><p class="lede">why a producer needs an append-only writer rather than a serializer, which inflated declaration actually leaks a pass, and what the model has to gain before an integrator can record human approval honestly</p><p><strong>Status:</strong> accepted, implemented — ships in the next release · <strong>Written:</strong>
+2026-08-15 · <strong>Continuous verification, item 1</strong></p>
+<h2 id="the-problem-stated-precisely">The problem, stated precisely</h2>
+<p><a href="../usage-analyze-trace.html"><code>analyze-trace</code></a> grades an execution somebody else
+recorded. <a href="trace-domain-model.html"><code>trace-domain-model.md</code></a> settled what a trace <em>is</em>
+and, more importantly, what an absence in one is allowed to mean. This document is
+about the other end of the pipe: <strong>how the file gets written.</strong></p>
+<p>Today there is exactly one way, <code>serialize_trace(trace) -&gt; str</code>, and it renders a
+finished <code>Trace</code> in a single call. That is the right shape for its stated job —
+converting an export, so an operator can add the authorization dimensions their
+framework does not emit — and the wrong shape for a producer. A production agent
+emits one event at a time, inside a session that may run for hours, and the file has
+to be useful if the process dies halfway through. A whole-trace serializer says: hold
+everything in memory, and if you crash, you have nothing.</p>
+<p>So the deliverable is an <strong>incremental writer</strong>. The five gaps below are not
+ergonomics. Each one is a way a file can be written that makes a rule report a pass
+it did not earn — which is the one failure this project exists against.</p>
+<h2 id="what-the-measurement-says-and-one-claim-it-corrects">What the measurement says, and one claim it corrects</h2>
+<p>The gap table in <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md"><code>ROADMAP.md</code></a> states that an integrator declaring
+<code>approval</code> while its hook never supplies one &quot;makes the approval rules run and pass on
+empty&quot;. That was written from the model rather than from a run. Four traces, graded by
+the released engine, say otherwise — and they locate the leak somewhere else.</p>
+<p>All four are the same execution: an agent refunds order 12 with no approval anywhere.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>header declares</th>
+<th>span carries</th>
+<th>verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td><code>approval</code>, <code>effects</code></td>
+<td>the effect, no approval</td>
+<td><code>unverified</code>, exit <code>0</code></td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td><code>approval</code>, <code>effects</code></td>
+<td>a <code>mutates: true</code> tool call, no effect, no approval</td>
+<td><strong><code>✓ No findings.</code>, exit <code>0</code></strong></td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td><code>approval</code>, <code>effects</code></td>
+<td>the effect <em>and</em> <code>not_requested</code></td>
+<td><code>HIGH</code>, exit <code>1</code></td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td><code>messages</code>, <code>tools</code></td>
+<td>the effect <em>and</em> the approval</td>
+<td><code>✓ No findings.</code>, exit <code>0</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>A does not pass.</strong> <code>guardana.trace.unapproved_side_effect</code> declines, once, for the
+whole trace: <em>&quot;1 consequential effect(s) executed with no approval record covering
+them (refund (payment)) — this trace records approvals, so this build cannot tell an
+action outside the approval policy from an approval that was skipped.&quot;</em> The contract
+assertion is stricter still: <code>approval_required</code> yields a <strong>finding</strong> when no granted
+approval precedes an in-scope effect, so an inflated <code>approval</code> declaration produces a
+false <em>red</em>, not a false green.</p>
+<p><strong>B is the false green.</strong> The same four rules ran as in A and C. Every one of them
+concluded that nothing was found, the run exited <code>0</code>, and nothing anywhere said the
+recording was thin. The dimension that leaks is <code>effects</code>, not <code>approval</code> — because
+the effect-shaped rules <em>iterate the effects</em> and consult the approvals. An empty list
+of approvals is a lookup that misses, and the code notices. An empty list of effects
+is a loop that does not run, and there is nothing left to notice with.</p>
+<p>That is the general shape, and it is worth stating as a rule of thumb for any future
+dimension: <strong>a declared dimension that drives a loop is the dangerous one; a declared
+dimension that answers a question is not.</strong> <code>effects</code> and <code>retrieval</code> drive loops.
+<code>approval</code>, <code>consent</code>, <code>policy</code> and <code>delegation</code> answer questions about what a loop
+found.</p>
+<p><strong>D is the quiet one.</strong> The producer wrote the approval and the effect correctly and
+declared neither, so both were read, dropped and never graded. The evidence of an
+unapproved refund is sitting in the file. This is the safe direction and it is still a
+defect: one typo in a declaration list silently removes a producer's entire
+authorization coverage while every other signal about the run looks normal.</p>
+<p>Two conclusions follow, and they set the priorities below. The engine's honesty
+machinery works where it was pointed — an absence in a <em>consulted</em> dimension already
+declines. The writer's job is the part nobody has covered: a declaration that is held
+against what was written, and the loop-driving dimensions in particular.</p>
+<h2 id="decision-1--append-only-and-termination-is-declared-in-the-header">Decision 1 — append-only, and termination is declared in the header</h2>
+<p>The header is written once, at <code>open</code>. Spans are appended, one JSON object per line,
+flushed as they go. Nothing rewrites an earlier byte, because a file being appended to
+by a live agent is also a file an operator may copy or grade at any moment.</p>
+<p>That creates one problem worth solving properly. <code>truncated: unterminated</code> is the
+reason a reader needs — &quot;we stopped looking&quot; rather than &quot;nothing happened after this&quot;
+— and it lives in the <strong>header</strong>, which by then is already on disk and cannot be
+amended. Three ways out:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Rejected because</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rewrite the header on clean close</td>
+<td>it is no longer append-only, and a file grabbed mid-session is a file with a header being rewritten under the reader</td>
+</tr>
+<tr>
+<td>A footer record on every file, absence ⇒ unterminated</td>
+<td>every trace ever hand-written or produced by <code>--write-trace</code> becomes <code>unterminated</code> overnight, which converts a working corpus into a corpus of declines. A change that turns everybody's passing files into inconclusive ones is not a safety improvement, it is a migration nobody agreed to</td>
+</tr>
+<tr>
+<td><strong>A footer, promised in the header</strong></td>
+<td>chosen</td>
+</tr>
+</tbody>
+</table></div>
+<p>The header gains <code>&quot;terminated&quot;: true</code>, meaning <em>this producer will write a footer, so
+read its absence as truncation</em>. A file without the key behaves exactly as it does
+today. A file with it and no footer reads as <code>truncated: unterminated</code>, and every rule
+that found nothing declines rather than passing.</p>
+<p>This is the same shape as <code>instrumented</code>, deliberately: a promise in the header that
+licenses a stronger reading of what follows, and never a reading the producer did not
+ask for.</p>
+<p><strong>The footer carries a count, not only a full stop.</strong> <code>{&quot;guardana_trace_end&quot;: 3, &quot;spans&quot;: 17}</code>. A footer that said nothing but &quot;I finished&quot; would certify a file whose
+middle a log shipper had dropped — a <em>new</em> claim of completeness that can be wrong,
+introduced by the mechanism installed to remove a false green. A file whose span
+records do not add up to the declared count reads as <code>truncated: records_lost</code>, which
+is a separate reason from <code>unterminated</code> because the two point at different systems to
+go and look at. Records the reader could not parse still count: those are already
+reported as unreadable, and folding them in here would invent a shipping problem the
+file does not have.</p>
+<p><strong><code>TraceTruncation.UNTERMINATED</code> has existed since 0.14 and nothing in the shipped
+source has ever set it.</strong> Only a hand-written header could produce it. The writer is
+the first thing that will — which is the usual finding here, and the usual reason to
+check the seam rather than the enum.</p>
+<h2 id="decision-2--the-writer-refuses-at-the-source">Decision 2 — the writer refuses at the source</h2>
+<p>Unknown keys are refused on <em>read</em> today. A producer with a typo learns about it when
+somebody finally grades the file, by which time the run it was supposed to cover is
+gone. The writer closes that: every span is serialized and <strong>read back through the
+native parser before the line is appended</strong>, and a span that does not survive the round
+trip raises instead of being written.</p>
+<p>This is a per-span parse on the write path, which is a real cost and a defensible one.
+The producing application is already doing model calls; a span parse is orders of
+magnitude below the event that produced it, and the alternative is losing evidence
+permanently rather than slowly. It is also not a switch: an opt-out here would be a
+fail-open flag on the only validation a producer gets, and this codebase does not ship
+those.</p>
+<p>The typed Python API already makes most invalid states unrepresentable — a <code>SinkKind</code>
+is an enum, not a string. What the round trip catches is the class that survives
+typing: a required field left empty, a value the parser rejects for a reason the
+constructor does not know, and any future divergence between what <code>serialize_trace</code>
+writes and what <code>_native.py</code> accepts. The round-trip gate on persisted schemas exists
+for exactly that divergence; this puts it on the writing path too.</p>
+<h2 id="decision-3--an-inflated-declaration-and-the-honest-limit-of-one-session">Decision 3 — an inflated declaration, and the honest limit of one session</h2>
+<p><code>instrumented</code> is a promise, and the writer holds it in both directions. They are not
+symmetric, and pretending they were would produce a check that fires on well-behaved
+producers.</p>
+<p><strong>Writing a block for an undeclared dimension is refused</strong> (case D above). It is a bug
+the integrator can fix in the line that caused it, the evidence would otherwise be
+discarded in silence, and no legitimate producer needs it. Fail loudly on bad input.</p>
+<p><strong>Declaring a dimension and never writing one is not decidable from a single
+session.</strong> An agent that made no tool calls genuinely produced no effects; a session
+where nothing happened is a real session. A writer that refused to close such a file
+would fire on every quiet hour of every correctly instrumented deployment, and a check
+that fires on correct behaviour is a check somebody excludes.</p>
+<p>What <em>is</em> decidable is a <strong>contradiction inside the session</strong>, and case B is exactly
+one: a producer that declares <code>effects</code>, records a tool execution marked
+<code>mutates: true</code>, and records no effect for it. That is not a quiet session. Decision 5
+removes the case entirely rather than detecting it — once the sink map is the seam a
+tool execution goes through, a mutating call cannot be recorded without its effect.</p>
+<p>The rest of the question — <em>this producer has declared <code>approval</code> for six months and
+has never once written one</em> — is a fact about a producer's history, not about a file.
+It belongs with the fleet history in the continuous-verification milestone, next to the
+already-deferred &quot;a rule that declines on every target, release after release&quot;. Both
+are the same missing capability, and neither is fixable by looking harder at one
+document.</p>
+<p><strong>Deriving <code>instrumented</code> from content is rejected for the same asymmetry.</strong> Reading
+&quot;this file has no effects&quot; as &quot;this producer does not record effects&quot; would stand the
+rules down on every quiet session — which is why the field is a declaration and not a
+measurement, and why the derivation the reader does for a header that omits the field
+entirely can only ever <em>reduce</em> what runs.</p>
+<h2 id="decision-4--the-approving-actor-becomes-structural-trace-v3">Decision 4 — the approving actor becomes structural (trace v3)</h2>
+<p>An agent framework's own gate returning &quot;approved&quot; is a policy decision by an
+automated component. A person seeing the action and agreeing to it is human oversight.
+Only the second one answers ASI09, and today the model cannot tell them apart:
+<code>Approval.approver</code> is a free string, and the distinction lives in a documented
+<em>convention</em> — <code>approvers: [&quot;human:*&quot;]</code> in
+<a href="../usage-contracts.html"><code>usage-contracts.md</code></a> — which is a glob over text an integrator
+types by hand. Nothing stops <code>human:auto-approve</code>, and nothing ever will; what a
+structure stops is the integrator who was not thinking about it.</p>
+<p><code>Approval</code> gains <code>approver_kind</code>, a closed enum with exactly two members — <code>human</code> and
+<code>automated</code> — alongside the existing identifier. There is deliberately no third member
+for &quot;unrecorded&quot;: that is the absent field, and a second spelling of it would be one
+fact with two answers. The model offers two constructors and no default, so choosing
+is the cheapest path and skipping is not a path at all.</p>
+<p>The contract's <code>approvers</code> glob keeps its meaning by matching a <strong>canonical
+rendering</strong>: <code>f&quot;{kind}:{approver}&quot;</code> when the kind is recorded, and the raw string when
+it is not. So:</p>
+<ul>
+<li>a v3 producer writing <code>approver: &quot;alice&quot;, approver_kind: human</code> matches the
+<code>human:*</code> that people already have in their contracts;</li>
+<li>a v2 file carrying <code>approver: &quot;human:alice&quot;</code> still matches it, unchanged;</li>
+<li>a v2 file carrying <code>approver: &quot;alice&quot;</code> still matches whatever it matched before.</li>
+</ul>
+<p>On read, a v2 <code>approver</code> whose prefix names a known kind is parsed into that kind —
+which promotes the convention that is already documented into the structure that
+enforces it, rather than inventing a second one beside it.</p>
+<p>This is a <strong>trace v3</strong>: a new field, absent in older files, exactly as v2 added
+<code>Span.agent</code>. The version ladder in <code>_native.py</code> carries a v2 header forward unchanged
+and the span parser accepts both shapes, so no existing file changes meaning. Doing it
+now is the cheap moment — principle 14 puts a complete domain model before any freeze,
+and the population of external producers is about to stop being zero.</p>
+<h2 id="decision-5--the-tool-to-sink-map-belongs-to-the-integrator-with-no-implicit-default">Decision 5 — the tool-to-sink map belongs to the integrator, with no implicit default</h2>
+<p>The engine cannot know that a framework's <code>terminal</code> tool is a shell. It knows no
+vendor, by principle 1. So the integrator declares the map, and the writer turns a
+recorded tool execution into a recorded effect through it.</p>
+<p>The interesting question is the unmapped tool, and <code>SinkKind.OTHER</code> is a trap here:
+<code>other</code> is deliberately on neither consequential list, so an effect recorded as <code>other</code>
+is an effect no rule will ever fire on. Falling back to it silently would convert
+&quot;nobody mapped this tool&quot; into &quot;this tool is harmless&quot;, which is the same false green
+this document opened with, one layer down.</p>
+<p>So:</p>
+<ul>
+<li>the map has <strong>no implicit default</strong> — the integrator states one, and stating
+<code>other</code> is then a deliberate act with a name on it;</li>
+<li>a tool the producer marked <code>mutates: true</code> that has <strong>no mapping</strong> is refused at
+write time, because that is precisely the class where an unnoticed fallback costs a
+verdict;</li>
+<li>every unmapped tool name is collected and reported at <code>close</code>, so an integrator
+finds out from the run rather than from an auditor.</li>
+</ul>
+<p>An effect of unknown kind is still an effect, and it is recorded as one. What is not
+allowed is the absence of a record.</p>
+<h2 id="the-shape-of-the-api">The shape of the API</h2>
+<p>The contract is the file format; this is a convenience over it.</p>
+<pre><code class="language-python">from guardana.core.trace import Dimension, SinkKind, SinkMap, open_trace
+
+with open_trace(
+    path,
+    trace_id=session_id,
+    producer=&quot;acme-app&quot;,
+    producer_version=&quot;1.4.0&quot;,
+    instrumented=[Dimension.MESSAGES, Dimension.TOOLS, Dimension.APPROVAL, Dimension.EFFECTS],
+    sinks=SinkMap({&quot;terminal&quot;: SinkKind.SHELL, &quot;refund&quot;: SinkKind.PAYMENT}, default=SinkKind.OTHER),
+) as trace:
+    trace.span(span_from_your_hook)
+</code></pre>
+<p><code>open_trace</code> writes the header — including <code>terminated: true</code> — before the first span
+exists, so a session that runs for hours is readable from the moment it starts. The
+context manager writes the footer on a clean exit and <em>not</em> on an exception, because a
+writer that tidied up after a crash would produce a file claiming to be complete over
+an execution nobody saw the end of. A crash that never runs <code>__exit__</code> leaves the same
+file, which is the point.</p>
+<p>One method rather than two. An integrator hands over a <code>Span</code> built from whatever their
+hook gave them, and the writer fills in the effect that a recorded tool call implies —
+which is what makes the case in decision 3 unwritable rather than merely detectable.
+<code>trace.unmapped_tools</code> names the tools that fell through the sink map, so the gap is
+visible at the end of a run rather than at the end of an audit.</p>
+<h2 id="what-this-is-not">What this is not</h2>
+<p><strong>Not a second SDK.</strong> Guardana's contract is the published, versioned file format
+(<code>schemas/trace-v3.schema.json</code>). Everything here is a convenience over it, and a team
+emitting JSONL from Go or TypeScript stays a first-class producer — which is why every
+decision above lands in the <em>format</em> first and the Python API second. A decision that
+could only be expressed through the writer would be a decision those producers cannot
+make.</p>
+<p><strong>Not an enforcement point.</strong> The writer records what happened; it decides nothing. A
+helper that asked Guardana whether an action is allowed would be inline enforcement
+wearing a library's clothes, and that is a standing non-goal. Nothing here runs in a
+request path.</p>
+<p><strong>Not an integration we carry.</strong> The examples that come with this pin the upstream
+version they were written against and state that a later release may break them. A green
+build here must never depend on somebody else's release — which is a rule about
+<em>dependencies</em>, not about directories: an example that never imports the framework it
+integrates with, because its payloads are copied from that framework's own
+documentation, runs in CI safely and pins this writer's API seen from outside the
+repository. Checking one against the real framework is a manual step, recorded in the
+example's README with the version and the date it was checked.</p>
+<h2 id="deferred-with-the-reason">Deferred, with the reason</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Deferred</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Detecting a dimension declared and never written, across sessions</td>
+<td>needs a producer's history, which is the fleet-history work in the same milestone. One session cannot tell a quiet hour from a hook that never fires</td>
+</tr>
+<tr>
+<td>Rotation, size limits and multi-file sessions</td>
+<td>a session that outgrows a file is a real operational problem and it is orthogonal to every decision here: the header/footer contract composes with a rotation scheme without changing. Deciding it now, with no producer running, would be inventing a shape from imagination</td>
+</tr>
+<tr>
+<td>A structured approver for <code>consent</code> and <code>policy_decisions</code></td>
+<td>the same automated-versus-human distinction exists there, and it does not carry the same weight: a consent is by definition the subject's, and a policy decision is by definition automated. Adding a kind to both would be symmetry for its own sake</td>
+</tr>
+<tr>
+<td>Async and thread-safe writing</td>
+<td>an agent framework that calls hooks from several threads needs it, and none of the two worked examples does yet. A lock is easy to add and impossible to remove; the honest order is a real caller first</td>
+</tr>
+</tbody>
+</table></div>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.20.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/trace-producer.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

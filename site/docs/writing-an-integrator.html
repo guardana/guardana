@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing an integrator — Guardana documentation</title>
+<meta name="description" content="how to make the agent you already run produce a trace Guardana can grade, which dimensions your framework will not give you for free, and the one distinction to get right before anything else">
+<link rel="canonical" href="https://guardana.dev/docs/writing-an-integrator.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../">guard<span>ana</span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="writing-an-integrator.html" aria-current="page">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="design/README.html">How these are written</a></li>
+<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Writing an integrator<span class="status beta">beta</span></h1><p class="lede">how to make the agent you already run produce a trace Guardana can grade, which dimensions your framework will not give you for free, and the one distinction to get right before anything else</p><p><a href="usage-analyze-trace.html"><code>analyze-trace</code></a> grades an execution that already happened.
+This page is about the other end: <strong>how the agent you already run produces a file worth
+grading.</strong></p>
+<p>You are in the right place if you run a self-hosted agent — your own harness, or a
+framework with a hook system — and you want its production executions checked against
+the same rules and <a href="usage-contracts.html">security contracts</a> your CI already runs. You do
+not need Guardana in your request path, and nothing here puts it there.</p>
+<h2 id="start-here-the-distinction-that-decides-whether-any-of-this-is-worth-doing">Start here: the distinction that decides whether any of this is worth doing</h2>
+<p>An agent framework's own gate returning <code>approved</code> is <strong>a policy decision by an
+automated component</strong>. A person looking at the action and agreeing to it is <strong>human
+oversight</strong>. Recording the first as the second satisfies a contract demanding a human
+while nobody ever saw the action — and that contract is usually the one somebody bought
+this for.</p>
+<p>So the model makes you say which:</p>
+<pre><code class="language-python">from guardana.core.trace import Approval
+
+Approval.granted_by_human(&quot;alice@acme.example&quot;, action=&quot;payment.refund&quot;)
+Approval.granted_by_automation(&quot;risk-policy-v4&quot;, action=&quot;payment.refund&quot;)
+</code></pre>
+<p>If your framework has an interactive approval prompt, that is a human. If it has an
+allow-list, a guardrail, a risk score or a <code>pre_tool_call</code> hook returning <code>approve</code>,
+that is automation — even when a person configured it. When you genuinely cannot tell,
+leave <code>approver_kind</code> off entirely; an unrecorded kind makes the contract decline, which
+is the answer you want over a guess.</p>
+<h2 id="what-your-framework-already-gives-you-and-what-it-does-not">What your framework already gives you, and what it does not</h2>
+<p>A trace has eleven dimensions. Measured against a real run from every framework adapter
+Guardana ships, the split is stark:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Where it usually comes from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>messages</code>, <code>tools</code></td>
+<td>your framework's existing tracing, or its LLM client</td>
+</tr>
+<tr>
+<td><code>retrieval</code>, <code>memory</code>, <code>handoff</code></td>
+<td>your framework, if it has those concepts at all</td>
+</tr>
+<tr>
+<td><code>identity</code>, <code>delegation</code>, <code>consent</code>, <code>policy</code>, <strong><code>approval</code></strong>, <strong><code>effects</code></strong></td>
+<td><strong>you</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>The bottom row is the point. The OpenTelemetry GenAI conventions have no field for any
+of it, so no exporter emits it, so a trace shaped for reliability is silent about
+authorization. The two in bold are the ones that turn a clean-looking file into a
+finding, and they are the two your hooks have to supply.</p>
+<h2 id="declare-what-you-record--and-only-what-you-record">Declare what you record — and only what you record</h2>
+<pre><code class="language-python">from guardana.core.trace import Dimension, SinkKind, SinkMap, open_trace
+
+with open_trace(
+    session_dir / f&quot;{session_id}.jsonl&quot;,
+    trace_id=session_id,
+    producer=&quot;acme-app&quot;,
+    producer_version=&quot;1.4.0&quot;,
+    instrumented=[
+        Dimension.MESSAGES,
+        Dimension.TOOLS,
+        Dimension.IDENTITY,
+        Dimension.APPROVAL,
+        Dimension.EFFECTS,
+    ],
+    sinks=SinkMap(
+        {&quot;refund&quot;: SinkKind.PAYMENT, &quot;terminal&quot;: SinkKind.SHELL, &quot;send_email&quot;: SinkKind.EMAIL},
+        default=SinkKind.OTHER,
+    ),
+) as trace:
+    ...
+</code></pre>
+<p><code>instrumented</code> is a <strong>promise</strong>, and it works in both directions.</p>
+<p>Leave a dimension out and its rules do not run — the safe direction, and how you start:
+declare <code>messages</code> and <code>tools</code> on day one, add <code>approval</code> and <code>effects</code> when the hooks
+that supply them exist.</p>
+<p>Overstate it and you get a check that runs on nothing. This is not theoretical, and it
+is not symmetric between dimensions: declaring <code>approval</code> and never writing one makes
+the rules <strong>decline</strong>, while declaring <code>effects</code> and never writing one produces
+<code>✓ No findings.</code> and exit <code>0</code> over an execution that moved money. The measurement is in
+<a href="design/trace-producer.html"><code>docs/design/trace-producer.md</code></a>. It is also why the writer
+refuses to record a tool call the producer marked <code>mutates: true</code> without an effect
+beside it — the file that grades falsely clean is one you cannot write.</p>
+<p>The writer also refuses a block for a dimension you did <em>not</em> declare. A reader drops
+those silently, so one typo in the list would remove your whole authorization coverage
+while every other signal about the run looked normal.</p>
+<h2 id="the-sink-map-is-yours-because-the-engine-knows-no-vendor">The sink map is yours, because the engine knows no vendor</h2>
+<p>Guardana cannot know that your <code>terminal</code> tool is a shell — by design; it encodes no
+vendor and no framework. You declare it, and <code>default</code> is required so that falling back
+to <code>other</code> is a decision with your name on it rather than something that happens by
+omission.</p>
+<p>Two consequences worth knowing before you pick a default:</p>
+<ul>
+<li>an unmapped tool your producer marked <code>mutates: true</code> is <strong>refused</strong>, because <code>other</code>
+is on no consequential list and recording it there would file &quot;nobody classified this
+tool&quot; under &quot;this tool is harmless&quot;;</li>
+<li>everything else that falls through is recorded and <strong>counted</strong>. Read
+<code>trace.unmapped_tools</code> at the end of a session and you get the list of tools nobody
+classified, from your own run rather than from an auditor.</li>
+</ul>
+<h2 id="writing-spans-from-your-hooks">Writing spans from your hooks</h2>
+<p>One method. Build a <code>Span</code> from whatever your hook handed you and pass it; the writer
+fills in the effect a recorded tool call implies, validates the record by reading it
+back through the real parser, and appends it to the file before returning.</p>
+<pre><code class="language-python">from guardana.core.trace import (
+    Identity, SessionRef, Span, SpanKind, ToolExecution, ToolStatus,
+)
+
+def on_tool_finished(call, result, approval_decision):
+    trace.span(
+        Span(
+            span_id=call.id,
+            kind=SpanKind.TOOL_EXECUTION,
+            name=call.tool_name,
+            tool=ToolExecution(
+                name=call.tool_name,
+                call_id=call.id,
+                arguments=call.arguments_json,
+                status=ToolStatus.SUCCEEDED if result.ok else ToolStatus.FAILED,
+                mutates=call.tool_name in WRITES,
+            ),
+            identity=Identity(actor=call.agent_name, session=SessionRef(id=call.session_id)),
+            approvals=(approval_of(approval_decision),),
+        )
+    )
+</code></pre>
+<p><code>mutates</code> is a tri-state and it is worth getting right: <code>True</code> and <code>False</code> are claims,
+and <code>None</code> means nobody said. A rule that needs to know reads <code>None</code> as unknown rather
+than as read-only.</p>
+<p>Write the span when the call <strong>finishes</strong>, not when it starts. A span records what
+happened; a span written at the start would record an intention, and an effect that
+never landed is not a consequence.</p>
+<h2 id="ending-the-session-and-admitting-when-you-did-not">Ending the session, and admitting when you did not</h2>
+<p>A file being appended to by a live agent cannot go back and amend its header, so a
+session that died mid-run looks exactly like one that finished with nothing to report —
+and every rule that found nothing then reports a pass over an execution it saw half of.</p>
+<p><code>open_trace</code> writes <code>&quot;terminated&quot;: true</code> into the header, which is a promise to sign
+off. Leaving the <code>with</code> block cleanly writes the footer. <strong>An exception does not</strong>, and
+that is deliberate: the file is then read as <code>truncated: unterminated</code>, every rule that
+found nothing declines, and that is the truth about that session. A crash that never
+runs <code>__exit__</code> leaves the same file.</p>
+<p>Nothing in your hooks has to know about this. What it costs you is that you must not
+swallow the exception around the writer just to make the file look tidy.</p>
+<h2 id="check-your-work-by-running-it">Check your work by running it</h2>
+<p>Grade the file you just produced and <strong>read the note</strong>, not only the verdict:</p>
+<pre><code class="language-console">$ guardana analyze-trace sessions/2026-08-15T09-41.jsonl
+read 14 span(s) from sessions/2026-08-15T09-41.jsonl as guardana (producer: acme-app)
+note: this producer does not record retrieval, handoff, delegation, consent, policy —
+      the rules needing those dimensions were skipped rather than reporting nothing
+      found. Set fail_on_skipped to treat that as indeterminate
+</code></pre>
+<p>That line is your coverage report. Every dimension it names is a rule that did not run.
+<code>guardana trace inspect</code> (<a href="usage-trace-inspect.html">usage</a>) shows the same thing as an
+evidence matrix, per assertion, which is the faster way to find out that the contract
+you care about cannot be checked yet.</p>
+<p>A run that reports <code>0 finding(s); 1 rule(s) run, 8 skipped</code> is not a passing agent. It
+is an agent nobody has looked at.</p>
+<h2 id="what-an-integrator-is-not">What an integrator is not</h2>
+<p><strong>Not an enforcement point.</strong> The writer records; it decides nothing. A helper that
+asked Guardana whether an action is allowed would be inline enforcement wearing a
+library's clothes, and it is a standing non-goal. Guardana is never in your request
+path.</p>
+<p><strong>Not a required dependency of your agent.</strong> The contract is the published file format
+(<a href="https://github.com/guardana/guardana/blob/main/schemas/trace-v3.schema.json"><code>schemas/trace-v3.schema.json</code></a>), and this writer is
+a convenience over it. A team emitting the same JSONL from Go or TypeScript is a
+first-class producer with no Python anywhere. If the writer's refusals are useful to
+you, take them; if you write your own emitter, take the four rules in
+<a href="usage-analyze-trace.html#the-native-format">the format reference</a> instead.</p>
+<p><strong>Not somebody else's problem to keep working.</strong> A worked example lives in
+<a href="https://github.com/guardana/guardana/tree/main/examples"><code>examples/</code></a>, pinned to the upstream version it was written against. It
+is an example rather than an integration this project carries: a later release of that
+framework may break it, and it deliberately stays out of CI, because a green build here
+must never depend on somebody else's release.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.20.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/writing-an-integrator.md">Edit this page on GitHub</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

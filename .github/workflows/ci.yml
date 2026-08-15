@@ -162,3 +162,16 @@ jobs:
           --with ./examples/custom_rule
           --with pytest
           pytest examples/custom_rule/tests -q
+
+      # The integrator example never imports Hermes — its payloads are copied from
+      # Hermes' documentation — so running it here depends on nobody else's release.
+      # What it pins is the trace writer's public API seen from outside this repo:
+      # the entry point, the hooks, and the file that comes out.
+      - name: Run the integrator example's own tests against an installed Guardana
+        run: >
+          uv run --isolated --no-cache
+          --with ./packages/guardana-core
+          --with ./packages/guardana-rules
+          --with ./examples/hermes_integrator
+          --with pytest
+          pytest examples/hermes_integrator/tests -q

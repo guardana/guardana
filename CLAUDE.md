@@ -189,6 +189,10 @@ uv run guardana scan packages  # dogfood: must stay at zero findings
 uv run --isolated --no-cache \
   --with ./packages/guardana-core --with ./packages/guardana-rules \
   --with ./examples/custom_rule --with pytest pytest examples/custom_rule/tests -q
+uv run --isolated --no-cache \
+  --with ./packages/guardana-core --with ./packages/guardana-rules \
+  --with ./examples/hermes_integrator --with pytest \
+  pytest examples/hermes_integrator/tests -q
 ```
 
 **`--no-cache` is not optional, and it is not a speed trade.** Without it uv serves
@@ -199,14 +203,20 @@ were measured and both returned the stale wheel. This gate has now produced a fa
 green **twice**: a pushed tag in 0.20.0 whose CI was red on the very tests this
 command had just reported passing.
 
-The last one is the third-party extension story, and it is **isolated from the
-main test environment on purpose** — installing `acme.*` into it would skew the
-dogfood scan. That isolation is also why `uv run pytest` cannot see it: a change
-to a rule-authoring contract can be green everywhere locally and still break the
-one package that stands in for everybody else's. It caught a bare `taxonomy:
-[LLM06]` in the example's own YAML that every other gate passed over, and in 0.20.0
-it caught the example's own "what is registered" set omitting the fourth extension
-group — a false *red* accusing a manifest of promising what it does register.
+The last two are the third-party story, and they are **isolated from the main test
+environment on purpose** — installing `acme.*` into it would skew the dogfood scan.
+That isolation is also why `uv run pytest` cannot see them: a change to a rule-authoring
+contract can be green everywhere locally and still break the one package that stands in
+for everybody else's. `custom_rule` caught a bare `taxonomy: [LLM06]` in the example's
+own YAML that every other gate passed over, and in 0.20.0 it caught the example's own
+"what is registered" set omitting the fourth extension group — a false *red* accusing a
+manifest of promising what it does register.
+
+`hermes_integrator` is the same idea for the *producer* contract: it registers through a
+third party's entry-point group and writes a trace with the public writer, so a change to
+the writer or the trace format shows up as somebody else's integration breaking.
+Its tests never import `hermes-agent`, which is what keeps it runnable in CI — checking
+it against the real Hermes is a manual step documented in its README.
 
 (`--cov` is not in `addopts` on purpose: it would make a single-file run like
 `uv run pytest packages/guardana-core/tests/test_runner.py` fail the coverage

@@ -113,6 +113,7 @@ convention = "pep257"
     "SLF001",   # tests may reach into the private surface they are pinning down
 ]
 "examples/custom_rule/tests/**" = ["S101", "D", "PLR2004"]
+"examples/hermes_integrator/tests/**" = ["S101", "D", "PLR2004"]
 "scripts/tests/**" = ["S101", "D", "PLR2004", "SLF001"]
 # Maintainer scripts are CLIs — print() is their user interface, not stray debug output.
 "scripts/*.py" = ["T201"]
@@ -138,6 +139,7 @@ mypy_path = [
     "packages/guardana-cli/src",
     "packages/guardana-server/src",
     "examples/custom_rule/src",
+    "examples/hermes_integrator/src",
     # Same reason as pytest's `pythonpath` below: the round-trip helpers are imported
     # by gates in several suites, so the type checker has to resolve them too.
     "packages/guardana-core/tests",
