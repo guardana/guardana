@@ -113,13 +113,51 @@ uv run pytest -q && uv run guardana scan packages
 git add -A
 git commit -m "chore(release): vX.Y.Z"
 
-# 7. Tag it (annotated — see below) and push the branch, then the tag.
-git tag -a vX.Y.Z -m "Guardana vX.Y.Z"
+# 7. Push the branch, and WAIT for CI to go green on that exact commit.
 git push origin main
-git push origin vX.Y.Z          # this is what triggers the publish
+gh run watch "$(gh run list --workflow=CI --branch=main --limit 1 --json databaseId -q '.[0].databaseId')"
 
-# 8. Publish the GitHub Release (see below), pasting the changelog section.
+# 8. Only then tag it (annotated — see below) and push the tag.
+git tag -a vX.Y.Z -m "Guardana vX.Y.Z"
+git push origin vX.Y.Z          # this is what triggers the publish
+git tag -a vX.Y -m "Guardana vX.Y (moving tag -> vX.Y.Z)" && git push -f origin vX.Y
+
+# 9. Publish the GitHub Release (see below), pasting the changelog section.
 ```
+
+### Push the branch and the tag as two steps, with CI in between
+
+**This is the step that has gone wrong in every release since 0.19.0.** Pushing both at
+once starts CI and the publish concurrently, so a red CI — for any reason, including one
+that has nothing to do with the code — leaves a publish already waiting on the `pypi`
+approval. Cancelling it, fixing, and re-tagging then produces a *second* Release run and
+a *second* approval click, and a `cancelled` run in the history that looks like a failed
+release and is not one. 0.20.0 cost four clicks that way.
+
+Waiting for CI first costs a few minutes and makes the whole release exactly one Release
+run and one click. It also means the tag can only ever land on a commit whose CI is
+green, which is the property the tag is supposed to carry.
+
+**If CI goes red after the tag is already pushed**, nothing is lost as long as the
+`publish` job is still `waiting` — it pauses *before* uploading, so a cancel at that
+point uploads nothing (verified: `gh run view <id> --json jobs`). Fix, then delete and
+re-create the tag on the green commit:
+
+```bash
+gh run cancel <release-run-id>          # check `publish` is still `waiting` first
+git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z
+# ... fix, commit, push, wait for CI ...
+git tag -a vX.Y.Z -m "Guardana vX.Y.Z" && git push origin vX.Y.Z
+```
+
+Moving a tag is only safe **before** anything is published. Once the wheels are on PyPI
+the tag stays where it is — PyPI will not accept a re-upload of the same filename, and a
+tag that moved after publication no longer names the bytes people installed.
+
+**Read the failing job's *step* conclusions, not the job's.** 0.21.0's first CI run went
+red on `Post Install uv` — a cache-cleanup step — while every test step passed. A job's
+conclusion tells you something failed; only the steps tell you whether it was the thing
+the job verifies.
 
 Pushing the `vX.Y.Z` tag triggers [`release.yml`](.github/workflows/release.yml),
 which builds all five wheels/sdists and publishes them to PyPI via OIDC trusted

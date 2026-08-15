@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Cut a release in one command: gate -> bump -> changelog -> commit -> tag -> push.
+"""Cut a release in one command: gate -> bump -> changelog -> commit -> push -> tag.
 
 The one command the RELEASING.md runbook describes, automated. Pushing the tag is
 what triggers `release.yml` to build and publish all five packages to PyPI (which
 still pauses on the `pypi` environment's approval — a deliberate final gate).
+
+The branch and the tag go up as two steps with CI in between, and that ordering is
+load-bearing: pushing both at once races CI against the publish, and a red run then
+costs a second approval click and leaves a cancelled release in the history.
 
     uv run python scripts/release.py patch            # 0.1.0 -> 0.1.1
     uv run python scripts/release.py minor            # 0.1.0 -> 0.2.0
@@ -152,9 +156,65 @@ def main(argv: list[str]) -> None:
     _run(["git", "commit", "-m", f"chore(release): {tag}"])
     _run(["git", "tag", "-a", tag, "-m", f"Guardana {tag}"])
     _run(["git", "push", "origin", "main"])
+    _await_green_ci()
     _run(["git", "push", "origin", tag])
     _move_marketplace_tag(version, tag)
     print(f"pushed {tag} — release.yml is building; approve the 'pypi' deployment to publish.")
+
+
+def _await_green_ci() -> None:
+    """Block until CI concludes on the commit just pushed, and stop if it is not green.
+
+    The tag is what starts the publish, so pushing it beside the branch races CI: a red
+    run — for any reason, including one that has nothing to do with the code — then
+    leaves a publish already waiting on the `pypi` approval. Cancelling, fixing and
+    re-tagging costs a second approval click and leaves a `cancelled` run in the history
+    that reads as a failed release. Every release from 0.19.0 to 0.21.0 paid that, and
+    0.20.0 paid it twice.
+
+    Fail-closed when the wait itself cannot be done: without `gh`, this stops before the
+    tag rather than pushing it blind, because an unverified tag is the thing being
+    avoided.
+    """
+    commit = _run(["git", "rev-parse", "HEAD"], capture=True).strip()
+    print(f"waiting for CI on {commit[:9]} before pushing the tag...")
+    try:
+        run_id = _run(
+            [
+                "gh",
+                "run",
+                "list",
+                "--workflow=CI",
+                f"--commit={commit}",
+                "--limit=1",
+                "--json=databaseId",
+                "--jq=.[0].databaseId",
+            ],
+            capture=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        _stop_before_tagging("the GitHub CLI (`gh`) is not available here")
+    if not run_id:
+        _stop_before_tagging(f"no CI run has started for {commit[:9]} yet")
+    # `gh run watch --exit-status` exits non-zero when the run failed, which is the
+    # whole check: without the flag it reports the failure and returns 0.
+    try:
+        _run(["gh", "run", "watch", run_id, "--exit-status"])
+    except subprocess.CalledProcessError:
+        _stop_before_tagging(f"CI run {run_id} is not green")
+    print("CI is green; tagging.")
+
+
+def _stop_before_tagging(reason: str) -> NoReturn:
+    """Leave the release commit pushed and unreleased, which is a state worth being in."""
+    print(
+        f"error: {reason}, so the tag was not pushed.\n"
+        f"The release commit is on `main` and nothing has been published. Once CI is\n"
+        f"green on it, push the tag by hand — see the 'Push the branch and the tag as\n"
+        f"two steps' section in RELEASING.md.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
 
 
 def _move_marketplace_tag(version: str, tag: str) -> None:

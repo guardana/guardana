@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+**Cutting a release produced two Release runs and cost two approval clicks, every time
+since 0.19.0.** The runbook — and `scripts/release.py` with it — pushed `main` and the
+tag back to back, which starts CI and the publish concurrently. A red CI then leaves a
+publish already waiting on the `pypi` gate, so cutting it short means cancelling,
+fixing, re-tagging, and clicking approve a second time; the cancelled run stays in the
+history looking like a failed release. 0.20.0 paid it twice.
+
+The branch and the tag now go up as two steps with CI in between, and `release.py`
+refuses to push the tag unless CI concluded green on the commit it just pushed — and
+refuses just as firmly when it cannot check at all, because an unverified tag is the
+thing being avoided. The release commit is then simply on `main`, pushed and
+unpublished, which is a state worth being in.
+
 ## [0.21.0] - 2026-08-15 — an agent that writes its own trace, and says who approved what
 
 ### Added
