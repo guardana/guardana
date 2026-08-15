@@ -351,6 +351,37 @@ attack results as observations**, provenance intact, landing in `unverified` unt
 Guardana can replay or grade them under its own contract. That composes with a
 promptfoo or garak run without taking a dependency on either.
 
+**Agent observability is the adjacent category, and it is an input rather than a
+competitor.** Checked 2026-08-14 against Lemma
+([uselemma.ai](https://www.uselemma.ai/), YC F25, a $2.3M pre-seed announced
+13 August 2026, reporting more than a million agent traces a day), which sells
+"production monitoring for AI agents": silent failures, an agent stuck in a loop, a
+tool call that failed, an intent misread, a success returned over a wrong result.
+Its site, its YC profile and its funding coverage name no policy, no guardrail and
+no blocked action — the category is **reliability**, and it works the way
+`analyze-trace` works, post-hoc over a recorded execution and never in the request
+path. Two things follow, and neither of them is "add reliability metrics":
+
+- **That category's trace contract has no field for the authorization half.** It
+  carries spans, generations, tool calls, `user_id`, `thread_id` and metadata, and
+  its documentation tells the author to redact secrets before sending. Identity,
+  delegation, consent, policy decisions, approvals, side effects, and retrieval
+  carrying a tenant on both sides — what **eight of the nine** `trace.*` rules and
+  four of the five contract assertion kinds need — are not in the schema, because it
+  was built to answer a different question.
+- **So the bottleneck is instrumentation, not reach.** Every trace being produced
+  out there is a potential Guardana input, and one shaped that way runs exactly the
+  ninth rule and nothing else — measured, in the continuous-verification milestone
+  below, where the same execution with three more blocks returns a HIGH finding.
+  That is why the order in that milestone is instrumentation first and receiver
+  second.
+
+The distinction to keep saying out loud, because it decides what belongs here: they
+ask whether the agent did the job *well*, and Guardana asks whether it did something
+it was *not allowed* to do. The first is a judgement about quality and is answered
+probabilistically; the second is a question about authority, is answered
+deterministically, and declines when the recording cannot answer it.
+
 Full notes: `docs/superpowers/research/2026-08-02-evaluation-landscape.md`.
 
 ## A note on milestone names and version numbers
@@ -597,15 +628,201 @@ refuses elsewhere. It stays on the list below 1.0.
 
 ## Milestone: continuous production verification
 
-OTLP receiver; scheduled synthetic checks with maintenance windows and jitter;
-trace replay; fleet history; a private-runner pattern for teams that cannot let a
-hosted service reach their endpoints. **Drift and regression root cause stays at
-the bottom** until Guardana can demonstrate attribution rather than correlation —
-naming the wrong cause confidently is worse than naming none.
+> **Outcome:** the invariants a security contract asserts are checked against what
+> the application actually did in production, continuously — and Guardana still
+> never stands in the request path.
 
-*(Repeated runs with confidence intervals moved up into the verification-semantics
-work, where they belong: they are about what a single run is entitled to claim,
-not about running one on a schedule.)*
+**What is missing here is the input, not the verification.**
+[`analyze-trace`](docs/usage-analyze-trace.md) already grades a recorded execution
+against nine built-in rules and whatever a [security
+contract](docs/usage-contracts.md) asserts, under the same evidence semantics as
+every other command. It reads a file an operator exported by hand. Everything below
+closes that one gap, in the order the measurement dictates rather than the order the
+components are interesting.
+
+### Instrumentation comes before the receiver, and that is a finding rather than a preference
+
+The LLM03 row above records that four of the five contract assertion kinds decline
+against a real run from *every* shipped adapter, because no framework records
+approvals, delegations or side effects on its own. A receiver built before that is a
+pipe carrying traces no rule can grade.
+
+What that costs is measurable, so it is measured. The same execution — an agent
+refunding an order — graded twice. First as an observability exporter shapes it,
+carrying messages and tool calls:
+
+```console
+$ guardana analyze-trace observability.jsonl
+read 2 span(s) from observability.jsonl as guardana (producer: observability-export)
+note: this producer does not record retrieval, handoff, identity, delegation, consent,
+      policy, approval, effects — the rules needing those dimensions were skipped
+      rather than reporting nothing found. Set fail_on_skipped to treat that as
+      indeterminate
+✓ No findings.
+
+0 finding(s); 1 rule(s) run, 8 skipped.
+```
+
+Then with the authorization half present:
+
+```console
+$ guardana analyze-trace enriched.jsonl
+read 2 span(s) from enriched.jsonl as guardana (producer: acme-app)
+note: this producer does not record retrieval, handoff, delegation, consent, policy —
+      the rules needing those dimensions were skipped rather than reporting nothing
+      found. Set fail_on_skipped to treat that as indeterminate
+✖ [HIGH] guardana.trace.unapproved_side_effect — A consequential effect executed
+    without an approval that was recorded as needed
+    span s2 executed payment: refund on order/12 (executed) while the approval for
+    'refund' is recorded as not_requested and the producer recorded it as irreversible
+
+1 finding(s); 4 rule(s) run, 5 skipped.
+```
+
+The first exits `0` and the second exits `1`. A clean pass over a production
+execution that refunded money without approval is the exact shape of failure this
+project exists against, and here it is not a bug in a rule — it is a fact the
+recording never carried.
+
+**No rule was added and nothing in the engine changed between those two runs.** The
+second file carries three blocks the first does not, and declares them:
+
+```jsonl
+{"guardana_trace": 2, …, "instrumented": ["messages","tools","identity","approval","effects"]}
+{"span_id": "s2", "kind": "tool_execution", "name": "refund",
+ "identity":  {"actor": "support-agent"},
+ "approvals": [{"action": "refund", "outcome": "not_requested"}],
+ "effects":   [{"sink": "payment", "action": "refund", "target": "order/12",
+                "status": "executed", "reversible": false}]}
+```
+
+That is the milestone in one diff: an unapproved, irreversible refund is *invisible*
+in a trace written for reliability and a HIGH finding in one written with the
+authorization half. The industry is instrumenting agents heavily and instrumenting
+them for the other question — so the traces are being produced and these dimensions
+are being left out of them.
+
+### 1. The authorization half, emitted rather than hand-written
+
+Today the path is `--write-trace` and an editor: convert an export, add the blocks,
+grade the result. That proves the model works and does not survive contact with a
+system that runs a thousand executions an hour.
+
+What closes it is a recording surface: a framework-neutral way for an application to
+state *this action was approved, by this principal*, *this policy returned deny*,
+*this credential crossed this boundary*, *this effect executed and cannot be undone*
+— and to declare in `instrumented` that it records them, since a dimension declared
+and empty is gradable while a dimension undeclared stands the rules down.
+
+Three constraints, each already stated elsewhere in this file:
+
+- It changes **what every adapter promises**, which is why the finer instrumentation
+  declaration in the deferred table above is the same piece of work, and why this
+  gets a design document before it gets code.
+- It must not become a second SDK. Guardana's contract is a **published, versioned
+  file format** (`schemas/trace-v2.schema.json`). Anything shipped here is a
+  convenience over that format and never the only door in — a team emitting JSONL
+  from Go or TypeScript stays a first-class producer.
+- It records what happened; it does not decide anything. A helper that *asks*
+  Guardana whether an action is allowed is inline enforcement wearing a library's
+  clothes, and that is a non-goal below.
+
+#### What the engine has to gain first
+
+`serialize_trace` renders a finished `Trace` in one call. That is right for
+converting an export and wrong for a producer, because a producer emits one event at
+a time inside a session that may run for hours and never fits in memory. Five gaps,
+each of which is a false-green risk rather than a convenience:
+
+| Gap | Why it is not cosmetic |
+|---|---|
+| **Append-only writing** | a long-running agent cannot buffer a session. The header is written once, spans are appended, and a file that stops mid-session is `truncated: unterminated` — a reason the model already carries, and the difference between "nothing happened after this" and "we stopped looking" |
+| **Validation at write time** | unknown keys are refused on *read* today, so a producer with a typo learns about it when somebody finally grades the file. By then the run it was supposed to cover is gone. The writer refuses at the source |
+| **A declaration that cannot be inflated** | `instrumented` is a promise. An integrator that declares `approval` while its hook never supplies one makes the approval rules run and pass on empty — the exact inversion this dimension exists to prevent. The writer holds the declaration against what is actually written |
+| **The approving actor, structurally** | an agent framework's own gate returning "approved" is a *policy decision by an automated component*, not a human approval. Recording it as `human:*` would satisfy `approval_required` while no person ever saw the action. This distinction is the first thing the integrator guide has to say, and the model has to make saying it easier than not |
+| **Tool-to-sink mapping owned by the integrator** | the engine cannot know that a framework's `terminal` tool is a shell — it knows no vendor, by principle 1. The integrator declares it, and a tool with no declared sink is an effect of *unknown* kind, never the absence of an effect |
+
+#### The integrator guide, and two examples that must differ
+
+The deliverable is documentation plus proof: a `docs/writing-an-integrator.md`
+beside [`writing-rules.md`](docs/writing-rules.md), answering one question — *how do
+I make the agent I already run produce a trace Guardana can grade?* — and **two
+worked examples under `examples/`**.
+
+Two, and not one, for a specific reason: **one example lets the contract be written
+around it.** The second is what proves the recording surface is general, which is the
+same argument that put three unrelated inputs into 1.0 entry criterion 2. So they
+have to be structurally different, not two agents of the same shape. The candidates
+are the two self-hosted agents people are actually running:
+
+- **[Hermes](https://github.com/NousResearch/hermes-agent)** (Nous Research, MIT) —
+  in-process hooks. Its plugin surface registers `pre_tool_call` (a directive
+  returning `block`/`approve`, carrying `tool_name`, `args`, `session_id`,
+  `tool_call_id`), `post_tool_call` (adding `result`, `status`, `duration_ms`) and
+  `post_llm_call`, which supplies six of the eleven dimensions — including the two
+  that matter most here, **approval and effect**. Read from its own documentation,
+  which also states the hook systems' purpose as "tool interception, metrics,
+  guardrails".
+- **OpenClaw** (MIT, self-hosted, shell and browser and messaging surfaces, memory
+  kept as files on disk) — the *other* shape: state on disk rather than callbacks in
+  the process. Its actual seam has not been read at source yet, and this entry says
+  so rather than promising a mapping nobody has checked.
+
+**These are examples, not integrations we carry.** Each pins the upstream version it
+was written against and its date, states that a later release may break it, and stays
+out of CI — a green build here must never depend on somebody else's release. A
+distribution per agent, or a catalogue of them, is a different product with different
+economics, and it is in the non-goals below.
+
+What the project keeps is the part that does not age: the published, versioned trace
+format, the honest declaration of what a producer records, and a guide anybody can
+follow for the agent we have never heard of.
+
+### 2. An OTLP receiver, out of band and never in the path
+
+A service that listens is a different security posture from reading a file an
+operator handed over, and it inherits the collector's answers rather than inventing
+its own: authenticated ingest, a key pinned to one project, byte-counted limits,
+and a refusal to read a schema version it does not know.
+
+One question is new and belongs decided here rather than discovered later.
+**Traces are input, not evidence, so redaction does not apply to them** — that is
+deliberate and documented, because redacting what the rules then grade would change
+the verdict while the file still looked authoritative. A receiver therefore holds
+raw production prompts, tool arguments and retrieved documents, which is not what
+this collector has ever stored.
+
+So the default is **grade at the edge and keep the finding, not the trace**: the
+trace is verified on arrival and dropped, with redacted evidence persisted the same
+way a `scan` result is. Retaining raw traces stays an explicit operator decision
+with its own retention policy, never a side effect of turning ingestion on. A
+verification tool that quietly becomes the largest unredacted store of customer
+prompts in the company has created the risk it was bought to measure.
+
+### 3. Continuous verification over the stream
+
+Scheduled synthetic checks with maintenance windows and jitter; fleet history across
+deployments; a private-runner pattern for teams that cannot let a hosted service
+reach their endpoints. **Drift and regression root cause stays at the bottom** until
+Guardana can demonstrate attribution rather than correlation — naming the wrong cause
+confidently is worse than naming none.
+
+*(Trace replay moved up into application awareness, where an incident becoming a
+permanent regression test belongs. Repeated runs with confidence intervals moved into
+the verification-semantics work: they are about what a single run is entitled to
+claim, not about running one on a schedule.)*
+
+### Deliberately left open here, with the reason
+
+**Third-party trace dialects stay deferred for the reason already in the table
+above**, and the neighbours make that reason stronger rather than weaker: every
+platform in this category publishes an OpenTelemetry path of its own, so reading the
+convention reaches all of them and owing each vendor a reader reaches one.
+
+| Deferred | Reason |
+|---|---|
+| **Alerting, grouping and issue triage over the stream** | grouping recurring occurrences into an issue is the neighbouring category's shape, and the collector already carries a finding lifecycle with waivers and an audit log. Rebuilding triage as a second system would be workflow surface, which sits below the verification work by policy |
+| **Sampling the stream** | a security verdict over 1% of executions is a coverage shortfall, and this engine has a channel for that. Deciding *which* executions to grade needs a policy language nobody has asked for yet; the honest interim is grading all of them and letting a budget refuse |
 
 ## Milestone: multi-agent protocols — a domain proof before 1.0, the target after
 
@@ -737,7 +954,24 @@ Parked with reasons:
 ## Non-goals
 
 - **Inline guardrail middleware.** Guardana verifies and gates; it does not sit in
-  the request path.
+  the request path. That covers a recording helper that would *ask* whether an
+  action is permitted: a library returning a decision an agent then acts on is the
+  request path, whichever package it ships in. Recording what happened is in scope;
+  deciding what may happen next is not.
+- **A maintained integration — or a distribution — per agent framework.** The
+  integrator guide and its two examples exist so that somebody else can write the
+  third. Carrying them ourselves is a catalogue business with a per-vendor
+  maintenance commitment, which is the same trade already refused for per-vendor
+  trace dialects, and it puts a green build at the mercy of upstream release
+  schedules. Two examples prove the recording surface is general; the tenth would
+  prove only that we now own nine other projects' calendars.
+- **Agent reliability, root-cause analysis and prompt optimisation.** Whether the
+  agent did the job *well*, why it got worse, and which prompt edit would fix it
+  belong to the observability category described above. Answering them here would
+  mean running a judge over every trace and calling the result a verdict — a
+  probabilistic claim inside a tool whose whole proposition is that it declines when
+  it cannot tell. The overlap is real: same trace, same post-hoc position, adjacent
+  buyers. That is precisely why the line is written down instead of assumed.
 - **An always-on guard classifier as the default gate** — open-weight guards miss
   too much, and a gate that fails open is worse than no gate.
 - **Attack-generation volume for its own sake.** garak sends more attacks;
