@@ -158,16 +158,23 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # No cache here, and that is the job's whole point: every step below runs
-      # `--no-cache` because uv otherwise serves a previously built wheel for an
-      # example, and the metadata inside it — the entry points a third party is
-      # discovered through — is exactly what these tests exist to check. Asking
-      # setup-uv to manage a cache nothing writes to leaves it pruning a directory
-      # that was never created, which it now fails the job over.
+      # `enable-cache: false`, stated rather than left to the default. Every step
+      # below runs `--no-cache` — that is the job's whole point, because uv
+      # otherwise serves a previously built wheel for an example and the metadata
+      # inside it is exactly what these tests check. So nothing ever writes to
+      # `UV_CACHE_DIR`, and setup-uv's post step fails the job trying to save a
+      # directory that was never created.
+      #
+      # Dropping `enable-cache: true` was not enough: the default is `auto`, which
+      # still enables it. The job passed anyway for four releases because another
+      # job's cache happened to match the key and *restoring* it created the
+      # directory — so the first commit to change `uv.lock` turned a green job red
+      # for a reason unrelated to anything it tests.
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: "3.13"
+          enable-cache: false
 
       # `--no-cache`: uv otherwise serves a previously built wheel for the example,
       # and the data files inside it — the pack manifest, the YAML rules — are what a

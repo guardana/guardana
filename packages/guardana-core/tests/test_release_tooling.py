@@ -431,3 +431,29 @@ def test_every_workflow_declares_the_token_it_needs(workflow: str) -> None:
         f"{workflow}: jobs with no declared token scope, so they inherit the "
         f"repository default: {undeclared}"
     )
+
+
+def test_the_no_cache_job_says_so_instead_of_relying_on_a_default() -> None:
+    """The example-plugin job runs everything with `--no-cache`, so nothing fills the cache.
+
+    `setup-uv` defaults `enable-cache` to `auto`, which still turns it on — and its
+    post step then fails the job trying to save a directory no step created.
+    Removing `enable-cache: true` did not fix that; the job simply kept passing
+    because another job's cache matched the key, and *restoring* it created the
+    directory. The first commit to change `uv.lock` broke a green job for a reason
+    unrelated to anything the job tests.
+
+    So the declaration is asserted rather than assumed. A job whose correctness
+    depends on a sibling job's cache is a job that is not testing what it says.
+    """
+    config = yaml.safe_load((_repo_root() / ".github" / "workflows" / "ci.yml").read_text("utf-8"))
+    steps = config["jobs"]["example-plugin"]["steps"]
+    runs_without_cache = [s for s in steps if "--no-cache" in str(s.get("run", ""))]
+    setup = [s for s in steps if "setup-uv" in str(s.get("uses", ""))]
+
+    assert runs_without_cache, "the job no longer runs anything with --no-cache"
+    assert setup, "the job no longer installs uv"
+    assert setup[0]["with"]["enable-cache"] is False, (
+        "example-plugin must declare `enable-cache: false`; `auto` enables it and "
+        "its post step fails on a cache directory nothing wrote to"
+    )
