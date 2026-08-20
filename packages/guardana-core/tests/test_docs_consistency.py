@@ -80,6 +80,29 @@ def test_documented_action_pins_track_the_released_minor() -> None:
         assert pins == {expected}, f"{relative} pins {sorted(pins)}, expected {expected}"
 
 
+def _product_prose() -> list[Path]:
+    """Tracked markdown that makes claims *about the product*, and is checked for them.
+
+    Three exclusions, each for its own reason. `CHANGELOG.md` is a record of the
+    past, and the past is allowed to say the collector had none of this.
+    `docs/design/` states the problem a decision solved; an accepted decision is
+    superseded rather than rewritten. And `.claude/` holds agent procedures that
+    deliberately *quote* the stale phrasings as examples of what to hunt for — a
+    gate that fires on its own description of itself is a gate people delete.
+
+    `CLAUDE.md` is deliberately **not** exempt. It is project law, it makes claims
+    about the product, and it named a milestone as current for fifteen releases
+    after it was met.
+    """
+    return [
+        path
+        for path in _tracked_markdown()
+        if path.name != "CHANGELOG.md"
+        and "design" not in path.parts
+        and ".claude" not in path.parts
+    ]
+
+
 def _tracked_markdown() -> list[Path]:
     listing = subprocess.run(
         ["git", "ls-files", "*.md"],  # noqa: S607 — resolved from PATH, as everywhere else here
@@ -145,8 +168,7 @@ def test_no_page_still_denies_a_capability_the_collector_now_has() -> None:
     """
     offenders = [
         f"{path.relative_to(_repo())}: {claim!r}"
-        for path in _tracked_markdown()
-        if path.name != "CHANGELOG.md" and "design" not in path.parts
+        for path in _product_prose()
         for claim in _CAPABILITIES_THE_COLLECTOR_NOW_HAS
         if claim in path.read_text(encoding="utf-8").lower()
     ]
@@ -247,10 +269,15 @@ def test_the_pin_gate_and_the_release_rewrite_agree_on_which_files_count() -> No
     assert set(bump._REQUIRED_IMAGE_PIN) <= image
 
 
-# `**vX.Y**` — with the `v` — is this repo's idiom for "planned for". Without it,
+# `**vX.Y` — with the `v` — is this repo's idiom for "planned for". Without it,
 # `**0.17**` is a row in the README's roadmap table naming a release that shipped,
 # which is the opposite claim.
-_PLANNED_MILESTONE = re.compile(r"\*\*v(\d+)\.(\d+)(?:\.\d+)?\*\*")
+#
+# The closing `**` is deliberately not required. Demanding it made the pattern miss
+# `**v0.7 — company-ready foundation**` in CLAUDE.md, which named the current
+# milestone fifteen releases after it was met — in the file that is project law,
+# and one release after a gate was added specifically to catch this.
+_PLANNED_MILESTONE = re.compile(r"\*\*v(\d+)\.(\d+)\b")
 # "Coming in v0.7", "tracked for v0.7", "arrives in v0.7", "lands in 0.7" — the
 # same claim without the bold. The threat model carried one of these for fourteen
 # releases and the bold pattern above could not see it.
@@ -281,8 +308,7 @@ def test_no_page_promises_a_milestone_that_has_already_shipped(pattern: re.Patte
     released = tuple(int(part) for part in __version__.split(".")[:2])
     stale = [
         f"{path.relative_to(_repo())}: {match.group(0)}"
-        for path in _tracked_markdown()
-        if path.name != "CHANGELOG.md" and "design" not in path.parts
+        for path in _product_prose()
         for match in pattern.finditer(path.read_text(encoding="utf-8"))
         if (int(match.group(1)), int(match.group(2))) <= released
     ]

@@ -164,7 +164,12 @@ failed</strong>.</p>
 <tr>
 <td><strong>The Action did not pin its own CLI</strong></td>
 <td><code>guardana/guardana@v0.21</code> installed the newest <code>guardana-cli</code>, so a pinned workflow changed engine on the next release; arguments were also word-split and glob-expanded</td>
-<td>closed in 0.22.0 — version default, shell-like argument splitting, every external action pinned to a commit</td>
+<td>closed in 0.22.0 — version default, shell-like argument splitting</td>
+</tr>
+<tr>
+<td><strong>Supply-chain hardening of CI</strong></td>
+<td>eleven external actions on moving major tags, and <code>ci.yml</code> with no <code>permissions:</code> block at all</td>
+<td><strong>partly</strong> closed in 0.22.0 — every action pinned to a commit, least-privilege tokens declared and gated. <strong>CodeQL is not added</strong>: it is a new workflow that cannot be exercised locally, and adding an untested one in a release commit is the mistake this release exists to stop repeating. Tracked, not done</td>
 </tr>
 <tr>
 <td><strong>Non-transactional plugin load</strong></td>
@@ -194,7 +199,7 @@ failed</strong>.</p>
 <tr>
 <td><strong>Too many sources of documentation truth</strong></td>
 <td>the same status restated in several files</td>
-<td>partly closed — one owner per claim, recorded in <code>ROADMAP.md</code></td>
+<td><strong>partly</strong> closed — one owner per claim is written down in <code>ROADMAP.md</code>, and the roadmap's narration of shipped milestones is gone (1042 → ~1000 lines while gaining a whole new strategy section). Not closed: no capability manifest generated from code, no provider matrix generated from conformance, no CLI-help snapshot, and no gate on the freshness date of a competitive comparison</td>
 </tr>
 <tr>
 <td><strong>Several large modules</strong></td>
@@ -213,6 +218,26 @@ failed</strong>.</p>
 </tr>
 </tbody>
 </table></div>
+<h2 id="found-while-fixing-the-above">Found while fixing the above</h2>
+<p>Four defects the audit did not see, three of which only appeared because the fix
+touched code the audit had no reason to read:</p>
+<ul>
+<li><strong><code>super()</code> cannot work inside a slotted dataclass.</strong> <code>YamlRule.digest()</code> and
+its two siblings raised <code>TypeError</code> on every rule not parsed from a file. Only
+reachable for a hand-built rule, so no fixture had one.</li>
+<li><strong><code>compare_reports</code> rebuilt <code>RunDiff</code> field by field</strong> and dropped the whole new
+channel. Found by running the documented command and reading the output.</li>
+<li><strong>Two more stale pins</strong> — <code>site/README.md</code> at <code>v0.13</code>, <code>docs/maintainers/ github-setup.md</code> at <code>:0.11</code> — found by the new repo-wide gate, not by the audit.</li>
+<li><strong>Three more stale milestone claims</strong>, found only after the gate was widened:
+<code>CLAUDE.md</code> named the 0.7 milestone as current fifteen releases on, and the
+threat model still described the plugin surface as &quot;not mitigated beyond
+documentation&quot; and the allowlist as future work. The first gate for this class
+required a closing <code>**</code> and missed all three.</li>
+</ul>
+<p>The last one is the lesson: <strong>a gate written against the instance you just found
+catches the instance you just found.</strong> Widening it cost one character and found
+three more, in the file that is project law and in the document a security reader
+opens first.</p>
 <h2 id="what-was-not-found">What was <em>not</em> found</h2>
 <p>Worth recording, because an audit that only lists problems is not a measurement
 either. The verdict semantics held up under adversarial reading: <code>unverified</code>,

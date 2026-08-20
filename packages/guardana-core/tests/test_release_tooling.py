@@ -402,3 +402,32 @@ def test_no_workflow_calls_an_action_by_a_moving_tag(workflow: str) -> None:
         if re.search(r"^\s*uses:\s*[^./]", line) and not re.search(r"@[0-9a-f]{40}\b", line)
     ]
     assert not moving, f"{workflow} calls an action by a moving ref:\n  " + "\n  ".join(moving)
+
+
+@pytest.mark.parametrize(
+    "workflow", sorted(p.name for p in (Path(__file__).parents[3] / ".github/workflows").iterdir())
+)
+def test_every_workflow_declares_the_token_it_needs(workflow: str) -> None:
+    """A workflow with no `permissions:` inherits whatever the repository default is.
+
+    On a repository created before GitHub changed that default, it is read-write —
+    so a compromised action would hold a token that can push to `main` of a
+    security product. `ci.yml` had no block at all, and nothing noticed, because a
+    token that is too wide never fails a build.
+
+    Checked at the file level: a top-level block covers every job in the file, and
+    a job may still widen it deliberately (publishing needs `id-token: write`).
+    """
+    config = yaml.safe_load(
+        (_repo_root() / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    )
+    jobs = config.get("jobs", {})
+    undeclared = [
+        name
+        for name, job in jobs.items()
+        if "permissions" not in config and "permissions" not in job
+    ]
+    assert not undeclared, (
+        f"{workflow}: jobs with no declared token scope, so they inherit the "
+        f"repository default: {undeclared}"
+    )

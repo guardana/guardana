@@ -25,16 +25,23 @@ and [`docs/architecture.md`](docs/architecture.md).
 
 ## What "done" means right now
 
-The current milestone is **v0.7 — company-ready foundation**: a real company can
-install, configure, run, secure, persist and upgrade Guardana without relying on
-undocumented knowledge. The exit criteria are the checklist in
-[`ROADMAP.md`](ROADMAP.md#definition-of-company-ready), and they outrank new
-coverage.
+The current milestone is **Horizon 1 — quality and regression**: answer honestly
+whether a change made the system better or worse, on a stated sample. The
+measurement channel landed in 0.22.0; what it needs next is suites, versioned
+datasets and a comparison with enough statistics to refuse a verdict it has not
+earned. The exit criteria are in [`ROADMAP.md`](ROADMAP.md#horizons-as-dependencies-rather-than-dates),
+and they outrank new coverage.
+
+(Company-readiness was the 0.7 milestone and its checklist has been complete since
+0.10.0. This paragraph named it as current for fifteen releases, which is the
+failure mode 0.22.0 spent a release closing everywhere else — so it is now one
+sentence with a date, and the milestone gate in `test_docs_consistency.py` scans
+this file too.)
 
 **Do not implement broad corpora, new protocols or new modalities while a
-company-readiness item is open**, unless the change is isolated in a content pack
-and does not delay the milestone. Coverage volume is not what this project
-competes on, and it is not what is blocking adoption.
+milestone item is open**, unless the change is isolated in a content pack and does
+not delay the milestone. Coverage volume is not what this project competes on, and
+it is not what is blocking adoption.
 
 ## Product principles — they outrank convenience, in every 0.x
 

@@ -126,16 +126,21 @@ the position above.
 **Scenario:** `pip install` of a package that registers a `guardana.rules` entry
 point and runs arbitrary code on discovery.
 
-**Stance:** this is the sharpest edge in the product, and it is **not currently
-mitigated beyond documentation**. Entry-point discovery imports installed
-packages; a malicious one runs with the user's privileges. `--no-plugins` disables
-discovery entirely — but it also disables the built-in rules, which makes the safe
-mode expensive enough that nobody uses it.
+**Stance:** this is the sharpest edge in the product, and it is **partially**
+mitigated. Entry-point discovery imports installed packages; a malicious one runs
+with the user's privileges, and no amount of engine design changes that.
 
-**v0.7:** a plugin allowlist (`--plugins disabled|builtins|allowlist`) so reviewed
-built-ins load without discovering arbitrary installed packages, plus an extension
-manifest declaring what a pack needs. **v1.0:** a declarative pack format that
-executes no Python at all, and subprocess isolation for those that do.
+What exists: `--plugins builtins|allowlist|disabled` loads the reviewed built-ins
+without discovering arbitrary installed packages; a pack manifest declares what a
+pack provides and `guardana pack lock` pins each rule by its hashed declaration;
+and since 0.22.0 the registry refuses an id another distribution already holds,
+enforces the reserved `guardana.*` namespace against installed packages, and
+records in the saved run which distribution and version supplied every rule that
+ran. That last part is what a compromise is *detectable* by after the fact.
+
+What does not exist: `--plugins all` is still the default, so an ordinary run
+imports whatever is installed. **v1.0:** a declarative pack format that executes
+no Python at all, and subprocess isolation for those that do.
 
 **Until then:** treat installing a Guardana pack exactly like installing any other
 Python package into your environment — because that is what it is. `SECURITY.md`

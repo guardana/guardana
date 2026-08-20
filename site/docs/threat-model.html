@@ -206,15 +206,19 @@ the position above.</p>
 <h3 id="t3--a-malicious-plugin-or-rule-pack">T3 — A malicious plugin or rule pack</h3>
 <p><strong>Scenario:</strong> <code>pip install</code> of a package that registers a <code>guardana.rules</code> entry
 point and runs arbitrary code on discovery.</p>
-<p><strong>Stance:</strong> this is the sharpest edge in the product, and it is <strong>not currently
-mitigated beyond documentation</strong>. Entry-point discovery imports installed
-packages; a malicious one runs with the user's privileges. <code>--no-plugins</code> disables
-discovery entirely — but it also disables the built-in rules, which makes the safe
-mode expensive enough that nobody uses it.</p>
-<p><strong>v0.7:</strong> a plugin allowlist (<code>--plugins disabled|builtins|allowlist</code>) so reviewed
-built-ins load without discovering arbitrary installed packages, plus an extension
-manifest declaring what a pack needs. <strong>v1.0:</strong> a declarative pack format that
-executes no Python at all, and subprocess isolation for those that do.</p>
+<p><strong>Stance:</strong> this is the sharpest edge in the product, and it is <strong>partially</strong>
+mitigated. Entry-point discovery imports installed packages; a malicious one runs
+with the user's privileges, and no amount of engine design changes that.</p>
+<p>What exists: <code>--plugins builtins|allowlist|disabled</code> loads the reviewed built-ins
+without discovering arbitrary installed packages; a pack manifest declares what a
+pack provides and <code>guardana pack lock</code> pins each rule by its hashed declaration;
+and since 0.22.0 the registry refuses an id another distribution already holds,
+enforces the reserved <code>guardana.*</code> namespace against installed packages, and
+records in the saved run which distribution and version supplied every rule that
+ran. That last part is what a compromise is <em>detectable</em> by after the fact.</p>
+<p>What does not exist: <code>--plugins all</code> is still the default, so an ordinary run
+imports whatever is installed. <strong>v1.0:</strong> a declarative pack format that executes
+no Python at all, and subprocess isolation for those that do.</p>
 <p><strong>Until then:</strong> treat installing a Guardana pack exactly like installing any other
 Python package into your environment — because that is what it is. <code>SECURITY.md</code>
 says so.</p>

@@ -111,6 +111,9 @@ Each begins when the previous one's exit criteria are met.
 | P1 | Statistical paired diff | an honest "better or worse" | L | suites |
 | P1 | Assessments in the collector | a quality trend, not only a finding count | M | assessments |
 | P1 | Provider conformance matrix | "OpenAI-compatible" is a claim, not a guarantee | M | protocols |
+| P1 | CodeQL as a second static signal | ruff's bandit rules do not do taint tracking; a security product should carry both. Deliberately not added in 0.22.0 — an untested new workflow in a release commit is the mistake that release closed | S | — |
+| P1 | Capability manifest generated from code | the remaining half of "one owner per claim": feature status is still prose a human keeps current | M | — |
+| P2 | A freshness date on every competitive claim, gated | the comparisons name their sources now; nothing yet fails when one goes stale | S | — |
 | P1 | `TargetFactory` and CLI target selection | a custom target usable without writing Python | M | protocols |
 | P2 | OTLP intake, queue, workers | production evidence, off the request path | L | intake design |
 | P2 | Prometheus and webhook output | fits an existing operations stack | M | aggregations |
@@ -258,133 +261,20 @@ Ordered by one question: **what does a real company need before it can adopt
 this?** Coverage volume is not that answer, so corpus growth moves to a parallel
 lane and does not gate the platform work.
 
-## Definition of company-ready
+## Company-ready: met, and what it did not cover
 
-**Complete as of 0.10.0.** This list stood unticked for three releases and was
-never rewritten to match what shipped — 0.7 and 0.8 were deliberately *not*
-called company-ready, because the checklist said they were not. It is ticked now
-because the boxes are met, and each one records what met it.
+**Complete as of 0.10.0**, and the checklist that proved it is in
+[`CHANGELOG.md`](CHANGELOG.md) for 0.7.0–0.10.0. It stood unticked for three
+releases and was ticked because the boxes were met, not because the wording moved.
 
-What "complete" does and does not mean: a company can install, configure, secure,
-deploy, upgrade, back up and restore Guardana, run it in whatever CI it already
-has, and verify what it downloaded — all documented, and all exercised rather
-than described. It does **not** mean the collector is finished. Everything that
-happens *after* a finding arrives — lifecycle, waivers, audit log, retention,
-RBAC — is the team-platform milestone below, and
-[`docs/deployment.md`](docs/deployment.md) says so to the operator's face rather
-than leaving them to find out.
+A company can install, configure, secure, deploy, upgrade, back up and restore
+Guardana, run it in whatever CI it already has, and verify what it downloaded —
+documented, and exercised rather than described. It never meant the collector was
+finished; what a team needs *after* a finding arrives shipped in 0.11.0, and what
+is still missing is human identity and RBAC (Horizon 3).
 
-- [x] official container images (CLI and server) — `ghcr.io/guardana/guardana`
-      and `ghcr.io/guardana/guardana-collector`, two stages so no build tooling
-      ships, non-root, `amd64` and `arm64`, with an SBOM and a signed provenance
-      attestation pushed alongside each one. Built **and run** in CI on every
-      push, not first at the tag: a scan of the deliberately malicious fixture
-      has to exit `1` from inside the image, because an image whose catalog
-      failed to ship reports "no findings" and exits `0`
-- [x] stable, versioned result schema
-- [x] reproducible run manifest
-- [x] budgets and a pre-flight `plan`
-- [x] documented, tested exit codes
-- [x] privacy and redaction defaults
-- [x] persistent collector
-- [x] authenticated runner ingest
-- [x] project/environment isolation — a key reads and writes one **project** and
-      nothing else, always; and one **environment** and nothing else when it is
-      created with `--environment`. The environment pin is deliberately opt-in: one
-      pipeline that deploys to three environments would otherwise need three
-      credentials, and the blast radius is already bounded by the project. Proven
-      per entity, on both stores and over HTTP
-- [x] migrations, backup, restore, upgrade — the backup procedure is
-      **exercised, not described**: a test takes the documented dump, restores it
-      into a database that never held the data, and reads it back through the
-      same tenant-scoped store the server uses, then writes to it again because a
-      restore you cannot write to afterwards is half a restore. Running it found
-      a real trap and the guide now names it — `pg_dump` 17 against PostgreSQL 16
-      produces a dump that cannot be restored into 16, so a backup can look fine
-      every day and fail on the one day it matters. *(This item said backup and
-      restore "need the retention work"; they do not. Retention is deleting data
-      the collector holds, which is its own item on the milestone below; a backup
-      is a database procedure and can be exercised without it.)*
-- [x] GitHub, GitLab and generic CI paths — the Action for GitHub, copyable
-      templates for GitLab, Jenkins and Azure DevOps, and a one-line container
-      recipe for everything else, all pinned to a published image tag. Three
-      properties are held by tests rather than by review, because they are the
-      three a copied pipeline gets wrong: the exit code reaches the platform, the
-      report is published on the run that *failed*, and the entrypoint is
-      overridden where the platform wraps commands in a shell
-- [x] production deployment guide — [`docs/deployment.md`](docs/deployment.md)
-      and a Compose file where every credential is `${VAR:?}` (Compose refuses
-      rather than invents), the database publishes no port, the collector
-      publishes on loopback so TLS termination is a deliberate step, and
-      migrating is a one-shot command rather than something a restart does to
-      you. Written by running it end to end — `up`, `migrate`, `bootstrap`, a
-      scan reporting into it, `run list` reading it back — and it says plainly
-      what this deployment still does not give you
-- [x] supported-version policy
-- [x] published threat model
-- [x] release SBOM and provenance — a CycloneDX SBOM **per distribution**
-      attached to every GitHub Release, Sigstore build provenance over `dist/*`
-      on top of PyPI's own PEP 740 attestation, and an SBOM plus provenance
-      pushed beside each container image. Generated by `uv export` from the lock
-      everything else resolves against, so the bill of materials cannot disagree
-      with what was built, and verified against each package's own metadata as it
-      is written. `SECURITY.md` shows how to check all of it without trusting
-      this list
-- [x] no known critical vulnerability — nothing Guardana ships or installs has
-      one. The twelve alerts that stood here were all
-      `examples/vulnerable-model/`, which exists to be vulnerable and is never
-      installed; they are dismissed as `not_used` with that reason recorded. The
-      box is ticked because the criterion is met, not because the signal went
-      quiet: shipped runtime dependencies are `pyyaml`, `defusedxml`, and — for
-      the optional collector — `fastapi`, `pydantic` and `psycopg`.
-- [x] end-to-end installation test from a clean environment — the five
-      distributions in an empty virtualenv, then the documented commands, with
-      their exit codes asserted rather than merely "it did not crash": a rule
-      catalog that failed to load prints "no findings" and exits `0`, which is
-      the fail-open this whole project is against. It runs in CI on every push,
-      in `release.py`'s gate, and again inside the release workflow before the
-      upload — three places, because the defect it exists to catch was found
-      *after* a tag was pushed
-
-## Milestone: engine and CLI foundation *(complete, shipped as 0.7.0)*
-
-> **Outcome:** the engine and the command line are ready to be gated on: a run knows
-> its own cost, says what it verified, refuses to call an unanswered question a pass,
-> and can be compared against last week's.
-
-Met. Run manifest, usage accounting, budgets and `plan`, capability inspection,
-evidence redaction, safety modes, plugin trust, the baseline lifecycle, the exit-code
-contract and the published schemas — detail in [`CHANGELOG.md`](CHANGELOG.md), reading
-in [`docs/design/run-manifest-v2.md`](docs/design/run-manifest-v2.md).
-
-Two things it left open are still open, and both are still deferred for the same
-reason:
-
-| Deferred | Reason |
-|---|---|
-| `--resume` for an interrupted run | needs a checkpoint format; exit `7` already says a run was partial |
-| cost in money (`estimated_cost` stays null) | needs a price table, which must be profile data — an invented cost is worse than none |
-| token and duration prediction in `plan` | nothing can know a request's cost before it is answered, and a guessed figure is one a team would budget against |
-| `configuration.*_digest` populated | a digest of a *system prompt* or *retriever* has to be taken from the thing in front of the model, which is the application-awareness work; filling in only the easy one would make the block look complete |
-| telling an unreachable endpoint from an unreadable reply | both raise `EndpointError` and the runner treats it as fatal, correctly for a dead endpoint and wrongly for one unparseable reply. Splitting it needs a second exception type third-party transports would have to follow |
-| token ceilings bounding the tool-calling path | `offer_tools` has no usage protocol, so those requests report no tokens. They are counted in `requests_missing_token_counts` and bounded by a *request* ceiling; a token ceiling that silently covered half a run would be worse |
-| a baseline key refused because its own `version` predates it | `pack validate` refuses a schema 1 manifest that names `taxonomies:`, and the reasoning transfers exactly: a `version: 1` baseline carrying `expires:` is a file whose declared version no longer describes it, and an older build reading the same file would drop the key and make the waiver permanent. Unknown keys are refused as of 0.21.0, which is the half that fails inside *this* build; the version-aware half changes the meaning of files that work today, and it protects against a build the supported-version policy already covers |
-| a rule that declines on *every* target, release after release | the run-level "nothing reached a verdict" gate (0.21.0) catches a target that went dark. It cannot see a rule that has quietly stopped grading anything anywhere, because each run still has other rules concluding. That is a question about a rule's history rather than about one run, and answering it needs the fleet history in the continuous-verification milestone |
-
-**The review method that came out of it is standing practice:** reviewing a design and
-reviewing the code that came out of it find different defects, so both happen, and
-separately. Three of the fourteen defects an adversarial review found in finished 0.7
-code were things the documentation already described correctly while the code did
-something else — the failure mode a green gate is least able to see.
-
-**And noise is measured rather than asserted, as of 0.21.0.** The dogfood scan proves
-Guardana finds nothing in Guardana, which says nothing about false alarms: this
-repository does not look like the ones people point a scanner at. A second ground, built
-in code, labels every file as a plant, a decoy or a recorded gap, so recall and
-precision both fail loudly and by name. An organisation that excludes a noisy scanner
-has an organisation-level fail-open, which puts the false-alarm rate in the same
-category as performance here.
-
+The narrated checklist lived here for twelve releases after it was met. That is a
+second changelog, and a second changelog disagrees with the first one.
 
 ## Where this sits, and what the neighbours do better
 
@@ -800,108 +690,12 @@ authorization half. The industry is instrumenting agents heavily and instrumenti
 them for the other question — so the traces are being produced and these dimensions
 are being left out of them.
 
-### 1. The authorization half, emitted rather than hand-written *(shipped)*
+### 1. The authorization half, emitted rather than hand-written *(shipped in 0.21.0)*
 
-Was: `--write-trace` and an editor — convert an export, add the blocks, grade the
-result. That proved the model works and did not survive contact with a system running a
-thousand executions an hour.
-
-`guardana.core.trace.open_trace` closes it. A producer writes its header once, appends
-one span per event, and signs the file off when the session ends; the trace format gained
-`terminated` plus a counted footer (so a session that died is `unterminated` rather than
-clean) and `approver_kind` (so a person and a policy engine stop being one field).
-Reasoning, rejected options and the measurement:
-[`docs/design/trace-producer.md`](docs/design/trace-producer.md). Usage:
-[`docs/writing-an-integrator.md`](docs/writing-an-integrator.md).
-
-**The measurement moved the plan, which is why it was taken.** Four hand-built traces of
-one unapproved refund, graded by the released 0.20.0, put the leak somewhere other than
-where this file said: an inflated `approval` declaration does *not* pass — the rule
-declines and the contract assertion fires — while an inflated **`effects`** declaration
-is the clean exit `0`. The dimensions that drive a rule's loop are the dangerous ones;
-the ones a loop merely consults already fail closed. So the writer derives an effect from
-every recorded tool call through the integrator's sink map, rather than checking a
-declaration after the fact.
-
-Three constraints held:
-
-- it changed **what every adapter promises**, which is why the finer instrumentation
-  declaration in the deferred table above is the same piece of work, and why this got a
-  design document before it got code;
-- it is not a second SDK. The contract is the **published, versioned file format**
-  (`schemas/trace-v3.schema.json`); the writer is a convenience over it and a team
-  emitting JSONL from Go or TypeScript stays a first-class producer;
-- it records what happened and decides nothing. A helper that *asks* Guardana whether an
-  action is allowed is inline enforcement wearing a library's clothes, and stays a
-  non-goal below.
-
-#### The integrator guide, and two examples that differ
-
-[`docs/writing-an-integrator.md`](docs/writing-an-integrator.md) answers *how do I make
-the agent I already run produce a trace Guardana can grade?*, and
-[`examples/hermes_integrator/`](examples/hermes_integrator/) is the proof that it is
-followable — a Hermes plugin, written against `hermes-agent` 0.19.0, verified by loading
-it through Hermes' own plugin manager and grading what came out.
-
-It earns its place on one distinction. Hermes has three approval surfaces and the third
-is an auxiliary LLM auto-approving low-risk dangerous commands, so the same `rm -rf`
-passes a contract demanding a person when somebody answered the prompt and fails when the
-model did. That is `approver_kind` paying for itself on a real agent rather than on a
-fixture.
-
-**Reading it at source corrected this entry twice**, which is the argument for the rule
-that a seam nobody has run is a seam nobody has read:
-
-- the approval signal is **not** `pre_tool_call`. That hook is a *block* gate — a policy
-  decision by software. Approvals fire a separate observer pair,
-  `pre_approval_request` / `post_approval_response`, which upstream documents as unable
-  to veto or pre-answer an approval. Conflating a guardrail with an approval is precisely
-  the error the model now makes hard to write down;
-- Hermes has **two** integration shapes, not one: an in-process Python plugin surface and
-  a shell-script bridge over the same hook manager. The second is the out-of-process
-  shape this file expected to have to find in a *different* agent.
-
-**The second example is [`examples/shell_hook_integrator/`](examples/shell_hook_integrator/),
-and it proved what the first could not.** One example lets the contract be written around
-it; the second is what shows the recording surface is general — the same argument that
-put three unrelated inputs into 1.0 entry criterion 2. So it is the other *shape*: a
-command the agent spawns per event, where nothing survives between events and the header,
-the spans and the footer are written by processes that never meet.
-
-Writing it changed the engine three times, which is the whole return on insisting the
-second one be structurally different rather than a second agent of the same kind:
-`resume_trace`, because opening for writing truncates the file on every event; a line
-torn off by a producer killed mid-write no longer costing the whole file, because that is
-the case `unterminated` exists for and it could not be graded at all; and an unreadable
-record making a rule decline, because `truncated` said nothing about a record that
-arrived and could not be read.
-
-**The candidate this file used to name is not the one.** `openclaw` on PyPI is an
-installer for a binary — eleven files, no agent — so its seam still cannot be read
-without running somebody's compiled artifact, and it is dropped rather than promised
-again. The two shapes are what mattered, and both now exist.
-
-**These are examples, not integrations we carry.** Each pins the upstream version it was
-written against and its date, and states that a later release may break it. A green build
-here must never depend on somebody else's release — a rule about dependencies rather than
-about directories: the Hermes example never imports Hermes, so its tests run in CI and
-pin *this* repository's writer API from outside, while checking it against the real agent
-stays a manual step recorded in its README. A distribution per agent, or a catalogue of
-them, is a different product with different economics, and it is in the non-goals below.
-
-What the project keeps is the part that does not age: the published, versioned trace
-format, the honest declaration of what a producer records, and a guide anybody can follow
-for the agent we have never heard of.
-
-#### Deferred out of this piece, with the reason
-
-| Deferred | Reason |
-|---|---|
-| **Two processes appending to one session at the same moment** | `resume_trace` is safe across processes that take turns, which is what a hook chain does, and it is not a lock. An agent firing two hooks concurrently for one session would interleave two lines; the honest fix is a lock in the producer rather than one invented here for a caller nobody has |
-| **Detecting a dimension declared and never written** | not decidable inside one session: an agent that made no tool calls genuinely produced no effects, and refusing to close that file would fire on every quiet hour of a correctly instrumented deployment. It is a fact about a producer's history, so it sits with the fleet history below, beside the already-deferred "a rule that declines on every target" |
-| **Rotation, size limits and multi-file sessions** | a session that outgrows a file is real and orthogonal: the header/footer contract composes with any rotation scheme without changing. Deciding it with no producer running would be inventing a shape from imagination |
-| **Async and thread-safe writing** | a framework calling hooks from several threads needs it and the worked example does not. A lock is easy to add and impossible to remove; the honest order is a real caller first |
-| **A structured approver for consent and policy decisions** | the same human-versus-automated distinction exists there and does not carry the same weight — a consent is by definition the subject's, and a policy decision is by definition automated. Adding a kind to both would be symmetry for its own sake |
+An agent writes its own trace one span at a time, declares which dimensions it
+actually records, and says whether a human or an auxiliary model approved an
+action. Reasoning in [`docs/design/trace-producer.md`](docs/design/trace-producer.md);
+what shipped, and why, in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### 2. An OTLP receiver, out of band and never in the path
 

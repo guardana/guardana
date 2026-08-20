@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: ["**"]
 
+# Least privilege for the whole file, then per job where more is genuinely needed
+# (none is, here — CI reads the repository and reports). Without this block the
+# workflow inherits whatever the repository default is, which on an older repo is
+# read-write: a compromised action anywhere in this file would then hold a token
+# that can push to `main` of a security product. `release.yml` already declares
+# its own; this one did not, and nothing noticed because a too-wide token never
+# fails a build.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
