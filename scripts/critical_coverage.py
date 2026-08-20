@@ -1,20 +1,16 @@
 #!/usr/bin/env python
 """Per-area coverage floors, because one global number hides the areas that matter.
 
-`fail_under = 90` in `pyproject.toml` is an aggregate. Aggregates let simple new
-code pay for an untested parser: forty covered lines of CLI plumbing and forty
-uncovered lines of GGUF header arithmetic average out to the same number as
-eighty covered lines, and only one of those two reads a file an attacker chose.
-
-So the areas where being wrong is expensive get their own floor. The floors are a
-**ratchet, not a target** — each is the measured value at the time it was added,
-rounded down. Raising one is a pull request; lowering one is a conversation.
+`fail_under = 90` is an aggregate, and an aggregate lets simple new code pay for
+an untested parser. The areas where being wrong is a wrong verdict or somebody
+else's data get their own floor — a **ratchet, not a target**: each is the
+measured value when it was added, rounded down.
 
     uv run pytest --cov --cov-report=json:.coverage.json
     uv run python scripts/critical_coverage.py .coverage.json
 
 Globs, not filenames, so a new rule dropped into `supply_chain/` inherits the
-floor its neighbours have rather than being invisible until somebody remembers.
+floor its neighbours have.
 """
 
 import argparse

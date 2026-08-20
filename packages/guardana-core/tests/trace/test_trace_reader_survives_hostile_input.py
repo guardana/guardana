@@ -11,6 +11,7 @@ error. A reader that raises `KeyError` turns "your trace is malformed" into a
 stack trace, and `analyze-trace` into exit 5.
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -59,8 +60,6 @@ def test_well_formed_json_of_the_wrong_shape_is_refused_and_never_crashes(
     whose values are lists, produces a file every JSON parser accepts. Every
     lookup after that is somewhere a `KeyError` or a `TypeError` can escape.
     """
-    import json  # noqa: PLC0415 — only this test needs it
-
     trace = tmp_path / "t.jsonl"
     trace.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
 
@@ -85,8 +84,6 @@ def test_a_native_header_claiming_any_version_is_handled(
     names the mismatch — never an index error inside the migration chain, and never
     a silent read that drops the fields this build cannot see.
     """
-    import json  # noqa: PLC0415
-
     trace = tmp_path / "t.jsonl"
     trace.write_text(json.dumps({"guardana_trace": version, "note": tail}) + "\n", encoding="utf-8")
 

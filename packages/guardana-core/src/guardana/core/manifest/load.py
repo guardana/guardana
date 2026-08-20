@@ -541,19 +541,12 @@ def migrate_v4(document: Mapping[str, Any]) -> dict[str, Any]:
 def migrate_v5(document: Mapping[str, Any]) -> dict[str, Any]:
     """Rewrite a schema-5 saved run as a schema-6 one, inventing nothing.
 
-    Version 6 adds two things, and both arrive as an honest absence.
+    `assessments` arrives empty, which for a version-5 run is the same as "none
+    happened" — no version-5 build could record one.
 
-    `assessments` is the measurement channel. It arrives **empty**, which for a
-    version-5 run means the same as "none happened": no version-5 build could
-    record one. An empty list and a missing key would read identically to a
-    permissive reader, so the key is written.
-
-    `run.rules[].origin` arrives **null**, and that is a different kind of blank.
-    A version-5 run did have an origin for every rule — the registry simply never
-    wrote it down. Filling it with "guardana-rules" because that is the likely
-    answer would put a fact into an evidence document that nobody observed, which
-    is the one thing a migration must never do. Null means unknown, and unknown is
-    what it is.
+    `run.rules[].origin` arrives **null**, which is a different blank: the run did
+    have an origin, the registry never wrote it down. Filling it with the likely
+    answer would put an unobserved fact into an evidence document.
     """
     run = _mapping(document.get("run"), "run")
     rules = run.get("rules")

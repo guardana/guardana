@@ -116,10 +116,9 @@ class ScenarioRule(Rule):
         self, scope: "_GradedScope", exchange: Exchange, target_ref: str, ctx: RuleContext
     ) -> Iterator[Finding]:
         verdict = scope.evaluator.evaluate(exchange, scope.expectation)
-        # One case per graded scope, passes included. The scope is part of the case
-        # id because a scenario grades the same conversation twice — once per turn
-        # and once whole — and folding them together would count one exchange as
-        # two measurements of the same thing.
+        # The scope is part of the case id: a scenario grades the same conversation
+        # per turn and again whole, and folding those together would count one
+        # exchange as two measurements of the same thing.
         ctx.record(
             from_verdict(
                 verdict,

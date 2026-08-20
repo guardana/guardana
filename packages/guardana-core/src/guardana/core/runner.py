@@ -89,11 +89,8 @@ class Runner:
         # the target that has to hold it. A target that cannot enforce it refuses
         # here rather than letting the run proceed under a ceiling nothing watches.
         target.apply_budgets(self.profile.budgets)
-        # Asked once, before a single rule is planned. A capability is a claim, and
-        # the runner selects rules by it — so a target that declares `read_files`
-        # and implements no `iter_files` used to be handed nineteen rules that each
-        # rejected it in turn. Nineteen errors saying one thing, none of them
-        # saying which thing.
+        # Asked once, before anything is planned: a capability is a claim, and one
+        # error naming the missing protocol beats nineteen rules each declining.
         contract_errors = [
             CheckError(
                 source=target.ref,
@@ -157,10 +154,8 @@ class Runner:
             # would punish the user for the budget they set.
             findings.extend(outcome.findings)
             unverified.extend(outcome.unverified)
-            # Kept from a cut-off rule for the same reason as its findings: a case
-            # that was measured before the ceiling was measured. What the run must
-            # not do is *claim* the coverage, which is why the rule still stays out
-            # of `rules_run`.
+            # Kept from a cut-off rule, like its findings: a case measured before
+            # the ceiling was measured. The rule still stays out of `rules_run`.
             assessments.extend(outcome.assessments)
             if outcome.stopped_by is not None:
                 stopped_by = outcome.stopped_by

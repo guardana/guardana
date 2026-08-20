@@ -43,8 +43,8 @@ from guardana.core.manifest.coverage import (
 from guardana.core.manifest.records import EvaluatorRecord, RuleRecord
 from guardana.core.manifest.settings import PrivacyRecord
 from guardana.core.manifest.summary import summarize
+from guardana.core.origin import Origin
 from guardana.core.profile import Profile
-from guardana.core.provenance import Provenance
 from guardana.core.registry import Registry
 from guardana.core.report import CoverageShortfall, ScanResult
 from guardana.core.rule import Rule
@@ -340,22 +340,11 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
     """
     now = datetime.now(UTC)
     ran = tuple(rule for rule in registry.rules() if rule.meta.id in result.rules_run)
-    # Provenance travels with the rule, into the document. `version` was in the
-    # manifest from the first release and nothing ever set it, which was the half
-    # of the plugin-override problem nobody could see: an id and a digest a
-    # replacement can copy exactly, and the one field that would have told them
-    # apart left null on every run ever written.
-    rules = tuple(
-        RuleRecord(
-            id=rule.meta.id,
-            digest=rule.digest(),
-            version=registry.provenance_of(rule.meta.id).version,
-            origin=_origin_of(registry.provenance_of(rule.meta.id)),
-            maturity=str(rule.meta.maturity),
-            trials=rule.estimated_requests,
-        )
-        for rule in ran
-    )
+    # `version` sat in the manifest from the first release with nothing writing it,
+    # which was the half of the plugin-override problem nobody could see: an id and
+    # a digest a replacement copies exactly, beside the one field that would have
+    # told them apart. See docs/design/capability-protocols.md.
+    rules = tuple(_rule_record(rule, registry.origin_of(rule.meta.id)) for rule in ran)
     evaluators = _evaluator_records(ran, calibrations_or_exit(profile))
     target = (
         identity
@@ -400,11 +389,18 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
     )
 
 
-def _origin_of(provenance: Provenance) -> str | None:
-    """Name the distribution, or the file, that supplied a rule.
+def _rule_record(rule: Rule, origin: Origin) -> RuleRecord:
+    """Describe one rule that ran, including which distribution supplied it.
 
-    `None` for an unattributed registration, and that stays `None` rather than
-    becoming `"unknown"`: a document that writes a placeholder into an evidence
-    field teaches its readers to treat the field as decoration.
+    An unattributed origin stays `None` rather than becoming `"unknown"`: a
+    placeholder in an evidence field teaches readers to treat the field as
+    decoration.
     """
-    return provenance.distribution or provenance.source
+    return RuleRecord(
+        id=rule.meta.id,
+        digest=rule.digest(),
+        version=origin.version,
+        origin=origin.distribution or origin.source,
+        maturity=str(rule.meta.maturity),
+        trials=rule.estimated_requests,
+    )

@@ -1,15 +1,11 @@
 """Prove a custom `Target` actually satisfies what it declares.
 
-The extension contract has two halves. `Capability` is the half a target
-declares, and until 0.22 it was the only half that existed: the surface a rule
-would call was undocumented, so `docs/extending.md` said a target with
-`READ_FILES` "can run all 19 build-time artifact rules unmodified" while every
-one of those rules asked whether it was an `ArtifactTarget` and refused it.
+`Capability` is what a target declares; a protocol in
+`guardana.core.target.protocols` is what a rule will call. This checks that the
+two agree, from a third party's own test suite.
 
-This is how a third party checks the other half without installing Guardana's
-test suite or reading its rules. It is deliberately in the shipped package, not
-in `tests/`: a conformance kit somebody has to vendor is a conformance kit
-nobody runs.
+Deliberately in the shipped package rather than in `tests/`: a conformance kit
+somebody has to vendor is a conformance kit nobody runs.
 """
 
 from guardana.core.target import Target

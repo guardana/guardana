@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any, Self
 
 from guardana.core.evaluator.base import Evaluator, check_expectation
+from guardana.core.origin import UNATTRIBUTED, Origin
 from guardana.core.plugins import PluginTrust
-from guardana.core.provenance import UNATTRIBUTED, Provenance
 from guardana.core.report.check_error import CheckError
 from guardana.core.rule.base import Rule
 from guardana.core.rule.errors import RuleLoadError
@@ -50,7 +50,7 @@ class Registry:
         self._evaluators: dict[str, Evaluator] = {}
         self._targets: list[type[Target]] = []
         self._load_errors: list[CheckError] = []
-        self._origins: dict[str, Provenance] = {}
+        self._origins: dict[str, Origin] = {}
 
     @property
     def load_errors(self) -> tuple[CheckError, ...]:
@@ -61,80 +61,68 @@ class Registry:
         """Record something that could not be loaded, so the run can report it."""
         self._load_errors.append(error)
 
-    def register_rule(self, rule: Rule, provenance: Provenance = UNATTRIBUTED) -> None:
+    def register_rule(self, rule: Rule, origin: Origin = UNATTRIBUTED) -> None:
         """Add a rule under its id, refusing an id another origin already holds.
 
-        De-duping still matters, because the same rule file can arrive twice (a
-        profile's `rules.paths` and a `--rules` flag over an overlapping dir) —
-        running it twice means doubled findings and, on a live model, doubled
-        probe calls. What is gone is *silent* last-wins across origins.
+        The same origin registering twice still de-duplicates: one rule file can
+        arrive through both `rules.paths` and `--rules`, and running it twice means
+        doubled findings and doubled probe calls.
 
-        It used to be documented as a feature: "last-wins lets a custom rule
-        override a built-in by reusing its id". The cost of that convenience was
-        the run's own evidence. `rules_run` records `meta.id`, and `Rule.digest()`
-        hashes the declaration — so a rule that copies a built-in's metadata and
-        yields nothing produced an identical id, an identical digest, and a clean
-        report naming the check it had replaced. Nothing in the document
-        disagreed, and `diff` could not see it either.
-
-        Raises `RegistryConflictError` when a different origin already holds the
-        id, and when an installed plugin claims the reserved `guardana.*`
-        namespace the docs have always said was reserved and nothing enforced.
+        A *different* origin raises `RegistryConflictError`, as does an installed
+        plugin claiming the reserved `guardana.*` namespace. Why silent last-wins
+        had to go: `docs/design/capability-protocols.md`.
         """
         _require_canary_participation(rule)
-        self._refuse_conflict("rule", rule.meta.id, provenance)
+        self._refuse_conflict("rule", rule.meta.id, origin)
         for i, existing in enumerate(self._rules):
             if existing.meta.id == rule.meta.id:
                 self._rules[i] = rule
                 return
         self._rules.append(rule)
-        self._origins[rule.meta.id] = provenance
+        self._origins[rule.meta.id] = origin
 
-    def register_evaluator(
-        self, evaluator: Evaluator, provenance: Provenance = UNATTRIBUTED
-    ) -> None:
+    def register_evaluator(self, evaluator: Evaluator, origin: Origin = UNATTRIBUTED) -> None:
         """Add an evaluator under its own `id`, refusing an id another origin holds.
 
-        The same reasoning as `register_rule`, and the sharper case of the two: a
-        rule names its grader by string, so replacing `canary` replaces how every
-        canary-graded rule decides pass from fail, without changing a single rule.
+        The sharper case of the two: a rule names its grader by string, so
+        replacing `canary` changes how every canary-graded rule decides pass from
+        fail without touching a rule.
         """
-        self._refuse_conflict("evaluator", evaluator.id, provenance)
+        self._refuse_conflict("evaluator", evaluator.id, origin)
         self._evaluators[evaluator.id] = evaluator
-        self._origins[f"evaluator:{evaluator.id}"] = provenance
+        self._origins[f"evaluator:{evaluator.id}"] = origin
 
-    def register_target(self, target: type[Target], provenance: Provenance = UNATTRIBUTED) -> None:
+    def register_target(self, target: type[Target], origin: Origin = UNATTRIBUTED) -> None:
         """Add a target class a third-party package advertises for its own backend."""
         self._targets.append(target)
-        self._origins[f"target:{target.__name__}"] = provenance
+        self._origins[f"target:{target.__name__}"] = origin
 
-    def provenance_of(self, rule_id: str) -> Provenance:
-        """Which origin supplied the rule registered under `rule_id`.
+    def origin_of(self, rule_id: str) -> Origin:
+        """Return which origin supplied the rule registered under `rule_id`.
 
-        Public because the run manifest records it. A registry that knows where a
-        rule came from and does not write it down leaves the same question
-        unanswerable one step later, when the only thing left is the document.
+        Public because the run manifest records it: a registry that knows and does
+        not say leaves the question unanswerable once the document is all there is.
         """
         return self._origins.get(rule_id, UNATTRIBUTED)
 
-    def _refuse_conflict(self, kind: str, identifier: str, provenance: Provenance) -> None:
+    def _refuse_conflict(self, kind: str, identifier: str, origin: Origin) -> None:
         """Raise unless `identifier` is free, or held by this very origin."""
         if (
             identifier.startswith(_RESERVED_NAMESPACE)
-            and provenance.distribution is not None
-            and not provenance.is_builtin
+            and origin.distribution is not None
+            and not origin.is_builtin
         ):
             raise RegistryConflictError(
-                f"{provenance.describe()} registers {kind} {identifier!r}, but the "
+                f"{origin.describe()} registers {kind} {identifier!r}, but the "
                 f"`{_RESERVED_NAMESPACE}*` namespace is reserved for Guardana's own "
                 f"distributions — namespace your ids (see docs/writing-rules.md)"
             )
         key = identifier if kind == "rule" else f"{kind}:{identifier}"
         held = self._origins.get(key)
-        if held is not None and held != provenance:
+        if held is not None and held != origin:
             raise RegistryConflictError(
                 f"{kind} {identifier!r} is already registered by {held.describe()}; "
-                f"{provenance.describe()} cannot claim the same id — one run cannot "
+                f"{origin.describe()} cannot claim the same id — one run cannot "
                 f"say which code produced the verdict recorded under it. Give yours "
                 f"its own id and switch the other off with `rules.exclude`, so the "
                 f"report names what actually ran"
@@ -185,11 +173,10 @@ class Registry:
         errors: list[CheckError] = []
         for path in paths:
             for file in _yaml_files(path):
-                # Resolved, not as written. `rules.paths: [my-rules]` and
-                # `--rules ./my-rules/` name the same file, and comparing the two
-                # spellings would call a legitimate double-load a conflict — which
-                # is exactly the overlap the de-duplication exists for.
-                origin = Provenance(source=str(_resolved(file)))
+                # Resolved, not as written: `rules.paths: [my-rules]` and
+                # `--rules ./my-rules/` name one file, and two spellings of it must
+                # not read as two origins.
+                origin = Origin(source=str(_resolved(file)))
                 try:
                     for rule in load_yaml_rules(file):
                         self.register_rule(rule, origin)
@@ -224,7 +211,7 @@ class Registry:
             # Taxonomies first: a rule can only name a framework that is already
             # registered, and a YAML rule pack resolves its `taxonomy:` ids while
             # its own entry point is being loaded.
-            (_TAXONOMY_GROUP, TaxonomyRef, _ignoring_provenance(register_taxonomy)),
+            (_TAXONOMY_GROUP, TaxonomyRef, _ignoring_origin(register_taxonomy)),
             (_RULE_GROUP, Rule, reg.register_rule),
             (_EVALUATOR_GROUP, Evaluator, reg.register_evaluator),
             (_TARGET_GROUP, Target, reg.register_target),
@@ -246,17 +233,11 @@ class Registry:
                         )
                     )
                     continue
-                origin = _provenance_of(ep)
-                # One entry point is one transaction. Rolling the registry back
-                # rather than pre-flighting every check keeps that true for
-                # refusals added later, without each one needing a second
-                # implementation in a validation pass.
-                #
-                # The framework catalogue is the exception, and deliberately: it
-                # is a process-wide set shared by every registry in the process,
-                # and re-registering an identical reference is already a no-op —
-                # so a half-loaded taxonomy provider leaves entries that name
-                # standards, not checks that claim to have run.
+                origin = _origin_of(ep)
+                # Rollback rather than a pre-flight, so a refusal added later stays
+                # atomic without needing a second implementation. The framework
+                # catalogue is deliberately outside it: it is process-wide, and
+                # re-registering an identical reference is already a no-op.
                 snapshot = reg._snapshot()
                 try:
                     _absorb(ep.load()(), expected, register, origin)
@@ -267,15 +248,13 @@ class Registry:
 
     def _snapshot(
         self,
-    ) -> tuple[list[Rule], dict[str, Evaluator], list[type[Target]], dict[str, Provenance]]:
+    ) -> tuple[list[Rule], dict[str, Evaluator], list[type[Target]], dict[str, Origin]]:
         """Copy the registrations, so one provider's failure can be undone whole."""
         return (list(self._rules), dict(self._evaluators), list(self._targets), dict(self._origins))
 
     def _restore(
         self,
-        snapshot: tuple[
-            list[Rule], dict[str, Evaluator], list[type[Target]], dict[str, Provenance]
-        ],
+        snapshot: tuple[list[Rule], dict[str, Evaluator], list[type[Target]], dict[str, Origin]],
     ) -> None:
         """Put the registrations back as they were before a provider was absorbed."""
         self._rules, self._evaluators, self._targets, self._origins = (
@@ -286,21 +265,21 @@ class Registry:
         )
 
 
-def _ignoring_provenance(register: Callable[[Any], None]) -> Callable[[Any, Provenance], None]:
+def _ignoring_origin(register: Callable[[Any], None]) -> Callable[[Any, Origin], None]:
     """Adapt a one-argument registrar to the two-argument shape discovery uses."""
 
-    def call(item: Any, _origin: Provenance) -> None:  # noqa: ANN401 — provider payload
+    def call(item: Any, _origin: Origin) -> None:  # noqa: ANN401 — provider payload
         register(item)
 
     return call
 
 
-def _provenance_of(ep: object) -> Provenance:
+def _origin_of(ep: object) -> Origin:
     """Name the distribution and version behind one entry point."""
     dist = getattr(ep, "dist", None)
     name = getattr(dist, "name", None)
     version = getattr(dist, "version", None)
-    return Provenance(
+    return Origin(
         distribution=str(name) if name else None,
         version=str(version) if version else None,
     )
@@ -344,20 +323,15 @@ def _require_canary_participation(rule: Rule) -> None:
 def _absorb(
     produced: object,
     expected: type | tuple[type, ...],
-    register: Callable[[Any, Provenance], None],
-    origin: Provenance,
+    register: Callable[[Any, Origin], None],
+    origin: Origin,
 ) -> None:
     """Register everything a provider returned, or none of it.
 
-    One provider is one transaction. It used to validate and register item by
-    item, so a pack whose fourth rule was malformed left three registered and then
-    recorded a load error — a run that both listed rules from that pack in
-    `rules_run` and reported the pack as unloadable. Two such runs differ in
-    coverage with nothing having changed in the system under test.
-
-    Materialising first matters for the same reason: a provider returning a
-    generator that raises half way through is otherwise indistinguishable from one
-    that returned a shorter list.
+    One provider is one transaction, so a run cannot both list a pack's rules in
+    `rules_run` and report the pack as unloadable. Materialised first for the same
+    reason: a generator that raises half way through is otherwise indistinguishable
+    from one that returned a shorter list.
     """
     items = list(produced) if isinstance(produced, Iterable) else [produced]
     for item in items:

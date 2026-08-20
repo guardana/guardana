@@ -1,25 +1,27 @@
 """Where a registered rule, evaluator or target came from.
 
-A run's evidence names the checks that ran. Until this existed it could not name
-*whose* checks they were: two distributions can advertise the same rule id, and
-`Rule.digest()` covers the declaration, so a rule that copies a built-in's
-metadata and returns nothing produces an identical id and an identical digest.
-The document then says the built-in ran, and nothing in it disagrees.
+A run's evidence names the checks that ran. It could not name *whose* they were:
+two distributions can advertise the same rule id, and `Rule.digest()` covers the
+declaration — so a rule copying a built-in's metadata produced an identical id and
+an identical digest, and the document agreed with itself.
+
+Named `Origin` rather than `Provenance` on purpose. Two classes already carry that
+name — `guardana.core.exchange.Provenance` and `guardana.core.trace.Provenance` —
+and a third would make `from guardana.core… import Provenance` a question rather
+than an import.
 """
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
-class Provenance:
+class Origin:
     """Which installed distribution, or which file, supplied one registered object.
 
     `distribution` and `version` come from `importlib.metadata` when the object
-    arrived through an entry point. `source` is the file a YAML rule was parsed
-    from. A registration with none of the three is *unattributed* — a rule built
-    in code by a test or an embedding caller — and stays distinguishable from one
-    that names its origin, because "nobody said" and "nothing installed" are
-    different facts.
+    arrived through an entry point; `source` is the file a YAML rule was parsed
+    from. All three absent means *unattributed* — built in code by a test or an
+    embedding caller — and that stays distinguishable from "nothing installed".
     """
 
     distribution: str | None = None
@@ -29,7 +31,7 @@ class Provenance:
     @property
     def is_builtin(self) -> bool:
         """Whether this came from one of Guardana's own reviewed distributions."""
-        from guardana.core.plugins import BUILTIN_DISTRIBUTIONS  # noqa: PLC0415 — cycle
+        from guardana.core.plugins import BUILTIN_DISTRIBUTIONS  # noqa: PLC0415 — import cycle
 
         return self.distribution in BUILTIN_DISTRIBUTIONS
 
@@ -42,5 +44,5 @@ class Provenance:
         return "an unattributed registration"
 
 
-UNATTRIBUTED = Provenance()
+UNATTRIBUTED = Origin()
 """The origin of an object registered in code rather than discovered."""

@@ -144,10 +144,9 @@ class TrajectoryRule(Rule):
             graded = drive(target, self.then_task, tools, max_steps=self.max_steps, stop_after=stop)
             detail = f"{detail}\n--- new session ---\n{graded.render()}"
         verdict = evaluator.evaluate(Exchange.from_trajectory(graded), self.expectation)
-        # One case per trajectory, whatever the verdict. A truncated run grades as
-        # inconclusive, and recording it keeps the shrinking denominator visible:
-        # a suite that hits its step ceiling more often has fewer graded cases, not
-        # a better model.
+        # Recorded whatever the verdict: a truncated run grades as inconclusive, and
+        # a suite hitting its step ceiling more often has fewer graded cases rather
+        # than a better model.
         ctx.record(
             from_verdict(
                 verdict,

@@ -110,10 +110,12 @@ Three changes, together:
   reserved since 0.1 with nothing checking it. An *installed* plugin claiming one
   is refused; code driving the registry directly is not, because there is no
   supply chain to defend against there — the caller is the origin.
-- **provenance is recorded and written down.** `Provenance(distribution,
-  version, source)` travels from the entry point into `RuleRecord.version` and
+- **the origin is recorded and written down.** `Origin(distribution, version,
+  source)` travels from the entry point into `RuleRecord.version` and
   `RuleRecord.origin`, so the saved run answers "whose rule was this" without
-  access to the machine that produced it.
+  access to the machine that produced it. Named `Origin` rather than `Provenance`
+  because two classes already carry that name — on an exchange and on a trace —
+  and a third would make the import a question.
 
 Provider loading also became transactional. It validated and registered item by
 item, so a pack whose fourth rule was malformed left three registered *and*

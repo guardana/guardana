@@ -1,22 +1,15 @@
 """What a run *measured*, as opposed to what it found wrong.
 
-`Finding` answers "what is unsafe here". It is the only channel a run had, and it
-records problems — so a check that ran and was satisfied left no trace at all
-beyond its rule id in `rules_run`. That is enough to gate a build and not enough
-to answer the next question anybody asks: **did this get better?**
+One record per case actually measured, pass included — the passes are what give a
+rate a denominator. A separate channel from `Finding` because a measurement and a
+defect are different sentences: one has a denominator, a direction and an
+uncertainty; the other has a severity and somebody who has to act.
 
-Fewer findings has three causes and they are not distinguishable from the finding
-count alone: the system improved, the test got weaker, or the sample changed. An
-`Assessment` is the record that tells them apart — one per case actually
-measured, pass included, carrying what graded it and against what.
-
-Deliberately a separate channel rather than a `Finding` with `severity: info`.
-A measurement and a defect are different sentences: one has a denominator, a
-direction and an uncertainty, the other has a severity and somebody who has to
-act. Folding either into the other is how "82/100" ends up gating a release.
+Why it is shaped this way, and what was rejected:
+[`docs/design/assessment-channel.md`](../../../../../docs/design/assessment-channel.md).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -29,10 +22,8 @@ if TYPE_CHECKING:
 class AssessmentStatus(StrEnum):
     """Whether this case produced a measurement, and if not, why not.
 
-    The three non-`MEASURED` members exist so none of them can be silently read
-    as zero. A judge that could not parse a reply, a request that never left, and
-    a case the target cannot support are three different facts, and averaging any
-    of them into a score invents data.
+    The three non-`MEASURED` members exist so none of them can be read as zero:
+    averaging a case nobody could measure into a score invents data.
     """
 
     MEASURED = "measured"
@@ -49,9 +40,8 @@ class AssessmentStatus(StrEnum):
 class Direction(StrEnum):
     """Which way is better, for a numeric measurement.
 
-    Recorded with the value because it cannot be inferred from the number: a
-    latency of 900 and a pass rate of 900 do not move the same way, and a
-    comparison that guesses will report half of all regressions as improvements.
+    Recorded with the value, never inferred from it: a latency of 900 and a score
+    of 900 do not move the same way.
     """
 
     HIGHER_IS_BETTER = "higher_is_better"
@@ -62,10 +52,8 @@ class Direction(StrEnum):
 class Assessment:
     """One case, measured once, by something that says what it was.
 
-    `case_id` is the identity two runs are paired on. It has to be stable across
-    runs and to *change* when the case changes — a rewritten prompt is a different
-    test, and pairing it with the old one under the same name is precisely the
-    comparison this channel exists to refuse.
+    `case_id` is the identity two runs are paired on: stable across runs, and
+    different when the case itself is different.
     """
 
     case_id: str
@@ -78,21 +66,18 @@ class Assessment:
     status: AssessmentStatus = AssessmentStatus.MEASURED
     rule_id: str = ""
     passed: bool | None = None
-    """The boolean reading, or None when this case has no pass/fail sense.
+    """The boolean reading; None for a pure measurement, or for one nobody could take.
 
-    None for a pure measurement (latency, token count). Never `False` because the
-    measurement could not be taken — that is what `status` is for.
+    Never `False` because the measurement failed — that is what `status` is for.
     """
 
     value: float | None = None
     unit: str | None = None
     direction: Direction | None = None
     threshold: float | None = None
-    """The bound `passed` was decided against in *this* run.
+    """The bound `passed` was decided against in *this* run, not the current one.
 
-    Recorded per assessment rather than looked up later: a threshold that moved
-    between two runs changes the verdict without changing the system, and a
-    comparison that cannot see the old bound reports that as a regression.
+    A threshold that moved changes the verdict without changing the system.
     """
 
     confidence: float | None = None
@@ -101,34 +86,30 @@ class Assessment:
     dataset: str | None = None
     """Which versioned corpus this case came from, when it came from one.
 
-    Part of comparability: the same `case_id` from two different datasets is two
-    different tests wearing one name.
+    The same `case_id` over two datasets is two tests wearing one name, so this is
+    part of `comparable_key`.
     """
 
     rationale: str = ""
-    tags: tuple[str, ...] = field(default_factory=tuple)
+    tags: tuple[str, ...] = ()
     """Slices a comparison may group by — language, category, tenant class."""
 
     @property
-    def is_comparable_key(self) -> tuple[str, str, str | None]:
-        """The triple two runs must agree on before their values may be compared."""
+    def comparable_key(self) -> tuple[str, str, str | None]:
+        """Return the triple two runs must agree on before their values may be compared."""
         return (self.case_id, self.assessor, self.dataset)
 
 
 def case_id_for(rule_id: str, *parts: str) -> str:
     """Build a stable case id for a rule and the text that distinguishes the case.
 
-    Hashed rather than positional. An index (`rule#0`) is stable only until the
-    prompts are reordered, at which point every case silently pairs with a
-    different one and the diff is confidently wrong. Hashing the text instead
-    makes a reordering a no-op and a *rewording* a new case — which is the honest
-    reading, because a rewritten prompt is not the same test.
-
-    The text is not recoverable from the id: it is a digest, so a case id may be
-    published in a report that redacts the prompt it came from.
+    Hashed rather than positional: an index survives until somebody reorders the
+    prompts, after which every case pairs with a different one and the comparison
+    is confidently wrong. A digest also means the id is safe in a report that
+    redacts the text it was built from.
     """
-    # `digest_of` names its algorithm (`sha256:…`); the id carries the hash only,
-    # because the algorithm is already recorded once per run in the manifest.
+    # The algorithm prefix `digest_of` adds is dropped: it is already recorded once
+    # per run in the manifest, and an id is read by people.
     return f"{rule_id}#{digest_of(*parts).split(':', 1)[-1][:12]}"
 
 
@@ -143,10 +124,9 @@ def from_verdict(  # noqa: PLR0913 — one keyword per fact the verdict cannot s
 ) -> Assessment:
     """Turn one graded exchange into a measurement, keeping "could not grade" apart.
 
-    `passed` is `None` for an inconclusive verdict, never `False`. The distinction
-    is the whole reason this channel is not a boolean: a judge that could not read
-    the reply has not observed a failure, and counting it as one makes a broken
-    grader look like a worsening model — which is the direction that gets acted on.
+    `passed` is `None` for an inconclusive verdict, never `False`: a judge that
+    could not read the reply has not observed a failure, and counting it as one
+    makes a broken grader look like a worsening model.
     """
     inconclusive = verdict.outcome == "inconclusive"
     return Assessment(

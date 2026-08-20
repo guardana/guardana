@@ -223,9 +223,11 @@ de-duplicates, which is the legitimate case the old behaviour existed for:
 reserved since 0.1 with nothing checking it. An <em>installed</em> plugin claiming one
 is refused; code driving the registry directly is not, because there is no
 supply chain to defend against there — the caller is the origin.</li>
-<li><strong>provenance is recorded and written down.</strong> <code>Provenance(distribution, version, source)</code> travels from the entry point into <code>RuleRecord.version</code> and
+<li><strong>the origin is recorded and written down.</strong> <code>Origin(distribution, version, source)</code> travels from the entry point into <code>RuleRecord.version</code> and
 <code>RuleRecord.origin</code>, so the saved run answers &quot;whose rule was this&quot; without
-access to the machine that produced it.</li>
+access to the machine that produced it. Named <code>Origin</code> rather than <code>Provenance</code>
+because two classes already carry that name — on an exchange and on a trace —
+and a third would make the import a question.</li>
 </ul>
 <p>Provider loading also became transactional. It validated and registered item by
 item, so a pack whose fourth rule was malformed left three registered <em>and</em>

@@ -43,10 +43,8 @@ def finding_to_dict(finding: Finding) -> dict[str, object]:
 def assessment_to_dict(assessment: Assessment) -> dict[str, object]:
     """Serialize one measured case.
 
-    Optional fields are written as `null` rather than omitted. A missing key and a
-    key holding `null` are the same to a permissive reader and different to a
-    strict one, and this document is read by both — so "no threshold was applied"
-    is written down instead of inferred from an absence.
+    Optional fields are written as `null` rather than omitted: a missing key and a
+    `null` differ to a strict reader, and this document is read by both.
     """
     return {
         "case_id": assessment.case_id,
@@ -99,9 +97,7 @@ def run_to_dict(result: ScanResult, manifest: RunManifest) -> dict[str, object]:
             }
             for o in result.observations
         ],
-        # What the run *measured*, pass included. Written even when empty, so a
-        # reader can tell "this build records measurements and there were none"
-        # from "this document predates the channel" — the second is answered by
-        # `schema_version`, and the two must not have to be guessed apart.
+        # Written even when empty, so "measured nothing" is a fact in the document
+        # rather than something a reader infers from a missing key.
         "assessments": [assessment_to_dict(a) for a in result.assessments],
     }

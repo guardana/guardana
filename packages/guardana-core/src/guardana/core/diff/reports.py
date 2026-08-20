@@ -42,10 +42,8 @@ def compare_reports(before: RunReport, after: RunReport) -> RunDiff:
         + _migration_note(before, after)
         + diff.notes
     )
-    # `replace`, not a fresh `RunDiff`: rebuilding it field by field is how the
-    # measurement channel reached this function and did not leave it. `ScanResult`
-    # grew `merged` for the identical reason one layer down — the mistake is not
-    # forgetting a field, it is writing code where forgetting one is possible.
+    # `replace`, never a fresh `RunDiff`: rebuilding field by field drops whatever
+    # channel is added next, which is why `ScanResult` grew `merged`.
     return replace(diff, notes=notes)
 
 

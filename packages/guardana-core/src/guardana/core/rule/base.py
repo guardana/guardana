@@ -84,15 +84,12 @@ class RuleContext:
     def record(self, assessment: Assessment) -> None:
         """Record what this rule measured, pass included. The runner collects them.
 
-        A sink rather than a second return value, because `run` returning
-        `Iterable[Finding]` is the contract every third-party rule implements and
-        widening it would break all of them at once — the adoption cost the
-        roadmap's API item exists to avoid.
+        A sink rather than a second return value: `run` returning
+        `Iterable[Finding]` is the contract every third-party rule implements.
 
-        Recording is optional and staying silent is not a failure: a rule that
-        reads a file and finds nothing has not *measured* anything, and inventing
-        an assessment for it would put hundreds of empty passes into the
-        denominator of every attack-success rate.
+        Optional, and silence is not a failure — a rule that reads a file and finds
+        nothing has not *measured* anything, and hundreds of empty passes would
+        deflate every rate computed from the channel.
         """
         self._assessments.append(assessment)
 

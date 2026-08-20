@@ -40,11 +40,9 @@ _DUNDER_RE = re.compile(r'^__version__ = "[^"]+"', re.MULTILINE)
 # `release.py` repoints at each final release. Left behind by a bump, that line
 # keeps serving an Action from an older series, which is worse than a broken
 # link: the workflow still runs, just without the fixes the release shipped.
-# Which files carry one is *discovered*, never listed. A hand-written list is
-# what let `deploy/docker-compose.yml`, `docs/deployment.md`, `docs/integrations.md`
-# and the collector's own README sit on `:0.9` while the packages shipped 0.21:
-# each was added after the list was written, so the rewrite could not see them and
-# nothing else looked. A list only covers the files somebody remembered.
+# Which files carry one is *discovered*, never listed: a list only covers the files
+# somebody remembered, and four of them sat on `:0.9` for twelve releases because
+# each was created after the list.
 _ACTION_PIN_RE = re.compile(r"(guardana/guardana[@/]v)\d+\.\d+")
 # The same failure mode, one artifact over: the docs tell users to run
 # `ghcr.io/guardana/guardana:MAJOR.MINOR`, a moving tag the release workflow
@@ -101,16 +99,13 @@ def pin_bearing_files(pattern: re.Pattern[str]) -> tuple[Path, ...]:
 # the same staleness one file over. Each is `(pattern, replacement template)`,
 # rewritten in the same pass and checked by the same pre-flight.
 _SITE_VERSION_RE = re.compile(r'(<span class="ver mono">)v\d+\.\d+\.\d+')
-# The Action's own CLI pin. `guardana/guardana@vX.Y` must install the CLI that
-# tag ships, not whatever is newest — otherwise a workflow nobody edited starts
-# running a different engine the day the next release lands.
+# The Action's own CLI pin: `guardana/guardana@vX.Y` must install the CLI that tag
+# ships, or a workflow nobody edited changes engine on the next release.
 _ACTION_CLI_RE = re.compile(r'(default: ")\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|\.post\d+|\.dev\d+)?(")')
 _SECURITY_VERSION_RE = re.compile(r"(pre-1\.0 )\(\d+\.\d+\.x\)")
 _README_CURRENT_RE = re.compile(r"\| \*\*\d+\.\d+\*\* \*\(current\)\*")
-# The roadmap's own "what ships today" heading. It was rewritten by hand for
-# fourteen releases, and `release.py` aborted after the bump every time somebody
-# forgot — a manual step whose only outcome is a failed release is a manual step
-# that should not exist.
+# The roadmap's own "what ships today" heading. Rewritten by hand until 0.22.0,
+# where forgetting it aborted the release after the bump.
 _ROADMAP_SHIPS_RE = re.compile(r"(## What ships today \()\d+\.\d+\.\d+(\))")
 # The prose beside the moving Action pin. Rewriting the pin and leaving the
 # sentence that explains it is how README and integrations.md shipped 0.5.0

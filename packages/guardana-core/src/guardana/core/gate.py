@@ -57,9 +57,8 @@ def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
     reporting the missing check instead would bury it.
 
     **Anything else that leaves the question open is `INDETERMINATE`** — see
-    `_left_unanswered`, which owns that list. They are one branch here because
-    they are one answer: their order among themselves cannot change a verdict,
-    only which sentence explains it, and that sentence lives in the result.
+    `_left_unanswered`, which owns that list. One branch here because they are one
+    answer: their order among themselves cannot change a verdict.
     """
     if result.stopped_by is not None:
         return GateOutcome.INDETERMINATE
@@ -79,24 +78,17 @@ def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
 def _left_unanswered(result: "ScanResult", threshold: "FailOn") -> bool:
     """Whether this run failed to answer its own question, for any reason.
 
-    Three of these have no toggle in front of them, deliberately:
+    Three have no toggle in front of them, because each is a demand rather than a
+    preference:
 
-    **Coverage the operator demanded and did not get.** Every `fail_on_*` switch
-    covers checks nobody specifically asked for. A dimension named in
-    `trace.require`, or needed by an assertion in a security contract, is not in
-    that category — it was demanded, and `fail_on_skipped` defaulting to off
-    would otherwise turn "your contract could not be checked" into exit `0`.
-
-    **A run that reached no conclusion at all.** No rule ran, or every rule that
-    ran could only decline. `verified_nothing` counts conclusions rather than
-    executions, because an endpoint answering every request with an empty message
-    executes every rule, grades none, and used to be recorded as `gate: pass`.
-
-    **A run that measured cases and measured none of them.** The same fact for the
-    measurement channel, and it needs its own line because the two are carried
-    separately: a suite whose judge stopped answering records an assessment per
-    case, none graded, and no finding anywhere — so every other test here is
-    satisfied and a pass rate over zero cases would be reported as a pass.
+    - **coverage the operator demanded and did not get** — every `fail_on_*` switch
+      covers checks nobody specifically asked for, and this one was asked for;
+    - **a run that reached no conclusion at all** — `verified_nothing` counts
+      conclusions, not executions, so an endpoint answering everything with an
+      empty message cannot pass with a full rule count;
+    - **a run that measured cases and measured none of them** — the same fact for
+      the measurement channel, which is carried separately and would otherwise
+      satisfy every test above on a sample of zero.
 
     The rest are preferences and stay behind their switches.
     """

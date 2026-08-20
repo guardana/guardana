@@ -170,10 +170,8 @@ def _result(raw: dict[str, Any], manifest: RunManifest, path: Path) -> ScanResul
 def _assessments(raw: object, path: Path) -> tuple[Assessment, ...]:
     """Read the measurement channel back, refusing a status this build cannot honour.
 
-    A status outside the four is rejected rather than coerced to `measured`. The
-    coercion is the tempting one and it is the dangerous one: an unknown status
-    read as a measurement puts a case into a denominator it was never in, and the
-    resulting pass rate is confidently wrong rather than absent.
+    Refused rather than coerced to `measured`: an unknown status read as a
+    measurement puts a case into a denominator it was never in.
     """
     if raw is None:
         return ()

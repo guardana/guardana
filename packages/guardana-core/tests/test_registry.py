@@ -5,7 +5,7 @@ import pytest
 from guardana.core.evaluator import Evaluator, Expectation, Verdict
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.exchange import Exchange
-from guardana.core.provenance import UNATTRIBUTED, Provenance
+from guardana.core.origin import UNATTRIBUTED, Origin
 from guardana.core.registry import Registry, RegistryConflictError, _absorb
 from guardana.core.report import Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
@@ -115,10 +115,10 @@ def test_two_distributions_cannot_claim_the_same_rule_id() -> None:
     in by anything.
     """
     reg = Registry()
-    reg.register_rule(_AcmeRule(), Provenance(distribution="acme-rules", version="1.0"))
+    reg.register_rule(_AcmeRule(), Origin(distribution="acme-rules", version="1.0"))
 
     with pytest.raises(RegistryConflictError, match=r"acme-rules 1\.0"):
-        reg.register_rule(_AcmeImpostor(), Provenance(distribution="evil-pack", version="9.9.9"))
+        reg.register_rule(_AcmeImpostor(), Origin(distribution="evil-pack", version="9.9.9"))
 
     assert [r.meta.title for r in reg.rules()] == ["acme"]
 
@@ -126,7 +126,7 @@ def test_two_distributions_cannot_claim_the_same_rule_id() -> None:
 def test_the_same_file_loaded_twice_is_still_de_duplicated() -> None:
     # The legitimate case the old last-wins existed for: `rules.paths` and
     # `--rules` pointing at overlapping directories. Same origin, so it de-dupes.
-    origin = Provenance(source="/rules/demo.yaml")
+    origin = Origin(source="/rules/demo.yaml")
     reg = Registry()
     reg.register_rule(_R(), origin)
     reg.register_rule(_R(), origin)
@@ -139,7 +139,7 @@ def test_an_installed_plugin_cannot_claim_the_reserved_namespace() -> None:
     reg = Registry()
 
     with pytest.raises(RegistryConflictError, match="reserved"):
-        reg.register_rule(_R(), Provenance(distribution="acme-rules", version="1.0"))
+        reg.register_rule(_R(), Origin(distribution="acme-rules", version="1.0"))
 
 
 def test_two_distributions_cannot_claim_the_same_evaluator_id() -> None:
@@ -149,10 +149,10 @@ def test_two_distributions_cannot_claim_the_same_evaluator_id() -> None:
     fail, and not one rule file changes.
     """
     reg = Registry()
-    reg.register_evaluator(_Ev(), Provenance(distribution="guardana-core", version="0.21.0"))
+    reg.register_evaluator(_Ev(), Origin(distribution="guardana-core", version="0.21.0"))
 
     with pytest.raises(RegistryConflictError, match="ev1"):
-        reg.register_evaluator(_Ev(), Provenance(distribution="acme-rules", version="1.0"))
+        reg.register_evaluator(_Ev(), Origin(distribution="acme-rules", version="1.0"))
 
 
 def test_the_registry_remembers_which_origin_supplied_a_rule() -> None:
@@ -160,11 +160,11 @@ def test_the_registry_remembers_which_origin_supplied_a_rule() -> None:
     # not say leaves the question unanswerable one step later, when the saved
     # document is all that is left.
     reg = Registry()
-    reg.register_rule(_R(), Provenance(distribution="guardana-rules", version="0.21.0"))
+    reg.register_rule(_R(), Origin(distribution="guardana-rules", version="0.21.0"))
 
-    assert reg.provenance_of("guardana.x").distribution == "guardana-rules"
-    assert reg.provenance_of("guardana.x").version == "0.21.0"
-    assert reg.provenance_of("nobody.registered.this") == UNATTRIBUTED
+    assert reg.origin_of("guardana.x").distribution == "guardana-rules"
+    assert reg.origin_of("guardana.x").version == "0.21.0"
+    assert reg.origin_of("nobody.registered.this") == UNATTRIBUTED
 
 
 def test_register_target_and_list() -> None:
@@ -234,12 +234,12 @@ def test_a_generator_that_raises_is_not_read_as_a_shorter_list() -> None:
     assert reg.rules() == ()
 
 
-def test_provenance_describes_itself_for_a_human_reading_the_error() -> None:
+def test_an_origin_describes_itself_for_a_human_reading_the_error() -> None:
     # The error naming a conflict is read by somebody who has two packs installed
     # and no idea which. "acme-rules 1.0" is actionable; "<Provenance object>" is not.
-    assert Provenance(distribution="acme-rules", version="1.0").describe() == "acme-rules 1.0"
-    assert Provenance(distribution="acme-rules").describe() == "acme-rules"
-    assert Provenance(source="/rules/demo.yaml").describe() == "/rules/demo.yaml"
+    assert Origin(distribution="acme-rules", version="1.0").describe() == "acme-rules 1.0"
+    assert Origin(distribution="acme-rules").describe() == "acme-rules"
+    assert Origin(source="/rules/demo.yaml").describe() == "/rules/demo.yaml"
     assert UNATTRIBUTED.describe() == "an unattributed registration"
 
 
@@ -247,8 +247,8 @@ def test_only_guardanas_own_distributions_count_as_built_in() -> None:
     # Matched by distribution name, which is what pip installed and what a lockfile
     # pins — not by entry-point name or module path, either of which a third party
     # can choose freely.
-    assert Provenance(distribution="guardana-rules").is_builtin
-    assert not Provenance(distribution="guardana_rules_but_not_really").is_builtin
+    assert Origin(distribution="guardana-rules").is_builtin
+    assert not Origin(distribution="guardana_rules_but_not_really").is_builtin
     assert not UNATTRIBUTED.is_builtin
 
 
@@ -291,7 +291,7 @@ def test_a_local_yaml_rule_may_not_shadow_a_built_in_id(tmp_path: Path) -> None:
     refusal with no remedy is a refusal people work around.
     """
     reg = Registry()
-    reg.register_rule(_R(), Provenance(distribution="guardana-rules", version="0.22.0"))
+    reg.register_rule(_R(), Origin(distribution="guardana-rules", version="0.22.0"))
     shadow = tmp_path / "shadow.yaml"
     shadow.write_text(_KEYWORD_RULE_YAML.replace("acme.prompt.demo", "guardana.x"))
     reg.register_evaluator(KeywordEvaluator())

@@ -1,21 +1,23 @@
 """How the measurement channel moved between two runs, paired case by case.
 
-The finding channel already answers "did a new problem appear". What it cannot
-answer is the question underneath it: *over how many cases*. A suite that graded
-forty cases yesterday and twelve today reports fewer findings, and every existing
-change kind reads that as an improvement.
+What the change list cannot show: *over how many cases*. A suite that graded forty
+yesterday and twelve today reports fewer findings, which every change kind reads
+as an improvement.
 
-So this deliberately does **not** re-report per-case pass→fail. A YAML rule that
-starts failing a prompt already yields a `Finding`, which the comparison already
-names `appeared`; adding a second entry for the same event would double-count the
-one thing the diff is most careful about. What is new here is the denominator, the
-pairing, and the refusal to compare cases whose definition changed.
+Deliberately not a second report of per-case pass→fail — that already reaches the
+comparison as a `Finding`, and counting it twice would double the one thing the
+diff is most careful about. What is new is the denominator, the pairing, and the
+refusal to compare cases whose definition moved.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from guardana.core.assessment import Assessment, AssessmentStatus
+
+_NAMED_IN_A_NOTE = 3
+"""How many case ids a note quotes before it stops. A note nobody finishes is a
+note nobody reads, and the count above it is the part that matters."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,10 +67,11 @@ class MeasurementDelta:
                 f"the dataset changed, so the two results are not answers to one question"
             )
         if self.blinded:
+            shown = self.blinded[:_NAMED_IN_A_NOTE]
+            more = ", …" if len(self.blinded) > _NAMED_IN_A_NOTE else ""
             lines.append(
                 f"{len(self.blinded)} case(s) produced a value before and could not be "
-                f"graded this time ({', '.join(self.blinded[:3])}"
-                f"{', …' if len(self.blinded) > 3 else ''}) — a smaller sample, not a "  # noqa: PLR2004
+                f"graded this time ({', '.join(shown)}{more}) — a smaller sample, not a "
                 f"better result"
             )
         if self.only_before:
@@ -90,7 +93,7 @@ def measure(before: Sequence[Assessment], after: Sequence[Assessment]) -> Measur
     blinded: list[str] = []
     for case_id in sorted(lhs.keys() & rhs.keys()):
         was, now = lhs[case_id], rhs[case_id]
-        if was.is_comparable_key != now.is_comparable_key:
+        if was.comparable_key != now.comparable_key:
             incomparable += 1
             continue
         if was.status is AssessmentStatus.MEASURED and now.status is not AssessmentStatus.MEASURED:

@@ -106,16 +106,10 @@ class YamlRule(Rule):
                 )
             )
             verdict = evaluator.evaluate(exchange, self.expectation)
-            # Every graded prompt is recorded, `pass` included. That is the whole
-            # point of the channel: without the passes there is no denominator, and
-            # a run with three findings out of four prompts is indistinguishable
-            # from one with three out of four hundred.
-            #
+            # `pass` included: without the passes there is no denominator. The
             # `dataset` is this rule's declaration digest — the same hash `diff`
-            # already uses to say "rule definition changed". Sharing it means a
-            # sharpened corpus makes the two runs *incomparable* rather than
-            # reading as a worse model, and there is only one definition of "the
-            # same test" in the project.
+            # uses for "rule definition changed", so a sharpened corpus makes two
+            # runs incomparable rather than making the model look worse.
             ctx.record(
                 from_verdict(
                     verdict,
