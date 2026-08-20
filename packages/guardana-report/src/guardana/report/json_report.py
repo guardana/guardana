@@ -1,7 +1,13 @@
 import json
 
 from guardana.core.manifest import RunManifest
-from guardana.core.report import ScanResult, error_to_dict, finding_to_dict, run_to_dict
+from guardana.core.report import (
+    ScanResult,
+    assessment_to_dict,
+    error_to_dict,
+    finding_to_dict,
+    run_to_dict,
+)
 
 
 class JsonRenderer:
@@ -43,6 +49,7 @@ def _without_manifest(result: ScanResult) -> dict[str, object]:
             {"kind": str(o.kind), "name": o.name, "ref": o.ref, "attributes": dict(o.attributes)}
             for o in result.observations
         ],
+        "assessments": [assessment_to_dict(a) for a in result.assessments],
         "note": (
             "rendered without a run manifest, so this is not a saved run: it "
             "cannot be compared and will be refused by `guardana diff`"

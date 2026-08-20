@@ -43,7 +43,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Version 16 on purpose: it has to match the service container above. A dump
       # taken by newer client tools does not restore into an older server — it
@@ -53,7 +53,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client-16
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
@@ -75,7 +75,13 @@ jobs:
         run: uv run lint-imports
 
       - name: Tests + coverage gate
-        run: uv run pytest --cov --cov-report=term-missing
+        run: uv run pytest --cov --cov-report=term-missing --cov-report=json:.coverage.json
+
+      # One global number lets simple new code pay for an untested parser. These
+      # are the areas where being wrong is a wrong verdict or somebody else's
+      # data, and each carries its own floor.
+      - name: Critical-path coverage floors
+        run: uv run python scripts/critical_coverage.py .coverage.json
 
       # We ship a supply-chain scanner; our own dependencies get the same scrutiny.
       - name: Dependency audit
@@ -94,10 +100,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: "3.13"
 
@@ -114,10 +120,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: "3.13"
 
@@ -140,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # No cache here, and that is the job's whole point: every step below runs
       # `--no-cache` because uv otherwise serves a previously built wheel for an
@@ -149,7 +155,7 @@ jobs:
       # setup-uv to manage a cache nothing writes to leaves it pruning a directory
       # that was never created, which it now fails the job over.
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: "3.13"
 

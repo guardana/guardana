@@ -128,12 +128,15 @@ def _fully_populated() -> RunManifest:
             max_severity="HIGH",
             gate=GateOutcome.FAIL,
             stopped_by=StopReason.BUDGET_EXHAUSTED,
+            assessments=7,
+            measured=5,
         ),
         rules=(
             RuleRecord(
                 id="guardana.prompt.system_prompt_leak.canary",
                 digest="sha256:8888",
-                version="2",
+                version="0.22.0",
+                origin="guardana-rules",
                 maturity="stable",
                 trials=4,
             ),

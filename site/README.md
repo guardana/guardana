@@ -80,11 +80,12 @@ being true of the website too, not only the engine. Worth a check at
 Two mechanisms, because the page has two kinds of claim that go stale in
 different ways.
 
-**Version markers** — the `v0.13.0` in the header and the `guardana/guardana@v0.13`
+**Version markers** — the `vX.Y.Z` in the header and the `guardana/guardana@vX.Y`
 Action pin — are rewritten by `scripts/bump_version.py` on every release, and the
-bump **refuses to run** if either marker has gone missing. The numbers here are the
-ones the page carries today; they move with every release, which is the whole reason
-the script owns them.
+bump **refuses to run** if either marker has gone missing. Written as placeholders
+on purpose: a literal number in a sentence *explaining* how numbers stay current is
+one more number to forget, and this one sat eight releases behind while the marker
+it described was rewritten every time.
 
 **Factual claims** — the rule total and the build/runtime split — come from the
 registry, not from memory:

@@ -303,6 +303,38 @@ stayed green. It now has its own channel and **fails the gate by default**
 (`fail_on_error`), one broken rule never stops the rest of the scan, and one
 broken plugin never takes rule discovery down with it.
 
+### What was measured, not only what was wrong (`assessments`)
+
+Every channel above records a **problem**. That is enough to gate a build and not
+enough for the question everybody asks next: *did this get better?* Fewer findings
+has three causes — the system improved, the test got weaker, the sample changed —
+and a finding count cannot separate them.
+
+So a run also records what it **measured**, one entry per graded case, *including
+the passes*:
+
+| Field | What it carries |
+|---|---|
+| `case_id` | the identity two runs are paired on — a hash, so reordering prompts is a no-op and rewording one is a new case |
+| `assessor` | what produced the verdict (an evaluator id, or a rule grading in its own code) |
+| `status` | `measured`, `inconclusive`, `error` or `skipped` — and the last three never become a zero |
+| `passed` | the boolean reading, or `null` when nothing could be graded (never `false`) |
+| `value` / `unit` / `direction` / `threshold` | the numeric reading, with which way is better and the bound applied on *this* run |
+| `dataset` | which versioned corpus the case came from; part of what makes two runs comparable |
+
+Every built-in dynamic rule records one per prompt, per scenario step and per
+trajectory. `guardana diff` pairs them case by case and **refuses to compare** one
+whose assessor or dataset changed, so an edited expectation is reported as
+incomparable rather than as a model that got worse. The gate gains exactly one new
+refusal, in one direction: a run that recorded assessments and measured **none** of
+them is `indeterminate` — a suite whose judge stopped answering produces no
+findings at all, and a pass rate over zero cases must never read as a pass.
+
+What it deliberately is not: a single quality score. There is no "82/100" here,
+because an aggregate without its parts, its sample size and the version of what
+produced it is false precision. The collector does not store this channel yet — it
+still trends findings, not measurements.
+
 ### Your application's threat model, executable (`--contract`)
 
 Rules are tests, evaluators are judgement, targets are the system. The missing
@@ -497,6 +529,37 @@ gate goes red again.
 carrying generated placeholder text, so a red gate is traceable to an acceptance
 running out rather than looking like new breakage. `update` only removes waivers
 for findings that are fixed; it never adds one on your behalf.
+
+### The extension contract is checkable (`guardana.testing.assert_target_conforms`)
+
+A capability has two halves. `Capability` is what a target **declares**; a protocol
+in `guardana.core.target.protocols` is what a rule will **call** — `FileReader`,
+`ChatEndpoint`, `ToolOfferingEndpoint`, `TraceReader`, `ToolListing`,
+`AuthorizationInspector`, one per capability. A third-party target that implements
+the protocol runs the built-in rules without inheriting anything of Guardana's.
+
+Both directions are checked, and the second is the one with no error of its own: a
+target that declares a capability it lacks is refused by the runner with one clear
+message, and a target that *implements* a surface and forgets to declare it is
+skipped by every rule that needed it — a green scan over zero coverage.
+`assert_target_conforms` fails on both, and ships in the package rather than in
+this repository's tests, because a conformance kit somebody has to vendor is one
+nobody runs.
+
+### One id, one owner (`Registry`, `RuleRecord.origin`)
+
+Two installed distributions cannot claim the same rule or evaluator id, and
+`guardana.*` is enforced as reserved rather than merely documented. A conflict is
+refused, recorded in `errors`, and fails the gate — because the alternative was
+silent: `rules_run` records the id and the rule digest hashes the *declaration*, so
+a pack copying a built-in's metadata produced an identical id, an identical digest
+and a clean report naming the check it had replaced.
+
+Every rule in a saved run now carries the distribution and version that supplied
+it, so "whose rule produced this verdict" is answerable from the document alone.
+Loading a pack is also atomic: a pack whose fourth rule is malformed registers
+none of them, instead of leaving three behind and reporting the pack as unloadable
+in the same document.
 
 ### Safe mode that still checks things (`--plugins`)
 

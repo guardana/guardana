@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
 from guardana.core.diff.errors import IncomparableRunsError
+from guardana.core.diff.measurement import measure
 from guardana.core.diff.model import Change, ChangeKind, CheckState, Outcome, RunDiff
 from guardana.core.report import Finding, ScanResult, StopReason, split_ref
 
@@ -136,10 +137,15 @@ def compare(
             )
         )
     changes.extend(_coverage_changes(ran_before, ran_after))
+    measurement = measure(before.assessments, after.assessments)
     return RunDiff(
         changes=tuple(changes),
         unchanged=unchanged,
-        notes=_notes(ran_before & ran_after, before_context, after_context),
+        notes=(
+            *_notes(ran_before & ran_after, before_context, after_context),
+            *measurement.notes(),
+        ),
+        measurement=measurement,
         incomplete=_incomplete(before, after),
     )
 

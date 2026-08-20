@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import yaml
+from guardana.core.assessment import case_id_for, from_verdict
 from guardana.core.evaluator.base import Expectation
 from guardana.core.exchange import Exchange
 from guardana.core.report import Evidence, Finding
@@ -20,7 +21,7 @@ from guardana.core.rule.base import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.rule.fixture import RuleFixture
 from guardana.core.target import ChatMessage, Target
-from guardana.core.target.endpoint import EndpointTarget
+from guardana.core.target.protocols import ChatEndpoint
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,8 +52,16 @@ class YamlRule(Rule):
         A rule built by hand rather than parsed (a test, or a plugin assembling one
         programmatically) has no declaration to hash, and the base implementation
         still gives it a stable identity.
+
+        `Rule.digest(self)` rather than `super().digest()`, and that is not style.
+        `@dataclass(slots=True)` builds a *new* class object and throws the
+        original away, while the zero-argument `super()` closure still points at
+        the original — so the call raises `TypeError` every time it is reached.
+        It was reached only when `source_digest` was empty, which is exactly the
+        hand-built case no fixture had, so it sat here undetected until something
+        started asking every rule for its digest.
         """
-        return self.source_digest or super().digest()
+        return self.source_digest or Rule.digest(self)
 
     @property
     def estimated_requests(self) -> int:
@@ -76,7 +85,7 @@ class YamlRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Send each prompt, grade each reply, and yield a finding per failure."""
-        if not isinstance(target, EndpointTarget):
+        if not isinstance(target, ChatEndpoint):
             # Unreachable while the capability contract holds: the runner only
             # plans this rule against a target that declared `chat`. If it ever
             # runs, the contract is broken, and that belongs in `errors` rather
@@ -97,6 +106,25 @@ class YamlRule(Rule):
                 )
             )
             verdict = evaluator.evaluate(exchange, self.expectation)
+            # Every graded prompt is recorded, `pass` included. That is the whole
+            # point of the channel: without the passes there is no denominator, and
+            # a run with three findings out of four prompts is indistinguishable
+            # from one with three out of four hundred.
+            #
+            # `dataset` is this rule's declaration digest — the same hash `diff`
+            # already uses to say "rule definition changed". Sharing it means a
+            # sharpened corpus makes the two runs *incomparable* rather than
+            # reading as a worse model, and there is only one definition of "the
+            # same test" in the project.
+            ctx.record(
+                from_verdict(
+                    verdict,
+                    case_id=case_id_for(self.meta.id, prompt),
+                    subject_ref=target.ref,
+                    rule_id=self.meta.id,
+                    dataset=self.digest(),
+                )
+            )
             # `fail` is a finding; `inconclusive` is surfaced too (the runner routes
             # it to `unverified`) so a check that could not grade is never a silent
             # pass. Only a real `pass` yields nothing.

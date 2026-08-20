@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The 0.21 audit — Guardana documentation</title>
+<meta name="description" content="what a full audit of the released 0.21.0 found, which findings were closed in 0.22.0 and with which gate, and which were deliberately left open">
+<link rel="canonical" href="https://guardana.dev/docs/design/audit-0.21.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html" aria-current="page">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>The 0.21 audit: what it found, and what closed it<span class="status accepted">accepted</span></h1><p class="lede">what a full audit of the released 0.21.0 found, which findings were closed in 0.22.0 and with which gate, and which were deliberately left open</p><p><strong>Status:</strong> accepted · <strong>Written:</strong> 2026-08-20 · <strong>Subject:</strong> the released 0.21.0</p>
+<p>An audit of the released build — code, architecture, documentation and market
+position — conducted against <code>4cb87d7</code>. Kept because the <em>pattern</em> in the findings
+is more useful than any one of them, and because half of what it found had passed
+every gate this repository has.</p>
+<h2 id="method-and-its-limits">Method, and its limits</h2>
+<p>Static reading, plus running the documented commands and reading the artifacts
+they produced. Every finding was then re-verified against the source before this
+was written; none turned out to be false, four were made more precise, and one
+grew a consequence its first version had missed.</p>
+<p>What was <strong>not</strong> done, stated so nobody reads more into this than it says: no
+network pentest of the collector, no probes against real vLLM/Ollama/TGI/MCP
+servers, no precision/recall measurement of the 51 rules against an independent
+corpus, no load test, and no user interviews. Market judgement is qualitative
+inference from published sources, not a sizing.</p>
+<h2 id="the-pattern-worth-keeping">The pattern worth keeping</h2>
+<p>Three of the five most serious findings share a shape: <strong>a claim that was true
+when it was written and became false without anything noticing.</strong> A promise about
+a future release. A pin to a container image. A statement that the collector
+lacked a feature it later gained.</p>
+<p>None of these is a bug in the ordinary sense — there is no wrong branch to find —
+and none can be caught by reading the diff that introduced it, because the diff
+was correct. They are caught only by asking, periodically, <em>is this still true</em>.
+That is why every fix in 0.22.0 came with a gate rather than an edit, and why the
+gates check the whole repository rather than a list of files: <strong>the list is what
+failed</strong>.</p>
+<h2 id="findings-and-their-disposition">Findings, and their disposition</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>What it was</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Assessment channel missing</strong></td>
+<td>a run recorded only problems, so &quot;improved&quot;, &quot;tested less&quot; and &quot;sampled differently&quot; were indistinguishable</td>
+<td>closed in 0.22.0 — <a href="assessment-channel.html"><code>assessment-channel.md</code></a></td>
+</tr>
+<tr>
+<td><strong>Capability contract false</strong></td>
+<td><code>docs/extending.md</code> promised a <code>READ_FILES</code> target could run the artifact rules; 35 <code>isinstance</code> checks made that impossible</td>
+<td>closed in 0.22.0 — <a href="capability-protocols.html"><code>capability-protocols.md</code></a></td>
+</tr>
+<tr>
+<td><strong>Silent rule/evaluator override</strong></td>
+<td>any installed pack could take over a built-in id, and neither <code>rules_run</code>, nor the rule digest, nor the never-populated <code>RuleRecord.version</code> could show it</td>
+<td>closed in 0.22.0 — conflict refused, namespace enforced, provenance recorded in the manifest</td>
+</tr>
+<tr>
+<td><strong>Documentation contradicted the build</strong></td>
+<td>six image pins from series 0.9–0.13, five future-tense claims about features shipped in 0.7, a collector described as lacking lifecycle/audit/retention it gained in 0.11, and a dashboard footer calling itself unauthenticated one screen below its Sign out button</td>
+<td>closed in 0.22.0 — repo-wide pin scan, shipped-milestone gate, capability-denial gate</td>
+</tr>
+<tr>
+<td><strong>The Action did not pin its own CLI</strong></td>
+<td><code>guardana/guardana@v0.21</code> installed the newest <code>guardana-cli</code>, so a pinned workflow changed engine on the next release; arguments were also word-split and glob-expanded</td>
+<td>closed in 0.22.0 — version default, shell-like argument splitting, every external action pinned to a commit</td>
+</tr>
+<tr>
+<td><strong>Non-transactional plugin load</strong></td>
+<td>a pack failing half way left part of itself registered <em>and</em> reported as unloadable</td>
+<td>closed in 0.22.0 — snapshot and rollback per entry point</td>
+</tr>
+<tr>
+<td><strong>No fuzzing of hostile parsers</strong></td>
+<td>named in the threat model as an open gap from v0.7</td>
+<td>closed in 0.22.0 — property tests over every extension a rule opens, plus the trace reader</td>
+</tr>
+<tr>
+<td><strong>Global coverage hid hotspots</strong></td>
+<td>one 90% aggregate let simple code pay for an untested parser</td>
+<td>closed in 0.22.0 — per-area floors, in CI</td>
+</tr>
+<tr>
+<td><strong>Over-absolute competitive claims</strong></td>
+<td>&quot;no red-team harness ships an exit-code contract, a saved run or a regression comparison&quot; was disprovable by 2026</td>
+<td>closed in 0.22.0 — dated, sourced comparisons; no &quot;none/only/first&quot;</td>
+</tr>
+<tr>
+<td><strong><code>monitor</code> is not passive monitoring</strong></td>
+<td>scheduled active probing, correctly documented, but not what &quot;continuous&quot; suggests to a reader</td>
+<td>open by design — <a href="production-intake.html"><code>production-intake.md</code></a>, Horizon 2</td>
+</tr>
+<tr>
+<td><strong>Too many sources of documentation truth</strong></td>
+<td>the same status restated in several files</td>
+<td>partly closed — one owner per claim, recorded in <code>ROADMAP.md</code></td>
+</tr>
+<tr>
+<td><strong>Several large modules</strong></td>
+<td>manifest loading, MCP authorization, endpoint and trace each past 400 lines</td>
+<td>open — split when the next subsystem lands in them, not mechanically</td>
+</tr>
+<tr>
+<td><strong>Release velocity vs. API stability</strong></td>
+<td>0.1 to 0.21 in a month, with the extension API frozen only at 1.0</td>
+<td>open by design — the 1.0 criteria are the answer, and the conformance kit shipped in 0.22.0 is the first half</td>
+</tr>
+<tr>
+<td><strong>Self-hosted operational gaps</strong></td>
+<td>no Helm, no SSO/RBAC, no HA workers, no tested provider conformance matrix</td>
+<td>open — Horizon 3</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="what-was-not-found">What was <em>not</em> found</h2>
+<p>Worth recording, because an audit that only lists problems is not a measurement
+either. The verdict semantics held up under adversarial reading: <code>unverified</code>,
+<code>errors</code> and <code>coverage_shortfall</code> behave as documented, the gate's precedence is
+correct, and no new class of fail-open was found in the execution path. The
+package boundary is enforced rather than asserted, the redaction seam is single,
+and the release pipeline's outputs (SBOM, provenance, OIDC) are ahead of the
+project's age.</p>
+<p>The two worst findings were both in the same place: <strong>the seam between what the
+project claims and what it does.</strong> Not the engine.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="assessment-channel.html"><code>assessment-channel.md</code></a> · <a href="capability-protocols.html"><code>capability-protocols.md</code></a> · <a href="production-intake.html"><code>production-intake.md</code></a></li>
+<li><a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md"><code>../../ROADMAP.md</code></a> — the direction this audit set</li>
+<li><a href="../product-status.html"><code>../product-status.md</code></a> — the single list of current limitations</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/audit-0.21.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

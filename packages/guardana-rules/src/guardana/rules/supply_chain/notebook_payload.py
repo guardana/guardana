@@ -9,7 +9,7 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
-from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
+from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
     NIST_SUPPLY_CHAIN,
     OWASP_ASI05_2026,
@@ -92,7 +92,7 @@ class NotebookPayloadRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every `.ipynb` for code-execution sinks and shell payloads."""
-        if not isinstance(target, ArtifactTarget):
+        if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".ipynb",)):
             yield from self._scan(path)

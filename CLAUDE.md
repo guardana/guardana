@@ -184,7 +184,8 @@ uv run ruff check .            # lint (~30 rule families incl. S/bandit and D/do
 uv run ruff format --check .   # format
 uv run mypy --strict .         # types — whole repo, tests included
 uv run lint-imports            # architecture: the engine must not import the collector
-uv run pytest --cov            # tests + the 90% branch-coverage gate
+uv run pytest --cov --cov-report=json:.coverage.json   # tests + the 90% branch gate
+uv run python scripts/critical_coverage.py .coverage.json  # per-area floors
 uv run guardana scan packages  # dogfood: must stay at zero findings
 uv run --isolated --no-cache \
   --with ./packages/guardana-core --with ./packages/guardana-rules \
@@ -410,6 +411,26 @@ registry level, only namespacing by `id`.
 
 `guardana scan --no-plugins` disables entry-point discovery entirely
 (YAML-only safe mode) — see `SECURITY.md` for why this exists.
+
+## Procedures that are written down, not remembered
+
+`.claude/skills/` and `.claude/agents/` are checked in, and they encode the things
+this project has actually got wrong rather than general advice:
+
+| Skill | Use it when |
+|---|---|
+| `full-gate` | running the gate for an answer you intend to act on — it carries the cache traps that have produced two false greens |
+| `cut-a-release` | releasing, tagging or bumping — the tag goes up only after CI is green on that exact commit |
+| `false-green-audit` | reviewing a release or a subsystem; the seven shapes of "green about something nobody examined", each with the release it was found in |
+| `add-a-rule` | adding coverage — as a rule, evaluator or target, never by patching the engine |
+
+| Agent | Use it when |
+|---|---|
+| `false-green-hunter` | an adversarial, read-only audit that runs the documented commands and reads the artifacts |
+| `gate-runner` | a long gate run whose output should stay out of the main conversation, reported with skips separated from passes |
+
+Add to these when something goes wrong twice. A procedure that lives in one
+person's head is a procedure the next session repeats the mistake of.
 
 ## Your edits are linted automatically
 

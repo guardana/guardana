@@ -5,9 +5,178 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.22.0] - 2026-08-20 — a run that says what it measured, and an extension contract that is true
+
+### Added
+
+**A run now records what it *measured*, not only what was wrong.** Every channel a
+run had — findings, unverified, errors, coverage shortfall — records a problem, so a
+check that ran and was satisfied left nothing behind but its id. That is enough to
+gate a build and not enough for the question everybody asks next: *did this get
+better?* Fewer findings has three causes — the system improved, the test got weaker,
+the sample changed — and a finding count cannot separate them.
+
+`ScanResult.assessments` is the denominator that was missing. One entry per graded
+case, **including the passes**, carrying what produced the verdict, the case's stable
+identity, the dataset it came from, and — for a numeric reading — the value, its
+unit, which way is better, and the bound applied on this run. Every built-in dynamic
+rule records one per prompt, per scenario step and per trajectory; a rule that merely
+reads a file records nothing, because "I looked and found nothing" is not a
+measurement and hundreds of them would deflate every rate computed from the channel.
+
+Four refusals are built into the shape. `inconclusive`, `error` and `skipped` are
+statuses, never zeros, and are excluded from the denominator. `passed` is `null` for
+an ungraded case and never `false`, because a judge that could not read a reply has
+not observed a failure — and reading it as one makes a broken grader look like a
+worsening model. `direction` is recorded rather than inferred, since a latency of 900
+and a score of 900 do not move the same way. And `threshold` is recorded per run, so
+a bound that moved cannot be read as a system that regressed.
+
+`guardana diff` pairs the two runs case by case and prints the population the changes
+happened in — and **refuses** to compare a case whose assessor or dataset changed,
+counting it as incomparable instead. It adds no new way to fail a build: a case that
+started failing already reaches the gate as a finding, and counting it twice would
+make one event look like two in the channel this project is most careful about. The
+gate gained exactly one refusal, in one direction — a run that recorded assessments
+and measured **none** of them is `indeterminate`, because a suite whose judge stopped
+answering produces no findings at all and would otherwise pass on a sample of zero.
+
+Saved-run schema **6** (`assessments`, and `run.rules[].origin`), diff document
+schema **2**. A version-5 run migrates forward with the channel empty and the origin
+null — the first because no version-5 build could record one, the second because
+`null` means unknown and inventing a likely answer is the one thing a migration must
+never do. Design: [`docs/design/assessment-channel.md`](docs/design/assessment-channel.md).
+
+**The extension contract is real, and checkable.** `docs/extending.md` promised from
+0.1 that a target declaring `READ_FILES` could run all nineteen artifact rules
+unmodified, four lines below admitting there was "no fixed interface beyond the base
+Target". Both could not be true. It was the promise that was false: every rule asked
+`isinstance(target, ArtifactTarget)` — thirty-five such checks across the engine and
+the rule packs — so a third-party target passed capability selection, was planned
+into the run, and was rejected by every rule it reached. The scan came back clean on
+a directory that plainly was not.
+
+`guardana.core.target.protocols` gives each capability the surface it promises —
+`FileReader`, `ChatEndpoint`, `ToolOfferingEndpoint`, `TraceReader`, `ToolListing`,
+`AuthorizationInspector` — and every built-in rule now checks the protocol instead of
+the class. A target that inherits nothing of Guardana's runs the built-in artifact
+rules, and there is a test that proves exactly that.
+
+Both directions are enforced. A target declaring a capability it has no surface for
+is refused by the runner with one error naming the missing protocol, rather than
+failing nineteen times in a row. A target that implements a surface and forgets to
+*declare* it had no error at all — every rule needing it was skipped, the scan came
+back green, and nothing distinguished that from a clean target. `guardana.testing.
+assert_target_conforms` fails on both and ships in the package, because a conformance
+kit somebody has to vendor is a conformance kit nobody runs. Design:
+[`docs/design/capability-protocols.md`](docs/design/capability-protocols.md).
 
 ### Fixed
+
+**Any installed package could quietly replace a built-in rule, and the run's own
+evidence could not show it.** `register_rule` was documented last-wins, as a feature.
+The cost was the evidence: `rules_run` records the id, `Rule.digest()` hashes the
+*declaration*, and `RuleRecord.version` — the one field that exists to tell two
+providers apart — **had never been populated by anything, on any run ever written**.
+A pack that copied a built-in's metadata and returned nothing therefore produced an
+identical id, an identical digest, a null version, and a clean report naming the
+check it had replaced. `guardana diff` could not see it either.
+
+Three changes together. A different origin claiming a held id is refused, recorded in
+`errors`, and fails the gate; identical origins still de-duplicate, which is the case
+last-wins actually existed for (`rules.paths` and `--rules` over overlapping
+directories). `guardana.*` is now *enforced* as reserved for installed distributions
+rather than merely documented — code driving the registry directly is unaffected,
+because there the caller is the origin and there is no supply chain to defend
+against. And provenance travels from the entry point into the manifest, so a saved
+run answers "which distribution supplied this rule, at which version" without access
+to the machine that produced it.
+
+**A pack whose fourth rule was malformed left three registered.** Provider loading
+validated and registered item by item, so a partial failure produced a document that
+listed rules from a pack it simultaneously reported as unloadable — two such runs
+differ in coverage with nothing having changed in the system under test. One entry
+point is now one transaction, by snapshot and rollback rather than by a pre-flight,
+so a refusal added later stays atomic without needing a second implementation.
+
+**`YamlRule.digest()`, `ScenarioRule.digest()` and `TrajectoryRule.digest()` raised
+`TypeError` on every rule not parsed from a file.** `@dataclass(slots=True)` builds a
+replacement class and discards the original, while the zero-argument `super()`
+closure keeps pointing at the original — so `super().digest()` could never succeed.
+It was reached only when the declaration digest was empty, which is exactly the
+hand-built rule a test or a plugin assembles in code, so no fixture had one and the
+error sat in the path the run manifest takes to record what ran.
+
+**`compare_reports` silently dropped any channel added to a comparison.** It rebuilt
+`RunDiff` field by field — the identical mistake `ScanResult.merged` was created to
+prevent one layer down. Found by running the documented command and reading the
+output, which is the third release in a row that has been the thing that found it;
+there is now a test that asserts over the dataclass's own field list rather than a
+hand-written set.
+
+**Documentation told users to run images from a series twelve releases old.**
+`deploy/docker-compose.yml`, `docs/deployment.md`, `docs/integrations.md` and the
+collector's README all pinned `:0.9` while the packages shipped 0.21; `site/README.md`
+pinned the Action at `v0.13` and `docs/maintainers/github-setup.md` at `:0.11`. Every
+gate passed, because the release tooling rewrote pins from a hand-written list of
+files and each of those was created after the list. The list is gone from both sides:
+`bump_version.py` discovers pin-bearing files across the whole repository, and a test
+asserts over the same discovery — a gate that scans a whitelist re-creates the hole it
+exists to close. Two of the six stale pins were found by the new test, not by the
+audit that prompted it.
+
+**Documentation described shipped features in the future tense.**
+`docs/product-status.md` said capability inspection, the plugin allowlist,
+`guardana plan` and the request/cost/duration budgets "are **v0.7**" — through
+fourteen releases in which all four shipped; `docs/safe-testing.md` carried a whole
+"Coming in v0.7" section describing behaviour it documented as current two screens
+below. The collector was described as having no lifecycle, no audit log and no
+retention, all of which shipped in 0.11.0, and the dashboard's own footer called
+itself unauthenticated fourteen lines under its Sign out button. All corrected, and a
+test now fails on any page marking a milestone at or below the released version —
+a promise about the future is the one kind of claim that is correct when written and
+rots on a schedule nobody watches.
+
+**`guardana/guardana@v0.21` did not pin the CLI it shipped with.** The Action's
+`version` input defaulted to empty, and empty meant `uvx --from guardana-cli` — the
+newest release on PyPI. A workflow pinned to a tag would therefore start running a
+different engine, with different rules and a different exit-code contract, the day
+the next version published. The default is now the Action's own version, rewritten by
+the release tooling; `latest` is opt-in.
+
+The same step expanded `$GUARDANA_ARGS` unquoted, so `--baseline "my baseline.yaml"`
+split into two arguments and any `*` was glob-expanded against the runner's
+workspace. Both change *what was scanned*, with no message anywhere. Arguments are
+now split the way a shell splits them — quotes honoured, nothing globbed — and an
+unbalanced quote fails the step rather than silently running a shorter command.
+
+**Every external GitHub Action is pinned to a commit.** Eleven were on moving major
+tags, including the ones inside `action.yml` that run in other people's pipelines
+under Guardana's name, and the ones in `release.yml` that hold PyPI OIDC and GHCR
+credentials. That is the supply-chain shape this project exists to flag in somebody
+else's repository. Dependabot already updates them and keeps the version in a comment.
+
+### Changed
+
+**The parsers that read files an attacker chose are now property-tested.** The threat
+model listed "the binary parsers are not fuzzed" as an open gap from v0.7 onward, and
+example-based tests cannot close it: an example proves the case its author thought
+of, and the case that matters is the length field one byte short of the file. Around
+20 000 generated inputs per run across every extension a built-in rule opens, plus
+the trace reader, asserting that nothing escapes but the declared error and that a
+crafted length does not become a hang. The corpus of extensions is *measured* from
+what the rules actually ask for rather than written down — which is how eight missing
+ones were found the first time it ran.
+
+**Critical paths have their own coverage floors.** One global 90% lets simple new
+code pay for an untested parser: forty covered lines of CLI plumbing and forty
+uncovered lines of GGUF header arithmetic average to the same number, and only one of
+them reads a hostile file. `scripts/critical_coverage.py` adds per-area floors for
+the parsers, the evidence contract, the gate, the registry, redaction and the
+multi-tenant boundaries — a ratchet at the measured value, and a floor whose glob
+matches nothing fails rather than reporting success about code it never saw.
+
+### Fixed (release tooling)
 
 **Cutting a release produced two Release runs and cost two approval clicks, every time
 since 0.19.0.** The runbook — and `scripts/release.py` with it — pushed `main` and the

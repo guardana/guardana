@@ -24,6 +24,19 @@ class DiffJsonRenderer:
             # Its own key, not folded into notes: a consumer gating on this needs
             # to tell "context worth reading" from "this answer is not available".
             "incomplete": list(diff.incomplete),
+            # The denominator the change list cannot show: how many cases the two
+            # runs measured, and how many of those were the *same* case measured
+            # the same way. A rate computed without it describes whatever sample
+            # happened to survive.
+            "measurement": {
+                "paired": diff.measurement.paired,
+                "incomparable": diff.measurement.incomparable,
+                "only_before": diff.measurement.only_before,
+                "only_after": diff.measurement.only_after,
+                "passed_before": diff.measurement.passed_before,
+                "passed_after": diff.measurement.passed_after,
+                "blinded": list(diff.measurement.blinded),
+            },
             "summary": {
                 "changes": len(diff.changes),
                 "regressions": len(diff.regressions),

@@ -137,7 +137,7 @@ Roll the *image* back to the matching tag at the same time. A collector older
 than its schema is exactly the situation `/readyz` and the version check exist to
 stop, and they will stop it.
 
-**Pin the image to a minor tag** (`:0.9`) rather than `latest`. You want fixes
+**Pin the image to a minor tag** (`:0.21`) rather than `latest`. You want fixes
 without a schema you did not plan for; `latest` gives you both.
 
 ## Backups, and restoring one
@@ -210,28 +210,38 @@ limit, rate-limit at the proxy that already terminates TLS.
 | `/readyz` | the only endpoint that knows about storage and pending migrations |
 | container restarts | a collector that cannot reach its database exits rather than serving half a service |
 | `guardana-collector status` | which migrations are applied, and whether any are pending |
-| disk on the `guardana-data` volume | there is **no retention yet**: submissions accumulate until you remove them |
+| disk on the `guardana-data` volume | retention is per project and **off until you set it**: submissions accumulate until a policy or a delete removes them |
 
-That last row is a real limitation, not a footnote. Until retention lands, size
-the volume for the runs you keep and watch it like any other database.
+That last row is the one to act on. `guardana-collector retention set --project
+ORG/PROJECT --keep-days N` bounds the growth, and `retention apply` removes what
+the policy says is too old. Without a policy the volume grows for as long as agents
+report: `--forever` is the default on purpose, because silently deleting a
+customer's evidence is the worse failure.
 
 ## What this deployment does not give you yet
 
 Being explicit, because a deployment guide that oversells is worse than none:
 
-- **no finding lifecycle and no waivers in the collector** — accepted risk lives
-  in `guardana baseline` next to the code, which is the right place for it today;
-- **no audit log** — who created a key, who read what, is not recorded;
-- **no retention or deletion** — nothing removes old submissions;
 - **no user accounts** — the read-only panel signs in with a read-scoped API key
   rather than with a person's identity, so "who looked at this" is answerable only
-  down to the credential;
-- **no Kubernetes manifests** — the image, the environment variables and the two
-  probes are all a Deployment needs, but we do not ship one we have not exercised.
+  down to the credential. OIDC/SSO and roles are a roadmap item, not a setting you
+  have missed;
+- **no quality trend** — the collector aggregates findings, `unverified` and
+  errors. It does not yet store the measurement channel, so it can say a system is
+  accumulating security problems and cannot say whether its answers got better;
+- **no Kubernetes manifests or Helm chart** — the image, the environment variables
+  and the two probes are all a Deployment needs, but we do not ship one we have not
+  exercised;
+- **one process, scaled by replicas you run yourself** — there is no worker pool,
+  no queue and no leader election, so anything periodic is something you schedule
+  outside the collector.
 
-These are the collector's open items on the
-[roadmap](../ROADMAP.md#milestone-team-security-platform), and none of them is
-worked around silently: each is absent, and says so.
+What this list no longer contains, because it shipped: finding lifecycle, waivers,
+audit log, retention and deletion, and a restore-tested backup procedure. Each is
+in [`docs/usage-collector.md`](usage-collector.md).
+
+These are the collector's open items on the [roadmap](../ROADMAP.md), and none of
+them is worked around silently: each is absent, and says so.
 
 ## Running it without Compose
 
@@ -241,7 +251,7 @@ The image is the unit; Compose is a convenience:
 docker run -d --name guardana-collector \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:…@db.internal:5432/guardana" \
   -p 127.0.0.1:8000:8000 \
-  ghcr.io/guardana/guardana-collector:0.9
+  ghcr.io/guardana/guardana-collector:0.22
 ```
 
 Or without a container at all — `pip install "guardana-server[serve]"`, then

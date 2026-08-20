@@ -203,6 +203,12 @@ docs = [
     "markdown-it-py>=3.0",
 ]
 dev = [
+    # Property-based tests for the parsers that read files an attacker chose.
+    # Test-only, and it earns the dependency the way `jsonschema` does: the threat
+    # model named "no fuzzing of the binary parsers" as an open gap for four
+    # releases, and an example-based test proves the case its author thought of —
+    # which is never the length field that is one byte short of the file.
+    "hypothesis>=6.115",
     "import-linter>=2.1",
     # Test-only, and deliberately not a runtime dependency of any distribution:
     # `schemas/run-v2.schema.json` is a published contract, and a schema

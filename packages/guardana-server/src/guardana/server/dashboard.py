@@ -166,9 +166,10 @@ _PAGE = """<!doctype html>
   </div>
 </main>
 <footer>
-  guardana-server · this dashboard is read-only and unauthenticated — do not expose
-  it to an untrusted network (see SECURITY.md). The time window covers the
-  collector's in-memory buffer, not long-range history.
+  guardana-server · this dashboard is read-only and signs in with a read-scoped
+  key — it is still a view over a security database, so keep it behind the same
+  network boundary as the collector (see SECURITY.md). The time window covers what
+  this collector holds, which on the in-memory store is only since it started.
 </footer>
 
 <script>

@@ -40,7 +40,7 @@ services:
       retries: 10
 
   collector:
-    image: ghcr.io/guardana/guardana-collector:0.9
+    image: ghcr.io/guardana/guardana-collector:0.22
     restart: unless-stopped
     depends_on:
       db:
@@ -62,7 +62,7 @@ services:
   #   docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
   migrate:
     profiles: ["migrate"]
-    image: ghcr.io/guardana/guardana-collector:0.9
+    image: ghcr.io/guardana/guardana-collector:0.22
     depends_on:
       db:
         condition: service_healthy

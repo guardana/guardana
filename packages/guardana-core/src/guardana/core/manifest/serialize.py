@@ -9,7 +9,7 @@ from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleR
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-SCHEMA_URL = "https://guardana.dev/schemas/run/v5.schema.json"
+SCHEMA_URL = "https://guardana.dev/schemas/run/v6.schema.json"
 """Identifier of the saved-run document, carrying its major version in the path.
 
 The practice in-toto and SLSA settled on, for the reason they settled on it: a
@@ -111,6 +111,7 @@ def _rule(rule: RuleRecord) -> dict[str, object]:
         "id": rule.id,
         "digest": rule.digest,
         "version": rule.version,
+        "origin": rule.origin,
         "maturity": rule.maturity,
         "trials": rule.trials,
     }
@@ -173,6 +174,8 @@ def _result_summary(summary: ResultSummary) -> dict[str, object]:
         "max_severity": summary.max_severity,
         "gate": str(summary.gate),
         "stopped_by": None if summary.stopped_by is None else str(summary.stopped_by),
+        "assessments": summary.assessments,
+        "measured": summary.measured,
     }
 
 

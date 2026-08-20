@@ -40,37 +40,78 @@ _DUNDER_RE = re.compile(r'^__version__ = "[^"]+"', re.MULTILINE)
 # `release.py` repoints at each final release. Left behind by a bump, that line
 # keeps serving an Action from an older series, which is worse than a broken
 # link: the workflow still runs, just without the fixes the release shipped.
-_ACTION_PIN_FILES = (
-    Path("README.md"),
-    Path("docs/integrations.md"),
-    Path("site/index.html"),
-    # The GitLab template is `include:`-ed from a raw URL that carries the same
-    # moving tag, in the `guardana/guardana/vX.Y` form rather than the `@vX.Y` one.
-    Path("deploy/ci/gitlab-ci.yml"),
-)
+# Which files carry one is *discovered*, never listed. A hand-written list is
+# what let `deploy/docker-compose.yml`, `docs/deployment.md`, `docs/integrations.md`
+# and the collector's own README sit on `:0.9` while the packages shipped 0.21:
+# each was added after the list was written, so the rewrite could not see them and
+# nothing else looked. A list only covers the files somebody remembered.
 _ACTION_PIN_RE = re.compile(r"(guardana/guardana[@/]v)\d+\.\d+")
 # The same failure mode, one artifact over: the docs tell users to run
 # `ghcr.io/guardana/guardana:MAJOR.MINOR`, a moving tag the release workflow
 # repoints. Left behind by a bump, a pipeline keeps pulling last series' image and
 # the build still goes green — with the rules of an older release.
-_IMAGE_PIN_FILES = (
-    Path("deploy/docker/README.md"),
-    Path("deploy/ci/README.md"),
-    Path("deploy/ci/gitlab-ci.yml"),
-    Path("deploy/ci/Jenkinsfile"),
-    Path("deploy/ci/azure-pipelines.yml"),
-    Path("docs/install.md"),
-    Path("docs/usage-collector.md"),
-    Path("SECURITY.md"),
-)
 _IMAGE_PIN_RE = re.compile(r"(ghcr\.io/guardana/guardana(?:-collector)?:)\d+\.\d+")
+# The two places a reader starts from. Discovery rewrites whatever it finds, but
+# these must never *stop* carrying a pin: a reworded README that lost its Action
+# line is not a file with nothing to rewrite, it is a quickstart that no longer
+# tells anyone which version to run.
+_REQUIRED_ACTION_PIN = (Path("README.md"), Path("docs/integrations.md"))
+_REQUIRED_IMAGE_PIN = (Path("docs/install.md"), Path("deploy/docker/README.md"))
+# Exempt from both the rewrite and the staleness gate, each for its own reason:
+# the changelog records what past releases said, a design document states the
+# problem it solved rather than being kept current, and a test fixture that feeds
+# an *old* pin to the rewriter has to stay old to be a test at all.
+_PIN_EXEMPT = ("CHANGELOG.md", "docs/design/", "/tests/", "AUDIT_", "ROADMAP_V2")
+
+
+def _tracked_text_files() -> tuple[Path, ...]:
+    """Every tracked file this script can read as text, repo-relative."""
+    listing = subprocess.run(
+        ["git", "ls-files"],  # noqa: S607 — resolved from PATH, as everywhere else here
+        cwd=_REPO,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return tuple(Path(line) for line in listing.stdout.splitlines() if line)
+
+
+def pin_bearing_files(pattern: re.Pattern[str]) -> tuple[Path, ...]:
+    """Every tracked, non-exempt file carrying `pattern`, repo-relative and sorted.
+
+    Public because the docs test calls it: the rewrite and the gate that catches a
+    stale pin have to agree on which files count, and two copies of that rule drift.
+    """
+    found = []
+    for relative in _tracked_text_files():
+        posix = f"/{relative.as_posix()}"
+        if any(mark in posix for mark in _PIN_EXEMPT):
+            continue
+        try:
+            text = (_REPO / relative).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if pattern.search(text):
+            found.append(relative)
+    return tuple(sorted(found))
+
+
 # The other places a release version is written down in prose. All three sat on
 # 0.3 through the 0.4.0 release, because only the Action pins were automated —
 # the same staleness one file over. Each is `(pattern, replacement template)`,
 # rewritten in the same pass and checked by the same pre-flight.
 _SITE_VERSION_RE = re.compile(r'(<span class="ver mono">)v\d+\.\d+\.\d+')
+# The Action's own CLI pin. `guardana/guardana@vX.Y` must install the CLI that
+# tag ships, not whatever is newest — otherwise a workflow nobody edited starts
+# running a different engine the day the next release lands.
+_ACTION_CLI_RE = re.compile(r'(default: ")\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|\.post\d+|\.dev\d+)?(")')
 _SECURITY_VERSION_RE = re.compile(r"(pre-1\.0 )\(\d+\.\d+\.x\)")
 _README_CURRENT_RE = re.compile(r"\| \*\*\d+\.\d+\*\* \*\(current\)\*")
+# The roadmap's own "what ships today" heading. It was rewritten by hand for
+# fourteen releases, and `release.py` aborted after the bump every time somebody
+# forgot — a manual step whose only outcome is a failed release is a manual step
+# that should not exist.
+_ROADMAP_SHIPS_RE = re.compile(r"(## What ships today \()\d+\.\d+\.\d+(\))")
 # The prose beside the moving Action pin. Rewriting the pin and leaving the
 # sentence that explains it is how README and integrations.md shipped 0.5.0
 # telling readers the tag points at "the latest 0.3.x".
@@ -145,6 +186,8 @@ _VERSION_MARKERS: tuple[tuple[Path, re.Pattern[str]], ...] = (
     (Path("README.md"), _README_CURRENT_RE),
     (Path("README.md"), _PIN_PROSE_RE),
     (Path("docs/integrations.md"), _PIN_PROSE_RE),
+    (Path("action.yml"), _ACTION_CLI_RE),
+    (Path("ROADMAP.md"), _ROADMAP_SHIPS_RE),
 )
 
 
@@ -157,6 +200,8 @@ def _documented_versions(new: str) -> tuple[tuple[Path, re.Pattern[str], str], .
         rf"| **{major}.{minor}** *(current)*",
         rf"\g<1>{major}.{minor}\g<2>",
         rf"\g<1>{major}.{minor}\g<2>",
+        rf"\g<1>{new}\g<2>",
+        rf"\g<1>{new}\g<2>",
     )
     return tuple(
         (path, pattern, replacement)
@@ -176,8 +221,8 @@ def _check_documented_markers() -> None:
     missing = [
         f"{relative} (no {label})"
         for relative, pattern, label in (
-            *((path, _ACTION_PIN_RE, "`guardana/guardana@vX.Y` pin") for path in _ACTION_PIN_FILES),
-            *((path, _IMAGE_PIN_RE, "`ghcr.io/guardana/…:X.Y` tag") for path in _IMAGE_PIN_FILES),
+            *((p, _ACTION_PIN_RE, "`guardana/guardana@vX.Y` pin") for p in _REQUIRED_ACTION_PIN),
+            *((p, _IMAGE_PIN_RE, "`ghcr.io/guardana/…:X.Y` tag") for p in _REQUIRED_IMAGE_PIN),
             *((path, pattern, "version marker") for path, pattern in _VERSION_MARKERS),
         )
         if pattern.search((_REPO / relative).read_text(encoding="utf-8")) is None
@@ -252,12 +297,12 @@ def main() -> int:
         dry_run=args.dry_run,
     )
 
-    for relative in _ACTION_PIN_FILES:
+    for relative in pin_bearing_files(_ACTION_PIN_RE):
         path = _REPO / relative
         pinned = _rewrite_action_pin(path.read_text(encoding="utf-8"), new)
         _apply(path, pinned, dry_run=args.dry_run)
 
-    for relative in _IMAGE_PIN_FILES:
+    for relative in pin_bearing_files(_IMAGE_PIN_RE):
         path = _REPO / relative
         tagged = _rewrite_image_pin(path.read_text(encoding="utf-8"), new)
         _apply(path, tagged, dry_run=args.dry_run)

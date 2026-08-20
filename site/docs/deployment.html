@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -219,7 +223,7 @@ docker compose -f deploy/docker-compose.yml status   # or: guardana-collector st
 <p>Roll the <em>image</em> back to the matching tag at the same time. A collector older
 than its schema is exactly the situation <code>/readyz</code> and the version check exist to
 stop, and they will stop it.</p>
-<p><strong>Pin the image to a minor tag</strong> (<code>:0.9</code>) rather than <code>latest</code>. You want fixes
+<p><strong>Pin the image to a minor tag</strong> (<code>:0.21</code>) rather than <code>latest</code>. You want fixes
 without a schema you did not plan for; <code>latest</code> gives you both.</p>
 <h2 id="backups-and-restoring-one">Backups, and restoring one</h2>
 <p>The <code>guardana-data</code> volume is the only state that matters, and the only backup
@@ -293,34 +297,42 @@ limit, rate-limit at the proxy that already terminates TLS.</p>
 </tr>
 <tr>
 <td>disk on the <code>guardana-data</code> volume</td>
-<td>there is <strong>no retention yet</strong>: submissions accumulate until you remove them</td>
+<td>retention is per project and <strong>off until you set it</strong>: submissions accumulate until a policy or a delete removes them</td>
 </tr>
 </tbody>
 </table></div>
-<p>That last row is a real limitation, not a footnote. Until retention lands, size
-the volume for the runs you keep and watch it like any other database.</p>
+<p>That last row is the one to act on. <code>guardana-collector retention set --project ORG/PROJECT --keep-days N</code> bounds the growth, and <code>retention apply</code> removes what
+the policy says is too old. Without a policy the volume grows for as long as agents
+report: <code>--forever</code> is the default on purpose, because silently deleting a
+customer's evidence is the worse failure.</p>
 <h2 id="what-this-deployment-does-not-give-you-yet">What this deployment does not give you yet</h2>
 <p>Being explicit, because a deployment guide that oversells is worse than none:</p>
 <ul>
-<li><strong>no finding lifecycle and no waivers in the collector</strong> — accepted risk lives
-in <code>guardana baseline</code> next to the code, which is the right place for it today;</li>
-<li><strong>no audit log</strong> — who created a key, who read what, is not recorded;</li>
-<li><strong>no retention or deletion</strong> — nothing removes old submissions;</li>
 <li><strong>no user accounts</strong> — the read-only panel signs in with a read-scoped API key
 rather than with a person's identity, so &quot;who looked at this&quot; is answerable only
-down to the credential;</li>
-<li><strong>no Kubernetes manifests</strong> — the image, the environment variables and the two
-probes are all a Deployment needs, but we do not ship one we have not exercised.</li>
+down to the credential. OIDC/SSO and roles are a roadmap item, not a setting you
+have missed;</li>
+<li><strong>no quality trend</strong> — the collector aggregates findings, <code>unverified</code> and
+errors. It does not yet store the measurement channel, so it can say a system is
+accumulating security problems and cannot say whether its answers got better;</li>
+<li><strong>no Kubernetes manifests or Helm chart</strong> — the image, the environment variables
+and the two probes are all a Deployment needs, but we do not ship one we have not
+exercised;</li>
+<li><strong>one process, scaled by replicas you run yourself</strong> — there is no worker pool,
+no queue and no leader election, so anything periodic is something you schedule
+outside the collector.</li>
 </ul>
-<p>These are the collector's open items on the
-<a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">roadmap</a>, and none of them is
-worked around silently: each is absent, and says so.</p>
+<p>What this list no longer contains, because it shipped: finding lifecycle, waivers,
+audit log, retention and deletion, and a restore-tested backup procedure. Each is
+in <a href="usage-collector.html"><code>docs/usage-collector.md</code></a>.</p>
+<p>These are the collector's open items on the <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">roadmap</a>, and none of
+them is worked around silently: each is absent, and says so.</p>
 <h2 id="running-it-without-compose">Running it without Compose</h2>
 <p>The image is the unit; Compose is a convenience:</p>
 <pre><code class="language-bash">docker run -d --name guardana-collector \
   -e GUARDANA_DATABASE_URL=&quot;postgresql://guardana:…@db.internal:5432/guardana&quot; \
   -p 127.0.0.1:8000:8000 \
-  ghcr.io/guardana/guardana-collector:0.9
+  ghcr.io/guardana/guardana-collector:0.22
 </code></pre>
 <p>Or without a container at all — <code>pip install &quot;guardana-server[serve]&quot;</code>, then
 <code>guardana-collector migrate</code> and <code>guardana-collector serve</code>. The ASGI server is an
@@ -330,7 +342,7 @@ extra rather than a dependency, so a site that already runs gunicorn points it a
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/deployment.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

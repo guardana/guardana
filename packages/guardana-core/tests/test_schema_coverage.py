@@ -67,7 +67,7 @@ def test_a_diff_document_satisfies_its_schema() -> None:
         RunDiff(changes=(), unchanged=0, notes=("a note",), incomplete=())
     )
 
-    Draft202012Validator(_schema("diff-v1.schema.json")).validate(json.loads(rendered))
+    Draft202012Validator(_schema("diff-v2.schema.json")).validate(json.loads(rendered))
 
 
 def test_an_incomplete_diff_document_satisfies_its_schema() -> None:
@@ -78,7 +78,7 @@ def test_an_incomplete_diff_document_satisfies_its_schema() -> None:
         RunDiff(changes=(), unchanged=0, incomplete=("the second run ran out of budget",))
     )
 
-    Draft202012Validator(_schema("diff-v1.schema.json")).validate(json.loads(rendered))
+    Draft202012Validator(_schema("diff-v2.schema.json")).validate(json.loads(rendered))
 
 
 def test_the_schema_version_in_each_schema_matches_the_code() -> None:
@@ -88,13 +88,13 @@ def test_the_schema_version_in_each_schema_matches_the_code() -> None:
     from guardana.core.manifest.model import MANIFEST_SCHEMA_VERSION  # noqa: PLC0415
     from guardana.core.trace import TRACE_SCHEMA_VERSION  # noqa: PLC0415
 
-    assert _schema("diff-v1.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
+    assert _schema("diff-v2.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
         DIFF_SCHEMA_VERSION
     )
     assert _schema("plan-v1.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
         PLAN_SCHEMA_VERSION
     )
-    assert _schema("run-v5.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
+    assert _schema("run-v6.schema.json")["properties"]["schema_version"]["const"] == (  # type: ignore[index]
         MANIFEST_SCHEMA_VERSION
     )
     assert (

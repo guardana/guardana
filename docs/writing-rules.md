@@ -359,13 +359,57 @@ list of them — see `examples/custom_rule/src/acme_rules/__init__.py` for a
 package that returns both a plugin rule instance and its loaded YAML rule
 from the same `provide_rules()`.
 
+## Recording what a rule measured (optional)
+
+A rule that *grades* something — sends a prompt, judges a reply — can record the
+measurement, not only the failure:
+
+```python
+from guardana.core.assessment import case_id_for, from_verdict
+
+verdict = evaluator.evaluate(exchange, self.expectation)
+ctx.record(
+    from_verdict(
+        verdict,
+        case_id=case_id_for(self.meta.id, prompt),
+        subject_ref=target.ref,
+        rule_id=self.meta.id,
+        dataset=self.digest(),
+    )
+)
+```
+
+Every built-in dynamic rule does this, **including on a pass**, and the passes are
+the point: without them there is no denominator, and three findings out of four
+prompts reads exactly like three out of four hundred. `guardana diff` pairs the
+two runs case by case and refuses to compare a case whose assessor or dataset
+changed.
+
+Recording is optional, and staying silent is not a failure. A rule that reads a
+file and finds nothing has not *measured* anything; inventing an assessment for it
+would put hundreds of empty passes into the denominator of every rate. See
+[`design/assessment-channel.md`](design/assessment-channel.md).
+
 ## Namespacing rule ids
 
-`guardana.*` is reserved for this repository's built-ins. Use your own
-prefix for anything you author — a company name, a team name, whatever
-won't collide (`acme.*` in the example package). This is what lets a
+`guardana.*` is reserved for this repository's built-ins, and since 0.22.0 that is
+**enforced**: an installed distribution registering a `guardana.*` id is refused at
+load time, and the refusal lands in `errors` so the gate will not call the run a
+pass. Use your own prefix for anything you author — a company name, a team name,
+whatever won't collide (`acme.*` in the example package). This is what lets a
 `guardana.yaml` profile's `rules.include`/`exclude` globs cleanly separate
 "Guardana's checks" from "our checks" (see [`profiles.md`](profiles.md)).
+
+**Customising a built-in** used to mean copying its id and letting last-wins take
+over. That path is gone: give your version its own id and switch the built-in off
+with `rules.exclude` in your profile. Two lines instead of one, and the report then
+names what actually ran.
+
+Two distributions claiming the *same* id is refused for the same reason, whatever
+the namespace. The run's evidence records `rules_run` by id and the rule's digest
+by declaration, so a pack that copies another's metadata would otherwise produce a
+report naming a check that did not run. Every rule the manifest lists now carries
+the distribution and version that supplied it.
 
 ## What happens when your rule raises
 

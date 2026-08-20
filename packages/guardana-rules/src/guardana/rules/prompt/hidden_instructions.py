@@ -5,7 +5,7 @@ from guardana.core.formats import FormatError, read_safetensors_header
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
-from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
+from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
     ATLAS_T0051,
     ATLAS_T0080,
@@ -65,7 +65,7 @@ class HiddenInstructionsRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan agent rule files, model cards, and safetensors metadata for smuggled characters."""
-        if not isinstance(target, ArtifactTarget):
+        if not isinstance(target, FileReader):
             return
         for path in target.iter_files():
             if _is_instruction_file(path):

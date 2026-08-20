@@ -62,8 +62,8 @@ For a pipeline that runs containers rather than Python, both halves are publishe
 to the GitHub Container Registry on every release:
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.21 scan /work
-docker run --rm ghcr.io/guardana/guardana-collector:0.21 --help
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.22 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:0.22 --help
 ```
 
 Three tags: the exact version, the moving minor (what the commands above pin),

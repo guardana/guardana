@@ -10,7 +10,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # `manifest` records a GateOutcome, and `report` is downstream of both
-    from guardana.core.profile.model import Policy
+    from guardana.core.profile.model import FailOn, Policy
     from guardana.core.report.result import ScanResult
 
 
@@ -42,9 +42,7 @@ class GateOutcome(StrEnum):
     INDETERMINATE = "indeterminate"
 
 
-def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them would hide the order
-    result: "ScanResult", policy: "Policy"
-) -> GateOutcome:
+def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
     """Judge one result against a policy, in three states rather than two.
 
     Precedence, and the reasoning for each step:
@@ -58,24 +56,10 @@ def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them woul
     crashed check is `FAIL`: the finding is a fact somebody has to act on, and
     reporting the missing check instead would bury it.
 
-    **Coverage the operator demanded and did not get is `INDETERMINATE`, with no
-    toggle in front of it.** Every other branch below is behind a `fail_on_*`
-    switch, correctly: they cover checks nobody specifically asked for. A dimension
-    named in `trace.require`, or needed by an assertion somebody wrote in a security
-    contract, is not in that category — it was demanded, and `fail_on_skipped`
-    defaulting to off would otherwise turn "your contract could not be checked" into
-    exit `0`.
-
-    **A run that reached no conclusion is `INDETERMINATE`, with no toggle either.**
-    No rule ran at all, or every rule that ran could only decline: both are the same
-    fact — nothing was established — and the second is what a model answering with
-    an empty message produces. `fail_on_inconclusive` stays the switch for *some*
-    checks going dark, which is a preference; a run with nothing to show is not.
-
-    **Everything else that leaves a question open is `INDETERMINATE`** — a check
-    could not run under `fail_on_error`, a check ran and could not grade under
-    `fail_on_inconclusive`, or a check the target could not support was skipped
-    under `fail_on_skipped`.
+    **Anything else that leaves the question open is `INDETERMINATE`** — see
+    `_left_unanswered`, which owns that list. They are one branch here because
+    they are one answer: their order among themselves cannot change a verdict,
+    only which sentence explains it, and that sentence lives in the result.
     """
     if result.stopped_by is not None:
         return GateOutcome.INDETERMINATE
@@ -87,25 +71,46 @@ def gate_outcome(  # noqa: PLR0911 — one return per verdict; merging them woul
         # that threshold is what keeps a noisy heuristic from breaking CI.
         if f.verdict is None or f.verdict.confidence >= threshold.min_confidence:
             return GateOutcome.FAIL
-    if result.coverage_shortfall:
-        return GateOutcome.INDETERMINATE
-    # Nothing was verified, so a pass would be a confident all-clear on a target
-    # nothing looked at — a misconfigured include/exclude, an empty registry, a
-    # target no installed rule applies to, or an endpoint that stopped answering.
-    # This used to read `not result.rules_run`, which counts executions: a model
-    # replying with an empty message to all of them ran every rule, graded none,
-    # and was recorded as `gate: pass`.
-    if result.verified_nothing:
-        return GateOutcome.INDETERMINATE
-    if result.errors and threshold.fail_on_error:
-        return GateOutcome.INDETERMINATE
-    if threshold.fail_on_inconclusive and any(
-        f.severity >= threshold.severity for f in result.unverified
-    ):
-        return GateOutcome.INDETERMINATE
-    if threshold.fail_on_skipped and any(s.is_coverage_gap for s in result.rules_skipped):
+    if _left_unanswered(result, threshold):
         return GateOutcome.INDETERMINATE
     return GateOutcome.PASS
+
+
+def _left_unanswered(result: "ScanResult", threshold: "FailOn") -> bool:
+    """Whether this run failed to answer its own question, for any reason.
+
+    Three of these have no toggle in front of them, deliberately:
+
+    **Coverage the operator demanded and did not get.** Every `fail_on_*` switch
+    covers checks nobody specifically asked for. A dimension named in
+    `trace.require`, or needed by an assertion in a security contract, is not in
+    that category — it was demanded, and `fail_on_skipped` defaulting to off
+    would otherwise turn "your contract could not be checked" into exit `0`.
+
+    **A run that reached no conclusion at all.** No rule ran, or every rule that
+    ran could only decline. `verified_nothing` counts conclusions rather than
+    executions, because an endpoint answering every request with an empty message
+    executes every rule, grades none, and used to be recorded as `gate: pass`.
+
+    **A run that measured cases and measured none of them.** The same fact for the
+    measurement channel, and it needs its own line because the two are carried
+    separately: a suite whose judge stopped answering records an assessment per
+    case, none graded, and no finding anywhere — so every other test here is
+    satisfied and a pass rate over zero cases would be reported as a pass.
+
+    The rest are preferences and stay behind their switches.
+    """
+    return bool(
+        result.coverage_shortfall
+        or result.verified_nothing
+        or (result.assessments and not result.measured)
+        or (result.errors and threshold.fail_on_error)
+        or (
+            threshold.fail_on_inconclusive
+            and any(f.severity >= threshold.severity for f in result.unverified)
+        )
+        or (threshold.fail_on_skipped and any(s.is_coverage_gap for s in result.rules_skipped))
+    )
 
 
 def gate(result: "ScanResult", policy: "Policy") -> bool:

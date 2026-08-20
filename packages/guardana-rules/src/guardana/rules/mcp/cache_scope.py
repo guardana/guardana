@@ -9,10 +9,10 @@ from guardana.core.target import (
     Era,
     McpAuthorizationView,
     McpConversation,
-    McpServerTarget,
     Target,
     TargetKind,
 )
+from guardana.core.target.protocols import AuthorizationInspector
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP07_2025, OWASP_MCP10_2025
 from guardana.rules.mcp._base import McpReporting
 
@@ -80,7 +80,7 @@ class McpCacheScopeRule(McpReporting):
         per run and shared, so reading them together costs this rule nothing beyond
         what the run already spent.
         """
-        if not isinstance(target, McpServerTarget):
+        if not isinstance(target, AuthorizationInspector):
             return
         view = target.authorization()
         blocked = self.unreachable(view)

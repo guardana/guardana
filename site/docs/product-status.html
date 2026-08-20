@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -138,12 +142,12 @@ so this page is maintained as carefully as the code.</p>
 <tr>
 <td><code>guardana diff</code></td>
 <td><strong>beta</strong></td>
-<td>Compares two saved runs. The saved-run format is versioned and will gain fields in 0.7.</td>
+<td>Compares two saved runs. The saved-run format is versioned and migratable — <code>guardana run migrate</code> reads every earlier schema.</td>
 </tr>
 <tr>
 <td>Collector (<code>guardana-server</code>)</td>
 <td><strong>beta</strong></td>
-<td>PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. No finding lifecycle, audit log or retention controls.</td>
+<td>PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. Findings have a lifecycle and expiring waivers; actions are audited; retention and deletion are commands. What it does not yet hold is a quality trend — it aggregates findings, not measurements.</td>
 </tr>
 <tr>
 <td>Extension API</td>
@@ -168,16 +172,20 @@ implementations.</p>
 see what your real users are doing, and is not an inline control. A passive
 out-of-band tap is researched and deferred — the hard constraint is zero impact on
 model latency.</p>
-<h3 id="the-collector-holds-evidence-and-does-not-yet-manage-it">The collector holds evidence, and does not yet manage it</h3>
+<h3 id="the-collector-stores-and-triages-findings--it-does-not-trend-quality">The collector stores and triages findings — it does not trend quality</h3>
 <p>It persists, authenticates, and isolates one project from another — and one
-environment from another when a key is created with <code>--environment</code>. What it does
-not have is everything that happens <em>after</em> a finding arrives: no lifecycle
-(nothing is acknowledged, owned or resolved), no waivers, no audit log, no
-retention controls, and no restore-tested backup procedure. Its dashboard also
-only mounts on a collector that requires no key, because a browser has nowhere to
-put a bearer token.</p>
-<p>Read it as durable, safely shared storage for evidence. Do not yet read it as the
-place a team runs its triage.</p>
+environment from another when a key is created with <code>--environment</code>. Everything
+that happens <em>after</em> a finding arrives is there too: a lifecycle (open,
+acknowledged, resolved, and back to open when the finding recurs), waivers whose
+expiry is evaluated at read time, an audit log that records whether the actor was
+a verified key or an unverified CLI claim, retention and deletion as commands, and
+a restore-tested backup procedure. The dashboard signs in with a read-scoped key
+held in an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie.</p>
+<p>What it does <strong>not</strong> hold is a measurement trend. It aggregates findings,
+<code>unverified</code> and errors — so it can answer &quot;is this system accumulating security
+problems&quot;, and cannot yet answer &quot;did quality improve&quot;. Assessments are recorded in
+the run document from 0.22.0; carrying them into the collector, with the sample
+sizes and confidence bounds a trend needs to be honest, is the next horizon.</p>
 <h3 id="rag-coverage-is-a-slice-not-a-story">RAG coverage is a slice, not a story</h3>
 <p><code>scenario.indirect_injection</code> tests the shape of retrieval-time injection through
 a scripted context. There is no live retriever target, so cross-tenant retrieval,
@@ -189,8 +197,13 @@ agent reads is a real attack class and is <strong>not covered</strong>. <strong>
 <h3 id="openai-compatible-is-not-a-guarantee">&quot;OpenAI-compatible&quot; is not a guarantee</h3>
 <p>Providers differ in system-message handling, tool-call formats, streaming, finish
 reasons and usage metadata. A rule that needs a capability a provider does not
-support is skipped and reported as skipped — never as a pass. Capability
-inspection that tells you this <em>before</em> a run is <strong>v0.7</strong>.</p>
+support is skipped and reported as skipped — never as a pass, and <code>guardana target</code>
+tells you which capabilities an endpoint answered for <em>before</em> you trust a run
+against it.</p>
+<p>What is still missing is a <strong>tested conformance matrix</strong>: the capability handshake
+reports what one endpoint answered, not which of vLLM, Ollama, SGLang, llama.cpp
+and TGI agree on streaming, finish reasons or usage metadata. Until that exists,
+treat &quot;OpenAI-compatible&quot; as a claim to check per deployment, not a guarantee.</p>
 <h3 id="probabilistic-verdicts-have-probabilistic-limits">Probabilistic verdicts have probabilistic limits</h3>
 <p>A judge-graded verdict is a measurement with error. <code>guardana calibrate</code> reports
 Brier score and expected calibration error so you can see how much to trust it,
@@ -200,12 +213,18 @@ anything noticing — re-measure after changing judge models.</p>
 <p>Entry-point discovery imports installed packages. A malicious Guardana pack is a
 malicious Python package, with everything that implies. <code>--no-plugins</code> disables
 discovery — but also the built-ins, which makes safe mode expensive. A plugin
-allowlist is <strong>v0.7</strong>; a declarative pack format that executes no Python is
-<strong>v1.0</strong>. See the <a href="threat-model.html">threat model</a>.</p>
-<h3 id="no-cost-estimation-yet">No cost estimation yet</h3>
-<p>A probe against a paid endpoint has no pre-flight estimate and no hard budget.
-<code>guardana plan</code> and <code>--max-requests</code>/<code>--max-cost</code>/<code>--max-duration</code> are <strong>v0.7</strong>.
-Until then, probe staging endpoints or ones you control the quota for.</p>
+allowlist (<code>--plugins builtins|allowlist|disabled</code>) is what fixes that, and a
+locked pack (<code>guardana pack lock</code>) pins the digest of every rule a pack provides.
+Two limits remain: <code>--plugins all</code> is still the default, and a declarative pack
+format that executes no Python is <strong>v1.0</strong>. See the
+<a href="threat-model.html">threat model</a>.</p>
+<h3 id="cost-is-bounded-not-predicted">Cost is bounded, not predicted</h3>
+<p><code>guardana plan</code> prices a run before it sends anything, and
+<code>--max-requests</code>/<code>--max-cost</code>/<code>--max-duration</code> are hard ceilings that stop the run
+and mark it <code>indeterminate</code> rather than letting it report partial coverage as a
+pass. What a plan cannot do is predict a <em>reply's</em> token count, so a cost estimate
+is a bound on requests and a projection on tokens — a rule with unknown cost is
+counted as unknown and says so.</p>
 <h2 id="what-guardana-deliberately-does-not-do">What Guardana deliberately does not do</h2>
 <ul>
 <li><strong>Inline blocking.</strong> It verifies and gates; it is never in the request path.</li>
@@ -265,7 +284,7 @@ clean. It has told you it could not look.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/product-status.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

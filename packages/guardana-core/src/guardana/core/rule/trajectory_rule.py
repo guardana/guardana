@@ -1,13 +1,15 @@
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 
+from guardana.core.assessment import case_id_for, from_verdict
 from guardana.core.evaluator.base import Expectation
 from guardana.core.exchange import Exchange
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule.base import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.target import Target
-from guardana.core.target.endpoint import EndpointTarget, ToolSpec
+from guardana.core.target.endpoint import ToolSpec
+from guardana.core.target.protocols import ToolOfferingEndpoint
 from guardana.core.trajectory import (
     AgentMemory,
     StaticToolDouble,
@@ -51,8 +53,16 @@ class TrajectoryRule(Rule):
         A rule built by hand rather than parsed (a test, or a plugin assembling one
         programmatically) has no declaration to hash, and the base implementation
         still gives it a stable identity.
+
+        `Rule.digest(self)` rather than `super().digest()`, and that is not style.
+        `@dataclass(slots=True)` builds a *new* class object and throws the
+        original away, while the zero-argument `super()` closure still points at
+        the original — so the call raises `TypeError` every time it is reached.
+        It was reached only when `source_digest` was empty, which is exactly the
+        hand-built case no fixture had, so it sat here undetected until something
+        started asking every rule for its digest.
         """
-        return self.source_digest or super().digest()
+        return self.source_digest or Rule.digest(self)
 
     @property
     def sessions(self) -> int:
@@ -111,7 +121,7 @@ class TrajectoryRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Drive the run, then grade it with the configured evaluator."""
-        if not isinstance(target, EndpointTarget):
+        if not isinstance(target, ToolOfferingEndpoint):
             # Unreachable while the capability contract holds: the runner only
             # plans this rule against a target that declared `chat`. If it ever
             # runs, the contract is broken, and that belongs in `errors` rather
@@ -134,6 +144,19 @@ class TrajectoryRule(Rule):
             graded = drive(target, self.then_task, tools, max_steps=self.max_steps, stop_after=stop)
             detail = f"{detail}\n--- new session ---\n{graded.render()}"
         verdict = evaluator.evaluate(Exchange.from_trajectory(graded), self.expectation)
+        # One case per trajectory, whatever the verdict. A truncated run grades as
+        # inconclusive, and recording it keeps the shrinking denominator visible:
+        # a suite that hits its step ceiling more often has fewer graded cases, not
+        # a better model.
+        ctx.record(
+            from_verdict(
+                verdict,
+                case_id=case_id_for(self.meta.id, self.task, self.then_task or ""),
+                subject_ref=target.ref,
+                rule_id=self.meta.id,
+                dataset=self.digest(),
+            )
+        )
         if verdict.outcome == "pass":
             return
         yield Finding(

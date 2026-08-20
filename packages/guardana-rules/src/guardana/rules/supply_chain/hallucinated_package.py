@@ -7,7 +7,7 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
-from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
+from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM03_2025, OWASP_LLM04_2026
 from guardana.rules.supply_chain._declared_deps import declared_import_names, normalize
 from guardana.rules.supply_chain._known_packages import (
@@ -100,7 +100,7 @@ class HallucinatedPackageRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every `.py` file, treating the target's own modules as known."""
-        if not isinstance(target, ArtifactTarget):
+        if not isinstance(target, FileReader):
             return
         root = Path(target.ref)
         local = _local_modules(root)

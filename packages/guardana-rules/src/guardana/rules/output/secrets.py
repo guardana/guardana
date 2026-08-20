@@ -7,7 +7,7 @@ from guardana.core.rule.errors import RuleError
 from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, ChatMessage, Target, TargetKind
-from guardana.core.target.endpoint import EndpointTarget
+from guardana.core.target.protocols import ChatEndpoint
 from guardana.core.taxonomy import OWASP_LLM02_2025, OWASP_LLM02_2026
 from guardana.rules._secrets import ALLOWLIST, REPLY_SECRET_PATTERNS, redact
 
@@ -51,7 +51,7 @@ class OutputSecretsRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Send benign prompts and flag any secret the model volunteers in reply."""
-        if not isinstance(target, EndpointTarget):
+        if not isinstance(target, ChatEndpoint):
             # Unreachable while the capability contract holds: the runner only
             # plans this rule against a target that declared `chat`. If it ever
             # runs, the contract is broken, and that belongs in `errors` rather

@@ -6,6 +6,7 @@ to notice. A saved run is a contract `guardana diff` and third-party tooling
 depend on, so both halves of it live in one package and are pinned by one test.
 """
 
+from guardana.core.assessment import Assessment
 from guardana.core.manifest.model import MANIFEST_SCHEMA_VERSION, RunManifest
 from guardana.core.manifest.serialize import SCHEMA_URL, manifest_to_dict
 from guardana.core.report.check_error import CheckError
@@ -36,6 +37,32 @@ def finding_to_dict(finding: Finding) -> dict[str, object]:
             "rationale": finding.verdict.rationale,
             "evaluator_id": finding.verdict.evaluator_id,
         },
+    }
+
+
+def assessment_to_dict(assessment: Assessment) -> dict[str, object]:
+    """Serialize one measured case.
+
+    Optional fields are written as `null` rather than omitted. A missing key and a
+    key holding `null` are the same to a permissive reader and different to a
+    strict one, and this document is read by both — so "no threshold was applied"
+    is written down instead of inferred from an absence.
+    """
+    return {
+        "case_id": assessment.case_id,
+        "assessor": assessment.assessor,
+        "subject_ref": assessment.subject_ref,
+        "status": str(assessment.status),
+        "rule_id": assessment.rule_id,
+        "passed": assessment.passed,
+        "value": assessment.value,
+        "unit": assessment.unit,
+        "direction": None if assessment.direction is None else str(assessment.direction),
+        "threshold": assessment.threshold,
+        "confidence": assessment.confidence,
+        "dataset": assessment.dataset,
+        "rationale": assessment.rationale,
+        "tags": list(assessment.tags),
     }
 
 
@@ -72,4 +99,9 @@ def run_to_dict(result: ScanResult, manifest: RunManifest) -> dict[str, object]:
             }
             for o in result.observations
         ],
+        # What the run *measured*, pass included. Written even when empty, so a
+        # reader can tell "this build records measurements and there were none"
+        # from "this document predates the channel" — the second is answered by
+        # `schema_version`, and the two must not have to be guessed apart.
+        "assessments": [assessment_to_dict(a) for a in result.assessments],
     }

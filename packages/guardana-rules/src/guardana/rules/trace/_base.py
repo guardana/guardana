@@ -19,7 +19,8 @@ from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.severity import Severity
-from guardana.core.target import Target, TraceTarget
+from guardana.core.target import Target
+from guardana.core.target.protocols import TraceReader
 from guardana.core.trace import Span, Trace
 
 
@@ -59,7 +60,7 @@ class TraceRule(Rule):
         The type check is the belt to the capability's braces, and it returns rather
         than asserting because an `assert` vanishes under `python -O`.
         """
-        if not isinstance(target, TraceTarget):
+        if not isinstance(target, TraceReader):
             return
         trace = target.trace
         found = list(self.examine(trace))

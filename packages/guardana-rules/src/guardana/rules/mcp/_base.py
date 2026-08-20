@@ -14,7 +14,8 @@ from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.severity import Severity
-from guardana.core.target import McpAuthorizationView, McpServerTarget, Target
+from guardana.core.target import McpAuthorizationView, Target
+from guardana.core.target.protocols import AuthorizationInspector
 
 
 class McpReporting(Rule):
@@ -85,7 +86,7 @@ class McpAuthorizationRule(McpReporting):
         that braces, and it returns rather than asserting because an `assert`
         vanishes under `python -O`.
         """
-        if not isinstance(target, McpServerTarget):
+        if not isinstance(target, AuthorizationInspector):
             return
         yield from self.examine(target.authorization())
 

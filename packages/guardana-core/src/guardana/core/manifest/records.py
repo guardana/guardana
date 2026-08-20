@@ -20,6 +20,23 @@ class RuleRecord:
     id: str
     digest: str
     version: str | None = None
+    """The version of the distribution that supplied this rule, when it named one.
+
+    The field existed from the first manifest and nothing ever filled it in. That
+    was the half of the plugin-override problem nobody could see: `rules_run`
+    records the id, `digest` hashes the declaration, so a pack that copied a
+    built-in's metadata produced an identical id, an identical digest and a null
+    version — a document that named the check it had replaced, with nothing in it
+    disagreeing.
+    """
+
+    origin: str | None = None
+    """Which installed distribution supplied it, or the file a YAML rule came from.
+
+    `None` means unattributed — a rule constructed in code by an embedding caller.
+    Distinguishable from "nothing installed", which is why it is not `""`.
+    """
+
     maturity: str | None = None
     trials: int | None = None
     """How many model calls this rule declared it would make, or None if it could not say.
@@ -80,3 +97,14 @@ class ResultSummary:
     max_severity: str | None
     gate: GateOutcome | None
     stopped_by: StopReason | None = None
+    assessments: int = 0
+    """How many cases this run recorded a measurement for, of any status."""
+
+    measured: int = 0
+    """How many of them produced a value — the denominator, kept beside the total.
+
+    Two numbers rather than one, because their *difference* is the fact that
+    matters: a suite reporting 40 assessments and 3 measured has a pass rate over
+    three cases, and a summary carrying only the pass count would present it with
+    the same confidence as a full run.
+    """

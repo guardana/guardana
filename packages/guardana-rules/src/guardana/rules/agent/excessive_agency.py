@@ -9,11 +9,11 @@ from guardana.core.severity import Severity
 from guardana.core.target import (
     Capability,
     ChatMessage,
-    EndpointTarget,
     Target,
     TargetKind,
     ToolSpec,
 )
+from guardana.core.target.protocols import ToolOfferingEndpoint
 from guardana.core.taxonomy import ATLAS_T0053, OWASP_ASI02_2026, OWASP_LLM03_2026, OWASP_LLM06_2025
 
 # A trivial, safe task that needs no dangerous capability. A model with sound
@@ -62,7 +62,7 @@ class ExcessiveAgencyRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Offer a benign and several dangerous tools for a trivial task; grade the calls."""
-        if not isinstance(target, EndpointTarget):
+        if not isinstance(target, ToolOfferingEndpoint):
             # Unreachable while the capability contract holds: the runner only
             # plans this rule against a target that declared `chat`. If it ever
             # runs, the contract is broken, and that belongs in `errors` rather

@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+from guardana.core.assessment import Assessment, AssessmentStatus, Direction
 from guardana.core.evaluator.base import Outcome, Verdict
 from guardana.core.manifest.load import (
     ManifestLoadError,
@@ -19,6 +20,7 @@ from guardana.core.manifest.load import (
     migrate_v2,
     migrate_v3,
     migrate_v4,
+    migrate_v5,
 )
 from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.usage import RunUsage
@@ -35,7 +37,9 @@ from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 from guardana.core.usage import TargetUsage
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
-_MIGRATIONS = {1: migrate_v1, 2: migrate_v2, 3: migrate_v3, 4: migrate_v4}
+_ASSESSMENT_STATUSES = frozenset(str(s) for s in AssessmentStatus)
+_DIRECTIONS = frozenset(str(d) for d in Direction)
+_MIGRATIONS = {1: migrate_v1, 2: migrate_v2, 3: migrate_v3, 4: migrate_v4, 5: migrate_v5}
 """One step forward per version, keyed by the version the document *is*.
 
 Chained rather than jumped: a schema-1 run goes through 2 on its way to 3, so a
@@ -159,7 +163,71 @@ def _result(raw: dict[str, Any], manifest: RunManifest, path: Path) -> ScanResul
         # metered nothing and negotiated no protocol, about a run that did both.
         usage=_target_usage(manifest.usage),
         protocols=dict(manifest.coverage.protocols),
+        assessments=_assessments(raw.get("assessments"), path),
     )
+
+
+def _assessments(raw: object, path: Path) -> tuple[Assessment, ...]:
+    """Read the measurement channel back, refusing a status this build cannot honour.
+
+    A status outside the four is rejected rather than coerced to `measured`. The
+    coercion is the tempting one and it is the dangerous one: an unknown status
+    read as a measurement puts a case into a denominator it was never in, and the
+    resulting pass rate is confidently wrong rather than absent.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ReportLoadError(f"{path}: 'assessments' must be a list")
+    return tuple(_assessment(entry, path) for entry in raw)
+
+
+def _assessment(raw: object, path: Path) -> Assessment:
+    if not isinstance(raw, dict):
+        raise ReportLoadError(f"{path}: every entry in 'assessments' must be an object")
+    block: dict[str, Any] = raw
+    status = _str(block, "status", path)
+    if status not in _ASSESSMENT_STATUSES:
+        raise ReportLoadError(
+            f"{path} records an assessment with status {status!r}; this build knows "
+            f"{sorted(_ASSESSMENT_STATUSES)} — upgrade whichever side is older"
+        )
+    direction = block.get("direction")
+    if direction is not None and direction not in _DIRECTIONS:
+        raise ReportLoadError(
+            f"{path} records an assessment with direction {direction!r}; this build "
+            f"knows {sorted(_DIRECTIONS)}"
+        )
+    return Assessment(
+        case_id=_str(block, "case_id", path),
+        assessor=_str(block, "assessor", path),
+        subject_ref=_str(block, "subject_ref", path),
+        status=AssessmentStatus(status),
+        rule_id=str(block.get("rule_id") or ""),
+        passed=_optional_bool(block.get("passed")),
+        value=_optional_float(block.get("value")),
+        unit=_optional_str(block.get("unit")),
+        direction=None if direction is None else Direction(str(direction)),
+        threshold=_optional_float(block.get("threshold")),
+        confidence=_optional_float(block.get("confidence")),
+        dataset=_optional_str(block.get("dataset")),
+        rationale=str(block.get("rationale") or ""),
+        tags=_str_tuple(block.get("tags"), "assessments[].tags", path),
+    )
+
+
+def _optional_bool(raw: object) -> bool | None:
+    return raw if isinstance(raw, bool) else None
+
+
+def _optional_float(raw: object) -> float | None:
+    # `bool` is an `int`, and a `passed: true` misread into `value` would become
+    # 1.0 — a real number in a distribution nobody measured.
+    return float(raw) if isinstance(raw, int | float) and not isinstance(raw, bool) else None
+
+
+def _optional_str(raw: object) -> str | None:
+    return raw if isinstance(raw, str) else None
 
 
 def _target_usage(usage: RunUsage) -> TargetUsage | None:

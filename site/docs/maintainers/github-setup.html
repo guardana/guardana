@@ -76,6 +76,10 @@
 <li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -249,7 +253,7 @@ first (see <code>RELEASING.md</code> → first-time PyPI setup).</p>
 <p>The release workflow pushes two images to <code>ghcr.io</code>. <strong>A package created by a
 workflow is private, whatever the repository's visibility is</strong>, so the very
 command the documentation tells users to run —</p>
-<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.11 scan /work
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.22 scan /work
 </code></pre>
 <p>— answers <code>unauthorized</code> until somebody changes it. There is no REST API for
 this; it is a one-time click per package:</p>
@@ -263,7 +267,7 @@ repository with <strong>Write</strong>, so later releases keep pushing to the sa
 <p>Check it from a machine with no credentials, because &quot;it works for me&quot; here means
 &quot;I am logged in&quot;:</p>
 <pre><code class="language-bash">docker logout ghcr.io
-docker run --rm ghcr.io/guardana/guardana:0.11 --version
+docker run --rm ghcr.io/guardana/guardana:0.22 --version
 </code></pre>
 <p>This is the failure mode this project keeps meeting from a different direction: a
 green release workflow, a documented command, and a user who cannot run it.</p>
@@ -287,7 +291,7 @@ the committed files — this page is the quick confirmation that nothing regress
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/maintainers/github-setup.md">Edit this page on GitHub</a>
 <a href="../../llms.txt">llms.txt</a>
 </div></footer>

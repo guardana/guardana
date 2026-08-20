@@ -117,6 +117,40 @@ guardana diff before.json after.json --profile guardana.yaml
 ignores it — a rule that did not run has no severity, and an unknown cannot be
 thresholded away.
 
+## The measured sample
+
+A comparison of two dynamic runs also prints the population the changes happened
+in:
+
+```text
+Measured cases
+  21 case(s) compared like for like: 16 → 15 passing
+  2 not compared (the assessor or dataset changed)
+  0 gone, 0 new
+```
+
+Every line answers a question the change list cannot. **21 compared** is the
+denominator: without it, "one fewer finding" and "half the cases stopped being
+graded" look identical. **Not compared** is a refusal, not a gap — a case whose
+expectation was edited is a different test, and pairing the two would attribute an
+authoring decision to the model. **Gone / new** is coverage of the measurement
+channel itself.
+
+Two things it deliberately does *not* do. It never prints a single percentage: a
+pass rate with no denominator beside it is exactly the number this channel exists
+to stop being quoted. And it adds no new way to fail the build — a case that
+started failing already reaches the gate as a finding, and counting it twice would
+make one event look like two. What it can do is add a note, and going blind gets
+one:
+
+```text
+Worth knowing
+  • 3 case(s) produced a value before and could not be graded this time
+    (guardana.prompt.jailbreak#b94d…) — a smaller sample, not a better result
+```
+
+`--format json` carries the same numbers under `measurement`.
+
 ## Was it the model, or was it the test?
 
 A saved run records a digest of every rule that ran. If a rule's own definition

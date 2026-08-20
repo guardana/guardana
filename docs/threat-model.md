@@ -57,8 +57,19 @@ bounded and fail closed: size caps, member caps, recursion caps, and a read that
 fails becomes an `errors` entry rather than an exception or a silent skip. Pickle
 is parsed at the opcode level, never unpickled.
 
-**Residual risk:** a parser bug is still a parser bug. Readers are fuzz-worthy and
-not yet fuzzed — tracked for v0.7.
+**Residual risk:** a parser bug is still a parser bug. Since 0.22.0 every rule that
+opens a file is property-tested against generated input — arbitrary bytes behind
+each format's magic number, declared lengths up to 2⁶³ pointed past the end of the
+file, and arbitrary Unicode including lone surrogates — asserting that nothing
+escapes but the declared `RuleError` and that a crafted length does not become a
+hang. The corpus of extensions is measured from what the rules actually ask for,
+so a rule for a new format is fed automatically rather than when somebody
+remembers.
+
+What that is not: a long-running fuzzing campaign, a coverage-guided one, or
+OSS-Fuzz. It is a fixed budget of generated cases per run, chosen so it can live
+in every pull request. A crash-free property suite is evidence that the obvious
+malformations are handled, not that the parsers are correct.
 
 ### T2 — A malicious or hostile target endpoint
 

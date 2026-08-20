@@ -74,8 +74,10 @@ it tool endpoints that write to a scratch environment.
 
 **Bound the run.** Concurrency is bounded (`--concurrency`, default 4 for probe)
 and rate limits are retried with backoff rather than hammered. Request, token, cost
-and duration budgets arrive in **v0.7** — until then, size the run by choosing a
-profile, not by hoping.
+and duration budgets are hard ceilings: `--max-requests`, `--max-cost` and
+`--max-duration` stop the run and report it as `indeterminate`, so an exhausted
+budget can never be mistaken for a clean result. `guardana plan` prices the run
+before it sends anything.
 
 **Run deep checks on a schedule, not on every pull request.** A fast static gate
 belongs in a PR. Endpoint probing belongs at deployment time and nightly. This
@@ -95,27 +97,13 @@ land differently next time.
 That is the whole reason `guardana diff` exists — a single run is a snapshot, and
 the question worth gating on is whether the snapshot got worse.
 
-## Coming in v0.7
-
-Rules will declare their impact, so a policy can select by it:
-
-```yaml
-impact: passive | active | side_effecting
-destructive: false
-estimated_requests: 3
-```
-
-with `--safety passive|active` and an explicit `--allow-side-effects`, destructive
-checks never running by default, and every attempted action reported as
-**simulated**, **proposed** or **executed**. See the [roadmap](../ROADMAP.md).
-
 ## See also
 
 - [Threat model](threat-model.md) — including what a hostile endpoint can do to Guardana
 - [Product status](product-status.md) — what is and is not covered
 - [`docs/usage-probe.md`](usage-probe.md) · [`docs/usage-monitor.md`](usage-monitor.md)
 
-## Declared impact, and what a run permits (0.7)
+## Declared impact, and what a run permits
 
 Every rule declares how far it reaches, and every run declares how far it is
 willing to let a rule reach.

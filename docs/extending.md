@@ -113,32 +113,78 @@ A `Target` is a uniform interface over the thing under test
 (`guardana.core.target.Target`), so a rule never hard-codes whether it
 talks to a file or a live model:
 
+A capability has two halves. `Capability` is what your target **declares**;
+a protocol in `guardana.core.target.protocols` is what a rule will **call**.
+Implement the protocol for every capability you declare, and the built-in rules
+work against your target without knowing it exists:
+
 ```python
+from collections.abc import Iterator
+from pathlib import Path
+
+from guardana.core.source import PythonSource, UnreadSource, read_source
 from guardana.core.target import Capability, Target, TargetKind
 
 class MyTarget(Target):
-    kind = TargetKind.ARTIFACT   # or TargetKind.ENDPOINT
+    kind = TargetKind.ARTIFACT   # ARTIFACT, ENDPOINT or TRACE
 
     def capabilities(self) -> set[Capability]:
-        return {Capability.READ_FILES}
+        return {Capability.READ_FILES}   # so implement `FileReader`, below
 
     @property
     def ref(self) -> str:
         return "..."  # stable identifier used in findings/reports
 
-    # add whatever read/interaction surface your rules need, e.g. an
-    # iter_files()-style method (ArtifactTarget) or a chat()-style method
-    # (EndpointTarget) — there's no fixed interface beyond the base Target
+    # --- the FileReader surface `READ_FILES` promises ---
+
+    def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
+        ...
+
+    def python_source(self, path: Path) -> PythonSource | None:
+        ...   # cache this: every rule that inspects Python asks through here
+
+    def unread_sources(self) -> tuple[UnreadSource, ...]:
+        ...   # what you were prevented from reading — the runner reports it
 ```
 
+| Protocol | Capability | Methods |
+|---|---|---|
+| `FileReader` | `read_files` | `iter_files`, `python_source`, `unread_sources` |
+| `ChatEndpoint` | `chat` | `model`, `chat` |
+| `ToolOfferingEndpoint` | `call_tools` | the above plus `offer_tools` |
+| `TraceReader` | `read_trace` + dimensions | `trace` |
+| `ToolListing` | `list_tools` | `list_tools` |
+| `AuthorizationInspector` | `inspect_authorization` | `authorization`, `conversation` |
+
 Built-ins are `ArtifactTarget` (files: pickles, GGUF, ONNX, ML formats,
-requirements/lockfiles, manifests) and `EndpointTarget`
-(OpenAI-compatible / Ollama / vLLM / HF-TGI chat). A rule declares the
-capabilities it needs via `required_capabilities` in `RuleMeta`; the
-`Runner` skips a rule whose target can't satisfy them rather than crashing
-— so a new `Target` subclass is usable by any existing rule that only needs
-capabilities your target also provides (e.g. a new artifact-like target
-that provides `READ_FILES` can run all 19 build-time artifact rules unmodified).
+requirements/lockfiles, manifests), `EndpointTarget`
+(OpenAI-compatible / Ollama / vLLM / HF-TGI chat), `TraceTarget` (a recorded
+execution) and `McpServerTarget`. A rule declares the capabilities it needs via
+`required_capabilities` in `RuleMeta`; the `Runner` skips a rule whose target
+cannot satisfy them rather than crashing.
+
+**Check it, rather than assuming it.** `guardana.testing.conformance` ships in the
+package for this, and it checks *both* directions — including the one that produces
+no error at all:
+
+```python
+from guardana.testing import assert_target_conforms
+
+def test_my_target_satisfies_the_contract() -> None:
+    assert_target_conforms(MyTarget("s3://models/"))
+```
+
+A target that declares a capability it has no surface for is refused by the runner
+with one clear error. A target that implements a surface and *forgets to declare
+it* is worse and used to be silent: every rule needing that capability is skipped,
+the scan comes back green, and nothing in the report separates that from a target
+with no problems. The conformance kit fails on it.
+
+> Before 0.22.0 this page promised that a target declaring `READ_FILES` could run
+> the artifact rules unmodified. It could not: every rule asked
+> `isinstance(target, ArtifactTarget)`. The protocols above are what made the
+> promise true — see
+> [`design/capability-protocols.md`](design/capability-protocols.md).
 
 **`guardana.targets` is discovered by `Registry.discover()`**, the same way
 as rules and evaluators (see

@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -195,8 +199,8 @@ validates the <em>artifact</em>, parametrised over every field a version-1 run c
 missing.</p>
 <h2 id="the-document">The document</h2>
 <p>The saved-run schema lives at
-<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v5.schema.json"><code>schemas/run-v5.schema.json</code></a>, identified by
-<code>https://guardana.dev/schemas/run/v5.schema.json</code>. The version is in the
+<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v6.schema.json"><code>schemas/run-v6.schema.json</code></a>, identified by
+<code>https://guardana.dev/schemas/run/v6.schema.json</code>. The version is in the
 identifier, so a consumer can tell which contract it is holding before parsing
 anything; it changes whenever the change is not backwards-compatible. A test
 validates what Guardana writes against that file, so the schema cannot drift
@@ -205,7 +209,9 @@ away from the tool.</p>
 <a href="https://github.com/guardana/guardana/tree/main/schemas"><code>schemas/</code></a> — because a saved run has to keep validating against the schema
 it was written to. Version 4 exists for one reason: it permits a <code>trace</code> target kind.
 Widening version 3's enum in place was the alternative, and it would have changed a
-contract under a name that promised it had not.</p>
+contract under a name that promised it had not. Version 6 adds the <code>assessments</code>
+channel and <code>run.rules[].origin</code>; a version-5 document migrates forward with the
+first empty and the second <code>null</code>, because that is what it knew.</p>
 <p>Top level:</p>
 <div class="table-wrap"><table>
 <thead>
@@ -217,7 +223,7 @@ contract under a name that promised it had not.</p>
 <tbody>
 <tr>
 <td><code>schema_version</code></td>
-<td><code>5</code>. Stated once, for the whole document.</td>
+<td><code>6</code>. Stated once, for the whole document.</td>
 </tr>
 <tr>
 <td><code>run</code></td>
@@ -225,7 +231,11 @@ contract under a name that promised it had not.</p>
 </tr>
 <tr>
 <td><code>findings</code> / <code>unverified</code> / <code>waived</code> / <code>errors</code> / <code>observations</code></td>
-<td>the channels</td>
+<td>the problem, evidence and inventory channels</td>
+</tr>
+<tr>
+<td><code>assessments</code></td>
+<td>what the run <em>measured</em>, pass included — see <a href="#assessments">assessments</a></td>
 </tr>
 </tbody>
 </table></div>
@@ -302,6 +312,76 @@ the fields the digest was computed from. A digest of a URL and a model name
 identifies a <em>declared</em> target; it attests nothing about the weights behind it,
 and the document says so rather than leaving a reader to assume the stronger
 reading.</p>
+<h2 id="assessments">Assessments</h2>
+<p>The channel that is not about problems. Every other one — findings, unverified,
+errors, coverage shortfall — records something wrong; a check that ran and was
+satisfied used to leave nothing but its id in <code>rules_run</code>.</p>
+<p>That is enough to gate a build and not enough to answer <em>did this get better</em>,
+because fewer findings has three causes and the count cannot separate them: the
+system improved, the test got weaker, or the sample changed.</p>
+<pre><code class="language-json">{
+  &quot;case_id&quot;: &quot;guardana.prompt.jailbreak#b94d27b9934d&quot;,
+  &quot;assessor&quot;: &quot;keyword&quot;,
+  &quot;subject_ref&quot;: &quot;http://localhost:11434#llama3&quot;,
+  &quot;status&quot;: &quot;measured&quot;,
+  &quot;rule_id&quot;: &quot;guardana.prompt.jailbreak&quot;,
+  &quot;passed&quot;: true,
+  &quot;value&quot;: null,
+  &quot;unit&quot;: null,
+  &quot;direction&quot;: null,
+  &quot;threshold&quot;: null,
+  &quot;confidence&quot;: 0.6,
+  &quot;dataset&quot;: &quot;5435b77094cde319&quot;,
+  &quot;rationale&quot;: &quot;Response contains a refusal marker.&quot;,
+  &quot;tags&quot;: []
+}
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>case_id</code></td>
+<td>the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It does not carry the text it was built from, so it is safe in a redacted report</td>
+</tr>
+<tr>
+<td><code>assessor</code></td>
+<td>what produced the verdict — an evaluator id, or a rule grading in its own code</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>measured</code>, <code>inconclusive</code>, <code>error</code> or <code>skipped</code>. The last three are statuses, never zeros, and are excluded from the denominator</td>
+</tr>
+<tr>
+<td><code>passed</code></td>
+<td>the boolean reading, or <code>null</code> when nothing could be graded. Never <code>false</code> for a case that was not measured</td>
+</tr>
+<tr>
+<td><code>value</code>, <code>unit</code>, <code>direction</code>, <code>threshold</code></td>
+<td>the numeric reading, which way is better, and the bound applied on <em>this</em> run</td>
+</tr>
+<tr>
+<td><code>confidence</code></td>
+<td>how much the assessor trusts itself, when it can say. Never invented</td>
+</tr>
+<tr>
+<td><code>dataset</code></td>
+<td>which versioned corpus the case came from. For a YAML rule this is its declaration digest, so an edited expectation makes the two runs incomparable rather than making the model look worse</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>run.result_summary</code> carries <code>assessments</code> and <code>measured</code> as two numbers rather
+than one rate. Their difference is the fact that matters: 40 assessments and 3
+measured is a pass rate over three cases, and a summary carrying only the pass
+count would present it with the same confidence as a full run.</p>
+<p>An artifact scan records none of these, and that is correct — reading a file and
+finding nothing is not a measurement. See
+<a href="design/assessment-channel.html"><code>design/assessment-channel.md</code></a> for the reasoning,
+and <a href="usage-diff.html"><code>usage-diff.md</code></a> for what a comparison does with them.</p>
 <h2 id="field-names-borrowed-on-purpose">Field names borrowed on purpose</h2>
 <p><code>usage.input_tokens</code> and <code>usage.output_tokens</code> are the OpenTelemetry GenAI
 convention's <a href="https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/"><code>gen_ai.usage.input_tokens</code> /
@@ -321,7 +401,7 @@ with <code>startTimeUtc</code>, <code>endTimeUtc</code>, <code>exitCode</code>, 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-run.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

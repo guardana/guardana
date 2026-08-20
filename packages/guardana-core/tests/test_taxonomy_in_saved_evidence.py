@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 from guardana.core.diff import compare_reports
 from guardana.core.diff.compare import finding_identity
+from guardana.core.manifest import MANIFEST_SCHEMA_VERSION
 from guardana.core.manifest.load import ManifestLoadError
 from guardana.core.manifest.serialize import SCHEMA_URL
 from guardana.core.report import Finding, load_report
@@ -95,7 +96,7 @@ def test_a_migrated_document_stops_claiming_the_older_contract() -> None:
     migrated = migrate_forward(document, 2)
 
     assert migrated["$schema"] == SCHEMA_URL
-    assert "v5" in SCHEMA_URL
+    assert f"v{MANIFEST_SCHEMA_VERSION}" in SCHEMA_URL
 
 
 def test_a_malformed_taxonomy_is_refused_by_the_migration_not_quietly_emptied() -> None:

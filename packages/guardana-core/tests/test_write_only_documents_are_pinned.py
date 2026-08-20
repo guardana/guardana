@@ -22,6 +22,7 @@ import pytest
 from _roundtrip import Document, key_paths, render, without
 from guardana.cli.plan import PLAN_SCHEMA_VERSION, _render_json
 from guardana.core.budget import Budgets
+from guardana.core.diff.measurement import MeasurementDelta
 from guardana.core.diff.model import Change, ChangeKind, CheckState, RunDiff
 from guardana.core.plan import RunPlan
 from guardana.core.severity import Severity
@@ -60,6 +61,15 @@ def _diff() -> RunDiff:
         ),
         unchanged=7,
         notes=("the tool version changed between these runs",),
+        measurement=MeasurementDelta(
+            paired=9,
+            incomparable=2,
+            only_before=3,
+            only_after=1,
+            passed_before=8,
+            passed_after=6,
+            blinded=("guardana.prompt.jailbreak#b94d27b9934d",),
+        ),
         incomplete=("the second run stopped when its request budget ran out",),
     )
 
@@ -131,10 +141,10 @@ def test_the_published_diff_schema_requires_every_key_the_writer_emits() -> None
     """
     document: Document = json.loads(get_diff_renderer("json").render(_diff()))
 
-    optional = _unrequired(document, "diff-v1.schema.json")
+    optional = _unrequired(document, "diff-v2.schema.json")
 
     assert not optional, (
-        "keys the comparison writes that `diff-v1.schema.json` does not require, so a "
+        "keys the comparison writes that `diff-v2.schema.json` does not require, so a "
         "consumer validating against it is not promised them:\n  " + "\n  ".join(optional)
     )
 

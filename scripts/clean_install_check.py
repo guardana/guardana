@@ -157,6 +157,58 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
             0,
             expect=("refused:",),
         ),
+        # The conformance kit ships in the package rather than in this repository's
+        # tests, precisely so a third party can run it. A wheel that carried the
+        # protocols and not the kit would leave the extension contract checkable
+        # only by us, which is the state 0.22.0 existed to end.
+        Check(
+            "the conformance kit refuses a target that lies about what it supports",
+            [
+                python,
+                "-c",
+                "from guardana.core.target import Capability, Target, TargetKind\n"
+                "from guardana.testing import TargetContractError, assert_target_conforms\n"
+                "class Liar(Target):\n"
+                "    kind = TargetKind.ARTIFACT\n"
+                "    def capabilities(self): return {Capability.READ_FILES}\n"
+                "    @property\n"
+                "    def ref(self): return 'liar://'\n"
+                "try:\n"
+                "    assert_target_conforms(Liar())\n"
+                "except TargetContractError as exc:\n"
+                "    print('refused:', str(exc).splitlines()[-1])\n"
+                "else:\n"
+                "    raise SystemExit('a target with no surface passed the contract')",
+            ],
+            0,
+            expect=("refused:",),
+        ),
+        # A dynamic run has to leave a denominator behind. Checked on the installed
+        # wheel because the channel crosses four packages — core records it, report
+        # renders it, the CLI writes it and diff reads it — and a wheel missing any
+        # one of them still imports.
+        Check(
+            "a graded run records what it measured, passes included",
+            [
+                python,
+                "-c",
+                "from guardana.core.assessment import case_id_for, from_verdict\n"
+                "from guardana.core.evaluator.base import Verdict\n"
+                "from guardana.core.report import ScanResult\n"
+                "from guardana.core.report.serialize import assessment_to_dict\n"
+                "v = Verdict(outcome='pass', confidence=0.6, rationale='refused', "
+                "evaluator_id='keyword')\n"
+                "a = from_verdict(v, case_id=case_id_for('r', 'p'), subject_ref='x', "
+                "rule_id='r')\n"
+                "run = ScanResult(findings=(), rules_run=('r',), rules_skipped=(), "
+                "assessments=(a,))\n"
+                "assert len(run.measured) == 1\n"
+                "assert assessment_to_dict(a)['passed'] is True\n"
+                "print('measured:', len(run.measured))",
+            ],
+            0,
+            expect=("measured: 1",),
+        ),
         Check(
             "the framework adapter imports without its framework",
             [

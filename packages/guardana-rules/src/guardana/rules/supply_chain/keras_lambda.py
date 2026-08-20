@@ -7,7 +7,7 @@ from pathlib import Path
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
-from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
+from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
     ATLAS_T0018,
     NIST_SUPPLY_CHAIN,
@@ -78,7 +78,7 @@ class KerasLambdaRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Parse `.keras` archives structurally; scan legacy `.h5`/`.hdf5` for the class marker."""
-        if not isinstance(target, ArtifactTarget):
+        if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".keras",)):
             yield from self._scan_keras(path)

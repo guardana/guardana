@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -494,12 +498,48 @@ my_rules = &quot;acme_rules:provide_rules&quot;
 list of them — see <code>examples/custom_rule/src/acme_rules/__init__.py</code> for a
 package that returns both a plugin rule instance and its loaded YAML rule
 from the same <code>provide_rules()</code>.</p>
+<h2 id="recording-what-a-rule-measured-optional">Recording what a rule measured (optional)</h2>
+<p>A rule that <em>grades</em> something — sends a prompt, judges a reply — can record the
+measurement, not only the failure:</p>
+<pre><code class="language-python">from guardana.core.assessment import case_id_for, from_verdict
+
+verdict = evaluator.evaluate(exchange, self.expectation)
+ctx.record(
+    from_verdict(
+        verdict,
+        case_id=case_id_for(self.meta.id, prompt),
+        subject_ref=target.ref,
+        rule_id=self.meta.id,
+        dataset=self.digest(),
+    )
+)
+</code></pre>
+<p>Every built-in dynamic rule does this, <strong>including on a pass</strong>, and the passes are
+the point: without them there is no denominator, and three findings out of four
+prompts reads exactly like three out of four hundred. <code>guardana diff</code> pairs the
+two runs case by case and refuses to compare a case whose assessor or dataset
+changed.</p>
+<p>Recording is optional, and staying silent is not a failure. A rule that reads a
+file and finds nothing has not <em>measured</em> anything; inventing an assessment for it
+would put hundreds of empty passes into the denominator of every rate. See
+<a href="design/assessment-channel.html"><code>design/assessment-channel.md</code></a>.</p>
 <h2 id="namespacing-rule-ids">Namespacing rule ids</h2>
-<p><code>guardana.*</code> is reserved for this repository's built-ins. Use your own
-prefix for anything you author — a company name, a team name, whatever
-won't collide (<code>acme.*</code> in the example package). This is what lets a
+<p><code>guardana.*</code> is reserved for this repository's built-ins, and since 0.22.0 that is
+<strong>enforced</strong>: an installed distribution registering a <code>guardana.*</code> id is refused at
+load time, and the refusal lands in <code>errors</code> so the gate will not call the run a
+pass. Use your own prefix for anything you author — a company name, a team name,
+whatever won't collide (<code>acme.*</code> in the example package). This is what lets a
 <code>guardana.yaml</code> profile's <code>rules.include</code>/<code>exclude</code> globs cleanly separate
 &quot;Guardana's checks&quot; from &quot;our checks&quot; (see <a href="profiles.html"><code>profiles.md</code></a>).</p>
+<p><strong>Customising a built-in</strong> used to mean copying its id and letting last-wins take
+over. That path is gone: give your version its own id and switch the built-in off
+with <code>rules.exclude</code> in your profile. Two lines instead of one, and the report then
+names what actually ran.</p>
+<p>Two distributions claiming the <em>same</em> id is refused for the same reason, whatever
+the namespace. The run's evidence records <code>rules_run</code> by id and the rule's digest
+by declaration, so a pack that copies another's metadata would otherwise produce a
+report naming a check that did not run. Every rule the manifest lists now carries
+the distribution and version that supplied it.</p>
 <h2 id="what-happens-when-your-rule-raises">What happens when your rule raises</h2>
 <p>Nothing catastrophic, and nothing silent. The runner catches any <code>Exception</code> your
 rule throws, records it in the result's <code>errors</code> channel with your rule id and the
@@ -641,7 +681,7 @@ would then be enforced against the guess.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/writing-rules.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

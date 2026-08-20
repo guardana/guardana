@@ -1,6 +1,7 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
+from guardana.core.assessment import Assessment, AssessmentStatus
 from guardana.core.observation import Observation
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
@@ -64,6 +65,19 @@ class ScanResult:
     here.
     """
 
+    assessments: tuple[Assessment, ...] = ()
+    """Every case this run measured, pass included. See `guardana.core.assessment`.
+
+    The one channel that is not about problems *and* not about inventory: it is
+    what makes a denominator exist. Findings alone cannot separate "the system
+    improved" from "the test got weaker" or "the sample changed", because all
+    three lower the count identically.
+
+    Empty is the honest default. A run of artifact rules measures nothing — it
+    looks for defects — and filling this with one empty pass per file read would
+    put a denominator under a rate nobody computed.
+    """
+
     protocols: Mapping[str, str] = field(default_factory=dict)
     """Protocol versions the target negotiated, by protocol name; see `Target.protocols`.
 
@@ -94,6 +108,12 @@ class ScanResult:
             rules_skipped=tuple({s.rule_id: s for r in results for s in r.rules_skipped}.values()),
             unverified=tuple(f for r in results for f in r.unverified),
             waived=tuple(f for r in results for f in r.waived),
+            # De-duplicated by comparability key, keeping the last: probe runs the
+            # same case once per planted canary, and counting one case three times
+            # would inflate the denominator of every rate computed from these.
+            assessments=tuple(
+                {a.is_comparable_key: a for r in results for a in r.assessments}.values()
+            ),
             errors=tuple(e for r in results for e in r.errors),
             # De-duplicated by ref: probe runs the same target several times (one
             # pass per planted canary), and the model under test is one component,
@@ -163,3 +183,24 @@ class ScanResult:
         if not self.findings:
             return None
         return max(f.severity for f in self.findings)
+
+    @property
+    def measured(self) -> tuple[Assessment, ...]:
+        """Only the assessments that actually produced a value.
+
+        The denominator, and the reason the other three statuses exist as
+        statuses: `inconclusive`, `error` and `skipped` are excluded here rather
+        than counted as failures, because a rate computed over cases nobody could
+        measure describes the harness, not the system.
+        """
+        return tuple(a for a in self.assessments if a.status is AssessmentStatus.MEASURED)
+
+    @property
+    def ungraded(self) -> tuple[Assessment, ...]:
+        """Assessments that were attempted and produced no trustworthy verdict.
+
+        Kept visible next to `measured` so a shrinking denominator is as legible
+        as a falling score. A suite whose judge stopped answering reports a
+        perfect pass rate over the two cases it still managed to grade.
+        """
+        return tuple(a for a in self.assessments if a.status is AssessmentStatus.INCONCLUSIVE)

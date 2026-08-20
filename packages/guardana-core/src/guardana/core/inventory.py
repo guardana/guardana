@@ -14,7 +14,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from guardana.core.observation import Observation, ObservationKind
-from guardana.core.target import ArtifactTarget, EndpointTarget, Target
+from guardana.core.target import Target
+from guardana.core.target.protocols import ChatEndpoint, FileReader
 
 _MODEL_SUFFIXES: dict[str, str] = {
     ".gguf": "gguf",
@@ -76,7 +77,7 @@ def _classify(path: Path) -> tuple[ObservationKind, dict[str, str]] | None:
     return None
 
 
-def _observe_artifacts(target: ArtifactTarget) -> Iterator[Observation]:
+def _observe_artifacts(target: FileReader) -> Iterator[Observation]:
     for path in target.iter_files():
         classified = _classify(path)
         if classified is None:
@@ -97,8 +98,8 @@ def observe(target: Target) -> tuple[Observation, ...]:
     answer: a custom `Target` knows its own components and can report them, but
     this must never invent an inventory for one it cannot see into.
     """
-    if isinstance(target, ArtifactTarget):
+    if isinstance(target, FileReader):
         return tuple(_observe_artifacts(target))
-    if isinstance(target, EndpointTarget):
+    if isinstance(target, ChatEndpoint):
         return (Observation(kind=ObservationKind.MODEL, name=target.model, ref=target.ref),)
     return ()

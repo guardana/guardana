@@ -20,5 +20,11 @@ with the rules that already exist.
 """
 
 from guardana.testing.assertion import SecurityAssertionError, assert_secure
+from guardana.testing.conformance import TargetContractError, assert_target_conforms
 
-__all__ = ["SecurityAssertionError", "assert_secure"]
+__all__ = [
+    "SecurityAssertionError",
+    "TargetContractError",
+    "assert_secure",
+    "assert_target_conforms",
+]

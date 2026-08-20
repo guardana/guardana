@@ -11,6 +11,7 @@ from pathlib import Path
 
 from guardana.cli.main import app
 from guardana.core.report import load_report
+from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -99,7 +100,7 @@ def test_migrate_rewrites_a_version_one_file_in_place(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", "migrate", str(path), "--output", str(out)])
 
     assert result.exit_code == 0, result.output
-    assert json.loads(out.read_text(encoding="utf-8"))["schema_version"] == 5
+    assert json.loads(out.read_text(encoding="utf-8"))["schema_version"] == REPORT_SCHEMA_VERSION
     assert load_report(out).manifest.migrated_from == 1
 
 

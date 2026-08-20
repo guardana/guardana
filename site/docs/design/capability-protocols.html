@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capability protocols — Guardana documentation</title>
+<meta name="description" content="why a capability without a surface made the extension contract false for four releases, what each capability now promises as a type, and why the registry had to stop letting one plugin quietly become another">
+<link rel="canonical" href="https://guardana.dev/docs/design/capability-protocols.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html" aria-current="page">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Capability protocols: making the extension contract true<span class="status accepted">accepted</span></h1><p class="lede">why a capability without a surface made the extension contract false for four releases, what each capability now promises as a type, and why the registry had to stop letting one plugin quietly become another</p><p><strong>Status:</strong> implemented in 0.22.0 · <strong>Written:</strong> 2026-08-20</p>
+<h2 id="the-promise-and-the-paragraph-that-broke-it">The promise, and the paragraph that broke it</h2>
+<p><code>docs/extending.md</code> said this, from 0.1 onward:</p>
+<blockquote>
+<p>a new artifact-like target that provides <code>READ_FILES</code> can run all 19 build-time
+artifact rules unmodified</p>
+</blockquote>
+<p>Four lines above it, the same page said:</p>
+<blockquote>
+<p>there's no fixed interface beyond the base Target</p>
+</blockquote>
+<p>Both could not be true. It was the first that was false. <code>Capability</code> declared
+<em>whether</em> a target could do something; nothing declared <em>how</em> it was asked. So
+every rule did the only thing available to it and asked whether the target was
+an <code>ArtifactTarget</code> — <strong>thirty-five times</strong> across the engine and the rule packs.</p>
+<p>The result was a seam that looked open and was closed. A third-party target
+declared <code>READ_FILES</code>, passed capability selection, was planned into the run, and
+was then rejected by every single rule it reached. The scan came back clean on a
+directory that plainly was not.</p>
+<p>That is not merely a broken feature. A capability that selects rules which then
+decline is a <strong>coverage gap wearing the shape of a clean result</strong>, which is the
+failure mode this project spends most of its design effort refusing.</p>
+<h2 id="the-shape">The shape</h2>
+<p>One <code>Protocol</code> per capability, in <code>guardana.core.target.protocols</code>:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Protocol</th>
+<th>Capability</th>
+<th>What a rule calls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FileReader</code></td>
+<td><code>read_files</code></td>
+<td><code>iter_files</code>, <code>python_source</code>, <code>unread_sources</code></td>
+</tr>
+<tr>
+<td><code>ChatEndpoint</code></td>
+<td><code>chat</code></td>
+<td><code>model</code>, <code>chat</code></td>
+</tr>
+<tr>
+<td><code>ToolOfferingEndpoint</code></td>
+<td><code>call_tools</code></td>
+<td>the above plus <code>offer_tools</code></td>
+</tr>
+<tr>
+<td><code>TraceReader</code></td>
+<td><code>read_trace</code> + dimensions</td>
+<td><code>trace</code></td>
+</tr>
+<tr>
+<td><code>ToolListing</code></td>
+<td><code>list_tools</code></td>
+<td><code>list_tools</code></td>
+</tr>
+<tr>
+<td><code>AuthorizationInspector</code></td>
+<td><code>inspect_authorization</code></td>
+<td><code>authorization</code>, <code>conversation</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The granularity is not aesthetic. <strong>One protocol per capability</strong> means a rule's
+<code>required_capabilities</code> and its <code>isinstance</code> check cannot come apart: a target
+that can hold a conversation but not offer tools satisfies <code>ChatEndpoint</code> and not
+<code>ToolOfferingEndpoint</code>, which is exactly the distinction <code>CHAT</code> and <code>CALL_TOOLS</code>
+already drew.</p>
+<p>Selection still belongs to the runner. The protocol is the narrower question
+asked at the point of use — and because it is a type, <code>mypy --strict</code> verifies
+the call, and a third party's target satisfies it structurally without inheriting
+anything of ours.</p>
+<p><code>python_source</code> is in the contract rather than being an implementation detail of
+the built-in target, because the <em>cost model</em> depends on it: every rule that
+inspects Python asks through there, so a file is read, decoded, parsed and walked
+once per scan rather than once per rule. A target that re-reads per call
+satisfies the signature and breaks the property the second product principle
+exists to protect.</p>
+<h2 id="both-directions-or-it-is-not-a-contract">Both directions, or it is not a contract</h2>
+<p><code>unmet_surfaces()</code> answers &quot;declares a capability, has no surface&quot; — checked once
+by the runner, before a single rule is planned. One error naming the missing
+protocol, instead of nineteen rules failing in turn.</p>
+<p>The <em>other</em> direction has no error at all, and it is the dangerous one.
+A target that implements <code>chat</code> and forgets to declare <code>CHAT</code> is skipped by every
+endpoint rule: the scan is green, the coverage is zero, and nothing in the report
+distinguishes that from a model with no problems. <code>guardana.testing.conformance</code>
+checks both, and is shipped in the package rather than living in <code>tests/</code> — a
+conformance kit somebody has to vendor is a conformance kit nobody runs.</p>
+<pre><code class="language-python">from guardana.testing import assert_target_conforms
+
+def test_my_target_satisfies_the_contract() -&gt; None:
+    assert_target_conforms(MyTarget(&quot;s3://models/&quot;))
+</code></pre>
+<h2 id="the-registry-half">The registry half</h2>
+<p>The same release closed a matching hole one layer over. <code>register_rule</code> was
+documented last-wins:</p>
+<blockquote>
+<p>Last-wins also lets a custom rule override a built-in by reusing its id</p>
+</blockquote>
+<p>The cost of that convenience was the run's own evidence. <code>rules_run</code> records
+<code>meta.id</code>; <code>Rule.digest()</code> hashes the <em>declaration</em>. So a pack that copied a
+built-in's metadata and returned nothing produced an identical id, an identical
+digest, and a clean report naming the check it had replaced. <code>diff</code> could not see
+it either. And <code>RuleRecord.version</code> — the one field in the manifest that exists to
+tell two providers apart — <strong>had never been populated by anything</strong>, on any run
+ever written.</p>
+<p>Three changes, together:</p>
+<ul>
+<li><strong>conflict is refused.</strong> A different origin claiming a held id raises, is
+recorded in <code>errors</code>, and the gate refuses the run. Identical origin still
+de-duplicates, which is the legitimate case the old behaviour existed for:
+<code>rules.paths</code> and <code>--rules</code> pointing at overlapping directories.</li>
+<li><strong>the reserved namespace is enforced.</strong> <code>guardana.*</code> has been documented as
+reserved since 0.1 with nothing checking it. An <em>installed</em> plugin claiming one
+is refused; code driving the registry directly is not, because there is no
+supply chain to defend against there — the caller is the origin.</li>
+<li><strong>provenance is recorded and written down.</strong> <code>Provenance(distribution, version, source)</code> travels from the entry point into <code>RuleRecord.version</code> and
+<code>RuleRecord.origin</code>, so the saved run answers &quot;whose rule was this&quot; without
+access to the machine that produced it.</li>
+</ul>
+<p>Provider loading also became transactional. It validated and registered item by
+item, so a pack whose fourth rule was malformed left three registered <em>and</em>
+recorded the pack as unloadable — a document that lists rules from a pack it says
+did not load. One entry point is now one transaction, by snapshot and rollback
+rather than by a pre-flight, so a refusal added later stays atomic without needing
+a second implementation.</p>
+<h2 id="what-is-deferred-and-why">What is deferred, and why</h2>
+<p><strong><code>TargetFactory</code> and CLI selection of a custom target.</strong> A discovered <code>Target</code>
+is usable by code that drives a <code>Runner</code>; the CLI's own selection is still
+path/URL-based. Doing it properly needs a decision about how a target names its
+configuration on a command line, and the protocols are the prerequisite — a
+factory that built an object every rule then rejected would have been the same
+false seam one level up.</p>
+<p><strong>A namespaced <code>Capability</code> descriptor.</strong> The enum stays closed: opening it to
+arbitrary strings turns a typo (<code>requires: [call_tols]</code>) from a load error into a
+requirement no target can satisfy, which is a rule silently skipped forever. A
+versioned, validated external descriptor is the right answer and is a bigger
+piece of design than this release.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../extending.html"><code>../extending.md</code></a> — how to write a target against these</li>
+<li><a href="assessment-channel.html"><code>assessment-channel.md</code></a> — the other half of the 0.22 contract work</li>
+<li><a href="extension-author-tooling.html"><code>extension-author-tooling.md</code></a> — pack manifests and locks</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/capability-protocols.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

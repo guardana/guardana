@@ -158,7 +158,7 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.21   # moving tag → latest 0.21.x
+      - uses: guardana/guardana@v0.22   # moving tag → latest 0.22.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
@@ -202,14 +202,18 @@ Complementary to most of the landscape rather than a replacement:
 | Category | Examples | Guardana's relationship |
 |---|---|---|
 | **Model/artifact scanners** | ModelScan, picklescan | Overlapping — the static layer does this and reads more formats |
-| **Red-team harnesses** | garak, PyRIT, promptfoo, DeepTeam | Complementary, and honestly: **they ship more attacks.** What they do not ship is an exit-code contract, a cost ceiling, a saved run or a regression comparison — and `import-observations` reads their results into Guardana's report |
+| **Red-team harnesses** | garak, PyRIT, promptfoo, DeepTeam | Complementary, and honestly: **they ship more attacks.** Several also ship CI integration, stored evals and scheduled re-runs — promptfoo documents self-hosting and model-drift scanning, Giskard documents continuous red teaming (checked 2026-08-20). What Guardana differs on is the *semantics*: an exhausted budget, an ungradable reply and missing coverage are three distinct outcomes, none of which is a pass. `import-observations` reads their results into Guardana's report |
 | **Evaluation frameworks** | DeepEval, Ragas | Different job — they measure whether the answer is *good*, Guardana whether the system is *safe*. Run both |
 | **Runtime guardrails** | LlamaFirewall, Llama Guard | Different job — Guardana verifies and gates, never inline |
 | **AI observability** | LangSmith, Langfuse | Complementary — their OpenTelemetry output is `analyze-trace`'s input |
 | **SAST / CVE / secrets** | Semgrep, Trivy, gitleaks | Complementary — Guardana stays dedicated to AI-specific risk |
 
-What none of them provides as its primary job: **a reproducible evidence record per
-run, and a verdict on whether the next release is worse than the last.**
+Where Guardana differs: **the evidence record is the product.** A run says what it
+checked, what it could not check, and on what sample — so "fewer findings" is
+separable from "less coverage", and a comparison that cannot honestly be made is
+refused rather than reported as no change. Comparisons here name a source and a date
+rather than claiming firsts; the neighbours ship fast and this table is re-checked
+each release.
 
 ## Your application has its own threat model
 
@@ -277,7 +281,8 @@ the project's [principles](CLAUDE.md) and its [roadmap](ROADMAP.md).
 | **0.18** | What a third party needs before the API freezes: `guardana rule test` running a rule's positive, negative and **inconclusive** fixtures; a versioned pack manifest and `guardana pack validate`, refusing an extension API this build cannot honour in **both** directions; and an evaluator's measured calibration carried into the run document rather than left null |
 | **0.19** | Documentation generated onto guardana.dev from this repository's own prose and its own registry, with a **rule explorer** whose every filter is a pre-rendered page — because `script-src 'none'` is a claim a visitor checks, not a default. Plus a round-trip gate on the run manifest, which found the `deployment` block written on every run and read back on none |
 | **0.20** | The pack author's last mile: `guardana pack lock` pins every installed extension by what it **is** — rules by their hashed declaration, so a sharpened corpus is visible where a version pin says nothing moved — and manifest schema 2 lets a pack declare the control catalogue it registers, which nothing could say before. Plus a round-trip gate on **every** persisted schema, which found a re-read run claiming its target metered nothing, and an approved MCP manifest whose server field the reader discarded |
-| **0.21** *(current)* | An agent can write its own trace and say **who** approved what: `approver_kind` makes "a person agreed" and "the agent's own gate allowed it" two different facts, so a contract demanding human oversight stops being satisfied by an auxiliary LLM auto-approving `rm -rf`. Plus a file that says where it ends, so a producer killed mid-session no longer reads as one that finished with nothing to report — and a run in which every check declined stops exiting `0` |
+| **0.21** | An agent can write its own trace and say **who** approved what: `approver_kind` makes "a person agreed" and "the agent's own gate allowed it" two different facts, so a contract demanding human oversight stops being satisfied by an auxiliary LLM auto-approving `rm -rf`. Plus a file that says where it ends, so a producer killed mid-session no longer reads as one that finished with nothing to report — and a run in which every check declined stops exiting `0` |
+| **0.22** *(current)* | A run records what it **measured**, not only what was wrong: one entry per graded case, passes included, so "fewer findings" stops being indistinguishable from "fewer cases graded" — and `diff` refuses to compare a case whose test definition changed. Plus the extension contract made true (a third-party target now runs the built-in rules, which the docs promised from 0.1 and thirty-five `isinstance` checks prevented), one owner per rule id with the distribution recorded in the evidence, and property tests over every parser that reads a file somebody else wrote |
 | **next** | RAG as a live target — a retriever that *sends* has its own budget surface and its own answer to who owns the corpus — then sink-aware output handling |
 | **1.0** | A compatibility contract — the point where a third-party rule pack is a safe investment. Not a feature count: it says what will not break under you |
 

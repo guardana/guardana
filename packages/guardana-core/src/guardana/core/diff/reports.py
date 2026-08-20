@@ -6,6 +6,8 @@ against a live-model probe is meaningless, and a pair handed over in the wrong
 order turns a regression into a clean bill of health without anyone noticing.
 """
 
+from dataclasses import replace
+
 from guardana.core.diff.compare import RunContext, compare
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.model import RunDiff
@@ -40,12 +42,11 @@ def compare_reports(before: RunReport, after: RunReport) -> RunDiff:
         + _migration_note(before, after)
         + diff.notes
     )
-    return RunDiff(
-        changes=diff.changes,
-        unchanged=diff.unchanged,
-        notes=notes,
-        incomplete=diff.incomplete,
-    )
+    # `replace`, not a fresh `RunDiff`: rebuilding it field by field is how the
+    # measurement channel reached this function and did not leave it. `ScanResult`
+    # grew `merged` for the identical reason one layer down — the mistake is not
+    # forgetting a field, it is writing code where forgetting one is possible.
+    return replace(diff, notes=notes)
 
 
 def _context(report: RunReport) -> RunContext:

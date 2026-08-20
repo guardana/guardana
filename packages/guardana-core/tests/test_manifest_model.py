@@ -95,7 +95,7 @@ def test_a_manifest_refuses_a_completed_timestamp_without_a_timezone() -> None:
 
 def test_a_manifest_declares_its_schema_version_and_no_migration_by_default() -> None:
     manifest = _manifest()
-    assert manifest.schema_version == MANIFEST_SCHEMA_VERSION == 5
+    assert manifest.schema_version == MANIFEST_SCHEMA_VERSION == 6
     assert manifest.migrated_from is None
 
 

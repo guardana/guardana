@@ -91,6 +91,14 @@ def _summary(result: ScanResult) -> str:
         summary += f" {len(result.errors)} check(s) could not run."
     if result.coverage_shortfall:
         summary += f" {len(result.coverage_shortfall)} coverage demand(s) unmet."
+    if result.assessments:
+        # Both numbers, never the rate. "12 measured" beside "40 cases" is what
+        # stops a pass rate over the three cases a broken judge still graded from
+        # reading like a pass rate over all of them.
+        summary += (
+            f" {len(result.measured)}/{len(result.assessments)} case(s) measured"
+            f"{f', {len(result.ungraded)} ungraded' if result.ungraded else ''}."
+        )
     if result.observations:
         # Says what the run actually looked at, so "no findings" reads as "nothing
         # wrong in these N components" rather than the ambiguous "nothing here".

@@ -10,7 +10,8 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.safety import Impact
 from guardana.core.severity import Severity
-from guardana.core.target import Capability, McpServerTarget, McpTool, Target, TargetKind
+from guardana.core.target import Capability, McpTool, Target, TargetKind
+from guardana.core.target.protocols import ToolListing
 from guardana.core.taxonomy import (
     ATLAS_T0084_001,
     ATLAS_T0109,
@@ -160,7 +161,7 @@ class McpServerManifestRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Fetch the live manifest, scan every declaration, and compare it with the pin."""
-        if not isinstance(target, McpServerTarget):
+        if not isinstance(target, ToolListing):
             return
         tools = target.list_tools()
         yield from self._poisoned(target.ref, tools)

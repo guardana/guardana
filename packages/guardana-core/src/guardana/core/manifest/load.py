@@ -229,6 +229,7 @@ def _rules(raw: object) -> tuple[RuleRecord, ...]:
                 id=_text(block, "id", "run.rules[]"),
                 digest=_text(block, "digest", "run.rules[]"),
                 version=_optional_text(block, "version"),
+                origin=_optional_text(block, "origin"),
                 maturity=_optional_text(block, "maturity"),
                 trials=_optional_int(block, "trials"),
             )
@@ -383,6 +384,8 @@ def _result_summary(raw: object) -> ResultSummary:
         max_severity=_optional_text(block, "max_severity"),
         gate=_gate(block.get("gate")),
         stopped_by=_stop_reason(block.get("stopped_by")),
+        assessments=_optional_int(block, "assessments") or 0,
+        measured=_optional_int(block, "measured") or 0,
     )
 
 
@@ -531,6 +534,46 @@ def migrate_v4(document: Mapping[str, Any]) -> dict[str, Any]:
         "run": {
             **run,
             "coverage": {**(coverage if isinstance(coverage, dict) else {}), "shortfall": []},
+        },
+    }
+
+
+def migrate_v5(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-5 saved run as a schema-6 one, inventing nothing.
+
+    Version 6 adds two things, and both arrive as an honest absence.
+
+    `assessments` is the measurement channel. It arrives **empty**, which for a
+    version-5 run means the same as "none happened": no version-5 build could
+    record one. An empty list and a missing key would read identically to a
+    permissive reader, so the key is written.
+
+    `run.rules[].origin` arrives **null**, and that is a different kind of blank.
+    A version-5 run did have an origin for every rule — the registry simply never
+    wrote it down. Filling it with "guardana-rules" because that is the likely
+    answer would put a fact into an evidence document that nobody observed, which
+    is the one thing a migration must never do. Null means unknown, and unknown is
+    what it is.
+    """
+    run = _mapping(document.get("run"), "run")
+    rules = run.get("rules")
+    summary = run.get("result_summary")
+    return {
+        **document,
+        "schema_version": 6,
+        "$schema": SCHEMA_URL,
+        "assessments": list(document.get("assessments") or []),
+        "run": {
+            **run,
+            "rules": [
+                {**_mapping(rule, "run.rules[]"), "origin": None}
+                for rule in (rules if isinstance(rules, list) else [])
+            ],
+            "result_summary": {
+                **(summary if isinstance(summary, dict) else {}),
+                "assessments": 0,
+                "measured": 0,
+            },
         },
     }
 

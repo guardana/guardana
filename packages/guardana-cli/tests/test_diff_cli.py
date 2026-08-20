@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from guardana.cli.main import app
+from guardana.core.diff.model import DIFF_SCHEMA_VERSION
 from guardana.core.evaluator.base import Verdict
 from guardana.core.manifest.records import RuleRecord
 from guardana.core.report import Evidence, Finding, ScanResult
@@ -155,7 +156,7 @@ def test_json_output_carries_the_changes_and_a_schema_version(tmp_path: Path) ->
     result = runner.invoke(app, ["diff", str(before), str(after), "--format", "json"])
 
     payload = json.loads(result.stdout)
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == DIFF_SCHEMA_VERSION
     assert payload["changes"][0]["kind"] == "appeared"
     assert payload["changes"][0]["regression"] is True
     assert payload["summary"]["regressions"] == 1

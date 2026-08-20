@@ -6,7 +6,7 @@ from pathlib import Path
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
-from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
+from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
     ATLAS_T0011_002,
     ATLAS_T0051,
@@ -77,7 +77,7 @@ class McpToolPoisoningRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every JSON file that has the shape of an MCP tool manifest."""
-        if not isinstance(target, ArtifactTarget):
+        if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".json",)):
             yield from self._scan(path)

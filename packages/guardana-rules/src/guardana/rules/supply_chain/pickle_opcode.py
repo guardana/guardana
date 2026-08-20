@@ -9,7 +9,7 @@ from pathlib import Path
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
-from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
+from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
     ATLAS_T0018,
     NIST_SUPPLY_CHAIN,
@@ -241,7 +241,7 @@ class PickleOpcodeRule(Rule):
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every pickle-shaped file under the target."""
-        if not isinstance(target, ArtifactTarget):
+        if not isinstance(target, FileReader):
             return
         for path in target.iter_files(_SUFFIXES):
             yield from self._scan(path)

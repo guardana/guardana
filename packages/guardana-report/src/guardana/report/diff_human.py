@@ -36,6 +36,9 @@ class DiffHumanRenderer:
             blocks.append(_section("Better", improvements, worse=False))
         if other:
             blocks.append(_section("Also changed", other, worse=False))
+        measured = _measurement(diff)
+        if measured:
+            blocks.append(measured)
         if diff.notes:
             blocks.append("Worth knowing\n" + "\n".join(f"  • {note}" for note in diff.notes))
         if not regressions and not diff.incomplete:
@@ -45,6 +48,28 @@ class DiffHumanRenderer:
             f"{len(regressions)} worse."
         )
         return "\n\n".join(blocks)
+
+
+def _measurement(diff: RunDiff) -> str:
+    """Render the measured sample, or nothing when neither run measured anything.
+
+    Printed as counts and never as a single percentage. A pass rate with no
+    denominator beside it is the number this whole channel exists to stop being
+    quoted: 100% of the two cases a broken judge still managed to grade reads
+    exactly like 100% of four hundred.
+    """
+    m = diff.measurement
+    if not (m.paired or m.incomparable or m.only_before or m.only_after):
+        return ""
+    lines = [
+        f"Measured cases\n  {m.paired} case(s) compared like for like: "
+        f"{m.passed_before} → {m.passed_after} passing"
+    ]
+    if m.incomparable:
+        lines.append(f"  {m.incomparable} not compared (the assessor or dataset changed)")
+    if m.only_before or m.only_after:
+        lines.append(f"  {m.only_before} gone, {m.only_after} new")
+    return "\n".join(lines)
 
 
 def _section(title: str, changes: tuple[Change, ...], *, worse: bool) -> str:

@@ -4,6 +4,7 @@ this test locates them relative to `guardana-core` — the version-of-record the
 bump script reads."""
 
 import importlib.util
+import re
 import sys
 import types
 from pathlib import Path
@@ -213,23 +214,30 @@ def test_the_images_are_published_only_after_the_packages() -> None:
     assert jobs["publish"]["environment"] == "pypi"
 
 
-def test_every_documented_image_tag_file_actually_carries_one() -> None:
-    # Same guard as the Action pins: a file that lost its tag has been reworded,
-    # and dropping it from the rewrite is how documentation comes to advertise an
-    # image from a series that no longer gets fixes.
-    for relative in _BUMP._IMAGE_PIN_FILES:
+def test_every_required_image_tag_file_actually_carries_one() -> None:
+    # Which files get rewritten is discovered, not listed — a list is what let four
+    # files sit on `:0.9` for twelve releases. But the two a reader starts from must
+    # never *stop* carrying a tag: an install page with no version in it is how
+    # somebody ends up on `latest`.
+    #
+    # Whether the tags are current is asserted repo-wide in `test_docs_consistency`,
+    # over the same discovery function. One rule, one owner.
+    for relative in _BUMP._REQUIRED_IMAGE_PIN:
         text = (_repo_root() / relative).read_text(encoding="utf-8")
         assert _BUMP._IMAGE_PIN_RE.search(text) is not None, f"no image tag in {relative}"
 
 
-def test_documented_image_tags_match_the_current_release() -> None:
-    major, minor, _ = _BUMP._core(_BUMP._current_version())
-    for relative in _BUMP._IMAGE_PIN_FILES:
-        text = (_repo_root() / relative).read_text(encoding="utf-8")
-        for found in _BUMP._IMAGE_PIN_RE.finditer(text):
-            assert found.group(0).endswith(f":{major}.{minor}"), (
-                f"{relative} pulls {found.group(0)}, but the released series is {major}.{minor}"
-            )
+def test_pin_discovery_finds_every_file_carrying_a_tag() -> None:
+    # The whole point of discovery: a file nobody added to a list is still covered.
+    # `deploy/docker-compose.yml` is the one that proved it — created after the
+    # list, invisible to the rewrite, and stale by twelve releases.
+    found = _BUMP.pin_bearing_files(_BUMP._IMAGE_PIN_RE)
+    assert Path("deploy/docker-compose.yml") in found
+    assert Path("packages/guardana-server/README.md") in found
+    # Exempt, and each for its own reason: the changelog records the past, and a
+    # test fixture feeding an old pin to the rewriter has to stay old.
+    assert Path("CHANGELOG.md") not in found
+    assert Path("packages/guardana-core/tests/test_release_tooling.py") not in found
 
 
 def test_a_prerelease_does_not_move_the_documented_image_tag() -> None:
@@ -243,26 +251,13 @@ def test_a_prerelease_does_not_move_the_documented_image_tag() -> None:
     )
 
 
-def test_every_documented_action_pin_file_actually_carries_a_pin() -> None:
-    # The list is what the bump rewrites. A file that stopped carrying a pin (a
-    # reworded snippet, a renamed tag form) must fail loudly here rather than
-    # quietly drop out of the rewrite and go stale again.
-    for relative in _BUMP._ACTION_PIN_FILES:
+def test_every_required_action_pin_file_actually_carries_a_pin() -> None:
+    # A file that stopped carrying a pin (a reworded snippet, a renamed tag form)
+    # must fail loudly rather than quietly drop out of the rewrite. Whether the
+    # pins are current is asserted repo-wide in `test_docs_consistency`.
+    for relative in _BUMP._REQUIRED_ACTION_PIN:
         text = (_repo_root() / relative).read_text(encoding="utf-8")
         assert _BUMP._ACTION_PIN_RE.search(text) is not None, f"no action pin in {relative}"
-
-
-def test_documented_action_pins_match_the_current_release() -> None:
-    major, minor, _ = _BUMP._core(_BUMP._current_version())
-    for relative in _BUMP._ACTION_PIN_FILES:
-        text = (_repo_root() / relative).read_text(encoding="utf-8")
-        for found in _BUMP._ACTION_PIN_RE.finditer(text):
-            # Either separator: `guardana/guardana@vX.Y` is the Action pin, and
-            # `guardana/guardana/vX.Y` is the raw URL the GitLab template is
-            # included from. Both are the same moving tag and both go stale alike.
-            assert found.group(0).endswith(f"v{major}.{minor}"), (
-                f"{relative} pins {found.group(0)}, but the released series is {major}.{minor}"
-            )
 
 
 def test_documented_versions_match_the_released_one() -> None:
@@ -297,7 +292,7 @@ def test_a_missing_pin_aborts_before_anything_is_written(monkeypatch: pytest.Mon
     # broken tree in the middle of a release. LICENSE stands in for a docs file
     # that was reworded and lost its pin.
     before = _BUMP._current_version()
-    monkeypatch.setattr(_BUMP, "_ACTION_PIN_FILES", (Path("LICENSE"),))
+    monkeypatch.setattr(_BUMP, "_REQUIRED_ACTION_PIN", (Path("LICENSE"),))
     monkeypatch.setattr(sys, "argv", ["bump_version.py", "minor"])
 
     with pytest.raises(SystemExit):
@@ -356,3 +351,54 @@ def test_main_refuses_the_same_version(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", ["bump_version.py", "0.1.0", "--dry-run"])
     with pytest.raises(SystemExit):
         _BUMP.main()
+
+
+def test_the_action_pins_the_cli_version_it_ships_with() -> None:
+    """`guardana/guardana@vX.Y` must install the CLI that tag was released with.
+
+    The `version` input used to default to empty, and empty meant `uvx --from
+    guardana-cli` — the newest release on PyPI. So a workflow pinned to `@v0.21`
+    would start running the 0.22 CLI the day it published: a pinned pipeline whose
+    engine, rules and exit-code contract changed with nobody editing anything.
+
+    A pin that does not pin is worse than no pin, because it is the one a security
+    team writes down as evidence that the check is reproducible.
+    """
+    action = yaml.safe_load((_repo_root() / "action.yml").read_text(encoding="utf-8"))
+    assert action["inputs"]["version"]["default"] == guardana.core.__version__
+
+
+def test_the_action_never_calls_another_action_by_a_moving_tag() -> None:
+    """Every action this one calls is pinned to a commit, with the tag in a comment.
+
+    This composite action runs inside other people's pipelines. A moving tag here
+    is a moving tag there, under Guardana's name — the supply-chain shape this
+    project exists to flag in somebody else's repository.
+    """
+    text = (_repo_root() / "action.yml").read_text(encoding="utf-8")
+    moving = [
+        line.strip()
+        for line in text.splitlines()
+        if "uses:" in line and not re.search(r"@[0-9a-f]{40}\b", line)
+    ]
+    assert not moving, "actions pinned to a moving ref:\n  " + "\n  ".join(moving)
+
+
+@pytest.mark.parametrize(
+    "workflow", sorted(p.name for p in (Path(__file__).parents[3] / ".github/workflows").iterdir())
+)
+def test_no_workflow_calls_an_action_by_a_moving_tag(workflow: str) -> None:
+    """The same rule one directory over, where the credentials are.
+
+    `release.yml` publishes to PyPI over OIDC and pushes to GHCR. A compromised
+    `@v7` on any action it calls publishes a security scanner under this project's
+    name — which is exactly the attestation-and-SBOM story the release workflow
+    exists to provide, undone at the one point that was not pinned.
+    """
+    text = (_repo_root() / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    moving = [
+        line.strip()
+        for line in text.splitlines()
+        if re.search(r"^\s*uses:\s*[^./]", line) and not re.search(r"@[0-9a-f]{40}\b", line)
+    ]
+    assert not moving, f"{workflow} calls an action by a moving ref:\n  " + "\n  ".join(moving)

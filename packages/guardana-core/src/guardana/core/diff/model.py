@@ -7,15 +7,16 @@ gets its own name here, because a comparison that collapses them into one number
 cannot be trusted to say which way things moved.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
 
+from guardana.core.diff.measurement import MeasurementDelta
 from guardana.core.severity import Severity
 
 Outcome = Literal["fail", "unverified"]
 
-DIFF_SCHEMA_VERSION = 1
+DIFF_SCHEMA_VERSION = 2
 """Version of the JSON document `guardana diff --format json` writes.
 
 Its own number rather than the run report's: a comparison and a run are separate
@@ -165,6 +166,15 @@ class RunDiff:
     notes: tuple[str, ...] = ()
     """Things a reader needs in order to weigh the changes: a different tool
     version, rules that changed definition. Never a substitute for a change."""
+
+    measurement: MeasurementDelta = field(default_factory=MeasurementDelta)
+    """How the measured sample moved — the denominator the change list cannot show.
+
+    Reported, never gated. Every per-case regression it could see already reaches
+    the gate as a `Finding`, so counting it twice would make one event look like
+    two; what this adds is the population those events happened in, and the notes
+    that say when it changed shape.
+    """
 
     incomplete: tuple[str, ...] = ()
     """Why this comparison could not be made in full, if it could not.

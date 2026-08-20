@@ -24,4 +24,6 @@ def summarize(result: ScanResult, gate: GateOutcome | None) -> ResultSummary:
         max_severity=max_severity.name if max_severity else None,
         gate=gate,
         stopped_by=result.stopped_by,
+        assessments=len(result.assessments),
+        measured=len(result.measured),
     )

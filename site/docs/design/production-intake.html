@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Production intake — Guardana documentation</title>
+<meta name="description" content="why assessing production traffic has to be a second lane rather than a faster monitor, what an intake must refuse before it stores anything, and what has to exist before any of it is worth building">
+<link rel="canonical" href="https://guardana.dev/docs/design/production-intake.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html" aria-current="page">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Production intake: assessing real traffic without being in its path<span class="status proposed">proposed</span></h1><p class="lede">why assessing production traffic has to be a second lane rather than a faster monitor, what an intake must refuse before it stores anything, and what has to exist before any of it is worth building</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-08-20 · <strong>Horizon 2</strong></p>
+<p>Not implemented. Written now because the shape of the measurement channel had to
+be decided with this in mind, and because &quot;we will add production monitoring
+later&quot; is the kind of intention that quietly turns into an inline guardrail.</p>
+<h2 id="what-monitor-is-and-what-it-is-not">What <code>monitor</code> is, and what it is not</h2>
+<p><code>guardana monitor</code> re-runs the same active probe on an interval and compares each
+cycle with the first successful one, using the same definition of &quot;worse&quot; that
+<code>guardana diff</code> uses. That is a genuine capability and it is <strong>scheduled synthetic
+testing</strong>. It does not observe production traffic, it cannot see what real users
+are doing, and it is not an inline control.</p>
+<p>Two different things are therefore wanted, and the mistake would be to build the
+second by loosening the first:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Lane</th>
+<th>Input</th>
+<th>Timing</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Active synthetic</td>
+<td>prompts Guardana sends</td>
+<td>on a schedule, inside a budget</td>
+<td>money and requests against the target</td>
+</tr>
+<tr>
+<td>Passive assessment</td>
+<td>traffic the system already served</td>
+<td>asynchronous, sampled</td>
+<td>none against the target; storage and workers instead</td>
+</tr>
+</tbody>
+</table></div>
+<p>They must stay separate lanes with separate queues, because they fail differently
+and because merging them is exactly how &quot;assessment&quot; ends up on the request path.</p>
+<h2 id="the-hard-constraint">The hard constraint</h2>
+<p><strong>Zero measurable overhead on the production request path.</strong> Not &quot;low&quot;, not
+&quot;asynchronous where possible&quot;: nothing Guardana does may be reached from the code
+that answers a user. A system under test that gets slower because it is being
+verified has been changed by the measurement, and the first person to notice will
+turn the verification off.</p>
+<p>That constraint decides the architecture on its own: telemetry leaves the
+application by whatever exporter it already has, Guardana receives it out of
+band, and everything else is a worker.</p>
+<h2 id="what-the-receiver-must-refuse">What the receiver must refuse</h2>
+<p>An intake endpoint is the first thing in this project that accepts unbounded input
+from outside on a continuous basis. The refusals are the design:</p>
+<ul>
+<li><strong>redaction before the queue, and a second policy before durable storage.</strong>
+Two passes, because the first is about what may be held in memory and the second
+about what may be written down. A single pass means one bug is a permanent leak.</li>
+<li><strong>bounded payloads, rate limits and idempotency keys.</strong> A duplicate OTLP export
+must not double a measurement; a retry storm must not become a bill.</li>
+<li><strong>tenant isolation on the ingest path, not only on read.</strong> The existing
+collector enforces this at the query boundary; an intake adds a write boundary
+that needs the same treatment and the same negative tests.</li>
+<li><strong>the schema version recorded per event.</strong> The OpenTelemetry GenAI conventions
+are still marked <code>Development</code> and have moved before. A stored event that does
+not say which convention it was written against is unreadable the moment they
+move again.</li>
+<li><strong>an explicit content mode.</strong> A deployment must be able to store <em>only</em>
+normalized features and hashes — no prompts, no completions — and still get
+aggregates. If that mode is an afterthought it will not exist.</li>
+</ul>
+<h2 id="what-is-refused-permanently">What is refused permanently</h2>
+<ul>
+<li><strong>No inline blocking.</strong> Guardana verifies and gates. A tool that is sometimes in
+the request path is in the request path.</li>
+<li><strong>No second trace store.</strong> MLflow, Phoenix, Langfuse and Jaeger hold traces
+well. The plan is to reference and exchange, not to duplicate — an intake that
+stores a normalized assessment and a pointer is more useful and much cheaper
+than one that becomes a worse copy of a tool the team already runs.</li>
+<li><strong>No automatic replay against production.</strong> Replaying a captured interaction is
+the strongest thing a trace makes possible and it is a deliberate, approved act
+against an approved target, never a background job.</li>
+</ul>
+<h2 id="what-has-to-exist-first">What has to exist first</h2>
+<p>In order, and none of it is optional:</p>
+<ol>
+<li><strong>The assessment channel</strong> — shipped in 0.22.0. Without it there is nothing to
+put on a queue: a stream of findings answers &quot;is it broken&quot; and not &quot;is it
+getting worse&quot;.</li>
+<li><strong>Suites and versioned datasets</strong> — otherwise two aggregates over different
+samples are averaged into one number that describes neither.</li>
+<li><strong>Statistical honesty</strong> — minimum sample size, minimum effect, confidence
+bounds. An alert with none of those is a random-number generator with a
+pager attached.</li>
+</ol>
+<h2 id="the-exit-criteria-written-before-the-work">The exit criteria, written before the work</h2>
+<p>A production lane is done when all of these hold, and each is a way the honest
+version differs from the easy one:</p>
+<ul>
+<li>losing telemetry is reported as a <strong>blind spot</strong>, never as an improvement;</li>
+<li>a duplicated export does not double an assessment;</li>
+<li>backlog depth and dropped samples are measured and alertable — an intake that
+silently drops under load reports a quieter system;</li>
+<li>under overload the production model sees <strong>no</strong> added latency;</li>
+<li>raw content can be switched off entirely while aggregates keep working;</li>
+<li>a regression can be attributed to a specific deployment and model revision;</li>
+<li>two external observability systems can exchange scores with Guardana.</li>
+</ul>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="assessment-channel.html"><code>assessment-channel.md</code></a> — the record this lane would carry</li>
+<li><a href="trace-domain-model.html"><code>trace-domain-model.md</code></a> — what a recorded execution has to contain to be gradable</li>
+<li><a href="../usage-monitor.html"><code>../usage-monitor.md</code></a> — the active lane, as it exists today</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/production-intake.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

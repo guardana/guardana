@@ -2,7 +2,7 @@
 
 > Open-source AI security verification. One rule engine scans model artifacts, probes live endpoints and MCP servers, and grades agent executions that already happened — on a laptop, in CI, and next to a served model. It runs offline, needs no account, and sends nothing anywhere except to the target you name.
 
-Version 0.21.0, Apache-2.0. 51 built-in rules: 19 static ones that need no model and no network, and 32 that grade a live system or a recorded run. Every rule maps to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).
+Version 0.22.0, Apache-2.0. 51 built-in rules: 19 static ones that need no model and no network, and 32 that grade a live system or a recorded run. Every rule maps to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).
 
 The distinguishing property is what happens when a check cannot reach a verdict. Guardana reports four separate outcomes — a finding, an unverified check, a check that errored, and evidence that was demanded and not available — and none of them is silently a pass. A run that could not establish something says so and exits non-zero.
 
@@ -33,7 +33,7 @@ This file is generated from the documentation map; do not edit it by hand.
 - [usage-plan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-plan.md): `guardana plan`: what a run would cost, before it costs anything
 - [usage-taxonomy.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-taxonomy.md): `guardana taxonomy`: which framework entry a reference names, and what it corresponds to in another edition
 - [exit-codes.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/exit-codes.md): the exit-status contract every command honours
-- [usage-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-run.md): `guardana run inspect|migrate`: reading a saved run and its manifest
+- [usage-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-run.md): `guardana run inspect|migrate`: reading a saved run, its manifest, and the cases it measured
 - [profiles.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/profiles.md): the `guardana.yaml` policy file: which rules run, what fails the build
 - [writing-rules.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/writing-rules.md): author a rule as YAML or as a Python plugin
 - [writing-an-integrator.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/writing-an-integrator.md): make the agent you already run produce a trace worth grading: what your framework will not give you, and the declaration that cannot be inflated
@@ -74,6 +74,10 @@ This file is generated from the documentation map; do not edit it by hand.
 ## Optional
 
 - [design/README.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/README.md): how these are named, what each status means, and why an accepted decision is superseded rather than rewritten
+- [design/assessment-channel.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/assessment-channel.md): what a run measured rather than what was wrong, and why the passes are the half that matters
+- [design/capability-protocols.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/capability-protocols.md): what each capability actually promises, and why the extension contract was false until it did
+- [design/production-intake.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/production-intake.md): assessing real traffic without ever being in its path *(proposed)*
+- [design/audit-0.21.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/audit-0.21.md): what a full audit of the released 0.21 found, and which gate closed each finding
 - [design/trace-domain-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/trace-domain-model.md): the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
 - [design/trace-producer.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/trace-producer.md): the append-only writer, which inflated declaration actually leaks a pass, and what the model needs before an integrator can record human approval honestly
 - [design/framework-adapters.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/framework-adapters.md): the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing

@@ -11,9 +11,11 @@ The canonical version is `guardana.core.__version__`. Everything else either
 derives from it or is checked against it here.
 """
 
+import importlib.util
 import re
 import subprocess
 import sys
+import types
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -120,6 +122,10 @@ _CAPABILITIES_THE_COLLECTOR_NOW_HAS = (
     "every key sees everything",
     "no persistence",
     "no authentication",
+    "no finding lifecycle",
+    "no audit log",
+    "no retention or deletion",
+    "read-only and unauthenticated",
 )
 
 
@@ -180,3 +186,107 @@ def test_generated_truth_is_current(script: str) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _bump_script() -> types.ModuleType:
+    """Load `scripts/bump_version.py`, which owns the definition of a pin-bearing file."""
+    spec = importlib.util.spec_from_file_location(
+        "bump_version", _repo() / "scripts" / "bump_version.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize("kind", ["_ACTION_PIN_RE", "_IMAGE_PIN_RE"])
+def test_no_tracked_file_pins_a_version_from_another_series(kind: str) -> None:
+    """Every pin anywhere in the repo names the released minor — discovered, not listed.
+
+    `deploy/docker-compose.yml`, `docs/deployment.md`, `docs/integrations.md` and
+    the collector's README told readers to run `:0.9` while the packages shipped
+    0.21 — twelve releases of a security tool, pulled by tag, with the rules of an
+    older series. Every gate passed: the rewrite worked from a hand-written list of
+    files, and each of those four was created after the list, so the one thing
+    watching for staleness could not see them.
+
+    So the list is gone from both sides. `pin_bearing_files` finds them, and this
+    asserts over the same set, because a gate that scans a whitelist re-creates the
+    hole it exists to close.
+    """
+    bump = _bump_script()
+    pattern = getattr(bump, kind)
+    # The script's patterns capture the prefix so a rewrite can keep it, which
+    # makes the rest of the match the series this file names.
+    expected = _minor(__version__)
+    stale = {
+        f"{path}: {match.group(0)}"
+        for path in bump.pin_bearing_files(pattern)
+        for match in pattern.finditer((_repo() / path).read_text(encoding="utf-8"))
+        if match.group(0)[len(match.group(1)) :] != expected
+    }
+    assert not stale, (
+        f"pins from another series (packages are at {__version__}):\n  "
+        + "\n  ".join(sorted(stale))
+    )
+
+
+def test_the_pin_gate_and_the_release_rewrite_agree_on_which_files_count() -> None:
+    """The canonical starting points must never stop carrying a pin.
+
+    Discovery rewrites whatever it finds, which means a file that loses its pin
+    line simply drops out of the set and nothing complains. For most files that is
+    correct. For the README and the install page it is not: a quickstart with no
+    version in it is how a reader ends up on `latest`.
+    """
+    bump = _bump_script()
+    action = set(bump.pin_bearing_files(bump._ACTION_PIN_RE))
+    image = set(bump.pin_bearing_files(bump._IMAGE_PIN_RE))
+    assert set(bump._REQUIRED_ACTION_PIN) <= action
+    assert set(bump._REQUIRED_IMAGE_PIN) <= image
+
+
+# `**vX.Y**` — with the `v` — is this repo's idiom for "planned for". Without it,
+# `**0.17**` is a row in the README's roadmap table naming a release that shipped,
+# which is the opposite claim.
+_PLANNED_MILESTONE = re.compile(r"\*\*v(\d+)\.(\d+)(?:\.\d+)?\*\*")
+# "Coming in v0.7", "tracked for v0.7", "arrives in v0.7", "lands in 0.7" — the
+# same claim without the bold. The threat model carried one of these for fourteen
+# releases and the bold pattern above could not see it.
+_COMING_IN = re.compile(
+    r"(?:[Cc]oming in|tracked for|arrives? in|lands? in|planned for)\s+v?(\d+)\.(\d+)"
+)
+
+
+@pytest.mark.parametrize("pattern", [_PLANNED_MILESTONE, _COMING_IN], ids=["bold", "heading"])
+def test_no_page_promises_a_milestone_that_has_already_shipped(pattern: re.Pattern[str]) -> None:
+    """A bold version marker means "planned". Planned for a release that shipped is a lie.
+
+    `docs/product-status.md` told readers that capability inspection, the plugin
+    allowlist, `guardana plan` and the request/cost/duration budgets were "**v0.7**"
+    — through fourteen releases in which all four shipped and were documented
+    elsewhere in the same tree. `docs/safe-testing.md` carried a whole "## Coming in
+    v0.7" section describing behaviour the page itself documented as current two
+    screens further down.
+
+    Nothing noticed, because a promise about the future is the one kind of claim
+    that is *correct when written* and rots on a schedule nobody is watching. This
+    is that schedule: the released version moves, and every page that named it as
+    future has to be re-read.
+
+    `CHANGELOG.md` and `docs/design/` are exempt for the reason they always are —
+    both are records of what was true when written.
+    """
+    released = tuple(int(part) for part in __version__.split(".")[:2])
+    stale = [
+        f"{path.relative_to(_repo())}: {match.group(0)}"
+        for path in _tracked_markdown()
+        if path.name != "CHANGELOG.md" and "design" not in path.parts
+        for match in pattern.finditer(path.read_text(encoding="utf-8"))
+        if (int(match.group(1)), int(match.group(2))) <= released
+    ]
+    assert not stale, (
+        f"pages promising a milestone at or below the released {__version__}:\n  "
+        + "\n  ".join(stale)
+    )

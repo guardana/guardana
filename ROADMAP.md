@@ -50,6 +50,75 @@ operator named and reads what came back; the ceilings are in
 [`docs/safe-testing.md`](docs/safe-testing.md) and the address barrier is in
 [`docs/threat-model.md`](docs/threat-model.md).
 
+## Direction: from security verification to continuous assurance
+
+Set 2026-08-20, after an audit of the released 0.21.0. The engine is not changing
+job; the **question it can answer** is widening by one.
+
+Today Guardana answers *is this safe*. Every channel it records is a problem, so a
+run that improved and a run that checked less produce the same shrinking numbers.
+The next releases add the other half — *what was measured, on what sample, by
+what* — without giving up a single one of the refusals that make the first half
+worth trusting.
+
+> **One policy and one evidence format from pull request to production — for
+> security, for regression, and for measurable quality.**
+
+**What does not change.** Explicit `pass`/`fail`/`indeterminate`. Separate
+channels for findings, ungradable checks, errors and missing coverage. Fail-closed
+on an exhausted budget or a stopped run. Deterministic offline artifact scanning.
+Active testing only on request and inside a ceiling. No regulation encoded in the
+engine, and no "AI Act compliant" claim anywhere.
+
+**What is added.** A first-class `Assessment` — what a case measured, *including
+the passes*, with the assessor, the sample and the uncertainty. Findings answer
+"what is dangerous"; assessments answer "what did we measure, how, and over how
+many cases". A policy may gate on both, and neither may be mistaken for the other.
+
+### Horizons, as dependencies rather than dates
+
+Each begins when the previous one's exit criteria are met.
+
+| Horizon | Outcome | Exit criteria |
+|---|---|---|
+| **0 — truth and contract** *(0.22.0, shipped)* | the documentation matches the build, the extension contract is real, and the evidence names its own provenance | a third-party file target runs the built-in artifact rules; an id conflict is refused; every documented pin tracks the release; the measurement channel round-trips |
+| **1 — quality and regression** | answer honestly whether a change made the system better or worse | suites, versioned datasets and assessors; paired diff by case; sample size and effect before an alert; a gate that refuses an incomparable pair |
+| **2 — continuous assurance** | assess synthetic scenarios *and* a sample of real interactions, off the request path | OTLP intake with redaction before the queue; workers, sampling, backpressure; trends keyed by deployment and model revision; Prometheus and webhook output |
+| **3 — self-hosted platform fit** | a natural part of an on-prem inference platform | a tested provider conformance matrix; live RAG targets; Helm and a tested upgrade/rollback; OIDC/SSO and RBAC |
+| **4 — a stable ecosystem, and 1.0** | other people can build on the API | the extension API frozen with a deprecation policy; a conformance kit shipped as its own package; two release candidates with no unplanned API change |
+
+### What this direction explicitly refuses to become
+
+- an inline firewall, guardrail or WAF in the request path;
+- a general APM or a second trace store competing with MLflow, Phoenix, Langfuse
+  or Jaeger — Guardana consumes their telemetry and exports back to them;
+- an "AI Act score", a compliance certification, or legal advice;
+- a marketplace of unverified prompts;
+- a separate SDK per agent framework.
+
+### Backlog order
+
+`S` is days, `M` a few weeks, `L` several person-weeks or more.
+
+| Priority | Initiative | Why it is worth it | Size | Depends on |
+|---|---|---|---:|---|
+| ~~P0~~ | ~~Documentation and release truth~~ | shipped in 0.22.0 | S | — |
+| ~~P0~~ | ~~Registry conflicts and provenance~~ | shipped in 0.22.0 | M | — |
+| ~~P0~~ | ~~Action reproducibility~~ | shipped in 0.22.0 | S | — |
+| ~~P0~~ | ~~Assessment channel~~ | shipped in 0.22.0 | L | — |
+| ~~P0~~ | ~~Target capability protocols~~ | shipped in 0.22.0 | L | — |
+| P1 | Suite, dataset, assessor | quality regression, with a denominator | L | assessments |
+| P1 | Statistical paired diff | an honest "better or worse" | L | suites |
+| P1 | Assessments in the collector | a quality trend, not only a finding count | M | assessments |
+| P1 | Provider conformance matrix | "OpenAI-compatible" is a claim, not a guarantee | M | protocols |
+| P1 | `TargetFactory` and CLI target selection | a custom target usable without writing Python | M | protocols |
+| P2 | OTLP intake, queue, workers | production evidence, off the request path | L | intake design |
+| P2 | Prometheus and webhook output | fits an existing operations stack | M | aggregations |
+| P2 | Helm and Kubernetes | platform fit where inference already runs | L | stateless workers |
+| P2 | OIDC, SSO, RBAC | human identity in the collector | L | control plane |
+| P2 | Live RAG targets | the application, not only the model | L | safe fixtures |
+| P3 | Multimodal, A2A, adaptive attacks | new risk classes | XL | calibration first |
+
 ## Target users, and what each needs to succeed
 
 The roadmap below is ordered by these journeys, not by what is most interesting
@@ -90,7 +159,7 @@ files pinned by digest in every run, and a rule carries both editions where the
 semantics genuinely overlap — never a silent remap onto the matching number, since
 `LLM07:2026` is Misinformation. `guardana taxonomy` shows what is installed.
 
-## What ships today (0.21.0)
+## What ships today (0.22.0)
 
 Counts come from the registry, never from memory:
 [rule summary](docs/generated/rule-summary.md) ·
@@ -329,10 +398,25 @@ this project onto their pitch, where it would lose and where it adds nothing.
 
 **On attack coverage we are behind, and that is the wrong race.** DeepTeam ships
 40+ vulnerability types and three jailbreak strategies against our 51 rules; garak
-ships roughly a hundred probes and can fire twenty thousand prompts in a run. What
-none of them ships is an exit-code contract, a budget that cannot be used as an
-excuse, a saved run, or a regression comparison. That is where this project
-competes, and the ordering below reflects it.
+ships roughly a hundred probes and can fire twenty thousand prompts in a run.
+
+The claim that used to sit here — that none of them ships an exit-code contract, a
+budget, a saved run or a regression comparison — was wrong by 2026 and is the kind
+of absolute that costs more credibility than it buys. promptfoo documents CI
+integration, self-hosting and scheduled model-drift scanning; Giskard documents
+continuous red teaming with stored suites
+([promptfoo model drift](https://www.promptfoo.dev/docs/red-team/model-drift/),
+[promptfoo self-hosting](https://www.promptfoo.dev/docs/usage/self-hosting/),
+[Giskard continuous red teaming](https://docs.giskard.ai/hub/ui/continuous-red-teaming);
+checked 2026-08-20).
+
+What this project competes on is narrower and harder to copy: **the semantics of
+the result.** An exhausted budget, a reply nobody could grade, a rule that stopped
+running and coverage somebody demanded and did not get are four distinct outcomes,
+none of which is a pass — and a comparison that cannot honestly be made is refused
+rather than reported as "no change". Every external claim on this page names a
+source and the date it was checked; **no comparison here may use "none", "only" or
+"first"**, because those age badly and are cheap to disprove.
 
 **"Developer-centric security testing in CI" stopped being a differentiator on
 9 March 2026.** OpenAI acquired promptfoo and is folding it into its own agent
@@ -508,6 +592,10 @@ one.
 |---|---|
 | **A contract assertion over a live endpoint** | every kind shipped reads *recorded authority* — a delegation's boundary, an approval's outcome. Proving one live would mean provoking the action to observe it, which is generated attack traffic, and the stated order is invariants first |
 | **Custom assertion kinds from a plugin** | a sixth kind today is a pull request; an extension point for kinds is an API 1.0 would freeze. It belongs with the pack manifest and `pack validate`, where compatibility is expressed, not bolted onto the contract loader |
+| **Assessments in the collector** *(deferred in 0.22.0)* | the channel has to settle in the run document first. A PostgreSQL migration under a schema that will change shape once suites and datasets land costs more than waiting one release, and a half-migrated trend is worse than no trend |
+| **`TargetFactory` and CLI selection of a custom target** *(deferred in 0.22.0)* | needs a decision about how a target names its configuration on a command line. The capability protocols were the prerequisite and shipped first — a factory that built an object every rule then rejected would have been the same false seam one level up |
+| **A namespaced `Capability` descriptor** *(deferred in 0.22.0)* | the enum stays closed on purpose: arbitrary strings turn a typo (`requires: [call_tols]`) from a load error into a requirement no target can satisfy, which is a rule silently skipped forever. A versioned, validated external descriptor is the right answer and is its own design |
+| **Numeric assessors** *(deferred in 0.22.0)* | `Assessment` carries `value`, `unit`, `direction` and `threshold`, and no built-in produces one yet. Deliberate order: the persisted shape is the expensive thing to change, so it shipped complete and empty rather than being widened later |
 | **A contract-authored taxonomy mapping** | the framework mapping lives on the assertion *kind*, so a team does not have to learn OWASP's numbering to say that payments need a human. A mapping invented to fill a column is worse than none, and the mapping is the part that has to survive somebody else's audit |
 | **A dimension for "this producer records credentials"** | `credential_boundary` declines when no delegation anywhere in a trace carries a credential, because `credential=None` cannot be told from a producer that omits the field. `Dimension.DELEGATION` says delegations are recorded and says nothing about credentials on them, so a well-behaved system that genuinely presented no token gets a permanent decline. The fix is a finer instrumentation declaration, which is a change to what every adapter promises — not something to bolt onto one assertion |
 | **`SkipReason` for a rule the policy excluded** | the runner drops it without recording it, so a saved run shows an exclusion as an absence. The CLI now prints it for a contract assertion, where "1 assertion applies" over a green report was an outright false sentence; making it evidence for *every* rule is a new value in a persisted enum, which is a schema version and a migration rather than a print |
@@ -1033,6 +1121,88 @@ deliver it, the documentation that explains it, security and performance
 acceptance criteria, migration and compatibility implications, and an explicit
 list of what was deferred and why. A version is not cut until its exit criteria
 are met — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## What is measured to know whether this is working
+
+Not the number of rules, the number of prompts or the number of integrations.
+Each of those measures a catalogue, and the thesis at the top of this file is
+about credibility rather than volume.
+
+**Adoption**
+
+- time from install to a first useful verdict;
+- share of new repositories that end up with a working CI gate;
+- share of users who save a baseline or a dataset — the point where the tool
+  stops being a linter and starts being evidence;
+- upgrade success, and the share of installations still on a supported version.
+
+**Credibility** — the group that decides whether any of the rest is worth
+anything
+
+- precision and recall per rule against a versioned corpus;
+- calibration error for probabilistic assessors;
+- the rate of `inconclusive`, `error`, `skipped` and coverage shortfall — rising
+  is not automatically bad, hiding it is;
+- share of comparisons refused as incomparable;
+- flakiness, and deterministic reproducibility on identical input;
+- **semantic documentation drift found after a release.** 0.22.0 found six stale
+  pins and five future-tense claims about shipped features. The target is zero
+  found *after* a release, not zero found.
+
+**Production**, once Horizon 2 exists
+
+- share of traffic that is gradable at all;
+- intake lag, queue depth, dropped and duplicated events;
+- time from regression to detection;
+- false-alert rate after minimum sample and effect;
+- cost per thousand interactions assessed;
+- measurable overhead on the production request path, which must stay at zero.
+
+## Validation before the expensive horizons
+
+Horizon 1 is cheap to reverse and Horizons 2 and 3 are not. Before committing to
+them: twelve to fifteen conversations across three groups — teams self-hosting
+inference on Kubernetes, AppSec and platform teams running AI checks in CI, and
+teams operating RAG or agents in production — each of which has to produce a real
+past incident or regression rather than a wish list, the stack they already run,
+the data that may not leave their organization, their own definition of "worse",
+and who is allowed to approve a new baseline.
+
+The point is the redirect criteria, which are written down now so they are not
+argued about later:
+
+- **if nobody wants a second trace store** — keep the collector to normalized
+  assessments plus a reference to whatever they already run;
+- **if quality is already measured in MLflow, Phoenix or Langfuse** — build
+  two-way score exchange instead of a second evaluator UI;
+- **if custom targets stay internal-only** — stabilise the protocols and do not
+  build a marketplace;
+- **if passive traffic turns out to carry too little security context** —
+  prioritise authorization and identity instrumentation, and scheduled suites,
+  over the intake;
+- **if Kubernetes does not appear among design partners** — a plain Helm chart,
+  and no operator.
+
+## Documentation is part of the product
+
+One owner per kind of claim, because 0.22.0 shipped fixes for the failure that
+happens when there are several:
+
+| File | Owns |
+|---|---|
+| `README.md` | a ten-minute start, and honest positioning |
+| `FEATURES.md` | what the runtime actually registers |
+| `docs/product-status.md` | the **single** hand-maintained list of limitations |
+| `ROADMAP.md` | the future, its order, and its exit criteria — never a second changelog |
+| `CHANGELOG.md` | history |
+| `docs/design/` | why, and what was rejected |
+| `docs/generated/` | counts and catalogues, from the registry |
+
+And the tests that keep it honest, each of which exists because the prose it
+guards went stale in public: version and image pins across the whole repository,
+no page denying a capability the collector has, no page promising a milestone at
+or below the released version, every local link resolving, the landing page's
+counts matching the registry, and `FEATURES.md` matching what discovery returns.
 
 ## How something gets onto (or up) this roadmap
 

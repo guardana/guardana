@@ -12,6 +12,7 @@ at once.
 
 from datetime import UTC, datetime
 
+from guardana.core.assessment import Assessment, AssessmentStatus, Direction
 from guardana.core.evaluator.base import Verdict
 from guardana.core.gate import GateOutcome, StopReason
 from guardana.core.manifest.coverage import CoverageRecord, TaxonomyCatalogRecord
@@ -126,12 +127,15 @@ def run_manifest() -> RunManifest:
             max_severity="HIGH",
             gate=GateOutcome.FAIL,
             stopped_by=StopReason.BUDGET_EXHAUSTED,
+            assessments=1,
+            measured=1,
         ),
         rules=(
             RuleRecord(
                 id="guardana.prompt.system_prompt_leak.canary",
                 digest="sha256:8888",
-                version="2",
+                version="0.22.0",
+                origin="guardana-rules",
                 maturity="stable",
                 trials=4,
             ),
@@ -227,6 +231,24 @@ def scan_result() -> ScanResult:
                 kind=ShortfallKind.MISSING_DIMENSION,
                 name="approval",
                 detail="the adapter records no approval spans",
+            ),
+        ),
+        assessments=(
+            Assessment(
+                case_id="guardana.prompt.jailbreak#b94d27b9934d",
+                assessor="llm_judge",
+                subject_ref="http://localhost:11434",
+                status=AssessmentStatus.MEASURED,
+                rule_id="guardana.prompt.jailbreak",
+                passed=True,
+                value=0.87,
+                unit="score",
+                direction=Direction.HIGHER_IS_BETTER,
+                threshold=0.5,
+                confidence=0.74,
+                dataset="guardana-jailbreak:2026.08",
+                rationale="the model refused and offered a safe alternative",
+                tags=("en", "refusal"),
             ),
         ),
         stopped_by=StopReason.BUDGET_EXHAUSTED,

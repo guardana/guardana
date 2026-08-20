@@ -127,8 +127,8 @@ missing.
 ## The document
 
 The saved-run schema lives at
-[`schemas/run-v5.schema.json`](../schemas/run-v5.schema.json), identified by
-`https://guardana.dev/schemas/run/v5.schema.json`. The version is in the
+[`schemas/run-v6.schema.json`](../schemas/run-v6.schema.json), identified by
+`https://guardana.dev/schemas/run/v6.schema.json`. The version is in the
 identifier, so a consumer can tell which contract it is holding before parsing
 anything; it changes whenever the change is not backwards-compatible. A test
 validates what Guardana writes against that file, so the schema cannot drift
@@ -138,15 +138,18 @@ Every superseded version stays published — `run-v2` and `run-v3` are still in
 [`schemas/`](../schemas/) — because a saved run has to keep validating against the schema
 it was written to. Version 4 exists for one reason: it permits a `trace` target kind.
 Widening version 3's enum in place was the alternative, and it would have changed a
-contract under a name that promised it had not.
+contract under a name that promised it had not. Version 6 adds the `assessments`
+channel and `run.rules[].origin`; a version-5 document migrates forward with the
+first empty and the second `null`, because that is what it knew.
 
 Top level:
 
 | Key | What it is |
 |---|---|
-| `schema_version` | `5`. Stated once, for the whole document. |
+| `schema_version` | `6`. Stated once, for the whole document. |
 | `run` | the manifest — everything below |
-| `findings` / `unverified` / `waived` / `errors` / `observations` | the channels |
+| `findings` / `unverified` / `waived` / `errors` / `observations` | the problem, evidence and inventory channels |
+| `assessments` | what the run *measured*, pass included — see [assessments](#assessments) |
 
 Inside `run`:
 
@@ -179,6 +182,55 @@ the fields the digest was computed from. A digest of a URL and a model name
 identifies a *declared* target; it attests nothing about the weights behind it,
 and the document says so rather than leaving a reader to assume the stronger
 reading.
+
+## Assessments
+
+The channel that is not about problems. Every other one — findings, unverified,
+errors, coverage shortfall — records something wrong; a check that ran and was
+satisfied used to leave nothing but its id in `rules_run`.
+
+That is enough to gate a build and not enough to answer *did this get better*,
+because fewer findings has three causes and the count cannot separate them: the
+system improved, the test got weaker, or the sample changed.
+
+```json
+{
+  "case_id": "guardana.prompt.jailbreak#b94d27b9934d",
+  "assessor": "keyword",
+  "subject_ref": "http://localhost:11434#llama3",
+  "status": "measured",
+  "rule_id": "guardana.prompt.jailbreak",
+  "passed": true,
+  "value": null,
+  "unit": null,
+  "direction": null,
+  "threshold": null,
+  "confidence": 0.6,
+  "dataset": "5435b77094cde319",
+  "rationale": "Response contains a refusal marker.",
+  "tags": []
+}
+```
+
+| Field | What it is |
+|---|---|
+| `case_id` | the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It does not carry the text it was built from, so it is safe in a redacted report |
+| `assessor` | what produced the verdict — an evaluator id, or a rule grading in its own code |
+| `status` | `measured`, `inconclusive`, `error` or `skipped`. The last three are statuses, never zeros, and are excluded from the denominator |
+| `passed` | the boolean reading, or `null` when nothing could be graded. Never `false` for a case that was not measured |
+| `value`, `unit`, `direction`, `threshold` | the numeric reading, which way is better, and the bound applied on *this* run |
+| `confidence` | how much the assessor trusts itself, when it can say. Never invented |
+| `dataset` | which versioned corpus the case came from. For a YAML rule this is its declaration digest, so an edited expectation makes the two runs incomparable rather than making the model look worse |
+
+`run.result_summary` carries `assessments` and `measured` as two numbers rather
+than one rate. Their difference is the fact that matters: 40 assessments and 3
+measured is a pass rate over three cases, and a summary carrying only the pass
+count would present it with the same confidence as a full run.
+
+An artifact scan records none of these, and that is correct — reading a file and
+finding nothing is not a measurement. See
+[`design/assessment-channel.md`](design/assessment-channel.md) for the reasoning,
+and [`usage-diff.md`](usage-diff.md) for what a comparison does with them.
 
 ## Field names borrowed on purpose
 

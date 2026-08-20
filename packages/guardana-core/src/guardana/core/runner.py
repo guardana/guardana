@@ -3,6 +3,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from urllib.error import URLError
 
+from guardana.core.assessment import Assessment
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import GateOutcome, gate, gate_outcome
 from guardana.core.inventory import observe
@@ -14,7 +15,8 @@ from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.rule.base import Rule, RuleContext
 from guardana.core.safety import permits
 from guardana.core.source import UnreadSource
-from guardana.core.target import ArtifactTarget, EndpointError, Target, TargetKind, TraceTarget
+from guardana.core.target import EndpointError, Target, TargetKind
+from guardana.core.target.protocols import FileReader, TraceReader, unmet_surfaces
 
 DEFAULT_ENDPOINT_CONCURRENCY = 1
 """Rules run one at a time unless a caller asks for more.
@@ -32,6 +34,7 @@ class _RuleOutcome:
     rule_id: str
     findings: tuple[Finding, ...] = ()
     unverified: tuple[Finding, ...] = ()
+    assessments: tuple[Assessment, ...] = ()
     error: CheckError | None = None
     stopped_by: StopReason | None = None
     """Set when the run ran out of budget part-way through this rule.
@@ -86,6 +89,22 @@ class Runner:
         # the target that has to hold it. A target that cannot enforce it refuses
         # here rather than letting the run proceed under a ceiling nothing watches.
         target.apply_budgets(self.profile.budgets)
+        # Asked once, before a single rule is planned. A capability is a claim, and
+        # the runner selects rules by it — so a target that declares `read_files`
+        # and implements no `iter_files` used to be handed nineteen rules that each
+        # rejected it in turn. Nineteen errors saying one thing, none of them
+        # saying which thing.
+        contract_errors = [
+            CheckError(
+                source=target.ref,
+                stage="capability",
+                reason=(
+                    f"{target.ref} declares {unmet} but does not implement it — "
+                    f"see guardana.core.target.protocols"
+                ),
+            )
+            for unmet in unmet_surfaces(target)
+        ]
         skipped: list[SkippedRule] = []
         plan: list[Rule] = []
         for rule in self.registry.rules():
@@ -121,6 +140,7 @@ class Runner:
         # a single rule runs: a plugin that failed to import, and a rule whose
         # `expect:` block does not satisfy its evaluator's declared contract.
         errors: list[CheckError] = [
+            *contract_errors,
             *self.registry.load_errors,
             *self.registry.expectation_errors(),
         ]
@@ -129,6 +149,7 @@ class Runner:
         # unreachable endpoint yields fewer outcomes than it planned rules — and
         # pairing by position would then attribute results to the wrong rules.
         ran: list[str] = []
+        assessments: list[Assessment] = []
         stopped_by: StopReason | None = None
         for outcome in self._execute(plan, target):
             # Kept even from a rule the budget cut off: a finding produced before
@@ -136,6 +157,11 @@ class Runner:
             # would punish the user for the budget they set.
             findings.extend(outcome.findings)
             unverified.extend(outcome.unverified)
+            # Kept from a cut-off rule for the same reason as its findings: a case
+            # that was measured before the ceiling was measured. What the run must
+            # not do is *claim* the coverage, which is why the rule still stays out
+            # of `rules_run`.
+            assessments.extend(outcome.assessments)
             if outcome.stopped_by is not None:
                 stopped_by = outcome.stopped_by
             elif outcome.error is not None:
@@ -155,6 +181,7 @@ class Runner:
             tuple(skipped),
             tuple(unverified),
             errors=tuple(errors),
+            assessments=tuple(assessments),
             # Taken from the target, not from the rules: if the inventory came out
             # of what fired, narrowing a profile would quietly shrink the list of
             # components a report says are deployed.
@@ -284,6 +311,7 @@ class Runner:
                 rule.meta.id,
                 tuple(findings),
                 tuple(unverified),
+                ctx.recorded(),
                 stopped_by=StopReason.BUDGET_EXHAUSTED,
             )
         except (URLError, EndpointError) as exc:
@@ -300,16 +328,18 @@ class Runner:
                 rule.meta.id,
                 tuple(findings),
                 tuple(unverified),
-                CheckError.from_exception(rule.meta.id, "run", exc),
+                ctx.recorded(),
+                error=CheckError.from_exception(rule.meta.id, "run", exc),
             )
         except Exception as exc:
             return _RuleOutcome(
                 rule.meta.id,
                 tuple(findings),
                 tuple(unverified),
-                CheckError.from_exception(rule.meta.id, "run", exc),
+                ctx.recorded(),
+                error=CheckError.from_exception(rule.meta.id, "run", exc),
             )
-        return _RuleOutcome(rule.meta.id, tuple(findings), tuple(unverified))
+        return _RuleOutcome(rule.meta.id, tuple(findings), tuple(unverified), ctx.recorded())
 
 
 def safety_refusal(profile: Profile, rule: Rule) -> SkippedRule | None:
@@ -362,7 +392,7 @@ def refused_by_this_run(profile: Profile, rule: Rule) -> bool:
 
 def _unread_sources(target: Target) -> tuple[UnreadSource, ...]:
     """Return what this target could not read, for targets that track it."""
-    if isinstance(target, ArtifactTarget):
+    if isinstance(target, FileReader):
         return target.unread_sources()
     return ()
 
@@ -382,7 +412,7 @@ def _coverage_shortfall(profile: Profile, target: Target) -> tuple[CoverageShort
     reading it as one would make a shared `guardana.yaml` a `guardana scan` that can
     never pass.
     """
-    if not profile.required_dimensions or not isinstance(target, TraceTarget):
+    if not profile.required_dimensions or not isinstance(target, TraceReader):
         return ()
     return tuple(
         CoverageShortfall(

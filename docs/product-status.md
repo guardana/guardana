@@ -21,8 +21,8 @@ so this page is maintained as carefully as the code.
 | `guardana scan` | **beta** | Deterministic, offline, no false-positive theatre. The most mature part of the product. |
 | `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers — the last of those on both its tool manifest and its authorization surface, and never by calling a tool. Verdict quality depends on the evaluator you configure. |
 | `guardana monitor` | **beta** | Scheduled **active** verification. Not passive traffic inspection, not inline. |
-| `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and will gain fields in 0.7. |
-| Collector (`guardana-server`) | **beta** | PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. No finding lifecycle, audit log or retention controls. |
+| `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and migratable — `guardana run migrate` reads every earlier schema. |
+| Collector (`guardana-server`) | **beta** | PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. Findings have a lifecycle and expiring waivers; actions are audited; retention and deletion are commands. What it does not yet hold is a quality trend — it aggregates findings, not measurements. |
 | Extension API | **unstable by design** | Frozen at 1.0, and deliberately not before — see below. |
 
 ## Known limitations
@@ -48,18 +48,22 @@ see what your real users are doing, and is not an inline control. A passive
 out-of-band tap is researched and deferred — the hard constraint is zero impact on
 model latency.
 
-### The collector holds evidence, and does not yet manage it
+### The collector stores and triages findings — it does not trend quality
 
 It persists, authenticates, and isolates one project from another — and one
-environment from another when a key is created with `--environment`. What it does
-not have is everything that happens *after* a finding arrives: no lifecycle
-(nothing is acknowledged, owned or resolved), no waivers, no audit log, no
-retention controls, and no restore-tested backup procedure. Its dashboard also
-only mounts on a collector that requires no key, because a browser has nowhere to
-put a bearer token.
+environment from another when a key is created with `--environment`. Everything
+that happens *after* a finding arrives is there too: a lifecycle (open,
+acknowledged, resolved, and back to open when the finding recurs), waivers whose
+expiry is evaluated at read time, an audit log that records whether the actor was
+a verified key or an unverified CLI claim, retention and deletion as commands, and
+a restore-tested backup procedure. The dashboard signs in with a read-scoped key
+held in an `HttpOnly`, `SameSite=Strict` cookie.
 
-Read it as durable, safely shared storage for evidence. Do not yet read it as the
-place a team runs its triage.
+What it does **not** hold is a measurement trend. It aggregates findings,
+`unverified` and errors — so it can answer "is this system accumulating security
+problems", and cannot yet answer "did quality improve". Assessments are recorded in
+the run document from 0.22.0; carrying them into the collector, with the sample
+sizes and confidence bounds a trend needs to be honest, is the next horizon.
 
 ### RAG coverage is a slice, not a story
 
@@ -77,8 +81,14 @@ agent reads is a real attack class and is **not covered**. **v1.3.**
 
 Providers differ in system-message handling, tool-call formats, streaming, finish
 reasons and usage metadata. A rule that needs a capability a provider does not
-support is skipped and reported as skipped — never as a pass. Capability
-inspection that tells you this *before* a run is **v0.7**.
+support is skipped and reported as skipped — never as a pass, and `guardana target`
+tells you which capabilities an endpoint answered for *before* you trust a run
+against it.
+
+What is still missing is a **tested conformance matrix**: the capability handshake
+reports what one endpoint answered, not which of vLLM, Ollama, SGLang, llama.cpp
+and TGI agree on streaming, finish reasons or usage metadata. Until that exists,
+treat "OpenAI-compatible" as a claim to check per deployment, not a guarantee.
 
 ### Probabilistic verdicts have probabilistic limits
 
@@ -92,14 +102,20 @@ anything noticing — re-measure after changing judge models.
 Entry-point discovery imports installed packages. A malicious Guardana pack is a
 malicious Python package, with everything that implies. `--no-plugins` disables
 discovery — but also the built-ins, which makes safe mode expensive. A plugin
-allowlist is **v0.7**; a declarative pack format that executes no Python is
-**v1.0**. See the [threat model](threat-model.md).
+allowlist (`--plugins builtins|allowlist|disabled`) is what fixes that, and a
+locked pack (`guardana pack lock`) pins the digest of every rule a pack provides.
+Two limits remain: `--plugins all` is still the default, and a declarative pack
+format that executes no Python is **v1.0**. See the
+[threat model](threat-model.md).
 
-### No cost estimation yet
+### Cost is bounded, not predicted
 
-A probe against a paid endpoint has no pre-flight estimate and no hard budget.
-`guardana plan` and `--max-requests`/`--max-cost`/`--max-duration` are **v0.7**.
-Until then, probe staging endpoints or ones you control the quota for.
+`guardana plan` prices a run before it sends anything, and
+`--max-requests`/`--max-cost`/`--max-duration` are hard ceilings that stop the run
+and mark it `indeterminate` rather than letting it report partial coverage as a
+pass. What a plan cannot do is predict a *reply's* token count, so a cost estimate
+is a bound on requests and a projection on tokens — a rule with unknown cost is
+counted as unknown and says so.
 
 ## What Guardana deliberately does not do
 

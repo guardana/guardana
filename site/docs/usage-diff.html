@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -227,6 +231,31 @@ guardana diff before.json after.json --profile guardana.yaml
 <p><code>fail_on.severity</code> sets how bad a regression has to be to fail. <code>coverage_lost</code>
 ignores it — a rule that did not run has no severity, and an unknown cannot be
 thresholded away.</p>
+<h2 id="the-measured-sample">The measured sample</h2>
+<p>A comparison of two dynamic runs also prints the population the changes happened
+in:</p>
+<pre><code class="language-text">Measured cases
+  21 case(s) compared like for like: 16 → 15 passing
+  2 not compared (the assessor or dataset changed)
+  0 gone, 0 new
+</code></pre>
+<p>Every line answers a question the change list cannot. <strong>21 compared</strong> is the
+denominator: without it, &quot;one fewer finding&quot; and &quot;half the cases stopped being
+graded&quot; look identical. <strong>Not compared</strong> is a refusal, not a gap — a case whose
+expectation was edited is a different test, and pairing the two would attribute an
+authoring decision to the model. <strong>Gone / new</strong> is coverage of the measurement
+channel itself.</p>
+<p>Two things it deliberately does <em>not</em> do. It never prints a single percentage: a
+pass rate with no denominator beside it is exactly the number this channel exists
+to stop being quoted. And it adds no new way to fail the build — a case that
+started failing already reaches the gate as a finding, and counting it twice would
+make one event look like two. What it can do is add a note, and going blind gets
+one:</p>
+<pre><code class="language-text">Worth knowing
+  • 3 case(s) produced a value before and could not be graded this time
+    (guardana.prompt.jailbreak#b94d…) — a smaller sample, not a better result
+</code></pre>
+<p><code>--format json</code> carries the same numbers under <code>measurement</code>.</p>
 <h2 id="was-it-the-model-or-was-it-the-test">Was it the model, or was it the test?</h2>
 <p>A saved run records a digest of every rule that ran. If a rule's own definition
 changed between the two runs — someone added prompts, sharpened an expectation —
@@ -265,7 +294,7 @@ inventory, not a gate.</li>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-diff.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

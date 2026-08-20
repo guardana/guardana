@@ -1,11 +1,15 @@
+import contextlib
 from pathlib import Path
 
 import pytest
+from guardana.core.evaluator.base import Expectation
 from guardana.core.evaluator.keyword import KeywordEvaluator
-from guardana.core.rule import RuleContext
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleLoadError
 from guardana.core.rule.yaml_rule import YamlRule, load_yaml_rules
-from guardana.core.target.endpoint import EndpointTarget
+from guardana.core.severity import Severity
+from guardana.core.target import TargetKind
+from guardana.core.target.endpoint import EndpointError, EndpointTarget
 from guardana.core.testing import RefusingTransport, ScriptedTransport
 
 _RULE_YAML = (
@@ -264,3 +268,92 @@ def test_unknown_evaluator_expect_requirements_are_not_second_guessed(tmp_path: 
     )
     rules = load_yaml_rules(tmp_path / "r.yaml")
     assert rules[0].meta.evaluator == "acme_custom"
+
+
+def test_a_hand_built_rule_can_still_state_its_digest() -> None:
+    """`super()` is broken inside a slotted dataclass, and this is where it showed.
+
+    `@dataclass(slots=True)` builds a replacement class and discards the original,
+    while the zero-argument `super()` closure keeps pointing at the original — so
+    `super().digest()` raised `TypeError` on every call. It was only reached when
+    `source_digest` was empty, which is the rule nobody parses from a file: one a
+    test or a plugin assembles in code. No fixture had one, so a `TypeError` sat in
+    the path the run manifest takes to record what actually ran.
+    """
+    rule = YamlRule(
+        meta=RuleMeta(
+            "acme.hand.built", "t", Severity.LOW, TargetKind.ENDPOINT, evaluator="keyword"
+        ),
+        prompts=("hi",),
+        expectation=Expectation(),
+    )
+
+    assert rule.digest()
+    assert rule.digest() == rule.digest()
+
+
+def test_a_yaml_rule_records_one_assessment_per_prompt_including_the_passes() -> None:
+    """Without the passes there is no denominator, and no honest rate.
+
+    Three findings out of four prompts and three out of four hundred are the same
+    report today. The measurement channel is what tells them apart, so a rule that
+    recorded only its failures would leave the channel as useless as the count.
+    """
+    rule = YamlRule(
+        meta=RuleMeta(
+            "acme.two.prompts", "t", Severity.LOW, TargetKind.ENDPOINT, evaluator="keyword"
+        ),
+        prompts=("first", "second"),
+        expectation=Expectation(),
+    )
+    ctx = RuleContext(evaluators={"keyword": KeywordEvaluator()})
+    target = EndpointTarget(
+        "http://x", "m", transport=ScriptedTransport("I can't help with that.", "Sure, here goes")
+    )
+
+    findings = list(rule.run(target, ctx))
+    recorded = ctx.recorded()
+
+    assert len(findings) == 1
+    assert len(recorded) == 2
+    assert [a.passed for a in recorded] == [True, False]
+    assert len({a.case_id for a in recorded}) == 2
+
+
+def test_reordering_prompts_does_not_renumber_the_cases() -> None:
+    """A positional case id pairs every case with a different one after a reorder.
+
+    The diff would then be confidently wrong rather than empty, which is the worse
+    of the two failures: it reports movement that did not happen.
+    """
+    meta = RuleMeta("acme.order", "t", Severity.LOW, TargetKind.ENDPOINT, evaluator="keyword")
+    expect = Expectation()
+    forward = YamlRule(meta=meta, prompts=("a", "b"), expectation=expect)
+    reversed_ = YamlRule(meta=meta, prompts=("b", "a"), expectation=expect)
+
+    def cases(rule: YamlRule, *replies: str) -> set[str]:
+        ctx = RuleContext(evaluators={"keyword": KeywordEvaluator()})
+        list(rule.run(EndpointTarget("http://x", "m", transport=ScriptedTransport(*replies)), ctx))
+        return {a.case_id for a in ctx.recorded()}
+
+    assert cases(forward, "ok", "ok") == cases(reversed_, "ok", "ok")
+
+
+def test_an_ungradable_reply_is_recorded_as_inconclusive_not_as_a_failure() -> None:
+    """A judge that could not read the reply has not observed a failure.
+
+    Counting it as one makes a broken grader look like a worsening model — and that
+    is the direction somebody acts on.
+    """
+    rule = YamlRule(
+        meta=RuleMeta("acme.silent", "t", Severity.LOW, TargetKind.ENDPOINT, evaluator="keyword"),
+        prompts=("hi",),
+        expectation=Expectation(),
+    )
+    ctx = RuleContext(evaluators={"keyword": KeywordEvaluator()})
+    target = EndpointTarget("http://x", "m", transport=ScriptedTransport(""))
+
+    with contextlib.suppress(EndpointError):
+        list(rule.run(target, ctx))
+
+    assert all(a.passed is not False for a in ctx.recorded())

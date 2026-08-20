@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -135,7 +139,7 @@ endpoint or agent, and an MCP server's manifest <strong>and authorization surfac
 <li><a href="usage-plan.html"><code>usage-plan.md</code></a> — <code>guardana plan</code>: what a run would cost, before it costs anything</li>
 <li><a href="usage-taxonomy.html"><code>usage-taxonomy.md</code></a> — <code>guardana taxonomy</code>: which framework entry a reference names, and what it corresponds to in another edition</li>
 <li><a href="exit-codes.html"><code>exit-codes.md</code></a> — the exit-status contract every command honours</li>
-<li><a href="usage-run.html"><code>usage-run.md</code></a> — <code>guardana run inspect|migrate</code>: reading a saved run and its manifest</li>
+<li><a href="usage-run.html"><code>usage-run.md</code></a> — <code>guardana run inspect|migrate</code>: reading a saved run, its manifest, and the cases it measured</li>
 <li><a href="profiles.html"><code>profiles.md</code></a> — the <code>guardana.yaml</code> policy file: which rules run, what fails the build</li>
 <li><a href="writing-rules.html"><code>writing-rules.md</code></a> — author a rule as YAML or as a Python plugin</li>
 <li><a href="writing-an-integrator.html"><code>writing-an-integrator.md</code></a> — make the agent you already run produce a trace worth grading: what your framework will not give you, and the declaration that cannot be inflated</li>
@@ -173,6 +177,10 @@ endpoint or agent, and an MCP server's manifest <strong>and authorization surfac
 <p>Written before the code they describe, so the reasoning survives the review.</p>
 <ul>
 <li><a href="design/README.html"><code>design/README.md</code></a> — how these are named, what each status means, and why an accepted decision is superseded rather than rewritten</li>
+<li><a href="design/assessment-channel.html"><code>design/assessment-channel.md</code></a> — what a run measured rather than what was wrong, and why the passes are the half that matters</li>
+<li><a href="design/capability-protocols.html"><code>design/capability-protocols.md</code></a> — what each capability actually promises, and why the extension contract was false until it did</li>
+<li><a href="design/production-intake.html"><code>design/production-intake.md</code></a> — assessing real traffic without ever being in its path <em>(proposed)</em></li>
+<li><a href="design/audit-0.21.html"><code>design/audit-0.21.md</code></a> — what a full audit of the released 0.21 found, and which gate closed each finding</li>
 <li><a href="design/trace-domain-model.html"><code>design/trace-domain-model.md</code></a> — the <code>Trace</code> model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact</li>
 <li><a href="design/trace-producer.html"><code>design/trace-producer.md</code></a> — the append-only writer, which inflated declaration actually leaks a pass, and what the model needs before an integrator can record human approval honestly</li>
 <li><a href="design/framework-adapters.html"><code>design/framework-adapters.md</code></a> — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing</li>
@@ -227,7 +235,7 @@ duplicate them.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/index.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

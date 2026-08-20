@@ -1,7 +1,8 @@
 import time
 from collections.abc import Callable, Mapping, Sequence
 
-from guardana.core.target.endpoint import ChatMessage, EndpointTarget, ToolCall
+from guardana.core.target.endpoint import ChatMessage, ToolCall
+from guardana.core.target.protocols import ToolOfferingEndpoint
 from guardana.core.trajectory.limits import (
     DEADLINE_SECONDS,
     MAX_CALLS_PER_STEP,
@@ -20,7 +21,7 @@ class TrajectoryError(Exception):
 
 
 def drive(  # noqa: PLR0913, PLR0911 — one parameter per knob; one return per named ending
-    target: EndpointTarget,
+    target: ToolOfferingEndpoint,
     task: str,
     tools: Sequence[ToolOffer],
     *,

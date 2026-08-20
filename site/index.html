@@ -188,7 +188,7 @@
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5 4 5.6v6.1c0 4.6 3.2 8.4 8 9.8 4.8-1.4 8-5.2 8-9.8V5.6L12 2.5Z" stroke="#5B3DF5" stroke-width="1.9" stroke-linejoin="round"/></svg>
       Guardana
     </a>
-    <span class="ver mono">v0.21.0</span>
+    <span class="ver mono">v0.22.0</span>
     <nav>
       <a href="/docs/">Docs</a>
       <a href="/docs/rules/" class="hide-sm">Rules</a>
@@ -357,7 +357,7 @@
       <p class="sec-lede">The official Action scans and uploads SARIF, so findings annotate the exact source line in GitHub code scanning. Every rule maps to a public framework — OWASP LLM Top 10, OWASP Agentic, OWASP MCP Top 10, MITRE ATLAS or NIST.</p>
       <pre class="yml"><code><span class="c">// .github/workflows/ai-security.yml</span>
 <span class="k">- uses:</span> <span class="s">actions/checkout@v4</span>
-<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.21</span>
+<span class="k">- uses:</span> <span class="s">guardana/guardana@v0.22</span>
   <span class="k">with:</span>
     <span class="k">args:</span> <span class="s">--preset ci</span></code></pre>
       <p class="ci-note">Turning a gate on for an existing repo? <code>guardana baseline create</code> accepts today's findings with a reason, an owner and an expiry date — and an expired waiver stops waiving. There's a pre-commit hook too.</p>

@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -141,8 +145,18 @@ pickle, a zip bomb, a 40 GB &quot;model&quot;, or a file designed to exploit a p
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
 fails becomes an <code>errors</code> entry rather than an exception or a silent skip. Pickle
 is parsed at the opcode level, never unpickled.</p>
-<p><strong>Residual risk:</strong> a parser bug is still a parser bug. Readers are fuzz-worthy and
-not yet fuzzed — tracked for v0.7.</p>
+<p><strong>Residual risk:</strong> a parser bug is still a parser bug. Since 0.22.0 every rule that
+opens a file is property-tested against generated input — arbitrary bytes behind
+each format's magic number, declared lengths up to 2⁶³ pointed past the end of the
+file, and arbitrary Unicode including lone surrogates — asserting that nothing
+escapes but the declared <code>RuleError</code> and that a crafted length does not become a
+hang. The corpus of extensions is measured from what the rules actually ask for,
+so a rule for a new format is fed automatically rather than when somebody
+remembers.</p>
+<p>What that is not: a long-running fuzzing campaign, a coverage-guided one, or
+OSS-Fuzz. It is a fixed budget of generated cases per run, chosen so it can live
+in every pull request. A crash-free property suite is evidence that the obvious
+malformations are handled, not that the parsers are correct.</p>
 <h3 id="t2--a-malicious-or-hostile-target-endpoint">T2 — A malicious or hostile target endpoint</h3>
 <p><strong>Scenario:</strong> the endpoint under test returns a 10 GB response, hangs forever,
 returns crafted content designed to exploit the evaluator, or is not the endpoint
@@ -266,7 +280,7 @@ vulnerability reporting is enabled on the repository.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/threat-model.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

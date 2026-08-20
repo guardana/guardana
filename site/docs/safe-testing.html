@@ -76,6 +76,10 @@
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
@@ -156,8 +160,10 @@ from staging transfers; a production incident does not.</p>
 it tool endpoints that write to a scratch environment.</p>
 <p><strong>Bound the run.</strong> Concurrency is bounded (<code>--concurrency</code>, default 4 for probe)
 and rate limits are retried with backoff rather than hammered. Request, token, cost
-and duration budgets arrive in <strong>v0.7</strong> — until then, size the run by choosing a
-profile, not by hoping.</p>
+and duration budgets are hard ceilings: <code>--max-requests</code>, <code>--max-cost</code> and
+<code>--max-duration</code> stop the run and report it as <code>indeterminate</code>, so an exhausted
+budget can never be mistaken for a clean result. <code>guardana plan</code> prices the run
+before it sends anything.</p>
 <p><strong>Run deep checks on a schedule, not on every pull request.</strong> A fast static gate
 belongs in a PR. Endpoint probing belongs at deployment time and nightly. This
 keeps cost predictable and stops a noisy check from blocking every merge.</p>
@@ -171,22 +177,13 @@ these problems on this run. A model is a probabilistic system: the same prompt c
 land differently next time.</p>
 <p>That is the whole reason <code>guardana diff</code> exists — a single run is a snapshot, and
 the question worth gating on is whether the snapshot got worse.</p>
-<h2 id="coming-in-v07">Coming in v0.7</h2>
-<p>Rules will declare their impact, so a policy can select by it:</p>
-<pre><code class="language-yaml">impact: passive | active | side_effecting
-destructive: false
-estimated_requests: 3
-</code></pre>
-<p>with <code>--safety passive|active</code> and an explicit <code>--allow-side-effects</code>, destructive
-checks never running by default, and every attempted action reported as
-<strong>simulated</strong>, <strong>proposed</strong> or <strong>executed</strong>. See the <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">roadmap</a>.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="threat-model.html">Threat model</a> — including what a hostile endpoint can do to Guardana</li>
 <li><a href="product-status.html">Product status</a> — what is and is not covered</li>
 <li><a href="usage-probe.html"><code>docs/usage-probe.md</code></a> · <a href="usage-monitor.html"><code>docs/usage-monitor.md</code></a></li>
 </ul>
-<h2 id="declared-impact-and-what-a-run-permits-07">Declared impact, and what a run permits (0.7)</h2>
+<h2 id="declared-impact-and-what-a-run-permits">Declared impact, and what a run permits</h2>
 <p>Every rule declares how far it reaches, and every run declares how far it is
 willing to let a rule reach.</p>
 <div class="table-wrap"><table>
@@ -242,7 +239,7 @@ what the reader needs to know.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.21.0 · Apache-2.0</span>
+<span>Guardana 0.22.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/safe-testing.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

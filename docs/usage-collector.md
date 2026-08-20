@@ -47,11 +47,11 @@ Or as a container, where the same three commands are three `docker run`s:
 
 ```bash
 docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.21 migrate
+  ghcr.io/guardana/guardana-collector:0.22 migrate
 docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.21 bootstrap --org acme --project web
+  ghcr.io/guardana/guardana-collector:0.22 bootstrap --org acme --project web
 docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.21
+  ghcr.io/guardana/guardana-collector:0.22
 ```
 
 The image's default command is `serve --host 0.0.0.0 --port 8000`, and it does

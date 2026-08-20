@@ -43,7 +43,7 @@ detail below.
 - [`usage-plan.md`](usage-plan.md) — `guardana plan`: what a run would cost, before it costs anything
 - [`usage-taxonomy.md`](usage-taxonomy.md) — `guardana taxonomy`: which framework entry a reference names, and what it corresponds to in another edition
 - [`exit-codes.md`](exit-codes.md) — the exit-status contract every command honours
-- [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run and its manifest
+- [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run, its manifest, and the cases it measured
 - [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
 - [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin
 - [`writing-an-integrator.md`](writing-an-integrator.md) — make the agent you already run produce a trace worth grading: what your framework will not give you, and the declaration that cannot be inflated
@@ -83,6 +83,10 @@ Generated from the registry, never typed by hand.
 Written before the code they describe, so the reasoning survives the review.
 
 - [`design/README.md`](design/README.md) — how these are named, what each status means, and why an accepted decision is superseded rather than rewritten
+- [`design/assessment-channel.md`](design/assessment-channel.md) — what a run measured rather than what was wrong, and why the passes are the half that matters
+- [`design/capability-protocols.md`](design/capability-protocols.md) — what each capability actually promises, and why the extension contract was false until it did
+- [`design/production-intake.md`](design/production-intake.md) — assessing real traffic without ever being in its path *(proposed)*
+- [`design/audit-0.21.md`](design/audit-0.21.md) — what a full audit of the released 0.21 found, and which gate closed each finding
 - [`design/trace-domain-model.md`](design/trace-domain-model.md) — the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
 - [`design/trace-producer.md`](design/trace-producer.md) — the append-only writer, which inflated declaration actually leaks a pass, and what the model needs before an integrator can record human approval honestly
 - [`design/framework-adapters.md`](design/framework-adapters.md) — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing

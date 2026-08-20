@@ -32,6 +32,14 @@ from guardana.core.target.mcp import (
     McpServerTarget,
     McpTool,
 )
+from guardana.core.target.protocols import (
+    AuthorizationInspector,
+    ChatEndpoint,
+    FileReader,
+    ToolListing,
+    ToolOfferingEndpoint,
+    TraceReader,
+)
 from guardana.core.target.trace import TraceTarget, capability_for, dimensions_of
 
 __all__ = [
@@ -39,8 +47,10 @@ __all__ = [
     "AdapterConfig",
     "Anonymous",
     "ArtifactTarget",
+    "AuthorizationInspector",
     "CacheHints",
     "Capability",
+    "ChatEndpoint",
     "ChatMessage",
     "ChatTransport",
     "Discovery",
@@ -48,6 +58,7 @@ __all__ = [
     "EndpointError",
     "EndpointTarget",
     "Era",
+    "FileReader",
     "ForeignToken",
     "HttpAdapterTransport",
     "McpAuthorizationView",
@@ -62,7 +73,10 @@ __all__ = [
     "ToolCall",
     "ToolCallReply",
     "ToolCallingTransport",
+    "ToolListing",
+    "ToolOfferingEndpoint",
     "ToolSpec",
+    "TraceReader",
     "TraceTarget",
     "capability_for",
     "challenge_parameters",

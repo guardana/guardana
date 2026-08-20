@@ -3,6 +3,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from guardana.core.assessment import Assessment
 from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.report import Finding
 from guardana.core.rule._digest import digest_parts
@@ -74,10 +75,30 @@ class RuleContext:
 
     config: Mapping[str, object] = field(default_factory=dict)
     evaluators: Mapping[str, Evaluator] = field(default_factory=dict)
+    _assessments: list[Assessment] = field(default_factory=list, repr=False)
 
     def get(self, key: str, default: object) -> object:
         """Read one config value, falling back to `default`."""
         return self.config.get(key, default)
+
+    def record(self, assessment: Assessment) -> None:
+        """Record what this rule measured, pass included. The runner collects them.
+
+        A sink rather than a second return value, because `run` returning
+        `Iterable[Finding]` is the contract every third-party rule implements and
+        widening it would break all of them at once — the adoption cost the
+        roadmap's API item exists to avoid.
+
+        Recording is optional and staying silent is not a failure: a rule that
+        reads a file and finds nothing has not *measured* anything, and inventing
+        an assessment for it would put hundreds of empty passes into the
+        denominator of every attack-success rate.
+        """
+        self._assessments.append(assessment)
+
+    def recorded(self) -> tuple[Assessment, ...]:
+        """Everything `record` was given, in the order it arrived."""
+        return tuple(self._assessments)
 
 
 class Rule(ABC):
