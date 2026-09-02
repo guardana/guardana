@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The 0.22 audit — Guardana documentation</title>
+<meta name="description" content="what a review of the released 0.22.0 found about the extension surface, which seams are closed on purpose and which by accident, and the six-cycle program that follows from it">
+<link rel="canonical" href="https://guardana.dev/docs/design/audit-0.22.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html" aria-current="page">The 0.22 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>The 0.22 audit: how open the engine really is, and what to open next<span class="status accepted">accepted</span></h1><p class="lede">what a review of the released 0.22.0 found about the extension surface, which seams are closed on purpose and which by accident, and the six-cycle program that follows from it</p><p><strong>Status:</strong> accepted · <strong>Written:</strong> 2026-09-02 · <strong>Subject:</strong> the released 0.22.0 at <code>8e2cd76</code></p>
+<p>A review of the released build with one question in front of it: <strong>can a team
+that is not this repository build its own security layer on top of Guardana —
+its own checks, graders, targets, datasets and outputs — without patching the
+engine, and get the same honest verdict the built-ins get?</strong> The answer is &quot;for
+rules and evaluators, yes; for everything else, only from Python&quot;, and the
+findings below are why. Kept as a design document because the <em>pattern</em> in them
+decides the next six increments, and because the two real defects passed every
+gate this repository has.</p>
+<h2 id="method-and-its-limits">Method, and its limits</h2>
+<p>Static reading of the engine, the CLI, the rule packs and the documentation, then
+running the commands the documentation tells an extension author to run and
+reading what they printed. Three things were verified by execution rather than
+by reading, and each is marked below. The review did not run a live model, a
+live MCP server or the collector; nothing here is a claim about those paths.</p>
+<h2 id="what-is-genuinely-open-today">What is genuinely open today</h2>
+<p>Worth stating first, because the gaps below are narrow beside it:</p>
+<ul>
+<li>Four entry-point groups (<code>guardana.rules</code>, <code>guardana.evaluators</code>,
+<code>guardana.targets</code>, <code>guardana.taxonomies</code>), every one exercised by
+<code>examples/custom_rule</code>, loaded transactionally, with id conflicts refused and
+the <code>guardana.*</code> namespace enforced.</li>
+<li>Capability protocols: a target that inherits nothing of Guardana's runs the
+built-in artifact rules, and <code>assert_target_conforms</code> checks both directions.</li>
+<li>Declarative rules in three shapes, fixtures with the three-state outcome,
+<code>rule test</code>, <code>pack validate</code>, <code>pack lock</code>, an <code>extension_api</code> version, a plugin
+trust policy, test doubles, model-format readers, <code>assert_secure</code>.</li>
+<li>The assessment channel with a stable case identity, and a diff that refuses an
+incomparable pair.</li>
+</ul>
+<p>Nothing in the program below replaces any of that. It fills the seams around it.</p>
+<h2 id="defects--the-two-that-were-verified-by-running">Defects — the two that were verified by running</h2>
+<p><strong>1. The reference third-party target fails the contract the same release made
+true.</strong> <code>examples/custom_rule/src/acme_rules/prompt_library_target.py</code> declares
+<code>Capability.READ_FILES</code> and implements none of <code>FileReader</code>. Run through the
+conformance kit the release shipped:</p>
+<pre><code class="language-console">$ uv run --isolated --no-cache --with ./packages/guardana-core \
+    --with ./packages/guardana-rules --with ./examples/custom_rule python check.py
+unmet_surfaces: ('read_files (needs FileReader)',)
+assert_target_conforms RAISED: TargetContractError AcmePromptLibraryTarget does not
+satisfy the target contract:
+  declares read_files (needs FileReader) but does not implement it
+</code></pre>
+<p>Any <code>Runner.run</code> over that target records a capability error, and with the default
+<code>fail_on_error: true</code> the run is <code>indeterminate</code>. The example's own tests never run
+the <code>Runner</code> over the target and never call the conformance kit, so the one
+package that stands in for every third party's was never held to the contract the
+documentation tells third parties to copy. 0.22.0 rewrote thirty-five
+<code>isinstance</code> checks in the engine and the rule packs and did not revisit the
+example, which is precisely the seam the example exists to exercise.</p>
+<p><strong>2. The documented inner loop for a third party exits <code>indeterminate</code> on the
+documentation's own example.</strong> <code>docs/usage-rule-test.md</code> opens with
+<code>guardana rule test 'acme.*'</code>. No rule in <code>examples/custom_rule</code> declares a fixture —
+not the two YAML rules (no <code>fixtures:</code> block) and not the three plugin rules (no
+<code>fixtures()</code> override) — so the command reports five gaps and exits <code>2</code>. The verdict
+is correct. The example is what is wrong: it demonstrates the part of the contract
+that says silence is not proof by being silent.</p>
+<p>Both are fixed in the first cycle, and the fix carries its own gate: the isolated
+example suite runs the <code>Runner</code> over the target, calls <code>assert_target_conforms</code>,
+and proves every example rule through <code>verify_rules</code>.</p>
+<h2 id="defects--found-by-reading-confirmed-by-output">Defects — found by reading, confirmed by output</h2>
+<p><strong>3. <code>plan scan</code> prices a file scan as unknown.</strong> Every one of the twenty built-in
+artifact rules inherits <code>estimated_requests = None</code>, so the plan for a scan that
+sends nothing prints:</p>
+<pre><code class="language-text">requests: at least 19, at most 0 — plus 19 of unknown cost
+</code></pre>
+<p>An artifact target has nothing to send a request to — the manifest already states
+that a file scan's <code>requests: 0</code> is a measurement — so <code>None</code> here is the wrong
+kind of honesty, and &quot;at least 19, at most 0&quot; is a sentence with no reading. The
+default becomes <code>0</code> for <code>TargetKind.ARTIFACT</code> and stays <code>None</code> for everything
+else, where the answer genuinely depends on the rule.</p>
+<p><strong>4. Plugin trust is not one policy.</strong> <code>scan</code>, <code>probe</code>, <code>monitor</code>, <code>analyze-trace</code>,
+<code>rule test</code> and <code>pack *</code> resolve <code>--plugins</code> through <code>resolve_trust</code>. <code>baseline</code>
+hard-codes <code>all</code>, <code>import-observations</code> hard-codes <code>disabled</code>, <code>target inspect</code>
+and <code>calibrate</code> call a bare <code>Registry.discover()</code>, and <code>plan probe</code> passes a
+literal <code>True</code>. A security control that a user sets on one command and not on the
+next is a control they believe they have. Every command that discovers gets the
+same two flags, from the same resolver, with the same test. Cycle 0's own static
+gate — which scans every file in <code>guardana.cli</code> for the bare call or the hard-coded
+literal instead of trusting a rereading — found two more than this list did,
+<code>guardana rules</code> and <code>guardana taxonomy</code>, which is the reading-versus-running
+argument this audit makes everywhere else, demonstrated on its own defect.</p>
+<p><strong>5. Fixtures in YAML exist for one of the three YAML shapes.</strong> <code>fixtures:</code> is
+accepted on a <code>prompts:</code> rule and rejected on <code>steps:</code> and <code>task:</code> rules. The
+seven built-in scenario and trajectory rules are therefore unsampled, and a third
+party writing the shapes the documentation calls the interesting ones cannot
+sample theirs either.</p>
+<p><strong>6. Prose that the build no longer agrees with.</strong> <code>SECURITY.md</code> lists three
+entry-point groups of four; <code>FEATURES.md</code> still invites a pack to &quot;override
+built-ins&quot;, which 0.22.0 made a refused conflict; <code>--no-plugins</code> is documented as
+the safe mode in <code>SECURITY.md</code> and implemented as a deprecated alias wired on two
+commands; <code>GullibleAgentTransport</code>, <code>FIXED_RUN_TIME</code>, <code>fake_jwt</code>, <code>fake_llm_key</code> and
+<code>fake_secrets</code> are exported and documented nowhere; and <code>CLAUDE.md</code> says scan cost
+is &quot;pinned by a benchmark&quot; when what exists — correctly — is two operation-count
+gates that count tree walks, parses and transport calls, which mean the same thing
+on a laptop and a loaded runner. The last one is fixed by changing the sentence,
+not by adding a wall-clock benchmark; see &quot;Rejected&quot; below.</p>
+<h2 id="the-closed-seams-sorted-by-intent">The closed seams, sorted by intent</h2>
+<p>Every place an extension author would reach and find a literal instead of a
+lookup. The second column is the decision, and the reasoning for each &quot;stays
+closed&quot; is as important as the reasoning for each &quot;opens&quot;.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Seam</th>
+<th>Today</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CLI target construction</td>
+<td>literal <code>ArtifactTarget(...)</code>, <code>build_endpoint(...)</code>, <code>TraceTarget(...)</code> in nine places; <code>registry.targets()</code> never consumed by a command</td>
+<td><strong>opens</strong> — <a href="target-locators.html"><code>target-locators.md</code></a></td>
+</tr>
+<tr>
+<td><code>--format</code> and renderers</td>
+<td>closed <code>OutputFormat</code> enum over a hard-coded dict</td>
+<td><strong>opens</strong> — <a href="output-plugins.html"><code>output-plugins.md</code></a></td>
+</tr>
+<tr>
+<td><code>--reporter</code></td>
+<td><code>server://</code> only</td>
+<td><strong>opens</strong> — same document</td>
+</tr>
+<tr>
+<td>Provider transports</td>
+<td><code>openai</code>, <code>ollama</code>, <code>tgi</code></td>
+<td><strong>stays closed</strong>; a custom wire protocol is a custom target with a scheme, which the first row makes selectable. A second registry for the same thing one layer down is two ways to do one job</td>
+</tr>
+<tr>
+<td><code>Capability</code></td>
+<td>closed enum, by design</td>
+<td><strong>opens, last</strong> — <a href="namespaced-extension-ids.html"><code>namespaced-extension-ids.md</code></a>, because the typo-becomes-silent-skip argument has to be answered before the list is opened</td>
+</tr>
+<tr>
+<td><code>AssertionKind</code></td>
+<td>closed enum plus four dispatch tables</td>
+<td><strong>opens, last</strong> — same document</td>
+</tr>
+<tr>
+<td>Attack technique</td>
+<td>absent; a vulnerability crossed with an encoding is a new rule</td>
+<td><strong>opens</strong> — <a href="attack-techniques.html"><code>attack-techniques.md</code></a></td>
+</tr>
+<tr>
+<td>Numeric assessors, suites, datasets</td>
+<td>the <code>Assessment</code> shape carries them; nothing produces them</td>
+<td><strong>opens</strong> — <a href="quality-suites.html"><code>quality-suites.md</code></a>, <a href="paired-regression-statistics.html"><code>paired-regression-statistics.md</code></a></td>
+</tr>
+<tr>
+<td>Presets</td>
+<td>three, hard-coded</td>
+<td><strong>stays closed</strong>; a preset is a named policy and a <code>guardana.yaml</code> already expresses any policy. A preset registry would be a second profile format</td>
+</tr>
+<tr>
+<td><code>guardana.yaml</code> keys</td>
+<td>frozensets, unknown key refused</td>
+<td><strong>stays closed</strong>; the refusal is the feature. Extensions get <code>rule_config:</code> and <code>evaluators:</code>, which are free-form by design</td>
+</tr>
+<tr>
+<td>CLI commands</td>
+<td>imperative list in <code>main.py</code></td>
+<td><strong>stays closed</strong>; a plugin that adds verbs to a security tool is a plugin that can add <code>guardana wipe</code>. Four verbs is a product decision</td>
+</tr>
+<tr>
+<td><code>TargetKind</code></td>
+<td>three values</td>
+<td><strong>stays closed</strong>; a verb selects a kind, and a fourth kind is a fifth verb</td>
+</tr>
+<tr>
+<td>Collector <code>Store</code></td>
+<td><code>create_app(store=...)</code></td>
+<td><strong>stays closed</strong>; the collector deliberately has no plugin loader, and it never imports the engine</td>
+</tr>
+<tr>
+<td><code>observe()</code> dispatch</td>
+<td><code>isinstance</code> over two protocols</td>
+<td><strong>stays closed for now</strong>; a custom target produces no inventory, which is an absence the manifest shows, not a false claim. Revisited when a design partner's target needs it</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="the-program-that-follows">The program that follows</h2>
+<p>Six cycles, ordered by dependency and by what a real team hits first. The
+implementation plans are working documents outside the public tree; this is the
+public commitment and the order.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Cycle</th>
+<th>Delivers</th>
+<th>Why here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0 — truth <em>(done)</em></td>
+<td>the six defects above closed with gates; a layers contract in import-linter; CodeQL; coverage floors for the areas that had none</td>
+<td>cheap, and every one of them is something a third party hits in their first hour</td>
+</tr>
+<tr>
+<td>1 — author tooling</td>
+<td>target locators; renderer and reporter plugins; YAML fixtures for all three shapes; <code>guardana new-pack</code>; a capability manifest generated from code</td>
+<td>a suite against <em>your</em> system needs your system to be a target the CLI can build; the rest is the difference between an afternoon and a week for a pack author</td>
+</tr>
+<tr>
+<td>2 — quality suites</td>
+<td>versioned datasets, suites as rules, measurement on <code>Verdict</code>, deterministic and judged assessors, a suite gate that refuses below a sample size</td>
+<td>Horizon 1's outcome, on the channel 0.22.0 shipped</td>
+</tr>
+<tr>
+<td>3 — paired statistics</td>
+<td><code>diff</code> and <code>monitor</code> answer &quot;worse&quot; over a paired sample with a minimum effect and an exact test, or say they cannot</td>
+<td>Horizon 1's exit criteria</td>
+</tr>
+<tr>
+<td>4 — techniques</td>
+<td>a <code>Technique</code> extension point and four deterministic transforms</td>
+<td>coverage as a product of two small sets rather than a sum of large ones, and a seam the freeze must see</td>
+</tr>
+<tr>
+<td>5 — namespaced ids</td>
+<td>capabilities and assertion kinds a pack can declare, resolved at load, typos still refused</td>
+<td>the last two extension points 1.0 criterion 8 names</td>
+</tr>
+</tbody>
+</table></div>
+<p>What moves on the roadmap: <code>TargetFactory</code> from &quot;deferred&quot; to cycle 1; the
+technique from &quot;designed before 1.0&quot; to cycle 4 with a design; the capability
+descriptor and custom assertion kinds from &quot;its own design&quot; to cycle 5 with one;
+CodeQL from P1 to cycle 0. Assessments in the collector stay after cycle 3,
+because the suite and dataset shapes have to settle first — the reason
+0.22.0 already gave. Nothing in Horizons 2 and 3 moves.</p>
+<h3 id="one-rule-for-the-extension-api-number-across-the-program">One rule for the extension API number across the program</h3>
+<p><code>extension_api</code> moves when a pack <em>can need</em> something an older build lacks, and
+every move is additive: the build advertises the set of API versions it
+implements, a pack names the one it was written against, and the check becomes
+&quot;does the pack's range contain any version this build implements&quot;. A pack
+declaring <code>&gt;=1,&lt;2</code> today loads on every build this program produces. Cycle 1
+advertises <code>2</code> (locators, output plugins, fixtures for every YAML shape), cycle 4
+advertises <code>3</code> (techniques), cycle 5 advertises <code>4</code> (namespaced ids). Cycles 0, 2
+and 3 add nothing a pack implements, so they add no number. The pack manifest's
+own <code>schema_version</code> moves separately, once per cycle that adds a <code>provides</code> list,
+and older manifests migrate forward in memory as they do now.</p>
+<h2 id="rejected">Rejected</h2>
+<p><strong>A <code>--plugin-file path.py</code> for script-style extensions.</strong> The request behind it is
+real — a team's first rule is a file, not a package — and the answer is
+<code>guardana new-pack</code>, which turns a name into an installable package with the four
+entry points, a manifest, three fixtures and a conforming target in one command. A
+second way to load Python into a security scanner, from a path on the command
+line, is a second trust decision with its own edge cases in a tool whose plugin
+policy exists to have exactly one.</p>
+<p><strong>A wall-clock benchmark as a gate.</strong> Time on a shared runner is noise, and a
+gate that fails on noise is a gate people learn to re-run. The operation-count
+gates measure the property principle 2 actually names — cost grows with the
+target, not with the rule count — and they cannot be made green by a faster
+machine. The sentence in <code>CLAUDE.md</code> changes to say what is pinned.</p>
+<p><strong>Mutation testing as a gate.</strong> The project already inverts every test by hand,
+and a mutation run over the engine takes longer than the whole suite. It may be
+worth running on a schedule as advice; it is not worth blocking a merge on.</p>
+<p><strong>A fifth verb for suites.</strong> A suite is a rule whose cases come from a dataset,
+and <code>probe</code> already runs rules against an endpoint under a budget, a plan, a
+policy and a manifest. A <code>guardana suite run</code> would be <code>probe</code> with a narrower
+help text and a second pipeline to keep honest.</p>
+<p><strong>Opening presets and profile keys to plugins.</strong> See the table. A profile that
+refuses a key it does not know is the reason a typo is a load error and not a
+gate nobody configured.</p>
+<p><strong>A public extension registry.</strong> Unchanged from the roadmap: meaningful once a pack
+has a manifest, a range, a lock and a trust model — the first three exist now, and
+the fourth still does not.</p>
+<h2 id="what-this-audit-does-not-change">What this audit does not change</h2>
+<p>The four verbs. The engine knowing no vendor and no regulation. Offline by
+default and no account. The fail-closed direction of every refusal named here:
+each cycle adds outcomes an extension can produce, and none of them is a new way
+to pass.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="extension-author-tooling.html"><code>extension-author-tooling.md</code></a> — the fixtures, manifest and lock this builds on</li>
+<li><a href="capability-protocols.html"><code>capability-protocols.md</code></a> — why a target's declaration and its surface must agree</li>
+<li><a href="assessment-channel.html"><code>assessment-channel.md</code></a> — the measurement record the suites fill</li>
+<li><a href="audit-0.21.html"><code>audit-0.21.md</code></a> — the previous audit, and the pattern both share</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/audit-0.22.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

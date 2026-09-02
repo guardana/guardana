@@ -17,7 +17,7 @@ from typing import Annotated
 
 import typer
 import yaml
-from guardana.cli._plugins import resolve_trust
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.pack import (
     EXTENSION_API_VERSION,
@@ -73,9 +73,12 @@ def validate(
     """Check a pack manifest against this build's extension API and its own registrations.
 
     Exit `0` every pack is loadable and accurate · `1` one is not · `2` nothing
-    declared a manifest · `3` the manifest could not be read at all.
+    declared a manifest, or plugin trust refused an extension so this build's own
+    registrations are unproven and no manifest can be checked against them · `3`
+    the manifest could not be read at all.
     """
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
+    warn_about_load_errors(registry, what="an extension")
     # All four groups a manifest may declare. Leaving targets out made every pack
     # shipping one accused of not registering it — a false red, which this project
     # treats exactly as seriously as a false green: a validator that accuses a pack
@@ -103,6 +106,21 @@ def validate(
         typer.echo(
             f"no pack declared a {'manifest' if manifest is None else 'readable manifest'} — "
             f"nothing was validated, which is not the same as nothing being wrong",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.INDETERMINATE)
+
+    if registry.load_errors:
+        # `registered` was built from this same registry, so an id it does not
+        # contain is unproven, not absent — printing "does not register" here
+        # would accuse a pack of a fault caused by the trust policy, not by the
+        # pack. See the module docstring: a validator that accuses a pack of a
+        # fault it does not have is a validator somebody turns off.
+        typer.echo(
+            f"error: {len(registry.load_errors)} extension(s) were refused by plugin "
+            f"trust, so what this build actually registers is unproven — a manifest "
+            f"cannot be checked against a registry this build did not fully load; "
+            f"see the warning(s) above",
             err=True,
         )
         raise typer.Exit(code=ExitCode.INDETERMINATE)
@@ -140,14 +158,31 @@ def lock(
     over the references they register.
 
     Exit `0` the build matches the lock · `1` it has drifted · `2` nothing was
-    installed to pin · `3` the lock could not be read.
+    installed to pin, or plugin trust refused an extension so what this build
+    registers is unproven · `3` the lock could not be read.
     """
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
+    warn_about_load_errors(registry, what="an extension")
     packs = installed_packs()
     if not packs:
         typer.echo(
             "no installed pack declares a manifest, so there is nothing to pin — which "
             "is not the same as nothing being installed",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.INDETERMINATE)
+    if registry.load_errors:
+        # `_installed(registry)` reads the same emptied registry `validate` does.
+        # Writing a lock from it would persist a false "rules: {}, evaluators: [],
+        # …" for a pack that registers plenty; checking against it would call a
+        # refused extension "gone" (`DriftKind.REMOVED`) when it was never absent.
+        # Both are worse than refusing outright — a lock is a document a team
+        # keeps and reads on every CI run, not a one-off report.
+        typer.echo(
+            f"error: {len(registry.load_errors)} extension(s) were refused by plugin "
+            f"trust, so what this build actually registers is unproven — a lock "
+            f"written or checked against it could call something 'gone' that was "
+            f"only refused; see the warning(s) above",
             err=True,
         )
         raise typer.Exit(code=ExitCode.INDETERMINATE)

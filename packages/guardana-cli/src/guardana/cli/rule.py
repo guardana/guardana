@@ -15,7 +15,7 @@ from typing import Annotated
 
 import typer
 from guardana.cli._evaluators import wire_config_evaluators
-from guardana.cli._plugins import resolve_trust
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli.exit_codes import ExitCode
@@ -72,8 +72,7 @@ def run_fixtures(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; t
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
     load_custom_rules(registry, prof, rules)
     wire_config_evaluators(registry, prof)
-    for error in registry.load_errors:
-        typer.echo(f"warning: could not load rule — {error}", err=True)
+    warn_about_load_errors(registry, what="rule")
 
     selected = [r for r in registry.rules() if fnmatch(r.meta.id, selector)]
     if not selected:

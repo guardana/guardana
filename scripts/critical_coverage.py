@@ -39,6 +39,23 @@ FLOORS: tuple[tuple[str, int, str], ...] = (
     ("guardana/server/tenancy.py", 98, "the query boundary between organizations"),
     ("guardana/server/security.py", 95, "hashes credentials and compares them"),
     ("guardana/server/envelope.py", 95, "the wire format between agent and collector"),
+    # Where an extension author's proof is decided.
+    ("guardana/core/contract/", 93, "compiles a team's own invariants into rules"),
+    ("guardana/core/pack/", 92, "decides whether a third party's package is loadable and whole"),
+    ("guardana/core/calibration/", 89, "measures whether a judge's confidence is honest"),
+    (
+        "guardana/testing/",
+        93,
+        "the conformance kit and the assertion users run in their own suites",
+    ),
+    # The surface a user actually types against.
+    ("guardana/cli/", 91, "every flag that selects, restricts or forwards"),
+    ("guardana/report/", 97, "what leaves the machine, in four formats"),
+    ("guardana/adapters/", 91, "translates somebody else's framework into a target"),
+    # Rule packs without a floor until now.
+    ("guardana/rules/prompt/", 96, "reads files a repository author wrote"),
+    ("guardana/rules/agent/", 91, "drives an agent loop against doubles"),
+    ("guardana/rules/trace/", 97, "grades a recording nobody here produced"),
 )
 
 

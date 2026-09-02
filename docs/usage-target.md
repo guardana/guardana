@@ -34,6 +34,13 @@ endpoint https://api.example.com#gpt-4o-mini
 This inspection cost 3 request(s).
 ```
 
+## Flags
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
+
 ## Declared versus verified
 
 A target *declares* capabilities from what its client can do. Inspection reports

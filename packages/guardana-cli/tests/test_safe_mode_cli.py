@@ -16,10 +16,12 @@ class _Evil:
 
 
 def test_no_plugins_runs_no_entry_point_rules(tmp_path: Path) -> None:
-    # --no-plugins is a security feature (SECURITY.md): it builds a bare Registry
-    # so no third-party entry-point code is loaded or executed. The cost is that
-    # the built-in plugin rules don't run either — including the one that would
-    # otherwise flag this pickle.
+    # --no-plugins is a security feature (SECURITY.md): it resolves through
+    # resolve_trust(..., no_plugins=True) to PluginTrust(mode=DISABLED), and
+    # Registry.discover still runs — it walks every entry point, refuses each
+    # one, and records the refusal in load_errors, rather than skipping
+    # discovery outright. The cost is that the built-in plugin rules don't run
+    # either — including the one that would otherwise flag this pickle.
     (tmp_path / "m.pkl").write_bytes(pickle.dumps(_Evil()))
 
     unsafe = runner.invoke(app, ["scan", str(tmp_path)])

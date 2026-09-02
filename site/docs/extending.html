@@ -41,6 +41,7 @@
 <li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -203,23 +211,43 @@ from guardana.core.target import Capability, Target, TargetKind
 class MyTarget(Target):
     kind = TargetKind.ARTIFACT   # ARTIFACT, ENDPOINT or TRACE
 
+    def __init__(self, root: Path | str) -&gt; None:
+        self._root = Path(root)
+        self._sources: dict[Path, PythonSource | None] = {}
+        self._unread: list[UnreadSource] = []
+
     def capabilities(self) -&gt; set[Capability]:
         return {Capability.READ_FILES}   # so implement `FileReader`, below
 
     @property
     def ref(self) -&gt; str:
-        return &quot;...&quot;  # stable identifier used in findings/reports
+        return f&quot;my-target:{self._root}&quot;  # stable identifier used in findings/reports
 
     # --- the FileReader surface `READ_FILES` promises ---
 
     def iter_files(self, suffixes: tuple[str, ...] | None = None) -&gt; Iterator[Path]:
-        ...
+        for path in sorted(p for p in self._root.rglob(&quot;*&quot;) if p.is_file()):
+            if suffixes is None or path.suffix in suffixes:
+                yield path
 
     def python_source(self, path: Path) -&gt; PythonSource | None:
-        ...   # cache this: every rule that inspects Python asks through here
+        # Cache this: every rule that inspects Python asks through here, so a
+        # target that re-reads per call turns a linear scan into a quadratic one.
+        if path.suffix != &quot;.py&quot;:
+            return None
+        if path not in self._sources:
+            result = read_source(path)
+            if isinstance(result, UnreadSource):
+                self._unread.append(result)
+                self._sources[path] = None
+            else:
+                self._sources[path] = result
+        return self._sources[path]
 
     def unread_sources(self) -&gt; tuple[UnreadSource, ...]:
-        ...   # what you were prevented from reading — the runner reports it
+        # A file you were *prevented* from reading (too large, unopenable) —
+        # the runner turns these into `errors`: a check that did not run.
+        return tuple(self._unread)
 </code></pre>
 <div class="table-wrap"><table>
 <thead>
@@ -298,7 +326,7 @@ library/embedding use; the CLI's own target selection remains path/URL-based
 (<code>scan</code> always builds an <code>ArtifactTarget</code>, <code>probe</code>/<code>monitor</code> always build an
 <code>EndpointTarget</code> via <code>build_endpoint()</code>) — a discovered custom <code>Target</code> isn't
 yet CLI-selectable, only usable by code that drives a <code>Runner</code> directly.</p>
-<h2 id="the-entry-point-contract-rules-evaluators--targets">The entry-point contract (rules, evaluators &amp; targets)</h2>
+<h2 id="the-entry-point-contract-rules-evaluators-targets--taxonomies">The entry-point contract (rules, evaluators, targets &amp; taxonomies)</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -308,6 +336,11 @@ yet CLI-selectable, only usable by code that drives a <code>Runner</code> direct
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>guardana.taxonomies</code></td>
+<td>one <code>TaxonomyRef</code>, or an iterable</td>
+<td><code>Registry.discover()</code>, <strong>first</strong> — a rule pack's own <code>taxonomy:</code> references resolve while its own entry point is still loading</td>
+</tr>
 <tr>
 <td><code>guardana.rules</code></td>
 <td>one <code>Rule</code>, or an iterable of <code>Rule</code>s</td>
@@ -326,7 +359,10 @@ yet CLI-selectable, only usable by code that drives a <code>Runner</code> direct
 </tbody>
 </table></div>
 <p>A package registers by adding to its <code>pyproject.toml</code>:</p>
-<pre><code class="language-toml">[project.entry-points.&quot;guardana.rules&quot;]
+<pre><code class="language-toml">[project.entry-points.&quot;guardana.taxonomies&quot;]
+my_taxonomies = &quot;acme_rules:provide_taxonomies&quot;
+
+[project.entry-points.&quot;guardana.rules&quot;]
 my_rules = &quot;acme_rules:provide_rules&quot;
 
 [project.entry-points.&quot;guardana.evaluators&quot;]
@@ -335,13 +371,14 @@ my_evaluators = &quot;acme_rules:provide_evaluators&quot;
 [project.entry-points.&quot;guardana.targets&quot;]
 my_targets = &quot;acme_rules:provide_targets&quot;
 </code></pre>
-<p><code>provide_rules()</code> / <code>provide_evaluators()</code> are zero-argument callables
-returning an instance or a list of instances. Any pip-installed package —
+<p><code>provide_rules()</code> / <code>provide_evaluators()</code> / <code>provide_targets()</code> /
+<code>provide_taxonomies()</code> are zero-argument callables returning an instance or a
+list of instances. Any pip-installed package —
 ours or a third party's private one — is discovered identically; there is
 no built-in/custom distinction at the registry level, only namespacing by
-<code>id</code>. <code>guardana scan --no-plugins</code> (and the equivalent bare <code>Registry()</code>)
-disables entry-point discovery entirely — see
-<a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for why this exists and when to use it.</p>
+<code>id</code>. <code>guardana scan --no-plugins</code> is a deprecated alias for <code>--plugins disabled</code>: discovery still runs, every plugin is refused, and each refusal is
+recorded — see <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for the trust modes and why
+this exists.</p>
 <h2 id="testing-your-extension">Testing your extension</h2>
 <p>Every public <code>Rule</code>, <code>Evaluator</code>, and <code>Target</code> should ship with tests: a
 rule needs a positive and a negative fixture (proving it fires on a bad
@@ -352,15 +389,57 @@ needs a test that <code>capabilities()</code> and its read/interaction surface b
 <a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule/tests"><code>examples/custom_rule/tests/</code></a> shows the
 pattern end-to-end for a rule package, including a discovery-proving test
 you can copy.</p>
-<p>For dynamic (endpoint) rules, <code>guardana.core.testing</code> ships transport test
-doubles — <code>ScriptedTransport</code> (canned replies, records requests),
-<code>RefusingTransport</code> (a well-behaved model that refuses everything),
-<code>EchoingTransport</code> (discloses its planted system prompt — the canary-leak
-fixture), <code>ToolCallingScriptedTransport</code> (calls the tools it was told to — the
-excessive-agency fixture), and <code>FailingTransport</code> (raises like an unreachable
-endpoint) — that plug into <code>EndpointTarget</code>'s <code>ChatTransport</code> seam, so both
-fixtures run against a scripted model with no network. Worked example:
+<p><code>guardana.core.testing</code> ships every double behind that, so a fixture is a
+few lines of Python instead of a network call or a hand-crafted binary.
+Sixteen exports, five families:</p>
+<p><strong>Transports</strong> plug into <code>EndpointTarget</code>'s <code>ChatTransport</code> seam, so a
+dynamic rule is graded end-to-end against a scripted model with no network:</p>
+<ul>
+<li><code>ScriptedTransport</code> — canned replies in order, the last one repeating
+once exhausted; records every request it received.</li>
+<li><code>RefusingTransport</code> — a well-behaved model: refuses everything, leaks
+nothing (the negative fixture for most dynamic rules).</li>
+<li><code>EchoingTransport</code> — discloses whatever system prompt was planted on it
+(the canary-leak positive fixture).</li>
+<li><code>ToolCallingScriptedTransport</code> — calls the tools it was told to when any
+are offered (the excessive-agency fixture).</li>
+<li><code>GullibleAgentTransport</code> — treats a tool's result as an instruction and
+acts on it (the positive fixture for prompt injection through tool
+output); pair with <code>RefusingTransport</code> for the negative.</li>
+<li><code>FailingTransport</code> — an unreachable endpoint: every call raises the
+given error.</li>
+</ul>
+<p>Worked example:
 <a href="writing-rules.html#testing-a-dynamic-rule-without-a-model"><code>writing-rules.md</code></a>.</p>
+<p><strong>Artifact builders</strong> stand in for a model file, so a static rule is driven
+against a crafted artifact with no binary checked into the repo:</p>
+<ul>
+<li><code>build_gguf</code> — a well-formed GGUF file carrying the given metadata
+entries, e.g. a malicious chat template.</li>
+<li><code>build_safetensors</code> — a well-formed safetensors file; the negative
+fixture for any artifact rule (no code-execution surface) and the
+positive one for anything reading <code>__metadata__</code>.</li>
+<li><code>build_onnx</code> — a walkable ONNX <code>ModelProto</code>, for operator-domain,
+metadata, and external-data checks.</li>
+</ul>
+<p><strong>Fake credentials</strong> are assembled at run time rather than written down, so
+a redaction test does not put a secret-shaped literal in the repository:</p>
+<ul>
+<li><code>fake_aws_key</code> — input for a secret-detection rule to hunt: shaped exactly
+like a real AWS access key id, without being one.</li>
+<li><code>fake_llm_key</code> — the same, shaped like an OpenAI API key.</li>
+<li><code>fake_jwt</code> — a JWT-shaped token (three base64url segments).</li>
+<li><code>fake_secrets</code> — all three above, for a test asserting that none leaked.</li>
+</ul>
+<p><strong>A scripted MCP server</strong>, <code>ScriptedMcpServer</code>, stands in for a live one,
+reached exactly the way the real one is (through a <code>Sender</code>) and
+configurable for authorization, session handling, caching headers, and both
+eras of the protocol — so an authorization rule gets a positive and a
+negative server with no network.</p>
+<p><strong>A run manifest</strong>: <code>manifest_for</code> builds a <code>RunManifest</code> describing a
+<code>ScanResult</code> with test-stable circumstances, and <code>FIXED_RUN_TIME</code> is the
+fixed instant it stamps everywhere — so two renderings of the same result
+are byte-identical and a renderer test is not also a test about clocks.</p>
 
 </main>
 </div>

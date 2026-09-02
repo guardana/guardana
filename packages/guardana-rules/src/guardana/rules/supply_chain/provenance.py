@@ -3,11 +3,12 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
 
@@ -44,7 +45,7 @@ def _license_lead(text: str) -> str | None:
     return None
 
 
-class ProvenanceRule(Rule):
+class ProvenanceRule(ArtifactRule):
     """Flags an unpinned model download, or a licence in the model card worth a second look."""
 
     meta = RuleMeta(

@@ -103,5 +103,5 @@ uv add acme-guardana-rules   # example; see examples/custom_rule/
 Guardana discovers their rules automatically the next time it runs, via the
 `guardana.rules` entry point (see [`extending.md`](extending.md)). Because
 this executes the installed package's code, only install rule packages you
-trust — or run with `--no-plugins` to disable all code-plugin discovery; see
-[`SECURITY.md`](../SECURITY.md).
+trust — or run with `--plugins builtins` to keep Guardana's own reviewed rules
+while refusing every third-party one; see [`SECURITY.md`](../SECURITY.md).

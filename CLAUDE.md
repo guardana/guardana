@@ -58,7 +58,10 @@ change that violates one is wrong even when it is small, tested, and useful.
    add a tree walk, a re-read, or a re-parse of something already read this run.
    A scan nobody waits for is a scan nobody runs, and an excluded scanner is an
    organisation-level fail-open — so performance is a security property here, and
-   it is pinned by a benchmark the same way coverage is.
+   it is pinned by operation-count gates (`test_scan_cost.py` counts tree walks
+   and parses, `test_probe_cost.py` counts transport calls) the same way
+   coverage is — counts, not wall-clock, because a count means the same thing
+   on a laptop and a loaded runner.
 3. **Offline, and no account, always.** The only network traffic is to the target
    under test. No telemetry, no phone-home, no license check; the collector is
    optional in every direction and never required for a feature to work.
@@ -144,8 +147,11 @@ distributions. **Never add a bare `packages/*/src/guardana/__init__.py`** —
 that would turn it into a regular package and break the other four
 distributions' ability to contribute to the same `guardana.*` namespace. Each
 package owns its own subpackage instead (`guardana.core`, `guardana.rules`,
-`guardana.cli`, `guardana.report`, `guardana.server`), and *those*
-subpackages do have their own `__init__.py`.
+`guardana.cli`, `guardana.report`, `guardana.server`). Four of the five have
+their own `__init__.py`; `guardana.cli` does not and needs none — it is a
+leaf, nothing else contributes to it, so it can be an implicit namespace
+package itself with no loss. The rule above protects the namespace those
+five *share*, not whether any single one of them has an `__init__.py`.
 
 ## Code quality — write as a senior developer
 
@@ -196,6 +202,7 @@ uv run python scripts/critical_coverage.py .coverage.json  # per-area floors
 uv run guardana scan packages  # dogfood: must stay at zero findings
 uv run --isolated --no-cache \
   --with ./packages/guardana-core --with ./packages/guardana-rules \
+  --with ./packages/guardana-cli --with ./packages/guardana-report \
   --with ./examples/custom_rule --with pytest pytest examples/custom_rule/tests -q
 uv run --isolated --no-cache \
   --with ./packages/guardana-core --with ./packages/guardana-rules \
@@ -416,8 +423,9 @@ Any pip-installed package — ours or a third party's private one — is
 discovered identically; there is no built-in/custom distinction at the
 registry level, only namespacing by `id`.
 
-`guardana scan --no-plugins` disables entry-point discovery entirely
-(YAML-only safe mode) — see `SECURITY.md` for why this exists.
+`guardana scan --no-plugins` is a deprecated alias for `--plugins disabled`:
+discovery still runs, every plugin is refused, and each refusal is recorded —
+see `SECURITY.md` for the trust modes and why this exists.
 
 ## Procedures that are written down, not remembered
 

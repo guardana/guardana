@@ -41,6 +41,7 @@
 <li><a href="../usage-monitor.html">guardana monitor</a></li>
 <li><a href="../usage-target.html">guardana target inspect</a></li>
 <li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
 <li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="../exit-codes.html">Exit codes</a></li>
 <li><a href="../usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -105,7 +113,7 @@
 </ul>
 </nav>
 <main>
-<p class="crumb"><a href="../rules/index.html">Rule explorer</a></p><h1>Unsafe model/deserialization loader call</h1><p class="lede"><span class="rid">guardana.supply_chain.dependency_risk</span></p><ul class="props"><li><b>Severity</b><a class="sev HIGH" href="../rules/by/severity-HIGH.html">HIGH</a></li><li><b>Surface</b><a href="../rules/by/surface-build.html">build</a></li><li><b>Family</b><a href="../rules/by/family-supply_chain.html">supply_chain</a></li><li><b>Impact</b><a href="../rules/by/impact-passive.html">passive</a></li><li><b>Target</b>artifact</li><li><b>Requests</b>not declared</li><li><b>Evaluator</b>graded in code</li><li><b>Maturity</b>stable</li><li><b>Destructive</b>no</li><li><b>Needs</b>read_files</li></ul><h2>What a secure system does</h2><p>This rule grades in code rather than against a declared expectation, so it states no goal here. Its behaviour is its fixtures, which <code>guardana rule test</code> runs.</p><h2>Maps to</h2><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Control</th><th>Catalogue</th></tr></thead><tbody><tr><td><a class="rid" href="../rules/by/reference-LLM03-2025.html">LLM03:2025</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM04-2026.html">LLM04:2026</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-supply-chain.html">supply-chain</a></td><td>GenAI Supply Chain Attack</td><td><a href="../rules/by/framework-NIST-AI-100-2.html">NIST-AI-100-2</a></td></tr></tbody></table></div><p><a href="../writing-rules.html">How a rule is written</a> · <a href="../profiles.html">Selecting it in a profile</a></p>
+<p class="crumb"><a href="../rules/index.html">Rule explorer</a></p><h1>Unsafe model/deserialization loader call</h1><p class="lede"><span class="rid">guardana.supply_chain.dependency_risk</span></p><ul class="props"><li><b>Severity</b><a class="sev HIGH" href="../rules/by/severity-HIGH.html">HIGH</a></li><li><b>Surface</b><a href="../rules/by/surface-build.html">build</a></li><li><b>Family</b><a href="../rules/by/family-supply_chain.html">supply_chain</a></li><li><b>Impact</b><a href="../rules/by/impact-passive.html">passive</a></li><li><b>Target</b>artifact</li><li><b>Requests</b>at most 0</li><li><b>Evaluator</b>graded in code</li><li><b>Maturity</b>stable</li><li><b>Destructive</b>no</li><li><b>Needs</b>read_files</li></ul><h2>What a secure system does</h2><p>This rule grades in code rather than against a declared expectation, so it states no goal here. Its behaviour is its fixtures, which <code>guardana rule test</code> runs.</p><h2>Maps to</h2><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Control</th><th>Catalogue</th></tr></thead><tbody><tr><td><a class="rid" href="../rules/by/reference-LLM03-2025.html">LLM03:2025</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM04-2026.html">LLM04:2026</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-supply-chain.html">supply-chain</a></td><td>GenAI Supply Chain Attack</td><td><a href="../rules/by/framework-NIST-AI-100-2.html">NIST-AI-100-2</a></td></tr></tbody></table></div><p><a href="../writing-rules.html">How a rule is written</a> · <a href="../profiles.html">Selecting it in a profile</a></p>
 </main>
 </div>
 <footer class="foot"><div class="bar">

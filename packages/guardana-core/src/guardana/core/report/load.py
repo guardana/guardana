@@ -13,9 +13,8 @@ from typing import Any, cast
 
 from guardana.core.assessment import Assessment, AssessmentStatus, Direction
 from guardana.core.evaluator.base import Outcome, Verdict
-from guardana.core.manifest.load import (
-    ManifestLoadError,
-    manifest_from_dict,
+from guardana.core.manifest.load import ManifestLoadError, manifest_from_dict
+from guardana.core.manifest.migrations import (
     migrate_v1,
     migrate_v2,
     migrate_v3,

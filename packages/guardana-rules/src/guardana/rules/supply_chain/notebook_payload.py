@@ -6,7 +6,7 @@ from pathlib import Path
 
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
@@ -16,6 +16,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM03_2025,
     OWASP_LLM04_2026,
 )
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._code_sinks import code_sinks
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
@@ -66,7 +67,7 @@ def _split_shell_and_python(source: str) -> tuple[str, list[str]]:
     return "\n".join(python), shell
 
 
-class NotebookPayloadRule(Rule):
+class NotebookPayloadRule(ArtifactRule):
     """Flags dangerous code and shell payloads inside Jupyter notebook (`.ipynb`) cells.
 
     Notebooks are a primary ML distribution format, yet the `.py` scanners never

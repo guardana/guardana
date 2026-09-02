@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -14,6 +14,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM04_2026,
     OWASP_ML06_2023,
 )
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._advisories import Advisory, load_advisories
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
@@ -94,7 +95,7 @@ def _setup_network_calls(source: str) -> Iterator[int]:
                 yield node.lineno
 
 
-class MaliciousDependencyRule(Rule):
+class MaliciousDependencyRule(ArtifactRule):
     """Flag advisory-listed package releases, and install-time network fetches in setup.py.
 
     The advisory dataset is AI/ML-only by construction (see `_advisories`): a

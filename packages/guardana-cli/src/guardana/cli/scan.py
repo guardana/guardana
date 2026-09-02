@@ -144,9 +144,10 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
     _refuse_a_target_that_is_not_there(path)
     check_reporter_url(reporter)
     prof = resolve_profile(profile, preset)
-    # --no-plugins builds a bare Registry, so no entry-point code is imported or
-    # run (see SECURITY.md). Custom YAML rules still load, but one whose evaluator
-    # lives behind an entry point resolves to nothing at run time and is skipped —
+    # --no-plugins resolves to `--plugins disabled`: discovery below still runs,
+    # refuses every entry point, and records each refusal in `errors` (see
+    # SECURITY.md). Custom YAML rules still load, but one whose evaluator lives
+    # behind an entry point resolves to nothing at run time and is skipped —
     # safe degradation, never a crash.
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=no_plugins))
     load_custom_rules(registry, prof, rules)

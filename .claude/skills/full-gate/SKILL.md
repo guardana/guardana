@@ -34,6 +34,7 @@ uv run python scripts/generate_llms_txt.py --check
 
 uv run --isolated --no-cache \
   --with ./packages/guardana-core --with ./packages/guardana-rules \
+  --with ./packages/guardana-cli --with ./packages/guardana-report \
   --with ./examples/custom_rule --with pytest pytest examples/custom_rule/tests -q
 uv run --isolated --no-cache \
   --with ./packages/guardana-core --with ./packages/guardana-rules \

@@ -12,18 +12,47 @@ was the upper bound. `guardana plan` states it, and **sends no request to do so*
 
 ```bash
 guardana plan probe --url https://api.example.com --model gpt-4o-mini
-guardana plan scan .
 ```
 
 ```text
-14 rule(s) would run, 7 skipped.
+14 rule(s) would run, 9 skipped.
 requests: at least 14, at most 47
-budget: 200 request(s)
 
 No request was sent to produce this estimate.
 ```
 
+```bash
+guardana plan scan .
+```
+
+```text
+19 rule(s) would run, 0 skipped.
+requests: 0 — every selected rule declares it sends nothing
+
+No request was sent to produce this estimate.
+```
+
+A file scan of the built-in rules is free and complete: every one of them reads
+files, never a model, and declares that about itself — see
+[Where the numbers come from](#where-the-numbers-come-from). A third-party
+artifact rule that stays silent about its cost is not assumed to be free; it
+shows up in `unknown_cost` exactly like an undeclared endpoint rule would.
+
 `--format json` gives the same numbers to a pipeline, with a `schema_version`.
+
+## Flags
+
+`plan scan` and `plan probe` both discover plugins to build the same registry the
+run they are pricing would use, so both take the same plugin-trust flags
+`scan`/`probe` do:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
+
+`plan scan` also keeps `--no-plugins` as a deprecated alias for `--plugins disabled`,
+exactly like `guardana scan` does.
 
 ## Where the numbers come from
 
@@ -33,10 +62,22 @@ scenario how many steps, an agent rule its step budget. The plan sums the rules
 the profile selects and the target can satisfy — the same selection the runner
 would make.
 
-The declaration is **measured, not trusted**. A gate in `guardana-rules` runs
-every shipped rule against a model that never refuses, counts the requests it
-actually sends, and fails if any rule spends more than it declared. So the
-ceiling is a claim somebody checks, not a promise.
+`Rule.estimated_requests` defaults to unknown for every target kind, artifact
+included: `guardana-core` has never read a rule's code, so it cannot promise an
+artifact rule sends nothing — a third-party rule can do its own network I/O
+exactly like an endpoint rule can. The 19 built-in artifact rules declare the
+zero themselves, on their own base class in `guardana-rules` — not a public
+extension point, so a third-party artifact rule declares its own
+`estimated_requests` rather than inheriting theirs.
+
+The declaration is **measured, not trusted**, on both sides of that split. A
+gate in `guardana-rules` runs every shipped endpoint rule against a model that
+never refuses, counts the requests it actually sends, and fails if any rule
+spends more than it declared. A second gate runs every shipped artifact rule
+with outbound connections blocked at the socket layer, and fails — naming the
+rule — if one ever tries to open one: for a rule that only reads files, zero is
+the only honest number, so there is nothing to spend less or more of. Either
+way, the ceiling is a claim somebody checks, not a promise.
 
 ## Plan the run you are going to make
 

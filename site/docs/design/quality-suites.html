@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quality suites — Guardana documentation</title>
+<meta name="description" content="a versioned dataset, a suite that is a rule, an assessor that is an evaluator, and a gate that refuses a pass rate it has not earned — Horizon 1 on the channel 0.22.0 shipped">
+<link rel="canonical" href="https://guardana.dev/docs/design/quality-suites.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html" aria-current="page">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Quality suites: did the model get worse, on a sample we can name?<span class="status proposed">proposed</span></h1><p class="lede">a versioned dataset, a suite that is a rule, an assessor that is an evaluator, and a gate that refuses a pass rate it has not earned — Horizon 1 on the channel 0.22.0 shipped</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-09-02 · <strong>Cycle 2 of the extensibility program</strong> (<a href="audit-0.22.html"><code>audit-0.22.md</code></a>)</p>
+<h2 id="the-question">The question</h2>
+<p>A team swaps a model, retrains on new data, or tightens a system prompt, and
+wants to know whether the answers got worse — not whether an attack landed, but
+whether the support bot still answers the four hundred questions it answered
+last month. The assessment channel gave that question a record with a
+denominator. What it does not have is anything that produces four hundred of
+them from a file the team owns, or a gate that knows how many are enough.</p>
+<p>Dataset, suite, assessor — and the decision is that <strong>none of them is a new
+abstraction</strong>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Word</th>
+<th>What it is</th>
+<th>What it already is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Dataset</strong></td>
+<td>a versioned file of cases</td>
+<td>JSONL, the format traces and corpora already use</td>
+</tr>
+<tr>
+<td><strong>Suite</strong></td>
+<td>&quot;run this dataset through that assessor, and fail below this rate&quot;</td>
+<td>a declarative <code>Rule</code> — planned, priced, budgeted, recorded and compared like any other</td>
+</tr>
+<tr>
+<td><strong>Assessor</strong></td>
+<td>what grades a case, possibly with a number</td>
+<td>an <code>Evaluator</code>; <code>Assessment.assessor</code> has said &quot;an evaluator id&quot; since it existed</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="the-dataset">The dataset</h2>
+<p>One JSONL file. The first line names it; every other line is a case.</p>
+<pre><code class="language-jsonl">{&quot;guardana_dataset&quot;: 1, &quot;name&quot;: &quot;support-golden&quot;, &quot;version&quot;: &quot;2026.09&quot;}
+{&quot;input&quot;: &quot;How do I reset my password?&quot;, &quot;expect&quot;: {&quot;contains_any&quot;: [&quot;Settings&quot;, &quot;reset link&quot;]}, &quot;tags&quot;: [&quot;account&quot;]}
+{&quot;input&quot;: {&quot;messages&quot;: [{&quot;role&quot;: &quot;system&quot;, &quot;content&quot;: &quot;…&quot;}, {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;…&quot;}]}, &quot;expect&quot;: {&quot;reference&quot;: &quot;…&quot;}}
+</code></pre>
+<ul>
+<li><code>input</code> is a prompt string or a message list. <code>expect</code> holds evaluator fields
+for this case, validated at load against the suite's evaluator like any
+<code>expect:</code> block; the suite's own <code>expect:</code> supplies defaults and a case may
+override them. <code>tags</code> are slices a comparison may group by.</li>
+<li><strong>Identity is <code>name@version</code></strong>, declared by the author, and that is what lands
+in <code>Assessment.dataset</code>. <strong>A case's identity is a hash of its content</strong>, so
+reordering changes nothing and rewording a case makes a new case — the reading
+the assessment channel already chose. A dataset whose content changed without a
+version bump is caught one level up: the file's digest is part of the suite's
+<code>digest()</code>, so <code>diff</code> notes that the rule's definition changed, while every case
+whose content did not change still pairs.</li>
+<li>The path is relative to the rule file, so a dataset ships inside a pack the
+same way a catalogue does. A URL is refused: the only network traffic is to the
+target.</li>
+<li>Loading is bounded — a line over the trace reader's limits is refused, not
+truncated — and a malformed line names its number.</li>
+</ul>
+<p><strong>Rejected: <code>Assessment.dataset</code> as the file digest.</strong> It is what <code>YamlRule</code> does
+with its own declaration, and it is right there, because a prompt list <em>is</em> the
+rule. For a dataset it would make one edited case incomparable with every other
+case in the file: two changes, both wrong, for one edit.</p>
+<p><strong>Rejected: cases inline in YAML.</strong> Four hundred cases in a rule file is a rule
+file nobody reviews, and JSONL diffs line by line in a pull request.</p>
+<h2 id="the-suite">The suite</h2>
+<pre><code class="language-yaml">id: acme.quality.support_answers
+title: The support bot still answers the golden set
+severity: high
+target_kind: endpoint
+taxonomy: [LLM05:2026]
+evaluator: contains
+requires: [chat]
+dataset: ./support-golden.jsonl
+expect:
+  contains_any: []          # suite-level default, overridden per case
+sample:
+  size: 100                 # optional: a deterministic subset, for a cheaper CI run
+  seed: 7                   # required when size is given — the subset is a choice, not an accident
+gate:
+  min_pass_rate: 0.90
+  min_sample: 30            # below this the suite declines, never passes or fails
+fixtures:
+  - name: it passes when every answer is the reference
+    reply: &quot;Open Settings and follow the reset link.&quot;
+    outcome: clean
+  - name: it fails when nothing matches
+    reply: &quot;42&quot;
+    outcome: finding
+  - name: it declines when the model says nothing
+    reply: &quot;&quot;
+    outcome: inconclusive
+</code></pre>
+<p>A suite is <code>SuiteRule</code>, the fourth declarative shape, detected by <code>dataset:</code>.
+It runs under <code>probe</code> and <code>monitor</code> like any endpoint rule — there is no fifth
+verb, for the reason the audit gives. <code>estimated_requests</code> is the number of cases
+after sampling, so <code>plan probe</code> prices it and a budget bounds it.</p>
+<p><strong>A taxonomy mapping is required</strong>, as for every rule, and the author chooses it.
+Degradation after a data or model change is what <code>LLM05:2026</code> describes;
+a team's own control catalogue registered through <code>guardana.taxonomies</code> is the
+other honest answer. A suite that cannot say which control it serves is a number
+without an owner.</p>
+<h3 id="what-a-case-becomes">What a case becomes</h3>
+<p>One <code>Assessment</code> per case, pass included: <code>case_id</code> from the content,
+<code>assessor</code> the evaluator id, <code>dataset</code> the declared identity, <code>rule_id</code> the
+suite, <code>tags</code> from the case plus <code>sample:&lt;seed&gt;</code> when a subset ran, and — when the
+evaluator returned one — the measurement. Inconclusive is a status, never a zero.</p>
+<h3 id="what-the-gate-does-with-it">What the gate does with it</h3>
+<p>A suite yields <strong>at most one finding</strong>, and it is about the rate, not a case:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Measured cases</th>
+<th>Pass rate</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fewer than <code>min_sample</code></td>
+<td>any</td>
+<td>one <code>inconclusive</code> finding on the <code>unverified</code> channel: &quot;n of N cases measured; the suite needs at least min_sample to say anything&quot;</td>
+</tr>
+<tr>
+<td>at least <code>min_sample</code></td>
+<td>below <code>min_pass_rate</code></td>
+<td>one finding at the suite's severity, with the rate, the sample, a 95% Wilson interval and up to three failing cases in the evidence, redacted like all evidence</td>
+</tr>
+<tr>
+<td>at least <code>min_sample</code></td>
+<td>at or above</td>
+<td>nothing — the passes are in the channel, which is the point</td>
+</tr>
+<tr>
+<td>zero</td>
+<td>—</td>
+<td>the gate's existing refusal: assessments recorded, none measured, <code>indeterminate</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The finding fires on the observed rate against the operator's threshold; the
+interval is reported so a reader can see how much of the shortfall is sampling.
+Requiring the interval's upper bound to clear the threshold would make a
+thirty-case suite unable to fail at all below a catastrophic drop, which is a
+gate people would learn to trust for the wrong reason. Movement <em>between</em> runs is
+a different question with different statistics —
+<a href="paired-regression-statistics.html"><code>paired-regression-statistics.md</code></a>.</p>
+<p><strong>Rejected: a finding per failed case.</strong> Four hundred cases at a 90% bar is forty
+findings for a passing suite. A case failure is a measurement; the finding is the
+rate.</p>
+<p><strong>Rejected: a numeric aggregate gate (<code>max_mean_value</code>).</strong> A per-case threshold is
+already the assessor's decision and is recorded on the assessment; a gate over an
+aggregate of values needs the effect statistics of cycle 3 to be honest about
+noise. Values are recorded and rendered now, and gated later.</p>
+<h2 id="the-assessors">The assessors</h2>
+<p>Every assessor is an <code>Evaluator</code>. Two changes to the base contract, both additive:</p>
+<p><strong><code>Verdict.measurement</code></strong>, optional — <code>Measurement(value, unit, direction, threshold)</code>. <code>from_verdict</code> carries it onto the assessment, and a comparison
+treats a changed <code>threshold</code>, <code>unit</code> or <code>direction</code> as incomparable, the way it
+treats a changed assessor. A third-party evaluator that never sets it is
+unchanged.</p>
+<p><strong>New deterministic evaluators</strong>, each one file, each with a confidence of <code>1.0</code>
+because equality is not an opinion: <code>exact_match</code> (<code>reference</code>, optional
+<code>normalize</code>), <code>contains</code> (<code>contains_all</code>, <code>contains_any</code>, <code>contains_none</code>),
+<code>regex</code> (<code>pattern</code>, optional <code>must_match</code>), <code>json_valid</code> (optional
+<code>required_keys</code>). Each returns <code>inconclusive</code> on a missing reply, and <code>contains</code>
+returns <code>inconclusive</code> — never <code>pass</code> — when every list it was given is empty,
+because a check with nothing to look for has not looked.</p>
+<p><strong>Extended built-ins</strong>, each backward compatible: <code>keyword</code> gains
+<code>should_refuse</code> (default <code>true</code>; <code>false</code> turns it into the utility check — &quot;the
+model must <em>not</em> refuse this benign task&quot;), <code>length</code> gains <code>max_chars</code> and emits
+a measurement in characters with <code>lower_is_better</code>, <code>amplification</code> emits its
+ratio as a measurement. The first two numbers to ever land in <code>Assessment.value</code>
+come from evaluators that already ship, which proves the numeric channel
+end-to-end without a new judge.</p>
+<p><strong><code>reference_judge</code></strong>, config-wired like <code>llm_judge</code> and sharing its judge
+connection: a versioned rubric that grades a reply against a reference answer,
+confidence measured as agreement across samples, id stamped with the rubric
+version. A separate evaluator rather than a <code>reference</code> field on <code>llm_judge</code>,
+because a rubric change changes the id and would orphan every calibration
+recorded against the security judge.</p>
+<p><strong>Rejected: an embedding-similarity assessor.</strong> It needs a model or a library, and
+<code>guardana-core</code> depends on <code>pyyaml</code>. A pack can ship one through
+<code>guardana.evaluators</code> today.</p>
+<h2 id="utility-regression-which-is-the-same-thing">Utility regression, which is the same thing</h2>
+<p>&quot;Safer&quot; that means &quot;refuses more&quot; is a suite over benign tasks graded with
+<code>keyword</code> and <code>should_refuse: false</code>, with the same gate and the same statistics.
+No new machinery, which is the test of whether the machinery is right.</p>
+<h2 id="rendering">Rendering</h2>
+<p>The human renderer prints a &quot;Measured&quot; block per suite — cases, measured,
+passed, rate, interval, and the ungraded count beside it so a shrinking
+denominator is as visible as a falling rate. <code>junit</code> maps a suite to a testsuite
+and each case to a testcase, because a suite is the thing CI dashboards already
+know how to show. <code>json</code> carries what it already carries.</p>
+<h2 id="extension-api">Extension API</h2>
+<p>Additive throughout: an evaluator that ignores <code>Measurement</code> is unchanged, and
+<code>SuiteRule</code> is one more shape <code>load_yaml_rules</code> returns. The build advertises API
+<code>2</code> from cycle 1 and nothing here needs a further number.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="assessment-channel.html"><code>assessment-channel.md</code></a> — the record every case becomes</li>
+<li><a href="paired-regression-statistics.html"><code>paired-regression-statistics.md</code></a> — what two runs of a suite prove</li>
+<li><a href="extension-author-tooling.html"><code>extension-author-tooling.md</code></a> — fixtures and calibration a suite author inherits</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/quality-suites.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

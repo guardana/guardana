@@ -725,8 +725,10 @@ deliberately not wired up yet: the agentic rules skip and say so, which
   packaging, or bundle in a package.
 - **Four entry-point groups** — `guardana.rules`, `guardana.evaluators`,
   `guardana.targets`, `guardana.taxonomies` — discovered identically for
-  built-ins and third-party packages; namespace by id, override built-ins, or go
-  YAML-only with `--no-plugins`.
+  built-ins and third-party packages; namespace by id — two installed
+  distributions cannot claim one id, and `guardana.*` is refused to anything
+  but Guardana's own — and choose what loads with `--plugins
+  builtins|allowlist|disabled`.
 - **Map rules to your own framework.** Mapping is mandatory for a rule, so the
   framework list is open: register `TaxonomyRef`s through `guardana.taxonomies`
   and a YAML rule can name them (`taxonomy: [ACME-14]`) beside `LLM01`. Because

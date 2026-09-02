@@ -24,11 +24,17 @@ guardana scan <path> [OPTIONS]
 | `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file — see [`profiles.md`](profiles.md) |
 | `--preset [ci\|pre-training\|monitor]` | none | Named policy preset (mutually exclusive with `--profile`) — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--format [human\|json\|sarif\|junit]` | `human` | Output format |
-| `--no-plugins` | off | Disable entry-point rule/evaluator discovery (YAML-only safe mode) — see [`SECURITY.md`](../SECURITY.md) |
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins (entry-point rules/evaluators/targets) to load — the primary plugin-trust control. `builtins` keeps Guardana's own reviewed rules while refusing third-party ones; `disabled` is YAML-only safe mode. See [`SECURITY.md`](../SECURITY.md). |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable. Only valid together with `--plugins allowlist`. |
+| `--no-plugins` | off | **Deprecated** alias for `--plugins disabled`, kept for pipelines that already set it. Prefer `--plugins`. |
 | `--rules PATH` | none | Directory or file of custom YAML rules; repeatable. Combined with the profile's `rules.paths` — see [`writing-rules.md`](writing-rules.md). A malformed rule file is a warning, never an abort. |
 | `--baseline PATH` | none | Baseline file: findings it lists are **waived** — still reported (as `WAIVED`), but they no longer fail the gate. A *new* finding elsewhere still does. See [Baselining](#baselining-existing-findings). |
 | `--write-baseline PATH` | none | Write a baseline waiving every current finding to `PATH`, then exit 0. Add a reason to each entry before committing it. |
 | `--reporter TEXT` | none | Forward findings to a collector, e.g. `server://https://collector.example.com/findings` |
+| `--ai-system TEXT` | none | Which AI system this run verifies, e.g. `support-agent`. Never guessed. |
+| `--environment TEXT` | none | Where it runs, e.g. `production`. Never guessed from a branch name. |
+| `--deployment-id TEXT` | none | Which version of it, if you have an identifier. |
+| `--output PATH` | stdout | Write the report to a file instead of stdout — needed by `guardana diff`. See [Saving a run for comparison](#saving-a-run-for-comparison). |
 
 ## What runs
 

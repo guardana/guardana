@@ -81,6 +81,17 @@ categories as well as re-ranking them, so most pairs are not equivalences.
 `--format json` prints the same thing for a script, with `scheme`, `edition` and
 `framework` as separate fields.
 
+## Flags
+
+`taxonomy` discovers plugins the same way `scan`/`probe` do — a company's own
+catalogue arrives through the `guardana.taxonomies` entry point — so it takes the
+same plugin-trust flags:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
+
 ## What this never does
 
 **It never rewrites stored evidence.** A saved run, a baseline and a collector row

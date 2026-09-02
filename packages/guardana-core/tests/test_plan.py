@@ -36,7 +36,14 @@ class _Priced(Rule):
 
 
 class _Unpriced(Rule):
-    """A third-party rule that never declared a cost — the case that must not vanish."""
+    """A third-party rule that never declared a cost — the case that must not vanish.
+
+    Declares no override at all: `Rule.estimated_requests` defaults to `None` for
+    every target kind, artifact included, so this fixture is unknown by
+    inheritance, not because it forces the value. Keying the default off the
+    kind instead would make every artifact rule this engine has never read
+    "priced" whether it sends anything or not — see that property's docstring.
+    """
 
     meta = RuleMeta(
         "acme.test.unpriced",

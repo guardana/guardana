@@ -457,3 +457,15 @@ def test_the_no_cache_job_says_so_instead_of_relying_on_a_default() -> None:
         "example-plugin must declare `enable-cache: false`; `auto` enables it and "
         "its post step fails on a cache directory nothing wrote to"
     )
+
+
+def test_codeql_runs_on_every_push_and_on_a_schedule() -> None:
+    """ruff's bandit rules do not do taint tracking; a security product carries both."""
+    workflow = (_repo_root() / ".github" / "workflows" / "codeql.yml").read_text(encoding="utf-8")
+
+    assert "github/codeql-action/init@" in workflow
+    assert "github/codeql-action/analyze@" in workflow
+    assert "schedule:" in workflow
+    assert "cron:" in workflow
+    assert "security-events: write" in workflow
+    assert "languages: python" in workflow

@@ -35,6 +35,16 @@ placeholder text for the reason and the approver, and `verify` fails while it is
 still there. A baseline nobody edited is a list of findings somebody silenced in a
 hurry, and it should look like one.
 
+## Flags
+
+`create` and `update` both run a scan, so both take the same plugin-trust flags
+`scan`/`probe` do. `verify` reads a file and runs nothing, so it takes neither.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
+
 ## Expiry actually expires
 
 An expired waiver simply stops waiving: the finding comes back and fails the gate

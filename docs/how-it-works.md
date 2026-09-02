@@ -252,7 +252,9 @@ mypack = "mypack:provide_evaluators"
 `provide_rules()` returns your `Rule` instances (or a list). `Registry.discover()`
 picks them up alongside the built-ins. Namespace your ids under your own prefix
 (`acme.*`); `guardana.*` is reserved for built-ins so profiles can include/exclude
-by glob.
+by glob. The same mechanism registers `guardana.targets` and `guardana.taxonomies`
+too — four groups in total, all discovered the same way; see
+[`architecture.md`](architecture.md#current-entry-point-groups) for the full table.
 
 ### The two authoring paths
 - **YAML** for "send this, grade with that" — single-turn `prompts:` or multi-turn
@@ -289,11 +291,12 @@ lines and no network — and artifact builders (`build_gguf`, `build_safetensors
 a binary committed to your repo.
 
 ### A complete, runnable example
-`examples/custom_rule/` is a real third-party package — two plugin rules, two YAML
-rules, and a custom classifier — discovered through entry points with zero changes
-to Guardana. One of the plugin rules inspects a GGUF model file and consists
-entirely of policy, because the parsing comes from the engine. That is the whole
-extensibility story in one folder.
+`examples/custom_rule/` is a real third-party package — two plugin rules, three
+YAML rules, a custom classifier, a custom target, and a custom taxonomy,
+registering all four entry-point groups — discovered through entry points with
+zero changes to Guardana. One of the plugin rules inspects a GGUF model file and
+consists entirely of policy, because the parsing comes from the engine. That is
+the whole extensibility story in one folder.
 
 ---
 

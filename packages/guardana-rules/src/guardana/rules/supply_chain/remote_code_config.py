@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -14,6 +14,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM03_2025,
     OWASP_LLM04_2026,
 )
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
 
@@ -66,7 +67,7 @@ def _local_module_present(reference: str, directory: Path) -> bool:
     return (directory / f"{filename}.py").is_file()
 
 
-class RemoteCodeConfigRule(Rule):
+class RemoteCodeConfigRule(ArtifactRule):
     """Flags a model config that asks for code to be run when the model loads.
 
     Two shapes, one artifact: `auto_map`/`custom_pipelines` point at Python that

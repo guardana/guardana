@@ -41,6 +41,7 @@
 <li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -142,9 +150,19 @@ commit.</p>
 <td>Output format</td>
 </tr>
 <tr>
+<td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
+<td><code>all</code></td>
+<td>Which installed plugins (entry-point rules/evaluators/targets) to load — the primary plugin-trust control. <code>builtins</code> keeps Guardana's own reviewed rules while refusing third-party ones; <code>disabled</code> is YAML-only safe mode. See <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a>.</td>
+</tr>
+<tr>
+<td><code>--allow-plugin TEXT</code></td>
+<td>none</td>
+<td>Distribution to trust; repeatable. Only valid together with <code>--plugins allowlist</code>.</td>
+</tr>
+<tr>
 <td><code>--no-plugins</code></td>
 <td>off</td>
-<td>Disable entry-point rule/evaluator discovery (YAML-only safe mode) — see <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a></td>
+<td><strong>Deprecated</strong> alias for <code>--plugins disabled</code>, kept for pipelines that already set it. Prefer <code>--plugins</code>.</td>
 </tr>
 <tr>
 <td><code>--rules PATH</code></td>
@@ -165,6 +183,26 @@ commit.</p>
 <td><code>--reporter TEXT</code></td>
 <td>none</td>
 <td>Forward findings to a collector, e.g. <code>server://https://collector.example.com/findings</code></td>
+</tr>
+<tr>
+<td><code>--ai-system TEXT</code></td>
+<td>none</td>
+<td>Which AI system this run verifies, e.g. <code>support-agent</code>. Never guessed.</td>
+</tr>
+<tr>
+<td><code>--environment TEXT</code></td>
+<td>none</td>
+<td>Where it runs, e.g. <code>production</code>. Never guessed from a branch name.</td>
+</tr>
+<tr>
+<td><code>--deployment-id TEXT</code></td>
+<td>none</td>
+<td>Which version of it, if you have an identifier.</td>
+</tr>
+<tr>
+<td><code>--output PATH</code></td>
+<td>stdout</td>
+<td>Write the report to a file instead of stdout — needed by <code>guardana diff</code>. See <a href="#saving-a-run-for-comparison">Saving a run for comparison</a>.</td>
 </tr>
 </tbody>
 </table></div>

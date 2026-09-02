@@ -18,8 +18,8 @@ guardana-core     Target / Rule / Evaluator / Finding / Profile,
                    No network I/O beyond what a Target itself performs.
 guardana-rules     Built-in rules (YAML + Python plugin), each mapped to
                    OWASP / MITRE ATLAS / NIST.
-guardana-cli       The `guardana` command: scan, probe, monitor, init, rules,
-                   new-rule.
+guardana-cli       The `guardana` command — scan, probe, monitor, diff,
+                   and sixteen more; `guardana --help` lists all twenty.
 guardana-report    Renderers: human, SARIF, JSON, JUnit.
 guardana-server    OPTIONAL collector. Ingests normalized Findings from many
                    agents; list/trend view. A separate, separately-deployed
@@ -219,35 +219,50 @@ evaluators, built-in or third-party, so nothing else in the engine
 hard-codes a list of them:
 
 ```python
+_TAXONOMY_GROUP = "guardana.taxonomies"
 _RULE_GROUP = "guardana.rules"
 _EVALUATOR_GROUP = "guardana.evaluators"
 _TARGET_GROUP = "guardana.targets"
 
 class Registry:
     @classmethod
-    def discover(cls) -> Self:
+    def discover(cls, trust: PluginTrust | None = None) -> Self:
+        policy = trust if trust is not None else PluginTrust()
         reg = cls()
-        for ep in entry_points(group=_RULE_GROUP):
-            _absorb(ep.load()(), reg.register_rule)
-        for ep in entry_points(group=_EVALUATOR_GROUP):
-            _absorb(ep.load()(), reg.register_evaluator)
-        for ep in entry_points(group=_TARGET_GROUP):
-            _absorb(ep.load()(), reg.register_target)
+        for group, register in (
+            # Taxonomies first: a YAML rule's `taxonomy:` resolves while its
+            # own entry point is still loading.
+            (_TAXONOMY_GROUP, register_taxonomy),
+            (_RULE_GROUP, reg.register_rule),
+            (_EVALUATOR_GROUP, reg.register_evaluator),
+            (_TARGET_GROUP, reg.register_target),
+        ):
+            for ep in entry_points(group=group):
+                if not policy.allows(ep):
+                    reg.record_load_error(...)   # refused, never imported
+                    continue
+                _absorb(ep.load()(), register)
         return reg
 ```
 
-`Registry.discover()` walks every installed package's `guardana.rules` and
-`guardana.evaluators` [entry points](https://packaging.python.org/en/latest/specifications/entry-points/)
-and calls each one (a zero-arg callable returning either a single `Rule`/
-`Evaluator` or an iterable of them — `_absorb` handles both shapes). A
+`Registry.discover(trust)` walks every installed package's four entry-point
+groups — `guardana.taxonomies`, `guardana.rules`, `guardana.evaluators`, and
+`guardana.targets` [entry points](https://packaging.python.org/en/latest/specifications/entry-points/)
+— and calls each one `trust` allows (a zero-arg callable returning either a
+single item or an iterable of them — `_absorb` handles both shapes). A
 third-party package registered this way is discovered exactly like
 `guardana-rules`' own built-ins — there is no built-in/custom distinction at
 the registry level, only namespacing by `id` (`guardana.*` reserved for
 built-ins; use your own prefix, e.g. `acme.*`).
 
-`Registry()` (the bare constructor, no entry-point scan) backs
-`guardana scan --no-plugins`: an empty registry that imports zero
-third-party code, for untrusted environments. See
+That same call runs in every CLI mode, `--plugins disabled` (`--no-plugins`'s
+deprecated spelling) included: it still walks every installed entry point,
+but `PluginTrust.allows()` refuses each one *before*
+its code is imported and records the refusal in `load_errors` — the registry
+ends up empty, but zero third-party code ever runs. `Registry()`, the bare
+constructor with no entry-point walk at all, is for embedding code that wants
+to skip discovery entirely — `guardana.core.testing.assert_secure` accepts one
+this way when a caller wants no plugins and no CLI involved. See
 [`SECURITY.md`](../SECURITY.md) for the trust model this exists for.
 
 **Declarative YAML rules are not entry points** — they're parsed straight
@@ -266,6 +281,7 @@ via `guardana.yaml`'s `rules.paths`) on `scan`, `probe`, and `monitor`.
 
 | Group | Provides | Wired into `Registry`? |
 |---|---|---|
+| `guardana.taxonomies` | one `TaxonomyRef`, or an iterable | **Yes** — `Registry.discover()`, loaded **first**, so a rule pack's own `taxonomy:` references resolve while its own entry point is still loading. |
 | `guardana.rules` | one `Rule`, or an iterable of `Rule`s | **Yes** — `Registry.discover()` |
 | `guardana.evaluators` | one `Evaluator`, or an iterable | **Yes** — `Registry.discover()` |
 | `guardana.targets` | one `Target` subclass, or an iterable | **Yes** — `Registry.discover()`. `Registry.targets()` exposes the discovered classes (types, not instances — targets are parameterized by a path/URL at construction time). The CLI itself still selects its built-in `ArtifactTarget`/`EndpointTarget` by path/URL; discovered custom targets are available to library/embedding use, not yet CLI-selectable — see [`extending.md`](extending.md#adding-a-target). |

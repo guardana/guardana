@@ -147,6 +147,18 @@ class Rule(ABC):
         It is an upper bound, not a prediction: spending less is fine, spending
         more is a defect. A gate in `guardana-rules` measures every shipped rule
         against its own declaration, so this cannot quietly drift.
+
+        **Every kind stays `None` here, artifact included — the engine makes no
+        claim about a rule it has never read.** An `ArtifactTarget` has no
+        transport of its own, but that says nothing about a rule written against
+        it: a third-party artifact rule can open a socket exactly like an
+        endpoint rule can. This property briefly returned `0` for every artifact
+        rule regardless of who wrote it, which made that claim on a stranger's
+        behalf and let `guardana plan` price a rule's real network calls as free.
+        The honest zero belongs to whoever actually wrote the rule: `guardana-
+        rules` declares it once, in `guardana.rules._base.ArtifactRule`, for
+        the built-ins it ships and measures — nothing upstream of that
+        declares it for anyone else.
         """
         return None
 

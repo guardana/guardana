@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Target locators — Guardana documentation</title>
+<meta name="description" content="how a discovered third-party target becomes something a command can build — a scheme the target declares, a locator the operator types, and the verb still choosing the kind">
+<link rel="canonical" href="https://guardana.dev/docs/design/target-locators.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html" aria-current="page">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Target locators: a custom target the CLI can build<span class="status proposed">proposed</span></h1><p class="lede">how a discovered third-party target becomes something a command can build — a scheme the target declares, a locator the operator types, and the verb still choosing the kind</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-09-02 · <strong>Cycle 1 of the extensibility program</strong> (<a href="audit-0.22.html"><code>audit-0.22.md</code></a>)</p>
+<h2 id="the-gap">The gap</h2>
+<p><code>guardana.targets</code> has been an entry-point group since 0.1, <code>Registry.discover()</code>
+loads it, <code>pack validate</code> checks it, <code>pack lock</code> pins it — and no command has ever
+consumed it. Every target a command runs is a literal: <code>ArtifactTarget(path)</code> in
+three places, <code>build_endpoint(...)</code> behind <code>probe</code>, <code>monitor</code>, <code>plan probe</code> and
+<code>target inspect</code>, <code>TraceTarget(read.trace)</code> behind <code>analyze-trace</code>. A team whose
+model sits behind an internal gateway with its own wire protocol, whose artifacts
+live in an object store, or whose traces come out of a system with its own export
+can write a <code>Target</code>, prove it with <code>assert_target_conforms</code>, and then only reach
+it from Python that drives a <code>Runner</code>.</p>
+<p>0.22.0 deferred this with a precise reason: it &quot;needs a decision about how a
+target names its configuration on a command line&quot;. This is that decision.</p>
+<h2 id="the-decision">The decision</h2>
+<p><strong>A target declares a scheme; the operator types a locator; the verb still chooses
+the kind.</strong></p>
+<pre><code class="language-console">$ guardana scan   --target acme-prompts://./prompts
+$ guardana probe  --target acme-gateway://llm.internal:8443/v1 --target-option model=support-v3
+$ guardana analyze-trace --target acme-langfuse://exports/2026-09-01.jsonl
+</code></pre>
+<p>The scheme, the locator and the verb each do one job:</p>
+<ol>
+<li><strong>The scheme is declared on the class.</strong> <code>Target.scheme</code> is a class attribute,
+<code>None</code> by default, and <code>Target.from_locator(locator)</code> is a classmethod that
+raises <code>LocatorError</code> by default. A target that sets neither is exactly what it
+is today: discoverable, usable from Python, not selectable. Nothing an existing
+pack implements changes meaning.</li>
+<li><strong>The locator is <code>scheme://rest</code>, plus options.</strong> Everything after <code>://</code> is
+handed to the target untouched — a path, a host and port, an object-store key.
+Options are <code>--target-option key=value</code>, repeatable, and reach the target as a
+mapping. Secrets are named by environment variable, the way <code>--api-key-env</code>
+already works, and never as option values that land in a shell history.</li>
+<li><strong>The verb decides the kind, and refuses a mismatch.</strong> <code>scan</code> builds artifact
+targets, <code>probe</code> and <code>monitor</code> endpoint targets, <code>analyze-trace</code> trace targets.
+A locator whose target reports another kind is refused with exit <code>3</code> before a
+rule runs. The verb is the layer selector, as it has always been; a locator does
+not get to change what <code>scan</code> means.</li>
+</ol>
+<h3 id="the-registry-side">The registry side</h3>
+<ul>
+<li><code>register_target</code> validates a declared scheme (<code>^[a-z][a-z0-9-]*$</code>), refuses a
+reserved one (<code>file</code>, <code>http</code>, <code>https</code>, <code>mcp</code>, <code>trace</code>) and refuses a scheme
+another origin already holds, with the same message shape as a rule-id conflict.
+A scheme is a claim about what <code>--target</code> will run, so it gets the same
+one-owner rule an id gets.</li>
+<li><code>Registry.target_for(scheme)</code> returns the class or <code>None</code>; <code>Registry.schemes()</code>
+lists what <code>--target</code> can build. <code>guardana doctor</code> prints them, so &quot;why does my
+scheme say unknown&quot; is answered by the command that answers everything else
+about an installation.</li>
+<li>Under <code>--plugins builtins</code> or <code>disabled</code>, third-party schemes are not loaded and a
+locator naming one exits <code>3</code> with the trust mode in the message. The refusal
+names the policy rather than pretending the scheme does not exist.</li>
+</ul>
+<h3 id="the-cli-side">The CLI side</h3>
+<p>One helper, used by every command that builds a target from a path or URL —
+<code>scan</code>, <code>baseline create</code>, <code>baseline update</code>, <code>plan scan</code>, <code>probe</code>, <code>plan probe</code>,
+<code>monitor</code>, <code>target inspect</code>, <code>analyze-trace</code>:</p>
+<pre><code class="language-python">def resolve_target(registry, *, locator, options, kind, fallback) -&gt; Target
+</code></pre>
+<p><code>fallback</code> is the literal construction the command does today, so the default path
+is untouched and the new path is one branch. Exit codes follow the existing table:
+<code>3</code> for an unknown scheme, an invalid locator, an option the target rejects, or a
+kind mismatch (invalid configuration); <code>4</code> when the target's own constructor
+reports it cannot reach what it names (target unavailable).</p>
+<h3 id="what-a-custom-endpoint-target-gets-from-probe">What a custom endpoint target gets from <code>probe</code></h3>
+<p><code>probe</code> runs one pass per planted canary, each on a target built with a fresh
+system prompt. That construction is endpoint-shaped today. It becomes a protocol:</p>
+<pre><code class="language-python">@runtime_checkable
+class SystemPromptPlanter(Protocol):
+    def planting(self, system_prompt: str) -&gt; Target: ...
+</code></pre>
+<p><code>EndpointTarget</code> implements it. A custom target that implements it gets the canary
+passes, exactly as the built-in does; one that does not gets the plain pass, and
+the rules needing <code>plant_system_prompt</code> are skipped by the runner for the reason
+it already records — the target did not declare it. That is the honest outcome:
+fewer rules ran, the report says which and why, and nothing was graded against a
+marker that was never planted.</p>
+<p>The protocol is deliberately <strong>not</strong> added to <code>CAPABILITY_SURFACE</code>. Doing so would
+turn a target that declares <code>plant_system_prompt</code> today — constructed with its
+prompt already in place, as the built-in is — into one the runner refuses, which
+is a contract change for every existing pack to serve a convenience for new ones.
+<code>plant_system_prompt</code> stays what <code>protocols.py</code> says it is, a fact about
+construction; <code>planting</code> is how <code>probe</code> asks for a differently constructed copy.</p>
+<h3 id="budgets-usage-observations-protocols">Budgets, usage, observations, protocols</h3>
+<p>Unchanged, and already fail-closed. A custom target that does not implement
+<code>apply_budgets</code> refuses any ceiling set against it; one that does not meter itself
+reports <code>usage: None</code>, which the manifest records as unknown rather than free;
+<code>observe()</code> produces no inventory for a target that implements neither
+<code>FileReader</code> nor <code>ChatEndpoint</code>, which the manifest shows as an absence.</p>
+<h2 id="the-example-follows-and-is-held-to-it">The example follows, and is held to it</h2>
+<p><code>examples/custom_rule</code>'s target gains <code>scheme = &quot;acme-prompts&quot;</code>, implements
+<code>FileReader</code> properly (which the audit found it did not), and its isolated test
+suite runs <code>guardana scan --target acme-prompts://…</code> as a subprocess, calls
+<code>assert_target_conforms</code>, and runs the <code>Runner</code> over it with the built-in registry.
+<code>guardana new-pack</code> scaffolds the same shape. A seam nothing exercises is a seam
+nobody has run, and this one has been that for twenty-two releases.</p>
+<h2 id="extension-api">Extension API</h2>
+<p>Nothing an existing pack implements changes, so a pack declaring <code>&gt;=1,&lt;2</code> still
+loads. A pack <em>using</em> <code>scheme</code> and <code>from_locator</code> on a build without them would
+still load and its target would still be unselectable — a silent absence, which is
+exactly what <code>extension_api</code> exists to turn into a refusal. So the build advertises
+that it implements API <code>2</code> alongside <code>1</code>, and a pack written against the locator
+contract declares <code>&gt;=2,&lt;3</code>. The range check becomes &quot;does the pack's range contain
+any version this build implements&quot;, which is the additive rule every later cycle
+follows: a new seam is a new number, and an older pack keeps loading.</p>
+<h2 id="rejected">Rejected</h2>
+<p><strong>A separate <code>TargetFactory</code> registered in its own group.</strong> Two objects for one
+thing: the class knows how to build itself or it does not, and a factory that
+outlives the class it builds is a second place for the two to disagree.</p>
+<p><strong>Options in the locator's query string.</strong> <code>acme-gateway://host/v1?model=x</code> reads
+well until the rest of the locator is a URL with its own query string, at which
+point the parser has to guess whose <code>?</code> it is. A repeatable flag has no such edge.</p>
+<p><strong>Auto-detecting a scheme from the positional argument.</strong> <code>guardana scan s3://…</code>
+silently routed to whichever installed pack claims <code>s3</code> is a plugin deciding what
+a command does. <code>--target</code> says the operator chose it.</p>
+<p><strong>Schemes for the built-in targets.</strong> <code>file://</code> and <code>mcp://</code> would add a second
+spelling for every documented command and change nothing a user can do. They stay
+reserved so nobody else can claim them, and unused until there is a reason.</p>
+<p><strong>A <code>targets:</code> block in <code>guardana.yaml</code>.</strong> Probably right eventually — a team
+shares options the way it shares a policy — but the profile is a closed schema on
+purpose, and a block designed before a design partner has typed a real locator
+is a shape nobody asked for. The flag form is enough to learn what the block
+should hold.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="capability-protocols.html"><code>capability-protocols.md</code></a> — the contract a target satisfies</li>
+<li><a href="output-plugins.html"><code>output-plugins.md</code></a> — the same move for what comes out of a run</li>
+<li><a href="../usage-target.html"><code>../usage-target.md</code></a> — the user page</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/target-locators.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -96,8 +96,16 @@ A tool that scans other people's supply chains must be exemplary about its own:
 - **Secret scanning** ✅ and **Push protection** ✅ — refuses a push that
   contains a detected credential. (Guardana has its own `detect-private-key`
   pre-commit hook and a secret-scanning rule; this is the server-side backstop.)
-- **Code scanning (CodeQL)** — optional now; a good v0.2 addition. Our `ruff`
-  `S`/bandit rules already lint for common issues in CI.
+- **Code scanning (CodeQL)** — `.github/workflows/codeql.yml` runs the analysis
+  on every push to `main`, every pull request, and weekly; nothing to enable here
+  beyond leaving **Code scanning alerts** on, which is the default for a public
+  repository. Alerts appear under **Security → Code scanning** once the workflow
+  has run once. `ruff`'s `S`/bandit family lints patterns; CodeQL does taint
+  tracking, so the two are complementary rather than redundant. Deliberately not
+  wired into branch protection's required status checks (step 3): CodeQL alerts
+  do not block a merge in this cycle, so a first run against the existing tree
+  does not retroactively fail every open PR. Revisit once the initial alert
+  backlog has been triaged.
 
 ## 6. The `pypi` release environment — Settings → Environments
 

@@ -104,6 +104,9 @@ malicious Python package, with everything that implies. `--no-plugins` disables
 discovery — but also the built-ins, which makes safe mode expensive. A plugin
 allowlist (`--plugins builtins|allowlist|disabled`) is what fixes that, and a
 locked pack (`guardana pack lock`) pins the digest of every rule a pack provides.
+`--no-plugins` is a deprecated alias for `--plugins disabled`, understood only by
+`scan` and `plan scan`; every other command that loads plugins takes `--plugins`
+directly.
 Two limits remain: `--plugins all` is still the default, and a declarative pack
 format that executes no Python is **v1.0**. See the
 [threat model](threat-model.md).

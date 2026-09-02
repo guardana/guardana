@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 from guardana.cli._evaluators import wire_config_evaluators
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli._profile import resolve_profile
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.calibration import CalibrationReport, calibrate
@@ -20,7 +21,7 @@ from guardana.core.registry import Registry
 _UNMEASURED = "—"
 
 
-def calibrate_command(
+def calibrate_command(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     evaluator: Annotated[
         str, typer.Option(help="Evaluator id to measure, e.g. llm_judge")
     ] = "llm_judge",
@@ -40,6 +41,14 @@ def calibrate_command(
             help="Write the measurement here so runs can carry it; see `calibrations:`.",
         ),
     ] = None,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Measure how honest an evaluator's stated confidence is, against known labels.
 
@@ -48,8 +57,10 @@ def calibrate_command(
     and tool calls settle them without a human — and compare what the evaluator
     said with what happened.
     """
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
     prof = resolve_profile(profile, None)
-    registry = Registry.discover()
+    registry = Registry.discover(trust)
+    warn_about_load_errors(registry, what="evaluator")
     wire_config_evaluators(registry, prof)
     graders = registry.evaluators()
     grader = graders.get(evaluator)

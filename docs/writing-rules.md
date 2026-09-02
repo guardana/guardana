@@ -241,21 +241,28 @@ Three ways, all real:
 Use this for custom parsers, stateful probes, or any check against an
 **artifact** target. Of the 51 built-in rules, 19 are build-time (artifact-kind)
 Python plugins — pickle opcodes (incl. ZIP-archive recursion), model format,
-Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk,
-remote-code (`trust_remote_code`/`torch.hub.load`) and its config form
-(`auto_map`), code execution (`eval`/`exec`/`os.system`/`shell=True`), notebook
-payloads, insecure transport (`verify=False`/plaintext HTTP), known-malicious
-dependencies, MCP tool-poisoning, hidden-instruction rules-file backdoors,
-training-data integrity, hallucinated packages, provenance, hardcoded secrets —
-since they need real parsing logic, not a prompt corpus. (A Python plugin is
-also how a runtime rule that isn't a simple prompt corpus is written — e.g. the
-tool-calling excessive-agency rule.) (The hallucinated-package rule scans `import`/`from` statements in
-`.py` files only; it does not read `requirements.txt` or lockfiles.) The
-other 8 are dynamic endpoint rules (4 single-turn YAML: injection, jailbreak,
-system-prompt-leak, unbounded-consumption; 2 YAML scenarios: gradual jailbreak
-and indirect/RAG injection; plus `output.secrets` and the tool-calling
-`agent.excessive_tool_use`, both Python plugins like this one but endpoint-kind
-— see the note below).
+chat-template code-execution gadgets, risky ONNX graph constructs, Keras
+Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk, remote-code
+(`trust_remote_code`/`torch.hub.load`) and its config form (`auto_map`), code
+execution (`eval`/`exec`/`os.system`/`shell=True`), notebook payloads, insecure
+transport (`verify=False`/plaintext HTTP), known-malicious dependencies, MCP
+tool-poisoning, hidden-instruction rules-file backdoors, training-data
+integrity, hallucinated packages, provenance, hardcoded secrets — since they
+need real parsing logic, not a prompt corpus. (The hallucinated-package rule
+scans `import`/`from` statements in `.py` files only; it does not read
+`requirements.txt` or lockfiles.) The other 32 are dynamic endpoint rules: 12
+are YAML (10 single-turn — injection, jailbreak, system-prompt-leak,
+unbounded-consumption, cost-asymmetry, and five agent-scoped checks for
+credential exfiltration, memory poisoning, tool-argument scope, tool-result
+injection, and hidden context in a tool schema — plus 2 scenarios: gradual
+jailbreak and indirect/RAG injection). The remaining 20 need real logic and are
+Python plugins like this one but endpoint-kind: `output.secrets`, the
+tool-calling `agent.excessive_tool_use` (see the note below),
+`agent.mcp_server_manifest`, all 8 `mcp.*` checks (the MCP authorization
+surface — session binding, token audience, scope breadth, and others), and all
+9 `trace.*` checks (graded from a recorded `Trace` rather than a live chat —
+credential passthrough, identity disagreement, cross-tenant retrieval, and
+others).
 
 Subclass `Rule`, set `meta` to a `RuleMeta`, implement `run`:
 
@@ -453,7 +460,16 @@ graded end-to-end against a scripted model — no network, no model process:
 | `RefusingTransport()` | A well-behaved model: refuses everything, leaks nothing — the negative fixture |
 | `EchoingTransport()` | A model that discloses its planted system prompt — the canary-leak positive fixture |
 | `ToolCallingScriptedTransport("tool_name", ...)` | A model that calls the named tools when offered any — the excessive-agency fixture |
+| `GullibleAgentTransport()` | A model that treats a tool's result as an instruction and acts on it — the positive fixture for prompt injection through tool output; pair it with `RefusingTransport` for the negative |
 | `FailingTransport(error)` | An unreachable endpoint: every call raises `error` |
+
+These six are what a rule author testing without a model needs. The kit ships ten
+more doubles for other concerns — artifact builders (see
+[below](#testing-a-rule-that-reads-a-model-file)), fake credentials for a
+redaction test, a scripted MCP server for an authorization rule, and a
+test-stable run manifest for a renderer test — none of which a dynamic endpoint
+rule's fixtures touch. The complete, enforced list is
+[`extending.md`](extending.md#testing-your-extension).
 
 Both fixtures for a dynamic rule, in full:
 

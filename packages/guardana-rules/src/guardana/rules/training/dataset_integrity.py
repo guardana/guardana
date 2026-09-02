@@ -3,7 +3,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
@@ -13,6 +13,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM05_2026,
     OWASP_ML02_2023,
 )
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._leads import lead_verdict
 
 # A dataset "loading script" is a Python class the datasets library imports and
@@ -56,7 +57,7 @@ def _unpinned_load_lines(source: PythonSource) -> Iterator[int]:
             yield node.lineno
 
 
-class DatasetIntegrityRule(Rule):
+class DatasetIntegrityRule(ArtifactRule):
     """Flags training-data hygiene gaps: dataset loading scripts and unpinned dataset pulls.
 
     Static poisoning *proof* is statistical, not a file scan — this rule instead

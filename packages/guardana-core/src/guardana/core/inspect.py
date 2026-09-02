@@ -222,6 +222,22 @@ def unrunnable_rules(report: TargetReport, rules: object) -> tuple[str, ...]:
     return tuple(sorted(unrunnable))
 
 
+def endpoint_rule_count(rules: object) -> int:
+    """How many endpoint rules `rules` holds — the population `unrunnable_rules` judges.
+
+    Needed to tell "every rule could run" from "no rule was there to judge": an
+    empty `unrunnable_rules()` result reads as the first only when this is nonzero.
+    A registry emptied by a restrictive plugin trust mode returns zero here, which
+    is the signal a renderer needs to report an absence of evidence rather than a
+    clean result.
+    """
+    return sum(
+        1
+        for rule in getattr(rules, "rules", lambda: ())()
+        if rule.meta.target_kind is TargetKind.ENDPOINT
+    )
+
+
 def declared_capabilities(target: Target) -> tuple[str, ...]:
     """Return what a target says it supports, without asking it anything."""
     return tuple(sorted(str(c) for c in target.capabilities()))

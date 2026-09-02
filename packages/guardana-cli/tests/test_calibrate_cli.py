@@ -73,6 +73,18 @@ def test_calibrate_refuses_an_evaluator_nobody_configured() -> None:
     assert "no evaluator 'llm_judge'" in result.output
 
 
+def test_a_restrictive_plugin_mode_is_named_when_no_evaluator_loaded() -> None:
+    """`--plugins disabled` used to leave `known: ` empty with no explanation, so
+    a typo'd evaluator id and a refused plugin looked exactly the same failure.
+    """
+    result = runner.invoke(app, ["calibrate", "--evaluator", "keyword", "--plugins", "disabled"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert "could not load evaluator" in result.output
+    assert "plugin trust is disabled" in result.output
+    assert "no evaluator 'keyword' is registered" in result.output
+
+
 def test_an_unreliable_measurement_exits_nonzero(tmp_path: Path) -> None:
     # "We measured nothing" must not read as "we measured, and it was fine".
     path = tmp_path / "tiny.jsonl"

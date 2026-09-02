@@ -13,18 +13,19 @@ network I/O and invents no capability — a target that cannot answer a question
 declares it cannot, and the runner skips the rules that need it.
 """
 
+from collections.abc import Iterator
 from pathlib import Path
 
+from guardana.core.source import PythonSource, UnreadSource, read_source
 from guardana.core.target import Capability, Target, TargetKind
 
 
 class AcmePromptLibraryTarget(Target):
     """A directory of Acme's approved prompt templates, read as artifacts.
 
-    Declares `READ_FILES` and nothing else. Declaring more would make the runner
-    select rules this target cannot serve, and a rule handed a target it cannot use
-    is a check that errors rather than one that ran — which is worse than the
-    coverage it was reaching for.
+    Declares `READ_FILES` and implements `FileReader` — both halves, because a
+    declaration the runner selects rules by must have a surface behind it, and
+    `guardana.testing.assert_target_conforms` refuses one that does not.
     """
 
     kind = TargetKind.ARTIFACT
@@ -32,6 +33,8 @@ class AcmePromptLibraryTarget(Target):
     def __init__(self, root: Path | str) -> None:
         """Point the target at a directory of prompt templates."""
         self._root = Path(root)
+        self._sources: dict[Path, PythonSource | None] = {}
+        self._unread: list[UnreadSource] = []
 
     def capabilities(self) -> set[Capability]:
         """Files, and only files."""
@@ -42,14 +45,31 @@ class AcmePromptLibraryTarget(Target):
         """How this target appears in a finding and in a run manifest."""
         return f"acme-prompts:{self._root}"
 
-    def templates(self) -> list[Path]:
-        """Every template in the library, sorted, or nothing when the directory is absent.
-
-        Absent is not an error here: a repository with no prompt library has none to
-        check. What the rules must not do is read that as "the templates are fine",
-        which is why a rule over this target declines rather than passing when it
-        finds nothing — the same distinction the engine draws everywhere else.
-        """
+    def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
+        """Walk the library in a stable order, optionally by suffix; nothing when absent."""
         if not self._root.is_dir():
-            return []
-        return sorted(p for p in self._root.rglob("*.txt") if p.is_file())
+            return
+        for path in sorted(p for p in self._root.rglob("*") if p.is_file()):
+            if suffixes is None or path.suffix in suffixes:
+                yield path
+
+    def python_source(self, path: Path) -> PythonSource | None:
+        """Read and index a Python file once; every rule asks through here."""
+        if path.suffix != ".py":
+            return None
+        if path not in self._sources:
+            result = read_source(path)
+            if isinstance(result, UnreadSource):
+                self._unread.append(result)
+                self._sources[path] = None
+            else:
+                self._sources[path] = result
+        return self._sources[path]
+
+    def unread_sources(self) -> tuple[UnreadSource, ...]:
+        """Every file this target could not read — a check that did not run."""
+        return tuple(self._unread)
+
+    def templates(self) -> list[Path]:
+        """Every template in the library, sorted, or nothing when the directory is absent."""
+        return list(self.iter_files((".txt",)))

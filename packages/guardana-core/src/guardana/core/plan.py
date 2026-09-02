@@ -69,6 +69,7 @@ def build_plan(registry: Registry, profile: Profile, target: Target) -> RunPlan:
     skipped: list[str] = []
     unknown: list[str] = []
     ceiling = 0
+    floor = 0
     for rule in registry.rules():
         meta = rule.meta
         if meta.target_kind != target.kind or not profile.policy.matches(meta.id):
@@ -82,17 +83,19 @@ def build_plan(registry: Registry, profile: Profile, target: Target) -> RunPlan:
         selected.append(meta.id)
         declared = rule.estimated_requests
         if declared is None:
+            # A rule that sends and did not say how much sends at least once.
             unknown.append(meta.id)
+            floor += 1
         else:
             ceiling += declared
+            floor += 1 if declared > 0 else 0
     return RunPlan(
         rules=tuple(selected),
         skipped=tuple(skipped),
         unknown_cost=tuple(unknown),
-        # Every selected rule sends at least one request; the ceiling is the sum of
-        # what they declared. A rule that declares nothing widens the gap between
-        # the two, which is exactly what `unknown_cost` is there to make visible.
-        min_requests=len(selected),
+        # The floor counts rules that send something; a rule that declared zero is
+        # not one of them.
+        min_requests=floor,
         max_requests=ceiling,
         budgets=profile.budgets,
     )

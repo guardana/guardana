@@ -41,6 +41,7 @@ detail below.
 - [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
 - [`usage-target.md`](usage-target.md) — `guardana target inspect`: what an endpoint really supports
 - [`usage-plan.md`](usage-plan.md) — `guardana plan`: what a run would cost, before it costs anything
+- [`usage-rules.md`](usage-rules.md) — `guardana rules`: list every discovered rule, grouped by the layer it secures
 - [`usage-taxonomy.md`](usage-taxonomy.md) — `guardana taxonomy`: which framework entry a reference names, and what it corresponds to in another edition
 - [`exit-codes.md`](exit-codes.md) — the exit-status contract every command honours
 - [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run, its manifest, and the cases it measured
@@ -87,6 +88,13 @@ Written before the code they describe, so the reasoning survives the review.
 - [`design/capability-protocols.md`](design/capability-protocols.md) — what each capability actually promises, and why the extension contract was false until it did
 - [`design/production-intake.md`](design/production-intake.md) — assessing real traffic without ever being in its path *(proposed)*
 - [`design/audit-0.21.md`](design/audit-0.21.md) — what a full audit of the released 0.21 found, and which gate closed each finding
+- [`design/audit-0.22.md`](design/audit-0.22.md) — how open the engine really is after 0.22, which seams stay closed on purpose, and the six-cycle program that follows
+- [`design/target-locators.md`](design/target-locators.md) — a discovered target the CLI can build: a scheme on the class, a locator on the command line, the verb still choosing the kind *(proposed)*
+- [`design/output-plugins.md`](design/output-plugins.md) — renderers and reporters as entry points, and the redaction invariant every output sits behind *(proposed)*
+- [`design/quality-suites.md`](design/quality-suites.md) — versioned datasets, suites that are rules, assessors that are evaluators, and a gate that refuses a rate it has not earned *(proposed)*
+- [`design/paired-regression-statistics.md`](design/paired-regression-statistics.md) — "worse" over a paired sample with an exact test, a minimum effect and a minimum sample, or "cannot tell" *(proposed)*
+- [`design/attack-techniques.md`](design/attack-techniques.md) — the technique as its own extension point, so coverage multiplies instead of adding *(proposed)*
+- [`design/namespaced-extension-ids.md`](design/namespaced-extension-ids.md) — capabilities and assertion kinds a pack can declare, with a typo still a load error *(proposed)*
 - [`design/trace-domain-model.md`](design/trace-domain-model.md) — the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
 - [`design/trace-producer.md`](design/trace-producer.md) — the append-only writer, which inflated declaration actually leaks a pass, and what the model needs before an integrator can record human approval honestly
 - [`design/framework-adapters.md`](design/framework-adapters.md) — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing
@@ -118,11 +126,14 @@ Written before the code they describe, so the reasoning survives the review.
 
 [`examples/custom_rule/`](../examples/custom_rule/) is a complete,
 installable third-party extension (fictional company "Acme") that declares
-its own `guardana.rules` and `guardana.evaluators` entry points and ships,
-under an `acme.*` namespace, two Python plugin rules, two YAML rules, and a
-**custom classifier** (an `Evaluator`) — with tests proving Guardana
-discovers and uses each one end-to-end. One of the plugin rules inspects a
-**GGUF model file** and is pure policy, because the binary parsing comes from
+all four entry-point groups — `guardana.rules`, `guardana.evaluators`,
+`guardana.targets`, and `guardana.taxonomies` — and ships, under an `acme.*`
+namespace, two Python plugin rules, three YAML rules, a **custom classifier**
+(an `Evaluator`), a **custom target** (a directory of approved prompts, read
+as artifacts), and a **custom taxonomy** (`ACME-14`, Acme's own internal
+control catalogue) — with tests proving Guardana discovers and uses each one
+end-to-end. One of the plugin rules inspects a **GGUF model file** and is pure
+policy, because the binary parsing comes from
 [`model-formats.md`](model-formats.md).
 [`examples/guardana.yaml`](../examples/guardana.yaml) is a sample profile
 that includes both Guardana's built-ins and Acme's custom rules.

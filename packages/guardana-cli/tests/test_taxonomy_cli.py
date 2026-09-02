@@ -54,6 +54,21 @@ def test_an_unknown_reference_says_so_rather_than_printing_nothing() -> None:
     assert "no installed catalogue defines" in result.output
 
 
+def test_a_restrictive_plugin_mode_says_refused_rather_than_absent() -> None:
+    """`--plugins disabled` refuses every entry point, this build's own built-ins
+    included, so `registry.load_errors` is non-empty regardless of which reference
+    is asked for. A miss under that condition is unproven, not absent — the
+    catalogue that would have defined it may be exactly the one just refused — so
+    the command must say so instead of declaring the reference does not exist.
+    """
+    result = runner.invoke(app, ["taxonomy", "LLM99:2025", "--plugins", "disabled"])
+
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+    assert "no installed catalogue" not in result.output
+    assert "no loaded catalogue" in result.stderr
+    assert "refused by plugin trust" in result.stderr
+
+
 def test_the_json_form_carries_the_edition_as_its_own_field() -> None:
     result = runner.invoke(app, ["taxonomy", "LLM08:2026", "--format", "json"])
 

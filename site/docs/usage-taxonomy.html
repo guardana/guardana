@@ -41,6 +41,7 @@
 <li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html" aria-current="page">guardana taxonomy</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -191,6 +199,31 @@ is Misinformation. The crosswalk is data with an explicit relation on every pair
 categories as well as re-ranking them, so most pairs are not equivalences.</p>
 <p><code>--format json</code> prints the same thing for a script, with <code>scheme</code>, <code>edition</code> and
 <code>framework</code> as separate fields.</p>
+<h2 id="flags">Flags</h2>
+<p><code>taxonomy</code> discovers plugins the same way <code>scan</code>/<code>probe</code> do — a company's own
+catalogue arrives through the <code>guardana.taxonomies</code> entry point — so it takes the
+same plugin-trust flags:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
+<td><code>all</code></td>
+<td>Which installed plugins to load — same meaning as on <code>probe</code></td>
+</tr>
+<tr>
+<td><code>--allow-plugin TEXT</code></td>
+<td>none</td>
+<td>Distribution to trust; repeatable, needs <code>--plugins allowlist</code></td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="what-this-never-does">What this never does</h2>
 <p><strong>It never rewrites stored evidence.</strong> A saved run, a baseline and a collector row
 keep the reference they were written with, forever: a <code>LLM07</code> recorded under

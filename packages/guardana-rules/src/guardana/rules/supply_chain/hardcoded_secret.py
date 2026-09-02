@@ -8,10 +8,11 @@ from pathlib import Path
 
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM02_2025, OWASP_LLM02_2026
+from guardana.rules._base import ArtifactRule
 from guardana.rules._secrets import ALLOWLIST, FILE_SECRET_PATTERNS, is_scannable_text, redact
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
@@ -113,7 +114,7 @@ def _scan_entropy(text: str) -> Iterator[tuple[int, str, str]]:
         yield _line_number(text, match.start()), name, value
 
 
-class HardcodedSecretRule(Rule):
+class HardcodedSecretRule(ArtifactRule):
     """Scans repository files for hardcoded secrets.
 
     Runs high-precision, prefix-anchored shapes for everyone; an opt-in entropy

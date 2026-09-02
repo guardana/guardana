@@ -262,3 +262,30 @@ source_modules = [
     "guardana.adapters",
 ]
 forbidden_modules = ["guardana.server"]
+
+[[tool.importlinter.contracts]]
+# The mirror image of the contract above: the collector consumes a versioned
+# envelope and never the engine's types, so the two can be upgraded apart.
+name = "The collector never depends on the engine"
+type = "forbidden"
+source_modules = ["guardana.server"]
+forbidden_modules = [
+    "guardana.core",
+    "guardana.rules",
+    "guardana.cli",
+    "guardana.report",
+    "guardana.testing",
+    "guardana.adapters",
+]
+
+[[tool.importlinter.contracts]]
+# The CLI sits on the packages and the packages sit on the engine. A rule pack
+# that reached for a CLI helper would make the engine's verdict depend on how it
+# was invoked, and a renderer importing a rule would make the report know threats.
+name = "Layers: cli over packages over core"
+type = "layers"
+layers = [
+    "guardana.cli",
+    "guardana.rules | guardana.report | guardana.testing | guardana.adapters",
+    "guardana.core",
+]

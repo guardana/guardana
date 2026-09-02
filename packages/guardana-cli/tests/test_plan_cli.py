@@ -57,6 +57,20 @@ def test_a_scan_plan_lists_the_rules_it_would_run(tmp_path: Path) -> None:
     assert payload["schema_version"] == 1
 
 
+def test_a_restrictive_plugin_mode_says_so_in_the_plan(tmp_path: Path) -> None:
+    """`--plugins disabled` used to empty the registry silently: the plan printed
+    "0 rule(s) would run" and, thanks to the zero-request sentence, "requests: 0 —
+    every selected rule declares it sends nothing" — which together read as a scan
+    that is free and fine, about a scan where nothing loaded at all. Loading
+    nothing must say so.
+    """
+    result = runner.invoke(app, ["plan", "scan", str(tmp_path), "--plugins", "disabled"])
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert "could not load rule" in result.output
+    assert "plugin trust is disabled" in result.output
+
+
 def test_a_narrowed_profile_produces_a_visibly_smaller_plan(tmp_path: Path) -> None:
     profile = tmp_path / "guardana.yaml"
     profile.write_text("name: narrow\nrules:\n  include: ['guardana.prompt.*']\n", encoding="utf-8")

@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
+from guardana.cli.exit_codes import ExitCode
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule
 from guardana.core.surface import Surface
@@ -35,6 +37,14 @@ def rules(
     surface: Annotated[
         SurfaceFilter, typer.Option(help="Filter by security layer: all|build|runtime")
     ] = SurfaceFilter.all,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
     rules: Annotated[
         list[Path],
         typer.Option(
@@ -48,15 +58,33 @@ def rules(
     flag `scan`/`probe` take — so you can confirm a rule pack parses and is picked
     up without launching a full probe. A file that fails to load is warned about,
     never silently dropped.
+
+    Exit `0` at least one rule was listed · `2` nothing was — a restrictive
+    `--plugins` mode or an empty `--rules` set can empty the registry, and that
+    must never read as a clean, deliberately empty catalogue.
     """
-    registry = Registry.discover()
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
+    registry = Registry.discover(trust)
     registry.load_yaml_rule_dirs(rules)
     # Includes entry-point failures, not just YAML: this command exists to confirm
     # a pack was picked up, so a pack that failed to import must not be an empty
     # line in the listing.
-    for error in registry.load_errors:
-        typer.echo(f"warning: could not load rule — {error}", err=True)
+    warn_about_load_errors(registry, what="rule")
     discovered = [r for r in registry.rules() if _keep(r, surface)]
+    if not discovered:
+        # An empty listing produced by a refusal is not a listing — the same
+        # principle `rule test` applies to an unmatched selector.
+        refusal = (
+            f" ({len(registry.load_errors)} extension(s) refused by plugin trust)"
+            if registry.load_errors
+            else ""
+        )
+        typer.echo(
+            f"error: no rule was loaded{refusal} — nothing was listed, which is "
+            f"not the same as nothing being installed",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.INDETERMINATE)
     if format == RulesFormat.json:
         typer.echo(json.dumps([_as_dict(r) for r in discovered], indent=2))
         return

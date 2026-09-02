@@ -73,7 +73,15 @@ def import_observations(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI 
         typer.Option("--output", help="Write the report to this file (needed by `guardana diff`)."),
     ] = None,
 ) -> None:
-    """Import another tool's results as unverified claims, with their provenance intact."""
+    """Import another tool's results as unverified claims, with their provenance intact.
+
+    The registry built here runs no rule at all — it exists only so `build_manifest`
+    can record that nothing ran. `PluginTrust(mode=DISABLED)` is hard-coded rather than
+    exposed as `--plugins`, on purpose: there is no third-party code for this command to
+    trust or refuse, so a flag implying otherwise would be decoration. Every command that
+    actually evaluates a rule takes `--plugins`/`--allow-plugin` instead — see
+    `guardana.cli._plugins.resolve_trust`.
+    """
     check_reporter_url(reporter)
     prof = resolve_profile(profile, preset)
     read = _read_or_exit(results, producer)

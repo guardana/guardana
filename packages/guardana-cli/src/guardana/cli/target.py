@@ -8,10 +8,12 @@ import typer
 from guardana.cli._endpoint import build_endpoint
 from guardana.cli._errors import run_against_endpoint
 from guardana.cli._formats import OutputFormat
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.inspect import (
     Support,
     TargetReport,
+    endpoint_rule_count,
     inspect_endpoint,
     unrunnable_rules,
 )
@@ -25,7 +27,7 @@ target_app = typer.Typer(
 )
 
 
-def _render_human(report: TargetReport, unrunnable: tuple[str, ...]) -> str:
+def _render_human(report: TargetReport, unrunnable: tuple[str, ...], endpoint_rules: int) -> str:
     lines = [f"{report.kind} {report.ref}", ""]
     lines.extend(
         f"  {_MARK[f.support]} {f.capability}: {f.support} — {f.detail}" for f in report.findings
@@ -40,8 +42,17 @@ def _render_human(report: TargetReport, unrunnable: tuple[str, ...]) -> str:
     if unrunnable:
         lines.append(f"{len(unrunnable)} rule(s) cannot run against this target:")
         lines.extend(f"    • {rule_id}" for rule_id in unrunnable)
-    else:
+    elif endpoint_rules:
         lines.append("Every endpoint rule can run against this target.")
+    else:
+        # An empty `unrunnable` here means there was nothing to judge, not that
+        # everything passed judgment — a restrictive `--plugins` mode empties the
+        # registry, and that must never read like a clean result.
+        lines.append(
+            "0 rule(s) were loaded to judge this target against — that is not a "
+            "clean result, it is an absence of evidence: nothing here says this "
+            "target is safe to run against."
+        )
     lines.append("")
     lines.append(f"This inspection cost {report.requests} request(s).")
     return "\n".join(lines)
@@ -88,6 +99,14 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
             help="Comma-separated capabilities that must be confirmed; exit 2 if any is not.",
         ),
     ] = None,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Report what this endpoint really supports, and which rules it leaves unrunnable.
 
@@ -96,6 +115,9 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
     proxy can drop the system message — either of which turns a rule into a check
     that runs and proves nothing.
     """
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
+    registry = Registry.discover(trust)
+    warn_about_load_errors(registry, what="rule")
     api_key = os.environ.get(api_key_env) if api_key_env else None
     plain = build_endpoint(url, model, api_key=api_key, provider=provider, transport=None)
     planted = build_endpoint(
@@ -108,11 +130,11 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
         transport=None,
     )
     report = run_against_endpoint(url, lambda: inspect_endpoint(plain, planted))
-    unrunnable = unrunnable_rules(report, Registry.discover())
+    unrunnable = unrunnable_rules(report, registry)
     if format is OutputFormat.json:
         typer.echo(_render_json(report, unrunnable))
     else:
-        typer.echo(_render_human(report, unrunnable))
+        typer.echo(_render_human(report, unrunnable, endpoint_rule_count(registry)))
     _enforce_requirements(report, require)
 
 

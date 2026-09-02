@@ -15,11 +15,11 @@ something it never examined.
 That third sample is what this command exists for.
 
 ```bash
-guardana rule test 'acme.*' --rules ./my-rules/
+guardana rule test 'acme.*'
 ```
 
 ```
-1 rule(s); 3 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
+5 rule(s); 15 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
 ```
 
 Sends nothing anywhere — every fixture is a scripted double — so it is safe to run

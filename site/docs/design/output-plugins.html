@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Output plugins — Guardana documentation</title>
+<meta name="description" content="renderers and reporters as entry points, why the built-in ones are not registered through them, and the one invariant every output must satisfy before it sees a result">
+<link rel="canonical" href="https://guardana.dev/docs/design/output-plugins.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html" aria-current="page">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Output plugins: renderers and reporters a pack can add<span class="status proposed">proposed</span></h1><p class="lede">renderers and reporters as entry points, why the built-in ones are not registered through them, and the one invariant every output must satisfy before it sees a result</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-09-02 · <strong>Cycle 1 of the extensibility program</strong> (<a href="audit-0.22.html"><code>audit-0.22.md</code></a>)</p>
+<h2 id="the-gap">The gap</h2>
+<p><code>--format</code> is a closed enum over a hard-coded dict of four renderers, and
+<code>--reporter</code> understands one scheme. The roadmap's own extension lane cannot be
+built on that: a CycloneDX ML-BOM export or an SPDX AI profile is a renderer over
+the run's observations, a Prometheus or webhook output is a reporter, and both
+are supposed to be packages <em>outside</em> the engine so that a standards body's
+revision never reaches <code>guardana-core</code>. Today the only way to add either is a
+pull request against the CLI.</p>
+<h2 id="the-decision">The decision</h2>
+<p>Two entry-point groups, resolved by the same registry that resolves everything
+else:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Provides</th>
+<th>Selected by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.renderers</code></td>
+<td><code>RendererSpec(name, factory)</code> — <code>factory(run: RunManifest | None) -&gt; Renderer</code></td>
+<td><code>--format &lt;name&gt;</code></td>
+</tr>
+<tr>
+<td><code>guardana.reporters</code></td>
+<td><code>ReporterSpec(scheme, factory)</code> — <code>factory(request: ReporterRequest) -&gt; Reporter</code></td>
+<td><code>--reporter &lt;scheme&gt;://&lt;rest&gt;</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The <code>Renderer</code> and <code>DiffRenderer</code> protocols move from <code>guardana.report.base</code> to
+<code>guardana.core.output</code>, where the registry can name them without importing the
+report package; <code>guardana.report.base</code> keeps re-exporting them. <code>Reporter</code> is
+already a core protocol.</p>
+<p><code>ReporterRequest</code> carries what a reporter legitimately needs and nothing else:
+the locator after the scheme, the run manifest, the deployment reference, and the
+name of the environment variable holding the credential. It does not carry the
+result — that arrives through <code>submit</code>, after the invariant below.</p>
+<h3 id="the-built-ins-are-not-registered-through-the-groups-on-purpose">The built-ins are not registered through the groups, on purpose</h3>
+<p>Rules have no built-in/custom distinction at the registry level, and that is
+right for rules. It is wrong here for one reason: <code>--plugins disabled</code> loads no
+entry points at all, and a run in that mode still has to print. If <code>human</code> were
+an entry point, the safest mode would be the one that cannot render a report.</p>
+<p>So the four renderers and the <code>server</code> reporter stay where they are, and the
+registry adds discovered specs beside them. A discovered spec may not claim a
+built-in name or scheme; the refusal is the same one-owner rule ids get. In
+<code>builtins</code> and <code>allowlist</code> modes, <code>guardana-report</code> is one of the reviewed
+distributions, so nothing changes there either.</p>
+<h3 id="the-invariant-no-output-sees-an-unredacted-result">The invariant: no output sees an unredacted result</h3>
+<p>Every renderer <code>get_renderer</code> returns is wrapped in <code>_Redacting</code>, so a renderer
+cannot obtain the result before the privacy policy has. That wrapping happens in
+the factory, not in each renderer, and a discovered renderer goes through the same
+factory. Every reporter receives the result the command already redacted before
+building the manifest — the same object the built-in <code>HttpReporter</code> receives.</p>
+<p>This is pinned by a test in the shape the project prefers: a recording renderer
+and a recording reporter registered in a test, a run over a fixture carrying a
+fake credential, and an assertion that neither saw it. A third-party output that
+needs the raw text is a third-party output that does not exist.</p>
+<h3 id="--format-becomes-a-name-not-an-enum"><code>--format</code> becomes a name, not an enum</h3>
+<p>The typer option becomes a string checked against the union of built-in names
+and discovered names; an unknown one exits <code>3</code> and lists what is available, with
+the trust mode in the message when a plugin might have been the reason.
+<code>diff --format</code> stays closed: a comparison document has two renderers and no
+extension has asked for a third, and a closed list that nobody needs opened is
+not a gap.</p>
+<h3 id="manifest-and-lock">Manifest and lock</h3>
+<p>Pack schema 3 adds <code>provides.renderers</code> and <code>provides.reporters</code>, checked against
+what actually registered, as every other <code>provides</code> entry is. The lock pins both by
+id, like evaluators — Python with no declaration to hash. The example pack
+registers one of each, because a group nothing exercises is the state
+<code>guardana.targets</code> sat in for twenty-two releases.</p>
+<h2 id="rejected">Rejected</h2>
+<p><strong>Registering the built-ins through the groups too</strong>, for symmetry with rules. See
+above: symmetry is not worth a safe mode that prints nothing.</p>
+<p><strong>A renderer flag saying &quot;give me the unredacted result&quot;.</strong> There is no format
+that needs the secret to be present to say a secret was present.</p>
+<p><strong>Diff renderers as plugins.</strong> Nothing needs it, and a group with no registrant is
+the failure this program is closing elsewhere.</p>
+<p><strong>Making <code>guardana-report</code> optional.</strong> The CLI depends on it for <code>human</code>, and a CLI
+that cannot print without an extra is a CLI whose first run is a stack trace.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="target-locators.html"><code>target-locators.md</code></a> — the same move for what goes into a run</li>
+<li><a href="privacy-and-redaction.html"><code>privacy-and-redaction.md</code></a> — the policy every output is behind</li>
+<li><a href="../usage-scan.html"><code>../usage-scan.md</code></a> — where <code>--format</code> and <code>--reporter</code> are documented</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/output-plugins.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -34,12 +34,12 @@ report those to the package's own maintainers (see the trust model below).
 ## The plugin trust model
 
 Guardana's extensibility is entry-point based: **any installed package that
-registers under the `guardana.rules`, `guardana.evaluators`, or
-`guardana.targets` entry-point groups is discovered and its code is
-executed** when the registry runs `Registry.discover()` (used by `guardana
-scan`, `probe`, and `monitor` by default). This is intentional — it's what
-lets a company or contributor ship a private rule package that plugs in
-exactly like a built-in — but it means:
+registers under the `guardana.rules`, `guardana.evaluators`,
+`guardana.targets`, or `guardana.taxonomies` entry-point groups is discovered
+and its code is executed** when the registry runs `Registry.discover()` (used
+by `guardana scan`, `probe`, and `monitor` by default). This is intentional —
+it's what lets a company or contributor ship a private rule package that
+plugs in exactly like a built-in — but it means:
 
 - **A third-party rule, evaluator, or target package runs arbitrary Python
   in your process.** Installing an untrusted package and letting Guardana
@@ -51,26 +51,61 @@ exactly like a built-in — but it means:
   engine. A third-party plugin is not — it's outside this project's
   supply chain the moment it's a separate package.
 
-### `--no-plugins`: the safe mode
+### `--plugins`: the trust modes
 
-For untrusted or locked-down environments, run with entry-point discovery
-disabled entirely:
+For untrusted or locked-down environments, choose how much installed code a
+run is willing to import:
 
 ```bash
-guardana scan . --no-plugins
+guardana scan .                              # all: every installed entry point
+guardana scan . --plugins builtins           # only Guardana's own distributions
+guardana scan . --plugins allowlist --allow-plugin acme-rules
+guardana scan . --plugins disabled           # nothing; YAML rules still load from disk
 ```
 
-This constructs an empty `Registry()` instead of calling
-`Registry.discover()` — **no code plugin, built-in or third-party, is
-imported.** Combine it with YAML rule directories you've reviewed yourself
-if you need checks beyond the engine's core behavior: YAML rules are parsed
-data (via `yaml.safe_load`), not executed code, so they don't carry the same
-risk as a `guardana.rules` entry-point package.
+`Registry.discover()` runs in every mode, including `disabled` — there is no
+"empty registry" shortcut. What changes is whether a `PluginTrust` policy lets
+a given entry point load: a refused one is never imported, and its refusal is
+recorded in `registry.load_errors` rather than dropped. Combine any mode with
+YAML rule directories you've reviewed yourself if you need checks beyond the
+engine's core behavior: YAML rules are parsed data (via `yaml.safe_load`), not
+executed code, so they don't carry the same risk as a `guardana.rules`
+entry-point package.
 
-Use `--no-plugins` whenever you're running Guardana against a codebase or in
-a pipeline where you haven't audited every installed plugin package, e.g.
-shared CI runners, third-party contribution checks, or any environment where
-"whatever happens to be pip-installed" isn't a trust boundary you control.
+A restricted run says what it declined, not just what it ran. `scan`,
+`probe`, `monitor`, `analyze-trace`, and `baseline create`/`update` fold
+`registry.load_errors` into the run's own `errors` channel, so a refused
+rule pack shows up in the report you already read and fails the gate by
+default (see "Plugin trust (0.7)" below). `plan scan`, `plan probe`,
+`rule test`, `rules`, `taxonomy`, `calibrate`, `target inspect`,
+`trace inspect`, `pack validate`, and `pack lock` produce no run report for a
+refusal to travel in, so each prints it directly on stderr — `warning: could
+not load rule — …`, with the evaluator, extension, and taxonomy-provider
+equivalents reading `could not load evaluator` / `could not load an
+extension` / `could not load a taxonomy provider`. Either way, restricting
+trust is something you can verify, not something you have to hope worked.
+
+A restrictive mode does not only print, either. `rules` and `taxonomy
+<reference>` exit `2` (indeterminate) rather than `0` when a restrictive
+`--plugins` mode is what emptied the answer — an empty rule listing, or a
+reference no *loaded* catalogue defines, is not a clean result, and each
+says so before exiting rather than reading as "nothing installed" or "no
+such entry". `pack validate` and `pack lock` go further and refuse outright
+the moment plugin trust refused anything at all, because both check or pin
+this build's *own* registrations: a registry that dropped extensions cannot
+tell you a pack "does not register" something it was simply never allowed to
+load, and a lock built from it cannot call a refused rule "gone" without
+lying about why. Script against the exit code when you restrict trust in
+CI, not just the presence of a warning on stderr.
+
+`--no-plugins` remains as a deprecated alias for `--plugins disabled` on
+`scan` and `plan scan` only.
+
+Use `--plugins builtins` whenever you're running Guardana against a codebase
+or in a pipeline where you haven't audited every installed plugin package,
+e.g. shared CI runners, third-party contribution checks, or any environment
+where "whatever happens to be pip-installed" isn't a trust boundary you
+control: the reviewed built-in rules still run, nothing else is imported.
 
 ## Running the collector (`guardana-server`)
 

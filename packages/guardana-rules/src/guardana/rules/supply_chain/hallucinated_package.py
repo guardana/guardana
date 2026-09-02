@@ -4,11 +4,12 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM03_2025, OWASP_LLM04_2026
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._declared_deps import declared_import_names, normalize
 from guardana.rules.supply_chain._known_packages import (
     KNOWN_DISTRIBUTIONS,
@@ -83,7 +84,7 @@ def _local_modules(root: Path) -> frozenset[str]:
     return frozenset(names)
 
 
-class HallucinatedPackageRule(Rule):
+class HallucinatedPackageRule(ArtifactRule):
     """Flags an import of a package nobody has heard of — a slopsquat lead, not a verdict."""
 
     meta = RuleMeta(

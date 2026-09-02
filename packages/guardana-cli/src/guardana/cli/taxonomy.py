@@ -17,6 +17,8 @@ from enum import StrEnum
 from typing import Annotated
 
 import typer
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
+from guardana.cli.exit_codes import ExitCode
 from guardana.core.registry import Registry
 from guardana.core.taxonomy import (
     Correspondent,
@@ -44,6 +46,14 @@ def taxonomy(
         typer.Argument(help="One reference to explain, e.g. LLM07:2025 or AML.T0051"),
     ] = None,
     format: Annotated[TaxonomyFormat, typer.Option(help="human|json")] = TaxonomyFormat.human,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Show the installed framework catalogues, or explain one reference.
 
@@ -52,20 +62,20 @@ def taxonomy(
     years later. With a reference it prints that entry and what it corresponds to
     in the other editions.
     """
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
     # Discovery first: a company's own catalogue arrives through the
     # `guardana.taxonomies` entry point, and a listing that showed only the
     # built-ins would tell them their pack is not installed when it is.
-    registry = Registry.discover()
+    registry = Registry.discover(trust)
     # And a pack that failed to load is worse than one that is absent: its
     # references are mappings the user believes they have. Warned about here for
     # the same reason `guardana rules` warns — this command exists to confirm what
     # is installed, so a silent gap defeats it.
-    for error in registry.load_errors:
-        typer.echo(f"warning: could not load a taxonomy provider — {error}", err=True)
+    warn_about_load_errors(registry, what="a taxonomy provider")
     if reference is None:
         _list_catalogs(format)
         return
-    _explain(reference, format)
+    _explain(reference, format, len(registry.load_errors))
 
 
 def _registered_outside_a_catalog() -> list[tuple[str, tuple[TaxonomyRef, ...]]]:
@@ -157,7 +167,7 @@ def _list_catalogs(format: TaxonomyFormat) -> None:
             typer.echo(f"    {ref.reference:16} {ref.title}")
 
 
-def _explain(reference: str, format: TaxonomyFormat) -> None:
+def _explain(reference: str, format: TaxonomyFormat, refused: int) -> None:
     try:
         found = resolve(reference)
     except TaxonomyError as exc:
@@ -166,6 +176,19 @@ def _explain(reference: str, format: TaxonomyFormat) -> None:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=_INVALID_USAGE) from exc
     if found is None:
+        if refused:
+            # `resolve` searches built-ins (always loaded) plus whatever
+            # `guardana.taxonomies` registered — and plugin trust just refused
+            # `refused` of those providers. A reference they would have defined
+            # is unproven, not absent, so "no installed catalogue" would say more
+            # than this build actually knows.
+            typer.echo(
+                f"error: no loaded catalogue defines {reference!r} — {refused} "
+                f"provider(s) were refused by plugin trust, so this may be theirs "
+                f"rather than missing; see the warning(s) above",
+                err=True,
+            )
+            raise typer.Exit(code=ExitCode.INDETERMINATE)
         typer.echo(
             f"error: no installed catalogue defines {reference!r}; "
             f"run `guardana taxonomy` to list what is installed",

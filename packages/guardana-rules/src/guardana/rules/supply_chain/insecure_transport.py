@@ -3,11 +3,12 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._leads import lead_verdict
 
 # Bare call names that fetch a model, dataset, or file over the network. A
@@ -70,7 +71,7 @@ def _plaintext_host(url: str) -> str | None:
     return None if host.lower() in _LOCAL_HOSTS else host
 
 
-class InsecureTransportRule(Rule):
+class InsecureTransportRule(ArtifactRule):
     """Flags disabled TLS verification, and model/data fetched over plaintext HTTP."""
 
     meta = RuleMeta(

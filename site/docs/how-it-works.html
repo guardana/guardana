@@ -41,6 +41,7 @@
 <li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -342,7 +350,9 @@ mypack = &quot;mypack:provide_evaluators&quot;
 <p><code>provide_rules()</code> returns your <code>Rule</code> instances (or a list). <code>Registry.discover()</code>
 picks them up alongside the built-ins. Namespace your ids under your own prefix
 (<code>acme.*</code>); <code>guardana.*</code> is reserved for built-ins so profiles can include/exclude
-by glob.</p>
+by glob. The same mechanism registers <code>guardana.targets</code> and <code>guardana.taxonomies</code>
+too — four groups in total, all discovered the same way; see
+<a href="architecture.html#current-entry-point-groups"><code>architecture.md</code></a> for the full table.</p>
 <h3 id="the-two-authoring-paths">The two authoring paths</h3>
 <ul>
 <li><strong>YAML</strong> for &quot;send this, grade with that&quot; — single-turn <code>prompts:</code> or multi-turn
@@ -376,11 +386,12 @@ lines and no network — and artifact builders (<code>build_gguf</code>, <code>b
 <code>build_onnx</code>) so a static rule's <em>malicious</em> fixture is a dict literal instead of
 a binary committed to your repo.</p>
 <h3 id="a-complete-runnable-example">A complete, runnable example</h3>
-<p><code>examples/custom_rule/</code> is a real third-party package — two plugin rules, two YAML
-rules, and a custom classifier — discovered through entry points with zero changes
-to Guardana. One of the plugin rules inspects a GGUF model file and consists
-entirely of policy, because the parsing comes from the engine. That is the whole
-extensibility story in one folder.</p>
+<p><code>examples/custom_rule/</code> is a real third-party package — two plugin rules, three
+YAML rules, a custom classifier, a custom target, and a custom taxonomy,
+registering all four entry-point groups — discovered through entry points with
+zero changes to Guardana. One of the plugin rules inspects a GGUF model file and
+consists entirely of policy, because the parsing comes from the engine. That is
+the whole extensibility story in one folder.</p>
 <hr />
 <h2 id="7-central-monitoring-and-why-the-collector-is-separate">7. Central monitoring, and why the collector is separate</h2>
 <p>Everything above works <strong>fully offline</strong> — every rule, evaluator, report format,

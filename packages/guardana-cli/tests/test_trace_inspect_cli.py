@@ -192,3 +192,54 @@ def test_it_writes_no_run_document_and_opens_no_socket(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert set(tmp_path.iterdir()) == before
+
+
+def test_a_restrictive_plugin_mode_says_so_in_the_table_itself(tmp_path: Path) -> None:
+    """A refused rule pack used to be absent from the matrix with no signal at all.
+
+    Every "needed by"/"unlocks" cell read `0 rule(s)`, indistinguishable from a
+    trace that genuinely licenses nothing — and the only correction lived on
+    stderr, which a reader of the table alone never sees. The correction has to
+    be in-band, in words that cannot be misread as "nothing here is worth
+    instrumenting".
+    """
+    path = _write_trace(tmp_path, Dimension.EFFECTS)
+
+    result = runner.invoke(app, ["trace", "inspect", str(path), "--plugins", "disabled"])
+
+    assert result.exit_code == 0, result.output
+    assert "could not load rule" in result.stderr
+    assert "plugin trust is disabled" in result.stderr
+    assert "could not load rule" not in result.stdout
+    assert "dimension" in result.stdout
+    assert "effects" in result.stdout
+    assert "0 rule(s) were loaded to judge this trace against" in result.stdout
+    assert "absence of evidence" in result.stdout
+
+
+def test_full_trust_leaves_a_genuine_zero_reading_as_a_plain_count(tmp_path: Path) -> None:
+    """The inversion target: the new note must appear only when nothing was loaded,
+    never beside a matrix built from a complete registry."""
+    path = _write_trace(tmp_path, Dimension.EFFECTS)
+
+    result = runner.invoke(app, ["trace", "inspect", str(path)])
+
+    assert result.exit_code == 0, result.output
+    assert "0 rule(s) were loaded to judge this trace against" not in result.output
+
+
+def test_the_json_form_counts_the_rules_actually_loaded(tmp_path: Path) -> None:
+    """The same distinction the human table gets, for a consumer reading JSON."""
+    path = _write_trace(tmp_path, Dimension.EFFECTS)
+
+    full = json.loads(
+        runner.invoke(app, ["trace", "inspect", str(path), "--format", "json"]).stdout
+    )
+    refused = json.loads(
+        runner.invoke(
+            app, ["trace", "inspect", str(path), "--format", "json", "--plugins", "disabled"]
+        ).stdout
+    )
+
+    assert full["trace_rules_loaded"] > 0
+    assert refused["trace_rules_loaded"] == 0

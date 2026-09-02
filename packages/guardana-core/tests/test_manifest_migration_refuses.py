@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from guardana.core.manifest.load import ManifestLoadError, migrate_v1
+from guardana.core.manifest.load import ManifestLoadError
+from guardana.core.manifest.migrations import migrate_v1
 from guardana.core.report import ReportLoadError, load_report
 from jsonschema import Draft202012Validator
 

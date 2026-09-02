@@ -2,16 +2,20 @@
 
 This package is a runnable example of the "extend Guardana in your own repo"
 story: a third-party distribution with its own namespace (`acme.*`) shipping
-two Python plugin rules, two declarative YAML rules, and a custom Evaluator
-(classifier) — following the exact contract Guardana's own built-ins use.
+two Python plugin rules, three declarative YAML rules, a custom Evaluator
+(classifier), a custom Target (a directory of approved prompts), and a custom
+taxonomy (`ACME-14`, Acme's own control catalogue) — following the exact
+contract Guardana's own built-ins use.
 
 `approved_model.py` is the one to read if you want to inspect a *model file*:
 it is pure policy, because `guardana.core.formats` does the binary parsing —
 bounded, offline, and fail-closed — so the rule never touches a byte offset.
 
 Nothing here is special-cased: `guardana scan`/`probe`/`monitor` discover these
-through the public `guardana.rules` and `guardana.evaluators` entry points
-exactly as they discover the built-ins.
+through the public `guardana.rules`, `guardana.evaluators`, `guardana.targets`,
+and `guardana.taxonomies` entry points exactly as they discover the built-ins —
+all four groups, registered here on purpose, because a documented group nothing
+registers is a seam nobody has run.
 """
 
 import importlib.resources

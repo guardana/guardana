@@ -5,7 +5,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -16,6 +16,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM10_2026,
     OWASP_ML06_2023,
 )
+from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
@@ -57,7 +58,7 @@ def _dangerous_module(config: object) -> str | None:
     return None
 
 
-class KerasLambdaRule(Rule):
+class KerasLambdaRule(ArtifactRule):
     """Flag a Keras `Lambda` layer — arbitrary Python that runs when the model loads."""
 
     meta = RuleMeta(

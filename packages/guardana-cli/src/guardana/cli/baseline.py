@@ -10,6 +10,7 @@ from guardana.cli._plugins import resolve_trust
 from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli.exit_codes import ExitCode
+from guardana.core.plugins import PluginTrust
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import (
@@ -30,9 +31,9 @@ baseline_app = typer.Typer(
 _DEFAULT = Path("guardana-baseline.yaml")
 
 
-def _scan(path: Path, profile: Path | None, preset: str | None) -> ScanResult:
+def _scan(path: Path, profile: Path | None, preset: str | None, trust: PluginTrust) -> ScanResult:
     prof = resolve_profile(profile, preset)
-    registry = Registry.discover(resolve_trust("all", [], no_plugins=False))
+    registry = Registry.discover(trust)
     load_custom_rules(registry, prof, [])
     target = ArtifactTarget(path, excludes=prof.path_excludes)
     result = Runner(registry=registry, profile=prof).run(target)
@@ -63,11 +64,19 @@ def _report_health(baseline: Baseline) -> int:
     return problems
 
 
-def create(
+def create(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     path: Annotated[Path, typer.Argument(help="Directory to scan")],
     output: Annotated[Path, typer.Option("--output", help="Where to write it")] = _DEFAULT,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help="Named policy preset")] = None,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Write a baseline waiving every finding a scan produces right now.
 
@@ -75,7 +84,8 @@ def create(
     placeholder text for the reason and the approver. A baseline nobody edited is
     a list of findings somebody silenced, and it should look like one.
     """
-    result = _scan(path, profile, preset)
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
+    result = _scan(path, profile, preset, trust)
     output.write_text(serialize_baseline(result), encoding="utf-8")
     count = len(result.findings)
     typer.echo(
@@ -113,11 +123,19 @@ def verify(
         raise typer.Exit(code=ExitCode.POLICY_FAILED)
 
 
-def update(
+def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     path: Annotated[Path, typer.Argument(help="Directory to scan")],
     file: Annotated[Path, typer.Option("--file", help="Baseline to refresh")] = _DEFAULT,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help="Named policy preset")] = None,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Drop waivers for findings that no longer occur, keeping the rest untouched.
 
@@ -125,12 +143,13 @@ def update(
     never adds new ones. Adding is what `create` does, and it should be a decision
     somebody makes rather than something an update does on their behalf.
     """
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
     try:
         baseline = read_baseline(file)
     except BaselineError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
-    result = _scan(path, profile, preset)
+    result = _scan(path, profile, preset, trust)
     if result.errors or result.stopped_by is not None:
         # Nothing is written. This command decides a finding is fixed by not
         # seeing it, and a rule that could not run produces exactly that absence —

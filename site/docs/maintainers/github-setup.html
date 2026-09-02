@@ -41,6 +41,7 @@
 <li><a href="../usage-monitor.html">guardana monitor</a></li>
 <li><a href="../usage-target.html">guardana target inspect</a></li>
 <li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
 <li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="../exit-codes.html">Exit codes</a></li>
 <li><a href="../usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -238,8 +246,16 @@ a UI toggle.</li>
 <li><strong>Secret scanning</strong> ✅ and <strong>Push protection</strong> ✅ — refuses a push that
 contains a detected credential. (Guardana has its own <code>detect-private-key</code>
 pre-commit hook and a secret-scanning rule; this is the server-side backstop.)</li>
-<li><strong>Code scanning (CodeQL)</strong> — optional now; a good v0.2 addition. Our <code>ruff</code>
-<code>S</code>/bandit rules already lint for common issues in CI.</li>
+<li><strong>Code scanning (CodeQL)</strong> — <code>.github/workflows/codeql.yml</code> runs the analysis
+on every push to <code>main</code>, every pull request, and weekly; nothing to enable here
+beyond leaving <strong>Code scanning alerts</strong> on, which is the default for a public
+repository. Alerts appear under <strong>Security → Code scanning</strong> once the workflow
+has run once. <code>ruff</code>'s <code>S</code>/bandit family lints patterns; CodeQL does taint
+tracking, so the two are complementary rather than redundant. Deliberately not
+wired into branch protection's required status checks (step 3): CodeQL alerts
+do not block a merge in this cycle, so a first run against the existing tree
+does not retroactively fail every open PR. Revisit once the initial alert
+backlog has been triaged.</li>
 </ul>
 <h2 id="6-the-pypi-release-environment--settings--environments">6. The <code>pypi</code> release environment — Settings → Environments</h2>
 <p><a href="https://github.com/guardana/guardana/blob/main/.github/workflows/release.yml"><code>release.yml</code></a> publishes from an

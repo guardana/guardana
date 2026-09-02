@@ -56,7 +56,14 @@ repos:
 
       - id: pytest
         name: pytest + coverage gate
-        entry: uv run pytest --cov
+        entry: uv run pytest --cov --cov-report=json:.coverage.json
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: critical-coverage
+        name: per-area coverage floors
+        entry: uv run python scripts/critical_coverage.py .coverage.json
         language: system
         pass_filenames: false
         stages: [pre-push]

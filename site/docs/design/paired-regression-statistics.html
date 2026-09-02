@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paired regression statistics — Guardana documentation</title>
+<meta name="description" content="how diff and monitor decide that a measured sample got worse — an exact test on the discordant pairs, a minimum effect, a minimum sample, and a refusal for anything short of all three">
+<link rel="canonical" href="https://guardana.dev/docs/design/paired-regression-statistics.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html" aria-current="page">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Paired regression statistics: &quot;worse&quot; with a p-value, or &quot;cannot tell&quot;<span class="status proposed">proposed</span></h1><p class="lede">how diff and monitor decide that a measured sample got worse — an exact test on the discordant pairs, a minimum effect, a minimum sample, and a refusal for anything short of all three</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-09-02 · <strong>Cycle 3 of the extensibility program</strong> (<a href="audit-0.22.html"><code>audit-0.22.md</code></a>)</p>
+<h2 id="where-0220-stopped">Where 0.22.0 stopped</h2>
+<p><code>guardana diff</code> pairs two runs' assessments on <code>case_id</code>, refuses a pair whose
+assessor or dataset changed, and prints the population: paired, incomparable,
+gone, new, blinded, and the two pass counts. It deliberately prints no percentage
+and gates nothing, because &quot;16 → 15 passing over 21 cases&quot; is a sentence a reader
+can weigh and &quot;5% worse&quot; is not. That was the right place to stop until there was
+a sample worth a statistic. Suites are that sample.</p>
+<h2 id="the-question-stated-precisely">The question, stated precisely</h2>
+<p>Over the cases both runs measured like for like, is the second run worse than
+the first by more than noise could explain, by at least an amount somebody said
+they care about, on a sample at least as large as somebody said they need?</p>
+<p>Three conditions, all three required, each named in the output when it fails.
+An alert missing any of them is the pager-attached random number generator the
+intake design refuses.</p>
+<h2 id="boolean-cases">Boolean cases</h2>
+<p>Every paired case is one of four: pass→pass, fail→fail, pass→fail (<code>b</code>),
+fail→pass (<code>c</code>). Only the discordant pairs carry information, so:</p>
+<ul>
+<li><strong>effect</strong> = <code>(b − c) / paired</code> — the change in pass rate on the paired sample,
+positive when worse;</li>
+<li><strong>p-value</strong> = the exact two-sided McNemar test, the binomial probability of a
+split at least as lopsided as <code>b : c</code> under the hypothesis that a flip is
+equally likely either way. Computed with <code>math.comb</code>; nothing new is imported.</li>
+</ul>
+<p>A <strong>rate regression</strong> is reported when <code>paired ≥ min_sample</code>, <code>effect ≥ min_effect</code>
+and <code>p ≤ max_p_value</code>. A <strong>rate improvement</strong> is the mirror image. Anything else is
+a note that says which condition was not met and by how much: &quot;12 paired cases,
+below the 30 this policy needs&quot;, &quot;pass rate fell 0.03 on 80 cases, below the
+minimum effect 0.05&quot;, &quot;3 cases got worse and 2 got better; p = 0.63&quot;.</p>
+<h2 id="numeric-cases">Numeric cases</h2>
+<p>For paired measurements with the same unit, direction and threshold: the mean of
+the paired differences, signed so that positive is worse, with a 95% interval
+from the sample standard deviation at <code>paired ≥ 30</code> and no interval below it. A
+regression is reported when the interval excludes zero on the worse side and the
+sample is at least <code>min_sample</code>. A minimum effect in units is deferred — characters
+and ratios and milliseconds do not share a scale, and a default would be wrong for
+two of the three — so the note names the mean and the interval and leaves the
+judgement to the reader until a policy can express it.</p>
+<h2 id="where-the-policy-lives">Where the policy lives</h2>
+<p>A <code>regression:</code> block in <code>guardana.yaml</code>, validated at load, with defaults that
+refuse rather than alert:</p>
+<pre><code class="language-yaml">regression:
+  min_sample: 30
+  min_effect: 0.05
+  max_p_value: 0.05
+</code></pre>
+<p><code>diff</code> and <code>monitor</code> already take <code>--profile</code> and <code>--preset</code>, so the block reaches
+both. The <code>monitor</code> preset carries the defaults. Slices by tag are printed with
+their own paired counts and never gated: a slice is by construction a smaller
+sample, and a gate on it would alert exactly where the evidence is thinnest.</p>
+<h2 id="what-changes-in-the-documents">What changes in the documents</h2>
+<p>Two new change kinds, <code>rate_regressed</code> and <code>rate_improved</code>, attributed to the
+suite's rule id with the numbers in <code>detail</code>, so a rate regression exits <code>1</code>
+through the machinery that already exists and <code>monitor</code> alerts on it with the
+same policy. The measurement block grows <code>regressed</code>, <code>improved</code>, <code>effect</code>,
+<code>p_value</code>, <code>verdict</code> and <code>slices</code>. Diff schema <code>3</code>, with a pinned published schema
+and the version-2 document still read.</p>
+<h3 id="the-two-questions-a-suite-answers-kept-apart">The two questions a suite answers, kept apart</h3>
+<p>A suite's own finding says &quot;this run's rate is below the bar the operator set&quot;.
+A rate regression says &quot;this run's rate is worse than last run's, beyond noise&quot;.
+A model can fail the first and not the second (it was already below the bar), or
+the second and not the first (it fell from 99% to 93% against a 90% bar). Both
+are reported, neither is folded into the other, and the change list shows a
+suite's threshold finding as <code>appeared</code> exactly as it would any other finding.</p>
+<h3 id="monitor"><code>monitor</code></h3>
+<p>Inherits everything through <code>compare</code>. One addition: at start-up it says, once,
+which suites are below <code>min_sample</code> — &quot;suite X has 20 cases, below
+regression.min_sample 30; rate changes will be reported, not alerted&quot; — because a
+monitor that silently cannot alert is the blind spot the intake design names
+first.</p>
+<h2 id="rejected">Rejected</h2>
+<p><strong><code>scipy</code>, <code>numpy</code>, <code>statsmodels</code>.</strong> Principle 6. Everything above is
+<code>math.comb</code>, <code>math.sqrt</code> and a loop.</p>
+<p><strong>Alerting on the point estimate.</strong> It is the thing that made &quot;16 → 15&quot; look like
+a regression, and it is what every dashboard already does.</p>
+<p><strong>A single quality score.</strong> Unchanged from the roadmap's refusal of a universal
+risk score: it would hide which condition was unmet.</p>
+<p><strong>Sequential testing and early stopping.</strong> Worth having for a monitor that samples
+continuously; belongs with the intake lane, where the sample arrives over time.
+A one-shot <code>diff</code> has both runs in hand.</p>
+<p><strong>Bayesian intervals.</strong> Defensible, and a prior is a policy decision this tool
+has no standing to set for somebody else's suite.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="quality-suites.html"><code>quality-suites.md</code></a> — where the paired sample comes from</li>
+<li><a href="assessment-channel.html"><code>assessment-channel.md</code></a> — the comparability key</li>
+<li><a href="../usage-diff.html"><code>../usage-diff.md</code></a> — the user page</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/paired-regression-statistics.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

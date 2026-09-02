@@ -145,3 +145,51 @@ def test_a_missing_lock_is_refused_rather_than_written_silently(tmp_path: Path) 
 
     assert result.exit_code == 3, result.output
     assert not (tmp_path / "absent.yaml").exists()
+
+
+def test_a_restrictive_plugin_mode_refuses_to_write_a_false_lock(tmp_path: Path) -> None:
+    """A refused entry point used to leave the lock pinning an emptied pack in silence:
+    `_installed` reads straight from the registry, so a distribution `--plugins`
+    refused was pinned with zero rules, indistinguishable from one that genuinely
+    ships none — and the command still said "pinned" and exited `0`. A lock is a
+    document a team keeps and reads on every CI run, so writing a false one is
+    worse than refusing to write at all: the command must refuse, and the file
+    must not exist afterwards.
+    """
+    path = tmp_path / "guardana-lock.yaml"
+
+    result = runner.invoke(app, ["pack", "lock", str(path), "--plugins", "disabled"])
+
+    assert result.exit_code == 2, result.output
+    assert "could not load an extension" in result.stderr
+    assert "plugin trust is disabled" in result.stderr
+    assert "refused by plugin trust" in result.stderr
+    assert "pinned" not in result.stdout
+    assert not path.exists()
+
+
+def test_a_restrictive_plugin_mode_refuses_the_check_too_rather_than_call_it_gone(
+    tmp_path: Path,
+) -> None:
+    """`--check` against a registry with refusals must not report a refused
+    extension as `removed` ("is gone") — it is exactly as unproven for a check as
+    it is for a fresh write, so the whole comparison is refused the same way.
+    """
+    path = _lock(tmp_path)
+
+    result = runner.invoke(app, ["pack", "lock", str(path), "--check", "--plugins", "disabled"])
+
+    assert result.exit_code == 2, result.output
+    assert "is gone" not in result.output
+    assert "removed" not in result.output
+    assert "refused by plugin trust" in result.stderr
+
+
+def test_full_trust_still_checks_clean_after_the_refusal_fix(tmp_path: Path) -> None:
+    """The inversion target: refusing on load errors must not become refusing always."""
+    path = _lock(tmp_path)
+
+    result = runner.invoke(app, ["pack", "lock", str(path), "--check"])
+
+    assert result.exit_code == 0, result.output
+    assert "match" in result.output

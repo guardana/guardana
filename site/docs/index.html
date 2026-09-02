@@ -41,6 +41,7 @@
 <li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -137,6 +145,7 @@ endpoint or agent, and an MCP server's manifest <strong>and authorization surfac
 <li><a href="usage-monitor.html"><code>usage-monitor.md</code></a> — <code>guardana monitor</code>: scheduled re-verification</li>
 <li><a href="usage-target.html"><code>usage-target.md</code></a> — <code>guardana target inspect</code>: what an endpoint really supports</li>
 <li><a href="usage-plan.html"><code>usage-plan.md</code></a> — <code>guardana plan</code>: what a run would cost, before it costs anything</li>
+<li><a href="usage-rules.html"><code>usage-rules.md</code></a> — <code>guardana rules</code>: list every discovered rule, grouped by the layer it secures</li>
 <li><a href="usage-taxonomy.html"><code>usage-taxonomy.md</code></a> — <code>guardana taxonomy</code>: which framework entry a reference names, and what it corresponds to in another edition</li>
 <li><a href="exit-codes.html"><code>exit-codes.md</code></a> — the exit-status contract every command honours</li>
 <li><a href="usage-run.html"><code>usage-run.md</code></a> — <code>guardana run inspect|migrate</code>: reading a saved run, its manifest, and the cases it measured</li>
@@ -181,6 +190,13 @@ endpoint or agent, and an MCP server's manifest <strong>and authorization surfac
 <li><a href="design/capability-protocols.html"><code>design/capability-protocols.md</code></a> — what each capability actually promises, and why the extension contract was false until it did</li>
 <li><a href="design/production-intake.html"><code>design/production-intake.md</code></a> — assessing real traffic without ever being in its path <em>(proposed)</em></li>
 <li><a href="design/audit-0.21.html"><code>design/audit-0.21.md</code></a> — what a full audit of the released 0.21 found, and which gate closed each finding</li>
+<li><a href="design/audit-0.22.html"><code>design/audit-0.22.md</code></a> — how open the engine really is after 0.22, which seams stay closed on purpose, and the six-cycle program that follows</li>
+<li><a href="design/target-locators.html"><code>design/target-locators.md</code></a> — a discovered target the CLI can build: a scheme on the class, a locator on the command line, the verb still choosing the kind <em>(proposed)</em></li>
+<li><a href="design/output-plugins.html"><code>design/output-plugins.md</code></a> — renderers and reporters as entry points, and the redaction invariant every output sits behind <em>(proposed)</em></li>
+<li><a href="design/quality-suites.html"><code>design/quality-suites.md</code></a> — versioned datasets, suites that are rules, assessors that are evaluators, and a gate that refuses a rate it has not earned <em>(proposed)</em></li>
+<li><a href="design/paired-regression-statistics.html"><code>design/paired-regression-statistics.md</code></a> — &quot;worse&quot; over a paired sample with an exact test, a minimum effect and a minimum sample, or &quot;cannot tell&quot; <em>(proposed)</em></li>
+<li><a href="design/attack-techniques.html"><code>design/attack-techniques.md</code></a> — the technique as its own extension point, so coverage multiplies instead of adding <em>(proposed)</em></li>
+<li><a href="design/namespaced-extension-ids.html"><code>design/namespaced-extension-ids.md</code></a> — capabilities and assertion kinds a pack can declare, with a typo still a load error <em>(proposed)</em></li>
 <li><a href="design/trace-domain-model.html"><code>design/trace-domain-model.md</code></a> — the <code>Trace</code> model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact</li>
 <li><a href="design/trace-producer.html"><code>design/trace-producer.md</code></a> — the append-only writer, which inflated declaration actually leaks a pass, and what the model needs before an integrator can record human approval honestly</li>
 <li><a href="design/framework-adapters.html"><code>design/framework-adapters.md</code></a> — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing</li>
@@ -211,11 +227,14 @@ endpoint or agent, and an MCP server's manifest <strong>and authorization surfac
 <h2 id="runnable-example">Runnable example</h2>
 <p><a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule"><code>examples/custom_rule/</code></a> is a complete,
 installable third-party extension (fictional company &quot;Acme&quot;) that declares
-its own <code>guardana.rules</code> and <code>guardana.evaluators</code> entry points and ships,
-under an <code>acme.*</code> namespace, two Python plugin rules, two YAML rules, and a
-<strong>custom classifier</strong> (an <code>Evaluator</code>) — with tests proving Guardana
-discovers and uses each one end-to-end. One of the plugin rules inspects a
-<strong>GGUF model file</strong> and is pure policy, because the binary parsing comes from
+all four entry-point groups — <code>guardana.rules</code>, <code>guardana.evaluators</code>,
+<code>guardana.targets</code>, and <code>guardana.taxonomies</code> — and ships, under an <code>acme.*</code>
+namespace, two Python plugin rules, three YAML rules, a <strong>custom classifier</strong>
+(an <code>Evaluator</code>), a <strong>custom target</strong> (a directory of approved prompts, read
+as artifacts), and a <strong>custom taxonomy</strong> (<code>ACME-14</code>, Acme's own internal
+control catalogue) — with tests proving Guardana discovers and uses each one
+end-to-end. One of the plugin rules inspects a <strong>GGUF model file</strong> and is pure
+policy, because the binary parsing comes from
 <a href="model-formats.html"><code>model-formats.md</code></a>.
 <a href="https://github.com/guardana/guardana/blob/main/examples/guardana.yaml"><code>examples/guardana.yaml</code></a> is a sample profile
 that includes both Guardana's built-ins and Acme's custom rules.</p>

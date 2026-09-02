@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from guardana.cli._plugins import resolve_trust
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._trace_input import load_trace_or_exit, trace_source
@@ -69,20 +69,26 @@ def inspect(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; the co
     prof = resolve_profile(profile, preset)
     read = load_trace_or_exit(trace, dialect)
     registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
+    warn_about_load_errors(registry, what="rule")
     load_custom_rules(registry, prof, rules)
     matrix = evidence_matrix(read.trace)
     licensed = _licensed_rules(registry)
     unlocked = _unlocked_rules(registry, read.trace.instrumented)
     required = frozenset(prof.required_dimensions)
+    # A restrictive `--plugins` mode can empty `_trace_rules(registry)` entirely,
+    # and every "needed by"/"unlocks" cell reads `0 rule(s)` identically whether
+    # nothing needs a dimension or nothing was loaded to ask. This count is what
+    # lets the render tell those two apart instead of reading like a clean matrix.
+    trace_rule_count = len(_trace_rules(registry))
     if format is InspectFormat.json:
-        document = _document(read.trace, matrix, licensed, unlocked, required)
+        document = _document(read.trace, matrix, licensed, unlocked, required, trace_rule_count)
         typer.echo(json.dumps(document, indent=2))
         return
     typer.echo(trace_source(read))
     typer.echo("")
     for line in _table(matrix, licensed, unlocked, required):
         typer.echo(line)
-    for line in _notes(read.trace, matrix, required):
+    for line in _notes(read.trace, matrix, required, trace_rule_count):
         typer.echo(line)
 
 
@@ -174,10 +180,26 @@ def _table(
 
 
 def _notes(
-    trace: Trace, matrix: tuple[DimensionCoverage, ...], required: frozenset[Dimension]
+    trace: Trace,
+    matrix: tuple[DimensionCoverage, ...],
+    required: frozenset[Dimension],
+    trace_rule_count: int,
 ) -> list[str]:
     """Say what a clean-looking matrix still does not mean."""
     lines = [""]
+    if trace_rule_count == 0:
+        # The equivalent of `target inspect`'s three-way branch: an empty
+        # "needed by"/"unlocks" column is not a clean result here either, and
+        # must not be read as "no dimension here is worth instrumenting" when
+        # the real cause is that no trace rule was loaded to ask in the first
+        # place. Said in-band, not only on stderr, because this table is the
+        # thing an operator reads on its own to decide what to instrument next.
+        lines.append(
+            "note: 0 rule(s) were loaded to judge this trace against — every "
+            "'needed by' and 'unlocks' count above is not a clean 0, it is an "
+            "absence of evidence: nothing here says a dimension is not worth "
+            "instrumenting"
+        )
     missing = [row.dimension for row in matrix if row.is_gap and row.dimension in required]
     if missing:
         lines.append(
@@ -204,14 +226,21 @@ def _notes(
     return lines
 
 
-def _document(
+def _document(  # noqa: PLR0913, PLR0917 — one already-computed report fact per argument
     trace: Trace,
     matrix: tuple[DimensionCoverage, ...],
     licensed: dict[str, tuple[str, ...]],
     unlocked: dict[str, tuple[str, ...]],
     required: frozenset[Dimension],
+    trace_rule_count: int,
 ) -> dict[str, object]:
-    """Build the machine-readable matrix — the same facts, named rather than aligned."""
+    """Build the machine-readable matrix — the same facts, named rather than aligned.
+
+    `trace_rules_loaded` carries the correction `_notes` prints for the human
+    table: an empty `licenses`/`unlocks` list reads the same for "nothing needs
+    this" and "nothing was loaded to ask" unless a consumer can check this count
+    first.
+    """
     return {
         "trace_id": trace.trace_id,
         "source": trace.provenance.source,
@@ -219,6 +248,7 @@ def _document(
         "producer": trace.provenance.producer,
         "spans": len(trace.spans),
         "truncated": None if trace.truncated is None else str(trace.truncated),
+        "trace_rules_loaded": trace_rule_count,
         "dimensions": [
             {
                 "dimension": str(row.dimension),

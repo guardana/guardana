@@ -5,6 +5,326 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **CodeQL runs as a second static-analysis signal, alongside `ruff`'s bandit
+  family.** `ruff`'s `S` rules lint for known-bad patterns; they do no taint
+  tracking, so a value that flows from an untrusted source to a dangerous sink
+  through a few hops of ordinary-looking code is outside what a pattern linter
+  can see. A security product should carry both signals rather than argue which
+  one is better. `.github/workflows/codeql.yml` runs the analysis on every push
+  to `main`, on every pull request, and once a week on a schedule, so a query
+  update can surface a regression even between pushes. `permissions:` is
+  least-privilege and explicit — `contents: read` and `security-events: write`,
+  nothing else — and every action it calls is pinned by full commit SHA with the
+  `# vN` tag in a comment, the same convention `ci.yml` and `release.yml` already
+  use. CodeQL alerts do **not** block a merge in this cycle: they are not added
+  to branch protection's required status checks, so the first run against the
+  existing tree does not retroactively fail every open PR before anyone has
+  triaged the initial backlog. See
+  [`docs/maintainers/github-setup.md`](docs/maintainers/github-setup.md) for the
+  one-time repository setting this still depends on.
+
+### Changed
+
+- **`scripts/critical_coverage.py` gained ten more per-area floors, for areas that had
+  none.** The aggregate gate (`fail_under = 90` in `pyproject.toml`) is one number over
+  the whole tree; it lets a well-tested feature's coverage buy a pass for a parser or a
+  query path nobody has exercised, in a subsystem the aggregate never has to name by
+  itself. The ten new rows — `guardana/core/contract/`, `guardana/core/pack/`,
+  `guardana/core/calibration/`, `guardana/testing/`, `guardana/cli/`,
+  `guardana/report/`, `guardana/adapters/`, `guardana/rules/prompt/`,
+  `guardana/rules/agent/`, `guardana/rules/trace/` — close that gap for the extension
+  contract an author's proof runs through, the surface a user actually types against,
+  and the three rule packs that had shipped with no floor of their own. Each is, per
+  the module's own docstring, a **ratchet, not a target**: the value measured on this
+  tree today, rounded down — never an aspirational number, and never rounded up.
+  `guardana/cli/` is the case that mattered: it measured 91.998%, which floors to 91,
+  not 92; a two-decimal display had rounded that to a deceptive "92.00%" first, and
+  only re-reading the unrounded float — then confirming against the script's own
+  check, which failed the freshly written floor by a tenth of a point — caught it
+  before the wrong number shipped. `guardana/core/calibration/` measured the lowest of
+  the ten, at 89.49%, the only one under ninety: it is the area that decides whether a
+  judge's stated confidence is honest, so a gap there is a confidence score nobody has
+  actually earned, not a crash — its floor is written at the measured 89 rather than
+  smoothed up to the aggregate's 90. `.pre-commit-config.yaml`'s `pytest` hook now
+  writes the JSON report the floors read
+  (`uv run pytest --cov --cov-report=json:.coverage.json`), and a new
+  `critical-coverage` local hook runs `scripts/critical_coverage.py` against it on
+  `pre-push`, right after `pytest` and before `dogfood`, so a floor breach is caught
+  locally at the same stage the other slow gates already run at, instead of only in CI.
+
+### Fixed
+
+- **`guardana plan scan` priced a file scan as unknown.** Every built-in artifact
+  rule inherited `estimated_requests = None`, so the plan for a run that sends
+  nothing printed "at least 19, at most 0 — plus 19 of unknown cost" — a sentence
+  with no reading, about a scan whose manifest already records `requests: 0` as a
+  measurement. `None` was the wrong kind of honesty: an artifact target has nothing
+  to send a request to, so `Rule.estimated_requests` now defaults to `0` for
+  `TargetKind.ARTIFACT` and stays `None` everywhere else, where whether a rule
+  sends genuinely depends on the rule. `plan` now prints "requests: 0 — a file scan
+  sends nothing" instead. The renderer first named that sentence from the numbers
+  alone, and a complete, zero-request plan is not unique to a file scan — a
+  `plan probe` that selects nothing (`--safety passive` refuses every shipped
+  endpoint rule, since each declares at least `active`) reaches the same shape,
+  and the shared renderer told it "a file scan sends nothing" about a run that
+  never touched a file. It now takes the target's kind and prints "requests: 0 —
+  no selected rule sends a request" for every kind but `ARTIFACT`. Held by
+  `test_plan_static_cost.py` (the engine's default and the floor/ceiling math),
+  `test_plan_scan_prices_a_file_scan_at_zero.py` (the scan sentence), and its
+  neighbour `test_plan_probe_prints_the_endpoint_sentence_never_the_file_one`
+  (the probe sentence, and that "file scan" never appears in it). The same
+  change reached the published site late: `scripts/sitegen/explorer.py`'s
+  `cost_bucket()` was written when `None` and a positive number were the only
+  declared values, so `0 <= _CHEAP` filed every rule that now honestly declares
+  zero under "Cost: 1 to 4 requests" — twenty-eight of the fifty-one shipped
+  rules, all artifact rules that send nothing, listed on
+  `site/docs/rules/by/cost-1-4.html` beside ones that genuinely send up to four.
+  The explorer now carries a fourth bucket, `"zero"`, labelled "0 requests —
+  sends nothing" so it cannot read as a cheap paid tier rather than a free one,
+  with its own page at `site/docs/rules/by/cost-zero.html`. Held by
+  `test_cost_bucket_keeps_a_declared_zero_out_of_the_cheapest_paid_band` in
+  `scripts/tests/test_site_generator.py`.
+
+  **That `0` was still the wrong kind of honesty: it made the claim on a rule's
+  behalf the engine had never read.** Keying the default off `TargetKind.ARTIFACT`
+  on the base class claimed zero requests for every artifact rule anywhere,
+  third-party ones included — the property's own docstring had already named
+  this exact mistake once, about the canary contract, a few paragraphs above
+  where it then happened again. A pack with an artifact rule that does its own
+  network I/O (demonstrated with a rule calling `urllib.request.urlopen` once
+  per file) made `plan scan` print `requests: 0` and exit `0`; rebuilt with the
+  pre-cycle default in the same process, the same plan reported `unknown_cost`
+  and exited `3` instead. `Rule.estimated_requests` is back to `None` for every
+  kind, artifact included, and the docstring is back to describing "unknown" —
+  the engine cannot promise anything about a rule it has never seen. The honest
+  zero for a file-reading rule now belongs to whoever actually wrote it: the 19
+  built-in artifact rules declare it themselves, on a new
+  `guardana.rules._base.ArtifactRule` — not a public extension point, so a
+  third-party rule declares its own. A new gate,
+  `test_no_shipped_artifact_rule_touches_the_network` in
+  `guardana-rules/tests/test_scan_network.py`, runs every one of them over a
+  fixture tree with outbound connections blocked at the socket layer, and fails
+  by rule id if any of them ever tries to open one. `plan`'s artifact-branch
+  sentence changed with it, from "a file scan sends nothing" — a claim about the
+  target kind — to "every selected rule declares it sends nothing", a claim
+  about what this measured.
+
+- **The plugin trust policy was honoured by some commands and silently ignored by
+  the rest.** `--plugins`/`--allow-plugin` decide whose installed Python a run is
+  willing to import — a security control, not a convenience flag — but `baseline
+  create`/`update` hard-coded `all`, `target inspect` and `calibrate` called
+  `Registry.discover()` bare (the same thing spelled differently), `plan probe` had
+  no lever for this at all, and `plan scan` only exposed the coarse `--no-plugins`
+  toggle: none of these four could express `builtins`, `allowlist`, or name a
+  distribution to trust. A control a user sets on `scan` and finds silently absent
+  on `calibrate` is a control they believe they have. **The count was six, not the
+  four an initial reading found**: `guardana rules` and `guardana taxonomy` called
+  `Registry.discover()` bare too, unconditionally importing every installed entry
+  point to build a catalogue listing instead of a scan — the same defect, just
+  behind a different verb. Nothing in that first reading was wrong, exactly nothing
+  looked at those two files; what caught them was the static gate itself, written
+  to scan every file in `guardana.cli` for a bare `Registry.discover()` with no
+  exception list, run once the first four were fixed, and left to fail loudly
+  instead of being narrowed to pass. All six now resolve trust through the same
+  `guardana.cli._plugins.resolve_trust` every already-correct discovering command
+  uses, take the identical `--plugins`/`--allow-plugin` pair, and refuse an unknown
+  mode before any network or file I/O — so an unknown mode on `target inspect` is a
+  usage error (exit `3`) raised before the endpoint is ever contacted, rather than
+  surfacing later as a connection failure. `plan scan` keeps `--no-plugins` as a
+  deprecated alias, exactly like `scan` does. `import-observations` keeps its
+  hard-coded `disabled` on purpose: it runs no rule at all, so there is no
+  third-party code for a flag to trust or refuse, and its docstring now says so for
+  the next audit.
+
+- **Restricting what loads was still invisible in the result**, even after all six
+  resolved the flag correctly: a refused entry point landed in
+  `registry.load_errors`, but only `rules` and `taxonomy` ever printed it, so
+  `plan scan --plugins disabled` reported "0 rule(s) would run" and "requests: 0 —
+  a file scan sends nothing" with nothing on screen to say the run had loaded
+  nothing rather than found nothing, and `calibrate --plugins disabled` refused an
+  unregistered evaluator with an empty "known:" list and no reason for the reader
+  to suspect trust rather than a typo. Worst was `target inspect --plugins
+  disabled`: an empty registry made the unrunnable-rules count zero, and zero
+  unrunnable rendered as **"Every endpoint rule can run against this target"** —
+  a confident pass over a target nothing had actually judged, which is the single
+  failure this repository's own rules exist to catch, reachable only because this
+  task had just given the command the flag that empties the registry. One
+  helper, `guardana.cli._plugins.warn_about_load_errors`, now prints the refusal
+  to stderr — in each caller's own word for what failed to load, since a rule is
+  not an evaluator is not a taxonomy provider — from every command that renders a
+  result built from a discovered registry: the six above, plus `trace inspect`,
+  `pack validate` and `pack lock`, whose trust resolution was already correct and
+  which had stayed just as silent about a refusal. `target inspect`'s human-readable
+  output now says plainly when zero rules were loaded to judge against, instead of
+  reusing the sentence a genuine clean result prints; its JSON form still cannot
+  make that distinction (`unrunnable_rules: []` reads the same for "nothing failed"
+  and "nothing loaded") and is left that way on purpose, since closing it needs a
+  schema version and a migration and cycle 0 changes no persisted schema. Held by
+  `test_plugin_trust_is_one_policy.py` (one test scans every command's source for
+  a bare `Registry.discover()` or a hard-coded trust-mode literal, with no
+  exemption list, and a parametrised test drives all six through an unknown mode
+  and a misplaced `--allow-plugin`) and three more, one per silent case:
+  `target inspect` never claims a pass over zero rules, `plan scan` names the
+  refused distribution, and `calibrate` names plugin trust rather than leaving an
+  empty list to speak for itself. `test_trace_inspect_cli.py`, `test_pack_validate_cli.py`
+  and `test_pack_lock_cli.py` each gained the matching stderr assertion for the three
+  commands that only needed the new warning wired in.
+
+  **Printing the refusal did not make the answer correct.** `warn_about_load_errors`
+  made a restrictive `--plugins` mode visible on stderr; it did not stop three
+  commands from computing an answer from the very registry the policy had just
+  emptied and stating it as fact. `pack validate` built `registered` from that
+  registry and printed "declares … and does not register them" for every pack —
+  under `--plugins disabled` this had `guardana-rules` accusing itself of not
+  registering the fifty-six rules it ships, at exit `1`, as if the manifest were
+  wrong rather than the trust policy restrictive. `pack lock` had the sharper
+  version: a lock is not a one-off report, it is a document a team keeps and reads
+  on every CI run, and it wrote one anyway — `rules: {}, evaluators: [], targets:
+  [], taxonomies: {}` for a pack that registers plenty, at exit `0`, indistinguishable
+  from a genuinely empty build once the run that produced it is gone. `taxonomy
+  <reference>` told the same lie in miniature: a reference an installed pack
+  registers through `guardana.taxonomies`, refused by the policy, printed "no
+  installed catalogue defines" it and exited `3` — the code for a bad command line
+  — about a catalogue that was never absent, only unloaded. `trace inspect`'s
+  evidence matrix read `0 rule(s)` in its "needed by" and "unlocks" columns
+  identically whether a dimension truly licensed nothing or nothing had been
+  loaded to ask, and unlike `target inspect` above, the correction lived only on
+  stderr, invisible to a reader of the table alone. `validate` and `lock` now
+  refuse the comparison outright whenever `registry.load_errors` is non-empty —
+  exit `2`, `ExitCode.INDETERMINATE`, "the result could not be established" in its
+  own words — rather than accuse a pack or persist a lock built on a registry this
+  build did not fully load; `lock --check` takes the same refusal, so a refused
+  extension is never reported `removed` ("is gone") either. `taxonomy` now says
+  "no *loaded* catalogue defines … — N provider(s) were refused by plugin trust"
+  and goes indeterminate too, instead of declaring the reference does not exist.
+  `trace inspect` gets the sentence `target inspect` already had, in both
+  renderers this time: the human table prints "0 rule(s) were loaded to judge
+  this trace against … an absence of evidence" in-band, and its JSON form carries
+  a new `trace_rules_loaded` count — unlike `target inspect`'s JSON, deliberately
+  left alone above, `trace inspect`'s declares no `schema_version` of its own and
+  was never a promise cycle 0's no-persisted-schema-changes rule covers.
+
+  Two more of the same shape, smaller. `warn_about_load_errors`'s own warning
+  printed the raw dataclass — `CheckError(source='builtin', stage='discovery',
+  reason='…')` — instead of its fields, in the one place this cycle had just
+  nominated as *the* place a refusal is shown; it now reads `source (stage):
+  reason`, the shape `doctor` and `_rules_loading.py` already used. And `guardana
+  rules --plugins disabled` exited `0` over an empty listing with nothing on
+  either stream — missed because nothing rendering at all left nothing for a
+  text-based check to catch — and now refuses the same way `rule test` refuses an
+  unmatched selector: "no rule was loaded … which is not the same as nothing
+  being installed", exit `2`.
+
+  `test_pack_validate_cli.py`, `test_pack_lock_cli.py`, `test_taxonomy_cli.py` and
+  `test_trace_inspect_cli.py` each gained the corrected assertion in place of the
+  one that had checked the old, wrong behaviour, plus an inversion case proving the
+  fix does not become "never validate/lock/explain anything"; a new
+  `test_rules_cli.py` covers the listing command the same way. One more test in
+  `test_plugin_trust_is_one_policy.py` runs every `--plugins`-taking command that
+  can be exercised without a live endpoint or an external fixture and asserts that
+  none of "does not register", "is gone" or "no installed catalogue" ever appears
+  under `--plugins disabled`, plus a dedicated case for the warning's own
+  formatting.
+
+- **`examples/custom_rule`'s own `Target` did not implement the contract it
+  declared.** `AcmePromptLibraryTarget` declared `Capability.READ_FILES` with no
+  `FileReader` surface behind it — no `iter_files`, no `python_source`, no
+  `unread_sources` — so `guardana.testing.assert_target_conforms` raised
+  `TargetContractError`, and a real `Runner.run` over it recorded a
+  `stage="capability"` error and, under the default `fail_on_error: true`, came
+  back `indeterminate`. The example's two plugin rules failed the same contract
+  from the other side: both checked `isinstance(target, ArtifactTarget)` and
+  returned silently for anything else, so a `FileReader` that was not
+  `ArtifactTarget` was skipped without a word — the same false green 0.22.0
+  removed from the built-in rules. Nothing here caught either direction, because
+  nothing in this package's own tests ever ran the `Runner` over the target or
+  called the conformance kit the same release shipped. `AcmePromptLibraryTarget`
+  now implements `FileReader`, with the same read-once source cache and
+  `unread_sources` bookkeeping `ArtifactTarget` uses, and `HardcodedAcmeKeyRule`
+  / `ApprovedModelRule` now check `isinstance(target, FileReader)` and raise
+  `RuleError` instead of returning. Held by the new
+  `test_prompt_library_target.py`, which runs `assert_target_conforms` and a real
+  `Runner` over the target and asserts the built-in artifact rules — not just
+  Acme's own — actually ran.
+
+- **`examples/custom_rule` demonstrated "silence is never a pass" by being
+  silent.** `docs/usage-rule-test.md` opens with `guardana rule test 'acme.*'` as
+  its headline example; run it and none of the package's five rules — three YAML,
+  two plugin — declared a single fixture, so the command reported five gaps and
+  exited `2`. The verdict was correct and the example was the defect: the one
+  package written to demonstrate the extension contract for every third party
+  demonstrated the inconclusive-fixture requirement by never sampling it. Every
+  rule now declares `fixtures:` (the three catalog YAML rules) or overrides
+  `fixtures()` (the two plugin rules), each proving all three outcomes —
+  `finding`, `clean`, and `inconclusive`. The inconclusive samples are real
+  failures, not staged ones: an empty scripted reply for the YAML rules
+  (`Exchange.reply_text` is `None` for blank content, so both the built-in
+  `keyword` evaluator and Acme's own `acme.strict_refusal` decline rather than
+  pass or fail), a dangling symlink for `HardcodedAcmeKeyRule` (a directory named
+  like the target file would never have reached `iter_files` — `os.walk` sorts a
+  directory into `dirnames`, not `filenames` — so that shape would have silently
+  graded as a clean sample instead of an inconclusive one), and five bytes that
+  fail the GGUF magic-number check for `ApprovedModelRule`. Both plugin rules'
+  `_scan` also stopped treating an unreadable file as a silent `return`: an
+  unreadable config or unparseable provenance now yields a `Finding` carrying an
+  `inconclusive` `Verdict`, never a clean scan of something the rule never
+  actually read. Held by the new `test_every_rule_is_sampled.py`, which asserts
+  `verify_rules` proves every rule the package ships, and by the isolated
+  `example-plugin` gate, which now installs `guardana-cli` and `guardana-report`
+  alongside the package so `rule test` — a CLI command — is reachable in the
+  environment that runs it.
+
+- **`guardana.core.testing` exported sixteen doubles; the extension guide
+  named five.** `GullibleAgentTransport`, both artifact builders beyond
+  `build_gguf`, all four fake-credential helpers, `ScriptedMcpServer`, and the
+  run-manifest pair (`manifest_for`, `FIXED_RUN_TIME`) were reachable from the
+  package and named nowhere in `docs/extending.md` — a third party reading the
+  guide to learn what the kit offers would not know most of it exists.
+  "Testing your extension" now names all sixteen, one sentence each on what
+  they stand in for rather than what their name already says, grouped into
+  the five families the module itself groups them into (transports, artifact
+  builders, fake credentials, the scripted MCP server, the run manifest).
+  `docs/writing-rules.md`'s transport table gained the missing
+  `GullibleAgentTransport` row and now says plainly which of the sixteen a
+  rule author testing without a model does not need, pointing at the
+  complete list instead of repeating it. Held by the new
+  `test_testing_kit_is_documented.py`, which fails by name for any export
+  `guardana.core.testing.__all__` grows that the guide does not mention.
+
+- **Four more claims the build had quietly stopped agreeing with.**
+  `SECURITY.md` named three entry-point groups a cycle after
+  `guardana.taxonomies` became a fourth (0.19.0), and its `--no-plugins`
+  section — renamed `` `--plugins`: the trust modes `` — claimed the flag
+  "constructs an empty `Registry()` instead of calling `Registry.discover()`";
+  cycle 0 made that false: `Registry.discover()` now runs in
+  every trust mode, including `disabled`, and a refusal lands in
+  `registry.load_errors` rather than being skipped by construction. The
+  section now says where that refusal actually surfaces — folded into
+  `errors` for `scan`/`probe`/`monitor`/`analyze-trace`/`baseline
+  create`/`update`, printed as `warning: could not load rule — …` on stderr
+  for the ten commands with no run report of their own (`plan scan`, `plan
+  probe`, `rule test`, `rules`, `taxonomy`, `calibrate`, `target inspect`,
+  `trace inspect`, `pack validate`, `pack lock`) — four of which (`rules`,
+  `taxonomy`, `pack validate`, `pack lock`) go further and exit `2` outright
+  once a restrictive mode is what emptied or unproved the answer, rather than
+  only warning about it — and recommends `--plugins builtins` where it used
+  to recommend the now-deprecated `--no-plugins`. `FEATURES.md` advertised
+  "override built-ins" as something namespacing buys you, contradicted two
+  sections later by its own description of a same-id conflict being refused
+  rather than allowed to override anything — dropped in favor of naming what
+  namespacing actually refuses. `CLAUDE.md` claimed its cost principle was
+  "pinned by a benchmark"; the 0.22.0 audit explicitly rejected wall-clock
+  benchmarking for cost (flaky on a loaded runner), so the sentence now names
+  the two operation-count gates that actually pin it (`test_scan_cost.py`,
+  `test_probe_cost.py`). And `CLAUDE.md`'s PEP 420 note claimed all five
+  subpackages carry their own `__init__.py`; `guardana.cli` never has — an
+  implicit namespace package one level down, which needs none since nothing
+  else contributes to it.
+
 ## [0.22.0] - 2026-08-20 — a run that says what it measured, and an extension contract that is true
 
 ### Added

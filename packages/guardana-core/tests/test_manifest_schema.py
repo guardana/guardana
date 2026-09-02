@@ -313,7 +313,7 @@ def test_a_migrated_document_validates_against_the_same_schema() -> None:
 
 
 def test_migration_normalizes_a_version_one_timestamp_to_utc_with_a_zone() -> None:
-    from guardana.core.manifest.load import migrate_v1  # noqa: PLC0415
+    from guardana.core.manifest.migrations import migrate_v1  # noqa: PLC0415
 
     v1 = {
         "schema_version": 1,

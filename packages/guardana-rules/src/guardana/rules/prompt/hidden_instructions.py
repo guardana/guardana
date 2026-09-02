@@ -3,7 +3,7 @@ from pathlib import Path
 
 from guardana.core.formats import FormatError, read_safetensors_header
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -15,6 +15,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM05_2025,
     OWASP_LLM10_2026,
 )
+from guardana.rules._base import ArtifactRule
 from guardana.rules.prompt._injection_markers import has_smuggled_char
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
@@ -36,7 +37,7 @@ def _is_instruction_file(path: Path) -> bool:
     return path.suffix in _DOC_SUFFIXES or path.name.lower() in _RULE_FILE_NAMES
 
 
-class HiddenInstructionsRule(Rule):
+class HiddenInstructionsRule(ArtifactRule):
     """Flags invisible instruction-smuggling characters in text an agent reads as context.
 
     The signal is *concealment*, not imperative language: an agent rules file, a

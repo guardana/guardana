@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Namespaced extension ids — Guardana documentation</title>
+<meta name="description" content="capabilities and assertion kinds a pack can declare — an open registry with closed validation, so a typo stays a load error and a third party&#x27;s concept gets the same runner and the same gate as a built-in">
+<link rel="canonical" href="https://guardana.dev/docs/design/namespaced-extension-ids.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html" aria-current="page">Namespaced extension ids<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Namespaced extension ids: opening two closed lists without opening the typo<span class="status proposed">proposed</span></h1><p class="lede">capabilities and assertion kinds a pack can declare — an open registry with closed validation, so a typo stays a load error and a third party's concept gets the same runner and the same gate as a built-in</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-09-02 · <strong>Cycle 5 of the extensibility program</strong> (<a href="audit-0.22.html"><code>audit-0.22.md</code></a>)</p>
+<h2 id="two-lists-closed-for-one-reason">Two lists, closed for one reason</h2>
+<p><code>Capability</code> and <code>AssertionKind</code> are closed enums, and the reason written on both
+is right: an unknown string read leniently is <code>requires: [call_tols]</code> becoming a
+requirement no target can satisfy — a rule silently skipped forever, which is a
+fail-open. &quot;A third party adding a capability adds it here, in a pull request
+someone reads.&quot;</p>
+<p>That is the correct rule for a list, and the wrong rule for an ecosystem. A team
+whose target retrieves from a vector store, executes SQL through a tool, or
+answers with a structured plan has a concept no built-in capability names, and a
+rule that needs it has nowhere to say so. Their choice today is to declare
+nothing — and be skipped by every rule that needs the concept — or to declare the
+nearest built-in and lie. Both are the failure the closed list exists to prevent,
+arriving from the other side.</p>
+<h2 id="the-answer-an-open-registry-a-closed-check">The answer: an open registry, a closed check</h2>
+<p>An id is valid if it is a built-in member <strong>or</strong> a namespaced id
+(<code>&lt;namespace&gt;.&lt;name&gt;</code>, <code>guardana.</code> reserved) that a loaded pack registered.
+Anything else is refused at the moment it is read. <code>acme.retrive</code> is not a rule
+skipped forever; it is a <code>RuleLoadError</code> at registration, recorded in <code>errors</code>,
+failing the gate, naming the id and the registered ids nearest to it.</p>
+<p>That preserves both halves of the original argument: a typo is still loud, and
+the thing that makes it loud is a registry rather than an enum.</p>
+<h3 id="capabilities">Capabilities</h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class CapabilityDescriptor:
+    id: str                    # &quot;acme.retrieve&quot;
+    surface: type              # a Protocol a rule will isinstance-check
+    title: str
+</code></pre>
+<ul>
+<li>Discovered through <code>guardana.capabilities</code>, loaded <strong>before</strong> rules, as
+taxonomies are, because a rule resolves <code>requires:</code> while its own pack loads.</li>
+<li><code>Capability</code> stays a <code>StrEnum</code> for the built-ins; <code>CustomCapability(str)</code> checks
+the namespaced shape in <code>__new__</code>; <code>CapabilityId = Capability | CustomCapability</code>.
+<code>RuleMeta.required_capabilities</code> and <code>Target.capabilities()</code> widen to it. Set
+arithmetic in the runner is unchanged, because both are strings.</li>
+<li><code>CAPABILITY_SURFACE</code> gains the registered descriptors, so <code>unmet_surfaces</code> and
+<code>assert_target_conforms</code> check a custom capability's surface exactly as they
+check <code>read_files</code>: declared without the protocol is refused, implemented
+without the declaration is refused.</li>
+<li><code>register_rule</code> refuses a rule whose custom capability nobody registered. The
+pack that needs the capability is the pack that registers it, or depends on one
+that does, and the manifest says which under <code>provides.capabilities</code>.</li>
+</ul>
+<h3 id="assertion-kinds">Assertion kinds</h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class AssertionKindSpec:
+    kind: str                                   # &quot;acme.data_residency&quot;
+    dimensions: tuple[Dimension, ...]           # what evidence it needs
+    allowed_keys: frozenset[str]                # what the YAML may say
+    build: Callable[[Mapping, Common, str], Assertion]
+    compile: Callable[[Contract, Assertion], Rule]
+</code></pre>
+<ul>
+<li>Discovered through <code>guardana.assertion_kinds</code>; declared under
+<code>provides.assertion_kinds</code>.</li>
+<li>The four dispatch tables that exist today — dimensions, allowed keys, builders in
+core, and the <code>isinstance</code> chain in <code>guardana.rules.contract.compile</code> — become one
+table of specs, with the five built-ins as its first five rows. One table read
+from every direction, which is what the assertion module already says it wants.</li>
+<li>The contract loader takes the registry's kinds. An unknown kind is refused as it
+is today, and the message adds the trust mode, because &quot;unknown kind&quot; under
+<code>--plugins builtins</code> is usually &quot;the pack that defines it was not loaded&quot;.</li>
+<li>The contract schema does not change: <code>type:</code> was always a string, and the set
+of strings it accepts is what widened.</li>
+</ul>
+<h2 id="extension-api">Extension API</h2>
+<p>A pack using either seam on an older build fails at import, which is honest but
+late. The build advertises API <code>4</code> beside <code>1</code>, <code>2</code> and <code>3</code> (locators and outputs,
+then techniques), and a pack that needs custom ids declares a range containing
+<code>4</code>. Pack schema 5 carries the two new <code>provides</code> lists; the lock pins both by id.</p>
+<h2 id="rejected">Rejected</h2>
+<p><strong>Free strings with a warning.</strong> A warning is the fail-open in a different font.</p>
+<p><strong>Soft requirements</strong> — a rule declaring &quot;run me if you can, skip me if not&quot;
+without naming what it needs. The skip reason is the evidence; a rule that cannot
+name it cannot be reported honestly.</p>
+<p><strong>Capability inheritance</strong> (<code>acme.retrieve</code> implies <code>chat</code>). Implied capabilities
+are capabilities nobody declared, and the runner selects on declarations.</p>
+<p><strong>Opening <code>TargetKind</code> at the same time.</strong> A kind is what a verb selects; see the
+audit. A target with a new concept declares a capability, not a kind.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="capability-protocols.html"><code>capability-protocols.md</code></a> — why a declaration must have a surface</li>
+<li><a href="security-contracts.html"><code>security-contracts.md</code></a> — the assertion kinds this opens</li>
+<li><a href="extension-author-tooling.html"><code>extension-author-tooling.md</code></a> — the manifest and lock that carry the new lists</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/namespaced-extension-ids.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

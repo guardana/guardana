@@ -107,14 +107,18 @@ Each begins when the previous one's exit criteria are met.
 | ~~P0~~ | ~~Action reproducibility~~ | shipped in 0.22.0 | S | — |
 | ~~P0~~ | ~~Assessment channel~~ | shipped in 0.22.0 | L | — |
 | ~~P0~~ | ~~Target capability protocols~~ | shipped in 0.22.0 | L | — |
+| P1 | `TargetFactory` and CLI target selection | a custom target usable without writing Python | M | protocols |
+| P1 | Renderer and reporter plugins | the extension lane's ML-BOM export and webhook output are outputs, and outputs had no seam | S | — |
+| P1 | YAML fixtures for scenario and trajectory rules | two of three declarative shapes could not be sampled | S | — |
+| P1 | guardana new-pack | a name becomes an installable pack with four entry points, a manifest and three fixtures | S | — |
 | P1 | Suite, dataset, assessor | quality regression, with a denominator | L | assessments |
 | P1 | Statistical paired diff | an honest "better or worse" | L | suites |
 | P1 | Assessments in the collector | a quality trend, not only a finding count | M | assessments |
 | P1 | Provider conformance matrix | "OpenAI-compatible" is a claim, not a guarantee | M | protocols |
-| P1 | CodeQL as a second static signal | ruff's bandit rules do not do taint tracking; a security product should carry both. Deliberately not added in 0.22.0 — an untested new workflow in a release commit is the mistake that release closed | S | — |
 | P1 | Capability manifest generated from code | the remaining half of "one owner per claim": feature status is still prose a human keeps current | M | — |
+| P1 | Technique extension point | designed, four deterministic transforms | M | protocols |
+| P1 | Namespaced capabilities and assertion kinds | the last two seams criterion 8 names | M | protocols |
 | P2 | A freshness date on every competitive claim, gated | the comparisons name their sources now; nothing yet fails when one goes stale | S | — |
-| P1 | `TargetFactory` and CLI target selection | a custom target usable without writing Python | M | protocols |
 | P2 | OTLP intake, queue, workers | production evidence, off the request path | L | intake design |
 | P2 | Prometheus and webhook output | fits an existing operations stack | M | aggregations |
 | P2 | Helm and Kubernetes | platform fit where inference already runs | L | stateless workers |
@@ -526,6 +530,9 @@ one.
 | **Free-text search across the documentation prose** | it is the one thing pre-rendering cannot do, and the only reason worth relaxing `script-src 'none'` to `'self'` under `/docs/*`. The explorer answers the four questions a reader actually arrives with by navigation; searching *prose* is a different need, and the policy is a claim visitors check rather than a default to spend on a nice-to-have. If it is ever taken, `connect-src 'none'` is not part of the trade — there is a test |
 | **Versioned documentation, one tree per release** | worth doing after 1.0, when the compatibility contract makes "the 1.2 docs" a meaningful thing to read. Before then every version's docs describe a moving API, and a version switcher offers a reader a choice with no right answer |
 | **A `guardana docs` command rendering a *local* explorer** | `rules.json` makes it cheap, and it is the extension story told once more: a team with private packs could render an explorer over their own rules under the same evidence semantics. It is a *feature* rather than a website, so it belongs with the pack tooling and gets its own tests, not a flag bolted onto the site build |
+| **A `CLEAN` fixture cannot be told from a blind one** | `verify.py`'s `_observed` reads an empty finding list as clean, so a fixture whose target yields no files still counts as proving the rule stays quiet — demonstrated by pointing a `clean` fixture at an empty directory and watching `is_proven` stay `True`. Not live today, since every shipped fixture does read its sample; closing it needs a fixture-level assertion that the target was actually consulted, which is a contract change to `RuleFixture` |
+| **`ArtifactTarget` does not meter a rule's own network calls** | `usage()` returns a hardcoded `TargetUsage(requests=0)` rather than a measurement, so a third-party artifact rule that opens its own connection still reports `requests: 0` — demonstrated with a rule calling `urllib.request.urlopen` twice. The declaration side is honest and gated now (`estimated_requests`, `test_no_shipped_artifact_rule_touches_the_network`); the *measurement* side still trusts the target kind instead of observing the rule, and closing it means metering at a layer below individual rules |
+| **A finding on a symlink is relocated to the link's target** | `report/location.py`'s `relativize` calls `Path(...).resolve()`, which follows a symlink, so a finding about a dangling symlink names a path that does not exist rather than the file `iter_files` actually examined. The same rewrite reaches the SARIF `uri` and the baseline fingerprint through the one shared call, so the fix is not local to one caller |
 
 ## Milestone: team security platform
 

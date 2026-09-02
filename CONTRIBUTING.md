@@ -81,6 +81,12 @@ both were measured and both returned the stale wheel. You want to see a line say
 `Building acme-guardana-rules` in the output. If it is not there, you are testing
 what you built last time.
 
+Two more isolated gates exist for the *producer* side of the contract —
+`examples/hermes_integrator` and `examples/shell_hook_integrator` — run the same
+way (`--isolated --no-cache`, one `--with` per example) whenever you touch the
+trace writer or the trace format itself, rather than rule authoring. `CLAUDE.md`'s
+tooling-gates list has the exact command for each.
+
 It installs the five distributions into an empty environment and runs the
 commands the documentation tells people to type. Everything above it passes in an
 environment where an undeclared module happens to be installed for some other
@@ -201,7 +207,8 @@ Guardana's code standard is: write it like a senior developer would.
 
 See `CLAUDE.md` → "Extending Guardana" for the full contract (YAML rule shape,
 Python plugin shape, entry-point registration, the `guardana.rules` /
-`guardana.evaluators` / `guardana.targets` groups). In short:
+`guardana.evaluators` / `guardana.targets` / `guardana.taxonomies` groups). In
+short:
 
 - A **new check** is almost always a YAML file dropped into a rule directory —
   no code. `uv run guardana new-rule acme.prompt.my_check` scaffolds one, and

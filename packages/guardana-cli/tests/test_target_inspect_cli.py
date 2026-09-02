@@ -6,12 +6,18 @@ pass. Inspection exists to name that before a run trusts it.
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 
 import pytest
 from guardana.cli import _endpoint as endpoint_module
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
+from guardana.core.registry import Registry
+from guardana.core.report import Finding
+from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.severity import Severity
+from guardana.core.target import Capability, Target, TargetKind
 from guardana.core.target.endpoint import ChatMessage, ToolCallReply, ToolSpec
 from typer.testing import CliRunner, Result
 
@@ -106,6 +112,77 @@ def test_unrunnable_rules_are_named(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert payload["unrunnable_rules"], "a chat-only endpoint cannot run the agent rules"
     assert all(isinstance(rule_id, str) for rule_id in payload["unrunnable_rules"])
+
+
+def test_an_empty_registry_does_not_claim_every_rule_can_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--plugins disabled` used to empty the registry and print the same all-clear
+    sentence a genuinely clean result prints: zero rules to judge made `unrunnable`
+    empty, and an empty `unrunnable` read as "every rule can run". A rule set of
+    zero is not evidence the target is fine — it is no evidence at all, and the two
+    must never say the same thing.
+    """
+    result = _inspect(monkeypatch, _PlainChat, "--plugins", "disabled")
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert "Every endpoint rule can run against this target." not in result.output
+    assert "could not load rule" in result.output
+    assert "0 rule(s) were loaded" in result.output
+    assert "absence of evidence" in result.output
+
+
+_ONE_RULE_META = RuleMeta(
+    id="test.target_inspect.chat_only",
+    title="Requires only chat",
+    severity=Severity.LOW,
+    target_kind=TargetKind.ENDPOINT,
+    required_capabilities=frozenset({Capability.CHAT}),
+    evaluator="keyword",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _OneVerifiableEndpointRule(Rule):
+    """A single endpoint rule whose only requirement `_PlainChat` genuinely satisfies.
+
+    The real, discovered registry can never make `unrunnable_rules` return empty
+    against a chat endpoint: several built-in MCP-family rules also declare
+    `target_kind: endpoint` and require `inspect_authorization`/`list_tools`, which
+    `inspect_endpoint`'s chat probes never verify — so a fully-capable *chat* mock
+    still leaves those unrunnable. This test stands up its own registry of exactly
+    one rule instead, so the pass branch is exercised on its own terms.
+    """
+
+    meta: RuleMeta = _ONE_RULE_META
+
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        return ()
+
+
+def _registry_with_one_verifiable_rule(*_: object, **__: object) -> Registry:
+    registry = Registry()
+    registry.register_rule(_OneVerifiableEndpointRule())
+    return registry
+
+
+def test_every_loaded_rule_that_can_run_prints_the_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The other half of the three-way branch in `_render_human`: a nonzero,
+    fully-satisfied rule set must still print the pass sentence, not the
+    absence-of-evidence one — a restrictive `--plugins` mode is not the only path
+    through this renderer, and the branch that delivers good news needs a witness
+    too.
+    """
+    # `target.py` binds `Registry` at import time via `from guardana.core.registry
+    # import Registry`, so patching the class object this module imports the same
+    # way reaches the identical attribute `inspect_target` looks up at call time.
+    monkeypatch.setattr(Registry, "discover", classmethod(_registry_with_one_verifiable_rule))
+
+    result = _inspect(monkeypatch, _PlainChat)
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert "Every endpoint rule can run against this target." in result.output
+    assert "absence of evidence" not in result.output
 
 
 def test_requiring_a_capability_the_target_lacks_exits_two(

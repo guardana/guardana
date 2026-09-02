@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
-from guardana.core.rule import Rule, RuleContext, RuleMeta
+from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -19,6 +19,7 @@ from guardana.core.taxonomy import (
     OWASP_MCP03_2025,
     OWASP_MCP10_2025,
 )
+from guardana.rules._base import ArtifactRule
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_hidden_char
 from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
@@ -52,7 +53,7 @@ def _iter_strings(node: object) -> Iterator[str]:
             yield from _iter_strings(item)
 
 
-class McpToolPoisoningRule(Rule):
+class McpToolPoisoningRule(ArtifactRule):
     """Flag hidden instructions in an MCP tool manifest — indirect prompt injection."""
 
     meta = RuleMeta(

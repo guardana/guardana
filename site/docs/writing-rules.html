@@ -41,6 +41,7 @@
 <li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -397,21 +405,28 @@ then hand the resulting rules to a <code>Registry</code>.</li>
 <p>Use this for custom parsers, stateful probes, or any check against an
 <strong>artifact</strong> target. Of the 51 built-in rules, 19 are build-time (artifact-kind)
 Python plugins — pickle opcodes (incl. ZIP-archive recursion), model format,
-Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk,
-remote-code (<code>trust_remote_code</code>/<code>torch.hub.load</code>) and its config form
-(<code>auto_map</code>), code execution (<code>eval</code>/<code>exec</code>/<code>os.system</code>/<code>shell=True</code>), notebook
-payloads, insecure transport (<code>verify=False</code>/plaintext HTTP), known-malicious
-dependencies, MCP tool-poisoning, hidden-instruction rules-file backdoors,
-training-data integrity, hallucinated packages, provenance, hardcoded secrets —
-since they need real parsing logic, not a prompt corpus. (A Python plugin is
-also how a runtime rule that isn't a simple prompt corpus is written — e.g. the
-tool-calling excessive-agency rule.) (The hallucinated-package rule scans <code>import</code>/<code>from</code> statements in
-<code>.py</code> files only; it does not read <code>requirements.txt</code> or lockfiles.) The
-other 8 are dynamic endpoint rules (4 single-turn YAML: injection, jailbreak,
-system-prompt-leak, unbounded-consumption; 2 YAML scenarios: gradual jailbreak
-and indirect/RAG injection; plus <code>output.secrets</code> and the tool-calling
-<code>agent.excessive_tool_use</code>, both Python plugins like this one but endpoint-kind
-— see the note below).</p>
+chat-template code-execution gadgets, risky ONNX graph constructs, Keras
+Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk, remote-code
+(<code>trust_remote_code</code>/<code>torch.hub.load</code>) and its config form (<code>auto_map</code>), code
+execution (<code>eval</code>/<code>exec</code>/<code>os.system</code>/<code>shell=True</code>), notebook payloads, insecure
+transport (<code>verify=False</code>/plaintext HTTP), known-malicious dependencies, MCP
+tool-poisoning, hidden-instruction rules-file backdoors, training-data
+integrity, hallucinated packages, provenance, hardcoded secrets — since they
+need real parsing logic, not a prompt corpus. (The hallucinated-package rule
+scans <code>import</code>/<code>from</code> statements in <code>.py</code> files only; it does not read
+<code>requirements.txt</code> or lockfiles.) The other 32 are dynamic endpoint rules: 12
+are YAML (10 single-turn — injection, jailbreak, system-prompt-leak,
+unbounded-consumption, cost-asymmetry, and five agent-scoped checks for
+credential exfiltration, memory poisoning, tool-argument scope, tool-result
+injection, and hidden context in a tool schema — plus 2 scenarios: gradual
+jailbreak and indirect/RAG injection). The remaining 20 need real logic and are
+Python plugins like this one but endpoint-kind: <code>output.secrets</code>, the
+tool-calling <code>agent.excessive_tool_use</code> (see the note below),
+<code>agent.mcp_server_manifest</code>, all 8 <code>mcp.*</code> checks (the MCP authorization
+surface — session binding, token audience, scope breadth, and others), and all
+9 <code>trace.*</code> checks (graded from a recorded <code>Trace</code> rather than a live chat —
+credential passthrough, identity disagreement, cross-tenant retrieval, and
+others).</p>
 <p>Subclass <code>Rule</code>, set <code>meta</code> to a <code>RuleMeta</code>, implement <code>run</code>:</p>
 <pre><code class="language-python">from collections.abc import Iterable
 
@@ -593,11 +608,22 @@ graded end-to-end against a scripted model — no network, no model process:</p>
 <td>A model that calls the named tools when offered any — the excessive-agency fixture</td>
 </tr>
 <tr>
+<td><code>GullibleAgentTransport()</code></td>
+<td>A model that treats a tool's result as an instruction and acts on it — the positive fixture for prompt injection through tool output; pair it with <code>RefusingTransport</code> for the negative</td>
+</tr>
+<tr>
 <td><code>FailingTransport(error)</code></td>
 <td>An unreachable endpoint: every call raises <code>error</code></td>
 </tr>
 </tbody>
 </table></div>
+<p>These six are what a rule author testing without a model needs. The kit ships ten
+more doubles for other concerns — artifact builders (see
+<a href="#testing-a-rule-that-reads-a-model-file">below</a>), fake credentials for a
+redaction test, a scripted MCP server for an authorization rule, and a
+test-stable run manifest for a renderer test — none of which a dynamic endpoint
+rule's fixtures touch. The complete, enforced list is
+<a href="extending.html#testing-your-extension"><code>extending.md</code></a>.</p>
 <p>Both fixtures for a dynamic rule, in full:</p>
 <pre><code class="language-python">from guardana.core import RuleContext
 from guardana.core.target import EndpointTarget

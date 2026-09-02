@@ -50,6 +50,7 @@ FACETS = (
 
 _COST_LABELS = {
     "undeclared": "no model requests declared",
+    "zero": "0 requests — sends nothing",
     "1-4": "1 to 4 requests",
     "5-plus": "5 or more requests",
 }
@@ -73,14 +74,20 @@ def load_rules(path: Path) -> list[dict[str, Any]]:
 def cost_bucket(rule: dict[str, Any]) -> str:
     """Which cost band a rule falls in, from the bound it declares.
 
-    `None` is *undeclared*, never zero. A rule that cannot say what it will spend
-    and a rule that spends nothing are different facts, and only one of them lets
-    somebody set a budget — which is why `estimated_requests` is nullable in the
-    first place.
+    `None` is *undeclared*: the rule cannot say what it will spend. `0` is
+    *zero*: the rule spends nothing, a fact about the rule rather than an
+    absence of one, so it earns its own band instead of falling into the
+    cheapest paid one — `0 <= _CHEAP` reads true, and a version of this
+    function that stopped at two buckets filed it as "1 to 4" on that account.
+    Only a rule that actually declares a bound lets somebody set a budget
+    against it — which is why `estimated_requests` is nullable in the first
+    place.
     """
     declared = rule.get("estimated_requests")
     if declared is None:
         return "undeclared"
+    if int(declared) == 0:
+        return "zero"
     return "1-4" if int(declared) <= _CHEAP else "5-plus"
 
 

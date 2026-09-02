@@ -41,6 +41,7 @@
 <li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
@@ -80,11 +81,18 @@
 <li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
 <li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
 <li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
 <li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
 <li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
 <li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
 <li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
 <li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
@@ -114,8 +122,8 @@
                    No network I/O beyond what a Target itself performs.
 guardana-rules     Built-in rules (YAML + Python plugin), each mapped to
                    OWASP / MITRE ATLAS / NIST.
-guardana-cli       The `guardana` command: scan, probe, monitor, init, rules,
-                   new-rule.
+guardana-cli       The `guardana` command — scan, probe, monitor, diff,
+                   and sixteen more; `guardana --help` lists all twenty.
 guardana-report    Renderers: human, SARIF, JSON, JUnit.
 guardana-server    OPTIONAL collector. Ingests normalized Findings from many
                    agents; list/trend view. A separate, separately-deployed
@@ -282,33 +290,48 @@ class Profile:
 <p><code>guardana.core.registry.Registry</code> is the one place that finds rules and
 evaluators, built-in or third-party, so nothing else in the engine
 hard-codes a list of them:</p>
-<pre><code class="language-python">_RULE_GROUP = &quot;guardana.rules&quot;
+<pre><code class="language-python">_TAXONOMY_GROUP = &quot;guardana.taxonomies&quot;
+_RULE_GROUP = &quot;guardana.rules&quot;
 _EVALUATOR_GROUP = &quot;guardana.evaluators&quot;
 _TARGET_GROUP = &quot;guardana.targets&quot;
 
 class Registry:
     @classmethod
-    def discover(cls) -&gt; Self:
+    def discover(cls, trust: PluginTrust | None = None) -&gt; Self:
+        policy = trust if trust is not None else PluginTrust()
         reg = cls()
-        for ep in entry_points(group=_RULE_GROUP):
-            _absorb(ep.load()(), reg.register_rule)
-        for ep in entry_points(group=_EVALUATOR_GROUP):
-            _absorb(ep.load()(), reg.register_evaluator)
-        for ep in entry_points(group=_TARGET_GROUP):
-            _absorb(ep.load()(), reg.register_target)
+        for group, register in (
+            # Taxonomies first: a YAML rule's `taxonomy:` resolves while its
+            # own entry point is still loading.
+            (_TAXONOMY_GROUP, register_taxonomy),
+            (_RULE_GROUP, reg.register_rule),
+            (_EVALUATOR_GROUP, reg.register_evaluator),
+            (_TARGET_GROUP, reg.register_target),
+        ):
+            for ep in entry_points(group=group):
+                if not policy.allows(ep):
+                    reg.record_load_error(...)   # refused, never imported
+                    continue
+                _absorb(ep.load()(), register)
         return reg
 </code></pre>
-<p><code>Registry.discover()</code> walks every installed package's <code>guardana.rules</code> and
-<code>guardana.evaluators</code> <a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry points</a>
-and calls each one (a zero-arg callable returning either a single <code>Rule</code>/
-<code>Evaluator</code> or an iterable of them — <code>_absorb</code> handles both shapes). A
+<p><code>Registry.discover(trust)</code> walks every installed package's four entry-point
+groups — <code>guardana.taxonomies</code>, <code>guardana.rules</code>, <code>guardana.evaluators</code>, and
+<code>guardana.targets</code> <a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry points</a>
+— and calls each one <code>trust</code> allows (a zero-arg callable returning either a
+single item or an iterable of them — <code>_absorb</code> handles both shapes). A
 third-party package registered this way is discovered exactly like
 <code>guardana-rules</code>' own built-ins — there is no built-in/custom distinction at
 the registry level, only namespacing by <code>id</code> (<code>guardana.*</code> reserved for
 built-ins; use your own prefix, e.g. <code>acme.*</code>).</p>
-<p><code>Registry()</code> (the bare constructor, no entry-point scan) backs
-<code>guardana scan --no-plugins</code>: an empty registry that imports zero
-third-party code, for untrusted environments. See
+<p>That same call runs in every CLI mode, <code>--plugins disabled</code> (<code>--no-plugins</code>'s
+deprecated spelling) included: it still walks every installed entry point,
+but <code>PluginTrust.allows()</code> refuses each one <em>before</em>
+its code is imported and records the refusal in <code>load_errors</code> — the registry
+ends up empty, but zero third-party code ever runs. <code>Registry()</code>, the bare
+constructor with no entry-point walk at all, is for embedding code that wants
+to skip discovery entirely — <code>guardana.core.testing.assert_secure</code> accepts one
+this way when a caller wants no plugins and no CLI involved. See
 <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for the trust model this exists for.</p>
 <p><strong>Declarative YAML rules are not entry points</strong> — they're parsed straight
 off disk by <code>load_yaml_rules(path)</code> and wired into the
@@ -331,6 +354,11 @@ via <code>guardana.yaml</code>'s <code>rules.paths</code>) on <code>scan</code>,
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>guardana.taxonomies</code></td>
+<td>one <code>TaxonomyRef</code>, or an iterable</td>
+<td><strong>Yes</strong> — <code>Registry.discover()</code>, loaded <strong>first</strong>, so a rule pack's own <code>taxonomy:</code> references resolve while its own entry point is still loading.</td>
+</tr>
 <tr>
 <td><code>guardana.rules</code></td>
 <td>one <code>Rule</code>, or an iterable of <code>Rule</code>s</td>

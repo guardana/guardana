@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attack techniques — Guardana documentation</title>
+<meta name="description" content="the technique as its own extension point — a deterministic transform of a prompt, crossed with a rule&#x27;s corpus, so coverage is a product of two small sets and a failed transform is a skipped case rather than a plain prompt">
+<link rel="canonical" href="https://guardana.dev/docs/design/attack-techniques.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../../">guard<span>ana</span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Start here</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+</ul>
+<h2>For developers</h2><ul>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe</a></li>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>For platform and CI teams</h2><ul>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>For security teams</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+</ul>
+<h2>Design documents</h2><ul>
+<li><a href="../design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
+<li><a href="../design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
+<li><a href="../design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
+<li><a href="../design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
+<li><a href="../design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
+<li><a href="../design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
+<li><a href="../design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
+<li><a href="../design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
+<li><a href="../design/mcp-protocol-eras.html">MCP has two eras<span class="tag">accepted</span></a></li>
+<li><a href="../design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">accepted</span></a></li>
+<li><a href="../design/taxonomy-editions.html">Taxonomy editions<span class="tag">accepted</span></a></li>
+<li><a href="../design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
+<li><a href="../design/target-locators.html">Target locators<span class="tag">proposed</span></a></li>
+<li><a href="../design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
+<li><a href="../design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
+<li><a href="../design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
+<li><a href="../design/attack-techniques.html" aria-current="page">Attack techniques<span class="tag">proposed</span></a></li>
+<li><a href="../design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
+<li><a href="../design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="../design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
+<li><a href="../design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
+<li><a href="../design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
+<li><a href="../design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
+<li><a href="../design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
+<li><a href="../design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
+<li><a href="../design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
+<li><a href="../design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<li><a href="../design/README.html">How these are written</a></li>
+<li><a href="../design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="../maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+</nav>
+<main>
+<h1>Attack techniques: the second dimension, as a seam<span class="status proposed">proposed</span></h1><p class="lede">the technique as its own extension point — a deterministic transform of a prompt, crossed with a rule's corpus, so coverage is a product of two small sets and a failed transform is a skipped case rather than a plain prompt</p><p><strong>Status:</strong> proposed · <strong>Written:</strong> 2026-09-02 · <strong>Cycle 4 of the extensibility program</strong> (<a href="audit-0.22.html"><code>audit-0.22.md</code></a>)</p>
+<h2 id="why-now">Why now</h2>
+<p>The roadmap has said since 0.12 that the technique is &quot;designed before 1.0&quot;,
+because an extension point added after <code>Rule</code> and <code>Evaluator</code> freeze is a major
+version the week after promising stability. It has also said why it matters for
+coverage: a vulnerability crossed with an encoding is a new rule today, so every
+new technique costs rules-times-vulnerabilities, and the only way to close the
+attack-coverage gap without violating &quot;cost grows with the target, not with the
+rule count&quot; is to make the two dimensions multiply.</p>
+<h2 id="the-shape">The shape</h2>
+<pre><code class="language-python">class Technique(ABC):
+    id: str
+    def apply(self, prompt: str) -&gt; str: ...
+    def describe(self) -&gt; str: ...
+</code></pre>
+<p>Deterministic, offline, and blind: a technique sees a prompt and nothing else —
+not the target, not the expectation, not the evaluator. It may raise
+<code>TechniqueError</code> when it cannot transform an input, and that is the whole
+contract.</p>
+<p>Discovered through <code>guardana.techniques</code>, registered with the same one-owner rule
+as evaluators (bare ids for the built-ins, namespaced for a pack, <code>guardana.*</code>
+reserved), pinned by id in the lock, declared under <code>provides.techniques</code> in pack
+schema 4, listed by <code>guardana techniques</code>.</p>
+<h2 id="how-a-rule-uses-one">How a rule uses one</h2>
+<pre><code class="language-yaml">id: acme.prompt.exfiltration
+prompts: [...]
+techniques: [base64, roleplay]
+</code></pre>
+<p>Every prompt still runs plain, and additionally once per technique. Each
+combination is its own case: <code>case_id_for(rule_id, prompt, technique_id)</code>, tagged
+<code>technique:&lt;id&gt;</code>, named in the finding's evidence. <code>estimated_requests</code> is
+<code>prompts × (1 + techniques)</code>, so <code>plan</code> prices the product. The technique ids are
+part of the rule's <code>digest()</code>, because a rule that acquired an encoding is a
+different test and a comparison must say so.</p>
+<p>The expectation does not change. The goal is the same goal; a canary is graded on
+the reply, which the technique never touches.</p>
+<p><strong>A technique that raises produces a <code>skipped</code> assessment for that case</strong>, with the
+error in the rationale — never the plain prompt in its place. Substituting the
+untransformed prompt would grade the wrong test and report it as the right one,
+which is the failure this repository is organised around.</p>
+<p>Available on <code>prompts:</code> rules and suites. Scenarios and trajectories are deferred:
+a technique applied to one step of a conversation changes what the conversation
+is, and a technique applied to an agent's task changes what the agent was asked to
+do; both need their own design rather than a flag.</p>
+<h2 id="the-built-ins">The built-ins</h2>
+<p>Four, in <code>guardana-rules</code>, one short file each, deterministic transforms with no
+model and no randomness:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>id</th>
+<th>what it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>base64</code></td>
+<td>encodes the prompt and asks for it to be decoded and followed</td>
+</tr>
+<tr>
+<td><code>homoglyph</code></td>
+<td>substitutes confusable Unicode letters from a fixed table</td>
+</tr>
+<tr>
+<td><code>roleplay</code></td>
+<td>wraps the prompt in a fixed persona framing</td>
+</tr>
+<tr>
+<td><code>payload_split</code></td>
+<td>splits the prompt in two and asks for the halves to be joined</td>
+</tr>
+</tbody>
+</table></div>
+<p>Each ships tests for determinism, for an empty prompt raising <code>TechniqueError</code>,
+and for round-trip where the transform is reversible. None claims to bypass
+anything; they are the transforms the neighbouring tools separate from their
+vulnerabilities, offered as data a rule author can select.</p>
+<h2 id="rejected">Rejected</h2>
+<p><strong>Adaptive or model-driven techniques.</strong> Gated on calibration, unchanged from the
+roadmap. A technique that calls a model is an attacker, and this tool runs none.</p>
+<p><strong>Techniques applied globally from the profile.</strong> Multiplying every rule's corpus
+by a profile setting turns a probe's cost into a number nobody typed. A rule
+names its techniques; a profile can still exclude the rule.</p>
+<p><strong>The technique as an evaluator parameter.</strong> It changes what is sent, not how the
+reply is judged; putting it on the grader would let a rule's cost change without
+its declaration changing.</p>
+<p><strong>A <code>techniques:</code> list on a scenario step.</strong> See above — deferred, not refused.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="extension-author-tooling.html"><code>extension-author-tooling.md</code></a> — where the technique was first named as owed</li>
+<li><a href="quality-suites.html"><code>quality-suites.md</code></a> — the other rule shape a technique applies to</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span>Guardana 0.22.0 · Apache-2.0</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/design/attack-techniques.md">Edit this page on GitHub</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>
