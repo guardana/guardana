@@ -340,7 +340,7 @@ them is worked around silently: each is absent, and says so.</p>
 <pre><code class="language-bash">docker run -d --name guardana-collector \
   -e GUARDANA_DATABASE_URL=&quot;postgresql://guardana:…@db.internal:5432/guardana&quot; \
   -p 127.0.0.1:8000:8000 \
-  ghcr.io/guardana/guardana-collector:0.22
+  ghcr.io/guardana/guardana-collector:0.23
 </code></pre>
 <p>Or without a container at all — <code>pip install &quot;guardana-server[serve]&quot;</code>, then
 <code>guardana-collector migrate</code> and <code>guardana-collector serve</code>. The ASGI server is an
@@ -350,7 +350,7 @@ extra rather than a dependency, so a site that already runs gunicorn points it a
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.22.0 · Apache-2.0</span>
+<span>Guardana 0.23.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/deployment.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

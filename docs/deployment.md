@@ -251,7 +251,7 @@ The image is the unit; Compose is a convenience:
 docker run -d --name guardana-collector \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:…@db.internal:5432/guardana" \
   -p 127.0.0.1:8000:8000 \
-  ghcr.io/guardana/guardana-collector:0.22
+  ghcr.io/guardana/guardana-collector:0.23
 ```
 
 Or without a container at all — `pip install "guardana-server[serve]"`, then

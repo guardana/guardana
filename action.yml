@@ -21,10 +21,10 @@ inputs:
   version:
     description: >-
       guardana-cli version to run. Defaults to the version this Action tag ships,
-      so a workflow pinned to `guardana/guardana@v0.22` keeps running the CLI that
+      so a workflow pinned to `guardana/guardana@v0.23` keeps running the CLI that
       tag was released with. Pass `latest` to always take the newest release.
     required: false
-    default: "0.22.0"
+    default: "0.23.0"
   sarif-file:
     description: "Where to write the SARIF report."
     required: false
@@ -62,7 +62,7 @@ runs:
         set +e
         # `latest` is opt-in, and the default is this Action tag's own version.
         # It used to be the other way round: an empty default meant `uvx` resolved
-        # whatever was newest, so `guardana/guardana@v0.22` would quietly start
+        # whatever was newest, so `guardana/guardana@v0.23` would quietly start
         # running the 0.22 CLI — a pinned workflow whose behaviour changed without
         # anyone editing it, which is the opposite of what a pin is for.
         spec="guardana-cli"

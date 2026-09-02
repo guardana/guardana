@@ -25,7 +25,7 @@ hypercorn can point it at the app instead:
 `gunicorn -k uvicorn.workers.UvicornWorker 'guardana.server:create_app()'`.
 
 There is an official image too:
-`docker run -p 8000:8000 -e GUARDANA_DATABASE_URL=… ghcr.io/guardana/guardana-collector:0.22`.
+`docker run -p 8000:8000 -e GUARDANA_DATABASE_URL=… ghcr.io/guardana/guardana-collector:0.23`.
 
 The dashboard is a single self-contained page (no build step, works offline)
 showing severity, per-source/per-rule breakdowns, an activity-over-time trend,

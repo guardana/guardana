@@ -166,7 +166,7 @@ files pinned by digest in every run, and a rule carries both editions where the
 semantics genuinely overlap — never a silent remap onto the matching number, since
 `LLM07:2026` is Misinformation. `guardana taxonomy` shows what is installed.
 
-## What ships today (0.22.0)
+## What ships today (0.23.0)
 
 Counts come from the registry, never from memory:
 [rule summary](docs/generated/rule-summary.md) ·

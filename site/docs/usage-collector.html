@@ -144,11 +144,11 @@ uvicorn 'guardana.server:create_app' --factory        # what serve does for you
 </code></pre>
 <p>Or as a container, where the same three commands are three <code>docker run</code>s:</p>
 <pre><code class="language-bash">docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:0.22 migrate
+  ghcr.io/guardana/guardana-collector:0.23 migrate
 docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:0.22 bootstrap --org acme --project web
+  ghcr.io/guardana/guardana-collector:0.23 bootstrap --org acme --project web
 docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:0.22
+  ghcr.io/guardana/guardana-collector:0.23
 </code></pre>
 <p>The image's default command is <code>serve --host 0.0.0.0 --port 8000</code>, and it does
 <strong>not</strong> migrate on start — see
@@ -675,7 +675,7 @@ protocol and fails on any method that does not take a tenant scope first.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.22.0 · Apache-2.0</span>
+<span>Guardana 0.23.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-collector.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

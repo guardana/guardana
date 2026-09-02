@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_by": "scripts/generate_docs.py from the installed registry \u2014 do not edit by hand",
-  "guardana_version": "0.22.0",
+  "guardana_version": "0.23.0",
   "rules": [
     {
       "id": "guardana.agent.credential_exfiltration",

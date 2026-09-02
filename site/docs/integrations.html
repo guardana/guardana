@@ -172,7 +172,7 @@ jobs:
       security-events: write   # required to upload SARIF
     steps:
       - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.22   # moving tag; pins to the latest 0.22.x
+      - uses: guardana/guardana@v0.23   # moving tag; pins to the latest 0.23.x
         with:
           path: .
           # args: --preset ci --baseline guardana-baseline.yaml
@@ -239,7 +239,7 @@ these&quot; is not &quot;nothing got worse&quot;. See <a href="usage-diff.html">
 <p>The templates live in <a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md"><code>deploy/ci/</code></a> and are meant to be
 copied. The shortest form, which is also what the Jenkins and Azure templates
 run:</p>
-<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.22 \
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.23 \
   scan /work --format junit &gt; guardana-junit.xml
 </code></pre>
 <p>The redirect is deliberate: the file is written by your shell, with your user's
@@ -249,7 +249,7 @@ the job's test report — GitLab, Jenkins and Azure all read JUnit natively — 
 let the exit code fail the build.</p>
 <p>GitLab can include the job rather than copy it:</p>
 <pre><code class="language-yaml">include:
-  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v0.22/deploy/ci/gitlab-ci.yml&quot;
+  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v0.23/deploy/ci/gitlab-ci.yml&quot;
 
 guardana:
   variables:
@@ -279,7 +279,7 @@ to turn the gate on for an existing repo without fixing the whole backlog first.
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.22.0 · Apache-2.0</span>
+<span>Guardana 0.23.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/integrations.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

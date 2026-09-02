@@ -124,7 +124,7 @@ workflow is private, whatever the repository's visibility is**, so the very
 command the documentation tells users to run —
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.22 scan /work
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.23 scan /work
 ```
 
 — answers `unauthorized` until somebody changes it. There is no REST API for
@@ -141,7 +141,7 @@ Check it from a machine with no credentials, because "it works for me" here mean
 
 ```bash
 docker logout ghcr.io
-docker run --rm ghcr.io/guardana/guardana:0.22 --version
+docker run --rm ghcr.io/guardana/guardana:0.23 --version
 ```
 
 This is the failure mode this project keeps meeting from a different direction: a

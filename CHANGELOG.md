@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-02 — the extension surface held to its own contract
+
 ### Added
 
 - **CodeQL runs as a second static-analysis signal, alongside `ruff`'s bandit
