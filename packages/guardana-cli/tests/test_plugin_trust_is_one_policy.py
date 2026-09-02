@@ -17,6 +17,13 @@ from typer.testing import CliRunner
 _CLI = Path(__file__).resolve().parents[1] / "src" / "guardana" / "cli"
 _BARE_DISCOVER = re.compile(r"Registry\.discover\(\s*\)")
 _LITERAL_TRUST = re.compile(r"resolve_trust\(\s*\"(all|builtins|allowlist)\"")
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def plain(output: str) -> str:
+    """An assertion on a Rich-rendered message is an assertion on the terminal's
+    width unless the output is normalised."""
+    return " ".join(_ANSI.sub("", output).replace("│", " ").split())
 
 
 def test_no_command_calls_discover_without_a_trust_policy() -> None:
@@ -54,7 +61,7 @@ def test_an_unknown_plugin_mode_is_a_usage_error_everywhere(argv: list[str]) -> 
     result = CliRunner().invoke(app, argv)
 
     assert result.exit_code == 3, result.output
-    assert "unknown plugin mode" in result.output
+    assert "unknown plugin mode" in plain(result.output)
 
 
 @pytest.mark.parametrize(
@@ -68,7 +75,7 @@ def test_naming_a_distribution_without_the_allowlist_mode_is_refused(argv: list[
     result = CliRunner().invoke(app, argv)
 
     assert result.exit_code == 3, result.output
-    assert "--allow-plugin only applies with --plugins allowlist" in result.output
+    assert "--allow-plugin only applies with --plugins allowlist" in plain(result.output)
 
 
 def _minimal_trace(tmp_path: Path) -> str:
@@ -142,7 +149,7 @@ def test_a_refusal_never_reads_as_a_proven_fact(
     result = CliRunner().invoke(app, build_argv(tmp_path))
 
     for phrase in _REFUSAL_LEAK_PHRASES:
-        assert phrase not in result.output, f"{label}: {phrase!r} leaked — {result.output}"
+        assert phrase not in plain(result.output), f"{label}: {phrase!r} leaked — {result.output}"
 
 
 def test_the_refusal_warning_formats_the_error_fields_rather_than_a_repr() -> None:
@@ -154,6 +161,6 @@ def test_the_refusal_warning_formats_the_error_fields_rather_than_a_repr() -> No
     """
     result = CliRunner().invoke(app, ["pack", "validate", "--plugins", "disabled"])
 
-    assert "CheckError(" not in result.stderr
-    assert "source=" not in result.stderr
-    assert "(discovery):" in result.stderr
+    assert "CheckError(" not in plain(result.stderr)
+    assert "source=" not in plain(result.stderr)
+    assert "(discovery):" in plain(result.stderr)

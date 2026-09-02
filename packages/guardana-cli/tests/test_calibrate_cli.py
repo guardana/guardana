@@ -6,6 +6,7 @@ measurement that did not happen, a rubric inheriting someone else's accuracy.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,13 @@ from guardana.core.exchange import Exchange
 from typer.testing import CliRunner
 
 runner = CliRunner()
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def plain(output: str) -> str:
+    """An assertion on a Rich-rendered message is an assertion on the terminal's
+    width unless the output is normalised."""
+    return " ".join(_ANSI.sub("", output).replace("│", " ").split())
 
 
 def test_the_bundled_starter_corpus_loads_and_is_big_enough_to_mean_something() -> None:
@@ -70,7 +78,7 @@ def test_calibrate_refuses_an_evaluator_nobody_configured() -> None:
     result = runner.invoke(app, ["calibrate", "--evaluator", "llm_judge"])
 
     assert result.exit_code != 0
-    assert "no evaluator 'llm_judge'" in result.output
+    assert "no evaluator 'llm_judge'" in plain(result.output)
 
 
 def test_a_restrictive_plugin_mode_is_named_when_no_evaluator_loaded() -> None:
@@ -80,9 +88,9 @@ def test_a_restrictive_plugin_mode_is_named_when_no_evaluator_loaded() -> None:
     result = runner.invoke(app, ["calibrate", "--evaluator", "keyword", "--plugins", "disabled"])
 
     assert result.exit_code == ExitCode.INVALID_USAGE, result.output
-    assert "could not load evaluator" in result.output
-    assert "plugin trust is disabled" in result.output
-    assert "no evaluator 'keyword' is registered" in result.output
+    assert "could not load evaluator" in plain(result.output)
+    assert "plugin trust is disabled" in plain(result.output)
+    assert "no evaluator 'keyword' is registered" in plain(result.output)
 
 
 def test_an_unreliable_measurement_exits_nonzero(tmp_path: Path) -> None:
