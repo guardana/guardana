@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["fastapi>=0.115", "pydantic>=2.7", "psycopg[binary]>=3.2"]
+dependencies = ["fastapi>=0.115", "pydantic>=2.13.5", "psycopg[binary]>=3.2"]
 
 # The ASGI server is an extra, not a dependency: FastAPI builds the application,
 # and which server runs it is the deployment's decision — a site already running
