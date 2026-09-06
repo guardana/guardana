@@ -208,7 +208,7 @@ dev = [
     # model named "no fuzzing of the binary parsers" as an open gap for four
     # releases, and an example-based test proves the case its author thought of —
     # which is never the length field that is one byte short of the file.
-    "hypothesis>=6.115",
+    "hypothesis>=6.167.1",
     "import-linter>=2.1",
     # Test-only, and deliberately not a runtime dependency of any distribution:
     # `schemas/run-v2.schema.json` is a published contract, and a schema
