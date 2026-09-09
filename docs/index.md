@@ -1,153 +1,104 @@
 ---
 title: "Documentation"
 nav_order: 340
-summary: "The map: every guide, reference and design document, grouped by who needs it."
+summary: "Choose a task, then follow one focused guide."
 status: stable
 ---
 
 # Guardana documentation
 
-Guardana is an open-source engine and CLI for verifying the security of
-self-hosted and self-built AI. One rule engine runs in three places — a
-developer's machine, CI/CD, and a long-running monitor next to a served
-model — and reports findings locally or to an optional central collector.
+Start with the root [README](../README.md). Before production use, read
+[Product status](product-status.md), [Safe testing](safe-testing.md), and the
+[Threat model](threat-model.md).
 
-If you're new here, start with the root [`README.md`](../README.md) for the
-what/why, then read [`how-it-works.md`](how-it-works.md) for the whole product
-from A to Z — the concept, the engine, and how extensions plug in — before the
-detail below.
+## First run
 
-## Start here
+- [`install.md`](install.md) — install the CLI or a container
+- [`usage-scan.md`](usage-scan.md) — scan artifacts offline
+- [`usage-probe.md`](usage-probe.md) — probe a live endpoint, agent, or MCP server
+- [`usage-testing.md`](usage-testing.md) — run the same checks from pytest
+- [`how-it-works.md`](how-it-works.md) — understand targets, rules, evaluators, and evidence
 
-- [`../README.md`](../README.md) — what Guardana is, the quickstart, and what it checks
-- [`product-status.md`](product-status.md) — **read first**: maturity per component, and the limitations you should know before adopting
-- [`how-it-works.md`](how-it-works.md) — what Guardana is, how the engine works, the two rule layers, the four verbs, and how extensions plug in
-- [`install.md`](install.md) — installing the CLI
-- [`safe-testing.md`](safe-testing.md) — before you point an active check at anything that matters
+## Run and policy
 
-## For developers
+- [`profiles.md`](profiles.md) — configure rules, gates, budgets, trust, and redaction
+- [`usage-plan.md`](usage-plan.md) — estimate a run before sending requests
+- [`usage-target.md`](usage-target.md) — verify endpoint capabilities
+- [`usage-doctor.md`](usage-doctor.md) — validate and explain effective configuration
+- [`safe-testing.md`](safe-testing.md) — bound active checks and side effects
+- [`exit-codes.md`](exit-codes.md) — interpret command outcomes
 
-- [`usage-testing.md`](usage-testing.md) — `guardana.testing.assert_secure`: verification as an ordinary `pytest` assertion, plus the LangChain adapter
-- [`usage-scan.md`](usage-scan.md) — `guardana scan`: static, offline, CI-friendly
-- [`usage-probe.md`](usage-probe.md) — `guardana probe`: adversarial checks against a live
-  endpoint or agent, and an MCP server's manifest **and authorization surface**
-- [`usage-analyze-trace.md`](usage-analyze-trace.md) — `guardana analyze-trace`: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect
-- [`usage-trace-inspect.md`](usage-trace-inspect.md) — `guardana trace inspect`: which evidence dimensions a producer really records, and which ones your policy requires
-- [`usage-contracts.md`](usage-contracts.md) — **security contracts**: your application's own invariants — tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink — as a versioned file the engine compiles into rules
-- [`usage-import-observations.md`](usage-import-observations.md) — `guardana import-observations`: carry garak, promptfoo or your own harness's results in as unverified claims
-- [`usage-doctor.md`](usage-doctor.md) — `guardana doctor`, `config validate|explain`
-- [`usage-baseline.md`](usage-baseline.md) — `guardana baseline`: accepted risk that expires
-- [`usage-diff.md`](usage-diff.md) — `guardana diff`: compare two saved runs, fail on deterioration
-- [`usage-monitor.md`](usage-monitor.md) — `guardana monitor`: scheduled re-verification
-- [`usage-target.md`](usage-target.md) — `guardana target inspect`: what an endpoint really supports
-- [`usage-plan.md`](usage-plan.md) — `guardana plan`: what a run would cost, before it costs anything
-- [`usage-rules.md`](usage-rules.md) — `guardana rules`: list every discovered rule, grouped by the layer it secures
-- [`usage-taxonomy.md`](usage-taxonomy.md) — `guardana taxonomy`: which framework entry a reference names, and what it corresponds to in another edition
-- [`exit-codes.md`](exit-codes.md) — the exit-status contract every command honours
-- [`usage-run.md`](usage-run.md) — `guardana run inspect|migrate`: reading a saved run, its manifest, and the cases it measured
-- [`profiles.md`](profiles.md) — the `guardana.yaml` policy file: which rules run, what fails the build
-- [`writing-rules.md`](writing-rules.md) — author a rule as YAML or as a Python plugin
-- [`writing-an-integrator.md`](writing-an-integrator.md) — make the agent you already run produce a trace worth grading: what your framework will not give you, and the declaration that cannot be inflated
-- [`usage-rule-test.md`](usage-rule-test.md) — `guardana rule test`: a rule's positive, negative and **inconclusive** fixtures, run as a command
-- [`usage-pack.md`](usage-pack.md) — `guardana pack validate` and `guardana pack lock`: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks
-- [`usage-calibrate.md`](usage-calibrate.md) — `guardana calibrate`: measure an evaluator's confidence against known outcomes, and carry the measurement into a run
-- [`extending.md`](extending.md) — add a Rule, an Evaluator, or a Target; the entry-point contract
-- [`model-formats.md`](model-formats.md) — the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract
+## Evidence and regression
 
-## For platform and CI teams
+- [`usage-run.md`](usage-run.md) — inspect and migrate saved runs
+- [`usage-diff.md`](usage-diff.md) — compare runs without hiding coverage changes
+- [`usage-baseline.md`](usage-baseline.md) — accept risk with an expiry
+- [`usage-monitor.md`](usage-monitor.md) — schedule active re-verification
+- [`usage-calibrate.md`](usage-calibrate.md) — measure evaluator confidence
+- [`privacy.md`](privacy.md) — control redaction and retained evidence
 
-- [`integrations.md`](integrations.md) — GitHub Action, pre-commit, and gating on deterioration
-- [`../deploy/ci/README.md`](../deploy/ci/README.md) — GitLab, Jenkins, Azure DevOps and the generic container pipeline
-- [`../deploy/docker/README.md`](../deploy/docker/README.md) — the official container images: tags, mounts, exit codes, and what the collector image deliberately does not do on start
-- [`usage-diff.md`](usage-diff.md) — the baseline-and-compare workflow
-- [`deployment.md`](deployment.md) — running the collector in production: Compose, TLS, upgrades, what to watch, and what it does not give you yet
-- [`usage-collector.md`](usage-collector.md) — the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness
+## Recorded applications
 
-## For security teams
+- [`usage-analyze-trace.md`](usage-analyze-trace.md) — grade a recorded execution
+- [`usage-trace-inspect.md`](usage-trace-inspect.md) — inspect available evidence dimensions
+- [`usage-contracts.md`](usage-contracts.md) — express application-specific invariants
+- [`usage-import-observations.md`](usage-import-observations.md) — import external tool claims
+- [`writing-an-integrator.md`](writing-an-integrator.md) — produce honest trace evidence
 
-- [`privacy.md`](privacy.md) — evidence redaction, modes, and what Guardana keeps
-- [`threat-model.md`](threat-model.md) — what Guardana defends against, what it does not, and where the trust boundaries sit
-- [`safe-testing.md`](safe-testing.md) — side effects, staging, and reading a result honestly
-- [`architecture.md`](architecture.md) — the five abstractions, the Registry, the core↔server boundary
+## Rules and extensions
+
+- [`usage-rules.md`](usage-rules.md) — list discovered rules
+- [`writing-rules.md`](writing-rules.md) — create YAML or Python rules
+- [`usage-rule-test.md`](usage-rule-test.md) — test positive, negative, and inconclusive fixtures
+- [`extending.md`](extending.md) — provide rules, evaluators, targets, or taxonomies
+- [`usage-pack.md`](usage-pack.md) — validate and lock extension packs
+- [`usage-taxonomy.md`](usage-taxonomy.md) — resolve framework editions and crosswalks
+- [`model-formats.md`](model-formats.md) — use the bounded artifact readers
+
+## Collector and deployment
+
+- [`usage-collector.md`](usage-collector.md) — operate the optional collector
+- [`deployment.md`](deployment.md) — deploy it with PostgreSQL and TLS
+- [`integrations.md`](integrations.md) — connect Guardana to CI and GitHub
+- [`../deploy/docker/README.md`](../deploy/docker/README.md) — use the official images
+- [`../deploy/ci/README.md`](../deploy/ci/README.md) — use GitLab, Jenkins, or Azure DevOps
+
+## Architecture and security
+
+- [`architecture.md`](architecture.md) — understand package and trust boundaries
+- [`threat-model.md`](threat-model.md) — see what Guardana does and does not defend
+- [`product-status.md`](product-status.md) — check maturity and known limitations
 
 ## Reference
 
-Generated from the registry, never typed by hand.
+These files are generated from the registry and are the source of truth for
+coverage. Do not edit them by hand.
 
-- [`generated/rule-summary.md`](generated/rule-summary.md) — counts by surface, target kind and severity
-- [`generated/rule-catalog.md`](generated/rule-catalog.md) — every built-in rule and what it maps to
+- [`generated/rule-summary.md`](generated/rule-summary.md) — counts by surface and severity
+- [`generated/rule-catalog.md`](generated/rule-catalog.md) — every built-in rule
 - [`generated/evaluator-catalog.md`](generated/evaluator-catalog.md) — every evaluator
-- [`generated/taxonomy-coverage.md`](generated/taxonomy-coverage.md) — which framework entries are covered
+- [`generated/taxonomy-coverage.md`](generated/taxonomy-coverage.md) — framework coverage
 
 ## Design documents
 
-Written before the code they describe, so the reasoning survives the review.
+- [`design/README.md`](design/README.md) — accepted decisions, proposals, and status conventions
 
-- [`design/README.md`](design/README.md) — how these are named, what each status means, and why an accepted decision is superseded rather than rewritten
-- [`design/assessment-channel.md`](design/assessment-channel.md) — what a run measured rather than what was wrong, and why the passes are the half that matters
-- [`design/capability-protocols.md`](design/capability-protocols.md) — what each capability actually promises, and why the extension contract was false until it did
-- [`design/production-intake.md`](design/production-intake.md) — assessing real traffic without ever being in its path *(proposed)*
-- [`design/audit-0.21.md`](design/audit-0.21.md) — what a full audit of the released 0.21 found, and which gate closed each finding
-- [`design/audit-0.22.md`](design/audit-0.22.md) — how open the engine really is after 0.22, which seams stay closed on purpose, and the six-cycle program that follows
-- [`design/target-locators.md`](design/target-locators.md) — a discovered target the CLI can build: a scheme on the class, a locator on the command line, the verb still choosing the kind *(proposed)*
-- [`design/output-plugins.md`](design/output-plugins.md) — renderers and reporters as entry points, and the redaction invariant every output sits behind *(proposed)*
-- [`design/quality-suites.md`](design/quality-suites.md) — versioned datasets, suites that are rules, assessors that are evaluators, and a gate that refuses a rate it has not earned *(proposed)*
-- [`design/paired-regression-statistics.md`](design/paired-regression-statistics.md) — "worse" over a paired sample with an exact test, a minimum effect and a minimum sample, or "cannot tell" *(proposed)*
-- [`design/attack-techniques.md`](design/attack-techniques.md) — the technique as its own extension point, so coverage multiplies instead of adding *(proposed)*
-- [`design/namespaced-extension-ids.md`](design/namespaced-extension-ids.md) — capabilities and assertion kinds a pack can declare, with a typo still a load error *(proposed)*
-- [`design/trace-domain-model.md`](design/trace-domain-model.md) — the `Trace` model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact
-- [`design/trace-producer.md`](design/trace-producer.md) — the append-only writer, which inflated declaration actually leaks a pass, and what the model needs before an integrator can record human approval honestly
-- [`design/framework-adapters.md`](design/framework-adapters.md) — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing
-- [`design/security-contracts.md`](design/security-contracts.md) — the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does
-- [`design/mcp-protocol-eras.md`](design/mcp-protocol-eras.md) — two revisions of MCP, and settling which one a server speaks before asking it anything
-- [`design/mcp-authorization-depth.md`](design/mcp-authorization-depth.md) — what a live MCP server's authorization surface can be asked with one credential
-- [`design/taxonomy-editions.md`](design/taxonomy-editions.md) — why a reference is scheme + edition + id, and never a bare `LLM07`
-- [`design/extension-author-tooling.md`](design/extension-author-tooling.md) — fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment
-- [`design/documentation-site.md`](design/documentation-site.md) — a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way
-- [`design/run-manifest-v2.md`](design/run-manifest-v2.md) — the reproducible run record
-- [`design/collector-domain-model.md`](design/collector-domain-model.md) — persistence, tenancy and the finding lifecycle
-- [`design/privacy-and-redaction.md`](design/privacy-and-redaction.md) — one redactor, one seam
-- [`design/exit-codes.md`](design/exit-codes.md) — why the codes are what they are
-- [`design/collector-persistence.md`](design/collector-persistence.md) — collector persistence and migrations
-- [`design/collector-tenancy.md`](design/collector-tenancy.md) — organizations, projects, and the scope on every query
-- [`design/ai-systems-and-deployments.md`](design/ai-systems-and-deployments.md) — what was verified, where it runs, and which version of it
-- [`design/collector-runs-and-findings.md`](design/collector-runs-and-findings.md) — the run's verdict, and following one finding across runs
-- [`design/finding-lifecycle-and-waivers.md`](design/finding-lifecycle-and-waivers.md) — statuses, waivers that expire, and why this is not a second `baseline`
-- [`design/audit-retention-and-deletion.md`](design/audit-retention-and-deletion.md) — who did what, how long evidence is kept, and deleting on purpose
-- [`design/panel-sessions.md`](design/panel-sessions.md) — signing in to the panel with a read key, and why the cookie cannot write
-- [`design/enterprise-readiness-plan.md`](design/enterprise-readiness-plan.md) — superseded by `ROADMAP.md`, kept because it records what the constraints were when the company-readiness work was planned
+Design documents explain why an implementation has its current shape. They are
+not task guides and may describe rejected or superseded alternatives.
 
 ## Project direction
 
-- [`FEATURES.md`](../FEATURES.md) — everything that ships out of the box
-- [`ROADMAP.md`](../ROADMAP.md) — where the project is headed, what's deferred, and the non-goals
-
-## Runnable example
-
-[`examples/custom_rule/`](../examples/custom_rule/) is a complete,
-installable third-party extension (fictional company "Acme") that declares
-all four entry-point groups — `guardana.rules`, `guardana.evaluators`,
-`guardana.targets`, and `guardana.taxonomies` — and ships, under an `acme.*`
-namespace, two Python plugin rules, three YAML rules, a **custom classifier**
-(an `Evaluator`), a **custom target** (a directory of approved prompts, read
-as artifacts), and a **custom taxonomy** (`ACME-14`, Acme's own internal
-control catalogue) — with tests proving Guardana discovers and uses each one
-end-to-end. One of the plugin rules inspects a **GGUF model file** and is pure
-policy, because the binary parsing comes from
-[`model-formats.md`](model-formats.md).
-[`examples/guardana.yaml`](../examples/guardana.yaml) is a sample profile
-that includes both Guardana's built-ins and Acme's custom rules.
+- [`../FEATURES.md`](../FEATURES.md) — concise shipped capability overview
+- [`../ROADMAP.md`](../ROADMAP.md) — ordered next work and exit criteria
+- [`../CHANGELOG.md`](../CHANGELOG.md) — release history
 
 ## Maintainers
 
-- [`RELEASING.md`](../RELEASING.md) — versioning (SemVer, lockstep), the release
-  runbook, tags, and PyPI publishing.
-- [`maintainers/github-setup.md`](maintainers/github-setup.md) — one-time GitHub
-  repository configuration.
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — setup, quality gates, and review rules
+- [`../RELEASING.md`](../RELEASING.md) — versioning and publishing
+- [`maintainers/github-setup.md`](maintainers/github-setup.md) — repository settings
 
 ## Governance
 
-Project rules for contributors (human or agent), commit/PR conventions, and
-code standards live in [`CONTRIBUTING.md`](../CONTRIBUTING.md) and
-[`CLAUDE.md`](../CLAUDE.md) at the repo root — this directory doesn't
-duplicate them.
+- [`../SECURITY.md`](../SECURITY.md) — report vulnerabilities and understand support
+- [`../CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) — community expectations

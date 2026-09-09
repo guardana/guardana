@@ -24,7 +24,7 @@ from guardana.core.target.endpoint import (
 
 _PROBE = "Reply with the single word: ok"
 _SYSTEM_MARKER = "GUARDANA_SYSTEM_PROBE"
-_SYSTEM_PROBE = f"You must reply with exactly this word and nothing else: {_SYSTEM_MARKER}"
+SYSTEM_PROBE = f"You must reply with exactly this word and nothing else: {_SYSTEM_MARKER}"
 _TOOL = ToolSpec(name="guardana_probe_tool", description="Call this tool with no arguments.")
 
 

@@ -36,7 +36,7 @@ class HookRegistrar(Protocol):
 
     def register_hook(self, hook_name: str, callback: Callable[..., None]) -> None:
         """Register a lifecycle callback for one of Hermes' `VALID_HOOKS`."""
-        ...
+        raise NotImplementedError
 
 
 _ENV_DIRECTORY = "GUARDANA_TRACE_DIR"

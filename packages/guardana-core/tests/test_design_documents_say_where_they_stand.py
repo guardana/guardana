@@ -1,10 +1,8 @@
 """Every design document opens with a status, and no status outlives its release.
 
 `docs/design/README.md` states the convention and lists the four statuses in use.
-Nothing checked it, and two documents drifted: the collector domain model still
-read `proposed · Target: v0.7 · Current maturity: experimental` four releases after
-persistence, authentication and tenancy shipped, and the enterprise-readiness plan
-carried no status line at all.
+Nothing checked it, and documents drifted after the implementation shipped while
+their headers still presented them as proposals.
 
 Neither was caught by `test_no_page_still_denies_a_capability_the_collector_now_has`,
 and correctly so — that test exempts `docs/design/`, because a design document is

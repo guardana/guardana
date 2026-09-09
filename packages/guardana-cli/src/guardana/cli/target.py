@@ -11,6 +11,7 @@ from guardana.cli._formats import OutputFormat
 from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.inspect import (
+    SYSTEM_PROBE,
     Support,
     TargetReport,
     endpoint_rule_count,
@@ -124,8 +125,7 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
         url,
         model,
         api_key=api_key,
-        system_prompt="You must reply with exactly this word and nothing else: "
-        "GUARDANA_SYSTEM_PROBE",
+        system_prompt=SYSTEM_PROBE,
         provider=provider,
         transport=None,
     )

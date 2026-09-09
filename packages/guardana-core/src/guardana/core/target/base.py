@@ -66,7 +66,7 @@ class Target(ABC):
     @abstractmethod
     def capabilities(self) -> set[Capability]:
         """Declare what this target supports; the runner skips rules it cannot satisfy."""
-        ...
+        raise NotImplementedError
 
     @property
     @abstractmethod

@@ -113,21 +113,21 @@ def _render() -> str:
         "# Guardana",
         "",
         "> Open-source AI security verification. One rule engine scans model artifacts, "
-        "probes live endpoints and MCP servers, and grades agent executions that already "
-        "happened — on a laptop, in CI, and next to a served model. It runs offline, needs "
-        "no account, and sends nothing anywhere except to the target you name.",
+        + "probes live endpoints and MCP servers, and grades agent executions that already "
+        + "happened — on a laptop, in CI, and next to a served model. It runs offline, needs "
+        + "no account, and sends nothing anywhere except to the target you name.",
         "",
         f"Version {__version__}, Apache-2.0. {counts['total']} built-in rules: "
-        f"{counts['build']} static ones that need no model and no network, and "
-        f"{counts['runtime']} that grade a live system or a recorded run. Every rule maps "
-        "to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, "
-        "OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).",
+        + f"{counts['build']} static ones that need no model and no network, and "
+        + f"{counts['runtime']} that grade a live system or a recorded run. Every rule maps "
+        + "to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, "
+        + "OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).",
         "",
         "The distinguishing property is what happens when a check cannot reach a verdict. "
-        "Guardana reports four separate outcomes — a finding, an unverified check, a check "
-        "that errored, and evidence that was demanded and not available — and none of them "
-        "is silently a pass. A run that could not establish something says so and exits "
-        "non-zero.",
+        + "Guardana reports four separate outcomes — a finding, an unverified check, a check "
+        + "that errored, and evidence that was demanded and not available — and none of them "
+        + "is silently a pass. A run that could not establish something says so and exits "
+        + "non-zero.",
         "",
         "This file is generated from the documentation map; do not edit it by hand.",
         "",

@@ -25,11 +25,10 @@ and [`docs/architecture.md`](docs/architecture.md).
 
 ## What "done" means right now
 
-The current milestone is **Horizon 1 — quality and regression**: answer honestly
-whether a change made the system better or worse, on a stated sample. The
-measurement channel landed in 0.22.0; what it needs next is suites, versioned
-datasets and a comparison with enough statistics to refuse a verdict it has not
-earned. The exit criteria are in [`ROADMAP.md`](ROADMAP.md#horizons-as-dependencies-rather-than-dates),
+The current milestone is **application awareness and honest regression**: make
+third-party targets usable from the CLI, then compare named, versioned samples
+without claiming more than the evidence supports. The ordered work and exit
+criteria are in [`ROADMAP.md`](ROADMAP.md#now-application-awareness-and-honest-regression),
 and they outrank new coverage.
 
 (Company-readiness was the 0.7 milestone and its checklist has been complete since

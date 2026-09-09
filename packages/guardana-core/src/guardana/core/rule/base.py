@@ -226,4 +226,4 @@ class Rule(ABC):
         cannot run at all — the runner records it as skipped instead of failing
         the whole scan.
         """
-        ...
+        raise NotImplementedError

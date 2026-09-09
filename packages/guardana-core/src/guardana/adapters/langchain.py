@@ -61,7 +61,7 @@ class LangChainModel(Protocol):
 
     def invoke(self, conversation: list[dict[str, Any]], /) -> object:
         """Send a conversation as role/content mappings and return the model's message."""
-        ...
+        raise NotImplementedError
 
 
 class LangChainTransport:

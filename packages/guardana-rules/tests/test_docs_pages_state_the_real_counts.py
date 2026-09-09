@@ -126,27 +126,15 @@ def _repo_file(name: str) -> str:
     raise AssertionError(f"could not locate {name} at the repo root")
 
 
-_ROADMAP_OURS_RE = re.compile(r"against our (\d+) rules")
 _SAMPLED_RE = re.compile(r"(\d+) rules ship and \*\*(\d+) are fully sampled\*\*")
 
 
-def test_the_roadmap_compares_competitors_against_the_real_rule_total() -> None:
-    """A count in a sentence about somebody else is still a count about us.
+def test_the_roadmap_delegates_rule_counts_to_generated_docs() -> None:
+    """The plan must not carry another hand-maintained count or coverage table."""
+    roadmap = _repo_file("ROADMAP.md")
 
-    `ROADMAP.md` compared DeepTeam's coverage "against our 32 rules" while 51
-    shipped, for four releases. It is the `47 security checks` failure exactly: a
-    number three screens away from a table that was correct, in a file nothing
-    checked, because the check was written for the *pages* and this one is at the
-    repository root. Grep the whole file for every other number of the same thing —
-    a number is not covered because it sits near one that is.
-    """
-    total = len(list(provide_rules()))
-
-    stated = _counts(_ROADMAP_OURS_RE, _repo_file("ROADMAP.md"), "ROADMAP.md")
-
-    assert stated == [total], (
-        f"ROADMAP.md compares competitors against {stated} rule(s); the registry has {total}"
-    )
+    assert "docs/generated/rule-summary.md" in roadmap
+    assert "docs/generated/rule-catalog.md" in roadmap
 
 
 def test_the_rule_test_page_states_how_many_rules_are_really_sampled() -> None:

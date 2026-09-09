@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentation — Guardana documentation</title>
-<meta name="description" content="The map: every guide, reference and design document, grouped by who needs it.">
+<meta name="description" content="Choose a task, then follow one focused guide.">
 <link rel="canonical" href="https://guardana.dev/docs/index.html">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 <link rel="stylesheet" href="docs.css">
@@ -21,48 +21,52 @@
 <div class="shell">
 <nav class="side">
 <ul class="home"><li><a href="index.html" aria-current="page">Overview</a></li></ul>
-<h2>Start here</h2><ul>
-<li><a href="product-status.html">Product status</a></li>
+<h2>First run</h2><ul>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
-<li><a href="safe-testing.html">Safe active testing</a></li>
-</ul>
-<h2>For developers</h2><ul>
 <li><a href="usage-testing.html">In your test suite</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
 <li><a href="usage-probe.html">guardana probe</a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
 <li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
-<li><a href="usage-doctor.html">guardana doctor</a></li>
-<li><a href="usage-baseline.html">guardana baseline</a></li>
-<li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
-<li><a href="usage-target.html">guardana target inspect</a></li>
-<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
-<li><a href="exit-codes.html">Exit codes</a></li>
-<li><a href="usage-run.html">guardana run</a></li>
-<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
-<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
-<li><a href="usage-calibrate.html">guardana calibrate</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
-<h2>For platform and CI teams</h2><ul>
-<li><a href="usage-diff.html">guardana diff</a></li>
+<h2>Collector and deployment</h2><ul>
 <li><a href="integrations.html">CI and pre-commit</a></li>
 <li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
 <li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
 </ul>
-<h2>For security teams</h2><ul>
-<li><a href="safe-testing.html">Safe active testing</a></li>
-<li><a href="privacy.html">Evidence and redaction</a></li>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
@@ -74,6 +78,12 @@
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
 </ul>
 <h2>Design documents</h2><ul>
+<li><a href="design/README.html">How these are written</a></li>
+</ul>
+<h2>Maintainers</h2><ul>
+<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
+</ul>
+<h2>Also here</h2><ul>
 <li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
 <li><a href="design/trace-producer.html">Producing a trace<span class="tag">accepted</span></a></li>
 <li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
@@ -105,151 +115,102 @@
 <li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
 <li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
 <li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
-<li><a href="design/README.html">How these are written</a></li>
-<li><a href="design/enterprise-readiness-plan.html">Enterprise-readiness plan<span class="tag">superseded</span></a></li>
-</ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
 </ul>
 </nav>
 <main>
-<h1>Guardana documentation</h1><p class="lede">The map: every guide, reference and design document, grouped by who needs it.</p><p>Guardana is an open-source engine and CLI for verifying the security of
-self-hosted and self-built AI. One rule engine runs in three places — a
-developer's machine, CI/CD, and a long-running monitor next to a served
-model — and reports findings locally or to an optional central collector.</p>
-<p>If you're new here, start with the root <a href="https://github.com/guardana/guardana/blob/main/README.md"><code>README.md</code></a> for the
-what/why, then read <a href="how-it-works.html"><code>how-it-works.md</code></a> for the whole product
-from A to Z — the concept, the engine, and how extensions plug in — before the
-detail below.</p>
-<h2 id="start-here">Start here</h2>
+<h1>Guardana documentation</h1><p class="lede">Choose a task, then follow one focused guide.</p><p>Start with the root <a href="https://github.com/guardana/guardana/blob/main/README.md">README</a>. Before production use, read
+<a href="product-status.html">Product status</a>, <a href="safe-testing.html">Safe testing</a>, and the
+<a href="threat-model.html">Threat model</a>.</p>
+<h2 id="first-run">First run</h2>
 <ul>
-<li><a href="https://github.com/guardana/guardana/blob/main/README.md"><code>../README.md</code></a> — what Guardana is, the quickstart, and what it checks</li>
-<li><a href="product-status.html"><code>product-status.md</code></a> — <strong>read first</strong>: maturity per component, and the limitations you should know before adopting</li>
-<li><a href="how-it-works.html"><code>how-it-works.md</code></a> — what Guardana is, how the engine works, the two rule layers, the four verbs, and how extensions plug in</li>
-<li><a href="install.html"><code>install.md</code></a> — installing the CLI</li>
-<li><a href="safe-testing.html"><code>safe-testing.md</code></a> — before you point an active check at anything that matters</li>
+<li><a href="install.html"><code>install.md</code></a> — install the CLI or a container</li>
+<li><a href="usage-scan.html"><code>usage-scan.md</code></a> — scan artifacts offline</li>
+<li><a href="usage-probe.html"><code>usage-probe.md</code></a> — probe a live endpoint, agent, or MCP server</li>
+<li><a href="usage-testing.html"><code>usage-testing.md</code></a> — run the same checks from pytest</li>
+<li><a href="how-it-works.html"><code>how-it-works.md</code></a> — understand targets, rules, evaluators, and evidence</li>
 </ul>
-<h2 id="for-developers">For developers</h2>
+<h2 id="run-and-policy">Run and policy</h2>
 <ul>
-<li><a href="usage-testing.html"><code>usage-testing.md</code></a> — <code>guardana.testing.assert_secure</code>: verification as an ordinary <code>pytest</code> assertion, plus the LangChain adapter</li>
-<li><a href="usage-scan.html"><code>usage-scan.md</code></a> — <code>guardana scan</code>: static, offline, CI-friendly</li>
-<li><a href="usage-probe.html"><code>usage-probe.md</code></a> — <code>guardana probe</code>: adversarial checks against a live
-endpoint or agent, and an MCP server's manifest <strong>and authorization surface</strong></li>
-<li><a href="usage-analyze-trace.html"><code>usage-analyze-trace.md</code></a> — <code>guardana analyze-trace</code>: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect</li>
-<li><a href="usage-trace-inspect.html"><code>usage-trace-inspect.md</code></a> — <code>guardana trace inspect</code>: which evidence dimensions a producer really records, and which ones your policy requires</li>
-<li><a href="usage-contracts.html"><code>usage-contracts.md</code></a> — <strong>security contracts</strong>: your application's own invariants — tenant boundary, required approval, allowed scopes, credential boundary, forbidden sink — as a versioned file the engine compiles into rules</li>
-<li><a href="usage-import-observations.html"><code>usage-import-observations.md</code></a> — <code>guardana import-observations</code>: carry garak, promptfoo or your own harness's results in as unverified claims</li>
-<li><a href="usage-doctor.html"><code>usage-doctor.md</code></a> — <code>guardana doctor</code>, <code>config validate|explain</code></li>
-<li><a href="usage-baseline.html"><code>usage-baseline.md</code></a> — <code>guardana baseline</code>: accepted risk that expires</li>
-<li><a href="usage-diff.html"><code>usage-diff.md</code></a> — <code>guardana diff</code>: compare two saved runs, fail on deterioration</li>
-<li><a href="usage-monitor.html"><code>usage-monitor.md</code></a> — <code>guardana monitor</code>: scheduled re-verification</li>
-<li><a href="usage-target.html"><code>usage-target.md</code></a> — <code>guardana target inspect</code>: what an endpoint really supports</li>
-<li><a href="usage-plan.html"><code>usage-plan.md</code></a> — <code>guardana plan</code>: what a run would cost, before it costs anything</li>
-<li><a href="usage-rules.html"><code>usage-rules.md</code></a> — <code>guardana rules</code>: list every discovered rule, grouped by the layer it secures</li>
-<li><a href="usage-taxonomy.html"><code>usage-taxonomy.md</code></a> — <code>guardana taxonomy</code>: which framework entry a reference names, and what it corresponds to in another edition</li>
-<li><a href="exit-codes.html"><code>exit-codes.md</code></a> — the exit-status contract every command honours</li>
-<li><a href="usage-run.html"><code>usage-run.md</code></a> — <code>guardana run inspect|migrate</code>: reading a saved run, its manifest, and the cases it measured</li>
-<li><a href="profiles.html"><code>profiles.md</code></a> — the <code>guardana.yaml</code> policy file: which rules run, what fails the build</li>
-<li><a href="writing-rules.html"><code>writing-rules.md</code></a> — author a rule as YAML or as a Python plugin</li>
-<li><a href="writing-an-integrator.html"><code>writing-an-integrator.md</code></a> — make the agent you already run produce a trace worth grading: what your framework will not give you, and the declaration that cannot be inflated</li>
-<li><a href="usage-rule-test.html"><code>usage-rule-test.md</code></a> — <code>guardana rule test</code>: a rule's positive, negative and <strong>inconclusive</strong> fixtures, run as a command</li>
-<li><a href="usage-pack.html"><code>usage-pack.md</code></a> — <code>guardana pack validate</code> and <code>guardana pack lock</code>: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks</li>
-<li><a href="usage-calibrate.html"><code>usage-calibrate.md</code></a> — <code>guardana calibrate</code>: measure an evaluator's confidence against known outcomes, and carry the measurement into a run</li>
-<li><a href="extending.html"><code>extending.md</code></a> — add a Rule, an Evaluator, or a Target; the entry-point contract</li>
-<li><a href="model-formats.html"><code>model-formats.md</code></a> — the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract</li>
+<li><a href="profiles.html"><code>profiles.md</code></a> — configure rules, gates, budgets, trust, and redaction</li>
+<li><a href="usage-plan.html"><code>usage-plan.md</code></a> — estimate a run before sending requests</li>
+<li><a href="usage-target.html"><code>usage-target.md</code></a> — verify endpoint capabilities</li>
+<li><a href="usage-doctor.html"><code>usage-doctor.md</code></a> — validate and explain effective configuration</li>
+<li><a href="safe-testing.html"><code>safe-testing.md</code></a> — bound active checks and side effects</li>
+<li><a href="exit-codes.html"><code>exit-codes.md</code></a> — interpret command outcomes</li>
 </ul>
-<h2 id="for-platform-and-ci-teams">For platform and CI teams</h2>
+<h2 id="evidence-and-regression">Evidence and regression</h2>
 <ul>
-<li><a href="integrations.html"><code>integrations.md</code></a> — GitHub Action, pre-commit, and gating on deterioration</li>
-<li><a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md"><code>../deploy/ci/README.md</code></a> — GitLab, Jenkins, Azure DevOps and the generic container pipeline</li>
-<li><a href="https://github.com/guardana/guardana/blob/main/deploy/docker/README.md"><code>../deploy/docker/README.md</code></a> — the official container images: tags, mounts, exit codes, and what the collector image deliberately does not do on start</li>
-<li><a href="usage-diff.html"><code>usage-diff.md</code></a> — the baseline-and-compare workflow</li>
-<li><a href="deployment.html"><code>deployment.md</code></a> — running the collector in production: Compose, TLS, upgrades, what to watch, and what it does not give you yet</li>
-<li><a href="usage-collector.html"><code>usage-collector.md</code></a> — the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness</li>
+<li><a href="usage-run.html"><code>usage-run.md</code></a> — inspect and migrate saved runs</li>
+<li><a href="usage-diff.html"><code>usage-diff.md</code></a> — compare runs without hiding coverage changes</li>
+<li><a href="usage-baseline.html"><code>usage-baseline.md</code></a> — accept risk with an expiry</li>
+<li><a href="usage-monitor.html"><code>usage-monitor.md</code></a> — schedule active re-verification</li>
+<li><a href="usage-calibrate.html"><code>usage-calibrate.md</code></a> — measure evaluator confidence</li>
+<li><a href="privacy.html"><code>privacy.md</code></a> — control redaction and retained evidence</li>
 </ul>
-<h2 id="for-security-teams">For security teams</h2>
+<h2 id="recorded-applications">Recorded applications</h2>
 <ul>
-<li><a href="privacy.html"><code>privacy.md</code></a> — evidence redaction, modes, and what Guardana keeps</li>
-<li><a href="threat-model.html"><code>threat-model.md</code></a> — what Guardana defends against, what it does not, and where the trust boundaries sit</li>
-<li><a href="safe-testing.html"><code>safe-testing.md</code></a> — side effects, staging, and reading a result honestly</li>
-<li><a href="architecture.html"><code>architecture.md</code></a> — the five abstractions, the Registry, the core↔server boundary</li>
+<li><a href="usage-analyze-trace.html"><code>usage-analyze-trace.md</code></a> — grade a recorded execution</li>
+<li><a href="usage-trace-inspect.html"><code>usage-trace-inspect.md</code></a> — inspect available evidence dimensions</li>
+<li><a href="usage-contracts.html"><code>usage-contracts.md</code></a> — express application-specific invariants</li>
+<li><a href="usage-import-observations.html"><code>usage-import-observations.md</code></a> — import external tool claims</li>
+<li><a href="writing-an-integrator.html"><code>writing-an-integrator.md</code></a> — produce honest trace evidence</li>
+</ul>
+<h2 id="rules-and-extensions">Rules and extensions</h2>
+<ul>
+<li><a href="usage-rules.html"><code>usage-rules.md</code></a> — list discovered rules</li>
+<li><a href="writing-rules.html"><code>writing-rules.md</code></a> — create YAML or Python rules</li>
+<li><a href="usage-rule-test.html"><code>usage-rule-test.md</code></a> — test positive, negative, and inconclusive fixtures</li>
+<li><a href="extending.html"><code>extending.md</code></a> — provide rules, evaluators, targets, or taxonomies</li>
+<li><a href="usage-pack.html"><code>usage-pack.md</code></a> — validate and lock extension packs</li>
+<li><a href="usage-taxonomy.html"><code>usage-taxonomy.md</code></a> — resolve framework editions and crosswalks</li>
+<li><a href="model-formats.html"><code>model-formats.md</code></a> — use the bounded artifact readers</li>
+</ul>
+<h2 id="collector-and-deployment">Collector and deployment</h2>
+<ul>
+<li><a href="usage-collector.html"><code>usage-collector.md</code></a> — operate the optional collector</li>
+<li><a href="deployment.html"><code>deployment.md</code></a> — deploy it with PostgreSQL and TLS</li>
+<li><a href="integrations.html"><code>integrations.md</code></a> — connect Guardana to CI and GitHub</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/deploy/docker/README.md"><code>../deploy/docker/README.md</code></a> — use the official images</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md"><code>../deploy/ci/README.md</code></a> — use GitLab, Jenkins, or Azure DevOps</li>
+</ul>
+<h2 id="architecture-and-security">Architecture and security</h2>
+<ul>
+<li><a href="architecture.html"><code>architecture.md</code></a> — understand package and trust boundaries</li>
+<li><a href="threat-model.html"><code>threat-model.md</code></a> — see what Guardana does and does not defend</li>
+<li><a href="product-status.html"><code>product-status.md</code></a> — check maturity and known limitations</li>
 </ul>
 <h2 id="reference">Reference</h2>
-<p>Generated from the registry, never typed by hand.</p>
+<p>These files are generated from the registry and are the source of truth for
+coverage. Do not edit them by hand.</p>
 <ul>
-<li><a href="generated/rule-summary.html"><code>generated/rule-summary.md</code></a> — counts by surface, target kind and severity</li>
-<li><a href="generated/rule-catalog.html"><code>generated/rule-catalog.md</code></a> — every built-in rule and what it maps to</li>
+<li><a href="generated/rule-summary.html"><code>generated/rule-summary.md</code></a> — counts by surface and severity</li>
+<li><a href="generated/rule-catalog.html"><code>generated/rule-catalog.md</code></a> — every built-in rule</li>
 <li><a href="generated/evaluator-catalog.html"><code>generated/evaluator-catalog.md</code></a> — every evaluator</li>
-<li><a href="generated/taxonomy-coverage.html"><code>generated/taxonomy-coverage.md</code></a> — which framework entries are covered</li>
+<li><a href="generated/taxonomy-coverage.html"><code>generated/taxonomy-coverage.md</code></a> — framework coverage</li>
 </ul>
 <h2 id="design-documents">Design documents</h2>
-<p>Written before the code they describe, so the reasoning survives the review.</p>
 <ul>
-<li><a href="design/README.html"><code>design/README.md</code></a> — how these are named, what each status means, and why an accepted decision is superseded rather than rewritten</li>
-<li><a href="design/assessment-channel.html"><code>design/assessment-channel.md</code></a> — what a run measured rather than what was wrong, and why the passes are the half that matters</li>
-<li><a href="design/capability-protocols.html"><code>design/capability-protocols.md</code></a> — what each capability actually promises, and why the extension contract was false until it did</li>
-<li><a href="design/production-intake.html"><code>design/production-intake.md</code></a> — assessing real traffic without ever being in its path <em>(proposed)</em></li>
-<li><a href="design/audit-0.21.html"><code>design/audit-0.21.md</code></a> — what a full audit of the released 0.21 found, and which gate closed each finding</li>
-<li><a href="design/audit-0.22.html"><code>design/audit-0.22.md</code></a> — how open the engine really is after 0.22, which seams stay closed on purpose, and the six-cycle program that follows</li>
-<li><a href="design/target-locators.html"><code>design/target-locators.md</code></a> — a discovered target the CLI can build: a scheme on the class, a locator on the command line, the verb still choosing the kind <em>(proposed)</em></li>
-<li><a href="design/output-plugins.html"><code>design/output-plugins.md</code></a> — renderers and reporters as entry points, and the redaction invariant every output sits behind <em>(proposed)</em></li>
-<li><a href="design/quality-suites.html"><code>design/quality-suites.md</code></a> — versioned datasets, suites that are rules, assessors that are evaluators, and a gate that refuses a rate it has not earned <em>(proposed)</em></li>
-<li><a href="design/paired-regression-statistics.html"><code>design/paired-regression-statistics.md</code></a> — &quot;worse&quot; over a paired sample with an exact test, a minimum effect and a minimum sample, or &quot;cannot tell&quot; <em>(proposed)</em></li>
-<li><a href="design/attack-techniques.html"><code>design/attack-techniques.md</code></a> — the technique as its own extension point, so coverage multiplies instead of adding <em>(proposed)</em></li>
-<li><a href="design/namespaced-extension-ids.html"><code>design/namespaced-extension-ids.md</code></a> — capabilities and assertion kinds a pack can declare, with a typo still a load error <em>(proposed)</em></li>
-<li><a href="design/trace-domain-model.html"><code>design/trace-domain-model.md</code></a> — the <code>Trace</code> model, why OpenTelemetry is the floor rather than the model, and why an absence is never read as a fact</li>
-<li><a href="design/trace-producer.html"><code>design/trace-producer.md</code></a> — the append-only writer, which inflated declaration actually leaks a pass, and what the model needs before an integrator can record human approval honestly</li>
-<li><a href="design/framework-adapters.html"><code>design/framework-adapters.md</code></a> — the framework translators into that model, why a capability is probed rather than assumed, and the one field three frameworks proved was missing</li>
-<li><a href="design/security-contracts.html"><code>design/security-contracts.md</code></a> — the application's own invariants as data, the evidence matrix that decides whether one can be checked, and why an implied demand ends where its assertion does</li>
-<li><a href="design/mcp-protocol-eras.html"><code>design/mcp-protocol-eras.md</code></a> — two revisions of MCP, and settling which one a server speaks before asking it anything</li>
-<li><a href="design/mcp-authorization-depth.html"><code>design/mcp-authorization-depth.md</code></a> — what a live MCP server's authorization surface can be asked with one credential</li>
-<li><a href="design/taxonomy-editions.html"><code>design/taxonomy-editions.md</code></a> — why a reference is scheme + edition + id, and never a bare <code>LLM07</code></li>
-<li><a href="design/extension-author-tooling.html"><code>design/extension-author-tooling.md</code></a> — fixtures a third party can run, evaluator measurement that reaches a run, and the pack manifest that makes an extension a safe investment</li>
-<li><a href="design/documentation-site.html"><code>design/documentation-site.md</code></a> — a docs site on guardana.dev, the rule explorer worth generating, and the CSP claim standing in its way</li>
-<li><a href="design/run-manifest-v2.html"><code>design/run-manifest-v2.md</code></a> — the reproducible run record</li>
-<li><a href="design/collector-domain-model.html"><code>design/collector-domain-model.md</code></a> — persistence, tenancy and the finding lifecycle</li>
-<li><a href="design/privacy-and-redaction.html"><code>design/privacy-and-redaction.md</code></a> — one redactor, one seam</li>
-<li><a href="design/exit-codes.html"><code>design/exit-codes.md</code></a> — why the codes are what they are</li>
-<li><a href="design/collector-persistence.html"><code>design/collector-persistence.md</code></a> — collector persistence and migrations</li>
-<li><a href="design/collector-tenancy.html"><code>design/collector-tenancy.md</code></a> — organizations, projects, and the scope on every query</li>
-<li><a href="design/ai-systems-and-deployments.html"><code>design/ai-systems-and-deployments.md</code></a> — what was verified, where it runs, and which version of it</li>
-<li><a href="design/collector-runs-and-findings.html"><code>design/collector-runs-and-findings.md</code></a> — the run's verdict, and following one finding across runs</li>
-<li><a href="design/finding-lifecycle-and-waivers.html"><code>design/finding-lifecycle-and-waivers.md</code></a> — statuses, waivers that expire, and why this is not a second <code>baseline</code></li>
-<li><a href="design/audit-retention-and-deletion.html"><code>design/audit-retention-and-deletion.md</code></a> — who did what, how long evidence is kept, and deleting on purpose</li>
-<li><a href="design/panel-sessions.html"><code>design/panel-sessions.md</code></a> — signing in to the panel with a read key, and why the cookie cannot write</li>
-<li><a href="design/enterprise-readiness-plan.html"><code>design/enterprise-readiness-plan.md</code></a> — superseded by <code>ROADMAP.md</code>, kept because it records what the constraints were when the company-readiness work was planned</li>
+<li><a href="design/README.html"><code>design/README.md</code></a> — accepted decisions, proposals, and status conventions</li>
 </ul>
+<p>Design documents explain why an implementation has its current shape. They are
+not task guides and may describe rejected or superseded alternatives.</p>
 <h2 id="project-direction">Project direction</h2>
 <ul>
-<li><a href="https://github.com/guardana/guardana/blob/main/FEATURES.md"><code>FEATURES.md</code></a> — everything that ships out of the box</li>
-<li><a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md"><code>ROADMAP.md</code></a> — where the project is headed, what's deferred, and the non-goals</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/FEATURES.md"><code>../FEATURES.md</code></a> — concise shipped capability overview</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md"><code>../ROADMAP.md</code></a> — ordered next work and exit criteria</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/CHANGELOG.md"><code>../CHANGELOG.md</code></a> — release history</li>
 </ul>
-<h2 id="runnable-example">Runnable example</h2>
-<p><a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule"><code>examples/custom_rule/</code></a> is a complete,
-installable third-party extension (fictional company &quot;Acme&quot;) that declares
-all four entry-point groups — <code>guardana.rules</code>, <code>guardana.evaluators</code>,
-<code>guardana.targets</code>, and <code>guardana.taxonomies</code> — and ships, under an <code>acme.*</code>
-namespace, two Python plugin rules, three YAML rules, a <strong>custom classifier</strong>
-(an <code>Evaluator</code>), a <strong>custom target</strong> (a directory of approved prompts, read
-as artifacts), and a <strong>custom taxonomy</strong> (<code>ACME-14</code>, Acme's own internal
-control catalogue) — with tests proving Guardana discovers and uses each one
-end-to-end. One of the plugin rules inspects a <strong>GGUF model file</strong> and is pure
-policy, because the binary parsing comes from
-<a href="model-formats.html"><code>model-formats.md</code></a>.
-<a href="https://github.com/guardana/guardana/blob/main/examples/guardana.yaml"><code>examples/guardana.yaml</code></a> is a sample profile
-that includes both Guardana's built-ins and Acme's custom rules.</p>
 <h2 id="maintainers">Maintainers</h2>
 <ul>
-<li><a href="https://github.com/guardana/guardana/blob/main/RELEASING.md"><code>RELEASING.md</code></a> — versioning (SemVer, lockstep), the release
-runbook, tags, and PyPI publishing.</li>
-<li><a href="maintainers/github-setup.html"><code>maintainers/github-setup.md</code></a> — one-time GitHub
-repository configuration.</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md"><code>../CONTRIBUTING.md</code></a> — setup, quality gates, and review rules</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/RELEASING.md"><code>../RELEASING.md</code></a> — versioning and publishing</li>
+<li><a href="maintainers/github-setup.html"><code>maintainers/github-setup.md</code></a> — repository settings</li>
 </ul>
 <h2 id="governance">Governance</h2>
-<p>Project rules for contributors (human or agent), commit/PR conventions, and
-code standards live in <a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a> and
-<a href="https://github.com/guardana/guardana/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a> at the repo root — this directory doesn't
-duplicate them.</p>
+<ul>
+<li><a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>../SECURITY.md</code></a> — report vulnerabilities and understand support</li>
+<li><a href="https://github.com/guardana/guardana/blob/main/CODE_OF_CONDUCT.md"><code>../CODE_OF_CONDUCT.md</code></a> — community expectations</li>
+</ul>
 
 </main>
 </div>

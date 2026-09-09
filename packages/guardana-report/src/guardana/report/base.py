@@ -11,7 +11,7 @@ class Renderer(Protocol):
 
     def render(self, result: ScanResult) -> str:
         """Render one scan result to text."""
-        ...
+        raise NotImplementedError
 
 
 class DiffRenderer(Protocol):
@@ -26,4 +26,4 @@ class DiffRenderer(Protocol):
 
     def render(self, diff: RunDiff) -> str:
         """Render one comparison to text."""
-        ...
+        raise NotImplementedError

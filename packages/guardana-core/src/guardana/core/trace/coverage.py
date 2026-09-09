@@ -14,6 +14,7 @@ percentage would hide which dimension is missing, which is the entire question.
 """
 
 from dataclasses import dataclass
+from typing import assert_never
 
 from guardana.core.trace.model import Dimension, Trace
 from guardana.core.trace.span import Span
@@ -82,6 +83,7 @@ def _records(  # noqa: C901, PLR0911 — one arm per dimension, which is what ma
             return len(span.approvals)
         case Dimension.EFFECTS:
             return len(span.effects)
+    assert_never(dimension)
 
 
 def evidence_matrix(trace: Trace) -> tuple[DimensionCoverage, ...]:

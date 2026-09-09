@@ -111,7 +111,9 @@ def _tracked_markdown() -> list[Path]:
         text=True,
         check=True,
     )
-    return [_repo() / line for line in listing.stdout.splitlines() if line]
+    return [
+        path for line in listing.stdout.splitlines() if line and (path := _repo() / line).is_file()
+    ]
 
 
 def _local_link_targets(text: str) -> Iterator[str]:

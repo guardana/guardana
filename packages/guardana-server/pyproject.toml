@@ -23,7 +23,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["fastapi>=0.115", "pydantic>=2.7", "psycopg[binary]>=3.2"]
+dependencies = ["fastapi>=0.115", "pydantic>=2.13.5", "psycopg[binary]>=3.3.5"]
 
 # The ASGI server is an extra, not a dependency: FastAPI builds the application,
 # and which server runs it is the deployment's decision — a site already running
@@ -31,7 +31,7 @@ dependencies = ["fastapi>=0.115", "pydantic>=2.7", "psycopg[binary]>=3.2"]
 # the API `guardana-collector serve` actually uses, `run(app, host=, port=)`,
 # which has been stable for far longer than this.
 [project.optional-dependencies]
-serve = ["uvicorn>=0.23"]
+serve = ["uvicorn>=0.52.4"]
 
 [project.urls]
 Homepage = "https://guardana.dev"

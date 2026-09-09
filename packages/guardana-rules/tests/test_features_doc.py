@@ -1,12 +1,10 @@
-"""FEATURES.md presents the shipped capability surface; a rule or evaluator
-that ships without appearing there is invisible to users. Pin the document to
-the registry so the two cannot drift."""
+"""FEATURES.md stays an overview and delegates volatile detail to generated docs."""
 
 from pathlib import Path
 
 from guardana.core.evaluator.guard import GuardEvaluator
 from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
-from guardana.rules import provide_evaluators, provide_rules
+from guardana.rules import provide_evaluators
 
 
 def _features_text() -> str:
@@ -17,10 +15,10 @@ def _features_text() -> str:
     raise AssertionError("could not locate FEATURES.md at the repo root")
 
 
-def test_every_builtin_rule_is_presented() -> None:
+def test_rule_detail_points_to_the_generated_catalog() -> None:
+    """Do not grow FEATURES.md into a second hand-maintained rule catalog."""
     text = _features_text()
-    missing = [rule.meta.id for rule in provide_rules() if rule.meta.id not in text]
-    assert not missing, f"FEATURES.md does not mention built-in rule(s): {missing}"
+    assert "[generated rule catalog](docs/generated/rule-catalog.md)" in text
 
 
 def test_every_builtin_evaluator_is_presented() -> None:

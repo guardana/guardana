@@ -98,4 +98,4 @@ class Evaluator(ABC):
         exchange has no reply to grade (`reply_text is None`), return
         `inconclusive`, never `pass`.
         """
-        ...
+        raise NotImplementedError

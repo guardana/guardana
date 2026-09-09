@@ -108,7 +108,7 @@ class Reporter(Protocol):
 
     def submit(self, result: ScanResult, *, source: str) -> None:
         """Forward one scan result, tagged with where it came from."""
-        ...
+        raise NotImplementedError
 
 
 def _deployment(deployment: DeploymentRef) -> dict[str, str] | None:

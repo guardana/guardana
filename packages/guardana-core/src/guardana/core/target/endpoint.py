@@ -86,7 +86,7 @@ class ChatTransport(Protocol):
         api_key: str | None,
     ) -> str:
         """Send `messages` to the model and return its reply text."""
-        ...
+        raise NotImplementedError
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,7 +177,7 @@ class ToolCallingTransport(Protocol):
         tools: Sequence[ToolSpec],
     ) -> ToolCallReply:
         """Send `messages` offering `tools`, and report the model's text and tool calls."""
-        ...
+        raise NotImplementedError
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,7 +214,7 @@ class UsageReportingTransport(Protocol):
         api_key: str | None,
     ) -> ChatReply:
         """Send `messages` and return the reply along with its token cost."""
-        ...
+        raise NotImplementedError
 
 
 def _read_with_retry(request: Request, ref: str) -> bytes:

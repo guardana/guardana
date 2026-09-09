@@ -42,7 +42,7 @@ def test_arbitrary_text_lines_are_refused_and_never_crash(tmp_path: Path, lines:
         read_trace(trace)
     except TraceLoadError:
         # The declared refusal, and the correct answer for most of these.
-        pass
+        return
     except Exception as exc:
         pytest.fail(f"read_trace raised {type(exc).__name__} on arbitrary lines: {exc}")
 
@@ -66,7 +66,7 @@ def test_well_formed_json_of_the_wrong_shape_is_refused_and_never_crashes(
     try:
         read_trace(trace)
     except TraceLoadError:
-        pass
+        return
     except Exception as exc:
         pytest.fail(f"read_trace raised {type(exc).__name__} on well-formed JSON: {exc}")
 
@@ -90,6 +90,6 @@ def test_a_native_header_claiming_any_version_is_handled(
     try:
         read_trace(trace)
     except TraceLoadError:
-        pass
+        return
     except Exception as exc:
         pytest.fail(f"read_trace raised {type(exc).__name__} on version {version}: {exc}")

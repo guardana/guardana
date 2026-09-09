@@ -147,12 +147,12 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
                 python,
                 "-c",
                 "from guardana.testing import assert_secure\n"
-                "try:\n"
-                "    assert_secure('/no/such/path')\n"
-                "except ValueError as exc:\n"
-                "    print('refused:', exc)\n"
-                "else:\n"
-                "    raise SystemExit('a path that does not exist passed')",
+                + "try:\n"
+                + "    assert_secure('/no/such/path')\n"
+                + "except ValueError as exc:\n"
+                + "    print('refused:', exc)\n"
+                + "else:\n"
+                + "    raise SystemExit('a path that does not exist passed')",
             ],
             0,
             expect=("refused:",),
@@ -167,18 +167,18 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
                 python,
                 "-c",
                 "from guardana.core.target import Capability, Target, TargetKind\n"
-                "from guardana.testing import TargetContractError, assert_target_conforms\n"
-                "class Liar(Target):\n"
-                "    kind = TargetKind.ARTIFACT\n"
-                "    def capabilities(self): return {Capability.READ_FILES}\n"
-                "    @property\n"
-                "    def ref(self): return 'liar://'\n"
-                "try:\n"
-                "    assert_target_conforms(Liar())\n"
-                "except TargetContractError as exc:\n"
-                "    print('refused:', str(exc).splitlines()[-1])\n"
-                "else:\n"
-                "    raise SystemExit('a target with no surface passed the contract')",
+                + "from guardana.testing import TargetContractError, assert_target_conforms\n"
+                + "class Liar(Target):\n"
+                + "    kind = TargetKind.ARTIFACT\n"
+                + "    def capabilities(self): return {Capability.READ_FILES}\n"
+                + "    @property\n"
+                + "    def ref(self): return 'liar://'\n"
+                + "try:\n"
+                + "    assert_target_conforms(Liar())\n"
+                + "except TargetContractError as exc:\n"
+                + "    print('refused:', str(exc).splitlines()[-1])\n"
+                + "else:\n"
+                + "    raise SystemExit('a target with no surface passed the contract')",
             ],
             0,
             expect=("refused:",),
@@ -193,18 +193,18 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
                 python,
                 "-c",
                 "from guardana.core.assessment import case_id_for, from_verdict\n"
-                "from guardana.core.evaluator.base import Verdict\n"
-                "from guardana.core.report import ScanResult\n"
-                "from guardana.core.report.serialize import assessment_to_dict\n"
-                "v = Verdict(outcome='pass', confidence=0.6, rationale='refused', "
-                "evaluator_id='keyword')\n"
-                "a = from_verdict(v, case_id=case_id_for('r', 'p'), subject_ref='x', "
-                "rule_id='r')\n"
-                "run = ScanResult(findings=(), rules_run=('r',), rules_skipped=(), "
-                "assessments=(a,))\n"
-                "assert len(run.measured) == 1\n"
-                "assert assessment_to_dict(a)['passed'] is True\n"
-                "print('measured:', len(run.measured))",
+                + "from guardana.core.evaluator.base import Verdict\n"
+                + "from guardana.core.report import ScanResult\n"
+                + "from guardana.core.report.serialize import assessment_to_dict\n"
+                + "v = Verdict(outcome='pass', confidence=0.6, rationale='refused', "
+                + "evaluator_id='keyword')\n"
+                + "a = from_verdict(v, case_id=case_id_for('r', 'p'), subject_ref='x', "
+                + "rule_id='r')\n"
+                + "run = ScanResult(findings=(), rules_run=('r',), rules_skipped=(), "
+                + "assessments=(a,))\n"
+                + "assert len(run.measured) == 1\n"
+                + "assert assessment_to_dict(a)['passed'] is True\n"
+                + "print('measured:', len(run.measured))",
             ],
             0,
             expect=("measured: 1",),
@@ -215,9 +215,9 @@ def _checks(venv: Path, clean_directory: Path, trace_file: Path) -> list[Check]:
                 python,
                 "-c",
                 "import sys\n"
-                "from guardana.adapters.langchain import langchain_target\n"
-                "assert not [m for m in sys.modules if m.split('.')[0] == 'langchain']\n"
-                "print('adapter ready')",
+                + "from guardana.adapters.langchain import langchain_target\n"
+                + "assert not [m for m in sys.modules if m.split('.')[0] == 'langchain']\n"
+                + "print('adapter ready')",
             ],
             0,
             expect=("adapter ready",),

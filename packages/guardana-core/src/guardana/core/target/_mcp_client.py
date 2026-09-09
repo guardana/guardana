@@ -47,15 +47,15 @@ class McpTransport(Protocol):
 
     def speak(self, wire: Wire) -> None:
         """Adopt a revision; every later request is written and headed for it."""
-        ...
+        raise NotImplementedError
 
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
         """Send one JSON-RPC request and return its `result`."""
-        ...
+        raise NotImplementedError
 
     def close(self) -> None:
         """Release whatever this transport holds, stopping a process if it started one."""
-        ...
+        raise NotImplementedError
 
 
 @dataclass(frozen=True, slots=True)

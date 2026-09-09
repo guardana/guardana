@@ -37,7 +37,7 @@ class FileReader(Protocol):
 
     def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
         """Walk this target's files in a stable order, optionally filtered by suffix."""
-        ...
+        raise NotImplementedError
 
     def python_source(self, path: Path) -> "PythonSource | None":
         """Return the parsed, indexed source for `path`, or None if there is no tree.
@@ -45,7 +45,7 @@ class FileReader(Protocol):
         A file this target was *prevented* from reading also belongs in
         `unread_sources`; one that simply is not Python does not.
         """
-        ...
+        raise NotImplementedError
 
     def unread_sources(self) -> "tuple[UnreadSource, ...]":
         """Return every file this target could not read, and why.
@@ -53,7 +53,7 @@ class FileReader(Protocol):
         The runner turns these into `errors`: a file nobody could look at is a
         check that did not run, not a clean one.
         """
-        ...
+        raise NotImplementedError
 
 
 @runtime_checkable
@@ -63,7 +63,7 @@ class ChatEndpoint(Protocol):
     @property
     def model(self) -> str:
         """Which model answers here, as it appears in observations and evidence."""
-        ...
+        raise NotImplementedError
 
     def chat(self, messages: "Sequence[ChatMessage]") -> str:
         """Send a conversation and return the reply text.
@@ -72,7 +72,7 @@ class ChatEndpoint(Protocol):
         hand every evaluator a string that matches no forbidden keyword — a
         confident pass for a model that said nothing.
         """
-        ...
+        raise NotImplementedError
 
 
 @runtime_checkable
@@ -87,7 +87,7 @@ class ToolOfferingEndpoint(ChatEndpoint, Protocol):
         self, messages: "Sequence[ChatMessage]", tools: "Sequence[ToolSpec]"
     ) -> "ToolCallReply":
         """Offer `tools` alongside `messages` and return what the model chose."""
-        ...
+        raise NotImplementedError
 
 
 @runtime_checkable
@@ -97,7 +97,7 @@ class TraceReader(Protocol):
     @property
     def trace(self) -> "Trace":
         """The execution this target grades, with the dimensions its producer recorded."""
-        ...
+        raise NotImplementedError
 
 
 @runtime_checkable
@@ -106,7 +106,7 @@ class ToolListing(Protocol):
 
     def list_tools(self) -> "tuple[McpTool, ...]":
         """Return the tools this server advertises, without invoking any of them."""
-        ...
+        raise NotImplementedError
 
 
 @runtime_checkable
@@ -119,11 +119,11 @@ class AuthorizationInspector(Protocol):
 
     def authorization(self) -> "McpAuthorizationView":
         """Return what this server said about who may call it, and how that was learned."""
-        ...
+        raise NotImplementedError
 
     def conversation(self) -> "McpConversation":
         """Return the redacted record of the exchange the view was derived from."""
-        ...
+        raise NotImplementedError
 
 
 __all__ = [

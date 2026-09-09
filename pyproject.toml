@@ -208,8 +208,8 @@ dev = [
     # model named "no fuzzing of the binary parsers" as an open gap for four
     # releases, and an example-based test proves the case its author thought of —
     # which is never the length field that is one byte short of the file.
-    "hypothesis>=6.115",
-    "import-linter>=2.1",
+    "hypothesis>=6.167.1",
+    "import-linter>=2.14",
     # Test-only, and deliberately not a runtime dependency of any distribution:
     # `schemas/run-v2.schema.json` is a published contract, and a schema
     # nothing validates against is a promise rather than a gate. Guardana itself
@@ -217,11 +217,11 @@ dev = [
     # dataclasses, so the shape is enforced by mypy on the way out.
     "jsonschema>=4.23",
     "types-jsonschema>=4.23",
-    "mypy>=2.3.0",
-    "pre-commit>=4.6.1",
+    "mypy>=2.3.1",
+    "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
-    "ruff>=0.16.1",
+    "ruff>=0.16.5",
 ]
 
 [tool.coverage.run]

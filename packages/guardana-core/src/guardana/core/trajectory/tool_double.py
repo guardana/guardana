@@ -20,7 +20,7 @@ class ToolDouble(Protocol):
 
     def respond(self, call: ToolCall) -> str:
         """Return what this tool would have replied to `call`."""
-        ...
+        raise NotImplementedError
 
 
 @dataclass(frozen=True, slots=True)

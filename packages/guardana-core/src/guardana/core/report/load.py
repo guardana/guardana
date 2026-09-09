@@ -303,7 +303,8 @@ def _verdict(raw: object, path: Path) -> Verdict | None:
         raise ReportLoadError(f"{path}: a verdict's confidence must be a number")
     try:
         return Verdict(
-            outcome=cast("Outcome", outcome),
+            # Runtime name keeps the import visible to CodeQL as well as mypy.
+            outcome=cast(Outcome, outcome),  # noqa: TC006
             confidence=float(confidence),
             rationale=str(raw.get("rationale") or ""),
             evaluator_id=str(raw.get("evaluator_id") or ""),

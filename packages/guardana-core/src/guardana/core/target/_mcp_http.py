@@ -204,7 +204,7 @@ class Sender(Protocol):
         alongside: str | None = None,
     ) -> RawReply:
         """Send one request and return the reply, whatever status it carries."""
-        ...
+        raise NotImplementedError
 
 
 def send(

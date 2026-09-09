@@ -50,7 +50,7 @@ class Store(Protocol):
         duplicate. Reported rather than silent, so the pipeline's own log does not
         say "stored 12 findings" about a run it stored nothing for.
         """
-        ...
+        raise NotImplementedError
 
     def submissions(
         self, scope: TenantScope, source: str | None = None, limit: int | None = None
@@ -62,17 +62,17 @@ class Store(Protocol):
         slices in Python turns one request into "load the entire finding history
         into memory" — which the in-memory store made safe only by forgetting.
         """
-        ...
+        raise NotImplementedError
 
     def trend(self, scope: TenantScope) -> dict[str, int]:
         """Return finding counts by severity, across everything this tenant stored."""
-        ...
+        raise NotImplementedError
 
     def records(
         self, scope: TenantScope, source: str | None = None, limit: int | None = None
     ) -> list[StoredSubmission]:
         """Return this tenant's submissions with their receive time — raw data for stats."""
-        ...
+        raise NotImplementedError
 
 
 class InMemoryStore:
