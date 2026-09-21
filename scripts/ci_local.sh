@@ -109,6 +109,7 @@ step "Generated docs"      uv run python scripts/generate_docs.py --check
 step "Landing counts"      uv run python scripts/sync_site.py --check
 step "Site build"          uv run python scripts/build_site.py --check
 step "llms.txt"            uv run python scripts/generate_llms_txt.py --check
+step "Sitemap"             uv run python scripts/generate_sitemap.py --check
 
 # The third-party story, isolated on purpose; --no-cache is load-bearing (a cached
 # wheel hides exactly the data files an extension change touches). No -q here: the

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Operations catalogue — Guardana documentation</title>
 <meta name="description" content="One row per script under scripts/: what it writes, its safe mode, what it needs. Exact flags come from each script&#x27;s own --help or docstring.">
-<link rel="canonical" href="https://guardana.dev/docs/maintainers/ops-catalogue.html">
+<link rel="canonical" href="https://guardana.dev/docs/maintainers/ops-catalogue">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 <link rel="stylesheet" href="../docs.css">
 </head>
@@ -245,6 +245,14 @@ runs three of them inside pytest.</p>
 <td><code>--check</code></td>
 <td><code>-</code></td>
 <td>—</td>
+</tr>
+<tr>
+<td><code>generate_sitemap.py</code></td>
+<td><code>site/sitemap.xml</code> and <code>site/robots.txt</code> from the pages actually built, in the URL form the host serves</td>
+<td><code>repo</code> (<code>site/sitemap.xml</code>, <code>site/robots.txt</code>)</td>
+<td><code>--check</code></td>
+<td><code>-</code></td>
+<td><code>site/</code> already built</td>
 </tr>
 <tr>
 <td><code>generate_llms_txt.py</code></td>

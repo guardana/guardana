@@ -51,6 +51,7 @@ runs three of them inside pytest.
 | `generate_docs.py` | `docs/generated/*` and the built-in pack manifest from the live registry | `repo` | `--check` | `-` | — |
 | `sync_site.py` | rewrite the landing page's rule counts from the registry | `repo` (`site/index.html`) | `--check` | `-` | — |
 | `build_site.py` | ⚠ delete and rewrite `site/docs/` from `docs/**.md` | `repo` (`site/docs/`) | `--check` | `-` | — |
+| `generate_sitemap.py` | `site/sitemap.xml` and `site/robots.txt` from the pages actually built, in the URL form the host serves | `repo` (`site/sitemap.xml`, `site/robots.txt`) | `--check` | `-` | `site/` already built |
 | `generate_llms_txt.py` | `site/llms.txt` from `docs/index.md` | `repo` | `--check` | `-` | — |
 | `og_card.html` | the source of `site/og.png`, rendered by hand (`site/README.md`) | `-` | `-` | `-` | a browser |
 
