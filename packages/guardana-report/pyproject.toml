@@ -12,9 +12,23 @@ authors = [
 maintainers = [
     { name = "Guardana contributors", email = "contact@guardana.dev" },
 ]
-keywords = ["ai-security", "llm", "prompt-injection", "security-scanner", "mlsecops"]
+keywords = [
+    "ai-security",
+    "llm-security",
+    "prompt-injection",
+    "security-scanner",
+    "mlsecops",
+    "agent-security",
+    "mcp",
+    "model-context-protocol",
+    "red-teaming",
+    "owasp",
+    "mitre-atlas",
+    "sarif",
+    "supply-chain-security",
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -28,7 +42,7 @@ dependencies = ["guardana-core>=0.26.0,<0.27"]
 [project.urls]
 Homepage = "https://guardana.dev"
 Repository = "https://github.com/guardana/guardana"
-Documentation = "https://guardana.dev"
+Documentation = "https://guardana.dev/docs/"
 Issues = "https://github.com/guardana/guardana/issues"
 Changelog = "https://github.com/guardana/guardana/blob/main/CHANGELOG.md"
 

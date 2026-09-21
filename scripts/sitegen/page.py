@@ -33,6 +33,22 @@ _REQUIRED = ("title", "nav_order", "summary", "status")
 _FENCE = "---\n"
 
 
+def served_path(relative: str) -> str:
+    """Turn a file under `site/` into the URL the host actually answers on.
+
+    Cloudflare serves a page without its extension and a directory by its index,
+    and redirects the file form to it. So `docs/usage-scan.html` answers at
+    `/docs/usage-scan` and `docs/index.html` at `/docs/`, while the file names
+    themselves are 307s. A canonical link or a sitemap entry written from the file
+    name therefore points at a redirect — which tells a crawler the opposite of
+    what either is for.
+    """
+    path = "/" + relative.removeprefix("/")
+    if path.endswith("/index.html"):
+        return path[: -len("index.html")]
+    return path.removesuffix(".html")
+
+
 @dataclass(frozen=True, slots=True)
 class Page:
     """A markdown source file, its declared metadata, and the HTML it becomes."""
@@ -53,8 +69,8 @@ class Page:
 
     @property
     def url(self) -> str:
-        """Where the page is served from, for a canonical link."""
-        return "/docs/" + self.output.as_posix()
+        """The URL this page is served at, extension and index file removed."""
+        return served_path("docs/" + self.output.as_posix())
 
 
 def read_pages(docs: Path) -> list[Page]:
