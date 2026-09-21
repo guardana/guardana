@@ -98,10 +98,14 @@ check and a regression in its own right.
 
 The second filter is confidence. Your policy's `min_confidence` applies to
 regressions backed by a graded verdict, so a shaky judge cannot stop a deploy.
-It deliberately does **not** apply to `blinded` or `coverage_lost`: an ungraded
-result carries confidence 0.0 by definition, so filtering those by confidence
-would mean a stricter setting silently switched off detection of checks going
-dark.
+
+**Neither filter applies to `blinded` or `coverage_lost`**, and severity is the one
+that mattered. An ungraded result carries confidence 0.0 by definition, and it keeps
+whatever severity its rule declares — so an artifact nobody could read is a `LOW`
+that every default `severity` bar filtered away, and the comparison printed "worse"
+while exiting `0`. A check going dark is now a regression at any severity and any
+confidence: filtering it would mean a stricter setting silently switched off
+detection of exactly that.
 
 ## Policy
 

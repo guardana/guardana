@@ -18,7 +18,7 @@ from guardana.core.taxonomy import (
 )
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._code_sinks import code_sinks
-from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._leads import unscanned_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
 
 # Fetching a script and piping it straight into a shell (`curl … | sh`) is the
@@ -105,14 +105,34 @@ class NotebookPayloadRule(ArtifactRule):
         try:
             doc = json.loads(raw)
         except ValueError:
+            # Malformed, or cut off by the read bound — the rule cannot tell which
+            # and does not need to. Either way not one cell was examined, and
+            # returning here made a notebook too large to read indistinguishable
+            # from a notebook with nothing in it.
+            yield self._unscanned(path, "the notebook could not be parsed as JSON")
             return
         cells = doc.get("cells") if isinstance(doc, dict) else None
         if not isinstance(cells, list):
+            yield self._unscanned(path, "the notebook declares no list of cells")
             return
         for index, cell in enumerate(cells):
             source = _cell_source(cell)
             if source is not None:
                 yield from self._scan_cell(path, index, source)
+
+    def _unscanned(self, path: Path, reason: str) -> Finding:
+        """Say the notebook was not examined, rather than returning as if it were clean."""
+        return Finding(
+            rule_id=self.meta.id,
+            severity=Severity.LOW,
+            title="Notebook not scanned",
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(
+                summary=f"notebook not scanned: {reason}", detail=f"file={path.name}"
+            ),
+            verdict=unscanned_verdict("the notebook could not be read, so nothing was cleared"),
+        )
 
     def _scan_cell(self, path: Path, index: int, source: str) -> Iterator[Finding]:
         python, shell = _split_shell_and_python(source)
@@ -129,7 +149,7 @@ class NotebookPayloadRule(ArtifactRule):
                 index,
                 Severity.LOW,
                 "notebook cell could not be parsed as Python; not analyzed",
-                lead_verdict("unparsed notebook cell"),
+                unscanned_verdict("the cell could not be parsed, so nothing in it was cleared"),
             )
             return
         # A notebook cell is source without a file of its own, so it is wrapped in

@@ -349,6 +349,13 @@ works the same way — just point `--url`/`--model` at it.
 you can ask whether the next run is worse than this one — see
 [`usage-diff.md`](usage-diff.md).
 
+`--output` with the default human format is **refused before the first request**,
+with exit `3`. The probe would otherwise spend its budget against your endpoint and
+tell you only afterwards that the file it wrote cannot be compared — and the run you
+wanted compared is the one you would have to pay for twice. `--format sarif` and
+`--format junit` are written as asked: a code-scanning upload and a CI report reader
+are what they are for, and neither has anything to do with `diff`.
+
 ```bash
 guardana probe --url … --model …  --format json --output run.json
 ```

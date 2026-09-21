@@ -6,6 +6,7 @@ import typer
 from guardana.cli.exit_codes import ExitCode
 
 COMPARABLE_FORMAT = "json"
+_TERMINAL_FORMAT = "human"
 """The only format `guardana diff` can read back.
 
 Named here rather than repeated in each command's help, so the warning below and
@@ -25,6 +26,8 @@ def emit(rendered: str, output: Path | None, output_format: str = COMPARABLE_FOR
     describes itself as what `guardana diff` needs, and it defaults to the human
     format — so the obvious command produced a file the comparison refuses, and
     the user found out on the *next* run, which is the run they wanted compared.
+    A command that spends a budget to produce the report refuses the combination
+    before it spends anything, through `refuse_incomparable_output`.
     """
     if output is None:
         typer.echo(rendered)
@@ -43,3 +46,28 @@ def emit(rendered: str, output: Path | None, output_format: str = COMPARABLE_FOR
             f"cannot read — add --format {COMPARABLE_FORMAT} to save a comparable run",
             err=True,
         )
+
+
+def refuse_incomparable_output(output: Path | None, output_format: str) -> None:
+    """Exit `3` when a run that costs something would save a file `diff` cannot read.
+
+    Announcing it afterwards is too late where the report is paid for in requests
+    against a live endpoint: the user learns on the next run that the comparison
+    they wanted needs the first one repeated, and repeating it costs GPU time or a
+    metered API a second time. Refused before the first request is sent instead.
+
+    **Only the terminal format is refused.** SARIF and JUnit to a file are the point
+    of those formats — a code-scanning upload and a CI report reader consume them,
+    and neither has anything to do with `diff`. Refusing them would make the flag
+    that exists to write them unusable, so they keep the warning `emit` prints and
+    the file they were asked for.
+    """
+    if output is None or output_format != _TERMINAL_FORMAT:
+        return
+    typer.echo(
+        f"error: {output} would be written in the {output_format} format, which "
+        f"`guardana diff` cannot read — add --format {COMPARABLE_FORMAT} to save a "
+        f"comparable run, or drop --output to print this format instead",
+        err=True,
+    )
+    raise typer.Exit(code=ExitCode.INVALID_USAGE)

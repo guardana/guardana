@@ -8,6 +8,7 @@ from guardana.rules._secrets import (
     ALLOWLIST,
     FILE_SECRET_PATTERNS,
     REPLY_SECRET_PATTERNS,
+    find_secret_matches,
 )
 
 
@@ -76,3 +77,39 @@ def test_every_allowlist_entry_is_matchable_by_some_pattern() -> None:
     # were never checked against each other.
     for example in ALLOWLIST:
         assert _match(FILE_SECRET_PATTERNS, example) is not None, example
+
+
+def test_a_provider_prefix_inside_a_word_is_not_a_key() -> None:
+    # What a BM25 vocabulary over a clinical corpus contains: `sk-` in the middle
+    # of a hyphenated word, followed by enough letters to fill a key body.
+    token = "risk-" + "clinicalpredictionmodel"
+    assert _match(FILE_SECRET_PATTERNS, token) is None
+    assert _match(REPLY_SECRET_PATTERNS, token) is None
+
+
+@pytest.mark.parametrize("before", ['"', "=", " ", ":", "-", "\n"])
+def test_a_key_after_punctuation_is_still_a_key(before: str) -> None:
+    key = before + "sk-proj-" + "a" * 48
+    assert _match(FILE_SECRET_PATTERNS, key) == "LLM provider API key"
+    assert _match(REPLY_SECRET_PATTERNS, key) == "LLM provider API key"
+
+
+def test_every_provider_hit_carries_its_own_label() -> None:
+    """One label per pattern, and never the last one for all of them.
+
+    The merged scan builds one generator per pattern. Built as a nested
+    comprehension they shared a single binding, so by the time the merge consumed
+    them every hit reported the final pattern's label — a GitHub token described as
+    a provider API key. Nothing else notices: the rule's own tests match patterns
+    directly and never go through the merge.
+    """
+    samples = {
+        "GitHub token": '{"tok":"ghp_' + "b" * 36 + '"}',
+        "AWS access key ID": "AKIA" + "A" * 16,
+        "LLM provider API key": "sk-" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0",
+    }
+
+    for expected, text in samples.items():
+        labels = [m[2] for m in find_secret_matches(text, FILE_SECRET_PATTERNS)]
+
+        assert labels == [expected], f"{text[:12]}… reported {labels}"

@@ -18,7 +18,7 @@ from guardana.core.taxonomy import (
 )
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain._jinja_gadgets import Gadget, jinja_gadgets
-from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._leads import unscanned_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded, read_text_bounded
 
 _RULE_ID = "guardana.supply_chain.chat_template"
@@ -154,7 +154,7 @@ class ChatTemplateRule(ArtifactRule):
                 summary=f"chat template not scanned: {reason}",
                 detail=f"file={path.name}",
             ),
-            verdict=lead_verdict("the template could not be read, so nothing was cleared"),
+            verdict=unscanned_verdict("the template could not be read, so nothing was cleared"),
         )
 
 

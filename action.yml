@@ -24,7 +24,7 @@ inputs:
       so a workflow pinned to `guardana/guardana@v0.26` keeps running the CLI that
       tag was released with. Pass `latest` to always take the newest release.
     required: false
-    default: "0.26.0"
+    default: "0.26.1"
   sarif-file:
     description: "Where to write the SARIF report."
     required: false

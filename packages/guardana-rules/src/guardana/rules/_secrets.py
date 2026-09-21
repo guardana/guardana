@@ -5,23 +5,37 @@ unambiguous — no bare-entropy matching. A false positive here is worse than
 a missed secret (no theater).
 """
 
+import heapq
 import re
+from collections.abc import Iterator
 from pathlib import Path
+
+# A provider prefix carries no signal in the middle of a word: a corpus token
+# such as `risk-clinicalpredictionmodel` holds `sk-` followed by enough letters
+# to satisfy the key body, and a vocabulary built from a large corpus always
+# holds some. Every prefix shape below therefore starts at a word boundary.
+_WORD_START = r"(?<![A-Za-z0-9_])"
+
+
+def _prefix_shape(source: str) -> re.Pattern[str]:
+    """Compile a prefix-anchored secret shape that may only start a word."""
+    return re.compile(_WORD_START + source)
+
 
 # The `sk-…` family: OpenAI's current default (`sk-proj-`), service accounts
 # (`sk-svcacct-`), Anthropic (`sk-ant-api03-`), and the legacy bare form. The
 # optional prefix group carries the `-` these keys use; the body itself is
 # alphanumeric, so it stays `[A-Za-z0-9]` — allowing `-`/`_` there would flag any
 # long kebab/snake identifier as a secret (a false positive precision forbids).
-_LLM_API_KEY = re.compile(r"sk-(?:proj-|svcacct-|ant-api\d+-)?[A-Za-z0-9]{20,}")
+_LLM_API_KEY = _prefix_shape(r"sk-(?:proj-|svcacct-|ant-api\d+-)?[A-Za-z0-9]{20,}")
 
 _COMMON_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("AWS access key ID", re.compile(r"AKIA[0-9A-Z]{16}")),
+    ("AWS access key ID", _prefix_shape(r"AKIA[0-9A-Z]{16}")),
     # ghp_ (PAT), gho_ (OAuth), ghu_/ghs_ (user/server-to-server), ghr_ (refresh).
-    ("GitHub token", re.compile(r"gh[oprsu]_[A-Za-z0-9]{36}")),
-    ("GitHub fine-grained token", re.compile(r"github_pat_[A-Za-z0-9_]{50,}")),
-    ("Slack token", re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
-    ("Google API key", re.compile(r"AIza[0-9A-Za-z_\-]{35}")),
+    ("GitHub token", _prefix_shape(r"gh[oprsu]_[A-Za-z0-9]{36}")),
+    ("GitHub fine-grained token", _prefix_shape(r"github_pat_[A-Za-z0-9_]{50,}")),
+    ("Slack token", _prefix_shape(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
+    ("Google API key", _prefix_shape(r"AIza[0-9A-Za-z_\-]{35}")),
     ("LLM provider API key", _LLM_API_KEY),
 )
 
@@ -60,6 +74,35 @@ ALLOWLIST: frozenset[str] = frozenset(
         "AKIAIOSFODNN7EXAMPLE",
     }
 )
+
+# One pattern hit: where it starts, where it ends, what it looks like, what it says.
+SecretMatch = tuple[int, int, str, str]
+
+
+def _tagged(label: str, pattern: re.Pattern[str], text: str) -> Iterator[SecretMatch]:
+    """Tag one pattern's hits with its own label.
+
+    A function rather than a nested generator expression: a comprehension shares one
+    binding across every generator it builds, so the labels would all read as the
+    last pattern's by the time the merge consumed them — a GitHub token reported as
+    a provider API key, which is a finding that names the wrong secret.
+    """
+    return ((m.start(), m.end(), label, m.group(0)) for m in pattern.finditer(text))
+
+
+def find_secret_matches(
+    text: str, patterns: tuple[tuple[str, re.Pattern[str]], ...]
+) -> Iterator[SecretMatch]:
+    """Yield every pattern hit outside the allowlist, ordered by position in the text.
+
+    The per-pattern scans are merged lazily rather than collected, so a file holds
+    one pending match per pattern however many hits it contains.
+    """
+    streams = [_tagged(label, pattern, text) for label, pattern in patterns]
+    for match in heapq.merge(*streams):
+        if match[3] not in ALLOWLIST:
+            yield match
+
 
 REDACT_PREFIX_LEN = 6
 

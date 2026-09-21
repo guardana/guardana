@@ -1,4 +1,6 @@
 import base64
+import json
+import re
 from pathlib import Path
 
 from guardana.core.rule import RuleContext
@@ -133,3 +135,93 @@ def test_ignores_binary_and_model_files(tmp_path: Path) -> None:
     (tmp_path / "weights.bin").write_bytes(secret_shaped + b"\xff\xfe\xfd")
     findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert findings == []
+
+
+def _corpus_tokens() -> dict[str, object]:
+    """A BM25 vocabulary: short corpus tokens and their ids, with no secret in it.
+
+    Two shapes a large corpus always produces: a token carrying a provider prefix
+    in the middle of a word, and a pair of adjacent entries whose raw bytes spell
+    one across the boundary between them.
+    """
+    tokens: dict[str, object] = {f"token{index:04d}": index for index in range(400)}
+    tokens["risk-clinicalpredictionmodel"] = 400
+    tokens["hypothetical" + "sk-"] = 401
+    tokens["abcdefghijklmnopqrstuvwxyz"] = 402
+    return tokens
+
+
+def _one_line(tokens: dict[str, object]) -> str:
+    return json.dumps(tokens, separators=(",", ":"))
+
+
+def _byte_offset(detail: str) -> int:
+    """Read the offset out of `detail`, which is where it may live.
+
+    Never out of `summary`: `Finding.fingerprint` hashes the summary, so an offset
+    there would give a one-line file a new identity after any unrelated edit and
+    the baseline waiver an operator wrote would stop matching on the next run.
+    """
+    match = re.search(r"at byte (\d+)", detail)
+    assert match is not None, detail
+    return int(match.group(1))
+
+
+def test_a_derived_vocabulary_holds_no_secret(tmp_path: Path) -> None:
+    (tmp_path / "vocab.index.json").write_text(_one_line(_corpus_tokens()), encoding="utf-8")
+    assert list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+def test_a_real_key_in_a_json_value_still_fires(tmp_path: Path) -> None:
+    key = "sk-proj-" + "a" * 40
+    tokens = _corpus_tokens()
+    tokens["openai_api_key"] = key
+    body = _one_line(tokens)
+    (tmp_path / "config.json").write_text(body, encoding="utf-8")
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.severity.name for f in findings] == ["HIGH"]
+    assert all(key not in f.evidence.summary for f in findings)
+    # A one-line file reports `:1`, so the byte offset is what locates the key.
+    assert "at byte" not in findings[0].evidence.summary
+    offset = _byte_offset(findings[0].evidence.detail)
+    assert body.encode("utf-8")[offset : offset + len(key)].decode("utf-8") == key
+    assert findings[0].target_ref.endswith("config.json:1")
+
+
+def test_a_real_key_in_source_still_fires_and_stays_line_located(tmp_path: Path) -> None:
+    key = "sk-proj-" + "b" * 40
+    (tmp_path / "settings.py").write_text(f'OPENAI_API_KEY = "{key}"\n', encoding="utf-8")
+    (tmp_path / ".env").write_text(f"OPENAI_API_KEY={key}\n", encoding="utf-8")
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert len(findings) == 2
+    assert all(f.severity.name == "HIGH" for f in findings)
+    # A short line needs no byte offset; the line number already locates it.
+    assert all("at byte" not in f.evidence.detail for f in findings)
+    assert all(f.target_ref.endswith(":1") for f in findings)
+
+
+def test_the_line_number_survives_a_multi_line_file(tmp_path: Path) -> None:
+    key = _fake_aws_key()
+    (tmp_path / "config.yaml").write_text(f"debug: true\nport: 8080\naws_key: {key}\n")
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.target_ref.rsplit(":", 1)[1] for f in findings] == ["3"]
+
+
+def test_a_key_in_a_json_with_comments_file_still_fires(tmp_path: Path) -> None:
+    """A comment is not a JSON scalar, and a key written in one is still a key.
+
+    Confining matches to string scalars was tried as a second guard against the
+    vocabulary false positive and removed: `devcontainer.json`, `tsconfig.json`
+    and `.vscode/settings.json` carry comments, the file still opens as a JSON
+    object, and a key in a comment fell outside every scalar — so the scan went
+    quiet on exactly the kind of file people paste a key into "for a minute".
+    """
+    key = "sk-proj-" + "c" * 40
+    (tmp_path / "devcontainer.json").write_text(
+        f'{{"name":"dev",\n  // TODO remove: OPENAI_API_KEY={key}\n  "image":"x"}}\n',
+        encoding="utf-8",
+    )
+
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.severity.name for f in findings] == ["HIGH"], "a key in a comment is still a key"

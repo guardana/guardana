@@ -17,7 +17,7 @@ from guardana.core.taxonomy import (
     OWASP_ML06_2023,
 )
 from guardana.rules._base import ArtifactRule
-from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._leads import unscanned_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 # A Keras `Lambda` layer wraps an arbitrary Python callable that runs on
@@ -138,7 +138,7 @@ class KerasLambdaRule(ArtifactRule):
                 summary=f"Keras model not scanned for Lambda layers: {reason}",
                 detail=f"file={path.name}",
             ),
-            verdict=lead_verdict("the model config could not be read, so nothing was cleared"),
+            verdict=unscanned_verdict("the model config could not be read, so nothing was cleared"),
         )
 
 

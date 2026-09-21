@@ -16,6 +16,13 @@ An unverified result carries confidence 0.0 by definition — that is what
 "could not tell" means — and a rule that did not run carries no severity at all.
 Applying `min_confidence` to these would mean that raising a policy's confidence
 bar silently disables exactly the two signals that say a check stopped working.
+
+**Neither threshold applies, and severity is the one that bit.** A blinded check
+keeps whatever severity the rule carries, so it was compared against `severity`
+before this set was ever consulted — and an artifact nobody could read is a LOW,
+so `guardana diff` printed "Worse than the previous run" and exited 0 under every
+default. Asking how bad an unmeasured thing is has no answer here for the same
+reason it has none in `core/gate.py`.
 """
 
 
@@ -40,13 +47,12 @@ def gate_diff(diff: RunDiff, policy: Policy) -> bool:
     for change in diff.changes:
         if not change.kind.is_regression:
             continue
-        if change.kind is ChangeKind.COVERAGE_LOST:
+        # Before either threshold, not after: see `_NO_EVIDENCE_TO_WEIGH`.
+        if change.kind in _NO_EVIDENCE_TO_WEIGH:
             return True
         state = change.after
         if state is None or state.severity < threshold.severity:
             continue
-        if change.kind in _NO_EVIDENCE_TO_WEIGH:
-            return True
         if state.confidence >= threshold.min_confidence:
             return True
     return False

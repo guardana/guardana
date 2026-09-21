@@ -234,7 +234,7 @@ evaluators:                     # config-wired evaluators — see the section be
 <td><code>fail_on.fail_on_inconclusive</code></td>
 <td>bool</td>
 <td><code>false</code></td>
-<td>When <code>true</code>, a check that ran but could not reach a verdict (reported on the <code>unverified</code> channel) also fails the gate — the strict posture for a hard CI gate.</td>
+<td>When <code>true</code>, a check that ran but could not reach a verdict (reported on the <code>unverified</code> channel) also fails the gate — the strict posture for a hard CI gate. <strong><code>severity</code> does not apply to it.</strong> A severity answers how bad a problem is, and an unverified result is the absence of an answer, so any of them fails the gate once this is on. This is what makes &quot;an artifact I could not read does not get promoted&quot; expressible in one key.</td>
 </tr>
 <tr>
 <td><code>fail_on.fail_on_error</code></td>
@@ -428,7 +428,7 @@ paying for the answer.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.26.0 · Apache-2.0</span>
+<span>Guardana 0.26.1 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/profiles.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

@@ -44,7 +44,10 @@ A run keeps separate channels for:
 
 Unknown counts and costs remain unknown rather than becoming zero. Exhausted
 budgets, incomplete runs, unreadable artifacts, and incomparable baselines produce
-explicit non-success exit codes. Saved runs carry versions, policy identity,
+explicit non-success exit codes. An unverified result is never weighed against a
+severity bar: how bad an unmeasured thing is has no answer, so `fail_on_inconclusive`
+governs all of them or none, and a check that went dark between two runs is a
+regression at any severity. Saved runs carry versions, policy identity,
 target identity, protocol versions, usage, redaction mode, and rule provenance.
 
 ## Security coverage

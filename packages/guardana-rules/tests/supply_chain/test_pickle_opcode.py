@@ -5,7 +5,12 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from guardana.core.gate import GateOutcome, gate_outcome
+from guardana.core.profile import FailOn, Policy, Profile
+from guardana.core.registry import Registry
 from guardana.core.rule import RuleContext
+from guardana.core.runner import Runner
+from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain import pickle_opcode
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule
@@ -306,3 +311,41 @@ def test_a_fifo_named_like_a_checkpoint_cannot_stall_the_scan(tmp_path: Path) ->
     findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert [f.severity.name for f in findings] == ["LOW"]
     assert "not scanned" in findings[0].evidence.summary
+
+
+def test_an_unreadable_member_is_unverified_and_not_a_finding(tmp_path: Path) -> None:
+    """ "I could not read this" is the absence of an answer, not a problem of a size.
+
+    Graded as a LOW finding it was governed by `fail_on.severity`, so a profile
+    failing on `medium` promoted a model store holding members nobody had parsed
+    while the run reported `unverified: 0`.
+    """
+    inner = _zip_with("archive/data.pkl", pickle.dumps(_Evil()))
+    (tmp_path / "model.pt").write_bytes(_zip_with("archive/nested.zip", inner))
+
+    result = Runner(registry=Registry.discover(), profile=Profile(name="t", policy=Policy())).run(
+        ArtifactTarget(tmp_path)
+    )
+
+    unscanned = [f for f in result.unverified if f.title == "Unscanned model file"]
+    assert unscanned, [f.title for f in result.findings]
+    assert not [f for f in result.findings if f.title == "Unscanned model file"]
+    assert all(f.verdict is not None and f.verdict.outcome == "inconclusive" for f in unscanned)
+
+
+def test_a_medium_gate_asking_for_inconclusive_refuses_an_unread_artifact(tmp_path: Path) -> None:
+    """The reporter's case: `fail_on.severity: medium` plus `fail_on_inconclusive`.
+
+    Severity is not consulted for an unverified result, because "how bad is the
+    thing I could not measure" has no answer. Before this, every unread member was
+    LOW and the medium threshold waved the whole store through.
+    """
+    inner = _zip_with("archive/data.pkl", pickle.dumps(_Evil()))
+    (tmp_path / "model.pt").write_bytes(_zip_with("archive/nested.zip", inner))
+    policy = Policy(fail_on=FailOn(severity=Severity.MEDIUM, fail_on_inconclusive=True))
+
+    result = Runner(registry=Registry.discover(), profile=Profile(name="t", policy=policy)).run(
+        ArtifactTarget(tmp_path)
+    )
+
+    assert gate_outcome(result, policy) is not GateOutcome.PASS

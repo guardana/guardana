@@ -99,6 +99,17 @@ def _as_glob_list(value: object, what: str, path: Path) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _beside_the_profile(patterns: tuple[str, ...], path: Path) -> tuple[str, ...]:
+    """Anchor relative entries to the profile's own directory, leaving absolute ones alone.
+
+    A profile is a committed file naming its neighbours, so a relative entry means
+    "beside this file" and not "beside whatever directory the caller happened to be
+    in" — otherwise the same profile works from a repository root and fails from a
+    hook or a CI step. Joined rather than resolved, so a glob keeps its meaning.
+    """
+    return tuple(p if Path(p).is_absolute() else str(path.parent / p) for p in patterns)
+
+
 def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
     _reject_unknown_keys(raw, _ALLOWED_FAIL_ON_KEYS, "fail_on", path)
     severity_name = raw.get("severity", "high")
@@ -288,6 +299,8 @@ def load_profile(path: Path) -> Profile:
         required_dimensions=_required_dimensions(
             _as_mapping(raw.get("trace"), "trace", path), path
         ),
-        contract_paths=_as_glob_list(raw.get("contracts"), "contracts", path),
+        contract_paths=_beside_the_profile(
+            _as_glob_list(raw.get("contracts"), "contracts", path), path
+        ),
         calibration_paths=_as_glob_list(raw.get("calibrations"), "calibrations", path),
     )

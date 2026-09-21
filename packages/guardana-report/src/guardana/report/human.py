@@ -1,4 +1,6 @@
-from guardana.core.report import ScanResult
+from collections.abc import Callable
+
+from guardana.core.report import Finding, ScanResult
 
 _ICON = {"CRITICAL": "✖", "HIGH": "✖", "MEDIUM": "▲", "LOW": "•", "INFO": "·"}
 
@@ -18,9 +20,8 @@ class HumanRenderer:
         if not result.findings:
             lines.append(_nothing_found(result))
         for f in result.unverified:
-            reason = f.verdict.rationale if f.verdict is not None else f.evidence.summary
             lines.append(f"? [UNVERIFIED] {f.rule_id} — {f.title}")
-            lines.append(f"    {reason}  ({f.target_ref})")
+            lines.append(f"    {_why_unverified(f)}  ({f.target_ref})")
         for f in result.waived:
             lines.append(f"~ [WAIVED] {f.rule_id} — {f.title}")
             lines.append(f"    {f.evidence.summary}  ({f.target_ref})")
@@ -40,42 +41,69 @@ class HumanRenderer:
         return "\n".join(lines)
 
 
+_NOT_AN_ALL_CLEAR: tuple[
+    tuple[Callable[[ScanResult], object], Callable[[ScanResult], str]], ...
+] = (
+    # Every rule ran and every one declined — an endpoint answering with an empty
+    # message, a trace cut short. The count above is not zero, which is the only
+    # reason this needs a line of its own.
+    (
+        lambda r: r.verified_nothing,
+        lambda r: f"not one of the {r.rules_run_count} check(s) that ran could reach a verdict",
+    ),
+    (
+        lambda r: r.coverage_shortfall,
+        lambda r: f"{len(r.coverage_shortfall)} piece(s) of demanded coverage were not available",
+    ),
+    (lambda r: r.errors, lambda r: f"{len(r.errors)} check(s) could not run"),
+    # The quietest of the six, and the one that arrives in bulk: a model store whose
+    # checkpoints this build cannot parse produces no findings at all and every one
+    # of them lands here. A tick over "I could not read your model" is the whole
+    # failure this tool is built to refuse, printed in green.
+    (
+        lambda r: r.unverified,
+        lambda r: f"{len(r.unverified)} check(s) ran and could not reach a verdict",
+    ),
+)
+
+
 def _nothing_found(result: ScanResult) -> str:
     """Say what "no findings" means here — a tick only when it means an all-clear.
 
-    Five ways a clean report is not a clean result, ordered by how completely each
+    Six ways a clean report is not a clean result, ordered by how completely each
     one invalidates the run. The tick is what people scroll for and what job summaries
     grep for, so every one of these is a line that denies it in words.
     """
     if not result.rules_run:
         return "⚠ 0 rules ran — nothing was checked (this is not an all-clear)."
-    if result.verified_nothing:
-        # Every rule ran and every one of them declined — an endpoint answering with
-        # an empty message, a trace cut short. The count above is not zero, which is
-        # the only reason this needs a line of its own.
-        return (
-            f"⚠ No findings, but not one of the {result.rules_run_count} check(s) that "
-            "ran could reach a verdict (this is not an all-clear)."
-        )
-    if result.coverage_shortfall:
-        return (
-            f"⚠ No findings, but {len(result.coverage_shortfall)} piece(s) of demanded "
-            "coverage were not available (this is not an all-clear)."
-        )
+    # Its own branch rather than a row in the table below, because the message needs
+    # the value the condition just proved is there. The exit code already says `6`,
+    # and nobody reads an exit code off a terminal: a tick over a run that ended
+    # after two rules is the same false green as a tick over a rule that crashed.
     if result.stopped_by is not None:
-        # The exit code already says `6`, and nobody reads an exit code off a
-        # terminal. A tick over a run that ended after two rules is the same false
-        # green as a tick over a rule that crashed.
         return (
             f"⚠ No findings, but the run stopped early ({result.stopped_by.value}) "
             "before finishing its plan (this is not an all-clear)."
         )
-    if result.errors:
-        return (
-            f"⚠ No findings, but {len(result.errors)} check(s) could not run "
-            "(this is not an all-clear)."
-        )
+    for applies, message in _NOT_AN_ALL_CLEAR:
+        if applies(result):
+            return f"⚠ No findings, but {message(result)} (this is not an all-clear)."
     return "✓ No findings."
+
+
+def _why_unverified(finding: Finding) -> str:
+    """Both halves of why a check could not tell, because either can be the specific one.
+
+    An artifact rule's summary names the member or the cap it hit while its rationale
+    is one sentence written per rule; a graded rule is the other way round, with the
+    reason the judge failed in the rationale. Preferring one loses the part a reader
+    can act on, in whichever direction it was chosen.
+    """
+    summary = finding.evidence.summary
+    rationale = finding.verdict.rationale if finding.verdict is not None else ""
+    if not rationale or rationale in summary:
+        return summary or rationale
+    return f"{summary} — {rationale}" if summary else rationale
 
 
 def _summary(result: ScanResult) -> str:

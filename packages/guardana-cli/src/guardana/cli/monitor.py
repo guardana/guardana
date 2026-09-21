@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from guardana.cli._errors import run_against_endpoint
+from guardana.cli._errors import EndpointFlag, run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe, run_target_probe
@@ -28,6 +28,8 @@ _DEFAULT_INTERVAL_SECONDS = 60.0
 # — fast enough to finish a cycle well inside the interval, polite enough for a
 # single-slot local server.
 _DEFAULT_CONCURRENCY = 4
+
+_ACCEPTED_FLAGS = (EndpointFlag.API_KEY_ENV, EndpointFlag.CONCURRENCY)
 
 
 def alert_handler(
@@ -248,6 +250,7 @@ def monitor(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this i
                 concurrency=concurrency,
                 on_alert=on_alert,
             ),
+            accepts=_ACCEPTED_FLAGS,
         )
         return
 
@@ -282,6 +285,7 @@ def monitor(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this i
             concurrency=concurrency,
             on_alert=on_alert,
         ),
+        accepts=_ACCEPTED_FLAGS,
     )
 
 

@@ -67,6 +67,37 @@ changes rather than fixture changes (`docs/design/declarative-fixtures.md`, Deci
   provenance field is the first fix; mapping the agent-facing techniques the newest releases add
   is rule work for the parallel contributor lane. See `docs/design/audit-0.25-market.md`.
 
+## From the first field report (0.26.0), deferred to 0.27.0
+
+The report is `docs/work/2026-09-21-field-report-0.26.md` while 0.26.1 is in flight. These
+two are its remaining items, held back because each adds surface a patch may not add.
+
+- **`--adapter` exists on `probe` and on nothing else.** `plan probe`, `target inspect`,
+  `monitor` and `calibrate` all open a connection and none accepts it, so a guarded endpoint
+  — the one most worth pre-flighting, watching and calibrating against — can only be probed
+  once, by hand. 0.26.1 stopped the error message naming a flag the command rejects; hoisting
+  the flag itself is a new argument on four commands.
+- **`guardana pack lock` writes `<rule id>: <16 hex>`**, which is the shape gitleaks'
+  `generic-api-key` rule fires on — a key containing "secret" beside a high-entropy value.
+  It turned a blocking secret-scan gate red on a file Guardana itself wrote. Nesting the
+  digest under `{digest: …}` is the clean fix and costs a lock `schema_version` bump and a
+  migration.
+
+## Found while fixing the field report
+
+Each was noticed by the lane working next to it and left alone rather than folded in.
+
+- **`calibrations:` in a profile is still resolved against the working directory**, the same
+  defect 0.26.1 fixed for `contracts:` (`_run_meta.py:252` does `Path(raw_path)`). The fix is
+  the same helper.
+- **`calibrate` never routes through `run_against_endpoint`**, so an endpoint that answers 401
+  surfaces as a traceback rather than as exit 4 with an explanation. Every other endpoint
+  command handles it.
+- **`onnx_graph` grades ONNX `metadata_props` on the bare presence of an invisible character**,
+  which is the defect 0.26.1 fixed in `hidden_instructions` in miniature. The grading lives in
+  the rule rather than in the shared `_injection_markers.py` detector, so fixing one did not
+  fix the other.
+
 ## Tooling debt
 
 - Four scripts have no argument parser and run for real when handed `--help`:

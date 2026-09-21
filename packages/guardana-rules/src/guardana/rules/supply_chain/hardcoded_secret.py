@@ -4,6 +4,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 from guardana.core.evaluator.base import Verdict
@@ -13,7 +14,12 @@ from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM02_2025, OWASP_LLM02_2026
 from guardana.rules._base import ArtifactRule
-from guardana.rules._secrets import ALLOWLIST, FILE_SECRET_PATTERNS, is_scannable_text, redact
+from guardana.rules._secrets import (
+    FILE_SECRET_PATTERNS,
+    find_secret_matches,
+    is_scannable_text,
+    redact,
+)
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 _RULE_ID = "guardana.supply_chain.hardcoded_secret"
@@ -93,25 +99,72 @@ def _looks_like_secret(value: str) -> bool:
     return classes >= _MIN_CHAR_CLASSES and _shannon(value) >= _ENTROPY_MIN
 
 
-def _line_number(text: str, offset: int) -> int:
-    return text.count("\n", 0, offset) + 1
+# Past this column a line number no longer points at anything a reader can find —
+# a derived JSON index is one line of millions of keys — so the byte offset is
+# named beside it.
+_COARSE_COLUMN = 200
 
 
-def _scan_prefixed(text: str) -> Iterator[tuple[int, str, str]]:
-    for label, pattern in FILE_SECRET_PATTERNS:
-        for match in pattern.finditer(text):
-            value = match.group(0)
-            if value in ALLOWLIST:
-                continue
-            yield _line_number(text, match.start()), label, value
+@dataclass(frozen=True, slots=True)
+class _Where:
+    """Where a match sits: its line, its byte offset, and how far into the line it is."""
+
+    line: int
+    byte: int
+    column: int
 
 
-def _scan_entropy(text: str) -> Iterator[tuple[int, str, str]]:
+class _Cursor:
+    """Turns character offsets into `_Where`, in one forward pass over the text.
+
+    Offsets must arrive non-decreasing, so a file with many matches still costs
+    a single walk rather than one re-count per match.
+    """
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+        self._at = 0
+        self._line = 1
+        self._line_start = 0
+        self._byte = 0
+
+    def at(self, offset: int) -> _Where:
+        """Locate `offset`, advancing the cursor to it."""
+        chunk = self._text[self._at : offset]
+        newlines = chunk.count("\n")
+        if newlines:
+            self._line += newlines
+            self._line_start = self._at + chunk.rfind("\n") + 1
+        self._byte += len(chunk.encode("utf-8"))
+        self._at = offset
+        return _Where(self._line, self._byte, offset - self._line_start)
+
+
+def _at(where: _Where) -> str:
+    """Name the byte offset only where the line number alone cannot locate the match."""
+    return f" at byte {where.byte}" if where.column >= _COARSE_COLUMN else ""
+
+
+def _scan_prefixed(text: str) -> Iterator[tuple[_Where, str, str]]:
+    # Scanned as one stream, deliberately. Confining a match to a JSON scalar was
+    # tried and removed: a provider prefix cannot span two scalars anyway — the
+    # separator always carries a quote or a comma, which no pattern body admits —
+    # so it defended nothing, while it silently dropped a key written in a comment
+    # of a JSON-with-comments file, which `devcontainer.json` and `tsconfig.json`
+    # are. Precision here comes from the word-start anchor on each prefix.
+    matches = find_secret_matches(text, FILE_SECRET_PATTERNS)
+    cursor = _Cursor(text)
+    for start, _end, label, value in matches:
+        yield cursor.at(start), label, value
+
+
+def _scan_entropy(text: str) -> Iterator[tuple[_Where, str, str]]:
+    cursor = _Cursor(text)
     for match in _ASSIGNMENT.finditer(text):
         name, value = match.group(1), match.group(2)
         if _NON_SECRET_NAME.search(name) or not _looks_like_secret(value):
             continue
-        yield _line_number(text, match.start()), name, value
+        yield cursor.at(match.start()), name, value
 
 
 class HardcodedSecretRule(ArtifactRule):
@@ -149,34 +202,34 @@ class HardcodedSecretRule(ArtifactRule):
         if prefix is None:
             return
         text = prefix[0].decode("utf-8", errors="ignore")
-        for lineno, label, secret in _scan_prefixed(text):
+        for where, label, secret in _scan_prefixed(text):
             yield self._finding(
                 path,
-                lineno,
+                where,
                 summary=f"matched {label} pattern: {redact(secret)}",
                 rationale=f"matched {label} shape in repository file",
                 confidence=0.95,
             )
         if entropy:
-            for lineno, name, value in _scan_entropy(text):
+            for where, name, value in _scan_entropy(text):
                 yield self._finding(
                     path,
-                    lineno,
-                    summary=f"high-entropy value assigned to '{name}': {redact(value)}",
+                    where,
+                    summary=(f"high-entropy value assigned to '{name}': {redact(value)}"),
                     rationale="high-entropy value assigned to a secret-named variable",
                     confidence=0.75,
                 )
 
     def _finding(
-        self, path: Path, lineno: int, *, summary: str, rationale: str, confidence: float
+        self, path: Path, where: _Where, *, summary: str, rationale: str, confidence: float
     ) -> Finding:
         return Finding(
             rule_id=self.meta.id,
             severity=self.meta.severity,
             title=self.meta.title,
             taxonomy=self.meta.taxonomy,
-            target_ref=f"{path}:{lineno}",
-            evidence=Evidence(summary=summary, detail=f"{path.name}:{lineno}"),
+            target_ref=f"{path}:{where.line}",
+            evidence=Evidence(summary=summary, detail=f"{path.name}:{where.line}{_at(where)}"),
             verdict=Verdict(
                 outcome="fail",
                 confidence=confidence,

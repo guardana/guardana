@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 from guardana.cli._endpoint import build_endpoint
-from guardana.cli._errors import run_against_endpoint
+from guardana.cli._errors import EndpointFlag, run_against_endpoint
 from guardana.cli._formats import OutputFormat
 from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli._target_locator import resolve_target
@@ -155,7 +155,11 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
         fallback=lambda: _endpoint(url, model, api_key, provider),
     )
     planted = plain.planting(SYSTEM_PROBE) if isinstance(plain, SystemPromptPlanter) else None
-    report = run_against_endpoint(plain.ref, lambda: inspect_endpoint(plain, planted))
+    report = run_against_endpoint(
+        plain.ref,
+        lambda: inspect_endpoint(plain, planted),
+        accepts=(EndpointFlag.API_KEY_ENV,),
+    )
     unrunnable = unrunnable_rules(report, registry)
     if format is OutputFormat.json:
         typer.echo(_render_json(report, unrunnable))

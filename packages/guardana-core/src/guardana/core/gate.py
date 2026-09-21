@@ -97,10 +97,12 @@ def _left_unanswered(result: "ScanResult", threshold: "FailOn") -> bool:
         or result.verified_nothing
         or (result.assessments and not result.measured)
         or (result.errors and threshold.fail_on_error)
-        or (
-            threshold.fail_on_inconclusive
-            and any(f.severity >= threshold.severity for f in result.unverified)
-        )
+        # Not filtered by severity, and that is the whole point of the switch. A
+        # severity answers "how bad is this problem"; an unverified result is the
+        # absence of an answer, so asking how bad it is has no meaning. Filtering
+        # it let a profile failing on `medium` promote a model store holding a
+        # hundred members nobody could parse, because each was graded LOW.
+        or (threshold.fail_on_inconclusive and bool(result.unverified))
         or (threshold.fail_on_skipped and any(s.is_coverage_gap for s in result.rules_skipped))
     )
 

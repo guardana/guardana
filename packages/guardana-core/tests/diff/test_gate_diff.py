@@ -108,3 +108,24 @@ def test_a_count_change_alone_never_fails_the_gate() -> None:
     )
 
     assert not gate_diff(RunDiff(changes=changes, unchanged=0), Policy())
+
+
+def test_a_blinded_check_gates_however_low_its_severity() -> None:
+    """The threshold that was still being applied, one layer above the one removed.
+
+    A blinded check keeps whatever severity its rule carries, and an artifact
+    nobody could read is a LOW — so under every default `severity` bar the
+    comparison printed "Worse than the previous run" and exited 0. Asking how bad
+    an unmeasured thing is has no answer here either.
+    """
+    blinded = Change(
+        kind=ChangeKind.BLINDED,
+        rule_id=_RULE,
+        location="",
+        detail="a proven problem can no longer be graded, not fixed",
+        before=CheckState("fail", Severity.LOW, 0.9, 1, False),
+        after=CheckState("unverified", Severity.LOW, 0.0, 1, False),
+    )
+    strictest = Policy(fail_on=FailOn(severity=Severity.CRITICAL, min_confidence=0.99))
+
+    assert gate_diff(RunDiff(changes=(blinded,), unchanged=0), strictest)

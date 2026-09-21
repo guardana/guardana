@@ -513,6 +513,12 @@ works the same way — just point <code>--url</code>/<code>--model</code> at it.
 <code>--format json</code> that file is a versioned document <code>guardana diff</code> reads back, so
 you can ask whether the next run is worse than this one — see
 <a href="usage-diff.html"><code>usage-diff.md</code></a>.</p>
+<p><code>--output</code> with the default human format is <strong>refused before the first request</strong>,
+with exit <code>3</code>. The probe would otherwise spend its budget against your endpoint and
+tell you only afterwards that the file it wrote cannot be compared — and the run you
+wanted compared is the one you would have to pay for twice. <code>--format sarif</code> and
+<code>--format junit</code> are written as asked: a code-scanning upload and a CI report reader
+are what they are for, and neither has anything to do with <code>diff</code>.</p>
 <pre><code class="language-bash">guardana probe --url … --model …  --format json --output run.json
 </code></pre>
 <p>Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
@@ -521,7 +527,7 @@ on the other end cannot parse that.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.26.0 · Apache-2.0</span>
+<span>Guardana 0.26.1 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-probe.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

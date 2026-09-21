@@ -20,6 +20,7 @@ from guardana.core.taxonomy import (
     OWASP_LLM10_2026,
 )
 from guardana.rules._base import ArtifactRule
+from guardana.rules.supply_chain._leads import unscanned_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 _SUFFIXES = (".pkl", ".pickle", ".pt", ".ckpt", ".joblib", ".dill")
@@ -354,4 +355,7 @@ class PickleOpcodeRule(ArtifactRule):
             ),
             target_ref=str(path),
             evidence=Evidence(summary=summary, detail=f"file={path.name}"),
+            verdict=unscanned_verdict(
+                "this member could not be parsed, so nothing in it was cleared"
+            ),
         )

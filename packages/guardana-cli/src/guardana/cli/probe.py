@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 from guardana.cli._adapter import load_adapter_config
 from guardana.cli._budget_flags import override
-from guardana.cli._errors import run_against_endpoint
+from guardana.cli._errors import EndpointFlag, run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._exit import exit_with, refuse_unenforceable_budget
 from guardana.cli._formats import OutputFormat
@@ -17,7 +17,7 @@ from guardana.cli._mcp_run import (
     require_chat_endpoint,
     run_mcp_probe,
 )
-from guardana.cli._output import emit
+from guardana.cli._output import emit, refuse_incomparable_output
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._probe_run import Connection, run_probe, run_target_probe
 from guardana.cli._profile import resolve_profile
@@ -47,6 +47,12 @@ from guardana.report import get_renderer
 # are retried with backoff, so a busy endpoint slows the probe instead of
 # failing it. Raise it for a hosted endpoint you own the quota for.
 _DEFAULT_CONCURRENCY = 4
+
+_ACCEPTED_FLAGS = (
+    EndpointFlag.ADAPTER,
+    EndpointFlag.API_KEY_ENV,
+    EndpointFlag.CONCURRENCY,
+)
 
 
 def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface plus target modes
@@ -182,6 +188,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface plus targe
 ) -> None:
     """Run dynamic security checks against a live model endpoint, or an MCP server."""
     check_reporter_url(reporter)
+    refuse_incomparable_output(output, format.value)
     started_at = datetime.now(UTC)
     deployment = detect_deployment(ai_system, environment, deployment_id)
     prof = resolve_profile(profile, preset)
@@ -232,6 +239,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface plus targe
             custom_probed = run_against_endpoint(
                 selected.ref,
                 lambda: run_target_probe(registry, prof, selected, concurrency=concurrency),
+                accepts=_ACCEPTED_FLAGS,
             )
         except BudgetExhausted as exc:
             raise refuse_unenforceable_budget(exc) from exc
@@ -311,7 +319,9 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface plus targe
 
     try:
         endpoint_probed = run_against_endpoint(
-            endpoint_url, lambda: run_probe(registry, prof, connection, concurrency=concurrency)
+            endpoint_url,
+            lambda: run_probe(registry, prof, connection, concurrency=concurrency),
+            accepts=_ACCEPTED_FLAGS,
         )
     except BudgetExhausted as exc:
         raise refuse_unenforceable_budget(exc) from exc

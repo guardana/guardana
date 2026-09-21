@@ -80,12 +80,28 @@ class JUnitRenderer:
                 f'      <error message="nothing was verified">{escape(detail)}</error>\n'
                 "    </testcase>"
             )
+        # The same fact, one step weaker, and the one that actually arrives: some
+        # checks declined while others concluded. `verified_nothing` is False then,
+        # so the guard above never fired — and a model store nobody could parse
+        # rendered as `failures="0" skipped="N"`, which every dashboard reads as a
+        # pass. A skip is honest for one check and dishonest for the suite.
+        if result.unverified and not result.verified_nothing:
+            detail = (
+                f"{len(result.unverified)} check(s) ran and could not reach a verdict, "
+                f"so what they cover was not established"
+            )
+            cases.append(
+                '    <testcase name="guardana.unverified" classname="guardana.coverage">\n'
+                f'      <error message="some checks reached no verdict">{escape(detail)}</error>\n'
+                "    </testcase>"
+            )
         body = "\n".join(cases)
         skipped = len(result.unverified) + len(result.waived)
         errors = (
             len(result.errors)
             + len(result.coverage_shortfall)
             + (1 if result.verified_nothing else 0)
+            + (1 if result.unverified and not result.verified_nothing else 0)
         )
         return (
             '<?xml version="1.0" encoding="UTF-8"?>\n'

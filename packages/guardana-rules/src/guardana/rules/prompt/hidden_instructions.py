@@ -16,8 +16,8 @@ from guardana.core.taxonomy import (
     OWASP_LLM10_2026,
 )
 from guardana.rules._base import ArtifactRule
-from guardana.rules.prompt._injection_markers import has_smuggled_char
-from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_smuggled_char
+from guardana.rules.supply_chain._leads import unscanned_verdict
 from guardana.rules.supply_chain._reading import read_text_bounded
 
 # Files an AI coding assistant or a model loader reads as *instructions* or as
@@ -31,10 +31,63 @@ _DOC_SUFFIXES = (".md", ".mdc")
 # agents read it back.
 _SAFETENSORS_SUFFIX = ".safetensors"
 _UNSCANNED_TITLE = "Model metadata not scanned"
+_PRESENT_TITLE = "Invisible characters in a file an agent reads as context"
+
+# The two smuggling characters a text extractor also produces on its own: PDF
+# extraction scatters them through ordinary prose, so their presence alone says
+# nothing about intent and they are graded by shape below. Every other character
+# the shared detector knows — the bidi controls and the Unicode Tags block — has
+# no typographic use in such a file at all.
+_ZERO_WIDTH_CHARS = frozenset((chr(0x200B), chr(0x2060)))
+# A zero-width channel carries one bit per character, so a shorter run cannot
+# spell even a single byte of a hidden instruction.
+_PAYLOAD_RUN = 8
 
 
 def _is_instruction_file(path: Path) -> bool:
     return path.suffix in _DOC_SUFFIXES or path.name.lower() in _RULE_FILE_NAMES
+
+
+def _longest_zero_width_run(text: str) -> int:
+    longest = 0
+    current = 0
+    for char in text:
+        current = current + 1 if char in _ZERO_WIDTH_CHARS else 0
+        longest = max(longest, current)
+    return longest
+
+
+def _near_override_phrase(text: str) -> bool:
+    return any(
+        any(char in _ZERO_WIDTH_CHARS for char in line) and OVERRIDE_PHRASE.search(line)
+        for line in text.splitlines()
+    )
+
+
+def _payload_shape(text: str) -> str | None:
+    """Describe why the invisible characters carry a plausible payload, or None if they do not.
+
+    Concealment is the signal, but presence is not concealment: one zero-width
+    space between two words is what extracting text from a PDF leaves behind,
+    while a bidi override, a Tags character or a run long enough to encode a byte
+    is nobody's typography.
+    """
+    if any(has_smuggled_char(char) and char not in _ZERO_WIDTH_CHARS for char in text):
+        return "bidi override or Unicode-Tags character"
+    run = _longest_zero_width_run(text)
+    if run >= _PAYLOAD_RUN:
+        return f"a run of {run} zero-width characters"
+    if _near_override_phrase(text):
+        return "zero-width characters alongside instruction-override phrasing"
+    return None
+
+
+def _first_payload_shape(texts: Iterable[str]) -> str | None:
+    for text in texts:
+        shape = _payload_shape(text)
+        if shape is not None:
+            return shape
+    return None
 
 
 class HiddenInstructionsRule(ArtifactRule):
@@ -45,6 +98,12 @@ class HiddenInstructionsRule(ArtifactRule):
     prose is not itself suspect. A bidirectional-override or Unicode-Tags
     character hiding a directive a human reviewer cannot see is — that is the
     Rules-File-Backdoor mechanism.
+
+    Presence and concealment are graded apart. Characters shaped like a payload
+    are the rule's HIGH finding; zero-width characters that are merely there stay
+    LOW and informational, because a corpus built out of PDFs carries them
+    everywhere and a rule that shouts at that corpus is the rule a team silences
+    before it ever sees the real thing.
     """
 
     meta = RuleMeta(
@@ -76,14 +135,21 @@ class HiddenInstructionsRule(ArtifactRule):
 
     def _scan_text(self, path: Path) -> Iterator[Finding]:
         text = read_text_bounded(path, errors="ignore")
-        if text is None:
+        if text is None or not has_smuggled_char(text):
             return
-        if has_smuggled_char(text):
-            yield self._finding(
+        shape = _payload_shape(text)
+        if shape is None:
+            yield self._present(
                 path,
-                "invisible instruction-smuggling character (bidi/zero-width/tag)",
+                "invisible characters present, not shaped like an instruction payload",
                 f"file={path.name}",
             )
+            return
+        yield self._finding(
+            path,
+            f"invisible instruction-smuggling character (bidi/zero-width/tag): {shape}",
+            f"file={path.name}",
+        )
 
     def _scan_safetensors(self, path: Path) -> Iterator[Finding]:
         try:
@@ -91,23 +157,48 @@ class HiddenInstructionsRule(ArtifactRule):
         except FormatError as exc:
             yield self._unscanned(path, str(exc))
             return
-        smuggled = [
-            key
+        smuggled = {
+            key: value
             for key, value in header.metadata.items()
             if has_smuggled_char(key) or has_smuggled_char(value)
-        ]
-        if smuggled:
-            yield self._finding(
+        }
+        if not smuggled:
+            return
+        detail = f"file={path.name}; entries={', '.join(repr(key) for key in smuggled)}"
+        shape = _first_payload_shape(
+            text for key, value in smuggled.items() for text in (key, value)
+        )
+        if shape is None:
+            yield self._present(
                 path,
-                "invisible instruction-smuggling character in the safetensors __metadata__ block",
-                f"file={path.name}; entries={', '.join(repr(key) for key in smuggled)}",
+                "invisible characters in the safetensors __metadata__ block, "
+                "not shaped like an instruction payload",
+                detail,
             )
+            return
+        yield self._finding(
+            path,
+            "invisible instruction-smuggling character in the safetensors "
+            f"__metadata__ block: {shape}",
+            detail,
+        )
 
     def _finding(self, path: Path, summary: str, detail: str) -> Finding:
         return Finding(
             rule_id=self.meta.id,
             severity=self.meta.severity,
             title=self.meta.title,
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(summary=summary, detail=detail),
+        )
+
+    def _present(self, path: Path, summary: str, detail: str) -> Finding:
+        """Report invisible characters that were examined and found not to carry a payload."""
+        return Finding(
+            rule_id=self.meta.id,
+            severity=Severity.LOW,
+            title=_PRESENT_TITLE,
             taxonomy=self.meta.taxonomy,
             target_ref=str(path),
             evidence=Evidence(summary=summary, detail=detail),
@@ -124,5 +215,7 @@ class HiddenInstructionsRule(ArtifactRule):
                 summary=f"model metadata not scanned for hidden instructions: {reason}",
                 detail=f"file={path.name}",
             ),
-            verdict=lead_verdict("the metadata block could not be read, so nothing was cleared"),
+            verdict=unscanned_verdict(
+                "the metadata block could not be read, so nothing was cleared"
+            ),
         )

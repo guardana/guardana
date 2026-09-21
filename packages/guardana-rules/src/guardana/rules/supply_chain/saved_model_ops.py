@@ -14,7 +14,7 @@ from guardana.core.taxonomy import (
     OWASP_ML06_2023,
 )
 from guardana.rules._base import ArtifactRule
-from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._leads import lead_verdict, unscanned_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded
 
 # TensorFlow SavedModel graph operators that touch the filesystem on model load.
@@ -58,7 +58,25 @@ class SavedModelOpsRule(ArtifactRule):
         prefix = read_bytes_bounded(path, _MAX_SCAN_BYTES)
         if prefix is None:
             return
-        data = prefix[0]
+        data, truncated = prefix
+        if truncated:
+            # The flag was already here and was being dropped. Past the bound the
+            # graph is unread, so an op sitting after it is invisible — and silence
+            # about the tail read exactly like a clean graph.
+            yield Finding(
+                rule_id=self.meta.id,
+                severity=Severity.LOW,
+                title="SavedModel not scanned",
+                taxonomy=self.meta.taxonomy,
+                target_ref=str(path),
+                evidence=Evidence(
+                    summary=f"only the first {_MAX_SCAN_BYTES} bytes were read",
+                    detail=f"file={path.name}",
+                ),
+                verdict=unscanned_verdict(
+                    "the graph was read only in part, so nothing was cleared"
+                ),
+            )
         for op in _FILESYSTEM_OPS:
             if op in data:
                 name = op.decode()

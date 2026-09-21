@@ -24,7 +24,7 @@ from guardana.core.taxonomy import (
 )
 from guardana.rules._base import ArtifactRule
 from guardana.rules.prompt._injection_markers import has_smuggled_char
-from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._leads import lead_verdict, unscanned_verdict
 
 _RULE_ID = "guardana.supply_chain.onnx_graph"
 _UNSCANNED_TITLE = "ONNX model not scanned"
@@ -160,5 +160,5 @@ class OnnxGraphRule(ArtifactRule):
                 summary=f"ONNX graph not scanned: {reason}",
                 detail=f"file={path.name}",
             ),
-            verdict=lead_verdict("the graph could not be walked, so nothing was cleared"),
+            verdict=unscanned_verdict("the graph could not be walked, so nothing was cleared"),
         )

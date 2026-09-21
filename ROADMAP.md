@@ -23,7 +23,7 @@ Every roadmap item must preserve these properties:
 5. Application-specific risk remains expressible without forking the engine.
 6. Public schemas are versioned and migratable.
 
-## What ships today (0.26.0)
+## What ships today (0.26.1)
 
 The current release is beta. It provides artifact scanning, controlled endpoint
 and MCP probing, recorded-trace analysis, regression comparison, policy and
