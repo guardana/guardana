@@ -2,11 +2,12 @@
 
 # 🛡️ Guardana
 
-**Open-source AI security verification, from build to production.**
+**Open-source AI security verification for every release.**
 
-Guardana scans AI artifacts, probes deployed models and agents, and analyzes recorded
-executions. It produces reproducible evidence and tells you whether a release is
-worse than its accepted baseline.
+Guardana scans model artifacts, probes live endpoints and MCP servers, and analyzes
+recorded agent traces. It produces reproducible evidence and a measured verdict,
+including an explicit "could not tell". Run it on your laptop, in CI, or in production,
+then compare a release with its accepted baseline.
 
 [![CI](https://github.com/guardana/guardana/actions/workflows/ci.yml/badge.svg)](https://github.com/guardana/guardana/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -54,6 +55,9 @@ uv add guardana-cli                       # or: pip install guardana-cli
 The console command is `guardana`; the distribution is `guardana-cli`. For a source
 checkout, clone and run `uv sync` as described in
 [`docs/install.md`](docs/install.md).
+
+Every published distribution has signed, keyless build provenance that you can verify
+with `gh attestation verify`, plus a PEP 740 attestation on PyPI.
 
 Scan the bundled vulnerable model directory:
 

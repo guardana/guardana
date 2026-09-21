@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from html import escape
 
 from sitegen.nav import NavSection
+from sitegen.page import served_path
 
 _ICON = (
     "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
@@ -48,7 +49,7 @@ def page(  # noqa: PLR0913 — one keyword per fact the shell needs; none is der
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{escape(title)} — Guardana documentation</title>
 <meta name="description" content="{escape(summary)}">
-<link rel="canonical" href="https://guardana.dev/docs/{escape(href)}">
+<link rel="canonical" href="https://guardana.dev{escape(served_path("docs/" + href))}">
 <link rel="icon" href="{_ICON}">
 <link rel="stylesheet" href="{up}docs.css">
 </head>
