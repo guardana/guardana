@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: Guardana
+message: >-
+  If you use Guardana in published work or in a security assessment, please cite
+  the release you actually ran.
+type: software
+authors:
+  - name: Guardana contributors
+    email: contact@guardana.dev
+repository-code: https://github.com/guardana/guardana
+url: https://guardana.dev
+abstract: >-
+  Guardana verifies AI systems against a rule engine that behaves the same on a
+  laptop, in CI and against a deployment: it scans model and application
+  artifacts, probes live endpoints, MCP servers and agents, grades recorded
+  executions, and compares runs for regressions. Every rule maps to a published
+  framework edition, and a check that could not run is reported as inconclusive
+  rather than as a pass.
+keywords:
+  - AI security
+  - LLM security
+  - prompt injection
+  - agent security
+  - Model Context Protocol
+  - supply chain security
+license: Apache-2.0
+version: 0.26.0
+date-released: '2026-09-20'

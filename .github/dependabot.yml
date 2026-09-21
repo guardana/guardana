@@ -8,6 +8,15 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps):"
+    groups:
+      # `codeql-action/init` writes a config file that `codeql-action/analyze`
+      # reads, and the two refuse to run at different versions. Ungrouped,
+      # Dependabot opens one pull request per sub-action, so each one moves half
+      # of a handshake and fails CI on its own — three red pull requests for an
+      # upgrade that is correct only as a whole.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # The images' base layer is a dependency like any other, and it is the one
   # nobody remembers: a `python:3.13-slim-bookworm` pinned once ages quietly while

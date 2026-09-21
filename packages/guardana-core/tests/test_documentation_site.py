@@ -210,3 +210,37 @@ def test_a_representative_page_carries_its_own_title_and_navigation(page: str) -
     assert '<meta name="description"' in html
     assert '<nav class="side">' in html
     assert '<link rel="canonical" href="https://guardana.dev/docs/' in html
+
+
+def test_the_sitemap_lists_urls_the_host_answers_rather_than_redirects() -> None:
+    """A sitemap of redirects is worse than none: it tells a crawler the wrong canonical.
+
+    The host serves a page without its extension and a directory by its index, and
+    307s the file form to it. So every `<loc>` must be the served form, and each one
+    must have a file behind it — a URL in a sitemap is a claim that something answers.
+    """
+    site = _repo() / "site"
+    sitemap = (site / "sitemap.xml").read_text(encoding="utf-8")
+    locs = re.findall(r"<loc>([^<]+)</loc>", sitemap)
+
+    assert locs, "the sitemap lists nothing — run `uv run python scripts/generate_sitemap.py`"
+    assert not [url for url in locs if url.endswith(".html")]
+
+    origin = "https://guardana.dev"
+    missing = []
+    for url in locs:
+        path = url.removeprefix(origin).lstrip("/")
+        candidate = site / (
+            f"{path}index.html" if path.endswith("/") or not path else f"{path}.html"
+        )
+        if not candidate.is_file():
+            missing.append(url)
+
+    assert not missing, missing[:5]
+
+
+def test_robots_points_at_the_sitemap() -> None:
+    """A sitemap nothing announces is a file only somebody who guessed the name will find."""
+    robots = (_repo() / "site" / "robots.txt").read_text(encoding="utf-8")
+
+    assert "Sitemap: https://guardana.dev/sitemap.xml" in robots
