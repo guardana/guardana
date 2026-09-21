@@ -45,7 +45,7 @@ dependencies = ["fastapi>=0.115", "pydantic>=2.13.5", "psycopg[binary]>=3.3.5"]
 # the API `guardana-collector serve` actually uses, `run(app, host=, port=)`,
 # which has been stable for far longer than this.
 [project.optional-dependencies]
-serve = ["uvicorn>=0.52.4"]
+serve = ["uvicorn>=0.53.0"]
 
 [project.urls]
 Homepage = "https://guardana.dev"
