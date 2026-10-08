@@ -72,6 +72,9 @@ def _no_subprocesses(monkeypatch: pytest.MonkeyPatch) -> None:
         ('git commit -m "docs: generated with a tool"', "deny"),
         ('git commit -m "feat(cli): add --target-option"', None),
         ("git push --force origin main", "ask"),
+        ("git push origin +main", "ask"),
+        ("git push origin +feature", "ask"),
+        ("git push origin HEAD:refs/heads/feature/x", None),
         ("git push -f origin main", "ask"),
         ("git push origin v0.25.0", "ask"),
         ("git push origin --tags", "ask"),
@@ -127,7 +130,14 @@ def test_bash_commands(
 
 @pytest.mark.parametrize(
     "command",
-    ["git push origin main", "git -C . push origin main", "git -c x=y --no-pager push origin main"],
+    [
+        "git push origin main",
+        "git -C . push origin main",
+        "git -c x=y --no-pager push origin main",
+        "git push origin refs/heads/main",
+        "git push origin HEAD:refs/heads/main",
+        "git push origin feature:refs/heads/main",
+    ],
 )
 def test_a_push_to_main_is_refused_while_the_site_is_stale(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], command: str

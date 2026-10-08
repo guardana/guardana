@@ -134,12 +134,26 @@ def _site_in_sync() -> None:
             )
 
 
-def _pushes_main(command: str) -> bool:
+def _push_args(command: str) -> list[str]:
     push = re.search(r"\bgit\s+push\b([^|;&]*)", command)
     if push is None:
-        return False
-    args = [arg for arg in push.group(1).split() if not arg.startswith("-")]
-    if any(arg == "main" or arg.endswith(":main") for arg in args):
+        return []
+    return [arg for arg in push.group(1).split() if not arg.startswith("-")]
+
+
+def _refspec_dest(arg: str) -> str:
+    """Destination of a refspec, ignoring a leading force marker."""
+    spec = arg.removeprefix("+")
+    return spec.split(":", 1)[1] if ":" in spec else spec
+
+
+def _is_main_ref(ref: str) -> bool:
+    return ref in {"main", "refs/heads/main"}
+
+
+def _pushes_main(command: str) -> bool:
+    args = _push_args(command)
+    if any(_is_main_ref(_refspec_dest(arg)) for arg in args):
         return True
     if len(args) >= 2 and args[1] != "HEAD":  # noqa: PLR2004 — remote plus an explicit refspec
         return False
@@ -174,7 +188,9 @@ def _guard_commit(command: str) -> None:
 def _guard_push(command: str) -> None:
     if not re.search(r"\bgit\s+push\b", command):
         return
-    if re.search(r"--force\b|\s-f\b|--force-with-lease", command):
+    if re.search(r"--force\b|\s-f\b|--force-with-lease", command) or any(
+        arg.startswith("+") for arg in _push_args(command)
+    ):
         decide("ask", "Force push to a shared branch.")
     if TAG_PUSH.search(command):
         decide(
