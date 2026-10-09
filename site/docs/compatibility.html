@@ -99,6 +99,9 @@
 <li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
 <li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
 <h2>Studies</h2><ul>
 <li><a href="studies/first-run-study.html">First-run study</a></li>
 <li><a href="studies/adopter-study.html">Adopter study</a></li>
@@ -183,6 +186,9 @@
 <li><a href="generated/first-run.html">First-run measure</a></li>
 <li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
 <li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
 </ul>
 <h2>Studies</h2><ul>
 <li><a href="studies/first-run-study.html">First-run study</a></li>
@@ -276,55 +282,82 @@ minor release ahead.</li>
 <p>Until 1.0, a breaking change can land in a minor release and is announced under
 &quot;Changed — breaking&quot; in the changelog, with what to write instead.</p>
 <h2 id="versioning">Versioning</h2>
-<p>Guardana follows <a href="https://semver.org">Semantic Versioning</a>. The twist is that it
-is <strong>pre-1.0</strong>, and 0.x has its own rules — under SemVer, <code>0.y.z</code> makes <em>no</em>
-stability promise across a <strong>minor</strong> bump, so the minor slot carries what the
-major slot will carry after 1.0:</p>
+<p>Guardana is <strong>pre-1.0</strong> until a final 1.x release. <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning 2.0.0</a>
+governs change impact. Package version strings use
+<a href="https://packaging.python.org/en/latest/specifications/version-specifiers/">PEP 440</a>.</p>
+<h3 id="historical-0yz-releases">Historical 0.y.z releases</h3>
+<p>Guardana's convention was that a minor release carried compatible features or
+breaking changes. A breaking change was announced as &quot;Changed — breaking&quot;,
+with replacement guidance. This included a new default-enabled check or an
+intentionally stricter default that could fail a previously passing build.
+A patch was a compatible correction.</p>
+<h3 id="the-10-candidate-freeze">The 1.0 candidate freeze</h3>
+<p>The <code>1.0.0rcN</code> candidates carry fixes only. They follow neither the historical
+<code>0.y.z</code> feature rules nor the post-1.0 minor-release rules.</p>
+<p>Until stable 1.0, candidates add no CLI flag, persisted field, rule family or
+public API. A change to the existing supported surface is allowed only to
+correct a defect in it and must be announced.</p>
+<p><code>scripts/release.py</code> refuses a candidate whose generated
+<code>docs/generated/api-surface.json</code> moved since the previous tag unless the
+changelog's Unreleased section has a Changed, Deprecated or Removed entry.
+That check enforces the announcement requirement; the fixes-only policy still
+applies.</p>
+<h3 id="choosing-a-release-after-10">Choosing a release after 1.0</h3>
+<p>The highest-impact change decides the version. The number of completed issues
+does not.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>You're releasing…</th>
-<th>Bump</th>
-<th>Pre-1.0 (<code>0.y.z</code>)</th>
-<th>Post-1.0 (<code>x.y.z</code>)</th>
+<th>Version part</th>
+<th>Change</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>A backwards-<strong>incompatible</strong> change (renamed/removed public API, a rule id change, a stricter default that can fail a previously-passing build)</td>
-<td><strong>minor</strong> pre-1.0, <strong>major</strong> post-1.0</td>
-<td><code>0.1.4 → 0.2.0</code></td>
-<td><code>1.4.2 → 2.0.0</code></td>
+<td>Patch</td>
+<td>A compatible correction, including a false-green fix within documented behaviour. The changelog states which gates may now fail.</td>
 </tr>
 <tr>
-<td>A backwards-<strong>compatible</strong> new feature (a new rule, a new flag, a new evaluator)</td>
-<td><strong>minor</strong> post-1.0, <strong>patch</strong>-or-minor pre-1.0</td>
-<td><code>0.1.4 → 0.2.0</code> <em>(or <code>→ 0.1.5</code> if you want to signal &quot;small&quot;)</em></td>
-<td><code>1.4.2 → 1.5.0</code></td>
+<td>Minor</td>
+<td>Compatible opt-in functionality, a new opt-in check, or a deprecation.</td>
 </tr>
 <tr>
-<td>A backwards-compatible <strong>bug fix</strong> (no API change)</td>
-<td><strong>patch</strong></td>
-<td><code>0.1.4 → 0.1.5</code></td>
-<td><code>1.4.2 → 1.4.3</code></td>
+<td>Major</td>
+<td>A contract break, a removal, dropping a reader for an older persisted document, a check enabled by default that can fail a previously passing build, or an intentionally stricter default.</td>
 </tr>
 </tbody>
 </table></div>
-<p>Practical pre-1.0 rule of thumb: <strong>patch = &quot;safe to upgrade blindly&quot;</strong>, <strong>minor
-= &quot;read the changelog, something might break.&quot;</strong> Because a security tool can
-<em>fail a build</em> by design, treat &quot;a new HIGH/CRITICAL rule that will flag code
-that passed before&quot; as a <strong>breaking</strong> change (minor bump) — users pin to a range
-precisely so that doesn't surprise their CI. Between Guardana's own packages
-the pins are exact (<code>==0.1.0</code>): the five ship together and are tested only as
-one set, so nothing else may resolve beside them.</p>
+<p>Experimental behaviour and thresholds are outside the stability promise; their
+saved documents still follow the persisted-document policy. A contract break,
+removal, dropped reader or intentionally stricter default requires a major
+release.</p>
+<h3 id="merging-and-publishing">Merging and publishing</h3>
+<p>Documentation-only, test-only and maintainer-tooling-only changes need no
+package release. A maintainer squash-merges a pull request after review and
+checks. The merge runs CI and never publishes a package.</p>
+<p>A maintainer chooses the version from completed issues, runs the full release
+gate, waits for green CI on the exact commit, then pushes the version tag.
+Publishing pauses for one approval.</p>
+<p>One tag releases all five packages at the same version: <code>guardana-core</code>,
+<code>guardana-rules</code>, <code>guardana-cli</code>, <code>guardana-report</code> and <code>guardana-server</code>.
+Between Guardana's own packages the pins are exact: the five ship together at
+the same version and are tested only as one set, so nothing else may resolve
+beside them.</p>
+<h3 id="package-versions-and-release-candidates">Package versions and release candidates</h3>
+<p>A release candidate's package version is written in PEP 440 form, for example
+<code>1.0.0rc2</code>, and its Git tag is <code>v1.0.0rc2</code>. PEP 440 orders these versions:</p>
+<p><code>1.0.0rc1 &lt; 1.0.0rc2 &lt; 1.0.0rc10 &lt; 1.0.0</code></p>
+<p>A risky minor or major release may first use a release candidate, such as
+<code>1.1.0rc1</code>. A candidate is a pre-release, not a stable release.</p>
 <h3 id="when-to-release-10">When to release 1.0</h3>
-<p>Cut <code>1.0.0</code> when the public API (the <code>guardana.core</code> surface, the rule/evaluator/
-target contracts, the CLI flags, the profile schema, the collector envelope) is
-one you're willing to keep stable — i.e. the next breaking change would be rare
-and deliberate. 1.0 is a promise, not a maturity badge; don't rush it, but don't
-hide behind 0.x forever either. Everything from 1.0 on follows the right-hand
-column above. The criteria, the release plan and the target are the first goal in
-<a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">ROADMAP.md</a>.</p>
+<p>Release <code>1.0.0</code> only when the supported surface is ready for the compatibility
+promise and all <a href="product-status.html#before-the-first-stable-release">stable-release criteria</a>
+hold. Both <code>1.0.0rc2</code> and <code>1.0.0rc3</code> are required, and stable 1.0 does not
+follow rc3 automatically. The
+<a href="https://github.com/guardana/guardana/milestones">GitHub milestones</a> group
+release scope, not dates. The target remains the first quarter of 2027,
+set by external evidence rather than by the code. A missed criterion moves the
+release, not the criterion.</p>
 <h2 id="the-collector-envelope">The collector envelope</h2>
 <p>A run reaches the collector as a versioned envelope. Every change to the envelope raises its
 version. A collector accepts every envelope version from 2 up to its own. An agent newer than

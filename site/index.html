@@ -282,6 +282,7 @@ footer.foot{border-top:1px solid var(--line);padding:44px 0 56px;font-size:14.5p
   <nav aria-label="Primary">
     <a href="/docs/">Docs</a>
     <a href="/docs/rules/">Rules</a>
+    <a href="#community" class="hide-s">Community</a>
     <a href="#control" class="hide-s">Control</a>
     <a href="https://github.com/guardana/guardana/releases" class="hide-s">Changelog</a>
     <a class="gh" href="https://github.com/guardana/guardana"><svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span class="hide-s">GitHub</span></a>
@@ -294,15 +295,16 @@ footer.foot{border-top:1px solid var(--line);padding:44px 0 56px;font-size:14.5p
     <p class="pill"><i></i>Open-source AI security verification</p>
     <h1>Check the <span class="grad">AI you run</span></h1>
     <p class="def">Guardana is an open-source AI security verification tool for security and platform engineers that checks model and code artifacts, live AI systems, and recorded runs, with scans that run fully offline.</p>
-    <div class="install"><span class="sig">$</span><code>uvx --from guardana-cli guardana scan .</code></div>
+    <div class="install"><span class="sig">$</span><code>uvx --from guardana-cli guardana init --starter first-run</code></div>
     <p class="alt">or <code>pip install guardana-cli</code></p>
-    <p class="alt start">Try <code>guardana init --starter first-run</code>: a small project with one problem to find and fix.</p>
+    <p class="alt start">An offline starter: find a problem, fix it, and keep the evidence. <a href="/docs/usage-init">Follow the first-run guide</a>.</p>
     <div class="ctas">
-      <a class="btn pri" href="/docs/">Read the docs <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a class="btn pri" href="/docs/usage-init">Try the offline starter <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       <a class="btn sec" href="#ci">Use it in CI</a>
     </div>
     <ul class="facts"><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg>Apache-2.0</li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg>No account</li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg><a href="/docs/privacy">No telemetry</a></li><li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg>Offline scans</li></ul>
     <p class="status">Release candidate · engine and rules beta · <a href="/docs/product-status">Product status</a></p>
+    <p class="alt">By default the command above selects stable releases. To install or upgrade to a candidate, use <code>pip install --upgrade --pre guardana-cli</code> or follow <a href="/docs/install">the install guide</a>.</p>
   </div>
   <div class="demo">
     <div class="term" role="img" aria-label="Terminal output: Guardana scanning a model directory and reporting twelve findings, three of them shown, including a critical pickle opcode that would execute code on load.">
@@ -498,12 +500,25 @@ footer.foot{border-top:1px solid var(--line);padding:44px 0 56px;font-size:14.5p
 <section class="s alt-bg" id="help"><div class="wrap">
   <p class="eyebrow">First Runs</p>
   <h2 class="reveal">Help us reach 1.0</h2>
-  <p class="lede">1.0 waits for people outside the project, not for more code.</p>
+  <p class="lede">The release candidate is ready for external first runs and team pilots. Stable 1.0 also needs recorded adoption evidence and the remaining release checks.</p>
   <div class="surfaces">
     <article class="card reveal"><h3>Try it once</h3><p>Join a first-run session on your machine for about 30 minutes. You consent first. Nothing leaves your machine except what you choose to send.</p><a class="more" href="/docs/studies/first-run-study">Join a first-run session <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></article>
-    <article class="card reveal"><h3>Pilot it with your team</h3><p>Run your own application with a CI gate and help from the maintainer. Your team keeps the saved run. Start in the GitHub Discussions Pilots category or email contact@guardana.dev.</p><a class="more" href="https://github.com/guardana/guardana/discussions">Start a pilot <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></article>
+    <article class="card reveal"><h3>Pilot it with your team</h3><p>Run your own application with a CI gate and help from the maintainer. Your team keeps the saved run. Start in GitHub Discussions or email contact@guardana.dev.</p><a class="more" href="https://github.com/guardana/guardana/discussions">Start a pilot <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></article>
   </div>
   <p class="aside">Use Watch → Releases on GitHub, <a href="https://github.com/guardana/guardana/releases.atom">the releases Atom feed</a>, or the notes feed (<a href="/notes/feed.xml">guardana.dev/notes/feed.xml</a>).</p>
+  <p class="aside"><a href="/docs/community">Contribute, share a result, or follow the path to 1.0</a>.</p>
+</div></section>
+
+<section class="s" id="community"><div class="wrap">
+  <p class="eyebrow">Around the project</p>
+  <h2 class="reveal">Articles and community posts</h2>
+  <p class="lede">Selected coverage of Guardana's verification approach. Read each source for its context and the version it describes.</p>
+  <div class="three">
+    <article class="tile reveal"><h3>Tomonori Naota on note</h3><p>A Japanese article on keeping inconclusive security results visible when testing AI agents.</p><a class="more" href="https://note.com/totorotom/n/na59d902ff9d4" rel="nofollow noopener" target="_blank">Read the article</a></article>
+    <article class="tile reveal"><h3>Mindful Machines</h3><p>Guardana in AI Security Newsletter No. 86, alongside other AI security research and tools.</p><a class="more" href="https://song-luo.com/2026/10/07/ai-security-newsletter-no-86-10-07-2026/" rel="nofollow noopener" target="_blank">Read the newsletter</a></article>
+    <article class="tile reveal"><h3>Daniel Kornaś on LinkedIn</h3><p>A community post introducing offline scans, active probes and recorded-run analysis.</p><a class="more" href="https://www.linkedin.com/posts/daniel-kornas_ai-security-checks-shouldnt-turn-an-unknown-activity-7508752122541363200-4qDC" rel="nofollow noopener" target="_blank">Read the post</a></article>
+  </div>
+  <p class="aside">Building with Guardana or writing about it? <a href="/docs/community">Share your result or a publication</a>.</p>
 </div></section>
 
 <section class="s" id="faq"><div class="wrap">

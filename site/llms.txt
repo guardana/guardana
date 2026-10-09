@@ -95,8 +95,8 @@ This file is generated from the documentation map; do not edit it by hand.
 
 ## Project direction
 
+- [community.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/community.md): try a candidate, join a pilot, contribute a fix or share coverage
 - [../FEATURES.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/FEATURES.md): concise shipped capability overview
-- [../ROADMAP.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/ROADMAP.md): ordered next work and exit criteria
 - [../CHANGELOG.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/CHANGELOG.md): release history
 
 ## Notes

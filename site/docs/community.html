@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>guardana rules — Guardana documentation</title>
-<meta name="description" content="guardana rules: list every discovered rule, grouped by the layer it secures">
-<link rel="canonical" href="https://guardana.dev/docs/usage-rules">
+<title>Community — Guardana documentation</title>
+<meta name="description" content="Try Guardana, contribute a fix, share an application result, or suggest coverage.">
+<link rel="canonical" href="https://guardana.dev/docs/community">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
@@ -68,7 +68,7 @@
 <h2>Rules and extensions</h2><ul>
 <li><a href="compatibility.html">Compatibility<span class="tag">beta</span></a></li>
 <li><a href="conformance-kit.html">Conformance kit<span class="tag">beta</span></a></li>
-<li><a href="usage-rules.html" aria-current="page">guardana rules</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
@@ -100,7 +100,7 @@
 <li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="community.html">Community</a></li>
+<li><a href="community.html" aria-current="page">Community</a></li>
 </ul>
 <h2>Studies</h2><ul>
 <li><a href="studies/first-run-study.html">First-run study</a></li>
@@ -108,7 +108,7 @@
 </ul>
 </nav>
 <details class="mnav">
-<summary>Menu · <b>guardana rules</b></summary>
+<summary>Menu · <b>Community</b></summary>
 <nav class="inner" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
 <h2>Guides for a first run</h2><ul>
@@ -156,7 +156,7 @@
 <h2>Rules and extensions</h2><ul>
 <li><a href="compatibility.html">Compatibility<span class="tag">beta</span></a></li>
 <li><a href="conformance-kit.html">Conformance kit<span class="tag">beta</span></a></li>
-<li><a href="usage-rules.html" aria-current="page">guardana rules</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
@@ -188,7 +188,7 @@
 <li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="community.html">Community</a></li>
+<li><a href="community.html" aria-current="page">Community</a></li>
 </ul>
 <h2>Studies</h2><ul>
 <li><a href="studies/first-run-study.html">First-run study</a></li>
@@ -197,51 +197,66 @@
 </nav>
 </details>
 <main>
-<h1><code>guardana rules</code> — what is discovered, before anything runs</h1><p class="lede"><code>guardana rules</code>: list every discovered rule, grouped by the layer it secures</p><p><code>guardana rules</code> lists discovered build-time and runtime rules when you need to check what is available.</p>
-<pre><code class="language-bash">guardana rules
+<h1>Take part in Guardana</h1><p class="lede">Try Guardana, contribute a fix, share an application result, or suggest coverage.</p><p>Try the <a href="usage-init.html">offline starter</a>, bring your own application to a pilot,
+or contribute a focused fix. The <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">roadmap</a> keeps the
+release-candidate work separate from additions after stable 1.0.</p>
+<h2 id="try-a-release-candidate">Try a release candidate</h2>
+<p>An ordinary install selects stable releases. To opt into a candidate and refresh
+an existing tool environment:</p>
+<pre><code class="language-bash">uvx --upgrade --prerelease allow --from guardana-cli guardana init --starter first-run
 </code></pre>
-<p>Pass <code>--rules &lt;dir&gt;</code> to include YAML rules, as with <code>scan</code> and <code>probe</code>. Files that fail to load produce a warning.</p>
-<h2 id="flags">Flags</h2>
-<p><code>rules</code> discovers plugins the same way <code>scan</code>/<code>probe</code> do, so it takes the same
-plugin-trust flags:</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Default</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
-<td><code>builtins</code>, or the profile's <code>plugins:</code></td>
-<td>Which installed plugins to load — same meaning as on <code>probe</code></td>
-</tr>
-<tr>
-<td><code>--allow-plugin TEXT</code></td>
-<td>none</td>
-<td>Distribution to trust; repeatable, needs <code>--plugins allowlist</code></td>
-</tr>
-<tr>
-<td><code>--profile PATH</code></td>
-<td>none</td>
-<td>A <code>guardana.yaml</code> whose <code>plugins:</code> decides which installed plugins load — see <a href="profiles.html#plugin-trust-plugins"><code>profiles.md</code></a></td>
-</tr>
-</tbody>
-</table></div>
-<h2 id="see-also">See also</h2>
+<p>Follow the generated project's instructions to find a failure, fix it and edit
+one check. <code>uvx</code> does not install <code>guardana</code> on your shell's PATH: prefix each
+README command with the same launcher, as the <a href="usage-init.html">first-run guide</a>
+explains. See <a href="install.html">installing</a> for pip, source and container options.
+For reproducible team runs, pin the exact reviewed version in your environment.</p>
+<h2 id="help-validate-10">Help validate 1.0</h2>
 <ul>
-<li><a href="usage-taxonomy.html"><code>usage-taxonomy.md</code></a> — the framework catalogues a rule's mapping names</li>
-<li><a href="writing-rules.html"><code>writing-rules.md</code></a> — author a rule as YAML or as a Python plugin</li>
+<li>Join a consented <a href="studies/first-run-study.html">first-run session</a>. Record where
+the instructions stop being clear; a failed session is useful evidence too.</li>
+<li>Start an application pilot in <a href="https://github.com/guardana/guardana/discussions">GitHub Discussions</a>
+or email <a href="mailto:contact@guardana.dev">contact@guardana.dev</a>. Begin with
+synthetic fixtures and harmless tools, then follow the
+<a href="recipe-real-application.html">real-application recipe</a>.</li>
+<li>Try an independently installed extension using the
+<a href="conformance-kit.html">conformance kit</a>. Share its supported surface and a
+redacted reproduction, including failed and incomplete outcomes.</li>
 </ul>
+<p>Each participant chooses what to share. The <a href="studies/adopter-study.html">study guides</a>
+describe consent and retained evidence. Do not send production secrets, personal
+records or private prompts to a public issue.</p>
+<h2 id="contribute-a-focused-change">Contribute a focused change</h2>
+<p>Documentation fixes, tests, examples and maintainer scripts are open during the
+candidate period. Use <a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> and the
+<a href="https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">good first issues</a>.
+Candidates keep the supported surface frozen; new rules and feature additions
+follow stable 1.0 and demonstrated application needs.</p>
+<p>For a bug, include the installed version, the smallest synthetic reproduction,
+the expected outcome and the observed outcome. Report suspected vulnerabilities
+privately through <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+<h2 id="share-a-result-or-publication">Share a result or publication</h2>
+<p>Send the canonical link, author, publication date when available, and the
+Guardana version discussed to <a href="mailto:contact@guardana.dev">contact@guardana.dev</a>
+or Discussions. A useful application report states what was checked, what the
+evidence could not establish, and which release decision it supported.</p>
+<p>The landing page links to selected articles and community posts. A directory
+listing is distinct from a hands-on review; a fork or star is distinct from a
+deployment. A quotation or named application story needs the author's consent
+and a reproducible, redacted result. Suggested links are reviewed for identity,
+accuracy and source context before publication.</p>
+<h2 id="follow-changes">Follow changes</h2>
+<p>Watch <a href="https://github.com/guardana/guardana/releases">GitHub releases</a>, subscribe
+to the <a href="https://github.com/guardana/guardana/releases.atom">release feed</a>, or read
+the <a href="https://guardana.dev/notes/">project notes</a>. <a href="product-status.html">Product status</a>
+states shipped capabilities and limitations; the roadmap gives conditional
+priorities, rather than promised release dates.</p>
 
 </main>
 </div>
 <footer class="foot"><div class="bar">
 <span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
-<a href="https://github.com/guardana/guardana/blob/main/docs/usage-rules.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana/blob/main/docs/community.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>

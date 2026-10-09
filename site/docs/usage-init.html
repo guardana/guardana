@@ -99,6 +99,9 @@
 <li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
 <li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
 <h2>Studies</h2><ul>
 <li><a href="studies/first-run-study.html">First-run study</a></li>
 <li><a href="studies/adopter-study.html">Adopter study</a></li>
@@ -184,6 +187,9 @@
 <li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
 <li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
 <h2>Studies</h2><ul>
 <li><a href="studies/first-run-study.html">First-run study</a></li>
 <li><a href="studies/adopter-study.html">Adopter study</a></li>
@@ -224,6 +230,12 @@ guardana init --starter first-run  # write a first-run project into ./first-run
 </tbody>
 </table></div>
 <p>Run the README's steps inside <code>DIR</code>:</p>
+<p>If you created the starter with <code>uvx --from guardana-cli guardana</code>, <code>guardana</code> is not on your
+shell's PATH. Prefix each README command with the same launcher — for a candidate, keep
+<code>--prerelease allow</code> in it — for example <code>uvx --from guardana-cli guardana scan model …</code>.
+Alternatively install the CLI in your environment (<a href="install.html">install guide</a>) and use the
+README commands as written. Installing needs network access; the starter's steps run offline
+once the CLI is present.</p>
 <ol>
 <li><code>guardana scan model --format json --output before.json</code> fails (exit <code>1</code>) on the pickle.</li>
 <li>Replace the pickle with the safetensors file.</li>
