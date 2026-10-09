@@ -231,8 +231,9 @@ guardana init --starter first-run  # write a first-run project into ./first-run
 </table></div>
 <p>Run the README's steps inside <code>DIR</code>:</p>
 <p>If you created the starter with <code>uvx --from guardana-cli guardana</code>, <code>guardana</code> is not on your
-shell's PATH. Prefix each README command with the same launcher — for a candidate, keep
-<code>--prerelease allow</code> in it — for example <code>uvx --from guardana-cli guardana scan model …</code>.
+shell's PATH. Prefix each README command with the same launcher, for example
+<code>uvx --from guardana-cli guardana scan model --format json --output before.json</code>. For a
+candidate, use the launcher you installed with: <code>uvx --prerelease allow --from guardana-cli guardana</code>.
 Alternatively install the CLI in your environment (<a href="install.html">install guide</a>) and use the
 README commands as written. Installing needs network access; the starter's steps run offline
 once the CLI is present.</p>
