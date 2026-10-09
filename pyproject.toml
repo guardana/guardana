@@ -225,7 +225,7 @@ conformance = [
     # `packages/*/src` may import `mcp` or `a2a` (the import-linter contract below),
     # and the clean-install check and the isolated example suites never install it.
     "mcp==2.3.0",
-    "a2a-sdk[http-server]==1.2.1",
+    "a2a-sdk[http-server]==1.2.2",
     "uvicorn",
 ]
 dev = [
