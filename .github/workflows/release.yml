@@ -253,8 +253,14 @@ jobs:
       - name: Set up QEMU (so the arm64 image is not an emulated afterthought)
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
 
+      # Pulls go through Google's mirror of Docker Hub, whose anonymous limit a shared
+      # runner address often exhausts; the digest-pinned base images cannot change.
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
 
       - name: Log in to the GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4

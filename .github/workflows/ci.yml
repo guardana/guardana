@@ -28,7 +28,9 @@ jobs:
     # fail-open this project refuses everywhere else.
     services:
       postgres:
-        image: postgres:16-alpine
+        # Google's mirror of Docker Hub's official images: a shared runner address
+        # often exhausts Docker Hub's anonymous pull limit, which failed every job here.
+        image: mirror.gcr.io/library/postgres:16-alpine
         env:
           POSTGRES_USER: guardana
           POSTGRES_PASSWORD: guardana
@@ -117,6 +119,16 @@ jobs:
         with:
           python-version: "3.13"
           cache-suffix: images
+
+      # The base images are pinned by digest, so the mirror serves the same bytes or
+      # the build fails; Docker Hub stays the fallback when the mirror has no copy.
+      - name: Pull Docker Hub images through Google's mirror
+        run: |
+          { sudo cat /etc/docker/daemon.json 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > "$RUNNER_TEMP/daemon.json"
+          sudo mv "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{json .RegistryConfig.Mirrors}}'
 
       - name: Build both images and run them
         run: uv run --no-project python scripts/image_smoke.py
