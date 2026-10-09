@@ -78,7 +78,8 @@ class _ClickCommand(Protocol):
     context_class: Callable[..., object]
     context_settings: dict[str, object]
 
-    def get_params(self, ctx: object) -> list[_ClickParam]: ...
+    def get_params(self, ctx: object) -> list[_ClickParam]:
+        """Return the command's parameters as Click resolves them for `ctx`."""
 
 
 def _from_click(command: object) -> _Spec:
