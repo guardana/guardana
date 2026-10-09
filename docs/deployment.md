@@ -305,8 +305,8 @@ Being explicit, because a deployment guide that oversells is worse than none:
 
 - **no user accounts** — the read-only panel signs in with a read-scoped API key
   rather than with a person's identity, so "who looked at this" is answerable only
-  down to the credential. OIDC/SSO and roles are a roadmap item, not a setting you
-  have missed;
+  down to the credential. OIDC/SSO and human roles are not built; see the
+  roadmap's [Later list](../ROADMAP.md#later) for conditional possibilities;
 - **no quality trend** — the collector aggregates findings, `unverified` and
   errors. It does not yet store the measurement channel, so it can say a system is
   accumulating security problems and cannot say whether its answers got better;
@@ -321,8 +321,8 @@ What this list no longer contains, because it shipped: finding lifecycle, waiver
 audit log, retention and deletion, and a restore-tested backup procedure. Each is
 in [`docs/usage-collector.md`](usage-collector.md).
 
-These are the collector's open items on the [roadmap](../ROADMAP.md), and none of
-them is worked around silently: each is absent, and says so.
+These collector features are absent, and their absence is not silently worked
+around; see the [roadmap](../ROADMAP.md) for future direction.
 
 ## Running it without Compose
 

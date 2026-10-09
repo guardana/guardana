@@ -20,6 +20,17 @@ body:
     validations:
       required: true
 
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: What would prove this works?
+      description: >
+        Give one example that should be detected or supported, and one that
+        should remain unaffected. For an early idea without a testable scope,
+        start in Discussions Ideas instead.
+    validations:
+      required: true
+
   - type: input
     id: taxonomy
     attributes:

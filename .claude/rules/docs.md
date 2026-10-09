@@ -10,9 +10,9 @@ Procedure: the `docs` skill.
 
 - **Five places for every user-visible change, in the same commit**: `CHANGELOG.md` under
   `[Unreleased]` (why, not only what) · `FEATURES.md` · the `docs/` page plus `docs/index.md` ·
-  `site/index.html` for a headline claim · `ROADMAP.md` when the direction moved (delete what
-  shipped, add what was deferred with the reason). Each is an edit or an explicit "not
-  applicable".
+  `site/index.html` for a headline claim · the affected GitHub issue or milestone when the
+  direction moved, with durable limits reconciled in `docs/product-status.md`. Each is an
+  edit or an explicit "not applicable".
 - **No public claim without generated or cited evidence.** Counts come from the registry
   (`scripts/generate_docs.py`, `scripts/sync_site.py`); a statistic names its source and what
   it measured; a capability claim is testable.

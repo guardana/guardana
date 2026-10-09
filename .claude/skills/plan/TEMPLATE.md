@@ -5,7 +5,7 @@ Size: M | L · Started: <yyyy-mm-dd> · Owner: <session or person> · Status: pl
 ## Goal
 
 Two or three sentences: the behaviour that changes and who notices. Non-goals in one line.
-Which `ROADMAP.md` item or exit criterion this serves, if any.
+Which GitHub issue, milestone or documented 1.0 exit criterion this serves, if any.
 
 ## Open questions (the user's to answer)
 
@@ -14,6 +14,18 @@ Which `ROADMAP.md` item or exit criterion this serves, if any.
 ## Context
 
 What exists today, with `path:line` anchors. Only what the design turns on.
+
+## Issue
+
+URL, assignee (or who claimed it in a comment), milestone and linked PRs — or "none".
+Release impact: none / patch / minor / major under `docs/compatibility.md#versioning`, and
+whether it is a fix a candidate may carry. Say whether a formerly passing gate could fail,
+and why.
+
+Acceptance, copied from the issue — each box ticked only with its evidence:
+
+- [ ] <criterion> — evidence: <command and verdict, path:line, artifact>
+- [ ] …
 
 ## Decisions
 
@@ -51,6 +63,7 @@ Per lane, below the table when needed: the change in behaviour, the tests that p
 - [ ] the documented command run against a real or faked target, its artifact read
 - [ ] reviewed; findings fixed or answered
 - [ ] the five documentation places answered in the same change
+- [ ] every acceptance box above ticked with evidence (`Closes #N`), or `Refs #N` and what remains
 - [ ] this file deleted in the shipping commit; leftovers opened as issues
 
 ## Handoff

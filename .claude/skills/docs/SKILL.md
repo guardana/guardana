@@ -15,7 +15,7 @@ Target: $ARGUMENTS
 | `FEATURES.md` | a new capability, or one whose shape changed (a registry test refuses a built-in rule or evaluator missing from it) |
 | `docs/` | a new command gets `usage-<command>.md`; a changed one gets its page reconciled; `docs/index.md` lists it under the right heading |
 | `site/index.html` | a headline claim moved: a count, a run mode, what the terminal demo prints |
-| `ROADMAP.md` | the direction moved — delete what shipped, add what was deferred with the reason |
+| GitHub issue or milestone | the direction moved — note on the issue what shipped and what was deferred and why (closed only when its acceptance criteria hold); durable limits go to `docs/product-status.md` |
 
 Then `uv run python scripts/generate_docs.py` for a rule, evaluator or taxonomy change — never
 edit `docs/generated/` by hand — and the four `--check` scripts prove the site agrees.

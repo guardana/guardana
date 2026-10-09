@@ -1,7 +1,8 @@
 """An MCP server that hands its tool manifest to anybody, and how loudly to say so."""
 
+import json
 import socket
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 import pytest
 from _offline import refuse_name_lookups
@@ -9,6 +10,7 @@ from guardana.core.rule import RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import EndpointUnreachable, McpServerTarget
 from guardana.core.target._mcp_http import DiscoveryScope, RawReply
+from guardana.core.testing import ScriptedMcpServer
 from guardana.rules.mcp import McpUnauthenticatedAccessRule
 from mcp_fixtures import (
     LOOPBACK,
@@ -101,3 +103,46 @@ def test_a_server_error_to_an_anonymous_caller_is_inconclusive_not_silence() -> 
 
     assert outcomes(reported) == ["inconclusive"]
     assert "HTTP 500" in summaries(reported)[0]
+
+
+@pytest.mark.parametrize(
+    "server",
+    [
+        pytest.param(wide_open, id="legacy-handshake-answered"),
+        pytest.param(lambda: guarded(protocol_versions=["2026-07-28"]), id="modern"),
+    ],
+)
+@pytest.mark.parametrize(
+    "result", [{}, {"tools": {"read_file": {}}}], ids=["empty", "tools-not-a-list"]
+)
+def test_a_success_without_a_tool_list_is_inconclusive_not_a_refusal(
+    server: Callable[[], ScriptedMcpServer], result: dict[str, object]
+) -> None:
+    # Only `401` and `403` decline a caller; a `200` holding no manifest has not.
+    inner = server()
+    listing = json.dumps({"jsonrpc": "2.0", "id": 1, "result": result}).encode()
+
+    def empty_without_credential(  # noqa: PLR0913 — the keywords the `Sender` protocol publishes
+        url: str,
+        *,
+        method: str = "POST",
+        body: bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        alongside: str | None = None,
+        discovery: DiscoveryScope | None = None,
+    ) -> RawReply:
+        sent = json.loads(body) if body else {}
+        if sent.get("method") == "tools/list" and "Authorization" not in (headers or {}):
+            return RawReply(status=200, headers={}, body=listing)
+        return inner(url, method=method, body=body, headers=headers, discovery=discovery)
+
+    target = McpServerTarget(
+        ROUTABLE,
+        credential="operator-supplied-token",
+        sender=empty_without_credential,
+        discovery_sender=empty_without_credential,
+    )
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "HTTP 200" in summaries(reported)[0]

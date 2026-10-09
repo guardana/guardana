@@ -24,8 +24,15 @@ import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 from fnmatch import fnmatchcase
+
+if sys.version_info < (3, 11):  # noqa: UP036 — explain the system Python failure
+    raise SystemExit(
+        "check_repo_settings.py needs Python 3.11 or newer; "
+        "run `uv run python scripts/check_repo_settings.py`"
+    )
+
+from enum import StrEnum
 
 import yaml
 

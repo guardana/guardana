@@ -27,8 +27,10 @@ Five packages under `packages/`, each a PEP 420 namespace package (`guardana.*`)
 | `guardana-report` | renderers: human, SARIF, JSON, JUnit |
 | `guardana-server` | the OPTIONAL collector — a separate service that consumes the versioned `Finding` envelope through the `Reporter` seam |
 
-The current milestone is the "Now" table in `ROADMAP.md`; it outranks new coverage.
-No broad corpora, new protocols or new modalities while a milestone item is open.
+The current release scope lives in [GitHub milestones](https://github.com/guardana/guardana/milestones);
+work and acceptance criteria live in [Issues](https://github.com/guardana/guardana/issues).
+The 1.0 criteria in `docs/product-status.md` outrank new coverage. No broad corpora,
+new protocols or new modalities while a release criterion remains open.
 
 ## Commands
 
@@ -83,6 +85,11 @@ The same list, for people: `CONTRIBUTING.md` § Principles.
   that starts an agent CLI per item boots a full session per call — state the count first.
 - **A push to `main` deploys guardana.dev** (before CI runs), and a version tag publishes to
   PyPI; both are maintainer steps. Never push a tree whose site checks are stale.
+- **A merged PR is not a release.** Apply `docs/compatibility.md#versioning` to the completed
+  issues: no package release for docs/tests/hooks alone; patch for compatible corrections,
+  minor for opt-in features or deprecations, major for contract breaks or intentionally
+  stricter defaults. A false-green fix within documented behavior is patch with gate-impact
+  notes. A maintainer chooses the version and the approved tag after green CI.
 - **"Not measured" is never "passed"** — in code, in reports, in your own conclusions.
 
 ## Protected contracts — change only on purpose, both sides together
@@ -115,5 +122,5 @@ files and the shape of the answer; agents do not spawn agents.
 | how the system works | `docs/how-it-works.md`, `docs/architecture.md`, `docs/threat-model.md` |
 | how to extend it | `docs/extending.md`, `docs/writing-rules.md`, `examples/custom_rule/` |
 | principles, process, proposals | `CONTRIBUTING.md` |
-| direction and what is next | `ROADMAP.md` |
+| direction and what is next | GitHub Issues and milestones; `ROADMAP.md` is the entry point |
 | what ships, what changed | `FEATURES.md`, `CHANGELOG.md`, `docs/product-status.md` |

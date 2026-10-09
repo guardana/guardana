@@ -12,14 +12,33 @@
 - [ ] test
 - [ ] chore
 
+## Issue and release impact
+
+<!-- Link the issue this PR completes. Use Closes #N only if all acceptance
+     criteria are met; otherwise link it without a closing keyword. -->
+Issue:
+
+<!-- Propose one using docs/compatibility.md#versioning; the maintainer confirms
+     the version when grouping a release. Before stable 1.0, rc2 takes fixes
+     only. A merge does not publish a package. -->
+- [ ] No package release needed (tests, docs, or maintainer tooling only)
+- [ ] Patch: compatible correction to documented behavior
+- [ ] Minor: compatible opt-in functionality or deprecation
+- [ ] Major: supported contract break or stricter default
+
+<!-- If a previously passing gate can fail after this change, explain which
+     check changes and whether this is a correction or a new default. -->
+Gate impact:
+
 ## Checklist
 
-- [ ] **This PR is a single commit.** (Multi-commit PRs are not accepted —
-      squash before pushing: see `CONTRIBUTING.md` § Commits and pull
-      requests.)
+- [ ] This PR contains one logical change. Multiple branch commits are fine;
+      a maintainer will squash-merge after all CI checks pass and review is
+      complete.
 - [ ] PR title is a specific, conventional-commit style message
       (`feat: …`, `fix: …`, `docs: …`, `refactor: …`, `test: …`,
-      `chore: …`) — not `wip` / `fixes`.
+      `chore: …`) — not `wip` / `fixes`. A maintainer confirms the squash
+      commit title.
 - [ ] All gates pass (or: `git push` and let the pre-push hooks run them):
       ```
       uv run ruff check . && uv run ruff format --check .

@@ -19,7 +19,7 @@ uv add guardana-cli                       # or add it to a project
 pip install guardana-cli                  # or plain pip
 ```
 
-These install the latest stable release. A release candidate is installed only when asked for: `pip install --pre guardana-cli`, or `uvx --prerelease allow --from guardana-cli guardana`.
+By default these select stable releases, and an existing or cached install may be older. To install or upgrade to a release candidate, add the upgrade and pre-release flags: `pip install --upgrade --pre guardana-cli`, or `uvx --upgrade --prerelease allow --from guardana-cli guardana`.
 
 The `guardana` console script comes from `guardana-cli`, which installs `guardana-core`, `guardana-rules`, and `guardana-report`. Use `--from guardana-cli` so `uvx` finds the script. The optional collector has a separate install: `pip install "guardana-server[serve]"`, where the `serve` extra brings the ASGI server `guardana-collector serve` needs.
 

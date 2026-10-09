@@ -24,6 +24,10 @@ paths:
   `publish-reference-pack` (after it) puts the pack on PyPI only while
   `vars.REFERENCE_PACK_PYPI` is `true`, and the images wait on neither. The moving `vX.Y` tag is for the Marketplace Action and never
   re-triggers a publish.
+- **A squash merge is not a release.** CI runs on the PR and on main; a maintainer groups
+  completed issues, chooses the version under `docs/compatibility.md#versioning`, and uses
+  `scripts/release.py` to gate, push main, wait for green CI, then tag. Do not publish
+  packages from a pull_request or main-push workflow.
 - **A push to `main` deploys `site/`** through Cloudflare's `npx wrangler deploy`, from the
   tree, before CI has run: `wrangler.jsonc` is a static-assets Worker with no build step,
   `workers_dev` and previews off. The pre-push hook refuses a push while the generated site is

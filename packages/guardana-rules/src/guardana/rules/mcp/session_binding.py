@@ -51,9 +51,10 @@ class McpSessionBindingRule(McpAuthorizationRule):
     A **dual-era** server is graded exactly as before, whichever era the run
     negotiated. It still hands a session to every legacy client it serves, and a
     counter there is a live defect that the modern half of the same server cannot
-    show. A handshake answered with an error before any id was collected is
-    inconclusive too: that is sampling that stopped, not a server issuing no session
-    id.
+    show. A handshake answered with an error, or not sent at all, is sampling that
+    stopped rather than a server issuing no session id: before any id it leaves the
+    whole rule inconclusive, and after some it leaves the shape of the ids unverified
+    unless the partial sample already shows a structure.
     """
 
     meta = RuleMeta(
@@ -124,10 +125,18 @@ class McpSessionBindingRule(McpAuthorizationRule):
                 f"{sessions.unsettled_offer}",
             )
             return
-        if sessions.sampling_error is not None:
+        if sessions.sampling_error is not None and not sessions.ids:
             yield self.unverified(view, f"session sampling stopped: {sessions.sampling_error}")
             return
-        yield from self._shape(view, sessions.ids)
+        shape = list(self._shape(view, sessions.ids))
+        yield from shape
+        if not shape and sessions.sampling_error is not None:
+            count = len(sessions.ids)
+            yield self.unverified(
+                view,
+                f"session sampling stopped after {count} session id{'' if count == 1 else 's'}, "
+                f"so whether the ids are guessable was not settled: {sessions.sampling_error}",
+            )
         if sessions.stripped_credential:
             if sessions.stripped_listed_tools:
                 yield self.finding(

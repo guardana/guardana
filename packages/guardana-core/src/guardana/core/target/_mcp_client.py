@@ -938,10 +938,10 @@ def carries_tools(reply: RawReply) -> bool | None:
     nobody could read as either — any other error status (`429`, `500`, `503` say the
     server never got as far as deciding), a success status carrying a JSON-RPC error
     (`-32603` is the server failing, and no code is reserved for a refusal), an
-    unparseable body, a reply with no result at all, or an interim result asking for
-    input. Folding those into `False` reported a server
-    nobody could read as a server that refused, which is a pass on a question that
-    was never answered.
+    unparseable body, a reply with no result at all, a result holding no `tools` list,
+    or an interim result asking for input. Folding those into `False` would report a
+    server nobody could read as a server that refused, which is a pass on a question
+    that was never answered.
     """
     if reply.status in REFUSAL_STATUSES:
         return False
@@ -955,7 +955,7 @@ def carries_tools(reply: RawReply) -> bool | None:
     result = payload.get("result")
     if not isinstance(result, dict) or result.get("resultType", COMPLETE) != COMPLETE:
         return None
-    return isinstance(result.get("tools"), list)
+    return True if isinstance(result.get("tools"), list) else None
 
 
 def http_failure(reply: RawReply, ref: str) -> HTTPError:

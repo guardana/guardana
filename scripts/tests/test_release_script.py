@@ -205,7 +205,11 @@ def test_the_real_bump_plan_names_every_file_the_bump_rewrites(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The two scripts agree on the plan's format, or the release refuses its own bump."""
-    monkeypatch.setattr(sys, "argv", ["bump_version.py", "patch", "--dry-run"])
+    # An explicit final version, so the Action pins are rewritten (a candidate leaves them)
+    # and the assertion holds whether or not the tree is itself a release candidate.
+    major, minor, patch = bump_version._core(bump_version._current_version())
+    target = f"{major}.{minor}.{patch + 1}"
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", target, "--dry-run"])
     assert bump_version.main() == 0
 
     named = release._bump_writes(capsys.readouterr().out)

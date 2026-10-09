@@ -49,6 +49,20 @@ def test_a_json_rpc_error_inside_a_success_status_is_unknown_rather_than_a_refus
     assert carries_tools(_reply(200, body)) is None
 
 
+@pytest.mark.parametrize(
+    "result",
+    [{}, {"tools": {"read_file": {}}}, {"tools": None}],
+    ids=["empty", "not-a-list", "null"],
+)
+def test_a_success_without_a_tools_list_is_unknown_rather_than_a_refusal(
+    result: dict[str, object],
+) -> None:
+    """Only `401` and `403` refuse; a `200` that lists nothing has not declined anyone."""
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "result": result}).encode()
+
+    assert carries_tools(_reply(200, body)) is None
+
+
 def test_a_listing_is_still_a_listing() -> None:
     assert carries_tools(_reply(200, _LISTING)) is True
 

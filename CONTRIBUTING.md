@@ -147,7 +147,7 @@ disliking the rule.
 
 Before the code standards, the rules that decide whether a change belongs in the
 engine *at all*. A PR that breaks one gets sent back however good the code is —
-these are what [`ROADMAP.md`](ROADMAP.md) is planned against, and they outrank
+these govern [public issues](https://github.com/guardana/guardana/issues), and they outrank
 convenience, in every 0.x:
 
 1. The engine knows no regulation and no vendor: a law, a vendor, a format is data, never logic in core.
@@ -218,6 +218,30 @@ short:
 Namespace anything you don't intend to upstream as `yourcompany.*` rather than
 `guardana.*`, so profiles can include/exclude cleanly.
 
+## Planning work in public
+
+[Issues](https://github.com/guardana/guardana/issues) are the work queue, and
+[milestones](https://github.com/guardana/guardana/milestones) group work committed
+to a release. Bring an idea without a reproducible problem or an acceptance
+criterion to [Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas)
+first. Before starting an issue, check for a duplicate and confirm that its
+description still matches the code. A ready issue states the user problem, the
+evidence, what would count as done, and any security, compatibility or
+execution-cost impact. A milestone is a release scope, not a promised date.
+
+Maintainers assign work to themselves. Contributors without repository write
+access can ask to take an issue in a comment; a maintainer will coordinate the
+assignment. Keep one logical change in a pull request. Link it with Closes #N
+only when it meets that issue's acceptance criteria; otherwise use a plain
+reference and leave the issue open. A release issue carries the public
+checklist, and its milestone closes after the promised artifacts are verified.
+
+A merged pull request runs CI but does not publish a package. The maintainer
+chooses a release from the completed work using
+[the versioning policy](docs/compatibility.md#versioning), then uses the
+tag-gated release process. Until stable 1.0, release candidates carry fixes
+only; proposed features wait outside the candidate milestone.
+
 ## Commits and pull requests
 
 - Commits are made **manually, after a milestone** — not continuously, not as a
@@ -226,22 +250,11 @@ Namespace anything you don't intend to upstream as `yourcompany.*` rather than
   `docs: …`, `refactor: …`, `test: …`, `chore: …`. The `commit-msg` hook
   enforces the format; a message like `wip` or `fixes` is rejected before it
   reaches review.
-- **PRs must be a single commit.** This repository does not accept multi-commit
-  PRs — squash your branch before opening or updating a PR.
-
-To squash before pushing:
-
-```bash
-# from your feature branch, with N commits since it diverged from main
-git rebase -i main   # mark all but the first commit as "squash" or "fixup"
-# or, simpler if you don't need to keep intermediate messages:
-git reset --soft $(git merge-base HEAD main)
-git commit -m "feat: your single, specific commit message"
-git push --force-with-lease
-```
-
-If you already opened a multi-commit PR, squash and force-push to the same
-branch — don't open a second PR.
+- Keep each PR to one logical change. Contributor branches may contain multiple
+  commits; there is no need to squash or force-push before review.
+- Give the PR a specific conventional-commit title. After all CI checks pass
+  and review is complete, a maintainer squash-merges the PR and confirms the
+  squash commit title. Merging a PR does not release a package.
 
 ### Sign-off (optional)
 
@@ -266,7 +279,7 @@ applicable":
 | [`FEATURES.md`](FEATURES.md) | a new capability, or one whose shape changed (a registry test fails if a built-in rule or evaluator ships without appearing there) |
 | [`docs/`](docs/) | a new command gets its own `usage-*.md`; a changed one gets its page reconciled, plus `docs/index.md` |
 | `site/index.html` | a headline claim moved: a rule count, a run mode, what the terminal demo prints |
-| [`ROADMAP.md`](ROADMAP.md) | the direction moved — delete what shipped, add what was deliberately deferred and why |
+| [Issues and milestones](https://github.com/guardana/guardana/issues) | the direction moved — update the affected issue and release scope; keep durable product limits in `docs/product-status.md` |
 
 This is a rule because it is a mistake the project has actually made: the landing
 page advertised "25 rules" across three releases that took the real number to 32,

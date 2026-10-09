@@ -1,13 +1,13 @@
 ---
 title: "Adopter study"
 nav_order: 16
-summary: "How the maintainer records the runs of two independent teams the roadmap asks for, the consent a team gives, and the sheet the two application measures are generated from"
+summary: "How the maintainer records two independent teams' runs required before 1.0, their consent, and the generated application measures"
 status: stable
 ---
 
 # Adopter study
 
-The roadmap's F6 row asks two independent teams to run Guardana against their own application
+The [F6 release criterion](../product-status.md#before-the-first-stable-release) asks two independent teams to run Guardana against their own application
 and gate a regression in CI, and the milestone publishes two measures from their runs: coverage
 of the real application and the share of attempted checks that reached a supported verdict.
 Only teams outside this project can answer that. This page explains how the maintainer records

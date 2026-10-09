@@ -10,6 +10,7 @@ truth are the [rule summary](docs/generated/rule-summary.md),
 [taxonomy coverage](docs/generated/taxonomy-coverage.md).
 
 For maturity and known gaps, read [Product status](docs/product-status.md).
+To try a candidate, join a pilot or contribute, read [Community](docs/community.md).
 
 ## Core workflows
 
@@ -239,7 +240,7 @@ incomplete implementation. [`docs/conformance-kit.md`](docs/conformance-kit.md) 
 
 All 58 built-in rules have finding, clean and inconclusive samples of their own. `guardana rule test 'guardana.*'` runs them and generates the summary count. A sample whose target cannot read a file is inconclusive. [`examples/reference_pack`](examples/reference_pack) is `guardana-reference-pack` 0.1.0, attached to the GitHub Release and installed in isolation in CI. It includes YAML and Python rules, an evaluator, a conforming target, a taxonomy, `reference-summary`, `reference-file`, a schema-3 manifest and a committed lock. It is not on PyPI yet.
 
-The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs/compatibility.md). [`Product status`](docs/product-status.md) and [`ROADMAP.md`](ROADMAP.md) state the remaining limits. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
+The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
 
 ## Optional collector
 
@@ -253,8 +254,8 @@ The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs
 - a read-only dashboard authenticated with a read-scoped session.
 
 The collector is optional. Local and CI verification do not depend on it. It does
-not yet provide quality-assessment trends, human SSO/RBAC, or a supported
-Kubernetes deployment; those remain roadmap work.
+not yet provide quality-assessment trends, human SSO/RBAC or a supported
+Kubernetes deployment; see the [roadmap](ROADMAP.md) for conditional future direction.
 
 The collector accepts envelope versions from 2 through its own and refuses a newer agent with `422` naming supported versions. Tests post stored older envelopes to migrated PostgreSQL and read them back. Tests exercise backup and restore, rollback and forward, project deletion, an older-schema upgrade and key rotation; [`docs/deployment.md`](docs/deployment.md) names each test. The dashboard uses a Content-Security-Policy with SHA-256 allowances for its script and style, `frame-ancestors 'none'`, and `Referrer-Policy: no-referrer`; every response has `X-Content-Type-Options: nosniff`. A test checks escaped dashboard values.
 

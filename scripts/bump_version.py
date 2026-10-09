@@ -155,6 +155,8 @@ _CORE_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
 # An explicit target: a plain X.Y.Z, optionally with a PEP 440 pre/post/dev
 # marker (`1.0.0rc1`, `1.0.0b2`, `1.0.0.post1`, `1.0.0.dev3`).
 _EXPLICIT_RE = re.compile(rf"^\d+\.\d+\.\d+{_SUFFIX}$")
+_FINAL_RE = re.compile(r"^\d+\.\d+\.\d+$")
+_BUMPS = frozenset({"major", "minor", "patch"})
 
 
 def _pyproject(package: str) -> Path:
@@ -179,6 +181,12 @@ def _core(version: str) -> tuple[int, int, int]:
 
 def _next_version(current: str, bump: str) -> str:
     major, minor, patch = _core(current)
+    if bump in _BUMPS and _FINAL_RE.match(current) is None:
+        # From 1.0.0rc1 a patch bump would skip 1.0.0 itself, so the next step is named.
+        sys.exit(
+            f"error: {current} is not a final release; name the next version "
+            f"(another candidate, or {major}.{minor}.{patch}) instead of {bump!r}"
+        )
     if bump == "major":
         return f"{major + 1}.0.0"
     if bump == "minor":

@@ -11,4 +11,4 @@ status: stable
 
 Sessions run as described in [the first-run study](../studies/first-run-study.md): a participant new to Guardana, a clean environment, the published release and the README only.
 
-**Not measured.** 0 of the 5 first-run sessions the roadmap asks for are recorded, so no completion rate or time is published.
+**Not measured.** 0 of the 5 first-run sessions required before 1.0 are recorded, so no completion rate or time is published.
