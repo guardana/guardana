@@ -514,6 +514,44 @@ write. It exists for evaluating Guardana on a laptop, and it has to be typed:
 combined with choosing the ephemeral store, that is two explicit switches for the
 toy configuration and none for the real one.
 
+## The HTTP API
+
+The optional collector stores and serves results submitted by Guardana runs. It starts no scan, probe or other job. Runs execute where Guardana runs (the CLI, CI, the Python API), and the CLI submits them with `--reporter server://<collector URL>`.
+
+`/openapi.json` lists routes, key permissions and refusals: `401` for a missing or unaccepted key, `403` for insufficient permission, and `503` when the database cannot be reached to check the key.
+
+| Route | Permission | Session cookie accepted |
+| --- | --- | --- |
+| `POST /findings` | `ingest` | No |
+| `GET /findings` | `read` | Yes |
+| `GET /trend` | `read` | Yes |
+| `GET /stats` (dashboard only) | `read` | Yes |
+| `/healthz`, `/readyz` | None (public) | — |
+| `/catalog`, `/` (dashboard only) | None (public) | — |
+| `POST /session`, `DELETE /session` (dashboard only) | None; `POST` takes a `read` key in its body | — |
+| `/openapi.json`, and FastAPI's `/docs` and `/redoc` viewers | None (public) | — |
+
+Send keys as `Authorization: Bearer <key>`. Read routes also accept the `guardana_session` cookie set by the dashboard after `POST /session`; a `Bearer` header takes precedence. Permissions belong to keys, not OAuth2 scopes.
+
+With `GUARDANA_ALLOW_UNAUTHENTICATED=1`, no route requires a key and the OpenAPI document declares no authentication requirement.
+
+`--reporter` sends the whole versioned envelope: gate, run id and findings. Its schema is [`schemas/collector-envelope-v8.schema.json`](../schemas/collector-envelope-v8.schema.json).
+
+This example posts a hand-written synthetic envelope to show its shape:
+
+```bash
+export INGEST_KEY=gdn_…   # a key with the ingest permission
+export READ_KEY=gdn_…     # a key with the read permission
+curl -s -X POST https://collector.example.com/findings \
+  -H "Authorization: Bearer $INGEST_KEY" -H "Content-Type: application/json" \
+  -d '{"schema_version": 8, "source": "ci/acme-web",
+       "findings": [{"rule_id": "acme.synthetic_check", "severity": "HIGH",
+                     "title": "Synthetic finding", "target_ref": "app/settings.py:3",
+                     "evidence": {"summary": "a synthetic example"}}]}'
+curl -s -H "Authorization: Bearer $READ_KEY" "https://collector.example.com/findings?limit=1"
+curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/trend   # {"HIGH": 1} on a fresh project
+```
+
 ## Migrations
 
 ```bash

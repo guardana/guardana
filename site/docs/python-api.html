@@ -217,6 +217,7 @@ verification.save(Path(&quot;run.json&quot;))  # the document `--format json --o
 </code></pre>
 <p><code>PluginTrust</code>, <code>PluginMode</code> and <code>load_profile</code> are needed to build a <code>Verifier</code> but sit outside the <a href="compatibility.html#the-supported-surface">supported surface</a>: a minor release may change them, so pin <code>guardana-core</code> to a minor while your code imports them.</p>
 <p>A run that fails, stays indeterminate, or is stopped by its budget or by its target failing part-way is returned like one that passed. Read <code>verification.gate</code>, <code>verification.exit_code</code> or <code>verification.open_questions</code>; nothing is raised for an outcome.</p>
+<p>To keep runs in the optional collector, the CLI sends them with <code>--reporter server://&lt;collector URL&gt;</code>; the collector's <a href="usage-collector.html#the-http-api">HTTP API</a> stores and serves results without starting runs. <code>verification.save(path)</code> writes the same run document as <code>--format json --output</code>.</p>
 <h2 id="configure-a-run">Configure a run</h2>
 <p><code>Verifier</code> holds the configuration and can run several targets in turn. It is frozen: to change the configuration, build another.</p>
 <div class="table-wrap"><table>
