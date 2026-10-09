@@ -37,6 +37,12 @@ def _load_script(name: str) -> types.ModuleType:
 _BUMP = _load_script("bump_version")
 
 
+def _next_final_minor() -> str:
+    """A final version after the current one, valid whether or not the tree is a candidate."""
+    major, minor, _patch = _BUMP._core(_BUMP._current_version())
+    return f"{major}.{minor + 1}.0"
+
+
 def test_release_notes_exclude_the_real_dependabot_login() -> None:
     # Dependabot authors PRs as the login `dependabot[bot]`; a bare `dependabot`
     # exclusion never matches, so dependency bumps still leak into the notes.
@@ -108,7 +114,7 @@ def test_every_package_pins_its_siblings_to_its_own_version_exactly() -> None:
 def test_main_dry_run_lists_the_core_dunder_file(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["bump_version.py", "patch", "--dry-run"])
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", _next_final_minor(), "--dry-run"])
     assert _BUMP.main() == 0
     assert "src/guardana/core/__init__.py" in capsys.readouterr().out
 
@@ -547,7 +553,7 @@ def test_a_missing_pin_aborts_before_anything_is_written(monkeypatch: pytest.Mon
 def test_main_dry_run_lists_the_action_pin_files(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["bump_version.py", "minor", "--dry-run"])
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", _next_final_minor(), "--dry-run"])
     assert _BUMP.main() == 0
     assert "README.md" in capsys.readouterr().out
 
@@ -563,6 +569,23 @@ def test_next_version_passes_through_a_pep440_prerelease() -> None:
     # accept a PEP 440 pre-release verbatim, not reject it as non-numeric.
     assert _BUMP._next_version("0.1.0", "1.0.0rc1") == "1.0.0rc1"
     assert _BUMP._next_version("0.9.0", "1.0.0b2") == "1.0.0b2"
+
+
+@pytest.mark.parametrize("bump", ["patch", "minor", "major"])
+def test_a_named_bump_from_a_candidate_is_refused(bump: str) -> None:
+    # `patch` from 1.0.0rc2 would otherwise give 1.0.1 and skip the final 1.0.0.
+    with pytest.raises(SystemExit, match="not a final release"):
+        _BUMP._next_version("1.0.0rc2", bump)
+    with pytest.raises(SystemExit, match="not a final release"):
+        _load_script("release")._target_version(bump, "1.0.0rc2")
+
+
+def test_an_explicit_version_after_a_candidate_is_accepted() -> None:
+    release = _load_script("release")
+    assert _BUMP._next_version("1.0.0rc2", "1.0.0rc3") == "1.0.0rc3"
+    assert _BUMP._next_version("1.0.0rc2", "1.0.0") == "1.0.0"
+    assert release._target_version("1.0.0", "1.0.0rc2") == "1.0.0"
+    assert release._target_version("patch", "1.0.0") == "1.0.1"
 
 
 def test_next_version_rejects_a_non_version_argument() -> None:

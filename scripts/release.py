@@ -87,6 +87,12 @@ def _current_version() -> str:
 def _target_version(arg: str, current: str) -> str:
     if arg not in {"patch", "minor", "major"}:
         return arg  # an explicit version like 0.2.0 or 1.0.0rc1
+    if _FINAL_RE.fullmatch(current) is None:
+        # From 1.0.0rc1 a patch bump would skip 1.0.0 itself, so the next step is named.
+        _fail(
+            f"{current} is not a final release; name the next version "
+            f"(another candidate, or the final release) instead of {arg!r}"
+        )
     major, minor, patch = (int(p) for p in current.split("."))
     if arg == "major":
         return f"{major + 1}.0.0"
