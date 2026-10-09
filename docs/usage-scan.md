@@ -62,10 +62,15 @@ single-file path is never empty. A third-party file target (`--target scheme://l
 that lists no file is the same shortfall.
 
 A scan does not follow a symlinked directory, and does not list a symlink whose target
-does not exist. Each one it meets is recorded as a source it could not read, naming the
-link, so the run records an error (exit `2` under the default `fail_on_error`). Scan the
-link's target directly, or exclude the link. A link the excludes remove, or a directory link
-named like a directory every scan skips, is not reported.
+does not exist. It also does not list or read a symlinked file whose target, after every
+link is followed, lies outside the scanned directory, because a link resolves on the
+machine that scans, not where the artifact ships. Each one it meets is recorded as a source
+it could not read, naming the link, so the run records an error (exit `2` under the default
+`fail_on_error`). Scan the link's target directly, or exclude the link. A link the excludes
+remove, or a directory link named like a directory every scan skips, is not reported. A
+symlinked file whose target lies inside the scanned directory is listed and read, the
+scanned directory itself may be reached through a symlink, and a single file named on the
+command line is read even when it is a symlink.
 
 ## Model files no rule reads
 
@@ -105,10 +110,16 @@ and in CI. A format name (`tflite`) is not a path and stays as it is.
 A `.bin`, `.sav`, `.p` or `.model` whose first bytes match none of those is not listed as a
 model. `pickle_opcode` also reads a `.tar` or `.zip` by its content: the members named like
 a model (`pickle`, `data.pkl`, `*.pt`, `*.pth.tar`), and every member of a `.tar` that is in
-fact a zip; a member named as a model that is itself an archive is a coverage shortfall. A
-model with no built-in
-rule is a coverage shortfall too, so a scan holding one ends `indeterminate` (exit `2`)
-rather than clean. A rule left
+fact a zip; a member named as a model that is itself an archive is a coverage shortfall,
+and one `pickle.load` would read is still read as a stream. Any file `pickle_opcode` reads
+that does not start as a zip and whose first 512-byte block is a tar header (`ustar`, or
+the older v7 form without `ustar` magic) is read as a tar, whatever it is named, because
+`torch.load` opens a legacy `torch.save` file that way. The same file is also read as the
+single pickle stream `pickle.load` would read from those bytes, and findings from both
+readings are reported; when the file is named `*.pth.tar` or `*.pt.tar`, or the tar holds a
+member named as a model, the stream counts only if its bytes are a pickle. Inside a tar, a member that several links name is read once for each
+way it is judged, not once per link. A model with no built-in rule is a coverage shortfall
+too, so a scan holding one ends `indeterminate` (exit `2`) rather than clean. A rule left
 out by the profile reads nothing, so a profile that excludes
 `guardana.supply_chain.pickle_opcode` leaves every pickle unread. A third-party rule
 counts a file as read by reporting on it, or by calling `ctx.examined(path)`

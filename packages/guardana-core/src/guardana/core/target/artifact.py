@@ -33,8 +33,26 @@ def _is_link(path: Path) -> bool:
     return os.path.islink(path)  # noqa: PTH114
 
 
-def _is_dangling(path: Path) -> bool:
-    return not os.path.exists(path) and _is_link(path)  # noqa: PTH110
+def _refused_link(link: Path, real_root: str) -> str | None:
+    """Why a symlinked file is not read, or `None` when it resolves to a file inside the root.
+
+    A link resolves on the scanning machine, not where the artifact ships, so a target
+    outside the root is not part of what is scanned.
+    """
+    if not os.path.exists(link):  # noqa: PTH110
+        return "a symlink whose target does not exist is not read; fix the link or exclude it"
+    real = os.path.realpath(link)
+    try:
+        inside = os.path.commonpath((real_root, real)) == real_root
+    except ValueError:
+        # Paths on different drives share no common path.
+        inside = False
+    if not inside:
+        return (
+            "a symlink leading outside the scanned path is not read; scan its target "
+            "directly or exclude it"
+        )
+    return None
 
 
 def _read_ignore_file(root: Path) -> tuple[str, ...]:
@@ -200,6 +218,7 @@ class ArtifactTarget(Target):
             yield self._root
             return
         matches: list[Path] = []
+        real_root = os.path.realpath(self._root)
         for dirpath, dirnames, filenames in os.walk(self._root, onerror=self._unlisted):
             kept = [
                 d
@@ -221,12 +240,9 @@ class ArtifactTarget(Target):
                 path = Path(dirpath) / filename
                 if self._excluded(path):
                     continue
-                if _is_dangling(path):
-                    self._unread[path] = UnreadSource(
-                        path,
-                        f"{path}: a symlink whose target does not exist is not read; fix "
-                        f"the link or exclude it",
-                    )
+                refused = _refused_link(path, real_root) if _is_link(path) else None
+                if refused is not None:
+                    self._unread[path] = UnreadSource(path, f"{path}: {refused}")
                     continue
                 matches.append(path)
         yield from sorted(matches)

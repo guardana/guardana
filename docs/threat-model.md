@@ -329,7 +329,7 @@ declares, not on who signed it. Only the JSON-RPC binding is spoken.
 
 **Stance:** prefer deterministic evaluators (`canary`, `tool_call` and the equality checks). A judge-graded rate is corrected only with a calibration that measures the judge's error per class. Otherwise it reads `uncorrected` and declines. An evaluator that does not declare itself `deterministic` is treated as a judge.
 
-**Residual risk:** correction assumes the judge errs the same way on the calibration corpus as on this run's replies. One model's refusals do not calibrate a judge reading another model's jailbreaks. The corpus digest is printed beside the rate so a reader can check it.
+**Residual risk:** correction assumes the judge errs the same way on the calibration corpus as on this run's replies. One model's refusals do not calibrate a judge reading another model's jailbreaks. The corpus digest is printed beside the rate so a reader can check it. The judge receives the conversation as `role: content` lines: a role label a reply writes inside its own text cannot be distinguished from a real turn, so a reply can make its own content look like another speaker's. Deterministic evaluators (`canary`, `tool_call`, the equality checks) do not read the transcript this way.
 
 ## Explicit non-goals
 

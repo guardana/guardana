@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A probe whose kept exchanges cannot be written no longer saves a run that claims their digest.** It removes the part-written sidecar, rewrites the saved run with `exchanges: null`, or removes the run when that fails, and still exits `3`.
 - **Baselines are written whole.** `baseline create`, `baseline update` and `scan --write-baseline` write through a temporary file and a rename, so an approved baseline survives a write that fails part-way, and `baseline create` and `baseline update` exit `3` with an error instead of a traceback when the file cannot be written.
 
+### Security
+
+- **`pickle_opcode` reads legacy tar checkpoints as both tar archives and pickle streams.** Reading a legacy checkpoint with no `ustar` magic only as a plain pickle stream left the members `torch.load` unpickles unread and could produce a clean scan. Every model file the rule reads that `tarfile` opens as a tar, other than a zip, is read both as a tar and as a stream, and an archive member `pickle.load` would read is still read as a stream when it is shaped like an archive. A member several links name is read once for each way it is judged, not once per link.
+- **Directory scans record symlinked files whose targets lie outside the scanned directory as unread sources.** Reading such a link graded a file outside the artifact and could report on it. The link is recorded as a source the scan could not read (exit `2` under the default `fail_on_error`); a symlinked file whose target lies inside the scanned directory is read.
+- **Recipe pins verify installed files and bytecode that Python loads in place of pinned sources.** An installed file that differs from its `RECORD`, or bytecode under `__pycache__/` that Python loads in place of a pinned source and that differs from what the source compiles to, leaves the distribution unpinned with the reason, so `recipe run` refuses the moved pin. Existing lock digests do not change.
+
 ## [1.0.0rc1] - 2026-10-05 — the first release candidate
 
 ### Fixed

@@ -365,11 +365,22 @@ recipe's own lock file and output directory when the recipe sits inside the dire
 <code>recipe lock</code> and <code>recipe run</code> write them. Symlinks are followed, so a linked file is pinned
 by what it holds. The <code>.pth</code> files and setuptools <code>__editable__…finder.py</code> modules the
 install's <code>RECORD</code> lists are read first: a path they add or map outside the directory is code
-the pin would not cover, so the distribution stays unpinned.</li>
+the pin would not cover, so the distribution stays unpinned. Bytecode under <code>__pycache__/</code>
+is not pinned, but bytecode this interpreter would load in place of a pinned source
+(hash-based bytecode, whatever hash it records, or bytecode recording the source's
+modification time and size) leaves the distribution unpinned unless it is what that source
+compiles to; bytecode only another interpreter would load is checked when that interpreter
+pins, and this check does not change pin digests.</li>
 <li><strong>Any other direct URL</strong> — a directory installed without <code>-e</code>, a VCS checkout, an archive —
 is pinned by its installed <code>RECORD</code>: each entry's path and recorded hash, except bytecode
 under <code>__pycache__/</code> and every file of its own <code>.dist-info</code> but <code>METADATA</code> (its version and
-requirements) and <code>entry_points.txt</code> (what it registers). The rest — <code>RECORD</code>, <code>INSTALLER</code>,
+requirements) and <code>entry_points.txt</code> (what it registers). An entry inside the install root
+is pinned only once the installed file hashes to the recorded value: a file that differs
+from its <code>RECORD</code>, cannot be read, or is hashed in <code>RECORD</code> with an algorithm other than
+SHA-256 or a stronger one leaves the distribution unpinned, with the reason; so does a
+row inside the install root without a size, or a path <code>RECORD</code> lists twice. The same
+bytecode check as for an editable install applies to each listed source. The pinned value
+is the recorded hash, so this check does not change lock digests. The rest — <code>RECORD</code>, <code>INSTALLER</code>,
 <code>REQUESTED</code>, <code>direct_url.json</code>, an installer's cache file — records the install, not the
 code that runs. A file installed outside the install root (<code>../../../bin/…</code>,
 <code>../../../share/…</code>) or under <code>*.data/scripts/</code> is pinned by its path and the SHA-256 of the
@@ -380,8 +391,11 @@ line is hashed as written. A console or GUI script the installer generated from 
 when it sits directly in this installation's scripts directory (<code>bin/</code> or <code>Scripts/</code>),
 is run by the environment's interpreter, and holds exactly what pip, uv or
 pypa/installer generate for its declared entry point: the import, an optional rewrite of
-<code>sys.argv[0]</code> and <code>sys.exit(&lt;entry point&gt;())</code>. <code>entry_points.txt</code> already pins what it
-calls. An edited wrapper, a file with the same name elsewhere and a Windows <code>.exe</code>
+<code>sys.argv[0]</code> and <code>sys.exit(&lt;entry point&gt;())</code>: <code>entry_points.txt</code>, which is pinned, names
+what it calls. A file no <code>RECORD</code> lists is not pinned, including a module placed in the
+scripts directory beside the wrapper, which the wrapper imports first when it runs as a
+script, and an unlisted file in <code>site-packages</code> that can be imported too; Guardana imports
+plugin entry points in its own process and does not run console scripts. An edited wrapper, a file with the same name elsewhere and a Windows <code>.exe</code>
 launcher are hashed, so a Windows lock covering a launcher moves when the installer or
 the environment changes. Installing the same code again into an environment this interpreter's
 <code>sysconfig</code> describes pins the same. An installation none of its schemes describes

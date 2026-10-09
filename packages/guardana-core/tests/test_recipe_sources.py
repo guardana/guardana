@@ -5,9 +5,16 @@ Each test installs a fake distribution into a directory of its own on `sys.path`
 `RECORD`. The pins are then read through `importlib.metadata`, as `recipe lock` reads them.
 """
 
+import base64
+import dis
+import hashlib
 import importlib
+import importlib.machinery
+import importlib.util
 import json
+import marshal
 import os
+import py_compile
 import sys
 import sysconfig
 import threading
@@ -232,19 +239,133 @@ _RECORD = _record(
 )
 
 
-def test_a_directory_install_is_pinned_by_its_record(site: Path) -> None:
-    _install(
-        site,
-        "acme-pack",
-        direct_url={"url": "file:///src/acme-pack", "dir_info": {}},
-        record=_RECORD,
+def _as_recorded(_path: str, _recorded: str, _size: int) -> None:
+    """Report every file inside the install root as RECORD records it."""
+
+
+_INSIDE = {
+    "acme_pack/__init__.py": "CHECK = 'refuses'\n",
+    "acme_pack/rules/refuses.yaml": "id: acme.refuses\n",
+}
+
+
+def _hashed(path: Path) -> str:
+    """The `RECORD` columns an installer writes for the file at `path`: hash and size."""
+    content = path.read_bytes()
+    digest = base64.urlsafe_b64encode(hashlib.sha256(content).digest()).rstrip(b"=").decode()
+    return f"sha256={digest},{len(content)}"
+
+
+def _install_directory(
+    site: Path,
+    files: Mapping[str, str] = _INSIDE,
+    *,
+    info_files: Mapping[str, str] = {},
+    rows: tuple[str, ...] = (),
+) -> Path:
+    """Install `acme-pack` from a directory: `files` and `info_files` written and truly hashed.
+
+    `rows` are added to `RECORD` as given, after the rows of the written files.
+    """
+    for path, text in files.items():
+        (site / path).parent.mkdir(parents=True, exist_ok=True)
+        (site / path).write_text(text, encoding="utf-8")
+    info = _install(
+        site, "acme-pack", direct_url={"url": "file:///src/acme-pack", "dir_info": {}}, record=None
     )
+    for name, text in info_files.items():
+        (info / name).write_text(text, encoding="utf-8")
+    written = [*files, *(f"{info.name}/{name}" for name in ("METADATA", *info_files))]
+    (info / "RECORD").write_text(
+        _record(
+            *(f"{path},{_hashed(site / path)}" for path in written),
+            *rows,
+            "acme_pack/__pycache__/__init__.cpython-313.pyc,,",
+            f"{info.name}/INSTALLER,{_EMPTY},0",
+            f"{info.name}/direct_url.json,{_EMPTY},0",
+            f"{info.name}/RECORD,,",
+        ),
+        encoding="utf-8",
+    )
+    importlib.invalidate_caches()
+    return info
+
+
+def test_a_directory_install_is_pinned_by_its_record(site: Path) -> None:
+    _install_directory(site)
 
     pinned = pin_distribution_source("acme-pack")
 
     assert pinned == SourcePin(
-        digest="sha256:c28dbf3f3540166a5102cb043e8006dddb2d3839bffc2e82cdd788ca9312b7f2", files=3
+        digest="sha256:7ef03ee3647f755ef5784e5ef5f3b85672c7af95459d947abf6bf440221d91cd", files=3
     )
+
+
+def test_a_file_edited_in_place_under_its_record_leaves_it_unpinned(site: Path) -> None:
+    _install_directory(site)
+    first = pin_distribution_source("acme-pack")
+
+    (site / "acme_pack/__init__.py").write_text("CHECK = 'complies'\n", encoding="utf-8")
+    edited = pin_distribution_source("acme-pack")
+    (site / "acme_pack/__init__.py").unlink()
+    removed = pin_distribution_source("acme-pack")
+
+    assert isinstance(first, SourcePin)
+    assert edited == "its acme_pack/__init__.py differs from its RECORD"
+    assert removed == "its acme_pack/__init__.py cannot be read"
+
+
+def test_edited_metadata_under_its_record_leaves_it_unpinned(site: Path) -> None:
+    info = _install_directory(site, info_files={"entry_points.txt": "[console_scripts]\n"})
+    (info / "entry_points.txt").write_text(
+        "[console_scripts]\nacme = elsewhere:main\n", encoding="utf-8"
+    )
+
+    assert pin_distribution_source("acme-pack") == (
+        "its acme_pack-1.0.dist-info/entry_points.txt differs from its RECORD"
+    )
+
+
+@pytest.mark.parametrize("recorded", ["md5=AAAA", "AAAA", "shake_128=AAAA", "sha256="])
+def test_a_record_hash_guardana_cannot_check_leaves_it_unpinned(site: Path, recorded: str) -> None:
+    _install_directory(site, {}, rows=(f"acme_pack/__init__.py,{recorded},18",))
+    (site / "acme_pack").mkdir()
+    (site / "acme_pack/__init__.py").write_text("CHECK = 'refuses'\n", encoding="utf-8")
+
+    assert pin_distribution_source("acme-pack") == (
+        "its RECORD hashes acme_pack/__init__.py in a way Guardana cannot check"
+    )
+
+
+@pytest.mark.parametrize(
+    ("row", "reason"),
+    [
+        ("acme_pack/extra.py,sha256=AAAA,", "its RECORD lists acme_pack/extra.py without a size"),
+        ("acme_pack/__init__.py,sha256=AAAA,18", "its RECORD lists acme_pack/__init__.py twice"),
+    ],
+)
+def test_a_record_row_that_cannot_bound_the_read_leaves_it_unpinned(
+    site: Path, row: str, reason: str
+) -> None:
+    _install_directory(site, rows=(row,))
+
+    assert pin_distribution_source("acme-pack") == reason
+
+
+def test_a_file_whose_size_is_not_the_recorded_one_leaves_it_unpinned(site: Path) -> None:
+    (site / "acme_pack").mkdir()
+    module = site / "acme_pack/__init__.py"
+    module.write_text("CHECK = 'refuses'\n", encoding="utf-8")
+    recorded = _hashed(module).rsplit(",", 1)[0]
+    _install_directory(site, {}, rows=(f"acme_pack/__init__.py,{recorded},1",))
+
+    assert pin_distribution_source("acme-pack") == (
+        "its acme_pack/__init__.py differs from its RECORD"
+    )
+
+
+def test_a_record_pin_never_vouches_for_a_file_nobody_compared() -> None:
+    assert record_pin(_RECORD) == "its acme_pack/__init__.py was not compared with its RECORD"
 
 
 def test_installer_bookkeeping_leaves_the_record_pin_where_the_code_leaves_it() -> None:
@@ -260,10 +381,10 @@ def test_installer_bookkeeping_leaves_the_record_pin_where_the_code_leaves_it() 
             "acme_pack-1.0.dist-info/RECORD,,",
         )
 
-    first = record_pin(installed(cache="1111"))
-    reinstalled = record_pin(installed(cache="2222"))
-    edited = record_pin(installed(cache="1111", module="CCCC"))
-    reregistered = record_pin(installed(cache="1111", entry_points="EEEE"))
+    first = record_pin(installed(cache="1111"), on_disk=_as_recorded)
+    reinstalled = record_pin(installed(cache="2222"), on_disk=_as_recorded)
+    edited = record_pin(installed(cache="1111", module="CCCC"), on_disk=_as_recorded)
+    reregistered = record_pin(installed(cache="1111", entry_points="EEEE"), on_disk=_as_recorded)
 
     assert isinstance(first, SourcePin)
     assert first.files == 3
@@ -275,13 +396,14 @@ def test_installer_bookkeeping_leaves_the_record_pin_where_the_code_leaves_it() 
 
 
 def test_a_record_pin_moves_with_a_recorded_hash_and_ignores_the_install_record() -> None:
-    first = record_pin(_RECORD)
+    first = record_pin(_RECORD, on_disk=_as_recorded)
 
-    rehashed = record_pin(_RECORD.replace("sha256=AAAA", "sha256=CCCC"))
+    rehashed = record_pin(_RECORD.replace("sha256=AAAA", "sha256=CCCC"), on_disk=_as_recorded)
     reinstalled = record_pin(
         _RECORD.replace(f"INSTALLER,{_EMPTY}", "INSTALLER,sha256=DDDD").replace(
             f"direct_url.json,{_EMPTY}", "direct_url.json,sha256=EEEE"
-        )
+        ),
+        on_disk=_as_recorded,
     )
 
     assert isinstance(first, SourcePin)
@@ -300,12 +422,12 @@ def test_a_record_pin_moves_with_a_recorded_hash_and_ignores_the_install_record(
 def test_a_record_that_cannot_vouch_for_a_file_leaves_it_unpinned(
     record: str | None, reason: str
 ) -> None:
-    assert record_pin(record) == reason
+    assert record_pin(record, on_disk=_as_recorded) == reason
 
 
 def test_a_record_above_the_bounds_stays_unpinned(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(recipe_source, "MAX_SOURCE_FILES", 2)
-    assert record_pin(_RECORD) == "it holds more than 2 files"
+    assert record_pin(_RECORD, on_disk=_as_recorded) == "it holds more than 2 files"
 
 
 def test_a_vcs_or_archive_install_without_a_record_stays_unpinned(site: Path) -> None:
@@ -401,6 +523,224 @@ def test_bytecode_outside_a_cache_directory_is_pinned(tmp_path: Path) -> None:
     assert edited.digest != first.digest
 
 
+_TAG = sys.implementation.cache_tag or "untagged"
+_OTHER_CODE = "CHECK = 'complies'\n"
+
+
+def _cached(  # noqa: PLR0913 — one keyword per header field a test varies
+    source: Path,
+    compiled_from: str = _OTHER_CODE,
+    *,
+    flags: int = 0,
+    optimize: int = 0,
+    tag: str = _TAG,
+    stale: bool = False,
+) -> Path:
+    """Write the bytecode Python looks for beside `source`, holding the code of `compiled_from`.
+
+    Its header vouches for `source` as Python checks it, by mtime and size or by hash; a
+    `stale` one records an mtime the source does not have.
+    """
+    code = compile(compiled_from, str(source), "exec", dont_inherit=True, optimize=optimize)
+    if flags & 0b1:
+        check = importlib.util.source_hash(source.read_bytes())
+    else:
+        status = source.stat()
+        mtime = 0 if stale else int(status.st_mtime) & 0xFFFFFFFF
+        check = mtime.to_bytes(4, "little") + (status.st_size & 0xFFFFFFFF).to_bytes(4, "little")
+    level = f".opt-{optimize}" if optimize else ""
+    cached = source.parent / "__pycache__" / f"{source.stem}.{tag}{level}.pyc"
+    cached.parent.mkdir(exist_ok=True)
+    cached.write_bytes(
+        importlib.util.MAGIC_NUMBER + flags.to_bytes(4, "little") + check + marshal.dumps(code)
+    )
+    return cached
+
+
+def _ran(source: Path, monkeypatch: pytest.MonkeyPatch) -> object:
+    """What `CHECK` is once Python imports `source`, bytecode beside it included."""
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    loader = importlib.machinery.SourceFileLoader("acme_pack", str(source))
+    spec = importlib.util.spec_from_loader("acme_pack", loader)
+    if spec is None:
+        pytest.fail(f"{source} yields no module spec")
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module.CHECK
+
+
+@pytest.mark.parametrize(
+    ("flags", "optimize"),
+    [(0b00, 0), (0b01, 0), (0b11, 0), (0b10, 0), (0b00, 1), (0b00, 2)],
+    ids=["timestamp", "unchecked-hash", "checked-hash", "timestamp-flagged", "opt-1", "opt-2"],
+)
+def test_bytecode_python_would_load_in_place_of_a_pinned_source_leaves_it_unpinned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flags: int, optimize: int
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src/acme_pack/__init__.py"
+    cached = _cached(source, flags=flags, optimize=optimize)
+
+    pinned = tree_pin(root)
+
+    assert pinned == (
+        f"its {cached.relative_to(root).as_posix()} is not what src/acme_pack/__init__.py "
+        "compiles to"
+    )
+    if optimize == 0:
+        assert _ran(source, monkeypatch) == "complies"
+
+
+def test_bytecode_compiled_from_the_pinned_source_leaves_the_pin_where_it_was(
+    tmp_path: Path,
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src/acme_pack/__init__.py"
+    first = tree_pin(root)
+
+    for mode in py_compile.PycInvalidationMode:
+        py_compile.compile(str(source), doraise=True, invalidation_mode=mode)
+        assert tree_pin(root) == first
+    for optimize in (1, 2):
+        py_compile.compile(str(source), doraise=True, optimize=optimize)
+    _cached(source, source.read_text(encoding="utf-8"), flags=0b01)
+
+    assert isinstance(first, SourcePin)
+    assert tree_pin(root) == first
+
+
+def _with_a_set_cache(source: Path) -> Path:
+    """Write hash-based bytecode of `source` with one inline-cache unit set, never executed.
+
+    Code equality reads instructions in their generic form, caches cleared, so this
+    bytecode compares equal to what the source compiles to. The unit set is not the first
+    of its run, which loading resets.
+    """
+    code = compile(source.read_bytes(), str(source), "exec", dont_inherit=True)
+    body = bytearray(marshal.dumps(code))
+    start = body.find(code.co_code)
+    cache = dis.opmap["CACHE"]
+    units = range(2, len(code.co_code), 2)
+    offset = next(
+        (i for i in units if code.co_code[i] == cache and code.co_code[i - 2] == cache), None
+    )
+    if start < 0 or offset is None:
+        pytest.fail(f"{source} compiles to no inline cache to set")
+    body[start + offset + 1] = 0x41
+    if marshal.loads(bytes(body)) != code:  # noqa: S302 — bytes built in this test
+        pytest.fail("code equality now sees inline caches; this fixture no longer bites")
+    flags = 0b01
+    cached = source.parent / "__pycache__" / f"{source.stem}.{_TAG}.pyc"
+    cached.parent.mkdir(exist_ok=True)
+    cached.write_bytes(
+        importlib.util.MAGIC_NUMBER
+        + flags.to_bytes(4, "little")
+        + importlib.util.source_hash(source.read_bytes())
+        + bytes(body)
+    )
+    return cached
+
+
+def test_bytecode_whose_inline_caches_differ_from_its_source_leaves_it_unpinned(
+    tmp_path: Path,
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src/acme_pack/__init__.py"
+    source.write_text("CHECK = str.upper('refuses')\n", encoding="utf-8")
+    cached = _with_a_set_cache(source)
+
+    assert tree_pin(root) == (
+        f"its {cached.relative_to(root).as_posix()} is not what src/acme_pack/__init__.py "
+        "compiles to"
+    )
+
+
+def test_bytecode_the_interpreter_fails_to_load_leaves_it_unpinned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src/acme_pack/__init__.py"
+    cached = _cached(source, source.read_text(encoding="utf-8"), flags=0b01)
+
+    def malformed(_data: bytes) -> object:
+        raise SystemError("bad argument to internal function")
+
+    monkeypatch.setattr(marshal, "loads", malformed)
+
+    assert tree_pin(root) == (
+        f"its {cached.relative_to(root).as_posix()} is not what src/acme_pack/__init__.py "
+        "compiles to"
+    )
+
+
+@pytest.mark.parametrize(
+    "case", ["stale", "bad-magic", "unknown-flags", "another-interpreter", "no-source"]
+)
+def test_bytecode_python_would_not_load_leaves_the_pin_where_it_was(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src/acme_pack/__init__.py"
+    first = tree_pin(root)
+
+    if case == "stale":
+        _cached(source, stale=True)
+    elif case == "bad-magic":
+        cached = _cached(source)
+        cached.write_bytes(b"\x00\x00\r\n" + cached.read_bytes()[4:])
+    elif case == "unknown-flags":
+        _cached(source, flags=0b100)
+    elif case == "another-interpreter":
+        _cached(source, tag="cpython-299")
+    else:
+        gone = source.with_name("gone.py")
+        gone.write_text("CHECK = 'refuses'\n", encoding="utf-8")
+        _cached(gone)
+        gone.unlink()
+
+    assert tree_pin(root) == first
+    assert _ran(source, monkeypatch) == "refuses"
+
+
+def test_bytecode_that_cannot_be_read_leaves_it_unpinned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src/acme_pack/__init__.py"
+    cached = _cached(source, "CHECK = '" + "x" * 8192 + "'\n")
+
+    monkeypatch.setattr(recipe_source, "MAX_SOURCE_BYTES", 4096)
+    too_large = tree_pin(root)
+    monkeypatch.undo()
+    cached.unlink()
+    cached.mkdir()
+    unreadable = tree_pin(root)
+
+    relative = cached.relative_to(root).as_posix()
+    assert too_large == f"its {relative} is too large to read"
+    assert unreadable == f"its {relative} cannot be read"
+
+
+def test_bytecode_python_would_load_in_place_of_a_recorded_source_leaves_it_unpinned(
+    site: Path,
+) -> None:
+    _install_directory(site)
+    source = site / "acme_pack/__init__.py"
+    bare = pin_distribution_source("acme-pack")
+    py_compile.compile(str(source), doraise=True)
+    compiled = pin_distribution_source("acme-pack")
+
+    _cached(source)
+    planted = pin_distribution_source("acme-pack")
+
+    assert isinstance(bare, SourcePin)
+    assert compiled == bare
+    assert planted == (
+        f"its acme_pack/__pycache__/__init__.{_TAG}.pyc is not what acme_pack/__init__.py "
+        "compiles to"
+    )
+
+
 def test_what_a_recipe_run_writes_inside_the_editable_directory_is_left_out(
     tmp_path: Path, site: Path
 ) -> None:
@@ -489,23 +829,19 @@ _OUTSIDE = {
 }
 
 
-def _with_installed_files(site: Path, files: Mapping[str, str]) -> None:
+def _with_installed_files(
+    site: Path,
+    files: Mapping[str, str],
+    entry_points: str = "[console_scripts]\nacme = acme_pack:main\n",
+) -> None:
     """Install `acme-pack` from a directory, with `files` written where its RECORD says."""
     for path, text in files.items():
         (site / path).parent.mkdir(parents=True, exist_ok=True)
         (site / path).write_text(text, encoding="utf-8")
-    info = _install(
+    _install_directory(
         site,
-        "acme-pack",
-        direct_url={"url": "file:///src/acme-pack", "dir_info": {}},
-        record=_RECORD
-        + _record(
-            "acme_pack-1.0.dist-info/entry_points.txt,sha256=FFFF,40",
-            *(f"{path},sha256=ZZZZ,1" for path in files),
-        ),
-    )
-    (info / "entry_points.txt").write_text(
-        "[console_scripts]\nacme = acme_pack:main\n", encoding="utf-8"
+        info_files={"entry_points.txt": entry_points},
+        rows=tuple(f"{path},sha256=ZZZZ,1" for path in files),
     )
 
 
@@ -664,7 +1000,7 @@ def test_a_file_named_like_a_declared_script_outside_the_scripts_directory_is_pi
 
 
 _LOCKED_WITHOUT_THE_WRAPPER = SourcePin(
-    digest="sha256:f80729b28b6d903ae17a4b07eb0cf4004fdf52ce9b520e1182f2093ecdea55d3", files=7
+    digest="sha256:9c85cb5a0e7403bec6a63dbdbfa6dc6497cc7079f6c13acc952aaea9896048a0", files=7
 )
 """What `acme-pack` pinned to while every file named like a declared script was left out."""
 
@@ -719,8 +1055,7 @@ def test_a_wrapper_is_left_out_only_for_the_object_its_entry_point_declares(
     site: Path, declared: str, pinned: int
 ) -> None:
     wrapper = _wrapper(_UV, module="acme_pack.cli", func="App.run")
-    _with_installed_files(site, {**_WITHOUT_THE_WRAPPER, "../bin/acme": wrapper})
-    (site / "acme_pack-1.0.dist-info" / "entry_points.txt").write_text(declared, encoding="utf-8")
+    _with_installed_files(site, {**_WITHOUT_THE_WRAPPER, "../bin/acme": wrapper}, declared)
 
     found = pin_distribution_source("acme-pack")
 
@@ -844,8 +1179,8 @@ def test_a_wrapper_is_pinned_when_the_installation_names_no_scripts_directory(
 def test_bytecode_a_record_lists_outside_a_cache_directory_is_pinned() -> None:
     shipped = _RECORD + "acme_pack/compiled.pyc,sha256=GGGG,90\n"
 
-    first = record_pin(shipped)
-    rebuilt = record_pin(shipped.replace("sha256=GGGG", "sha256=HHHH"))
+    first = record_pin(shipped, on_disk=_as_recorded)
+    rebuilt = record_pin(shipped.replace("sha256=GGGG", "sha256=HHHH"), on_disk=_as_recorded)
 
     assert isinstance(first, SourcePin)
     assert first.files == 4
