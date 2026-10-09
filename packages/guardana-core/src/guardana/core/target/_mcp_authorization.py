@@ -18,6 +18,7 @@ import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from http.client import HTTPException
 from urllib.error import HTTPError
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
@@ -37,6 +38,7 @@ from guardana.core.target._mcp_http import (
     RawReply,
     RedirectRefusedError,
     Sender,
+    ascii_host,
     refusal_for,
     server_is_local,
 )
@@ -539,7 +541,12 @@ class _Probe:
         issuer = _first_issuer(resource)
         if issuer is None:
             return Discovery(resource=resource, refused=tuple(refused))
-        authorization, more = self._first_readable(_authorization_server_urls(issuer), scope)
+        try:
+            candidates = _authorization_server_urls(issuer)
+        except ValueError:
+            unusable = Document(url=issuer, refused="the address is not a URL a client may open")
+            return Discovery(resource=resource, refused=(*refused, unusable))
+        authorization, more = self._first_readable(candidates, scope)
         return Discovery(
             resource=resource, authorization=authorization, refused=tuple(refused + more)
         )
@@ -962,11 +969,24 @@ class _Probe:
 
     def _fetch(self, url: str, scope: DiscoveryScope) -> Document:
         """Fetch one discovery document over a connection pinned to an address the guard passed."""
+        url = ascii_host(url)
         refusal = refusal_for(url, local_target=scope.local_target)
         if refusal is not None:
             return Document(url=url, refused=refusal)
+        reply = self._get(url, scope)
+        if isinstance(reply, Document):
+            return reply
+        if reply.status >= _HTTP_ERROR:
+            return _error_document(url, reply.status)
+        content = reply.json_object()
+        if content is None:
+            return Document(url=url, status=reply.status, error="the reply is not a JSON object")
+        return Document(url=url, status=reply.status, content=content)
+
+    def _get(self, url: str, scope: DiscoveryScope) -> RawReply | Document:
+        """Send one discovery `GET`, or say as a document why it got no reply."""
         try:
-            reply = self._spend(
+            return self._spend(
                 lambda: self._discovery_send(
                     url,
                     method="GET",
@@ -981,12 +1001,10 @@ class _Probe:
             return Document(url=url, refused=_refused_because(exc))
         except McpError as exc:
             return Document(url=url, error=str(exc))
-        if reply.status >= _HTTP_ERROR:
-            return _error_document(url, reply.status)
-        content = reply.json_object()
-        if content is None:
-            return Document(url=url, status=reply.status, error="the reply is not a JSON object")
-        return Document(url=url, status=reply.status, content=content)
+        except (HTTPException, ValueError):
+            # The guard already refuses every address `http.client` is known to reject; one
+            # a sender still rejects is a gap in the evidence, read once and kept like any other.
+            return Document(url=url, error="the address is not a URL a client may open")
 
     def _first_readable(
         self, urls: tuple[str, ...], scope: DiscoveryScope
@@ -1203,7 +1221,7 @@ def _resource_metadata_urls(server: str, challenge: str | None) -> tuple[str, ..
     candidates = []
     advertised = challenge_parameters(challenge).get("resource_metadata")
     if advertised:
-        candidates.append(advertised)
+        candidates.append(_without_userinfo(advertised))
     if path:
         candidates.append(
             urlunsplit((parts.scheme, host, f"/.well-known/oauth-protected-resource{path}", "", ""))
@@ -1235,6 +1253,17 @@ def _authorization_server_urls(issuer: str) -> tuple[str, ...]:
         urlunsplit((parts.scheme, host, "/.well-known/oauth-authorization-server", "", "")),
         urlunsplit((parts.scheme, host, "/.well-known/openid-configuration", "", "")),
     )
+
+
+def _without_userinfo(url: str) -> str:
+    """Return `url` without userinfo; one that does not parse is kept for the guard to refuse."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    if "@" not in parts.netloc:
+        return url
+    return urlunsplit(parts._replace(netloc=_host_of(parts)))
 
 
 def _host_of(parts: SplitResult) -> str:

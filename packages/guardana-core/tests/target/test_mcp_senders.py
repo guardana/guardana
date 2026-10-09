@@ -5,6 +5,8 @@ server chose, silently. With two seams a supplied sender is never handed discove
 supplying one without the other is refused before anything is sent.
 """
 
+import socket
+import threading
 from collections.abc import Mapping
 
 import pytest
@@ -12,6 +14,7 @@ from _offline import refuse_name_lookups
 from guardana.core.target import (
     DiscoveryScope,
     DiscoverySender,
+    McpError,
     McpServerTarget,
     Sender,
     send,
@@ -109,3 +112,32 @@ def test_the_built_in_send_serves_as_either_sender() -> None:
     wide: DiscoverySender = send
 
     assert narrow is wide
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["http://127.0.0.1:9/.well-known/oauth protected-resource", "http://[127.0.0.1:9/mcp"],
+    ids=["space", "unparseable"],
+)
+def test_the_built_in_sender_reports_a_url_it_cannot_send_as_no_answer(url: str) -> None:
+    with pytest.raises(McpError, match="could not send a request to"):
+        send(url, method="GET")
+
+
+def test_the_built_in_sender_reports_a_reply_it_cannot_parse_as_no_answer() -> None:
+    with socket.create_server(("127.0.0.1", 0)) as listener:
+        port = listener.getsockname()[1]
+
+        def answer() -> None:
+            connection, _ = listener.accept()
+            with connection:
+                connection.recv(65536)
+                connection.sendall(b"not an http status line\r\n\r\n")
+
+        serving = threading.Thread(target=answer, daemon=True)
+        serving.start()
+        with pytest.raises(
+            McpError, match=r"sent a reply that could not be read \(BadStatusLine\)"
+        ):
+            send(f"http://127.0.0.1:{port}/mcp", method="POST", body=b"{}")
+        serving.join(timeout=5)

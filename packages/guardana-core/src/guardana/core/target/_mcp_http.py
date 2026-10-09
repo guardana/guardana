@@ -23,15 +23,23 @@ lookups has nothing to switch.
 
 import ipaddress
 import json
+import re
 import socket
 import ssl
 import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from http.client import HTTPConnection, HTTPMessage, HTTPResponse, HTTPSConnection
+from http.client import (
+    HTTPConnection,
+    HTTPException,
+    HTTPMessage,
+    HTTPResponse,
+    HTTPSConnection,
+    InvalidURL,
+)
 from typing import IO, Protocol
 from urllib.error import HTTPError, URLError
-from urllib.parse import SplitResult, unquote, urlsplit
+from urllib.parse import SplitResult, unquote, urlsplit, urlunsplit
 from urllib.request import (
     BaseHandler,
     HTTPHandler,
@@ -425,7 +433,10 @@ def _send(  # noqa: PLR0913 — the `Sender` keywords and the peer recorder
     discovery: DiscoveryScope | None,
     record: Callable[[str, _Address | None], None] | None,
 ) -> RawReply:
-    scheme = urlsplit(url).scheme
+    try:
+        scheme = urlsplit(url).scheme
+    except ValueError as exc:
+        raise McpError(f"could not send a request to {display_url(url)}") from exc
     if scheme not in _SAFE_SCHEMES:
         raise McpError("the MCP URL needs an http or https scheme")
     request = Request(url, data=body, headers=dict(headers or {}), method=method)  # noqa: S310
@@ -448,6 +459,15 @@ def _send(  # noqa: PLR0913 — the `Sender` keywords and the peer recorder
         return RawReply(status=error.code, headers=dict(error.headers.items()), body=payload)
     except (URLError, OSError) as exc:
         raise McpError(f"could not reach {display_url(url)}: {exc}") from exc
+    except (InvalidURL, ValueError) as exc:
+        # `http.client` refuses a URL or header it cannot put on the wire; its message is
+        # not repeated, since it quotes the raw URL.
+        raise McpError(f"could not send a request to {display_url(url)}") from exc
+    except HTTPException as exc:
+        # A status line or body `http.client` cannot parse is no answer either.
+        raise McpError(
+            f"{display_url(url)} sent a reply that could not be read ({type(exc).__name__})"
+        ) from exc
 
 
 class _Route:
@@ -528,6 +548,46 @@ class _FirstHopProxy(ProxyHandler):
         return opened
 
 
+_UNSENDABLE = re.compile(r"[^\x21-\x7e]")
+"""What `http.client` refuses to put on a request line, or cannot encode there."""
+
+
+def ascii_host(url: str) -> str:
+    """Return `url` with a non-ASCII host written in IDNA, as a resolver reads it.
+
+    Anything else, an unparseable URL included, comes back as given for the guard to judge.
+    """
+    try:
+        parts = urlsplit(url)
+        host, port = parts.hostname, parts.port
+    except ValueError:
+        return url
+    if host is None or host.isascii():
+        return url
+    try:
+        encoded = host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return url
+    userinfo, at, _ = parts.netloc.rpartition("@")
+    netloc = f"{userinfo}{at}{encoded}" + ("" if port is None else f":{port}")
+    return urlunsplit(parts._replace(netloc=netloc))
+
+
+def _openable(url: str) -> SplitResult | str:
+    """Return `url` split, or why no client may put it on a request line."""
+    if _UNSENDABLE.search(url):
+        return (
+            "the address holds a space, a control or a non-ASCII character, so it is not a "
+            "URL a client may open"
+        )
+    try:
+        parts = urlsplit(url)
+        _ = parts.hostname, parts.port
+    except ValueError:
+        return "the address is not a URL a client may open"
+    return parts
+
+
 def refusal_for(url: str, *, local_target: bool) -> str | None:
     """Say why a client must not fetch `url`, or None when fetching it is safe.
 
@@ -548,10 +608,12 @@ def refusal_for(url: str, *, local_target: bool) -> str | None:
     addresses to the same rule and dials one of them, so the answer that is
     enforced is the answer that is used.
     """
-    parts = urlsplit(url)
+    parts = _openable(url)
+    if isinstance(parts, str):
+        return parts
+    host = parts.hostname
     if parts.scheme not in _SAFE_SCHEMES:
         return f"scheme {parts.scheme!r} is not one a client may open"
-    host = parts.hostname
     if not host:
         return "the address names no host"
     address_refusal = _refused_address(host, _resolve(host) or (), local_target=local_target)

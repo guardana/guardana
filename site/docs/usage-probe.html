@@ -690,16 +690,22 @@ waiting on one does not stall the run; its notifications are ignored. An stdio c
 cannot be started exits <code>4</code> before any rule, with nothing saved, and <code>--write-mcp-pin</code>
 against a server that fails exits <code>4</code> without writing a pin.</p>
 <h3 id="cost">Cost</h3>
-<p>An MCP probe sends these requests: one <code>server/discover</code> to settle the
-revision, a listing without a credential (preceded by a handshake where the server
-still expects one), up to five discovery fetches, a listing with the forged token,
-a handful of handshakes to sample session ids, one <code>initialize</code> to ask whether a
-modern server still offers <code>2025-11-25</code>, one <code>tasks/list</code> (and up to three more requests
-— a handshake, its announcement and a listing — for your own listing when the anonymous one
-is empty), and a <code>notifications/initialized</code> after each accepted handshake. Every one is
-counted, so <code>--max-requests</code> bounds it, and a run that hits the ceiling exits <code>6</code>
-with an <code>indeterminate</code> gate rather than reporting the checks it never reached as
-clean.</p>
+<p>An MCP probe sends these requests: one <code>server/discover</code> to settle the revision, a
+listing without a credential (preceded by a handshake where the server still expects
+one), up to six discovery fetches, a listing with the forged token, a handful of
+handshakes to sample session ids, one <code>initialize</code> to ask whether a modern server still
+offers <code>2025-11-25</code>, one <code>tasks/list</code> (and up to three more requests — a handshake, its
+announcement and a listing — for your own listing when the anonymous one is empty), and
+a <code>notifications/initialized</code> after each accepted handshake. Discovery runs once per
+probe, and every check reads its result. It fetches up to three places for the protected
+resource's metadata: the address the server advertises, the path-specific well-known
+address, and the root well-known address. It then makes up to three fetches for the
+authorization server's metadata. Each fetch follows at most ten redirects, with every
+hop held to the same address rules, and counts once against <code>--max-requests</code> however
+many redirects it follows. Every one is counted, so <code>--max-requests</code> bounds it; a
+redirect hop the transport follows for a request is held to the same address rules but
+is not counted on its own, and a run that hits the ceiling exits <code>6</code> with an
+<code>indeterminate</code> gate rather than reporting the checks it never reached as clean.</p>
 <p>Ask before you spend, with <a href="usage-plan.html"><code>guardana plan</code></a>:</p>
 <pre><code class="language-bash">guardana plan probe --mcp https://mcp.example.com/mcp
 </code></pre>

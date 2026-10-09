@@ -216,7 +216,8 @@ reach production;</li>
 <p><code>probe --mcp</code> is narrower than that, deliberately. Against an MCP server Guardana
 speaks only <code>server/discover</code>, <code>tools/list</code>, the <code>initialize</code> handshake (followed by
 <code>notifications/initialized</code>) where the server still expects one, <code>tasks/list</code>, and
-unauthenticated <code>GET</code>s of the authorization discovery documents, up to five of them; the
+unauthenticated <code>GET</code>s of the authorization discovery documents, up to six of them,
+each following at most ten redirects held to the same address rules; the
 full inventory and its count are in <a href="usage-probe.html#cost">the MCP probe's cost</a>. It
 <strong>never calls a tool</strong>, because a tool call is a side
 effect on somebody's system and no verification result is worth finding that out by
@@ -254,13 +255,15 @@ prompt, same tool manifest, non-production credentials and data. Staging evidenc
 production only insofar as the model, system prompt, and tool manifest match.</p>
 <p><strong>Point tools at a sandbox.</strong> If you must exercise a production-shaped agent, give
 it tool endpoints that write to a scratch environment.</p>
-<p><strong>Bound the run.</strong> Concurrency is bounded (<code>--concurrency</code>, default 4 for probe)
-and rate limits are retried with backoff rather than hammered. Request, token and
+<p><strong>Bound the run.</strong> Concurrency is bounded (<code>--concurrency</code>, default 4 for probe) and
+rate limits are retried with backoff rather than hammered. Request, token and
 duration budgets are hard ceilings: <code>--max-requests</code>, <code>--max-input-tokens</code>,
 <code>--max-output-tokens</code> and <code>--max-duration</code> stop the run, which exits <code>6</code> with an
-<code>indeterminate</code> gate, so an exhausted budget can never be mistaken for a clean result.
-<code>--max-requests-per-minute</code> paces the requests. <code>guardana plan</code> prices the run before it
-sends anything.</p>
+<code>indeterminate</code> gate, so an exhausted budget can never be mistaken for a clean
+result. The request budget counts each request Guardana makes, not each redirect hop
+the transport follows for one (at most ten per request, each held to the same
+address rules). <code>--max-requests-per-minute</code> paces the requests. <code>guardana plan</code>
+prices the run before it sends anything.</p>
 <p><strong>Run deep checks on a schedule, not on every pull request.</strong> A fast static gate
 belongs in a PR. Endpoint probing belongs at deployment time and nightly. This
 keeps cost predictable and stops a noisy check from blocking every merge.</p>

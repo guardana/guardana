@@ -240,9 +240,14 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
         issuer = _named_issuer(view.protected_resource)
         if issuer is None:
             return
-        host = urlsplit(issuer).hostname
+        host = _hostname(issuer)
         refused = next(
-            (d for d in view.refused_addresses if urlsplit(d.url).hostname == host), None
+            (
+                d
+                for d in view.refused_addresses
+                if d.url == issuer or (host is not None and _hostname(d.url) == host)
+            ),
+            None,
         )
         if refused is None:
             return
@@ -322,3 +327,11 @@ def _different_origin(declared: str, server: str) -> bool:
     deployment as a finding — or worse, the other way round.
     """
     return not same_origin(declared, server)
+
+
+def _hostname(url: str) -> str | None:
+    """Return the host `url` names, or None when it does not parse as a URL."""
+    try:
+        return urlsplit(url).hostname
+    except ValueError:
+        return None
