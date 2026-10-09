@@ -720,7 +720,7 @@ toy configuration and none for the real one.</p>
 </tbody>
 </table></div>
 <p>Send keys as <code>Authorization: Bearer &lt;key&gt;</code>. Read routes also accept the <code>guardana_session</code> cookie set by the dashboard after <code>POST /session</code>; a <code>Bearer</code> header takes precedence. Permissions belong to keys, not OAuth2 scopes.</p>
-<p>With <code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code>, no route requires a key and the OpenAPI document declares no authentication requirement.</p>
+<p>With <code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code>, no route requires a key and the OpenAPI document declares no security requirement.</p>
 <p><code>--reporter</code> sends the whole versioned envelope: gate, run id and findings. Its schema is <a href="https://github.com/guardana/guardana/blob/main/schemas/collector-envelope-v8.schema.json"><code>schemas/collector-envelope-v8.schema.json</code></a>.</p>
 <p>This example posts a hand-written synthetic envelope to show its shape:</p>
 <pre><code class="language-bash">export INGEST_KEY=gdn_…   # a key with the ingest permission

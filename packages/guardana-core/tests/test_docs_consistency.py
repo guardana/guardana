@@ -97,7 +97,7 @@ def _product_prose() -> list[Path]:
     return [
         path
         for path in _tracked_markdown()
-        if path.name != "CHANGELOG.md" and ".claude" not in path.parts
+        if path.name != "CHANGELOG.md" and ".claude" not in path.relative_to(_repo()).parts
     ]
 
 

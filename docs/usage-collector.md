@@ -533,7 +533,7 @@ The optional collector stores and serves results submitted by Guardana runs. It 
 
 Send keys as `Authorization: Bearer <key>`. Read routes also accept the `guardana_session` cookie set by the dashboard after `POST /session`; a `Bearer` header takes precedence. Permissions belong to keys, not OAuth2 scopes.
 
-With `GUARDANA_ALLOW_UNAUTHENTICATED=1`, no route requires a key and the OpenAPI document declares no authentication requirement.
+With `GUARDANA_ALLOW_UNAUTHENTICATED=1`, no route requires a key and the OpenAPI document declares no security requirement.
 
 `--reporter` sends the whole versioned envelope: gate, run id and findings. Its schema is [`schemas/collector-envelope-v8.schema.json`](../schemas/collector-envelope-v8.schema.json).
 
