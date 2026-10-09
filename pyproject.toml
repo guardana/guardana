@@ -242,7 +242,7 @@ dev = [
     # never validates at run time — it constructs manifests from typed
     # dataclasses, so the shape is enforced by mypy on the way out.
     "jsonschema>=4.23",
-    "types-jsonschema>=4.23",
+    "types-jsonschema>=4.26.0.20261006",
     "mypy>=2.3.1",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
