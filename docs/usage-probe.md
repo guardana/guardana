@@ -321,16 +321,22 @@ against a server that fails exits `4` without writing a pin.
 
 ### Cost
 
-An MCP probe sends these requests: one `server/discover` to settle the
-revision, a listing without a credential (preceded by a handshake where the server
-still expects one), up to five discovery fetches, a listing with the forged token,
-a handful of handshakes to sample session ids, one `initialize` to ask whether a
-modern server still offers `2025-11-25`, one `tasks/list` (and up to three more requests
-— a handshake, its announcement and a listing — for your own listing when the anonymous one
-is empty), and a `notifications/initialized` after each accepted handshake. Every one is
-counted, so `--max-requests` bounds it, and a run that hits the ceiling exits `6`
-with an `indeterminate` gate rather than reporting the checks it never reached as
-clean.
+An MCP probe sends these requests: one `server/discover` to settle the revision, a
+listing without a credential (preceded by a handshake where the server still expects
+one), up to six discovery fetches, a listing with the forged token, a handful of
+handshakes to sample session ids, one `initialize` to ask whether a modern server still
+offers `2025-11-25`, one `tasks/list` (and up to three more requests — a handshake, its
+announcement and a listing — for your own listing when the anonymous one is empty), and
+a `notifications/initialized` after each accepted handshake. Discovery runs once per
+probe, and every check reads its result. It fetches up to three places for the protected
+resource's metadata: the address the server advertises, the path-specific well-known
+address, and the root well-known address. It then makes up to three fetches for the
+authorization server's metadata. Each fetch follows at most ten redirects, with every
+hop held to the same address rules, and counts once against `--max-requests` however
+many redirects it follows. Every one is counted, so `--max-requests` bounds it; a
+redirect hop the transport follows for a request is held to the same address rules but
+is not counted on its own, and a run that hits the ceiling exits `6` with an
+`indeterminate` gate rather than reporting the checks it never reached as clean.
 
 Ask before you spend, with [`guardana plan`](usage-plan.md):
 
