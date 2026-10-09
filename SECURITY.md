@@ -164,7 +164,9 @@ The release controls are described in [the threat model](docs/threat-model.md#t1
 
 ## Supported versions
 
-Guardana is pre-1.0 (0.41.x). Security fixes land on the latest released
-version; there is no separate LTS branch yet. Which versions stay compatible, how
-long a Python version is supported and how a name is deprecated before it is
-removed is stated in the [compatibility policy](docs/compatibility.md).
+Guardana is pre-1.0 (0.41.x) and on the 1.0 release candidate line. Security fixes
+ship in the next candidate, installed with `pip install --upgrade --pre`; a plain
+install selects the last stable release, 0.41.x, which receives no further release. After 1.0, security
+fixes land on the latest release; there is no LTS branch. Which versions stay
+compatible, how long a Python version is supported and how a name is deprecated
+before it is removed is stated in the [compatibility policy](docs/compatibility.md).

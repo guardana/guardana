@@ -2,26 +2,34 @@
 
 A version pin says nothing about such a distribution: its code can change while its
 version stays put. An editable install is pinned by the source directory its
-`direct_url.json` names; any other direct URL by the hashes its installed `RECORD` lists.
+`direct_url.json` names; any other direct URL by the hashes its installed `RECORD` lists,
+once every file it lists inside the install root is found to hash as recorded.
 An editable install whose path file or finder loads code from outside that directory, or
 whose path file runs a hook other than a setuptools finder read here, stays unpinned with
 the reason; so does a distribution too large to read, with a symlink leading out of its
-directory, or with nothing to read.
+directory, with nothing to read, or with bytecode in `__pycache__` that Python would load
+in place of a pinned source and that is not what the source compiles to.
 """
 
 import ast
+import base64
 import csv
 import hashlib
+import importlib.machinery
 import importlib.metadata
+import importlib.util
 import io
 import json
+import marshal
 import os
 import re
 import sys
 import sysconfig
+import warnings
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from types import CodeType
 from typing import BinaryIO
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
@@ -88,6 +96,16 @@ _REQUIREMENT_NAME = re.compile(r"\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)
 _FINDER_TABLES = frozenset({"MAPPING", "NAMESPACES"})
 _PTH_IMPORT = ("import ", "import\t")
 """The prefixes `site` executes, rather than adds to `sys.path`, in a path file."""
+_RECORD_HASHES = frozenset(
+    {"sha256", "sha384", "sha512", "sha3_256", "sha3_384", "sha3_512", "blake2b", "blake2s"}
+)
+"""The hashes a `RECORD` may name, SHA-256 or stronger as the wheel format requires."""
+_CACHE_DIRECTORY = "__pycache__"
+_PYC_HEADER = 16
+_PYC_KNOWN_FLAGS = 0b11
+_PYC_HASH_BASED = 0b01
+_OPTIMIZATIONS = ((0, ""), (1, ".opt-1"), (2, ".opt-2"))
+"""Each optimisation level and what it adds to the name of the bytecode compiled at it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +193,7 @@ def pin_distribution_source(
         found.read_text("RECORD"),
         installed=lambda path: _installed_content(found, path),
         generated=_generated_wrappers(found),
+        on_disk=lambda path, recorded, size: _as_recorded(found, path, recorded, size),
     )
 
 
@@ -337,7 +356,9 @@ def tree_pin(root: Path, *, leave_out: Iterable[Path] = ()) -> SourcePin | str:
     Untracked files count, since an editable install imports what the directory holds.
     Symlinks are followed, so a linked file is pinned by what it holds, and one that
     leads outside `root` leaves the directory unpinned. `leave_out` names files and
-    directories under `root` that are not pinned.
+    directories under `root` that are not pinned. Bytecode is not pinned, but bytecode
+    Python would load in place of a pinned source leaves the directory unpinned unless it
+    is what that source compiles to.
     """
     try:
         listed = _listed(root.resolve(), frozenset(path.resolve() for path in leave_out))
@@ -353,6 +374,9 @@ def tree_pin(root: Path, *, leave_out: Iterable[Path] = ()) -> SourcePin | str:
         except OSError:
             return f"{relative} cannot be read"
         entries.append((os.fsencode(relative), content))
+        loaded = _bytecode_differs(path, relative)
+        if loaded is not None:
+            return loaded
     return _pin(_TREE_TAG, entries)
 
 
@@ -421,13 +445,19 @@ def record_pin(
     *,
     installed: Callable[[str], str | None] = lambda _path: None,
     generated: Callable[[str], bool] = lambda _path: False,
+    on_disk: Callable[[str, str, int], str | None] = lambda path, _recorded, _size: (
+        f"its {path} was not compared with its RECORD"
+    ),
 ) -> SourcePin | str:
     """Pin a distribution by its installed `RECORD`: every entry's path and recorded hash.
 
     Bytecode under `__pycache__/` and the installer's bookkeeping — every file of the
     distribution's own `.dist-info` but `METADATA` and `entry_points.txt` — are left
     out, so installing the same code again, into any environment, pins the same; any
-    other entry inside the install root without a hash leaves the distribution unpinned.
+    other entry inside the install root without a hash or a size, or listed twice, leaves
+    the distribution unpinned. Each such entry is pinned by its recorded hash only once
+    `on_disk`, given its path, that hash and that size, returns None; what it returns
+    instead is why the distribution stays unpinned.
 
     A file installed outside the install root or under `*.data/scripts/` is pinned by
     what `installed` reads for it, all of it but the path to this environment's
@@ -438,6 +468,7 @@ def record_pin(
     if record is None:
         return "it has no RECORD to read"
     entries: list[tuple[bytes, str]] = []
+    listed: set[str] = set()
     total = 0
     for row in csv.reader(record.splitlines()):
         if not row:
@@ -448,20 +479,203 @@ def record_pin(
         outside = _installed_outside(path)
         if outside and generated(path):
             continue
-        if not outside and not recorded:
-            return f"its RECORD lists {path} without a hash"
+        refused = _unlistable(path, recorded, size, outside=outside, listed=listed)
+        if refused is not None:
+            return refused
+        listed.add(path)
         total += int(size) if size.isdigit() else 0
         above = _above_bounds(len(entries) + 1, total)
         if above is not None:
             return above
-        if outside:
-            content = installed(path)
-            if content is None:
-                return f"its {path} cannot be read"
-            entries.append((_outside_key(path).encode("utf-8"), content))
-        else:
-            entries.append((path.encode("utf-8"), recorded))
+        entry = _record_entry(
+            path, recorded, int(size) if size.isdigit() else 0, installed=installed, on_disk=on_disk
+        )
+        if isinstance(entry, str):
+            return entry
+        entries.append(entry)
     return _pin(_RECORD_TAG, entries)
+
+
+def _unlistable(
+    path: str, recorded: str, size: str, *, outside: bool, listed: set[str]
+) -> str | None:
+    """Why a `RECORD` row cannot vouch for its file; None if it can."""
+    if not outside and not recorded:
+        return f"its RECORD lists {path} without a hash"
+    if not outside and not size.isdigit():
+        return f"its RECORD lists {path} without a size"
+    if path in listed:
+        return f"its RECORD lists {path} twice"
+    return None
+
+
+def _record_entry(
+    path: str,
+    recorded: str,
+    size: int,
+    *,
+    installed: Callable[[str], str | None],
+    on_disk: Callable[[str, str, int], str | None],
+) -> tuple[bytes, str] | str:
+    """Return the path and content a `RECORD` entry is pinned by, or why it cannot be."""
+    if _installed_outside(path):
+        content = installed(path)
+        if content is None:
+            return f"its {path} cannot be read"
+        return _outside_key(path).encode("utf-8"), content
+    differs = on_disk(path, recorded, size)
+    if differs is not None:
+        return differs
+    return path.encode("utf-8"), recorded
+
+
+def _as_recorded(
+    found: importlib.metadata.Distribution, path: str, recorded: str, size: int
+) -> str | None:
+    """Why the file a `RECORD` entry of `found` names is not what it records; None if it is.
+
+    The file must be `size` bytes and hash to `recorded`, and bytecode Python would load in
+    its place must be what it compiles to. The size is checked before anything is read, so
+    the bound `record_pin` keeps on recorded sizes holds for the bytes hashed.
+    """
+    algorithm, _, expected = recorded.partition("=")
+    expected = expected.rstrip("=")
+    if algorithm not in _RECORD_HASHES or not expected:
+        return f"its RECORD hashes {path} in a way Guardana cannot check"
+    location = Path(str(found.locate_file(path)))
+    digest = hashlib.new(algorithm)
+    try:
+        with open_regular(location) as handle:
+            if os.fstat(handle.fileno()).st_size != size:
+                return f"its {path} differs from its RECORD"
+            while chunk := handle.read(min(_READ_CHUNK, size + 1)):
+                digest.update(chunk)
+                size -= len(chunk)
+                if size < 0:
+                    return f"its {path} differs from its RECORD"
+    except (OSError, FormatError):
+        return f"its {path} cannot be read"
+    if base64.urlsafe_b64encode(digest.digest()).rstrip(b"=").decode("ascii") != expected:
+        return f"its {path} differs from its RECORD"
+    return _bytecode_differs(location, path)
+
+
+def _bytecode_differs(source: Path, shown: str) -> str | None:
+    """Why bytecode Python would load in place of `source` is not its code; None if there is none.
+
+    Only the files this interpreter opens in `__pycache__` beside `source` count; one for
+    another interpreter is checked when that interpreter pins. `shown` names `source` in
+    the reason.
+    """
+    tag = sys.implementation.cache_tag
+    stem, dot, suffix = source.name.rpartition(".")
+    if tag is None or not stem or f"{dot}{suffix}" not in importlib.machinery.SOURCE_SUFFIXES:
+        return None
+    for optimize, level in _OPTIMIZATIONS:
+        name = f"{stem}.{tag}{level}.pyc"
+        cached = source.parent / _CACHE_DIRECTORY / name
+        try:
+            cached.stat()
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        except OSError:
+            problem: str | None = "cannot be read"
+        else:
+            problem = _loaded_bytecode(source, cached, optimize, shown)
+        if problem is not None:
+            return f"its {PurePosixPath(shown).parent / _CACHE_DIRECTORY / name} {problem}"
+    return None
+
+
+def _loaded_bytecode(source: Path, cached: Path, optimize: int, shown: str) -> str | None:
+    """Return what is wrong with `cached` if Python would load it in place of `source`."""
+    try:
+        with open_regular(cached) as handle:
+            if not _loads_in_place(handle.read(_PYC_HEADER), source.stat()):
+                return None
+            body = handle.read(MAX_SOURCE_BYTES + 1)
+        text = source.read_bytes()
+    except (OSError, FormatError):
+        return "cannot be read"
+    if len(body) > MAX_SOURCE_BYTES:
+        return "is too large to read"
+    compiled = _compiled(text, source, optimize)
+    try:
+        loaded = marshal.loads(body)  # noqa: S302 — the import system unmarshals these same bytes
+        same = compiled is not None and _same_code(loaded, compiled)
+    # Malformed code objects raise more than marshal documents, SystemError included.
+    except Exception:
+        same = False
+    if not same:
+        return f"is not what {shown} compiles to"
+    return None
+
+
+def _loads_in_place(header: bytes, source: os.stat_result) -> bool:
+    """Whether the import system takes bytecode opening with `header` over its source.
+
+    It reads the source instead when the magic number is another interpreter's, the flags
+    are unknown, or timestamp bytecode records an mtime or size the source does not have.
+    Hash-based bytecode counts whatever hash it records: the interpreter can be told not to
+    check it.
+    """
+    flags = int.from_bytes(header[4:8], "little")
+    if (
+        len(header) < _PYC_HEADER
+        or header[:4] != importlib.util.MAGIC_NUMBER
+        or flags & ~_PYC_KNOWN_FLAGS
+    ):
+        return False
+    if flags & _PYC_HASH_BASED:
+        return True
+    recorded = (int(source.st_mtime) & 0xFFFFFFFF).to_bytes(4, "little") + (
+        source.st_size & 0xFFFFFFFF
+    ).to_bytes(4, "little")
+    return header[8:16] == recorded
+
+
+def _compiled(text: bytes, source: Path, optimize: int) -> CodeType | None:
+    """Compile `text` as the import system compiles `source`; None if it does not compile."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            return compile(text, str(source), "exec", dont_inherit=True, optimize=optimize)
+        except (SyntaxError, ValueError, OverflowError, RecursionError, MemoryError):
+            return None
+
+
+def _same_code(loaded: object, compiled: CodeType) -> bool:
+    """Whether `loaded` is the code `compiled` is, nested code included, but for its file name.
+
+    Code equality leaves out the qualified name, the stack size and which names are cells,
+    so those are compared as well. It also reads instructions in their generic form, so the
+    raw instructions and inline caches the interpreter executes are compared too; without
+    them nothing is vouched for.
+    """
+    if not isinstance(loaded, CodeType) or loaded != compiled:
+        return False
+    raw = getattr(loaded, "_co_code_adaptive", None)
+    if raw is None or raw != getattr(compiled, "_co_code_adaptive", None):
+        return False
+    if (
+        loaded.co_qualname,
+        loaded.co_stacksize,
+        loaded.co_varnames,
+        loaded.co_cellvars,
+        loaded.co_freevars,
+    ) != (
+        compiled.co_qualname,
+        compiled.co_stacksize,
+        compiled.co_varnames,
+        compiled.co_cellvars,
+        compiled.co_freevars,
+    ):
+        return False
+    return all(
+        _same_code(inner, expected)
+        for inner, expected in zip(loaded.co_consts, compiled.co_consts, strict=True)
+        if isinstance(expected, CodeType)
+    )
 
 
 def _installed_content(found: importlib.metadata.Distribution, path: str) -> str | None:

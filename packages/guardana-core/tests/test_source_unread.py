@@ -12,8 +12,10 @@ find. Those stay quiet on purpose, and the tests below pin that difference so
 neither half drifts.
 """
 
+import os
 from pathlib import Path
 
+import pytest
 from guardana.core.gate import GateOutcome, gate_outcome
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile.model import Policy, Profile
@@ -204,16 +206,93 @@ def test_a_dangling_file_symlink_is_recorded_as_unread_and_not_listed(tmp_path: 
     assert [u.path for u in unread] == [tmp_path / "model.pkl"]
 
 
-def test_a_file_symlink_that_resolves_is_listed_and_read(tmp_path: Path) -> None:
-    real = tmp_path / "real.py"
-    real.write_text("x = 1\n", encoding="utf-8")
+def test_a_file_symlink_inside_the_root_is_listed_and_read(tmp_path: Path) -> None:
+    (tmp_path / "real").mkdir()
+    (tmp_path / "real" / "loader.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "linked.py").symlink_to(tmp_path / "real" / "loader.py")
+    target = ArtifactTarget(tmp_path)
+
+    assert [path.name for path in target.iter_files()] == ["linked.py", "loader.py"]
+    assert target.unread_sources() == ()
+
+
+def _linked_outside(tmp_path: Path) -> Path:
+    """Build a scan root whose `sub/settings.py` is a symlink to a file outside it."""
+    outside = tmp_path / "outside.py"
+    outside.write_text(_SINK, encoding="utf-8")
     root = tmp_path / "scan"
-    root.mkdir()
-    (root / "linked.py").symlink_to(real)
+    (root / "sub").mkdir(parents=True)
+    (root / "README.md").write_text("app\n", encoding="utf-8")
+    (root / "sub" / "settings.py").symlink_to(outside)
+    return root
+
+
+def test_a_file_symlink_leading_outside_the_root_is_recorded_as_unread_and_not_read(
+    tmp_path: Path,
+) -> None:
+    root = _linked_outside(tmp_path)
     target = ArtifactTarget(root)
 
-    assert [path.name for path in target.iter_files()] == ["linked.py"]
+    listed = [path.name for path in target.iter_files()]
+    unread = target.unread_sources()
+
+    assert listed == ["README.md"]
+    assert [u.path for u in unread] == [root / "sub" / "settings.py"]
+    assert "leading outside the scanned path is not read" in unread[0].reason
+    assert "outside.py" not in unread[0].reason
+
+
+def test_a_file_symlink_chained_through_another_link_inside_the_root_is_not_read(
+    tmp_path: Path,
+) -> None:
+    root = _linked_outside(tmp_path)
+    (root / "alias.py").symlink_to(root / "sub" / "settings.py")
+    target = ArtifactTarget(root)
+
+    listed = [path.name for path in target.iter_files()]
+    unread = target.unread_sources()
+
+    assert listed == ["README.md"]
+    assert [u.path for u in unread] == [root / "alias.py", root / "sub" / "settings.py"]
+
+
+def test_a_file_symlink_to_another_drive_is_recorded_as_unread(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _linked_outside(tmp_path)
+
+    def other_drive(paths: object) -> str:
+        raise ValueError("Paths don't have the same drive")
+
+    monkeypatch.setattr(os.path, "commonpath", other_drive)
+    target = ArtifactTarget(root)
+
+    assert [path.name for path in target.iter_files()] == ["README.md"]
+    assert [u.path for u in target.unread_sources()] == [root / "sub" / "settings.py"]
+
+
+def test_a_root_reached_through_a_symlink_still_reads_its_own_links(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "loader.py").write_text("x = 1\n", encoding="utf-8")
+    (real / "linked.py").symlink_to(real / "loader.py")
+    (tmp_path / "alias").symlink_to(real, target_is_directory=True)
+    target = ArtifactTarget(tmp_path / "alias")
+
+    assert [path.name for path in target.iter_files()] == ["linked.py", "loader.py"]
     assert target.unread_sources() == ()
+
+
+def test_a_scan_fails_the_gate_on_a_symlink_leading_outside_the_root(tmp_path: Path) -> None:
+    result = Runner(
+        registry=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)),
+        profile=Profile(name="t", policy=Policy()),
+    ).run(ArtifactTarget(_linked_outside(tmp_path)))
+
+    assert [(e.source, e.stage) for e in result.errors] == [("guardana.core.source", "read")]
+    assert "settings.py" in result.errors[0].reason
+    assert result.findings == ()
+    assert gate_outcome(result, Policy()) is GateOutcome.INDETERMINATE
 
 
 def test_an_ignored_or_excluded_symlinked_directory_stays_pruned(tmp_path: Path) -> None:
