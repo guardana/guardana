@@ -26,13 +26,13 @@ so this page is maintained as carefully as the code.
 | Collector (`guardana-server`) | **beta** | PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. Findings have a lifecycle and expiring waivers; actions are audited; retention and deletion are commands. What it does not yet hold is a quality trend — it aggregates findings, not measurements. |
 | `guardana grade` | **beta** | Grades a recording — answers you supplied, or the exchanges `probe --keep-exchanges` kept — with your rules and no target request. MCP and A2A rules are `not_applicable` on a chat recording; canary and tool rules still skip for a missing capability, and a rule the recording does not answer is skipped as `not_recorded`. |
 | Quality suites | **beta** | Gates pass rates on team-supplied versioned datasets, with repeated trials and judge correction. No numeric aggregate gate or statistical comparison between suite runs. |
-| Extension API | **beta** | Frozen at 1.0 under the [compatibility policy](compatibility.md). `ROADMAP.md` states the remaining 1.0 criteria. |
+| Extension API | **beta** | Frozen at 1.0 under the [compatibility policy](compatibility.md). The remaining 1.0 criteria are below. |
 
 ## Released and experimental
 
 **Released (beta):** Quality suites use the deterministic assessors `exact_match`, `contains`, `regex`, `json_valid`, and `length`. They support versioned JSONL datasets (`name@version`), deterministic sampling (`sample: {size, seed}`), repeated trials per case, and a suite gate that passes, fails, or declines with `min_sample`. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.
 
-**Experimental:** Judge-graded suites use `answered` and `reference_judge`. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with `guardana calibrate --record`. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental means shipped, but behaviour, thresholds, and saved fields may change in a minor release.
+**Experimental:** Judge-graded suites use `answered` and `reference_judge`. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with `guardana calibrate --record`. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental behaviour and thresholds are outside the compatibility promise, but saved documents remain versioned and readers continue to support older versions under the persisted-document policy.
 
 **Released (beta), first half of F6:** [repository recipes](usage-recipe.md) that pin a team's checks and refuse a run whose pins moved, one set of connection settings across `probe`, `plan probe`, `target inspect`, `monitor` and every judge, and a tested [provider table](providers.md).
 
@@ -40,7 +40,103 @@ so this page is maintained as carefully as the code.
 
 **Released (beta), F4:** an installed package adds a format for `--format` and a reporter for `--reporter` ([installed outputs](outputs.md)), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit `8` when an installed output fails. `examples/output_pack` is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own `output_api`. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on `monitor`, `import-observations` and `recipe run`.
 
-**Not released:** The five-user first-run study (F2) and the rest of F6 (the team regression loop and the live retrieval pilot) are roadmap items in `ROADMAP.md`.
+**Not released:** The five-user first-run study (F2) and the rest of F6 (the team regression loop and the live retrieval pilot) remain [1.0 criteria](#before-the-first-stable-release).
+
+## Before the first stable release
+
+At 1.0, the supported Python facade, rule, evaluator and target contracts,
+output contracts, CLI flags and exit codes, profile schema and collector
+envelope become a compatibility promise.
+[Compatibility](compatibility.md) defines the full surface.
+
+1.0.0rc1 shipped the 0.41.0 supported surface unchanged. That surface is frozen
+until stable 1.0. Candidates carry fixes only, with no new CLI flag, persisted
+field, rule family or public API. A change to the existing supported surface
+is allowed only to correct a defect in it and must be announced.
+
+Three candidates are required: rc1, rc2 and rc3. The rc3 round lets fixes found
+after the first external reports land before the stable promise. Both `1.0.0rc2`
+and `1.0.0rc3` ship only after their own full green release gate and green CI on
+the exact commit. A further candidate is required only if a release blocker
+needs one.
+
+Stable 1.0 does not follow rc3 automatically. A candidate must have a period
+without new defect reports, and the following criteria must hold:
+
+- Five consented first-run sessions with people new to Guardana. Target: at
+  least four of five people complete a failure, a fix and one custom check in
+  ten minutes without maintainer help. The clean-install starter provides
+  saved evidence without an account, key, model or collector. It uses built-in
+  trust and explains what an installed pack would execute. Separate paths
+  cover local scans, recorded answers and a real application.
+- Two independent teams run locked checks against their own application.
+  Recipes pin profiles, datasets, packs and grading identities. Each team
+  saves a failed and an incomplete result, versions and regrades a redacted
+  regression, and gates it in CI with a reviewable artifact. Use safe fixtures
+  or doubles. Label any model harness clearly. Sensitive production data is
+  never promoted automatically.
+- One controlled live retrieval pilot on a team's own retrieval target catches
+  a poisoned document and a tenant-filter failure without an uncontrolled
+  side effect.
+- One successful third-party customization and an independent reproduction
+  are recorded with consent. Third-party targets, rules, evaluators, formats
+  and reporters work without an engine fork.
+- Python consumers receive failed, incomplete and stopped outcomes as typed
+  data. Case outcomes and missing evidence survive serialization, redaction
+  and export.
+- First-run completion, real-application coverage and the share of attempted
+  checks reaching a supported verdict with comparable evidence are published
+  from generated data. Research is recorded with consent, without telemetry
+  or invented adoption claims.
+- The supported surface, compatibility matrix and deprecation policy are
+  published. The conformance kit is published. A reference pack is
+  independently installable from PyPI, with an independent installation
+  exercised.
+- Every built-in rule that can decline has finding, clean and inconclusive
+  fixtures.
+- Provider and adapter conformance covers the pilots' system messages, tools,
+  failure paths, budgets, usage and adapter limits.
+- The collector envelope is versioned independently from the run schema.
+  Clients and storage migrate together.
+- Older persisted documents and extension conformance pass the release gate.
+  Migrations are exercised with older run, dataset, profile, pack and collector
+  documents.
+- The security runbook is exercised in a drill. Recovery runbooks are exercised.
+
+Today the generated [first-run measure](generated/first-run.md) and
+[application measures](generated/application-measures.md) read "not measured":
+0 of 5 sessions and 0 of 2 teams. The reference pack is attached to the GitHub
+Release but is not on PyPI. Recovery runbooks are exercised by tests, and the
+security drill is not recorded. These facts do not substitute for the remaining
+external evidence.
+
+[Issues](https://github.com/guardana/guardana/issues) are the live work queue.
+The [milestones](https://github.com/guardana/guardana/milestones) `1.0.0rc2`,
+`1.0.0rc3` and `1.0.0` group release scope, not dates. The target remains the
+first quarter of 2027, set by external evidence rather than by the code. A
+missed criterion moves the stable release, not the criterion. The owner decides
+changes to release criteria.
+
+Paired statistical diff (M1) starts when two independent pilot teams use local
+`diff` on comparable saved before/after application runs for a documented ship
+decision, and one needs uncertainty beyond descriptive counts. Collector
+measurements (M3) start when two independent teams submit and read their own
+locked application runs in the optional collector and each asks the same
+cross-run question local files cannot answer. The [roadmap](../ROADMAP.md)
+preserves their full done conditions. Neither these items nor the Later
+possibilities block 1.0.
+
+## Product boundaries for future proposals
+
+The roadmap's eight [product constraints](../ROADMAP.md#product-constraints)
+govern proposals as well as releases.
+
+Ideas without a reproducible problem or acceptance test start in
+[Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
+Promotion to active work requires pilot pain, a reproducible failing case,
+an acceptance criterion and a review of the versioned contract it touches.
+The [contribution principles](../CONTRIBUTING.md#principles) and
+[threat model](threat-model.md) explain these boundaries in more detail.
 
 ## Known limitations
 
@@ -130,13 +226,14 @@ Both checks are verified against a reference application,
 [`examples/retrieval_pilot/`](../examples/retrieval_pilot/), whose tests run them with a
 broken tenant filter, an obeying model, a partly seeded index and the fixed application
 on every CI run. It is a reference, not a team's own retrieval target: until one has run
-them, the retrieval pilot stays open in `ROADMAP.md`.
+them, the retrieval pilot remains an [open 1.0 criterion](#before-the-first-stable-release).
 
 ### Text only
 
 No image, PDF, audio or document carriers. Injection through an image or a PDF an
-agent reads is a real attack class and is **not covered**. `ROADMAP.md` lists
-multimodal attack carriers under "Researched after the foundations."
+agent reads is a real attack class and is **not covered**. A proposal for a
+multimodal carrier needs a pilot's concrete input, expected result and bound
+before it becomes an implementation issue.
 
 ### "OpenAI-compatible" is not a guarantee
 
@@ -233,7 +330,7 @@ clean. It has told you it could not look.
 
 ## Where to go next
 
-- [Roadmap](../ROADMAP.md) — what is coming, in what order, with exit criteria
+- [Current work](https://github.com/guardana/guardana/issues) — issues, ownership and release scope
 - [Threat model](threat-model.md) — what Guardana defends against and what it does not
 - [Safe testing](safe-testing.md) — before you point it at anything that matters
 - [Features](../FEATURES.md) — everything that ships today

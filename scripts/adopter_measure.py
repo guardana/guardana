@@ -290,8 +290,8 @@ def render(path: Path | None = None) -> str:
     teams = sorted({row.team for row in rows})
     if len(teams) < REQUIRED_TEAMS:
         return (
-            f"**Not measured.** {len(teams)} of the {REQUIRED_TEAMS} teams the roadmap asks "
-            f"for have recorded a locked application run, so neither the coverage of the real "
+            f"**Not measured.** {len(teams)} of the {REQUIRED_TEAMS} teams required before "
+            f"1.0 have recorded a locked application run, so neither the coverage of the real "
             f"application nor the supported-verdict share is published.\n"
         )
     applicable = sum(row.rules_selected - row.rules_not_applicable for row in rows)

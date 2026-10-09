@@ -11,4 +11,4 @@ status: stable
 
 Counts from locked application runs that teams recorded, with their consent to publish, in `docs/studies/adopter-runs.csv`. The coverage of the real application is the rules attempted out of the rules that apply to it; the supported-verdict share is the rules that reached a finding or a clean result out of the rules attempted.
 
-**Not measured.** 0 of the 2 teams the roadmap asks for have recorded a locked application run, so neither the coverage of the real application nor the supported-verdict share is published.
+**Not measured.** 0 of the 2 teams required before 1.0 have recorded a locked application run, so neither the coverage of the real application nor the supported-verdict share is published.

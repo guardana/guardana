@@ -198,7 +198,7 @@ def _taxonomy(rules: list[Rule]) -> str:
         _HEADER,
         "Which entries of each framework at least one built-in rule maps to.",
         "Coverage of an entry is not a claim that the entry is fully addressed —",
-        "see `ROADMAP.md` for the honest per-category assessment.\n",
+        "See [detection limits](detection-limits.md) for what each rule proves.\n",
         "| Framework | Entries covered |",
         "|---|---|",
     ]

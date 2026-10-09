@@ -13,7 +13,7 @@ Guardana is an open-source AI security verification tool for security and platfo
 [![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Quickstart](#quickstart) · [Features](FEATURES.md) · [Rule catalog](docs/generated/rule-catalog.md) · [Docs](docs/index.md) · [Status & limits](docs/product-status.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Get involved](#get-involved)
+[Quickstart](#quickstart) · [Features](FEATURES.md) · [Rule catalog](docs/generated/rule-catalog.md) · [Docs](docs/index.md) · [Status & limits](docs/product-status.md) · [Current work](https://github.com/guardana/guardana/issues) · [Changelog](CHANGELOG.md) · [Get involved](#get-involved)
 
 </div>
 
@@ -260,7 +260,7 @@ The collector is optional. Local and CI verification do not depend on it. For sh
 > **Maturity: beta.** Finding routes require scoped API keys. Projects cannot read each other's data, and keys can be pinned to an environment. Findings have audited lifecycle states and expiring waivers. Operators control retention and deletion. The dashboard uses a read-scoped session; it has no human identities or RBAC.
 > [`docs/usage-collector.md`](docs/usage-collector.md) · [`docs/deployment.md`](docs/deployment.md)
 
-The engine and built-in rules are Apache-2.0. See the project [principles](CONTRIBUTING.md#principles) and [roadmap](ROADMAP.md).
+The engine and built-in rules are Apache-2.0. See the project [principles](CONTRIBUTING.md#principles) and [current work](https://github.com/guardana/guardana/issues).
 
 ## Documentation
 
@@ -270,7 +270,7 @@ The engine and built-in rules are Apache-2.0. See the project [principles](CONTR
 - [`docs/install.md`](docs/install.md) · [`docs/usage-init.md`](docs/usage-init.md) · [`docs/profiles.md`](docs/profiles.md) · [`docs/exit-codes.md`](docs/exit-codes.md)
 - [`docs/usage-suites.md`](docs/usage-suites.md) · [`docs/python-api.md`](docs/python-api.md) — quality suites and supported Python API
 - [`docs/threat-model.md`](docs/threat-model.md) · [`docs/privacy.md`](docs/privacy.md) · [`docs/safe-testing.md`](docs/safe-testing.md)
-- [`ROADMAP.md`](ROADMAP.md) · [`CHANGELOG.md`](CHANGELOG.md)
+- [Current work](https://github.com/guardana/guardana/issues) · [Release milestones](https://github.com/guardana/guardana/milestones) · [`CHANGELOG.md`](CHANGELOG.md)
 
 ## Security
 
@@ -283,7 +283,7 @@ Report suspected vulnerabilities privately through [`SECURITY.md`](SECURITY.md),
 ## Get involved
 
 - Try it in about ten minutes and tell us where you got stuck in a [first-run session](docs/studies/first-run-study.md).
-- Bring your team's LLM, RAG or MCP application as a [pilot](docs/studies/adopter-study.md). Start in GitHub Discussions’ [Pilots category](https://github.com/guardana/guardana/discussions) or email contact@guardana.dev.
+- Bring your team's LLM, RAG or MCP application as a [pilot](docs/studies/adopter-study.md). Start in [GitHub Discussions](https://github.com/guardana/guardana/discussions) or email contact@guardana.dev.
 - Write your own pack or check. See [docs/extending.md](docs/extending.md) and [examples/](examples/).
 - Star the repository or watch releases if you want to follow 1.0.
 

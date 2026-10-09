@@ -62,34 +62,85 @@ Until 1.0, a breaking change can land in a minor release and is announced under
 
 ## Versioning
 
-Guardana follows [Semantic Versioning](https://semver.org). The twist is that it
-is **pre-1.0**, and 0.x has its own rules — under SemVer, `0.y.z` makes *no*
-stability promise across a **minor** bump, so the minor slot carries what the
-major slot will carry after 1.0:
+Guardana is **pre-1.0** until a final 1.x release. [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)
+governs change impact. Package version strings use
+[PEP 440](https://packaging.python.org/en/latest/specifications/version-specifiers/).
 
-| You're releasing… | Bump | Pre-1.0 (`0.y.z`) | Post-1.0 (`x.y.z`) |
-|---|---|---|---|
-| A backwards-**incompatible** change (renamed/removed public API, a rule id change, a stricter default that can fail a previously-passing build) | **minor** pre-1.0, **major** post-1.0 | `0.1.4 → 0.2.0` | `1.4.2 → 2.0.0` |
-| A backwards-**compatible** new feature (a new rule, a new flag, a new evaluator) | **minor** post-1.0, **patch**-or-minor pre-1.0 | `0.1.4 → 0.2.0` *(or `→ 0.1.5` if you want to signal "small")* | `1.4.2 → 1.5.0` |
-| A backwards-compatible **bug fix** (no API change) | **patch** | `0.1.4 → 0.1.5` | `1.4.2 → 1.4.3` |
+### Historical 0.y.z releases
 
-Practical pre-1.0 rule of thumb: **patch = "safe to upgrade blindly"**, **minor
-= "read the changelog, something might break."** Because a security tool can
-*fail a build* by design, treat "a new HIGH/CRITICAL rule that will flag code
-that passed before" as a **breaking** change (minor bump) — users pin to a range
-precisely so that doesn't surprise their CI. Between Guardana's own packages
-the pins are exact (`==0.1.0`): the five ship together and are tested only as
-one set, so nothing else may resolve beside them.
+Guardana's convention was that a minor release carried compatible features or
+breaking changes. A breaking change was announced as "Changed — breaking",
+with replacement guidance. This included a new default-enabled check or an
+intentionally stricter default that could fail a previously passing build.
+A patch was a compatible correction.
+
+### The 1.0 candidate freeze
+
+The `1.0.0rcN` candidates carry fixes only. They follow neither the historical
+`0.y.z` feature rules nor the post-1.0 minor-release rules.
+
+Until stable 1.0, candidates add no CLI flag, persisted field, rule family or
+public API. A change to the existing supported surface is allowed only to
+correct a defect in it and must be announced.
+
+`scripts/release.py` refuses a candidate whose generated
+`docs/generated/api-surface.json` moved since the previous tag unless the
+changelog's Unreleased section has a Changed, Deprecated or Removed entry.
+That check enforces the announcement requirement; the fixes-only policy still
+applies.
+
+### Choosing a release after 1.0
+
+The highest-impact change decides the version. The number of completed issues
+does not.
+
+| Version part | Change |
+|---|---|
+| Patch | A compatible correction, including a false-green fix within documented behaviour. The changelog states which gates may now fail. |
+| Minor | Compatible opt-in functionality, a new opt-in check, or a deprecation. |
+| Major | A contract break, a removal, dropping a reader for an older persisted document, a check enabled by default that can fail a previously passing build, or an intentionally stricter default. |
+
+Experimental behaviour and thresholds are outside the stability promise; their
+saved documents still follow the persisted-document policy. A contract break,
+removal, dropped reader or intentionally stricter default requires a major
+release.
+
+### Merging and publishing
+
+Documentation-only, test-only and maintainer-tooling-only changes need no
+package release. A maintainer squash-merges a pull request after review and
+checks. The merge runs CI and never publishes a package.
+
+A maintainer chooses the version from completed issues, runs the full release
+gate, waits for green CI on the exact commit, then pushes the version tag.
+Publishing pauses for one approval.
+
+One tag releases all five packages at the same version: `guardana-core`,
+`guardana-rules`, `guardana-cli`, `guardana-report` and `guardana-server`.
+Between Guardana's own packages the pins are exact: the five ship together at
+the same version and are tested only as one set, so nothing else may resolve
+beside them.
+
+### Package versions and release candidates
+
+A release candidate's package version is written in PEP 440 form, for example
+`1.0.0rc2`, and its Git tag is `v1.0.0rc2`. PEP 440 orders these versions:
+
+`1.0.0rc1 < 1.0.0rc2 < 1.0.0rc10 < 1.0.0`
+
+A risky minor or major release may first use a release candidate, such as
+`1.1.0rc1`. A candidate is a pre-release, not a stable release.
 
 ### When to release 1.0
 
-Cut `1.0.0` when the public API (the `guardana.core` surface, the rule/evaluator/
-target contracts, the CLI flags, the profile schema, the collector envelope) is
-one you're willing to keep stable — i.e. the next breaking change would be rare
-and deliberate. 1.0 is a promise, not a maturity badge; don't rush it, but don't
-hide behind 0.x forever either. Everything from 1.0 on follows the right-hand
-column above. The criteria, the release plan and the target are the first goal in
-[ROADMAP.md](../ROADMAP.md).
+Release `1.0.0` only when the supported surface is ready for the compatibility
+promise and all [stable-release criteria](product-status.md#before-the-first-stable-release)
+hold. Both `1.0.0rc2` and `1.0.0rc3` are required, and stable 1.0 does not
+follow rc3 automatically. The
+[GitHub milestones](https://github.com/guardana/guardana/milestones) group
+release scope, not dates. The target remains the first quarter of 2027,
+set by external evidence rather than by the code. A missed criterion moves the
+release, not the criterion.
 
 ## The collector envelope
 

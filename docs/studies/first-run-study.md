@@ -1,13 +1,13 @@
 ---
 title: "First-run study"
 nav_order: 13
-summary: "How the maintainer runs the five first-run sessions the roadmap asks for, the consent a participant gives, and the sheet the published measure is generated from"
+summary: "How the maintainer runs the five first-run sessions required before 1.0, records consent, and generates the published measure"
 status: stable
 ---
 
 # First-run study
 
-The roadmap's F2 row asks whether a new user can get a failing result, fix it, keep the evidence and edit one check, offline, within ten minutes. Only people new to Guardana can answer that question. This page explains how the maintainer runs those sessions. The published answer is [generated from the sheet](../generated/first-run.md) and says "not measured" until five consented sessions are recorded.
+The [F2 release criterion](../product-status.md#before-the-first-stable-release) asks whether a new user can get a failing result, fix it, keep the evidence and edit one check, offline, within ten minutes. Only people new to Guardana can answer that question. This page explains how the maintainer runs those sessions. The published answer is [generated from the sheet](../generated/first-run.md) and says "not measured" until five consented sessions are recorded.
 
 ## One session
 
