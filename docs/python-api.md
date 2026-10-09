@@ -32,6 +32,8 @@ verification.save(Path("run.json"))  # the document `--format json --output` wri
 
 A run that fails, stays indeterminate, or is stopped by its budget or by its target failing part-way is returned like one that passed. Read `verification.gate`, `verification.exit_code` or `verification.open_questions`; nothing is raised for an outcome.
 
+To keep runs in the optional collector, the CLI sends them with `--reporter server://<collector URL>`; the collector's [HTTP API](usage-collector.md#the-http-api) stores and serves results without starting runs. `verification.save(path)` writes the same run document as `--format json --output`.
+
 ## Configure a run
 
 `Verifier` holds the configuration and can run several targets in turn. It is frozen: to change the configuration, build another.

@@ -665,6 +665,75 @@ the app in code) accepts a collector anyone who can reach the port can read and
 write. It exists for evaluating Guardana on a laptop, and it has to be typed:
 combined with choosing the ephemeral store, that is two explicit switches for the
 toy configuration and none for the real one.</p>
+<h2 id="the-http-api">The HTTP API</h2>
+<p>The optional collector stores and serves results submitted by Guardana runs. It starts no scan, probe or other job. Runs execute where Guardana runs (the CLI, CI, the Python API), and the CLI submits them with <code>--reporter server://&lt;collector URL&gt;</code>.</p>
+<p><code>/openapi.json</code> lists routes, key permissions and refusals: <code>401</code> for a missing or unaccepted key, <code>403</code> for insufficient permission, and <code>503</code> when the database cannot be reached to check the key.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Permission</th>
+<th>Session cookie accepted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /findings</code></td>
+<td><code>ingest</code></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>GET /findings</code></td>
+<td><code>read</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>GET /trend</code></td>
+<td><code>read</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>GET /stats</code> (dashboard only)</td>
+<td><code>read</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>/healthz</code>, <code>/readyz</code></td>
+<td>None (public)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/catalog</code>, <code>/</code> (dashboard only)</td>
+<td>None (public)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>POST /session</code>, <code>DELETE /session</code> (dashboard only)</td>
+<td>None; <code>POST</code> takes a <code>read</code> key in its body</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/openapi.json</code>, and FastAPI's <code>/docs</code> and <code>/redoc</code> viewers</td>
+<td>None (public)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>Send keys as <code>Authorization: Bearer &lt;key&gt;</code>. Read routes also accept the <code>guardana_session</code> cookie set by the dashboard after <code>POST /session</code>; a <code>Bearer</code> header takes precedence. Permissions belong to keys, not OAuth2 scopes.</p>
+<p>With <code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code>, no route requires a key and the OpenAPI document declares no security requirement.</p>
+<p><code>--reporter</code> sends the whole versioned envelope: gate, run id and findings. Its schema is <a href="https://github.com/guardana/guardana/blob/main/schemas/collector-envelope-v8.schema.json"><code>schemas/collector-envelope-v8.schema.json</code></a>.</p>
+<p>This example posts a hand-written synthetic envelope to show its shape:</p>
+<pre><code class="language-bash">export INGEST_KEY=gdn_…   # a key with the ingest permission
+export READ_KEY=gdn_…     # a key with the read permission
+curl -s -X POST https://collector.example.com/findings \
+  -H &quot;Authorization: Bearer $INGEST_KEY&quot; -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;schema_version&quot;: 8, &quot;source&quot;: &quot;ci/acme-web&quot;,
+       &quot;findings&quot;: [{&quot;rule_id&quot;: &quot;acme.synthetic_check&quot;, &quot;severity&quot;: &quot;HIGH&quot;,
+                     &quot;title&quot;: &quot;Synthetic finding&quot;, &quot;target_ref&quot;: &quot;app/settings.py:3&quot;,
+                     &quot;evidence&quot;: {&quot;summary&quot;: &quot;a synthetic example&quot;}}]}'
+curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; &quot;https://collector.example.com/findings?limit=1&quot;
+curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; https://collector.example.com/trend   # {&quot;HIGH&quot;: 1} on a fresh project
+</code></pre>
 <h2 id="migrations">Migrations</h2>
 <pre><code class="language-bash">guardana-collector status      # what is applied, what is pending
 guardana-collector migrate     # apply everything pending

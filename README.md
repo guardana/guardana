@@ -255,7 +255,7 @@ A run records what was checked, what could not be checked, and the sample used. 
 
 ## Central monitoring — self-hosted
 
-The collector is optional. Local and CI verification do not depend on it. For shared visibility, runs can send normalized findings to self-hosted `guardana-server`, backed by PostgreSQL with an opt-in dashboard.
+The collector is optional. Local and CI verification do not depend on it. For shared visibility, runs can send normalized findings to self-hosted `guardana-server`, backed by PostgreSQL with an opt-in dashboard. The collector's [HTTP API](docs/usage-collector.md#the-http-api) stores and serves results and does not start scans or probes. `/openapi.json` describes its routes, `ingest` and `read` key permissions, and refusals.
 
 > **Maturity: beta.** Finding routes require scoped API keys. Projects cannot read each other's data, and keys can be pinned to an environment. Findings have audited lifecycle states and expiring waivers. Operators control retention and deletion. The dashboard uses a read-scoped session; it has no human identities or RBAC.
 > [`docs/usage-collector.md`](docs/usage-collector.md) · [`docs/deployment.md`](docs/deployment.md)

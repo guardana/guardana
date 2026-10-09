@@ -31,6 +31,7 @@ To try a candidate, join a pilot or contribute, read [Community](docs/community.
 | Re-run checks on a schedule | `guardana monitor ...` | each cycle gated and compared with the first cycle |
 | Use verification in tests | `guardana.testing.assert_secure(...)` | the same policy as a pytest assertion |
 | Run verification from Python | `guardana.core.verify.Verifier(trust=...)` | the run `scan` or `probe` writes, as typed data, failed and stopped runs included |
+| Keep and read results over HTTP | `--reporter server://URL`; `GET /findings`; `GET /trend` (optional collector) | Stored runs read back per project with a `read` key; `/openapi.json` describes routes and permissions. No route starts a scan or probe. |
 
 `probe`, `plan probe`, `target inspect`, `monitor` and every judge read one connection —
 `--url`, `--model`, `--provider`, `--api-key-env`, `--adapter` — and refuse one they cannot
