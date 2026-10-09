@@ -153,7 +153,7 @@ def _notes(notes: Path) -> list[tuple[str, str, str]]:
     try:
         return [(note.title, note.url, inline_text(note.summary)) for note in read_notes(notes)]
     except SiteBuildError as exc:
-        sys.exit(f"error: {exc}")
+        raise SystemExit(f"error: {exc}") from exc
 
 
 def _render() -> str:
