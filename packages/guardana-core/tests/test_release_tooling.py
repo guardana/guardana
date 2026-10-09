@@ -723,6 +723,24 @@ def test_every_workflow_declares_the_token_it_needs(workflow: str) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "workflow", sorted(p.name for p in (Path(__file__).parents[3] / ".github/workflows").iterdir())
+)
+def test_no_workflow_grants_a_write_scope_to_all_of_its_jobs(workflow: str) -> None:
+    """A write scope belongs to the job that needs it, never to the whole file.
+
+    A top-level grant reaches every job, including one added later that only lints, and
+    OpenSSF Scorecard's Token-Permissions check scores the file by it.
+    """
+    config = yaml.safe_load(
+        (_repo_root() / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    )
+    top = config.get("permissions")
+    assert isinstance(top, dict), f"{workflow}: no top-level permissions block"
+    writes = sorted(scope for scope, level in top.items() if level == "write")
+    assert not writes, f"{workflow}: grants {writes} to every job"
+
+
 def test_the_no_cache_job_says_so_instead_of_relying_on_a_default() -> None:
     """The example-plugin job runs everything with `--no-cache`, so nothing fills the cache.
 
