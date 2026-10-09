@@ -1,7 +1,7 @@
 ---
 name: plan
 description: Turn a development task into one work file in .work/ — goal, decisions, lanes with exact files and verification, done-criteria. Use for M and L tasks before writing code, and whenever a task needs a design decision, touches a persisted schema, an exit code, the extension contract or the collector, or will be split across subagents.
-argument-hint: "[task description]"
+argument-hint: "[issue #N | task description]"
 ---
 # Plan — one file, spec and plan together
 
@@ -14,11 +14,13 @@ spec, the plan, the task briefs and the progress ledger. Target: under 150 lines
 ## Before you write
 
 1. **Find out, cheaply.** Send `scout` for "where does X live / who calls Y"; read yourself only
-   what the design turns on. Check `ROADMAP.md`, open issues and `.work/` — the work may
-   already be planned.
+   what the design turns on. Check open issues, milestones, `docs/product-status.md` and
+   `.work/` — the work may already be planned.
 2. **Ask only what is the user's to decide** (product behaviour, what a user's CI will see, what
    is paid). Everything the code or the docs can answer, answer yourself. Put open questions at
    the top of the file and keep working on what does not depend on them.
+   For an issue, fill the template's Issue section as `/work` § From an issue says: owner,
+   milestone, linked PRs, release impact, and every acceptance criterion as a checkbox.
 3. **Name the blast radius.** Which of these does the change touch? Each one adds a done-criterion:
    - a persisted document (run manifest, report envelope, baseline, lock file, profile, pack
      manifest, `schemas/`) → `schema_version` moves, a migration exists, the round-trip test
@@ -61,6 +63,7 @@ receives it, and review it as text.
 - the documented command run against a real or faked target, its artifact read
 - reviewed (`/review`), findings fixed or answered
 - the five documentation places answered in the same change (`/docs`)
+- every acceptance box of the issue ticked with its evidence, or the issue left open
 - work file deleted in the shipping commit; leftovers opened as issues
 
 Show the user the goal, the decisions and the lane list in a few lines, then continue unless a

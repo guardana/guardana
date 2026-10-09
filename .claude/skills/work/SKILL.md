@@ -1,13 +1,44 @@
 ---
 name: work
 description: Entry point for any development task in this repo — feature, bugfix, refactor, cleanup, a new command, target or evaluator, a collector change. Sizes the task, picks the lightest lifecycle that is still safe, and says which model tier does which part. Use at the start of a task, or to resume one from .work/.
-argument-hint: "[task description | path to a work file]"
+argument-hint: "[issue #N | next | task description | path to a work file]"
 ---
 # Work — the lifecycle
 
 Task: $ARGUMENTS
 
 In-flight work files: !`ls .work/*.md 2>/dev/null || echo none`
+
+## From an issue, or `next`
+
+GitHub Issues are the work queue and milestones the release scope (`CONTRIBUTING.md` § Planning
+work in public). Read before planning — every call below is a GET:
+
+```bash
+gh issue view N --json number,title,body,state,labels,milestone,assignees,url,closedByPullRequestsReferences
+gh issue view N --comments          # a comment may already claim it ("I'd like to take this")
+gh pr list --state open --search "N" --json number,title,author,headRefName
+gh api repos/guardana/guardana/milestones --jq '.[] | select(.state=="open") | {title, open_issues}'
+gh issue list --state open --milestone "<title>" --json number,title,labels,assignees,url
+```
+
+- **`next`** takes the open milestone of the nearest release (`1.0.0rc2` before `1.0.0rc3`
+  before `1.0.0`) and picks one issue with no assignee, no open PR, no claiming comment, no
+  `needs-evidence` label, and acceptance criteria that still match HEAD. Order: a release
+  blocker, then a bug, then the rest. No milestone, no ready issue or no `gh` access → say so
+  and stop; never invent work to fill the slot.
+- **Claiming is public.** Assigning, labelling or commenting on an issue needs the user's yes
+  unless the task said so; record the claim in the work file either way.
+- **Every issue gets a work file**, even an S one (Goal, Issue, Acceptance, Handoff are
+  enough), so another session can continue it. Copy each acceptance criterion into it as a
+  checkbox with the evidence that will prove it, and state the release impact from
+  `docs/compatibility.md#versioning`. While a candidate milestone is open, only fixes qualify:
+  no new CLI flag, persisted field, rule family or public API.
+- **Close only on evidence.** `Closes #N` goes into a commit or PR only when every acceptance
+  box is ticked with its evidence; otherwise `Refs #N`, and the work file says what remains.
+  An issue about a release or a measurement closes when the artifact or the measure exists,
+  not when the code merges.
+- An unscoped idea goes to Discussions Ideas, not into a work file.
 
 ## 0. Check it is still true, and that nobody holds it
 

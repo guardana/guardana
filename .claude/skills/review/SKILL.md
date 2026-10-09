@@ -27,4 +27,7 @@ git status --short | head -60
 Other people's uncommitted work may sit in this tree. Review only what belongs to the change
 described by the work file or the range; list anything else under "not reviewed".
 
+When the work file names an issue, check each ticked acceptance box against its evidence and
+say which are not proven; a closing keyword over an unproven box is a finding.
+
 Follow your review order and report format exactly.

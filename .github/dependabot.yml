@@ -53,9 +53,9 @@ updates:
   # the fixture's pins deserve still appears in the Security tab — as of
   # 2026-08-03, all twelve of them, and none from a real dependency of any
   # shipped package. They are dismissed by hand with a reason, which is the only
-  # mechanism GitHub offers. Do not "fix" the pins to clear them: the roadmap's
-  # "no known critical vulnerability" box is about what Guardana ships, and this
-  # directory is not shipped.
+  # mechanism GitHub offers. Do not "fix" the pins to clear them: this
+  # directory is a deliberately vulnerable example and is not shipped in a
+  # Guardana package. Review alerts against the shipped dependency graph.
   - package-ecosystem: "pip"
     directory: "/examples/vulnerable-model"
     schedule:
