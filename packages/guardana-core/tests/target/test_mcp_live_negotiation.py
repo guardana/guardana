@@ -26,7 +26,7 @@ from guardana.core.target import (
     TargetChanged,
     TargetKind,
 )
-from guardana.core.target._mcp_http import RawReply
+from guardana.core.target._mcp_http import RawReply, RedirectRefusedError
 from guardana.core.target._mcp_wire import INITIALIZED, LATEST_VERSION, LEGACY_VERSION, LEGACY_WIRE
 from guardana.core.testing import ScriptedMcpServer
 
@@ -468,6 +468,90 @@ def test_a_result_without_a_session_id_still_reads_as_none_issued() -> None:
 
     assert sessions.sampling_error is None
     assert sessions.not_stripped_because == "the server issues no session id"
+
+
+class _CutsSamplingShort(ScriptedMcpServer):
+    """Answers the first `answered` credentialed handshakes, then every later one with `cut`."""
+
+    def __init__(
+        self, url: str, *, answered: int, cut: RawReply | McpError, **settings: object
+    ) -> None:
+        super().__init__(url, **settings)  # type: ignore[arg-type]
+        self.answered = answered
+        self.cut = cut
+        self.handshakes = 0
+
+    def __call__(self, url: str, **kwargs: object) -> RawReply:
+        body, headers = _sent(kwargs)
+        if body.get("method") == "initialize" and "Authorization" in headers:
+            self.handshakes += 1
+            if self.handshakes > self.answered:
+                if isinstance(self.cut, McpError):
+                    raise self.cut
+                return self.cut
+        return super().__call__(url, **kwargs)  # type: ignore[arg-type]
+
+
+_RATE_LIMITED = RawReply(429, {}, b"")
+_FAILING = RawReply(
+    200,
+    {},
+    json.dumps(
+        {"jsonrpc": "2.0", "id": 1, "error": {"code": -32603, "message": "internal error"}}
+    ).encode(),
+)
+_REDIRECTED = RedirectRefusedError("https://1.2.3.4/mcp", "it leaves the server's origin")
+_NO_SESSION = RawReply(
+    200,
+    {},
+    json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"protocolVersion": LEGACY_VERSION, "capabilities": {}, "serverInfo": {}},
+        }
+    ).encode(),
+)
+
+
+@pytest.mark.parametrize(
+    ("cut", "reason"),
+    [
+        (_RATE_LIMITED, "the handshake was answered with HTTP 429"),
+        (_FAILING, "the handshake was answered with JSON-RPC error -32603"),
+        (_REDIRECTED, f"the handshake could not be sent: {_REDIRECTED}"),
+        (_NO_SESSION, "a later handshake was answered without a session id"),
+    ],
+    ids=["status", "json-rpc-error", "transport", "no-session-id"],
+)
+def test_sampling_cut_short_after_an_id_keeps_why_it_stopped(
+    cut: RawReply | McpError, reason: str
+) -> None:
+    server = _CutsSamplingShort(
+        ROUTABLE, answered=1, cut=cut, tools=TOOLS, credential=CREDENTIAL, session_ids=IDS
+    )
+
+    sessions = _target(server, credential=CREDENTIAL).authorization().sessions
+
+    assert sessions.ids == (IDS[0],)
+    assert sessions.sampling_error == reason
+
+
+def test_a_handshake_that_could_not_be_sent_is_not_a_server_issuing_no_session_id() -> None:
+    server = _CutsSamplingShort(
+        ROUTABLE,
+        answered=0,
+        cut=_REDIRECTED,
+        tools=TOOLS,
+        credential=CREDENTIAL,
+        session_ids=IDS,
+    )
+
+    sessions = _target(server, credential=CREDENTIAL).authorization().sessions
+
+    assert sessions.ids == ()
+    assert sessions.sampling_error == f"the handshake could not be sent: {_REDIRECTED}"
+    assert sessions.not_stripped_because is None
 
 
 def test_every_session_id_the_run_learned_is_withheld_with_the_credential() -> None:

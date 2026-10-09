@@ -233,7 +233,11 @@ class Sessions:
     not_stripped_because: str | None = None
     no_protocol_sessions: str | None = None
     sampling_error: str | None = None
-    """Why sampling stopped before any id was collected: an error or a status, not a result."""
+    """Why sampling stopped short of every planned handshake: an error or a status, not a result.
+
+    Set beside `ids` when it stopped after some were collected, so the ids are a partial
+    sample a rule cannot read the absence of a structure from.
+    """
     unsettled_offer: str | None = None
     """Why it is not known whether the server offers a revision with sessions at all."""
 
@@ -610,8 +614,8 @@ class _Probe:
             return Sessions(not_stripped_because="the server issues no session id")
         declined = self._cannot_strip_the_credential(anonymous)
         if declined is not None:
-            return Sessions(ids=ids, not_stripped_because=declined)
-        return self._without_the_credential(ids, legacy)
+            return Sessions(ids=ids, not_stripped_because=declined, sampling_error=sampling_error)
+        return replace(self._without_the_credential(ids, legacy), sampling_error=sampling_error)
 
     def tasks(self, anonymous: Anonymous, offer: Callable[[], "LegacyOffer"]) -> Tasks:
         """Ask once for the task list presenting no credential, and record what came back.
@@ -848,20 +852,24 @@ class _Probe:
 
         Bounded by attempts rather than by results, so a server that issues no
         session id ends the loop instead of handshaking until the budget stops it.
-        The reason is kept only when the very first handshake was not a result: an
-        error there is not a server that issues no session id.
+        Whenever the loop ends short of `_SESSION_SAMPLES` ids for any reason but a
+        first result carrying none, the reason is returned: a handshake that failed
+        is not a server issuing no session id, and a partial sample cannot show that
+        the ids have no structure.
         """
         sampled: list[str] = []
         for _ in range(_SESSION_SAMPLES):
             try:
                 reply = self._call("initialize", self._opening(wire), wire=wire)
-            except McpError:
-                break
+            except McpError as exc:
+                return tuple(sampled), f"the handshake could not be sent: {exc}"
             problem = _sampling_problem(reply)
             if problem is not None:
-                return tuple(sampled), (None if sampled else problem)
+                return tuple(sampled), problem
             issued = self._session_id_of(reply)
             if issued is None:
+                if sampled:
+                    return tuple(sampled), "a later handshake was answered without a session id"
                 break
             sampled.append(issued)
         return tuple(sampled), None
