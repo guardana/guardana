@@ -27,6 +27,12 @@ behaviour.
 
 ## The reasoning
 
+`plan scan`, `plan probe`, `plan grade`, `config explain`, `target inspect` and
+`run inspect` accept `--format human` or
+`--format json`. Any other format, including `sarif` and `junit`, exits `3`
+before the command reads configuration or a saved run, discovers plugins or
+builds a target.
+
 **Every non-zero code is a non-pass.** Nothing in the table means "probably
 fine". A CI job that treats any non-zero as a failure is *correct* by default and
 gets finer control only if it asks for it — the safe reading is the default

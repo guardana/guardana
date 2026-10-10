@@ -59,6 +59,9 @@ This inspection cost 3 request(s).
 | `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
 | `--profile PATH` | none | A `guardana.yaml` whose `plugins:` decides which installed plugins load — see [`profiles.md`](profiles.md#plugin-trust-plugins) |
 
+Only `human` and `json` are accepted. Any other `--format` exits `3` before
+reading configuration, discovering plugins or contacting the endpoint.
+
 `--target` is mutually exclusive with the built-in connection flags. The
 selected class comes from the trusted `guardana.targets` entry points; an unknown
 scheme, conflicting owner, rejected option, or wrong target kind exits `3` before

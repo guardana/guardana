@@ -30,7 +30,7 @@ from guardana.cli._connection import (
 )
 from guardana.cli._evaluators import wire_config_evaluators
 from guardana.cli._exit import refuse_invalid_profile, refuse_unenforceable_budget
-from guardana.cli._formats import OutputFormat
+from guardana.cli._formats import ReportFormat
 from guardana.cli._mcp_run import plan_target, registry_entry_from, require_chat_endpoint
 from guardana.cli._plugins import (
     AllowPluginOption,
@@ -246,7 +246,7 @@ def _render_json(run_plan: RunPlan) -> str:
 
 def _emit(  # noqa: PLR0913 — the plan, how to print it, and what it was planned against
     run_plan: RunPlan,
-    output_format: OutputFormat,
+    output_format: ReportFormat,
     kind: TargetKind,
     *,
     profile: Profile,
@@ -254,7 +254,7 @@ def _emit(  # noqa: PLR0913 — the plan, how to print it, and what it was plann
     replayed: bool = False,
     retries: int = 0,
 ) -> None:
-    if output_format is OutputFormat.json:
+    if output_format is ReportFormat.json:
         typer.echo(_render_json(run_plan))
     else:
         typer.echo(_render_human(run_plan, kind, replayed=replayed, retries=retries))
@@ -388,7 +388,7 @@ def plan_scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this
     path: Annotated[Path | None, typer.Argument(help="Directory that would be scanned")] = None,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
-    format: Annotated[OutputFormat, typer.Option(help="human|json")] = OutputFormat.human,
+    format: Annotated[ReportFormat, typer.Option(help="human|json")] = ReportFormat.human,
     no_plugins: NoPluginsOption = False,
     plugins: PluginsOption = None,
     allow_plugin: AllowPluginOption = None,
@@ -454,7 +454,7 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
     fixtures: FixturesOption = None,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
-    format: Annotated[OutputFormat, typer.Option(help="human|json")] = OutputFormat.human,
+    format: Annotated[ReportFormat, typer.Option(help="human|json")] = ReportFormat.human,
     rules: Annotated[
         list[Path], typer.Option("--rules", help="Directory or file of custom YAML rules.")
     ] = [],  # noqa: B006 — typer builds the option from a literal default
@@ -635,7 +635,7 @@ def plan_grade(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
     recording: Annotated[Path, typer.Argument(help="The recording `guardana grade` would grade.")],
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
-    format: Annotated[OutputFormat, typer.Option(help="human|json")] = OutputFormat.human,
+    format: Annotated[ReportFormat, typer.Option(help="human|json")] = ReportFormat.human,
     rules: Annotated[
         list[Path], typer.Option("--rules", help="Directory or file of custom YAML rules.")
     ] = [],  # noqa: B006 — typer builds the option from a literal default

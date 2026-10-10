@@ -60,6 +60,10 @@ More in [exit codes](exit-codes.md) and [the gate](profiles.md#the-gate).
 - [`safe-testing.md`](safe-testing.md) — bound active checks and side effects
 - [`exit-codes.md`](exit-codes.md) — interpret command outcomes
 
+`plan scan`, `plan probe`, `plan grade`, `target inspect`, `config explain` and
+`run inspect` produce `human` or `json`
+output. An unsupported format is invalid usage, exit `3`, before command work.
+
 ## Evidence and regression
 
 - [`usage-run.md`](usage-run.md) — inspect and migrate saved runs

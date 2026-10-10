@@ -34,6 +34,8 @@ run 0191d4c2-8f1a-7c3e-9b21-6f0a2d8e4c11
 ```
 
 `--format json` prints the manifest. `requests: 0` is measured; tokens are `not recorded`.
+`run inspect` accepts only `human` and `json`. Any other `--format`, including
+`sarif` or `junit`, exits `3` before reading the saved run.
 A run started from a recipe adds a `recipe:` line under `target:`, such as
 `recipe:    checkout (model_harness, from a recording)`: the recipe's name, the subject
 it declared and how the run reached it. A run given fixtures adds a `fixtures:` line, such as

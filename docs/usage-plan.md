@@ -42,6 +42,12 @@ shows up in `unknown_cost` exactly like an undeclared endpoint rule would.
 
 `--format json` gives the same numbers to a pipeline, with a `schema_version`.
 
+`plan scan`, `plan probe` and `plan grade` accept only `human` and `json`.
+Any other `--format` exits `3`
+before reading configuration, discovering plugins or building the target.
+`run inspect` also accepts only these formats and refuses others before reading
+the saved run.
+
 ## Flags
 
 `plan scan` and `plan probe` both discover plugins to build the same registry the

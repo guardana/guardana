@@ -219,6 +219,8 @@ guardana run inspect run.json
   evidence:  redacted
 </code></pre>
 <p><code>--format json</code> prints the manifest. <code>requests: 0</code> is measured; tokens are <code>not recorded</code>.
+<code>run inspect</code> accepts only <code>human</code> and <code>json</code>. Any other <code>--format</code>, including
+<code>sarif</code> or <code>junit</code>, exits <code>3</code> before reading the saved run.
 A run started from a recipe adds a <code>recipe:</code> line under <code>target:</code>, such as
 <code>recipe:    checkout (model_harness, from a recording)</code>: the recipe's name, the subject
 it declared and how the run reached it. A run given fixtures adds a <code>fixtures:</code> line, such as

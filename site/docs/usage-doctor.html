@@ -265,6 +265,8 @@ budget finding out.</p>
 <h2 id="config-explain--what-is-actually-in-force"><code>config explain</code> — what is actually in force</h2>
 <pre><code class="language-bash">guardana config explain --format json
 </code></pre>
+<p><code>config explain</code> accepts only <code>human</code> and <code>json</code>. Any other <code>--format</code> exits
+<code>3</code> before reading the profile or loading the files and plugins it names.</p>
 <p>A profile file shows what somebody wrote. The question they actually have is what
 is <em>in force</em>, and most of a gate is defaults — including the ones nobody typed.
 <code>explain</code> prints the resolved settings: thresholds, budgets, privacy, safety, plugin

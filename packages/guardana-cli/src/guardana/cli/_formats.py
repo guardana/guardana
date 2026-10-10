@@ -19,6 +19,13 @@ FORMAT_HELP = "human|json|sarif|junit, or an installed format"
 """The `--format` help of every command that can also write an installed format."""
 
 
+class ReportFormat(StrEnum):
+    """Formats a non-findings command can produce."""
+
+    human = "human"
+    json = "json"
+
+
 def is_built_in_format(value: str) -> bool:
     """Whether `value` names one of the four built-in formats."""
     return value in OutputFormat.__members__

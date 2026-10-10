@@ -296,6 +296,8 @@ This inspection cost 3 request(s).
 </tr>
 </tbody>
 </table></div>
+<p>Only <code>human</code> and <code>json</code> are accepted. Any other <code>--format</code> exits <code>3</code> before
+reading configuration, discovering plugins or contacting the endpoint.</p>
 <p><code>--target</code> is mutually exclusive with the built-in connection flags. The
 selected class comes from the trusted <code>guardana.targets</code> entry points; an unknown
 scheme, conflicting owner, rejected option, or wrong target kind exits <code>3</code> before
