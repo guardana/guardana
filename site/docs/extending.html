@@ -286,7 +286,7 @@ only for a rule that grades in its own code and stamps verdicts with its own id,
 </tr>
 <tr>
 <td><code>Rule.not_applicable_to(target)</code></td>
-<td>Return why the rule has nothing to check on <code>target</code> as a non-empty string, or <code>None</code>. The run and the plan record the rule as skipped <code>not_applicable</code>, never as a check that ran. Any other return (<code>False</code>, <code>&quot;&quot;</code>) is an error naming the hook and what it returned, and the rule runs.</td>
+<td>Return why the rule has nothing to check on <code>target</code> as a non-empty string, or <code>None</code>. The run and the plan record the rule as skipped <code>not_applicable</code>, never as a check that ran. Any other return (<code>False</code>, <code>&quot;&quot;</code>) is an error naming the hook and what it returned, and the rule runs. A hook that raises is also an error naming the hook and the exception, recorded in the run and the plan, and the rule runs. Only rules the profile selects are asked.</td>
 </tr>
 <tr>
 <td><code>raise NotOffered(detail, missing=(...))</code></td>

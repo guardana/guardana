@@ -219,7 +219,7 @@ def pre_run_errors(
         *registry.load_errors,
         *registry.expectation_errors(),
         *_unknown_recorded_rules(registry, target),
-        *_unreadable_applicability(registry, target),
+        *_unreadable_applicability(selected, target),
         *_broken_regressions(selected, registry),
     )
 
@@ -826,7 +826,7 @@ def applicability_refusal(rule: Rule, target: Target) -> SkippedRule | None:
 
     Not a coverage gap: nothing the rule needs is missing. Only a non-empty string is a
     reason. A rule whose `not_applicable_to` raises, or returns anything else, is run
-    instead of read as having nothing to check; `pre_run_errors` records the second.
+    instead of read as having nothing to check; `pre_run_errors` records either as an error.
     """
     try:
         reason = rule.not_applicable_to(target)
@@ -847,21 +847,21 @@ def _is_reason(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def _unreadable_applicability(registry: Registry, target: Target) -> tuple[CheckError, ...]:
-    """Return an error for every rule whose `not_applicable_to` answered neither None nor a reason.
+def _unreadable_applicability(selected: Sequence[Rule], target: Target) -> tuple[CheckError, ...]:
+    """Return an error for every selected rule whose applicability hook raised or gave no answer.
 
-    Asked of the rules the hook is consulted for: those of `target`'s kind whose
-    capabilities it declares. Such a rule is run rather than skipped, and the error keeps
-    a run under `fail_on_error` from passing on a hook that cannot say what it meant.
+    An answer is None or a non-empty reason.
+
+    Such a rule is run rather than skipped, and the error keeps a run under
+    `fail_on_error` from passing on a hook that cannot say what it meant. A rule the
+    profile left out is never asked.
     """
-    capabilities = set(target.capabilities())
     errors: list[CheckError] = []
-    for rule in registry.rules():
-        if rule.meta.target_kind != target.kind or rule.meta.required_capabilities - capabilities:
-            continue
+    for rule in selected:
         try:
             answer: object = rule.not_applicable_to(target)
-        except Exception:  # noqa: S112 — the rule runs, and records its own failure
+        except Exception as exc:
+            errors.append(CheckError.from_exception(rule.meta.id, "applicability", exc))
             continue
         if answer is None or _is_reason(answer):
             continue
