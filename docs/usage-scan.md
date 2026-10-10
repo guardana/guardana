@@ -82,7 +82,8 @@ install a rule that reads the format.
 
 A model or notebook a rule tried to read and could not is a shortfall of the same kind,
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
-name the scanner cannot resolve, a model file that cannot be opened (a `.bin` included,
+name the scanner cannot resolve, a pickle naming a callable by an extension-registry
+code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file whose header is malformed, a file cut by a
 read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports
 two things for it: an inconclusive "not scanned" result on the unverified channel, and an
