@@ -3,7 +3,7 @@ extension_api: 2
 packs:
 - name: guardana-reference-pack
   distribution: guardana-reference-pack
-  version: 0.1.0
+  version: 0.1.1
   rules:
     reference.prompt.codename_disclosure:
       digest: b00991d5ddc71066
