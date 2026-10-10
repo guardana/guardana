@@ -208,19 +208,23 @@ def _editable_pin(
     root = Path(url2pathname(parts.path))
     if not root.is_dir():
         return "the directory its editable install names does not exist"
-    escaped = _loaded_from_outside(found, root)
+    escaped = _loaded_from_outside(found, root, leave_out)
     if escaped is not None:
         return escaped
     return tree_pin(root, leave_out=leave_out)
 
 
-def _loaded_from_outside(found: importlib.metadata.Distribution, root: Path) -> str | None:
-    """Why the install imports code its directory does not hold; None when it imports none.
+def _loaded_from_outside(
+    found: importlib.metadata.Distribution, root: Path, leave_out: Iterable[Path] = ()
+) -> str | None:
+    """Why the install imports code its tree pin does not hold; None when it imports none.
 
     The path files and setuptools finders its `RECORD` lists are what make an editable
-    install importable, so a path one of them names outside `root`, or a hook a path
-    file runs other than a finder read here, is code no tree pin covers.
+    install importable, so a path one of them names outside `root`, or under a directory
+    the tree pin leaves out, or a hook a path file runs other than a finder read here, is
+    code no tree pin covers.
     """
+    left_out = frozenset(path.resolve() for path in leave_out)
     files = found.files
     if files is None:
         return "it has no RECORD to read"
@@ -245,12 +249,30 @@ def _loaded_from_outside(found: importlib.metadata.Distribution, root: Path) -> 
         if paths is None:
             return f"its {name} maps its packages in a way Guardana cannot read"
         for path in paths:
-            if not (located.parent / path).resolve().is_relative_to(inside):
-                return (
-                    f"its {name} loads code from {path}, outside the directory it was "
-                    f"installed from"
-                )
+            unpinned = _unpinned_load(name, path, located.parent, inside, left_out)
+            if unpinned is not None:
+                return unpinned
     return None
+
+
+def _unpinned_load(
+    name: str, path: str, base: Path, root: Path, left_out: frozenset[Path]
+) -> str | None:
+    """Why code `name` loads from `path` is not covered by the tree pin of `root`, or None."""
+    loaded = (base / path).resolve()
+    if not loaded.is_relative_to(root):
+        return f"its {name} loads code from {path}, outside the directory it was installed from"
+    if _unpinned_part(loaded, root, left_out):
+        return f"its {name} loads code from {path}, which the pin leaves out"
+    return None
+
+
+def _unpinned_part(path: Path, root: Path, left_out: frozenset[Path]) -> bool:
+    """Whether `path`, inside `root`, lies under a directory `tree_pin` leaves out."""
+    parts = path.relative_to(root).parts
+    if any(_excluded(part, top=index == 0) for index, part in enumerate(parts)):
+        return True
+    return any(path.is_relative_to(left) for left in left_out)
 
 
 def _is_finder(name: str) -> bool:
