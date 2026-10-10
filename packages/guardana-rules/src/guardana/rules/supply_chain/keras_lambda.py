@@ -189,6 +189,9 @@ class KerasLambdaRule(ArtifactRule):
 def _read_keras_config(path: Path) -> object | None:
     """Read and parse `config.json` from a `.keras` archive; None if unreadable."""
     try:
+        # A FIFO or device node opens and then blocks on read, which would hang the scan.
+        if not path.is_file():
+            return None
         with zipfile.ZipFile(path) as archive:
             if "config.json" not in archive.namelist():
                 return None

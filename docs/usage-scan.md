@@ -84,13 +84,19 @@ A model or notebook a rule tried to read and could not is a shortfall of the sam
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
 name the scanner cannot resolve, a model file that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file whose header is malformed, a file cut by a
-read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports two things for it: an inconclusive
-"not scanned" result on the unverified channel, and an `unexamined_component` shortfall
-whose name is the file's path and whose detail reads `<rule id> could not read it:
-<reason>`. The file is not named a second time by format. With no switch over it, a scan
-holding one such file is `indeterminate` (exit `2`) under every preset, `ci` included,
-unless a finding fails it. A notebook cell that does not parse as Python is not one: the
-notebook was read, and the cell is reported as an unverified result only.
+read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports
+two things for it: an inconclusive "not scanned" result on the unverified channel, and an
+`unexamined_component` shortfall whose name is the file's path and whose detail reads
+`<rule id> could not read it: <reason>`. The file is not named a second time by format.
+With no switch over it, a scan holding one such file is `indeterminate` (exit `2`) under
+every preset, `ci` included, unless a finding fails it. A notebook cell that does not
+parse as Python is not one: the notebook was read, and the cell is reported as an
+unverified result only. The IPython line magics `%time`, `%timeit`, `%prun` and `%debug`,
+and the first line of the `%%timeit`, `%%prun` and `%%debug` cell magics, are read as
+Python after their options are removed; `%system` and `%sx` lines are read as shell
+escapes, like `!`, and `%%sx`, `%%system` and `%%!` cells as shell cells, like `%%bash`,
+whose magic is found on the first non-blank line; other magics are skipped. A magic whose
+statement does not parse makes the cell inconclusive.
 
 Shortfall names are relative to the working directory, as finding locations are, and the
 scan root is removed from their detail, so a saved run names the same file on a laptop

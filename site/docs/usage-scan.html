@@ -338,12 +338,19 @@ install a rule that reads the format.</p>
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
 name the scanner cannot resolve, a model file that cannot be opened (a <code>.bin</code> included,
 since it may be a model), a safetensors file whose header is malformed, a file cut by a
-read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports two things for it: an inconclusive
-&quot;not scanned&quot; result on the unverified channel, and an <code>unexamined_component</code> shortfall
-whose name is the file's path and whose detail reads <code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format. With no switch over it, a scan
-holding one such file is <code>indeterminate</code> (exit <code>2</code>) under every preset, <code>ci</code> included,
-unless a finding fails it. A notebook cell that does not parse as Python is not one: the
-notebook was read, and the cell is reported as an unverified result only.</p>
+read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports
+two things for it: an inconclusive &quot;not scanned&quot; result on the unverified channel, and an
+<code>unexamined_component</code> shortfall whose name is the file's path and whose detail reads
+<code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format.
+With no switch over it, a scan holding one such file is <code>indeterminate</code> (exit <code>2</code>) under
+every preset, <code>ci</code> included, unless a finding fails it. A notebook cell that does not
+parse as Python is not one: the notebook was read, and the cell is reported as an
+unverified result only. The IPython line magics <code>%time</code>, <code>%timeit</code>, <code>%prun</code> and <code>%debug</code>,
+and the first line of the <code>%%timeit</code>, <code>%%prun</code> and <code>%%debug</code> cell magics, are read as
+Python after their options are removed; <code>%system</code> and <code>%sx</code> lines are read as shell
+escapes, like <code>!</code>, and <code>%%sx</code>, <code>%%system</code> and <code>%%!</code> cells as shell cells, like <code>%%bash</code>,
+whose magic is found on the first non-blank line; other magics are skipped. A magic whose
+statement does not parse makes the cell inconclusive.</p>
 <p>Shortfall names are relative to the working directory, as finding locations are, and the
 scan root is removed from their detail, so a saved run names the same file on a laptop
 and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.</p>
