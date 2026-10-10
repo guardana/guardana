@@ -145,6 +145,10 @@ $ guardana monitor --url http://localhost:11434 --model llama3 --interval 300 --
 1 finding(s); 8 rule(s) run, 0 skipped.
 ```
 
+Skipped checks are part of that trailing count: rules the target does not
+offer (e.g. a2a rules, or rules needing `plant_system_prompt`/`seeded_data`
+against a plain chat endpoint) are reported as skipped rather than run.
+
 ## Forwarding alerts to a collector
 
 ```bash
