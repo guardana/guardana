@@ -251,7 +251,10 @@ guardana scan . --reporter server://https://collector.example.com
 ```
 
 Findings are POSTed to the collector after being printed locally — this
-never blocks the local exit-code gate. See
+never blocks the local exit-code gate. Required collector delivery still
+changes the code: each unacknowledged delivery the profile required is printed
+as an `error:` line, and a final `0`, `1` or `2` becomes `8` (see
+[`exit-codes.md`](exit-codes.md)). See
 [`architecture.md`](architecture.md#the-coreserver-boundary).
 
 ## Saving a run for comparison
