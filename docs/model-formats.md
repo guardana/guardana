@@ -95,19 +95,28 @@ class OnnxSummary:
 
 The graph is walked straight off disk by a dependency-free streaming protobuf
 reader that seeks past tensor payloads, so summarising a multi-gigabyte model
-reads kilobytes. `STANDARD_ONNX_DOMAINS` is exported alongside it: anything else
-in `node_domains` means the runtime must register a native operator library
-before the model will run.
+reads kilobytes. The walk covers every graph the model carries: the main graph
+and its sparse initializers, tensors and subgraphs held in node attributes
+(Constant values, If/Loop/Scan bodies), model-local functions and training
+graphs. `node_domains` and `external_data_paths` collect from all of them.
+`STANDARD_ONNX_DOMAINS` is exported alongside it: anything else in
+`node_domains` means the runtime must register a native operator library before
+the model will run.
 
-`truncated` is the honest half of the bound — it says the field budget ran out
-before the walk finished. **A partial walk has not cleared the model, whatever
-it found**: a lead in the fields it reached says nothing about a worse one past
-the budget. A rule reports the findings it has and says the walk was partial:
+`truncated` is the honest half of the bound — it says the walk did not finish:
+the field budget ran out, subgraphs were nested deeper than 32 levels, or the
+metadata passed `Limits.max_header_bytes`. The
+`guardana.supply_chain.onnx_graph` rule gives a file one field per two bytes of
+its size, never fewer than 1,000,000 and never more than 8,000,000, so a graph
+below the cap is walked in full. **A partial walk has not cleared the model,
+whatever it found**: a lead in the fields it reached says nothing about a worse
+one past the budget. A rule reports the findings it has and says the walk was
+partial:
 
 ```python
 yield from self._graded(path, summary)
 if summary.truncated:
-    yield self._unscanned(path, "the graph was too large to walk within the budget", ctx)
+    yield self._unscanned(path, "the model was too large or nested too deeply to walk in full", ctx)
 ```
 
 `_unscanned` there yields the inconclusive finding and reports the file as an
