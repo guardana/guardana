@@ -159,7 +159,7 @@ Built-in evaluators are:
 - `contains` for required or forbidden case-sensitive substrings; a forbidden one fails in any reply under grade;
 - `exact_match` for comparison with a reference answer, with optional normalization;
 - `json_valid` for valid JSON and optional required keys;
-- `regex` for matching a bounded reply against a pattern; `must_match: false` fails in any reply under grade;
+- `regex` for matching a bounded reply against a pattern; each search is stopped after 2 seconds as `inconclusive`; `must_match: false` fails in any reply under grade;
 - `reference_judge` for grading against a reference answer with a versioned rubric;
 - `guard` for an optional external safety classifier, given every reply under grade in one call.
 
