@@ -155,3 +155,12 @@ def test_an_unreadable_h5_is_reported_as_unscanned(tmp_path: Path) -> None:
     os.mkfifo(tmp_path / "model.h5")
     assert [severity for severity, _ in _findings(tmp_path)] == ["LOW"]
     assert _unread(tmp_path) == [str(tmp_path / "model.h5")]
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="mkfifo is POSIX-only")
+def test_a_keras_file_that_is_not_a_regular_file_is_reported_as_unscanned(
+    tmp_path: Path,
+) -> None:
+    os.mkfifo(tmp_path / "model.keras")
+    assert [severity for severity, _ in _findings(tmp_path)] == ["LOW"]
+    assert _unread(tmp_path) == [str(tmp_path / "model.keras")]

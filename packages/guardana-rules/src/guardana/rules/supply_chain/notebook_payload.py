@@ -2,6 +2,7 @@ import ast
 import json
 import re
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 from guardana.core.evaluator.base import Verdict
@@ -27,9 +28,33 @@ from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefi
 # Fetching a script and piping it straight into a shell (`curl … | sh`) is the
 # classic notebook payload — a channel the `.py` AST scanners never see.
 _PIPE_TO_SHELL = re.compile(r"\|\s*(sudo\s+)?(ba)?sh\b")
-_SHELL_CELL_MAGIC = ("%%bash", "%%sh", "%%script")
+_SHELL_CELL_MAGIC = ("%%bash", "%%sh", "%%script", "%%sx", "%%system", "%%!")
 # IPython shell forms that are not Python: a `!` line escape, and `var = !cmd`.
 _ASSIGN_SHELL = re.compile(r"^\s*[\w.]+\s*=\s*!(.*)$")
+_SHELL_LINE_MAGICS = frozenset({"system", "sx"})
+_OPTION_WORD = re.compile(r"\S+")
+
+
+@dataclass(frozen=True)
+class _MagicOptions:
+    """The leading options a Python-running line magic accepts before its statement."""
+
+    flags: str = ""
+    valued: str = ""
+    long_valued: tuple[str, ...] = ()
+
+
+# Line magics that execute their argument as Python, with the options IPython
+# parses off the front of it (getopt for `timeit`/`prun`, argparse for `debug`).
+_PYTHON_LINE_MAGICS = {
+    "time": _MagicOptions(),
+    "timeit": _MagicOptions(flags="tcqo", valued="nrpv"),
+    "prun": _MagicOptions(flags="rq", valued="DlsT"),
+    "debug": _MagicOptions(valued="b", long_valued=("breakpoint",)),
+}
+# Cell magics whose own line, after its options, is also run as Python (the
+# setup statement for `%%timeit`); `%%time` refuses code on that line.
+_PYTHON_CELL_MAGICS = {name: _PYTHON_LINE_MAGICS[name] for name in ("timeit", "prun", "debug")}
 
 
 def _cell_source(cell: object) -> str | None:
@@ -42,19 +67,81 @@ def _cell_source(cell: object) -> str | None:
     return source if isinstance(source, str) else None
 
 
+def _short_options(word: str, options: _MagicOptions) -> bool | None:
+    """Read a getopt-style cluster such as `-qn1`.
+
+    None means `word` is not an option cluster this magic accepts; otherwise the
+    result says whether the next word is the value of its last option.
+    """
+    if word == "-" or not word.startswith("-") or word.startswith("--"):
+        return None
+    for position, char in enumerate(word[1:], start=1):
+        if char in options.valued:
+            return position == len(word) - 1
+        if char not in options.flags:
+            return None
+    return False
+
+
+def _long_option(word: str, options: _MagicOptions) -> bool | None:
+    """Read `--name[=value]`; None unless it abbreviates an option this magic accepts."""
+    name, equals, _ = word[2:].partition("=")
+    if not word.startswith("--") or not name:
+        return None
+    if not any(option.startswith(name) for option in options.long_valued):
+        return None
+    return not equals
+
+
+def _magic_statement(args: str, options: _MagicOptions) -> str:
+    """Return the Python a line magic runs: `args` past the options it accepts.
+
+    The first word that is not an accepted option starts the statement, so an
+    unknown option stays in the Python and is parsed with it, never discarded.
+    """
+    value_pending = False
+    for match in _OPTION_WORD.finditer(args):
+        word = match.group()
+        if value_pending:
+            value_pending = False
+            continue
+        if word == "--":
+            return args[match.end() :].lstrip()
+        takes_value = _short_options(word, options)
+        if takes_value is None:
+            takes_value = _long_option(word, options)
+        if takes_value is None:
+            return args[match.start() :]
+        value_pending = takes_value
+    return ""
+
+
+def _magic_python(args: str, options: _MagicOptions | None, indent: str) -> str:
+    """Return the Python a magic line contributes in its place; blank if it runs none."""
+    if options is None:
+        return ""
+    statement = _magic_statement(args, options)
+    return indent + statement if statement else ""
+
+
 def _split_shell_and_python(source: str) -> tuple[str, list[str]]:
     """Separate a cell into (Python source, shell command lines).
 
-    `!` escapes, `var = !cmd`, and `%%bash`-style cell magics run a shell, not
-    Python; line magics (`%…`) are dropped so the remaining Python parses. Removed
-    lines are blanked, not deleted, so a reported line still maps to the cell.
+    `!` escapes, `var = !cmd`, `%system`/`%sx` and `%%bash`-style cell magics run
+    a shell, not Python. A magic that runs Python (`%time`, `%timeit`, `%prun`,
+    `%debug`, and the first line of `%%timeit`, `%%prun`, `%%debug`) keeps its
+    statement in place of the magic; every other magic line is dropped so the
+    remaining Python parses. Removed lines are blanked, not deleted, so a
+    reported line still maps to the cell.
     """
     lines = source.splitlines()
-    if lines and lines[0].lstrip().startswith(_SHELL_CELL_MAGIC):
+    # IPython drops leading blank lines before it looks for a cell magic.
+    first = next((index for index, line in enumerate(lines) if line.strip()), None)
+    if first is not None and lines[first].lstrip().startswith(_SHELL_CELL_MAGIC):
         return "", lines
     python: list[str] = []
     shell: list[str] = []
-    for line in lines:
+    for index, line in enumerate(lines):
         stripped = line.lstrip()
         assign = _ASSIGN_SHELL.match(line)
         if stripped.startswith("!"):
@@ -63,8 +150,19 @@ def _split_shell_and_python(source: str) -> tuple[str, list[str]]:
         elif assign:
             shell.append(assign.group(1))
             python.append("")
+        elif stripped.startswith("%%"):
+            name, _, args = stripped[2:].partition(" ")
+            options = _PYTHON_CELL_MAGICS.get(name) if index == first else None
+            python.append(_magic_python(args, options, ""))
         elif stripped.startswith("%"):
-            python.append("")
+            # IPython takes the magic's name up to the first space, exactly.
+            name, _, args = stripped[1:].partition(" ")
+            if name in _SHELL_LINE_MAGICS:
+                shell.append(args)
+                python.append("")
+            else:
+                indent = line[: len(line) - len(stripped)]
+                python.append(_magic_python(args, _PYTHON_LINE_MAGICS.get(name), indent))
         else:
             python.append(line)
     return "\n".join(python), shell
