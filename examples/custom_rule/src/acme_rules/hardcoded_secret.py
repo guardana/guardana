@@ -33,7 +33,7 @@ def _read_guarded(path: Path) -> tuple[str | None, str | None]:
     try:
         if not path.is_file():
             return None, "not a regular file"
-        with open(path, "rb") as handle:
+        with path.open("rb") as handle:
             raw = handle.read(_READ_LIMIT_BYTES + 1)
     except OSError as exc:
         return None, f"could not read: {exc}"
