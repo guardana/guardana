@@ -49,6 +49,11 @@ dependency, an import or an entry point:
 uv run python scripts/clean_install_check.py   # ~40s: five packages, empty venv
 ```
 
+After `uv lock` or `uv add`, and on a Dependabot `uv` pull request, run
+`uv run python scripts/export_image_requirements.py` and commit the three
+`deploy/docker/*-requirements.txt` files it rewrites: the container images install
+from them, and CI refuses an export that no longer matches `uv.lock`.
+
 And one more, whenever you touch anything a third-party pack depends on — the
 `Rule`/`Evaluator`/`Target` contracts, the entry-point groups, the pack manifest:
 

@@ -293,7 +293,9 @@ README says so before the quickstart.
 **Stance:** trusted publishing via OIDC (no long-lived token). Each release
 publishes Sigstore-signed build provenance and PyPI's PEP 740 attestation for the
 distributions, a CycloneDX SBOM per distribution, and an SBOM and provenance
-attestation beside each container image. How to check them is in
+attestation beside each container image. Both images install third-party
+dependencies by version and hash from files exported from `uv.lock`, so they
+run the versions CI tested. How to check them is in
 [`SECURITY.md`](../SECURITY.md#what-a-release-publishes-and-how-to-check-it-yourself).
 
 A tag ruleset lets only maintainers create, move or delete `v*` tags. The `pypi` environment requires one reviewer's approval for every publish. The `publish` job requires `ci-passed`, so a tag publishes only a commit CI passed. Both ghcr packages are public. `scripts/check_repo_settings.py` reports each setting as `PRESENT`, `ABSENT` or `NOT CHECKED`.
