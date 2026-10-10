@@ -311,6 +311,14 @@ def test_ci_builds_and_runs_both_images_on_every_push() -> None:
     _index_of(steps, "scripts/image_smoke.py")
 
 
+def test_ci_checks_the_image_requirements_against_the_lock_before_building() -> None:
+    """An image built from a stale export runs versions the test job never ran."""
+    steps = _steps(_workflow("ci.yml"), "images")
+    check = _index_of(steps, "scripts/export_image_requirements.py --check")
+
+    assert check < _index_of(steps, "scripts/image_smoke.py")
+
+
 def test_the_release_publishes_both_images_with_an_sbom_and_provenance() -> None:
     """A published image is a supply-chain artifact or it is a mystery binary."""
     steps = _steps(_workflow("release.yml"), "images")

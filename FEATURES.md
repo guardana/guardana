@@ -199,7 +199,8 @@ without guessing from a short id.
 - Python 3.11–3.13 and five separately installable distributions.
 - A SHA-pinned GitHub Action and generic JSON, SARIF, JUnit, and human output.
 - CI examples for GitHub, GitLab, Jenkins, and Azure DevOps.
-- Multi-architecture CLI and collector containers.
+- Multi-architecture CLI and collector containers. Their dependencies are the
+  versions in `uv.lock`, installed by hash.
 - OpenTelemetry GenAI input plus LangChain, Pydantic AI, OpenAI Agents, Hermes,
   and shell-hook integration examples.
 - No account and no telemetry; an artifact scan opens no network connection unless a `--reporter` is configured.

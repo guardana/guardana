@@ -428,7 +428,9 @@ README says so before the quickstart.</p>
 <p><strong>Stance:</strong> trusted publishing via OIDC (no long-lived token). Each release
 publishes Sigstore-signed build provenance and PyPI's PEP 740 attestation for the
 distributions, a CycloneDX SBOM per distribution, and an SBOM and provenance
-attestation beside each container image. How to check them is in
+attestation beside each container image. Both images install third-party
+dependencies by version and hash from files exported from <code>uv.lock</code>, so they
+run the versions CI tested. How to check them is in
 <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a>.</p>
 <p>A tag ruleset lets only maintainers create, move or delete <code>v*</code> tags. The <code>pypi</code> environment requires one reviewer's approval for every publish. The <code>publish</code> job requires <code>ci-passed</code>, so a tag publishes only a commit CI passed. Both ghcr packages are public. <code>scripts/check_repo_settings.py</code> reports each setting as <code>PRESENT</code>, <code>ABSENT</code> or <code>NOT CHECKED</code>.</p>
 <p><strong>Residual risk:</strong> Git tags are not signed. Images before 0.33.0 carry unsigned

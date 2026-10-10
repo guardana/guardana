@@ -108,8 +108,36 @@ docker build -f deploy/docker/cli.Dockerfile -t guardana-cli:dev .
 docker build -f deploy/docker/collector.Dockerfile -t guardana-collector:dev .
 ```
 
+### Where the dependencies come from
+
+Neither image resolves dependencies at build time. Each installs a requirement file
+exported from `uv.lock`, the lock CI tests against, with every version pinned and
+every file checked by hash (`pip install --require-hashes --no-deps`):
+
+| File | Installed into |
+|---|---|
+| `cli-requirements.txt` | the CLI image: dependencies of `guardana-cli`, `guardana-core`, `guardana-rules` and `guardana-report` |
+| `collector-requirements.txt` | the collector image: `guardana-server` with its `serve` extra, with no engine dependencies |
+| `build-requirements.txt` | a build-only environment: `hatchling`, the build backend, from the lock's `image-build` group |
+
+The locked `hatchling` builds the Guardana packages from the copied source without
+build isolation. They are installed with `--no-deps`; `pip check` then fails the build
+if the locked set does not cover their declared dependencies. The build environment
+stays in the first stage, so the shipped image contains no `hatchling`. The image
+keeps its base image's `pip` without upgrading it.
+
+After any change to `uv.lock`, regenerate the three files. CI fails if the export
+is stale:
+
+```bash
+uv run python scripts/export_image_requirements.py           # rewrite them from uv.lock
+uv run python scripts/export_image_requirements.py --check   # what CI runs
+```
+
 `uv run python scripts/image_smoke.py` builds both and runs them — the same
 checks CI runs on every push, including a scan of the deliberately malicious
 fixture that must exit `1`. An image whose rule catalog failed to ship reports
 "no findings" and exits `0`, and that is the failure this project exists to
-prevent.
+prevent. Before building, it checks that every package in those files has a
+wheel in `uv.lock` that installs on `linux/arm64`, the release platform it does not
+build. It names any package that would need compilation there.

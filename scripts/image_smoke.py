@@ -11,10 +11,15 @@ one that matters most, a scan of the deliberately malicious fixture exiting `1`
 rather than reporting a clean bill of health), and a real HTTP request against a
 collector started exactly the way the image's `CMD` starts it.
 
+Before building, it checks that every package the images install from
+`deploy/docker/*-requirements.txt` has a wheel in `uv.lock` that installs on
+linux/arm64, the second platform a release publishes and the one this run does not
+build. A package without one would be compiled from source at release time, or fail.
+
     uv run python scripts/image_smoke.py
     uv run python scripts/image_smoke.py --no-build   # reuse what is already built
 
-Needs Docker. CI runs it on every push.
+Needs Docker. CI runs it on every push. The arm64 check reads only `uv.lock`.
 """
 
 import argparse
@@ -25,6 +30,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +42,15 @@ _COLLECTOR_IMAGE = "guardana-collector:smoke"
 _CONTAINER = "guardana-collector-smoke"
 _PORT = 18000
 _STARTUP_SECONDS = 30
+_REQUIREMENT_RE = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s;\\]+)")
+_FROM_RE = re.compile(r"^FROM\s+(?P<image>\S+)", re.MULTILINE)
+_BASE_RE = re.compile(r"python:(?P<major>\d+)\.(?P<minor>\d+)-slim-bookworm@sha256:[0-9a-f]+")
+_DOCKERFILES = ("cli.Dockerfile", "collector.Dockerfile")
+_MANYLINUX_RE = re.compile(r"manylinux_(?P<major>\d+)_(?P<minor>\d+)_aarch64")
+_INTERPRETER_RE = re.compile(r"(?P<kind>py|cp)(?P<major>\d)(?P<minor>\d*)")
+# The glibc of Debian bookworm; `_base_python` refuses any other base, so a move to a
+# distribution with another glibc has to change this too.
+_BASE_GLIBC = (2, 36)
 
 
 @dataclass(frozen=True)
@@ -56,6 +71,98 @@ def _version() -> str:
     if match is None:
         raise SystemExit("could not read the version from guardana-core/pyproject.toml")
     return match.group("v")
+
+
+def _normalized(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _interpreter_fits(interpreter: str, abi: str, python: tuple[int, int]) -> bool:
+    match = _INTERPRETER_RE.fullmatch(interpreter)
+    if match is None or int(match["major"]) != python[0]:
+        return False
+    minor = int(match["minor"]) if match["minor"] else None
+    if abi == "none":
+        if match["kind"] == "py":
+            return minor is None or minor <= python[1]
+        return minor == python[1]
+    if abi == "abi3":
+        return match["kind"] == "cp" and minor is not None and minor <= python[1]
+    return match["kind"] == "cp" and minor == python[1] and abi == interpreter
+
+
+def _platform_fits(platform: str) -> bool:
+    if platform in ("any", "manylinux2014_aarch64"):
+        return True
+    match = _MANYLINUX_RE.fullmatch(platform)
+    return match is not None and (int(match["major"]), int(match["minor"])) <= _BASE_GLIBC
+
+
+def wheel_installs_on_arm64(filename: str, python: tuple[int, int]) -> bool:
+    """Whether pip on the images' CPython would install this wheel on linux/aarch64."""
+    interpreters, abis, platforms = filename.removesuffix(".whl").split("-")[-3:]
+    return any(_platform_fits(platform) for platform in platforms.split(".")) and any(
+        _interpreter_fits(interpreter, abi, python)
+        for interpreter in interpreters.split(".")
+        for abi in abis.split(".")
+    )
+
+
+def _locked_wheels(lock: Path) -> dict[tuple[str, str], list[str]]:
+    with lock.open("rb") as handle:
+        packages = tomllib.load(handle).get("package", [])
+    return {
+        (_normalized(package["name"]), package.get("version", "")): [
+            wheel["url"].rsplit("/", 1)[-1] for wheel in package.get("wheels", []) if "url" in wheel
+        ]
+        for package in packages
+    }
+
+
+def _base_python(docker: Path) -> tuple[int, int] | str:
+    """Return the CPython both images are built on, or why the check cannot rely on it."""
+    bases = {}
+    for name in _DOCKERFILES:
+        images = set(_FROM_RE.findall((docker / name).read_text(encoding="utf-8")))
+        match = _BASE_RE.fullmatch(images.pop()) if len(images) == 1 else None
+        if match is None:
+            return f"{name} is not built on one digest-pinned python:X.Y-slim-bookworm image"
+        bases[name] = match
+    if len({match[0] for match in bases.values()}) != 1:
+        return f"{' and '.join(_DOCKERFILES)} are built on different base images"
+    match = bases[_DOCKERFILES[0]]
+    return int(match["major"]), int(match["minor"])
+
+
+def arm64_gaps(root: Path) -> list[str]:
+    """Name every exported requirement that has no wheel installable on linux/arm64.
+
+    Markers are not evaluated: a package limited to another platform is checked
+    anyway, so the check can only be stricter than the install.
+    """
+    python = _base_python(root / "deploy" / "docker")
+    if isinstance(python, str):
+        return [python]
+    wheels = _locked_wheels(root / "uv.lock")
+    files = sorted((root / "deploy" / "docker").glob("*-requirements.txt"))
+    if not files:
+        return ["deploy/docker holds no exported requirement files to check"]
+    gaps = []
+    for path in files:
+        pins = [
+            match
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if (match := _REQUIREMENT_RE.match(line))
+        ]
+        if not pins:
+            gaps.append(f"{path.name} pins no package")
+        for pin in pins:
+            key = (_normalized(pin["name"]), pin["version"])
+            if key not in wheels:
+                gaps.append(f"{path.name}: {pin[0]} is not in uv.lock")
+            elif not any(wheel_installs_on_arm64(name, python) for name in wheels[key]):
+                gaps.append(f"{path.name}: {pin[0]} has no wheel for linux/arm64 in uv.lock")
+    return gaps
 
 
 def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
@@ -204,11 +311,17 @@ def main(argv: list[str] | None = None) -> int:
     """Build both images, run every check, and report what failed."""
     no_build: bool = _parser().parse_args(argv).no_build
     version = _version()
+    failures = 0
+    gaps = arm64_gaps(_ROOT)
+    for gap in gaps:
+        failures += 1
+        print(f"  FAIL  arm64: {gap}")
+    if not gaps:
+        print("  ok    arm64: every exported requirement has a linux/arm64 wheel in uv.lock")
     if not no_build:
         _build("cli.Dockerfile", _CLI_IMAGE, version)
         _build("collector.Dockerfile", _COLLECTOR_IMAGE, version)
 
-    failures = 0
     with tempfile.TemporaryDirectory(prefix="guardana-image-smoke-") as workspace:
         clean = Path(workspace) / "clean"
         clean.mkdir()

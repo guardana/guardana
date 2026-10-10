@@ -17,12 +17,23 @@
 FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed AS builder
 
 WORKDIR /src
+COPY deploy/docker/build-requirements.txt deploy/docker/collector-requirements.txt ./
 COPY packages/guardana-server packages/guardana-server
 COPY LICENSE LICENSE
 
-RUN python -m venv /opt/guardana \
-    && /opt/guardana/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/guardana/bin/pip install --no-cache-dir "./packages/guardana-server[serve]"
+# The same install as the CLI image: locked, hash-checked versions only, the package
+# built by the locked backend outside the shipped venv, and `pip check` as the proof
+# that the locked set is complete. The `serve` extra is in the exported set, not here.
+RUN python -m venv /opt/build \
+    && /opt/build/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r build-requirements.txt \
+    && /opt/build/bin/pip wheel --no-cache-dir --no-deps --no-build-isolation \
+        --wheel-dir /src/wheels ./packages/guardana-server \
+    && python -m venv /opt/guardana \
+    && /opt/guardana/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r collector-requirements.txt \
+    && /opt/guardana/bin/pip install --no-cache-dir --no-deps /src/wheels/*.whl \
+    && /opt/guardana/bin/pip check
 
 FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
 

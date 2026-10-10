@@ -2,8 +2,9 @@
 
 `release.py` fetches, runs the gate and pushes; `clean_install_check.py` builds a
 virtual environment; `generate_sbom.py` writes `sbom/`; `image_smoke.py` builds and
-runs containers. A request for usage that did any of that, or an unknown flag that
-was ignored and ran the default, is the script doing something nobody asked for.
+runs containers; `export_image_requirements.py` writes `deploy/docker/`. A request
+for usage that did any of that, or an unknown flag that was ignored and ran the
+default, is the script doing something nobody asked for.
 """
 
 import subprocess
@@ -17,6 +18,7 @@ from typing import Any, NoReturn
 import pytest
 
 import clean_install_check
+import export_image_requirements
 import generate_sbom
 import image_smoke
 import release
@@ -49,7 +51,13 @@ def acted(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     monkeypatch.setattr(tempfile, "TemporaryDirectory", _stub("tempfile.TemporaryDirectory"))
     monkeypatch.setattr(urllib.request, "urlopen", _stub("urllib.request.urlopen"))
     # A stray write lands in an empty directory the test can inspect, not the repository.
-    for module in (release, clean_install_check, generate_sbom, image_smoke):
+    for module in (
+        release,
+        clean_install_check,
+        generate_sbom,
+        image_smoke,
+        export_image_requirements,
+    ):
         monkeypatch.setattr(module, "_ROOT", tmp_path)
     return attempts
 
@@ -61,8 +69,15 @@ _SCRIPTS = pytest.mark.parametrize(
         (clean_install_check, ("--keep",)),
         (generate_sbom, ("--check",)),
         (image_smoke, ("--no-build",)),
+        (export_image_requirements, ("--check",)),
     ],
-    ids=["release", "clean_install_check", "generate_sbom", "image_smoke"],
+    ids=[
+        "release",
+        "clean_install_check",
+        "generate_sbom",
+        "image_smoke",
+        "export_image_requirements",
+    ],
 )
 
 
@@ -134,8 +149,9 @@ def test_release_without_a_part_is_refused(
         (clean_install_check, "keep", "--keep"),
         (generate_sbom, "check", "--check"),
         (image_smoke, "no_build", "--no-build"),
+        (export_image_requirements, "check", "--check"),
     ],
-    ids=["clean_install_check", "generate_sbom", "image_smoke"],
+    ids=["clean_install_check", "generate_sbom", "image_smoke", "export_image_requirements"],
 )
 def test_each_existing_flag_still_parses_and_defaults_off(
     module: ModuleType, attribute: str, flag: str

@@ -12,21 +12,31 @@
 FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed AS builder
 
 WORKDIR /src
+COPY deploy/docker/build-requirements.txt deploy/docker/cli-requirements.txt ./
 COPY packages/guardana-core packages/guardana-core
 COPY packages/guardana-rules packages/guardana-rules
 COPY packages/guardana-report packages/guardana-report
 COPY packages/guardana-cli packages/guardana-cli
 COPY LICENSE LICENSE
 
-# One environment, four distributions, resolved together so the inter-package
-# pins are satisfied from this source tree rather than from PyPI.
-RUN python -m venv /opt/guardana \
-    && /opt/guardana/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/guardana/bin/pip install --no-cache-dir \
+# Every third-party version and hash comes from uv.lock, the set CI tests, so pip
+# resolves nothing. The four packages are built from this tree by the locked backend
+# in a separate venv, so the shipped one carries no build tooling; `pip check` fails
+# the build if the locked set does not satisfy what the packages declare.
+RUN python -m venv /opt/build \
+    && /opt/build/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r build-requirements.txt \
+    && /opt/build/bin/pip wheel --no-cache-dir --no-deps --no-build-isolation \
+        --wheel-dir /src/wheels \
         ./packages/guardana-core \
         ./packages/guardana-rules \
         ./packages/guardana-report \
-        ./packages/guardana-cli
+        ./packages/guardana-cli \
+    && python -m venv /opt/guardana \
+    && /opt/guardana/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r cli-requirements.txt \
+    && /opt/guardana/bin/pip install --no-cache-dir --no-deps /src/wheels/*.whl \
+    && /opt/guardana/bin/pip check
 
 FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
 
