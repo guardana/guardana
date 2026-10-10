@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import re
 
-from sitegen import layout
+from sitegen import layout, theme
 
-_FOCUSABLE = re.compile(r'<(?:a\s[^>]*href=|button|input|select|textarea|summary)[^>]*>', re.I)
+_FOCUSABLE = re.compile(
+    r"<(?:a\s[^>]*href=|button|input|select|textarea|summary)[^>]*>", re.IGNORECASE
+)
 
 
 def _render() -> str:
@@ -32,6 +34,4 @@ def test_main_content_carries_matching_id() -> None:
 
 
 def test_skip_link_visible_on_focus_css() -> None:
-    from sitegen import theme
-
     assert ".skip:focus" in theme.CSS or ".skip:focus-visible" in theme.CSS
