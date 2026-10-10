@@ -143,7 +143,12 @@ imports it is.
   install's `RECORD` lists are read first: a path they add or map outside the directory, or
   into a directory the tree pin leaves out (such as `build/`, where a setuptools strict
   editable install maps its packages, `.venv/` or `*.egg-info/`), is code the pin would not
-  cover, so the distribution stays unpinned. Bytecode under `__pycache__/` is not pinned, but
+  cover, so the distribution stays unpinned. Otherwise each is also pinned by its
+  content and each package and path it maps, relative to the directory. The directory's
+  absolute path, wherever they name it, and the environment's location are excluded, so
+  moving the project and installing it editable again keeps the pin. Editing a finder or
+  `.pth` file, or mapping a package elsewhere, changes it; the bytecode check below applies to
+  each finder too. Bytecode under `__pycache__/` is not pinned, but
   bytecode this interpreter would load in place of a pinned source (hash-based bytecode,
   whatever hash it records, or bytecode recording the source's modification time and size)
   leaves the distribution unpinned unless it is what that source compiles to; bytecode only
