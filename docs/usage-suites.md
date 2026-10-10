@@ -118,4 +118,4 @@ The saved run includes a suite summary; see [suite summaries](usage-run.md#suite
 - The collector receives the target's request count, not `usage.judge`.
 - `diff` pairs cases across runs but does not test a suite's rate statistically.
 - A file holds one calibration per evaluator id.
-- `regex` grades a reply of up to 65,536 characters; a longer reply is `inconclusive`. There is no time bound: a pattern that backtracks can hang on a crafted reply, so avoid nested quantifiers and several `.*` in a row, or use possessive quantifiers and atomic groups.
+- `regex` grades replies up to 65,536 characters; longer replies are `inconclusive`. Each search runs in a separate worker process for at most 2 seconds. Longer searches are stopped and marked `inconclusive` ("regex search exceeded 2 s; not evaluated"), never a pass. Like any `inconclusive` result, this makes the run `indeterminate` (exit `2`) when `fail_on_inconclusive` is on. Backtracking patterns, such as nested quantifiers or several `.*` in a row, can still exhaust this time on a crafted reply; use possessive quantifiers or atomic groups instead.
