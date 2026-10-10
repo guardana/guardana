@@ -15,10 +15,11 @@ import json
 import marshal
 import os
 import py_compile
+import shutil
 import sys
 import sysconfig
 import threading
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 
 import pytest
@@ -1360,3 +1361,180 @@ def test_an_editable_install_without_a_record_stays_unpinned(tmp_path: Path, sit
     )
 
     assert pin_distribution_source("acme-pack") == "it has no RECORD to read"
+
+
+def test_a_plain_tree_pin_keeps_the_digest_earlier_locks_hold(tmp_path: Path) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+
+    assert tree_pin(root) == SourcePin(
+        digest="sha256:d88dbd444d175cf6d68fe1d26a432cf639315c153c419647b682377123dace4e", files=5
+    )
+
+
+def _importable(
+    root: Path, *, mapped: str = "src/acme_pack", pth_extra: str = ""
+) -> dict[str, str]:
+    """The path file and finder a setuptools editable install of `root` writes, by file name."""
+    return {
+        "__editable__.acme_pack-1.0.pth": (
+            f"{root / 'src'}\n{pth_extra}import {_FINDER}; {_FINDER}.install()\n"
+        ),
+        f"{_FINDER}.py": _finder({"acme_pack": str(root / mapped)}, {"acme_ns": [str(root)]}),
+    }
+
+
+def _pinned_with(site: Path, root: Path, files: Mapping[str, str]) -> SourcePin:
+    """Install `acme-pack` editable from `root` with `files` again, and return its pin."""
+    for stale in site.iterdir():
+        if stale.is_dir():
+            shutil.rmtree(stale)
+        else:
+            stale.unlink()
+    _editable_with(site, root, files)
+    pinned = pin_distribution_source("acme-pack")
+    assert isinstance(pinned, SourcePin)
+    return pinned
+
+
+def test_an_editable_pin_moves_when_its_finder_or_path_file_changes(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    files = _importable(root)
+    first = _pinned_with(site, root, files)
+
+    finder = _pinned_with(
+        site, root, {**files, f"{_FINDER}.py": files[f"{_FINDER}.py"] + "import acme_pack\n"}
+    )
+    path_file = _pinned_with(site, root, _importable(root, pth_extra="# rebuilt\n"))
+
+    assert first.files == 7
+    assert finder.digest != first.digest
+    assert path_file.digest != first.digest
+    assert _pinned_with(site, root, files) == first
+
+
+def test_an_editable_pin_moves_when_a_package_is_mapped_to_another_directory_of_the_tree(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    first = _pinned_with(site, root, _importable(root))
+
+    remapped = _pinned_with(site, root, _importable(root, mapped="src/acme_pack/build"))
+
+    assert remapped.digest != first.digest
+
+
+def test_an_editable_pin_moves_when_a_path_its_path_file_names_resolves_elsewhere_in_the_tree(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    link = tmp_path / "current"
+    link.symlink_to(root / "src", target_is_directory=True)
+    files = {"_acme_pack.pth": f"{link}\n"}
+    first = _pinned_with(site, root, files)
+
+    link.unlink()
+    link.symlink_to(root / "src" / "acme_pack", target_is_directory=True)
+    relinked = _pinned_with(site, root, files)
+
+    assert relinked.files == first.files
+    assert relinked.digest != first.digest
+
+
+def _pinned_before_and_after_a_move(
+    tmp_path: Path,
+    site: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    files: Callable[[Path], Mapping[str, str]],
+) -> tuple[SourcePin, SourcePin]:
+    """Pin `acme-pack` installed editable, then moved with its environment and installed again.
+
+    `files` writes the path file and finder for the root they are installed from.
+    """
+    root = _source_tree(tmp_path / "one" / name)
+    first = _pinned_with(site, root, files(root))
+    moved_root = tmp_path / "two" / "checkouts" / name
+    moved_root.parent.mkdir(parents=True)
+    root.rename(moved_root)
+    moved_site = tmp_path / "two" / "venv" / "site-packages"
+    moved_site.mkdir(parents=True)
+    site.rename(tmp_path / "gone")
+    monkeypatch.syspath_prepend(str(moved_site))
+    importlib.invalidate_caches()
+    return first, _pinned_with(moved_site, moved_root, files(moved_root))
+
+
+@pytest.mark.parametrize("name", ["acme-pack", "acme\\pack"], ids=["plain", "escaped-in-a-literal"])
+def test_an_editable_pin_holds_when_the_project_and_its_environment_move(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    first, moved = _pinned_before_and_after_a_move(tmp_path, site, monkeypatch, name, _importable)
+
+    assert moved == first
+    assert first.files == 7
+
+
+def test_a_directory_beside_the_editable_root_is_not_read_as_a_path_inside_it(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, moved = _pinned_before_and_after_a_move(
+        tmp_path,
+        site,
+        monkeypatch,
+        "acme-pack",
+        lambda root: _importable(root, pth_extra=f"# {root}-old/src\n"),
+    )
+
+    assert moved.digest != first.digest
+
+
+def test_bytecode_python_would_load_in_place_of_an_editable_finder_leaves_it_unpinned(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, _importable(root))
+    cached = _cached(site / f"{_FINDER}.py")
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its __pycache__/{cached.name} is not what {_FINDER}.py compiles to"
+    )
+
+
+def test_bytecode_compiled_from_an_editable_finder_leaves_its_pin_where_it_was(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    first = _pinned_with(site, root, _importable(root))
+    finder = site / f"{_FINDER}.py"
+
+    py_compile.compile(str(finder), doraise=True)
+
+    assert (site / "__pycache__").is_dir()
+    assert pin_distribution_source("acme-pack") == first
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_an_editable_finder_that_is_a_fifo_is_never_opened_and_leaves_it_unpinned(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, _importable(root))
+    finder = site / f"{_FINDER}.py"
+    finder.unlink()
+    os.mkfifo(finder)
+    pinned: list[SourcePin | str] = []
+    worker = threading.Thread(
+        target=lambda: pinned.append(pin_distribution_source("acme-pack")), daemon=True
+    )
+
+    worker.start()
+    worker.join(timeout=10)
+    blocked = worker.is_alive()
+    if blocked:
+        os.close(os.open(finder, os.O_WRONLY | os.O_NONBLOCK))
+        worker.join(timeout=10)
+
+    assert not blocked
+    assert pinned == [f"its {_FINDER}.py cannot be read"]

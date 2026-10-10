@@ -2,8 +2,9 @@
 
 A version pin says nothing about such a distribution: its code can change while its
 version stays put. An editable install is pinned by the source directory its
-`direct_url.json` names; any other direct URL by the hashes its installed `RECORD` lists,
-once every file it lists inside the install root is found to hash as recorded.
+`direct_url.json` names and by the path files and finders that make it importable; any
+other direct URL by the hashes its installed `RECORD` lists, once every file it lists
+inside the install root is found to hash as recorded.
 An editable install whose path file or finder loads code from outside that directory, or
 whose path file runs a hook other than a setuptools finder read here, stays unpinned with
 the reason; so does a distribution too large to read, with a symlink leading out of its
@@ -94,6 +95,10 @@ _INTERPRETER = b"<interpreter>"
 _INTERPRETER_NAME = re.compile(r"python(?:\d+(?:\.\d+)?)?w?(?:\.exe)?")
 _REQUIREMENT_NAME = re.compile(r"\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)")
 _FINDER_TABLES = frozenset({"MAPPING", "NAMESPACES"})
+_ROOT = "<root>"
+_QUOTED_ROOT = "<root in a string literal>"
+_ROOT_END = r"""(?=[/\\'"\r\n]|\Z)"""
+"""What follows the root where a file names it: a separator, a quote, a line end or nothing."""
 _PTH_IMPORT = ("import ", "import\t")
 """The prefixes `site` executes, rather than adds to `sys.path`, in a path file."""
 _RECORD_HASHES = frozenset(
@@ -208,23 +213,28 @@ def _editable_pin(
     root = Path(url2pathname(parts.path))
     if not root.is_dir():
         return "the directory its editable install names does not exist"
-    escaped = _loaded_from_outside(found, root, leave_out)
-    if escaped is not None:
-        return escaped
-    return tree_pin(root, leave_out=leave_out)
+    left_out = frozenset(path.resolve() for path in leave_out)
+    imported = _import_entries(found, root, left_out)
+    if isinstance(imported, str):
+        return imported
+    tree = _tree_entries(root, left_out)
+    if isinstance(tree, str):
+        return tree
+    return _pin(_TREE_TAG, tree + imported)
 
 
-def _loaded_from_outside(
-    found: importlib.metadata.Distribution, root: Path, leave_out: Iterable[Path] = ()
-) -> str | None:
-    """Why the install imports code its tree pin does not hold; None when it imports none.
+def _import_entries(
+    found: importlib.metadata.Distribution, root: Path, left_out: frozenset[Path]
+) -> list[tuple[bytes, str]] | str:
+    """Pin what makes an editable install importable, or say why it loads code its tree misses.
 
     The path files and setuptools finders its `RECORD` lists are what make an editable
     install importable, so a path one of them names outside `root`, or under a directory
     the tree pin leaves out, or a hook a path file runs other than a finder read here, is
-    code no tree pin covers.
+    code no tree pin covers. Each file is pinned by its content and by what it maps, as
+    paths relative to `root`, so neither where `root` sits nor where the environment does
+    enters the pin.
     """
-    left_out = frozenset(path.resolve() for path in leave_out)
     files = found.files
     if files is None:
         return "it has no RECORD to read"
@@ -232,6 +242,7 @@ def _loaded_from_outside(
     finders = frozenset(
         entry.stem for entry in files if _is_finder(entry.name) and str(entry) == entry.name
     )
+    entries: list[tuple[bytes, str]] = []
     for entry in files:
         name = entry.name
         finder = _is_finder(name)
@@ -239,32 +250,85 @@ def _loaded_from_outside(
             continue
         located = Path(str(entry.locate()))
         try:
-            text = located.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+            with open_regular(located) as handle:
+                written = handle.read().decode("utf-8")
+        except (OSError, FormatError, UnicodeDecodeError):
             return f"its {name} cannot be read"
+        text = written.replace("\r\n", "\n").replace("\r", "\n")
         hook = None if finder else _unread_hook(text, finders)
         if hook is not None:
             return f"its {name} runs {hook}, which Guardana cannot read"
-        paths = _finder_paths(text) if finder else _path_file_paths(text)
-        if paths is None:
-            return f"its {name} maps its packages in a way Guardana cannot read"
-        for path in paths:
-            unpinned = _unpinned_load(name, path, located.parent, inside, left_out)
-            if unpinned is not None:
-                return unpinned
-    return None
+        mapped = _finder_mapping(text) if finder else _path_file_mapping(text)
+        loads = _loads(name, mapped, located.parent, inside, left_out)
+        if isinstance(loads, str):
+            return loads
+        cached = _bytecode_differs(located, str(entry)) if finder else None
+        if cached is not None:
+            return cached
+        entries.append((_import_key(str(entry)), _import_content(written, root, loads)))
+    return entries
 
 
-def _unpinned_load(
+def _loads(
+    name: str,
+    mapped: list[tuple[str, str, str]] | None,
+    base: Path,
+    root: Path,
+    left_out: frozenset[Path],
+) -> list[tuple[str, str, str]] | str:
+    """Return what `name` maps, with each path relative to `root`, or why the tree pin misses it."""
+    if mapped is None:
+        return f"its {name} maps its packages in a way Guardana cannot read"
+    loads: list[tuple[str, str, str]] = []
+    for kind, package, path in mapped:
+        loaded = _pinned_load(name, path, base, root, left_out)
+        if isinstance(loaded, str):
+            return loaded
+        loads.append((kind, package, loaded.as_posix()))
+    return loads
+
+
+def _pinned_load(
     name: str, path: str, base: Path, root: Path, left_out: frozenset[Path]
-) -> str | None:
-    """Why code `name` loads from `path` is not covered by the tree pin of `root`, or None."""
+) -> PurePosixPath | str:
+    """Where under `root` code `name` loads from `path` lies, or why the tree pin misses it."""
     loaded = (base / path).resolve()
     if not loaded.is_relative_to(root):
         return f"its {name} loads code from {path}, outside the directory it was installed from"
     if _unpinned_part(loaded, root, left_out):
         return f"its {name} loads code from {path}, which the pin leaves out"
-    return None
+    return PurePosixPath(*loaded.relative_to(root).parts)
+
+
+def _import_key(recorded: str) -> bytes:
+    """Return the path a path file or finder is pinned by, beside the files of the tree.
+
+    No path of the tree starts with `../`, so the key never names one of its files.
+    """
+    return os.fsencode(PurePosixPath("..", recorded).as_posix())
+
+
+def _import_content(written: str, root: Path, loads: list[tuple[str, str, str]]) -> str:
+    """Digest a path file or finder as written for `root`, and what it maps under `root`."""
+    document = {"file": _relocatable(written, root), "loads": loads}
+    return hashlib.sha256(json.dumps(document).encode("utf-8")).hexdigest()
+
+
+def _relocatable(text: str, root: Path) -> list[str]:
+    """Split `text` at each spelling of `root`, so a file written for a moved root reads the same.
+
+    Odd items name the spelling found. `root` is matched as given and resolved, as written
+    and with forward slashes, and as a Python string literal escapes it, which doubles a
+    Windows path's backslashes; a literal is kept apart since the two read as different paths.
+    A spelling counts only where a path separator, a quote, a line end or the end of `text`
+    follows it, so a directory beside `root` whose name extends root's is not read as inside.
+    """
+    written = {form for path in (root, root.resolve()) for form in (str(path), path.as_posix())}
+    forms = {repr(path)[1:-1]: _QUOTED_ROOT for path in written}
+    forms.update(dict.fromkeys(written, _ROOT))
+    pattern = "|".join(re.escape(form) for form in sorted(forms, key=len, reverse=True))
+    parts = re.split(f"({pattern}){_ROOT_END}", text)
+    return [forms[part] if index % 2 else part for index, part in enumerate(parts)]
 
 
 def _unpinned_part(path: Path, root: Path, left_out: frozenset[Path]) -> bool:
@@ -319,21 +383,24 @@ def _installs_finder(statement: ast.stmt, finders: frozenset[str]) -> bool:
     )
 
 
-def _path_file_paths(text: str) -> list[str]:
-    """Return the paths a `.pth` file adds to `sys.path`, relative to its own directory.
+def _path_file_mapping(text: str) -> list[tuple[str, str, str]]:
+    """Return each path a `.pth` file adds to `sys.path`, relative to its own directory, in order.
 
     Lines are read as `site` reads them. An `import` line runs code rather than naming a
     path, and `_unread_hook` decides whether that code is known.
     """
     return [
-        line.rstrip()
+        ("path", "", line.rstrip())
         for line in text.splitlines()
         if line.strip() and not line.startswith(("#", *_PTH_IMPORT))
     ]
 
 
-def _finder_paths(text: str) -> list[str] | None:
-    """Every path a setuptools editable finder maps a package to; None when it cannot be read."""
+def _finder_mapping(text: str) -> list[tuple[str, str, str]] | None:
+    """Each package and namespace a setuptools editable finder maps, with the path it maps to.
+
+    None when the finder cannot be read.
+    """
     try:
         module = ast.parse(text)
     except (SyntaxError, ValueError):
@@ -350,13 +417,19 @@ def _finder_paths(text: str) -> list[str] | None:
     mapping, namespaces = tables.get("MAPPING"), tables.get("NAMESPACES", {})
     if not isinstance(mapping, dict) or not isinstance(namespaces, dict):
         return None
-    paths: list[object] = [*mapping.values()]
-    for listed in namespaces.values():
+    mapped: list[tuple[str, object, object]] = [
+        ("package", package, path) for package, path in mapping.items()
+    ]
+    for namespace, listed in namespaces.items():
         if not isinstance(listed, list):
             return None
-        paths.extend(listed)
-    named = [path for path in paths if isinstance(path, str)]
-    return named if len(named) == len(paths) else None
+        mapped.extend(("namespace", namespace, path) for path in listed)
+    named = [
+        (kind, package, path)
+        for kind, package, path in mapped
+        if isinstance(package, str) and isinstance(path, str)
+    ]
+    return named if len(named) == len(mapped) else None
 
 
 def _assigned(statement: ast.stmt) -> tuple[str | None, ast.expr | None]:
@@ -382,8 +455,14 @@ def tree_pin(root: Path, *, leave_out: Iterable[Path] = ()) -> SourcePin | str:
     Python would load in place of a pinned source leaves the directory unpinned unless it
     is what that source compiles to.
     """
+    entries = _tree_entries(root, frozenset(path.resolve() for path in leave_out))
+    return entries if isinstance(entries, str) else _pin(_TREE_TAG, entries)
+
+
+def _tree_entries(root: Path, left_out: frozenset[Path]) -> list[tuple[bytes, str]] | str:
+    """Return the path and content `tree_pin` pins each file of `root` by, or why it cannot."""
     try:
-        listed = _listed(root.resolve(), frozenset(path.resolve() for path in leave_out))
+        listed = _listed(root.resolve(), left_out)
     except OSError as exc:
         return f"its directory cannot be read: {exc.strerror or type(exc).__name__}"
     if isinstance(listed, str):
@@ -399,7 +478,7 @@ def tree_pin(root: Path, *, leave_out: Iterable[Path] = ()) -> SourcePin | str:
         loaded = _bytecode_differs(path, relative)
         if loaded is not None:
             return loaded
-    return _pin(_TREE_TAG, entries)
+    return entries
 
 
 def _listed(root: Path, leave_out: frozenset[Path]) -> list[tuple[str, Path]] | str:
