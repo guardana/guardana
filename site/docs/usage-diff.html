@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <h1><code>guardana diff</code> — is this worse than last time?</h1><p class="lede"><code>guardana diff</code>: compare two saved runs, fail on deterioration</p><p><code>guardana diff</code> compares runs when you need to see whether a change made results worse. <code>scan</code>, <code>probe</code>, and <code>monitor</code> check current results. A regression can stop a deploy; an incomparable pair is reported as such.</p>
 <h2 id="save-a-run-then-compare-two">Save a run, then compare two</h2>
 <pre><code class="language-bash">guardana probe --url http://localhost:11434 --model llama3 \

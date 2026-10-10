@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <h1>Detection limits</h1><p class="lede">Per rule family, whether a finding is a tested invariant, a heuristic lead, or undeclared.</p><p>What a finding from each built-in rule states about the target, grouped by rule family and read from the <code>detection</code> each rule declares.</p>
 <ul>
 <li><strong>Tested invariant</strong>: every finding the rule can emit states a checked fact about the target (a planted marker seen in output, a byte sequence or opcode present, a server answering without credentials, a recorded span showing the forbidden step), and the rule ships a finding sample and a clean sample that it classifies correctly.</li>

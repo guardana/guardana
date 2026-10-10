@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <h1>Recipe: probe your real application</h1><p class="lede">probe the endpoint your application exposes, with its own prompt, tools and data, bounded by a budget, ending with a saved run</p><p>Probe the system your users talk to. A model server without your application's system prompt, tools or data tests the model, not the application. Point the probe at the endpoint your application exposes. The commands below assume it speaks the OpenAI-compatible chat API; if it has its own request and response format, write an adapter first and add <code>--adapter adapter.yaml</code> to each command (<a href="usage-probe.html#probing-a-guarded-endpoint">guarded endpoints</a>).</p>
 <pre><code class="language-bash">guardana plan probe --url https://staging.example.com --model my-app --max-requests 50
 guardana target inspect --url https://staging.example.com --model my-app --require chat

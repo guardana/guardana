@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <p class="crumb"><a href="../rules/index.html">Rule explorer</a></p><h1>A retrieval returned a document belonging to another tenant</h1><p class="lede"><span class="rid">guardana.trace.cross_tenant_retrieval</span></p><ul class="props"><li><b>Severity</b><a class="sev CRITICAL" href="../rules/by/severity-CRITICAL.html">CRITICAL</a></li><li><b>Surface</b><a href="../rules/by/surface-runtime.html">runtime</a></li><li><b>Family</b><a href="../rules/by/family-trace.html">trace</a></li><li><b>Impact</b><a href="../rules/by/impact-passive.html">passive</a></li><li><b>Target</b>trace</li><li><b>Requests</b>at most 0</li><li><b>Evaluator</b>graded in code</li><li><b>Maturity</b>stable</li><li><b>Detection</b>invariant</li><li><b>Destructive</b>no</li><li><b>Needs</b>read_retrieval, read_trace</li></ul><h2>What a secure system does</h2><p>This rule grades in code rather than against a declared expectation, so it states no goal here. Its behaviour is its fixtures, which <code>guardana rule test</code> runs.</p><h2>Maps to</h2><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Control</th><th>Catalogue</th></tr></thead><tbody><tr><td><a class="rid" href="../rules/by/reference-LLM09-2026.html">LLM09:2026</a></td><td>Vector and Embedding Weaknesses</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM02-2026.html">LLM02:2026</a></td><td>Sensitive Information Disclosure</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr></tbody></table></div><p><a href="../writing-rules.html">How a rule is written</a> · <a href="../profiles.html">Selecting it in a profile</a></p>
 </main>
 </div>

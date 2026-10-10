@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <h1><code>guardana import-observations</code> — carry another tool's results in as claims</h1><p class="lede"><code>guardana import-observations</code>: carry garak, promptfoo or your own harness's results in as unverified claims</p><p><code>guardana import-observations</code> brings external test results into Guardana when you need to review them beside its findings. It keeps results from garak, promptfoo, or an internal harness attributed to their source.</p>
 <pre><code class="language-bash">guardana import-observations garak.report.jsonl --target https://llm.internal/v1
 </code></pre>

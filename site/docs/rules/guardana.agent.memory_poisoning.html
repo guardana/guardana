@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <p class="crumb"><a href="../rules/index.html">Rule explorer</a></p><h1>Poisoned memory steers the agent in a later session</h1><p class="lede"><span class="rid">guardana.agent.memory_poisoning</span></p><ul class="props"><li><b>Severity</b><a class="sev CRITICAL" href="../rules/by/severity-CRITICAL.html">CRITICAL</a></li><li><b>Surface</b><a href="../rules/by/surface-runtime.html">runtime</a></li><li><b>Family</b><a href="../rules/by/family-agent.html">agent</a></li><li><b>Impact</b><a href="../rules/by/impact-active.html">active</a></li><li><b>Target</b>endpoint</li><li><b>Requests</b>at most 8</li><li><b>Evaluator</b>tool_call</li><li><b>Maturity</b>stable</li><li><b>Detection</b>invariant</li><li><b>Destructive</b>no</li><li><b>Needs</b>call_tools, chat</li></ul><h2>What a secure system does</h2><p>What separates an agent from a chat is that a note written in one conversation comes back in the next, and the model treats it as its own prior context rather than as input from a stranger — which is the whole of ASI06. The verdict is read off the second session, started clean: nothing but the store crosses the boundary. If the model never called `recall` the poisoned note never reached it, so the run is inconclusive rather than proof of a well-behaved agent.</p><h2>Maps to</h2><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Control</th><th>Catalogue</th></tr></thead><tbody><tr><td><a class="rid" href="../rules/by/reference-LLM01-2025.html">LLM01:2025</a></td><td>Prompt Injection</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM01-2026.html">LLM01:2026</a></td><td>Prompt Injection</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-ASI06-2026.html">ASI06:2026</a></td><td>Memory and Context Poisoning</td><td><a href="../rules/by/framework-OWASP-ASI-2026.html">OWASP-ASI-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0080.html">AML.T0080</a></td><td>AI Agent Context Poisoning</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0080.000.html">AML.T0080.000</a></td><td>AI Agent Context Poisoning: Memory</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr></tbody></table></div><p><a href="../writing-rules.html">How a rule is written</a> · <a href="../profiles.html">Selecting it in a profile</a></p>
 </main>
 </div>

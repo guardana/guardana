@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <h1><code>guardana pack validate</code> — can this build load your pack, and does it do what it says</h1><p class="lede"><code>guardana pack validate</code> and <code>guardana pack lock</code>: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks</p><p><code>guardana pack validate</code> checks a pack's declarations when you need to verify extension compatibility for <code>Rule</code>, <code>Evaluator</code>, and <code>Target</code>.</p>
 <pre><code class="language-bash">guardana pack validate --plugins allowlist --allow-plugin acme-guardana-rules
 </code></pre>

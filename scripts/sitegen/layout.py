@@ -62,6 +62,7 @@ def page(  # noqa: PLR0913 — one keyword per fact the shell needs; none is der
 <link rel="stylesheet" href="{up}docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="{up}../">{MARK}<span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -80,7 +81,7 @@ def page(  # noqa: PLR0913 — one keyword per fact the shell needs; none is der
 {_sidebar(chrome.sections, href, up)}
 </nav>
 </details>
-<main>
+<main id="main">
 {body}
 </main>
 </div>

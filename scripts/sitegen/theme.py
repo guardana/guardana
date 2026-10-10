@@ -29,6 +29,9 @@ body{
 a{color:var(--brand); text-underline-offset:.18em; text-decoration-thickness:1px}
 a:hover{color:var(--brand-ink)}
 :focus-visible{outline:2px solid var(--brand); outline-offset:2px; border-radius:4px}
+.skip{position:absolute; left:12px; top:-48px; z-index:100; background:var(--bg);
+  padding:8px 14px; border:1px solid var(--line); border-radius:8px; transition:top .15s}
+.skip:focus-visible{top:12px}
 
 .top{
   position:sticky; top:0; z-index:20; border-bottom:1px solid var(--line);

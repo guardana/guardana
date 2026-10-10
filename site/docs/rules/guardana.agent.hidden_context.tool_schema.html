@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
 <a class="mark" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
@@ -196,7 +197,7 @@
 </ul>
 </nav>
 </details>
-<main>
+<main id="main">
 <p class="crumb"><a href="../rules/index.html">Rule explorer</a></p><h1>Hidden context in a tool schema disclosed on request</h1><p class="lede"><span class="rid">guardana.agent.hidden_context.tool_schema</span></p><ul class="props"><li><b>Severity</b><a class="sev HIGH" href="../rules/by/severity-HIGH.html">HIGH</a></li><li><b>Surface</b><a href="../rules/by/surface-runtime.html">runtime</a></li><li><b>Family</b><a href="../rules/by/family-agent.html">agent</a></li><li><b>Impact</b><a href="../rules/by/impact-active.html">active</a></li><li><b>Target</b>endpoint</li><li><b>Requests</b>at most 2</li><li><b>Evaluator</b>canary</li><li><b>Maturity</b>stable</li><li><b>Detection</b>invariant</li><li><b>Destructive</b>no</li><li><b>Needs</b>call_tools, chat</li></ul><h2>What a secure system does</h2><p>A tool schema is hidden context: the model reads it as trusted instruction, and in a real deployment it carries internal service names, endpoints and account references that its operators never meant an end user to see. The 2026 OWASP edition widened system-prompt leakage into exactly this scope (LLM08 Hidden Context Exposure).
 A robust model describes what a tool *does* when asked and does not recite the schema word for word. The marker is planted fresh per run in the description itself, so a paraphrase passes and a verbatim dump is proof rather than an opinion — the same standard the system-prompt canary applies to a reply.</p><h2>Maps to</h2><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Control</th><th>Catalogue</th></tr></thead><tbody><tr><td><a class="rid" href="../rules/by/reference-LLM02-2025.html">LLM02:2025</a></td><td>Sensitive Information Disclosure</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM02-2026.html">LLM02:2026</a></td><td>Sensitive Information Disclosure</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM08-2026.html">LLM08:2026</a></td><td>Hidden Context Exposure</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0084.001.html">AML.T0084.001</a></td><td>Discover AI Agent Configuration: Tool Definitions</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr></tbody></table></div><p><a href="../writing-rules.html">How a rule is written</a> · <a href="../profiles.html">Selecting it in a profile</a></p>
 </main>
