@@ -22,16 +22,19 @@ robust behind a caller that is not has been tested in the wrong place.
 """
 
 import contextlib
+import struct
 import time
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from guardana.core.formats import FormatError
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.rule.errors import RuleError
 from guardana.core.target import ArtifactTarget, TargetKind
+from guardana.rules.supply_chain import chat_template as chat_template_module
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -159,20 +162,13 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
     a crafted file chooses, and the two failure modes are a read that allocates it
     and a loop that iterates it.
     """
-    import struct
-
-    from guardana.rules.supply_chain import chat_template as chat_template_module
-
     header = declared.to_bytes(8, "little")
     (tmp_path / "model.safetensors").write_bytes(header + actual)
     # A real GGUF header: magic bytes, version 3, then the declared tensor and
     # metadata counts. Without the magic first, every example stops at the magic
     # check and the length handling below is never exercised.
     gguf_header = (
-        b"GGUF"
-        + struct.pack("<I", 3)
-        + struct.pack("<Q", declared)
-        + struct.pack("<Q", declared)
+        b"GGUF" + struct.pack("<I", 3) + struct.pack("<Q", declared) + struct.pack("<Q", declared)
     )
     (tmp_path / "model.gguf").write_bytes(gguf_header + actual)
     reached: list[Path] = []
@@ -180,8 +176,6 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
     real_reader = chat_template_module.read_gguf_metadata
 
     def counting_reader(path: Path, **kwargs: object) -> object:
-        from guardana.core.formats import FormatError
-
         reached.append(path)
         try:
             return real_reader(path, **kwargs)  # type: ignore[arg-type]
@@ -204,9 +198,9 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
     elapsed = time.monotonic() - started
 
     assert reached, "no example reached the GGUF reader past the magic check"
-    assert not any(
-        "bad magic" in message for message in reader_errors
-    ), "input carries valid magic: a magic rejection means the header regressed"
+    assert not any("bad magic" in message for message in reader_errors), (
+        "input carries valid magic: a magic rejection means the header regressed"
+    )
     assert elapsed < _DEADLINE_SECONDS, (
         f"scanning a file that declares {declared} bytes took {elapsed:.1f}s — "
         f"a crafted length must not become a hang"
@@ -225,8 +219,6 @@ def test_the_text_parsers_survive_arbitrary_unicode(
     These rules exist *because* text can carry what a reader cannot see, so the
     input they are pointed at is exactly the input most likely to be malformed.
     """
-    from guardana.rules.supply_chain import chat_template as chat_template_module
-
     for name in ("tokenizer_config.json", "chat_template.jinja", "README.txt", "loader.py"):
         (tmp_path / name).write_text(text, encoding="utf-8", errors="surrogatepass")
     # Counters on the public reader seams: the config reader must open
