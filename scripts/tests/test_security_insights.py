@@ -6,12 +6,12 @@ issue require (reporting process, release artifacts, contact) plus the
 format rules the CUE schema enforces (semver, YYYY-MM-DD dates, URL and
 email shapes), so drift fails loudly here instead of in a scanner.
 """
+
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 
 _ROOT = Path(__file__).resolve().parents[2]
