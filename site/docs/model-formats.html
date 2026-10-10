@@ -283,16 +283,25 @@ class OnnxSummary:
 </code></pre>
 <p>The graph is walked straight off disk by a dependency-free streaming protobuf
 reader that seeks past tensor payloads, so summarising a multi-gigabyte model
-reads kilobytes. <code>STANDARD_ONNX_DOMAINS</code> is exported alongside it: anything else
-in <code>node_domains</code> means the runtime must register a native operator library
-before the model will run.</p>
-<p><code>truncated</code> is the honest half of the bound — it says the field budget ran out
-before the walk finished. <strong>A partial walk has not cleared the model, whatever
-it found</strong>: a lead in the fields it reached says nothing about a worse one past
-the budget. A rule reports the findings it has and says the walk was partial:</p>
+reads kilobytes. The walk covers every graph the model carries: the main graph
+and its sparse initializers, tensors and subgraphs held in node attributes
+(Constant values, If/Loop/Scan bodies), model-local functions and training
+graphs. <code>node_domains</code> and <code>external_data_paths</code> collect from all of them.
+<code>STANDARD_ONNX_DOMAINS</code> is exported alongside it: anything else in
+<code>node_domains</code> means the runtime must register a native operator library before
+the model will run.</p>
+<p><code>truncated</code> is the honest half of the bound — it says the walk did not finish:
+the field budget ran out, subgraphs were nested deeper than 32 levels, or the
+metadata passed <code>Limits.max_header_bytes</code>. The
+<code>guardana.supply_chain.onnx_graph</code> rule gives a file one field per two bytes of
+its size, never fewer than 1,000,000 and never more than 8,000,000, so a graph
+below the cap is walked in full. <strong>A partial walk has not cleared the model,
+whatever it found</strong>: a lead in the fields it reached says nothing about a worse
+one past the budget. A rule reports the findings it has and says the walk was
+partial:</p>
 <pre><code class="language-python">yield from self._graded(path, summary)
 if summary.truncated:
-    yield self._unscanned(path, &quot;the graph was too large to walk within the budget&quot;, ctx)
+    yield self._unscanned(path, &quot;the model was too large or nested too deeply to walk in full&quot;, ctx)
 </code></pre>
 <p><code>_unscanned</code> there yields the inconclusive finding and reports the file as an
 unexamined component; see <a href="#writing-a-rule-on-top">writing a rule on top</a>.</p>
