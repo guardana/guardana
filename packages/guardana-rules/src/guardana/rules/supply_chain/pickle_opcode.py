@@ -192,10 +192,9 @@ _STRING_OPS = frozenset(
 _MEMO_PUT_INDEXED = frozenset({"BINPUT", "LONG_BINPUT", "PUT"})
 _MEMO_GET = frozenset({"BINGET", "LONG_BINGET", "GET"})
 _IMPORTS_BY_ARG = frozenset({"GLOBAL", "INST"})
-# An extension code names a global through the loading process's copyreg registry,
-# which is empty unless that process filled it, so an unpickler refuses the code and a
-# file cannot change that. Failing closed here would flag random tensor bytes, three of
-# whose 256 values are extension opcodes.
+# An extension code names a global through the loading process's copyreg registry, which
+# no file shows, so what it imports is unknown. Only a stream that opens with a pickle
+# header counts: three of every 256 random tensor bytes are extension opcodes.
 _EXTENSION_OPS = frozenset({"EXT1", "EXT2", "EXT4"})
 # The C unpickler reaches the list or dict under these items without honouring the
 # MARK fence, so the model does the same rather than stopping where it would not.
@@ -266,6 +265,10 @@ class _RefusedError(Exception):
     """
 
 
+class _ExtensionCodeError(_RefusedError):
+    """An extension code, which imports whatever the loading process registered under it."""
+
+
 def _is_allowed(module: str, qualname: str) -> bool:
     if module in _BUILTIN_MODULES:
         return qualname in _SAFE_BUILTINS
@@ -304,7 +307,10 @@ class _PickleMachine:
             self.refs.extend(_maybe_dangerous(*self._stack_global()))
             self.stack.append(None)
         elif name in _EXTENSION_OPS:
-            raise _RefusedError(f"{name} names a global through an unseen registry")
+            # An unpickler refuses a code of zero or below before it consults any registry.
+            if not isinstance(arg, int) or arg <= 0:
+                raise _RefusedError(f"{name} with code {arg!r}, which no registry holds")
+            raise _ExtensionCodeError(f"{name} names a global through an unseen registry")
         elif not self._step_marks_and_memo(name, arg):
             if name in _IMPORTS_BY_ARG and isinstance(arg, str):
                 module, _, qualname = arg.partition(" ")
@@ -405,15 +411,17 @@ class _PickleMachine:
 class ParseEnd(StrEnum):
     """How reading a byte stream as pickle opcodes ended.
 
-    The distinctions exist because "I could not read this" has four meanings, and
-    three of them are evidence of something unexamined. A member of a real
+    The distinctions exist because "I could not read this" has five meanings, and
+    four of them are evidence of something unexamined. A member of a real
     checkpoint is raw tensor data and is `NOT_PICKLE` within its first few bytes —
     reporting that would put a finding on every tensor in every honest model, and so
     is a stream an unpickler would refuse part-way, since nothing after that runs. A
     stream that was still parsing when the buffer ended (`RAN_OUT`), or one the
     pickle machine could not model an operand for (`UNRESOLVABLE`), is a pickle this
     rule did not finish proving clean, and so is one cut off by the archive's opcode
-    budget (`OVER_BUDGET`).
+    budget (`OVER_BUDGET`), and one that opened with a protocol 2+ header and then
+    named a callable by an extension-registry code (`EXTENSION`), which only the
+    loading process can resolve.
     """
 
     COMPLETE = "complete"
@@ -421,6 +429,7 @@ class ParseEnd(StrEnum):
     RAN_OUT = "ran_out"
     UNRESOLVABLE = "unresolvable"
     OVER_BUDGET = "over_budget"
+    EXTENSION = "extension"
 
 
 @dataclass(slots=True)
@@ -443,8 +452,11 @@ def _bin_verdict(head: bytes, scan: "_OpcodeScan", *, cut: bool) -> bool | None:
     A pickle of protocol 2 to 5 says so in its first two bytes. One without that header is
     taken for a pickle when it imports a callable with a real dotted name, or hides the
     operands of an import, because a few random bytes in a thousand parse as some
-    opcode stream and those end on a short stack instead.
+    opcode stream and those end on a short stack instead. A later stream that opens with
+    a header and names a callable by an extension code makes it one too.
     """
+    if scan.end is ParseEnd.EXTENSION:
+        return True
     if head.startswith(_PICKLE_HEADERS):
         return scan.end is not ParseEnd.NOT_PICKLE or bool(scan.refs)
     if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs):
@@ -467,15 +479,15 @@ def _maybe_a_file(path: Path) -> bool:
 def _left_a_pickle_unproven(end: ParseEnd, *, cut: bool) -> bool:
     """Whether this member is a pickle the rule stopped short of clearing.
 
-    `UNRESOLVABLE` always is: the pickle machine reached an operand it cannot model,
-    and an unpickler may well resolve what this could not.
+    `UNRESOLVABLE` and `EXTENSION` always are: the pickle machine reached an operand or
+    an extension code it cannot resolve, and an unpickler may well resolve it.
 
     `RAN_OUT` only counts when the read was actually cut. Any short stretch of
     non-pickle bytes ends where the buffer does — `archive/version` in a torch
     checkpoint is the single byte `3` — so without that guard every honest
     checkpoint would carry a finding for the file that records its format version.
     """
-    return end is ParseEnd.UNRESOLVABLE or (cut and end is ParseEnd.RAN_OUT)
+    return end in {ParseEnd.UNRESOLVABLE, ParseEnd.EXTENSION} or (cut and end is ParseEnd.RAN_OUT)
 
 
 @dataclass(frozen=True, slots=True)
@@ -514,7 +526,8 @@ def _scan_opcodes(data: bytes, budget: _OpcodeBudget | None = None) -> _OpcodeSc
     complete = 0
     while True:
         start = stream.tell()
-        end, short_stack = _scan_one(stream, len(data), refs, budget)
+        headed = data.startswith(_PICKLE_HEADERS, start)
+        end, short_stack = _scan_one(stream, len(data), refs, budget, headed=headed)
         if end is not ParseEnd.COMPLETE:
             trailing_data = end is ParseEnd.NOT_PICKLE or (
                 end is ParseEnd.UNRESOLVABLE and short_stack
@@ -528,11 +541,18 @@ def _scan_opcodes(data: bytes, budget: _OpcodeBudget | None = None) -> _OpcodeSc
 
 
 def _scan_one(
-    stream: io.BytesIO, size: int, refs: list[str], budget: _OpcodeBudget | None
+    stream: io.BytesIO,
+    size: int,
+    refs: list[str],
+    budget: _OpcodeBudget | None,
+    *,
+    headed: bool,
 ) -> tuple[ParseEnd, bool]:
     """Read one pickle from `stream`'s position to its STOP, with its own stack and memo.
 
     Returns how it ended, and whether an `UNRESOLVABLE` end was for lack of operands.
+    `headed` says whether the stream opens with a protocol 2+ header, which an extension
+    code needs to end it as `EXTENSION` rather than as bytes that are no pickle.
     """
     machine = _PickleMachine(refs)
     ops = pickletools.genops(stream)
@@ -552,8 +572,9 @@ def _scan_one(
             return (ParseEnd.RAN_OUT if stream.tell() >= size else ParseEnd.NOT_PICKLE), False
         try:
             machine.step(op, arg)
-        except _RefusedError:
-            return ParseEnd.NOT_PICKLE, False
+        except _RefusedError as refusal:
+            extension = headed and isinstance(refusal, _ExtensionCodeError)
+            return (ParseEnd.EXTENSION if extension else ParseEnd.NOT_PICKLE), False
         except _ShortStackError:
             return ParseEnd.UNRESOLVABLE, True
         except UnparseableStreamError:
@@ -630,10 +651,13 @@ def _holds_a_pickle(head: bytes, scan: _OpcodeScan, *, cut: bool) -> bool:
     """Whether a tensor storage's bytes are a pickle rather than values that parse as opcodes.
 
     A pickle imports a callable with a real dotted name, or hides the operands of an
-    import, or says it is one in its header and was still parsing where the read was cut.
-    Tensor values end on a short stack, a malformed opcode or the end of their bytes.
+    import, or says it is one in its header and either names a callable by an extension
+    code or was still parsing where the read was cut. Tensor values end on a short stack,
+    a malformed opcode or the end of their bytes.
     """
     if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs):
+        return True
+    if scan.end is ParseEnd.EXTENSION:
         return True
     if scan.end is ParseEnd.UNRESOLVABLE and not scan.short_stack:
         return True
@@ -902,6 +926,11 @@ class PickleOpcodeRule(ArtifactRule):
                 "pickle imports a callable whose name this scanner cannot resolve; "
                 "not scanned past it"
             )
+        elif scan.end is ParseEnd.EXTENSION:
+            report.unscanned(
+                "pickle names a callable by an extension-registry code this scanner cannot "
+                "resolve; not scanned past it"
+            )
         elif scan.truncated and not scan.refs:
             report.unscanned(f"{unparsed}; not scanned")
 
@@ -1129,7 +1158,7 @@ class PickleOpcodeRule(ArtifactRule):
         if scan.end is ParseEnd.OVER_BUDGET:
             report.unscanned(self._over_budget(report, budget, name))
             return True
-        if cut or scan.end is ParseEnd.UNRESOLVABLE:
+        if cut or _left_a_pickle_unproven(scan.end, cut=cut):
             end = ParseEnd.RAN_OUT if cut else scan.end
             report.unscanned(self._unfinished(report, end, name, _MEMBER_MAX_BYTES))
         elif scan.truncated and not scan.refs:
@@ -1151,6 +1180,11 @@ class PickleOpcodeRule(ArtifactRule):
             return (
                 f"{member} is a pickle larger than {limit} bytes ({name}); "
                 f"not scanned past that point"
+            )
+        if end is ParseEnd.EXTENSION:
+            return (
+                f"{member} is a pickle that names a callable by an extension-registry code "
+                f"this scanner cannot resolve ({name})"
             )
         return f"{member} is a pickle with an operand this scanner cannot resolve ({name})"
 
