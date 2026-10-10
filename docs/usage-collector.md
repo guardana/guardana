@@ -354,6 +354,16 @@ tenant column on a database serving two teams folds their evidence into one
 undifferentiated pile, so the down migration counts the tenants across the
 submissions *and* the keys first and raises rather than doing it.
 
+## What the collector refuses and redacts on ingest
+
+`POST /findings` redacts recognisable secrets with engine patterns and `[redacted:<label>:<12 hex digits>]`; existing placeholders remain unchanged. Redacted fields: `source`; every finding and unverified result's title, target reference, evidence summary/detail and verdict rationale; every error's source, stage and reason; the missing items of every skipped rule. Ids, identity, rule ids, taxonomy, evaluator ids, run summary and declared deployment fields remain as sent (deployment fields are operator declarations; see the privacy guide).
+
+Post-redaction overflow (4,096 characters: `source`/error sources; 65,536: other text fields) returns `422`; nothing is stored.
+
+Across accepted envelope versions, published-schema violations return `422`, one error entry (`loc`, `msg`, `input`) per value: severity outside exact-case `INFO`/`LOW`/`MEDIUM`/`HIGH`/`CRITICAL`; verdict outcome outside `pass`/`fail`/`inconclusive`; confidence outside [0,1] or nonfinite; negative counts; negative/infinite wall time; gate outside `pass`/`fail`/`indeterminate`; evidence mode outside `metadata_only`/`redacted`/`full`; a skip reason outside `missing_capability`/`unsafe_mode`/`not_applicable`/`not_recorded`/`not_offered`; an identity that is present but not `sha256:` followed by 64 lower-case hex digits. Permitted `null` remains accepted.
+
+Data stored earlier reads back unchanged, including any secret it holds; redaction applies to new submissions. The dashboard never ranks an unknown severity as the worst.
+
 ## Limits: how much one caller may send, and how often
 
 | Variable | Default | What it bounds |
@@ -380,7 +390,7 @@ A credential is charged on its own only after the collector has accepted it; eve
 other request — no key, a rejected key, a key no route checked — is charged to the
 peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
 inventing a new token per request cannot buy a fresh one. The limiter tracks at
-most 10,000 callers per process.
+most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its `Bearer` scheme; an Authorization header with a scheme other than `Bearer` is charged to the peer address.
 
 ## Choosing where submissions go
 

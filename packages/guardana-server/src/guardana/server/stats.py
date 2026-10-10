@@ -21,11 +21,12 @@ dashboard refresh load the project's whole history into memory.
 _SEVERITY_ORDER = ("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL")
 
 
-def _severity_rank(severity: str) -> int:
+def _severity_rank(severity: str) -> int | None:
+    """Where `severity` sits in `_SEVERITY_ORDER`, or `None` for a value it does not hold."""
     try:
         return _SEVERITY_ORDER.index(severity)
     except ValueError:
-        return -1
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +138,7 @@ def compute_stats(
             by_rule_counts[finding.rule_id] = by_rule_counts.get(finding.rule_id, 0) + 1
             source_findings[source] += 1
             rank = _severity_rank(finding.severity)
-            if rank > source_worst.get(source, -2):
+            if rank is not None and rank > source_worst.get(source, -1):
                 source_worst[source] = rank
 
     by_source = [

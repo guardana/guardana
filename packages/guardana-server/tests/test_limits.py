@@ -13,8 +13,9 @@ put a proxy in front of.
 """
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
-from guardana.server.app import create_app
+from guardana.server.app import _credential, create_app
 from guardana.server.auth import Scope
 from guardana.server.limits import Limits, RateLimiter
 from guardana.server.store import InMemoryStore
@@ -265,3 +266,44 @@ def test_an_accepted_key_keeps_its_allowance_while_bogus_tokens_exhaust_the_peer
 
     assert rejected == [_UNAUTHORIZED, _UNAUTHORIZED, _TOO_MANY]
     assert client.get("/findings", headers=_bearer(token)).status_code == _OK
+
+
+_SPELLINGS = ("Bearer", "bearer", "BEARER")
+
+
+def _request(authorization: str) -> Request:
+    return Request({"type": "http", "headers": [(b"authorization", authorization.encode())]})
+
+
+def test_every_spelling_of_the_bearer_scheme_is_one_rate_limit_caller() -> None:
+    keys = {_credential(_request(f"{scheme} gdn_test_token ")) for scheme in _SPELLINGS}
+
+    assert len(keys) == 1
+    assert None not in keys
+
+
+def test_a_header_that_is_not_a_bearer_token_is_charged_to_the_peer() -> None:
+    assert _credential(_request("Basic dXNlcjpwYXNz")) is None
+    assert _credential(_request("Bearer ")) is None
+
+
+def test_respelling_the_scheme_does_not_buy_a_key_a_fresh_allowance(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Authentication reads the scheme in any case, so the limiter has to as well."""
+    _migrated(database_url)
+    token = _issue(database_url, "ci", (Scope.READ,))
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    monkeypatch.setenv("GUARDANA_RATE_LIMIT_PER_MINUTE", "3")
+    client = TestClient(create_app())
+
+    # The first request is charged to the peer and earns the key its own allowance,
+    # which the next three spend.
+    spent = [client.get("/findings", headers=_bearer(token)).status_code for _ in range(4)]
+    respelled = [
+        client.get("/findings", headers={"Authorization": f"{scheme} {token}"}).status_code
+        for scheme in _SPELLINGS
+    ]
+
+    assert spent == [_OK] * 4
+    assert respelled == [_TOO_MANY] * 3

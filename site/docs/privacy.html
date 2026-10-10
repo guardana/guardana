@@ -208,7 +208,7 @@ to judges or guards under <code>evaluators:</code>; when an MCP target requires 
 also read its advertised protected-resource metadata and the metadata of the authorization
 server it names, possibly on other hosts. Guardana itself contacts nothing else; a package admitted with <code>--plugins</code> runs with your privileges and can open its own connections (<a href="threat-model.html#t3--a-malicious-plugin-or-rule-pack">threat model, T3</a>). The collector, or a reporter
 an installed package adds, receives results only when <code>--reporter</code> names it, and a reporter never
-receives kept exchanges (<a href="outputs.html#what-an-output-receives">installed outputs</a>).</p>
+receives kept exchanges (<a href="outputs.html#what-an-output-receives">installed outputs</a>). The collector also <a href="usage-collector.html#what-the-collector-refuses-and-redacts-on-ingest">redacts</a> recognisable secrets in a submission's evidence text using the engine's patterns before storing it, so those secrets do not enter the database even when a third-party sender or an older agent does not redact them.</p>
 <pre><code class="language-yaml">privacy:
   evidence_mode: redacted     # metadata_only | redacted | full
   redact_secrets: true        # the only value; `false` is refused, see below

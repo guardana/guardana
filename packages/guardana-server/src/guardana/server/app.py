@@ -1,4 +1,5 @@
 import copy
+import math
 import os
 import sys
 from collections.abc import Awaitable, Callable
@@ -9,6 +10,8 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from guardana.server.auth import Authenticated, AuthError, Scope, authenticate
 from guardana.server.dashboard import dashboard_headers, render_dashboard
@@ -16,14 +19,16 @@ from guardana.server.db.connection import connect
 from guardana.server.db.migrations import MigrationState, apply_pending, read_state
 from guardana.server.db.settings import StorageChoice, migrate_on_start, resolve_storage
 from guardana.server.deployment import EnvironmentMismatchError
-from guardana.server.envelope import SUPPORTED_SCHEMA_VERSIONS, Submission
+from guardana.server.envelope import SUPPORTED_SCHEMA_VERSIONS, Submission, off_schema_values
 from guardana.server.limits import Limits, RateLimiter
 from guardana.server.postgres_store import PostgresStore
+from guardana.server.redaction import RedactedTextTooLongError, redact_submission
 from guardana.server.rule_catalog import rule_catalog
 from guardana.server.security import (
     SECURITY_SCHEMES,
     SESSION_COOKIE,
     UnauthenticatedCollectorError,
+    bearer_token,
     documented,
     guard,
     require_authentication,
@@ -118,6 +123,7 @@ def create_app(
     # After the limits, so it wraps them and their refusals carry the header too.
     _mount_nosniff(app)
     _mount_server_error(app)
+    _mount_validation_errors(app)
     _mount_health(app, database_url)
     # `Annotated`, not a `Depends` default: the parameter really is an identity at
     # run time and really is a dependency marker at definition time, and only this
@@ -134,16 +140,9 @@ def create_app(
 
     @app.post("/findings", **ingest_docs)
     def post_findings(submission: Submission, identity: ingesting) -> dict[str, object]:
-        if submission.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
-            raise HTTPException(
-                status_code=_UNPROCESSABLE,
-                detail=(
-                    f"unsupported schema_version {submission.schema_version}; "
-                    f"this collector speaks {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
-                ),
-            )
+        redacted = _admissible(submission)
         try:
-            stored = active_store.add(_scope_of(identity), submission)
+            stored = active_store.add(_scope_of(identity), redacted)
         except EnvironmentMismatchError as exc:
             # `403`, like a missing scope: the caller *is* somebody, and that
             # somebody may not write here. A `422` would read as "your envelope is
@@ -230,6 +229,45 @@ def _describe_authentication(app: FastAPI, database_url: str | None) -> None:
         return schema
 
     app.openapi = openapi  # type: ignore[method-assign]
+
+
+def _admissible(submission: Submission) -> Submission:
+    """Return what `POST /findings` may store of `submission`, or refuse it with a 422.
+
+    Refused when the collector does not speak its version or when it carries a value
+    the published schema does not allow; otherwise returned with its secrets redacted.
+    """
+    if submission.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        raise HTTPException(
+            status_code=_UNPROCESSABLE,
+            detail=(
+                f"unsupported schema_version {submission.schema_version}; "
+                f"this collector speaks {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
+            ),
+        )
+    refused = off_schema_values(submission)
+    if refused:
+        # The shape of FastAPI's own 422, so a client reads one kind of refusal.
+        raise HTTPException(
+            status_code=_UNPROCESSABLE,
+            detail=_finite(
+                [
+                    {
+                        "type": "value_error",
+                        "loc": ["body", *value.loc],
+                        "msg": value.message,
+                        "input": value.value,
+                    }
+                    for value in refused
+                ]
+            ),
+        )
+    try:
+        return redact_submission(submission)
+    except RedactedTextTooLongError as exc:
+        raise HTTPException(
+            status_code=_UNPROCESSABLE, detail=f"{exc}; nothing was stored"
+        ) from exc
 
 
 def _refuse_a_store_no_unauthenticated_caller_can_reach(store: Store) -> None:
@@ -444,6 +482,32 @@ def _mount_server_error(app: FastAPI) -> None:
     app.add_exception_handler(Exception, _server_error)
 
 
+def _mount_validation_errors(app: FastAPI) -> None:
+    """Answer a refused body with FastAPI's usual 422, even when it held NaN or Infinity.
+
+    Python's `json` reads both, and the usual answer echoes the offending input, which
+    a strict JSON response cannot encode, so the refusal would itself fail as a 500.
+    """
+
+    @app.exception_handler(RequestValidationError)
+    async def _refused(request: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=_UNPROCESSABLE,
+            content={"detail": _finite(jsonable_encoder(exc.errors()))},
+        )
+
+
+def _finite(value: object) -> object:
+    """Return `value` with every non-finite float spelled as text."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, list):
+        return [_finite(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _finite(item) for key, item in value.items()}
+    return value
+
+
 async def _reject_oversized(request: Request, ceiling: int) -> JSONResponse | None:
     """Read the body once, refusing past the ceiling, and hand it to the route.
 
@@ -481,16 +545,16 @@ def _too_large(ceiling: int) -> JSONResponse:
 
 
 def _credential(request: Request) -> str | None:
-    """Key the limiter on the credential this request presented, if any.
+    """Key the limiter on the bearer token this request presented, if any.
 
-    A digest of the header rather than the resolved key, because the limiter runs
+    A digest of the token rather than the resolved key, because the limiter runs
     before authentication; the key earns its own allowance only once a route has
     accepted it.
     """
-    authorization = request.headers.get("Authorization", "")
-    if not authorization:
+    token = bearer_token(request)
+    if not token:
         return None
-    return f"token:{sha256(authorization.encode()).hexdigest()[:16]}"
+    return f"token:{sha256(token.encode()).hexdigest()[:16]}"
 
 
 def _peer(request: Request) -> str:
