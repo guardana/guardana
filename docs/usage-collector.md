@@ -33,6 +33,10 @@ because a security boundary that adds four commands to the first run is a bounda
 that makes a tool nobody starts. The granular commands below exist for the second
 team, not for the first one.
 
+`bootstrap` takes `--key-name TEXT` (default `first-key`): what to call the first
+key. It also takes `--scope [ingest|read]` (default `ingest` only): repeatable,
+exactly like `key create`.
+
 `serve` binds **loopback** unless told otherwise: `--host 0.0.0.0` is a decision,
 so it is one you type. It needs an ASGI server, which is an extra
 (`pip install "guardana-server[serve]"`) rather than a dependency — a deployment

@@ -230,6 +230,7 @@ is a refusal rather than a drifted pin, because it is broken in the lock and in 
 configuration alike; the refusal names each case by its rule and dataset line.
 
 `recipe run` takes no selection, trust, trials or profile flags: those are what the lock pins.
+Its one flag is `--concurrency INTEGER` (default `4`): how many rules may run at once.
 
 Every rule the lock pins must run to completion. One that the run skips — a recording that
 holds no answer for it is the usual cause — that errors or that is never reached is a
