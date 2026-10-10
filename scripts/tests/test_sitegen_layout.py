@@ -1,4 +1,5 @@
 """Every generated docs page opens with a skip link targeting the main content (#87)."""
+
 from __future__ import annotations
 
 import re
