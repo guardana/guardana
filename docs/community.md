@@ -26,7 +26,7 @@ README command with the same launcher, as the [first-run guide](usage-init.md)
 explains. See [installing](install.md) for pip, source and container options.
 For reproducible team runs, pin the exact reviewed version in your environment.
 
-## Help validate 1.0
+## Join a first run or pilot
 
 - Join a consented [first-run session](studies/first-run-study.md). Record where
   the instructions stop being clear; a failed session is useful evidence too.

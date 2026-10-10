@@ -40,21 +40,17 @@ after the first external reports land before the stable promise. A further
 candidate is required only if a release blocker needs one. Stable 1.0.0 does not
 follow rc3 automatically.
 
-Stable 1.0 also needs the following evidence.
-[Product status](docs/product-status.md#before-the-first-stable-release) gives the full criteria.
+Stable 1.0 is the compatibility promise for the supported surface. It ships when the [stable-release criteria](docs/product-status.md#before-the-first-stable-release) hold:
 
-- Five consented first-run sessions. Target: at least four of five people complete a failure, a fix and one custom check in ten minutes without maintainer help.
-- Two independent teams run locked checks on their own application, save failed and incomplete results, regrade a redacted regression and gate it in CI.
-- One controlled live retrieval pilot on a team's own target catches a poisoned document and a tenant-filter failure.
-- One third-party customization and an independent reproduction are recorded with consent.
-- The security runbook drill and recovery runbooks are exercised; a reference pack is independently installable from PyPI.
-- Older persisted documents and extension conformance pass the release gate.
+- `1.0.0rc2` and `1.0.0rc3` each ship after a full green release gate and green CI on the exact commit; a candidate has a period without new supported-surface defect reports. A further candidate is required only if a release blocker needs one.
+- Maintainer-run proofs are published with commands and results, labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failure, fix and custom check; the reference retrieval pilot in `examples/retrieval_pilot/` catching a poisoned document and tenant-filter failure; the regression loop on the same reference application (a failed and an incomplete result saved, a redacted regression regraded and gated in CI); customization through published extension points only, using the reference pack installed from PyPI outside the repository and passing the conformance kit; the security runbook drill's completion and lessons safe to share; exercised recovery runbooks.
+- The engineering criteria in product status hold.
 
-Today the generated [first-run](docs/generated/first-run.md) and
-[application](docs/generated/application-measures.md) measures read "not measured":
-0 of 5 sessions and 0 of 2 teams.
-The target remains the first quarter of 2027, not a promise.
-External evidence sets readiness. A missed criterion moves the release, never the criterion.
+Adoption measures — five consented first runs, two independent application teams, a team's live retrieval pilot and independent third-party customization and its reproduction — are published separately, not release criteria. The generated [first-run](docs/generated/first-run.md) and [application](docs/generated/application-measures.md) measures read "not measured": 0 of 5 sessions and 0 of 2 teams. Invitations remain open.
+
+No maintainer-run proof is published. The reference pack is attached to the GitHub Release, not on PyPI; recovery runbooks are exercised by tests; the security drill is not recorded.
+
+The owner decides release-criteria changes openly in `docs/product-status.md` and the changelog.
 
 ## Product constraints
 

@@ -350,14 +350,7 @@ beside them.</p>
 <p>A risky minor or major release may first use a release candidate, such as
 <code>1.1.0rc1</code>. A candidate is a pre-release, not a stable release.</p>
 <h3 id="when-to-release-10">When to release 1.0</h3>
-<p>Release <code>1.0.0</code> only when the supported surface is ready for the compatibility
-promise and all <a href="product-status.html#before-the-first-stable-release">stable-release criteria</a>
-hold. Both <code>1.0.0rc2</code> and <code>1.0.0rc3</code> are required, and stable 1.0 does not
-follow rc3 automatically. The
-<a href="https://github.com/guardana/guardana/milestones">GitHub milestones</a> group
-release scope, not dates. The target remains the first quarter of 2027,
-set by external evidence rather than by the code. A missed criterion moves the
-release, not the criterion.</p>
+<p>Release <code>1.0.0</code> when all <a href="product-status.html#before-the-first-stable-release">stable-release criteria</a> hold: required <code>1.0.0rc2</code> and <code>1.0.0rc3</code> gates, a candidate period without new supported-surface defect reports, published maintainer-run proofs and engineering criteria. A further candidate is required only if a release blocker needs one. Stable 1.0 is the compatibility promise for the supported surface; adoption measures are published separately and are not release criteria. The <a href="https://github.com/guardana/guardana/milestones">GitHub milestones</a> group release scope.</p>
 <h2 id="the-collector-envelope">The collector envelope</h2>
 <p>A run reaches the collector as a versioned envelope. Every change to the envelope raises its
 version. A collector accepts every envelope version from 2 up to its own. An agent newer than
