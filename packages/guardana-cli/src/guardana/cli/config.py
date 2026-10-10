@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from guardana.cli._formats import OutputFormat
+from guardana.cli._formats import HumanJsonFormatOption, OutputFormat
 from guardana.cli._plugins import DEFAULT_MODE, resolve_trust
 from guardana.cli._profile import PRESET_HELP, resolve_profile
 from guardana.cli._profile_files import ProfileFiles, read_profile_files
@@ -126,7 +126,7 @@ def _refuse_problems(files: ProfileFiles) -> None:
 def explain(
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
-    format: Annotated[OutputFormat, typer.Option(help="human|json")] = OutputFormat.human,
+    format: HumanJsonFormatOption = "human",
 ) -> None:
     """Print the settings actually in force, defaults included, and exit `3` on a problem.
 
@@ -136,7 +136,7 @@ def explain(
     prof = resolve_profile(profile, preset)
     files = _read_files(prof)
     resolved = _resolved(prof, files)
-    if format is OutputFormat.json:
+    if format == OutputFormat.json:
         typer.echo(json.dumps(resolved, indent=2))
     else:
         _print_human(resolved)

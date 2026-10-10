@@ -94,6 +94,9 @@ budget finding out.
 guardana config explain --format json
 ```
 
+`config explain` accepts only `human` and `json`. Any other `--format` exits
+`3` before reading the profile or loading the files and plugins it names.
+
 A profile file shows what somebody wrote. The question they actually have is what
 is *in force*, and most of a gate is defaults — including the ones nobody typed.
 `explain` prints the resolved settings: thresholds, budgets, privacy, safety, plugin

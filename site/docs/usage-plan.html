@@ -221,6 +221,8 @@ files, never a model, and declares that about itself — see
 artifact rule that stays silent about its cost is not assumed to be free; it
 shows up in <code>unknown_cost</code> exactly like an undeclared endpoint rule would.</p>
 <p><code>--format json</code> gives the same numbers to a pipeline, with a <code>schema_version</code>.</p>
+<p><code>plan scan</code> accepts only <code>human</code> and <code>json</code>. Any other <code>--format</code> exits <code>3</code>
+before reading configuration, discovering plugins or building the target.</p>
 <h2 id="flags">Flags</h2>
 <p><code>plan scan</code> and <code>plan probe</code> both discover plugins to build the same registry the
 run they are pricing would use, so both take the same plugin-trust flags
