@@ -11,6 +11,7 @@ from guardana.core.formats.limits import DEFAULT_LIMITS, Limits
 
 _LENGTH_PREFIX_BYTES = 8
 _METADATA_KEY = "__metadata__"
+_QUOTED_CHARS = 80
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,8 @@ def read_safetensors_header(path: Path, *, limits: Limits = DEFAULT_LIMITS) -> S
 
     Raises `FormatError` when the container is not a well-formed safetensors
     file — including the crafted case where the 8-byte length prefix claims a
-    header larger than the file that carries it, and a tensor whose
+    header larger than the file that carries it, a tensor entry whose `dtype` is
+    not a string or whose `shape` is not a list of sizes, and a tensor whose
     `data_offsets` point outside the payload that follows the header.
     """
     header_size, raw, payload_size = _read_header_bytes(path, limits)
@@ -79,21 +81,45 @@ def _check_header_size(prefix_len: int, header_size: int, file_size: int, limits
 
 
 def _tensor(name: str, entry: object, payload_size: int) -> dict[str, object]:
-    """Check one tensor entry indexes a byte range the payload actually holds."""
+    """Check one tensor entry declares its dtype and shape and indexes bytes the payload holds."""
     if not isinstance(entry, dict):
-        raise FormatError(f"safetensors tensor {name!r} is not a JSON object")
+        raise _malformed(name, "the entry is not a JSON object")
+    dtype = entry.get("dtype")
+    if not isinstance(dtype, str):
+        raise _malformed(name, f"dtype is {_stated(entry, 'dtype')}, not a string")
+    shape = entry.get("shape")
+    if not isinstance(shape, list) or not all(_count(size) for size in shape):
+        raise _malformed(
+            name, f"shape is {_stated(entry, 'shape')}, not a list of non-negative integers"
+        )
     offsets = entry.get("data_offsets")
     match offsets:
         case [int() as begin, int() as end] if (
-            not isinstance(begin, bool)
-            and not isinstance(end, bool)
-            and 0 <= begin <= end <= payload_size
+            _count(begin) and _count(end) and begin <= end <= payload_size
         ):
             return entry
-    raise FormatError(
-        f"safetensors tensor {name!r} has data_offsets {offsets!r}, which is not a "
-        f"byte range inside the {payload_size}-byte payload"
+    raise _malformed(
+        name,
+        f"data_offsets is {_stated(entry, 'data_offsets')}, which is not a byte range "
+        f"inside the {payload_size}-byte payload",
     )
+
+
+def _count(value: object) -> bool:
+    """Whether `value` is a JSON integer of zero or more; `true` is a bool, not a size."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _stated(entry: Mapping[str, object], key: str) -> str:
+    """Quote what an entry states for `key`, short enough to sit in a finding."""
+    if key not in entry:
+        return "missing"
+    text = repr(entry[key])
+    return text if len(text) <= _QUOTED_CHARS else f"{text[: _QUOTED_CHARS - 3]}..."
+
+
+def _malformed(name: str, what: str) -> FormatError:
+    return FormatError(f"malformed safetensors header: {name!r}: {what}")
 
 
 def _metadata(block: object) -> dict[str, str]:

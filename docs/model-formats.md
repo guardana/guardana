@@ -75,6 +75,10 @@ class SafetensorsHeader:
     metadata: Mapping[str, str]           # the __metadata__ block, separated out
 ```
 
+Every tensor entry must state a string `dtype`, a `shape` that is a list of
+non-negative integers, and `data_offsets` that lie inside the payload; an entry
+that does not raises `FormatError("malformed safetensors header: '<name>': <what>")`.
+
 `metadata` is the format's one attacker-writable *text* channel, so it is
 separated from the tensor index rather than left mixed in with it. A non-string
 value is serialised rather than dropped — a writer smuggling a structure in
@@ -99,6 +103,9 @@ reads kilobytes. The walk covers every graph the model carries: the main graph
 and its sparse initializers, tensors and subgraphs held in node attributes
 (Constant values, If/Loop/Scan bodies), model-local functions and training
 graphs. `node_domains` and `external_data_paths` collect from all of them.
+A file whose top-level message, walked in full, holds no graph raises
+`FormatError("ONNX model without a graph")`: an empty file parses as an empty
+protobuf message, and that is no model.
 `STANDARD_ONNX_DOMAINS` is exported alongside it: anything else in
 `node_domains` means the runtime must register a native operator library before
 the model will run.

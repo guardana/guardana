@@ -34,7 +34,11 @@ from guardana.rules.supply_chain._npy import (
     npy_header_span,
     read_npy_header,
 )
-from guardana.rules.supply_chain._reading import read_bytes_bounded
+from guardana.rules.supply_chain._reading import (
+    LFS_POINTER_REASON,
+    is_lfs_pointer,
+    read_bytes_bounded,
+)
 from guardana.rules.supply_chain._tar import TarListing, TarListingError, holds_file_data
 
 _NUMPY_SUFFIXES = (".npy", ".npz")
@@ -834,6 +838,9 @@ class PickleOpcodeRule(ArtifactRule):
             report.unscanned(_UNREADABLE)
             return True
         magic = sniffed[0]
+        if not by_content and is_lfs_pointer(magic):
+            report.unscanned(LFS_POINTER_REASON)
+            return True
         if magic.startswith(_ZIP_MAGIC):
             return self._scan_zip(report)
         if not (_opens_as_tar(magic) or (report.tar_named and _has_ustar_magic(magic))):

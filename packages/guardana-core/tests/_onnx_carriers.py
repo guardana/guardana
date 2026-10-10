@@ -94,6 +94,8 @@ def nested_subgraphs(depth: int, innermost: bytes) -> bytes:
 
 _EXTERNAL = external_tensor()
 _CUSTOM_NODE = node(CUSTOM_DOMAIN)
+# A loadable model always has a main graph, also when what it hides lives elsewhere.
+_MAIN_GRAPH = model_with_graph(graph_of(node()))
 
 CARRIERS: Final = (
     Carrier(
@@ -146,31 +148,32 @@ CARRIERS: Final = (
     ),
     Carrier(
         "model-local function node",
-        delimited(25, text(1, "fn") + delimited(7, _CUSTOM_NODE)),
+        _MAIN_GRAPH + delimited(25, text(1, "fn") + delimited(7, _CUSTOM_NODE)),
         None,
         CUSTOM_DOMAIN,
     ),
     Carrier(
         "model-local function node attribute tensor",
-        delimited(25, text(1, "fn") + delimited(7, node("", attribute(5, _EXTERNAL)))),
+        _MAIN_GRAPH
+        + delimited(25, text(1, "fn") + delimited(7, node("", attribute(5, _EXTERNAL)))),
         OUTSIDE_PATH,
         None,
     ),
     Carrier(
         "model-local function default attribute tensor",
-        delimited(25, text(1, "fn") + delimited(11, attribute(5, _EXTERNAL))),
+        _MAIN_GRAPH + delimited(25, text(1, "fn") + delimited(11, attribute(5, _EXTERNAL))),
         OUTSIDE_PATH,
         None,
     ),
     Carrier(
         "training initialization graph",
-        delimited(20, delimited(1, delimited(5, _EXTERNAL))),
+        _MAIN_GRAPH + delimited(20, delimited(1, delimited(5, _EXTERNAL))),
         OUTSIDE_PATH,
         None,
     ),
     Carrier(
         "training algorithm graph",
-        delimited(20, delimited(2, graph_of(_CUSTOM_NODE))),
+        _MAIN_GRAPH + delimited(20, delimited(2, graph_of(_CUSTOM_NODE))),
         None,
         CUSTOM_DOMAIN,
     ),

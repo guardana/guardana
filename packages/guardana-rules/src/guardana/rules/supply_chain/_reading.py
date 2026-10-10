@@ -4,7 +4,14 @@ A scanned repository is untrusted input: an unreadable, crafted-huge, or
 non-regular file must degrade to "skipped", never abort or stall the whole scan.
 """
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Concatenate, ParamSpec, TypeVar
+
+from guardana.core.formats import FormatError
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
 
 # The read bound. `ast.parse` handles far larger files than this comfortably, so
 # the cap is generous — small enough to bound memory against a crafted file,
@@ -12,6 +19,34 @@ from pathlib import Path
 # exports) are scanned rather than silently skipped. A file over the cap is read
 # up to the bound and truncated, so a rule still sees the top of it.
 MAX_SCAN_BYTES = 16 * 1024 * 1024
+
+# The first line every Git LFS pointer file starts with. A repository cloned without
+# the LFS objects holds these small text files under the model's own name.
+_LFS_POINTER = b"version https://git-lfs.github.com/spec/v1"
+LFS_POINTER_REASON = "a Git LFS pointer, not the model; fetch the LFS object"
+"""Why a file named as a model and holding a Git LFS pointer was not scanned."""
+
+
+def is_lfs_pointer(head: bytes) -> bool:
+    """Whether `head`, the start of a file, is a Git LFS pointer rather than its content."""
+    return head.startswith(_LFS_POINTER)
+
+
+def read_model(
+    reader: Callable[Concatenate[Path, _P], _T], path: Path, *args: _P.args, **kwargs: _P.kwargs
+) -> _T:
+    """Run a `guardana.core.formats` reader, naming a Git LFS pointer for what it is.
+
+    A pointer is text and never parses as a binary model format, so it is looked
+    for only once the reader refused the file, and an honest model costs no extra read.
+    """
+    try:
+        return reader(path, *args, **kwargs)
+    except FormatError as exc:
+        head = read_bytes_bounded(path, len(_LFS_POINTER))
+        if head is not None and is_lfs_pointer(head[0]):
+            raise FormatError(LFS_POINTER_REASON) from exc
+        raise
 
 
 def read_bytes_bounded(path: Path, limit: int = MAX_SCAN_BYTES) -> tuple[bytes, bool] | None:

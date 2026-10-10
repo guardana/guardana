@@ -67,6 +67,20 @@ def _cell_source(cell: object) -> str | None:
     return source if isinstance(source, str) else None
 
 
+def _malformed_cell(cell: object) -> str | None:
+    """Say how a cell breaks the notebook format in a way that would hide code; else None."""
+    if not isinstance(cell, dict):
+        return "is not a JSON object"
+    if cell.get("cell_type") != "code":
+        return None
+    source = cell.get("source")
+    if isinstance(source, str):
+        return None
+    if isinstance(source, list) and all(isinstance(line, str) for line in source):
+        return None
+    return "has a source that is not text"
+
+
 def _short_options(word: str, options: _MagicOptions) -> bool | None:
     """Read a getopt-style cluster such as `-qn1`.
 
@@ -252,10 +266,17 @@ class NotebookPayloadRule(ArtifactRule):
         if not isinstance(cells, list):
             yield self._unscanned(path, "the notebook declares no list of cells", ctx)
             return
+        malformed: str | None = None
         for index, cell in enumerate(cells):
+            problem = _malformed_cell(cell)
+            if problem is not None:
+                malformed = malformed or f"cell {index} {problem}"
+                continue
             source = _cell_source(cell)
             if source is not None:
                 yield from self._scan_cell(path, index, source)
+        if malformed is not None:
+            yield self._unscanned(path, malformed, ctx)
 
     def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
         """Say the notebook was not examined, rather than returning as if it were clean."""
