@@ -163,8 +163,12 @@ def _render() -> str:
         "",
         "> Guardana is open-source AI security verification. Its rule engine scans model "
         + "artifacts, probes live endpoints and MCP servers, and grades completed agent "
-        + "runs. Use it on a laptop, in CI, or beside a served model. It runs offline, "
-        + "needs no account, and sends nothing anywhere except to the target you name.",
+        + "runs. Use it on a laptop, in CI, or beside a served model. "
+        + "Artifact scans run offline and send nothing; Guardana needs no account and "
+        + "sends no telemetry. A probe contacts the named target, the judges or guards "
+        + "configured under `evaluators:`, and, for an MCP target requiring "
+        + "authorization, the authorization metadata it advertises, possibly on other "
+        + "hosts; results go to a collector or reporter only when `--reporter` names it.",
         "",
         f"Version {__version__}, Apache-2.0. {counts['total']} built-in rules: "
         + f"{counts['build']} static ones that need no model and no network, and "
@@ -173,8 +177,11 @@ def _render() -> str:
         + "OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).",
         "",
         "Guardana reports four separate outcomes: a finding, an unverified check, a check "
-        + "that errored, and required evidence that was unavailable. None silently counts "
-        + "as a pass. If a run cannot establish something, it says so and exits non-zero.",
+        + "that errored, and required evidence that was unavailable. None of the four "
+        + "outcomes is reported as a pass; by default, an error or a coverage shortfall "
+        + "makes the run indeterminate (exit 2). An unverified (inconclusive) check is "
+        + "always listed but fails the run only under `fail_on_inconclusive`, which is on"
+        + " in `--preset release` and in `monitor`.",
         "",
         "This file is generated from the documentation map; do not edit it by hand.",
         "",
