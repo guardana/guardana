@@ -22,16 +22,19 @@ robust behind a caller that is not has been tested in the wrong place.
 """
 
 import contextlib
+import struct
 import time
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from guardana.core.formats import FormatError
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.rule.errors import RuleError
 from guardana.core.target import ArtifactTarget, TargetKind
+from guardana.rules.supply_chain import chat_template as chat_template_module
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -150,7 +153,7 @@ def test_no_artifact_rule_raises_on_bytes_nobody_wrote(
     actual=st.binary(min_size=0, max_size=256),
 )
 def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
-    tmp_path: Path, declared: int, actual: bytes
+    tmp_path: Path, declared: int, actual: bytes, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The header field an attacker controls, pointed past the end of the file.
 
@@ -160,8 +163,27 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
     and a loop that iterates it.
     """
     header = declared.to_bytes(8, "little")
-    for name in ("model.safetensors", "model.gguf"):
-        (tmp_path / name).write_bytes(header + actual)
+    (tmp_path / "model.safetensors").write_bytes(header + actual)
+    # A real GGUF header: magic bytes, version 3, then the declared tensor and
+    # metadata counts. Without the magic first, every example stops at the magic
+    # check and the length handling below is never exercised.
+    gguf_header = (
+        b"GGUF" + struct.pack("<I", 3) + struct.pack("<Q", declared) + struct.pack("<Q", declared)
+    )
+    (tmp_path / "model.gguf").write_bytes(gguf_header + actual)
+    reached: list[Path] = []
+    reader_errors: list[str] = []
+    real_reader = chat_template_module.read_gguf_metadata
+
+    def counting_reader(path: Path, **kwargs: object) -> object:
+        reached.append(path)
+        try:
+            return real_reader(path, **kwargs)  # type: ignore[arg-type]
+        except FormatError as exc:
+            reader_errors.append(str(exc))
+            raise
+
+    monkeypatch.setattr(chat_template_module, "read_gguf_metadata", counting_reader)
     target = ArtifactTarget(tmp_path)
     ctx = RuleContext()
 
@@ -175,6 +197,10 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
             pytest.fail(f"{rule.meta.id} raised {type(exc).__name__}: {exc}")
     elapsed = time.monotonic() - started
 
+    assert reached, "no example reached the GGUF reader past the magic check"
+    assert not any("bad magic" in message for message in reader_errors), (
+        "input carries valid magic: a magic rejection means the header regressed"
+    )
     assert elapsed < _DEADLINE_SECONDS, (
         f"scanning a file that declares {declared} bytes took {elapsed:.1f}s — "
         f"a crafted length must not become a hang"
@@ -185,14 +211,33 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
     max_examples=40, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @given(text=st.text(max_size=2048))
-def test_the_text_parsers_survive_arbitrary_unicode(tmp_path: Path, text: str) -> None:
+def test_the_text_parsers_survive_arbitrary_unicode(
+    tmp_path: Path, text: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Bidi controls, lone surrogates, unassigned planes — the hidden-instruction surface.
 
     These rules exist *because* text can carry what a reader cannot see, so the
     input they are pointed at is exactly the input most likely to be malformed.
     """
-    for name in ("config.json", "chat_template.jinja", "README.txt", "loader.py"):
+    for name in ("tokenizer_config.json", "chat_template.jinja", "README.txt", "loader.py"):
         (tmp_path / name).write_text(text, encoding="utf-8", errors="surrogatepass")
+    # Counters on the public reader seams: the config reader must open
+    # tokenizer_config.json and the template reader chat_template.jinja, or the
+    # test below proves nothing about either.
+    reached: list[str] = []
+    real_text_prefix = chat_template_module.read_text_prefix
+    real_bytes = chat_template_module.read_bytes_bounded
+
+    def counting_text_prefix(path: Path, **kwargs: object) -> object:
+        reached.append(path.name)
+        return real_text_prefix(path, **kwargs)  # type: ignore[arg-type]
+
+    def counting_bytes(path: Path, *args: object, **kwargs: object) -> object:
+        reached.append(path.name)
+        return real_bytes(path, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(chat_template_module, "read_text_prefix", counting_text_prefix)
+    monkeypatch.setattr(chat_template_module, "read_bytes_bounded", counting_bytes)
     target = ArtifactTarget(tmp_path)
     ctx = RuleContext()
 
@@ -203,6 +248,8 @@ def test_the_text_parsers_survive_arbitrary_unicode(tmp_path: Path, text: str) -
             continue
         except Exception as exc:
             pytest.fail(f"{rule.meta.id} raised {type(exc).__name__}: {exc}")
+    assert "tokenizer_config.json" in reached
+    assert "chat_template.jinja" in reached
 
 
 def test_the_corpus_covers_every_extension_a_built_in_rule_opens(tmp_path: Path) -> None:
