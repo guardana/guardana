@@ -7,6 +7,7 @@ from typing import Annotated
 
 import typer
 from guardana.cli._atomic import write_whole
+from guardana.cli._formats import ReportFormat
 from guardana.cli._outputs import remove_earlier_exchanges
 from guardana.cli._sidecar import refuse_writing_over_an_input, same_file
 from guardana.core.manifest import RunManifest
@@ -184,11 +185,11 @@ def _calibration_lines(manifest: RunManifest) -> list[str]:
 
 def inspect(
     path: Annotated[Path, typer.Argument(help="Saved run to describe")],
-    format: Annotated[str, typer.Option(help="human|json")] = "human",
+    format: Annotated[ReportFormat, typer.Option(help="human|json")] = ReportFormat.human,
 ) -> None:
     """Describe a saved run: what it examined, what it cost, and how it was gated."""
     manifest, document = _load(path)
-    if format == "json":
+    if format is ReportFormat.json:
         typer.echo(json.dumps(document, indent=2))
         return
     typer.echo("\n".join(_lines(manifest)))
