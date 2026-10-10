@@ -337,8 +337,14 @@ install a rule that reads the format.</p>
 <p>A model or notebook a rule tried to read and could not is a shortfall of the same kind,
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
 name the scanner cannot resolve, a model file that cannot be opened (a <code>.bin</code> included,
-since it may be a model), a safetensors file whose header is malformed, a file cut by a
-read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports
+since it may be a model), a safetensors file with a malformed header (including a tensor entry
+with a missing or mistyped <code>dtype</code>, <code>shape</code> or <code>data_offsets</code>), an ONNX
+file without a graph (including an empty file), a <code>.keras</code> archive whose <code>config.json</code> is not
+a JSON object, a file cut by a read bound, a PMML document past the bound, a notebook that
+is not JSON or has a cell that is not an object or a code cell whose source is not text.
+A Git LFS pointer named as a model (<code>version https://git-lfs.github.com/spec/v1</code>, what a
+clone without the LFS objects holds) is reported with the reason <code>a Git LFS pointer, not the model; fetch the LFS object</code>. It is reported as not scanned, never as a checked model.
+The rule reports
 two things for it: an inconclusive &quot;not scanned&quot; result on the unverified channel, and an
 <code>unexamined_component</code> shortfall whose name is the file's path and whose detail reads
 <code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format.

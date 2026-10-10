@@ -29,6 +29,7 @@ from guardana.rules._base import ArtifactRule
 from guardana.rules.prompt._injection_markers import has_smuggled_char
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
+from guardana.rules.supply_chain._reading import read_model
 
 _RULE_ID = "guardana.supply_chain.onnx_graph"
 _UNSCANNED_TITLE = "ONNX model not scanned"
@@ -126,7 +127,9 @@ class OnnxGraphRule(ArtifactRule):
 
     def _scan(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         try:
-            summary = read_onnx_summary(path, limits=Limits(max_entries=self._budget(path)))
+            summary = read_model(
+                read_onnx_summary, path, limits=Limits(max_entries=self._budget(path))
+            )
         except FormatError as exc:
             yield self._unscanned(path, str(exc), ctx)
             return

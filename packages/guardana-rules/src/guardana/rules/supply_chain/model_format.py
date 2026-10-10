@@ -24,7 +24,13 @@ from guardana.core.testing import build_safetensors
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import unread_component, unscanned_verdict
-from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_bytes_bounded
+from guardana.rules.supply_chain._reading import (
+    LFS_POINTER_REASON,
+    MAX_SCAN_BYTES,
+    is_lfs_pointer,
+    read_bytes_bounded,
+    read_model,
+)
 
 _RULE_ID = "guardana.supply_chain.model_format"
 
@@ -98,7 +104,7 @@ def _scan_safetensors(path: Path, ctx: RuleContext) -> Iterator[Finding]:
     loader makes of it was never read here.
     """
     try:
-        read_safetensors_header(path)
+        read_model(read_safetensors_header, path)
     except FormatError as exc:
         ctx.shortfall(unread_component(_RULE_ID, path, str(exc)))
         yield Finding(
@@ -216,6 +222,9 @@ class ModelFormatRule(ArtifactRule):
         if prefix is None:
             return False
         data, truncated = prefix
+        if path.suffix.lower() == _PMML_SUFFIX and is_lfs_pointer(data):
+            yield _unscanned(path, LFS_POINTER_REASON, ctx)
+            return True
         examined = yield from _CONTENT_DETECTORS[path.suffix.lower()](path, data)
         if truncated:
             # A parser reads the whole document, and a prolog of comments can push a

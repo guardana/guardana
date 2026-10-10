@@ -21,7 +21,11 @@ from guardana.core.taxonomy import (
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import unread_component, unscanned_verdict
-from guardana.rules.supply_chain._reading import read_bytes_bounded
+from guardana.rules.supply_chain._reading import (
+    LFS_POINTER_REASON,
+    is_lfs_pointer,
+    read_bytes_bounded,
+)
 
 # A Keras `Lambda` layer wraps an arbitrary Python callable that runs on
 # `load_model` — a code-execution primitive, no inference needed. `safe_mode` is
@@ -38,6 +42,8 @@ _DANGEROUS_MODULES = ("os", "subprocess", "sys", "socket", "shutil", "pty", "imp
 _CLASS_MARKER = re.compile(rb'"class_name"\s*:\s*"Lambda"')
 _MAX_CONFIG_BYTES = 16 * 1024 * 1024
 _UNSCANNED_TITLE = "Keras model not scanned"
+# Not None: a config whose JSON is `null` was read, and is no model either.
+_UNREADABLE = object()
 
 
 def _iter_lambda_configs(node: object) -> Iterator[object]:
@@ -129,11 +135,15 @@ class KerasLambdaRule(ArtifactRule):
 
     def _scan_keras(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         config = _read_keras_config(path)
-        if config is None:
+        if config is _UNREADABLE:
             # Real `.keras` files are zip archives. A file that is not one is
             # malformed, so fall back to the byte marker — a payload inside a
             # deliberately broken archive must not become invisible.
             yield from self._byte_scan(path, ctx, fallback_reason="not a readable .keras archive")
+            return
+        if not isinstance(config, dict):
+            # Keras writes the model as one object; anything else holds no layer to clear.
+            yield self._unscanned(path, "the model config is not a JSON object", ctx)
             return
         for lambda_config in _iter_lambda_configs(config):
             module = _dangerous_module(lambda_config)
@@ -150,6 +160,9 @@ class KerasLambdaRule(ArtifactRule):
             yield self._unscanned(path, "file could not be read", ctx)
             return
         data, truncated = prefix
+        if is_lfs_pointer(data):
+            yield self._unscanned(path, LFS_POINTER_REASON, ctx)
+            return
         if _CLASS_MARKER.search(data) is not None:
             # Firm, not a lead: the config declares the layer, and `load_model`
             # ignores `safe_mode` for the legacy format (CVE-2025-9905), so this
@@ -186,19 +199,19 @@ class KerasLambdaRule(ArtifactRule):
         )
 
 
-def _read_keras_config(path: Path) -> object | None:
-    """Read and parse `config.json` from a `.keras` archive; None if unreadable."""
+def _read_keras_config(path: Path) -> object:
+    """Read and parse `config.json` from a `.keras` archive; `_UNREADABLE` if it cannot be."""
     try:
         # A FIFO or device node opens and then blocks on read, which would hang the scan.
         if not path.is_file():
-            return None
+            return _UNREADABLE
         with zipfile.ZipFile(path) as archive:
             if "config.json" not in archive.namelist():
-                return None
+                return _UNREADABLE
             with archive.open("config.json") as member:
                 raw = member.read(_MAX_CONFIG_BYTES)
         parsed: object = json.loads(raw)
     except (zipfile.BadZipFile, OSError, ValueError):
-        return None
+        return _UNREADABLE
     else:
         return parsed
