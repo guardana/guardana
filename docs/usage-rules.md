@@ -22,6 +22,7 @@ plugin-trust flags:
 
 | Flag | Default | Meaning |
 |---|---|---|
+| `--surface [all\|build\|runtime]` | `all` | Filter by security layer: list every rule, or only build-time or runtime ones |
 | `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe` |
 | `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
 | `--profile PATH` | none | A `guardana.yaml` whose `plugins:` decides which installed plugins load — see [`profiles.md`](profiles.md#plugin-trust-plugins) |

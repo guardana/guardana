@@ -41,6 +41,9 @@ hurry, and it should look like one.
 | Flag | Default | Meaning |
 |---|---|---|
 | `PATH` (positional) | — | Directory to scan; required unless `--target` is used |
+| `--file PATH` | `guardana-baseline.yaml` | The baseline to refresh (`update` only; `create` writes with `--output`) |
+| `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file |
+| `--preset [ci\|pre-training\|monitor\|release]` | none | Named policy preset (mutually exclusive with `--profile`) — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--target SCHEME://LOCATOR` | none | Build a trusted installed artifact target for `create` or `update` |
 | `--target-option KEY=VALUE` | none | Repeatable, non-secret configuration passed to that target |
 | `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe` |
