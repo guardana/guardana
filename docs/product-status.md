@@ -40,7 +40,7 @@ so this page is maintained as carefully as the code.
 
 **Released (beta), F4:** an installed package adds a format for `--format` and a reporter for `--reporter` ([installed outputs](outputs.md)), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit `8` when an installed output fails. `examples/output_pack` is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own `output_api`. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on `monitor`, `import-observations` and `recipe run`.
 
-**Not released:** The five-user first-run study (F2) and the rest of F6 (the team regression loop and the live retrieval pilot) remain [1.0 criteria](#before-the-first-stable-release).
+**Not released:** The five-user first-run study (F2) and the rest of F6 (the team regression loop and the live retrieval pilot) remain open [adoption measures](#adoption-measures); the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.
 
 ## Before the first stable release
 
@@ -60,62 +60,33 @@ and `1.0.0rc3` ship only after their own full green release gate and green CI on
 the exact commit. A further candidate is required only if a release blocker
 needs one.
 
-Stable 1.0 does not follow rc3 automatically. A candidate must have a period
-without new defect reports, and the following criteria must hold:
+Stable 1.0 is the compatibility promise for the supported surface. It ships only when all criteria below hold; it does not follow rc3 automatically.
 
-- Five consented first-run sessions with people new to Guardana. Target: at
-  least four of five people complete a failure, a fix and one custom check in
-  ten minutes without maintainer help. The clean-install starter provides
-  saved evidence without an account, key, model or collector. It uses built-in
-  trust and explains what an installed pack would execute. Separate paths
-  cover local scans, recorded answers and a real application.
-- Two independent teams run locked checks against their own application.
-  Recipes pin profiles, datasets, packs and grading identities. Each team
-  saves a failed and an incomplete result, versions and regrades a redacted
-  regression, and gates it in CI with a reviewable artifact. Use safe fixtures
-  or doubles. Label any model harness clearly. Sensitive production data is
-  never promoted automatically.
-- One controlled live retrieval pilot on a team's own retrieval target catches
-  a poisoned document and a tenant-filter failure without an uncontrolled
-  side effect.
-- One successful third-party customization and an independent reproduction
-  are recorded with consent. Third-party targets, rules, evaluators, formats
-  and reporters work without an engine fork.
-- Python consumers receive failed, incomplete and stopped outcomes as typed
-  data. Case outcomes and missing evidence survive serialization, redaction
-  and export.
-- First-run completion, real-application coverage and the share of attempted
-  checks reaching a supported verdict with comparable evidence are published
-  from generated data. Research is recorded with consent, without telemetry
-  or invented adoption claims.
-- The supported surface, compatibility matrix and deprecation policy are
-  published. The conformance kit is published. A reference pack is
-  independently installable from PyPI, with an independent installation
-  exercised.
-- Every built-in rule that can decline has finding, clean and inconclusive
-  fixtures.
-- Provider and adapter conformance covers the pilots' system messages, tools,
-  failure paths, budgets, usage and adapter limits.
-- The collector envelope is versioned independently from the run schema.
-  Clients and storage migrate together.
-- Older persisted documents and extension conformance pass the release gate.
-  Migrations are exercised with older run, dataset, profile, pack and collector
-  documents.
-- The security runbook is exercised in a drill. Recovery runbooks are exercised.
+- `1.0.0rc2` and `1.0.0rc3` have shipped, each after its own full green release gate and green CI on the exact commit. A candidate has had a period without new defect reports against the supported surface. A further candidate is required only if a release blocker needs one.
+- Maintainer-run proofs are published with commands and results, each labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failing result, a fix and one custom check; the retrieval pilot against the reference application in `examples/retrieval_pilot/`, catching a poisoned document and a tenant-filter failure; the regression loop on the same reference application, with a failed and an incomplete result saved and a redacted regression regraded and gated in CI with a reviewable artifact; customization through published extension points only, installing the reference pack from PyPI outside the repository and passing the conformance kit; the security runbook drill, reporting completion and lessons safe to share; recovery runbooks exercised.
+- The engineering criteria hold:
+  - Python consumers receive failed, incomplete and stopped outcomes as typed data; case outcomes and missing evidence survive serialization, redaction and export.
+  - Every built-in rule that can decline has finding, clean and inconclusive fixtures.
+  - Provider and adapter conformance covers system messages, tools, failure paths, budgets, usage and adapter limits.
+  - The collector envelope is versioned independently from the run schema; clients and storage migrate together.
+  - Older persisted documents and extension conformance pass the release gate, with migrations exercised on older run, dataset, profile, pack and collector documents.
+  - The supported surface, compatibility matrix, deprecation policy and conformance kit are published.
 
-Today the generated [first-run measure](generated/first-run.md) and
-[application measures](generated/application-measures.md) read "not measured":
-0 of 5 sessions and 0 of 2 teams. The reference pack is attached to the GitHub
-Release but is not on PyPI. Recovery runbooks are exercised by tests, and the
-security drill is not recorded. These facts do not substitute for the remaining
-external evidence.
+The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.
 
-[Issues](https://github.com/guardana/guardana/issues) are the live work queue.
-The [milestones](https://github.com/guardana/guardana/milestones) `1.0.0rc2`,
-`1.0.0rc3` and `1.0.0` group release scope, not dates. The target remains the
-first quarter of 2027, set by external evidence rather than by the code. A
-missed criterion moves the stable release, not the criterion. The owner decides
-changes to release criteria.
+No maintainer-run proof is published. The reference pack is attached to the GitHub Release but is not on PyPI. Recovery runbooks are exercised by tests; the security drill is not recorded.
+
+[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope for `1.0.0rc2`, `1.0.0rc3` and `1.0.0`.
+
+The owner decides changes to release criteria and records each one here and in the changelog.
+
+### Adoption measures
+
+These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study, F2; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study, F6); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.
+
+Each is published only as a generated aggregate with consent. The generated [first-run](generated/first-run.md) and [application](generated/application-measures.md) measures read "not measured": 0 of 5 sessions and 0 of 2 teams. First-run and pilot invitations remain open.
+
+### After 1.0
 
 Paired statistical diff (M1) starts when two independent pilot teams use local
 `diff` on comparable saved before/after application runs for a documented ship
@@ -225,8 +196,9 @@ what was retrieved, and Guardana never queries a vector store itself.
 Both checks are verified against a reference application,
 [`examples/retrieval_pilot/`](../examples/retrieval_pilot/), whose tests run them with a
 broken tenant filter, an obeying model, a partly seeded index and the fixed application
-on every CI run. It is a reference, not a team's own retrieval target: until one has run
-them, the retrieval pilot remains an [open 1.0 criterion](#before-the-first-stable-release).
+on every CI run. It is a reference, not a team's own retrieval target: until a team has run
+them on its own target, the team retrieval pilot remains an open
+[adoption measure](#adoption-measures); the reference run is a maintainer-run proof.
 
 ### Text only
 

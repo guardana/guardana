@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Adopter study — Guardana documentation</title>
-<meta name="description" content="How the maintainer records two independent teams&#x27; runs required before 1.0, their consent, and the generated application measures">
+<meta name="description" content="How the maintainer records two independent teams&#x27; consented runs and generates adoption measures, separate from stable 1.0 release criteria">
 <link rel="canonical" href="https://guardana.dev/docs/studies/adopter-study">
 <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../../assets/brand/v1/tokens.css">
@@ -197,12 +197,7 @@
 </nav>
 </details>
 <main>
-<h1>Adopter study</h1><p class="lede">How the maintainer records two independent teams' runs required before 1.0, their consent, and the generated application measures</p><p>The <a href="../product-status.html#before-the-first-stable-release">F6 release criterion</a> asks two independent teams to run Guardana against their own application
-and gate a regression in CI, and the milestone publishes two measures from their runs: coverage
-of the real application and the share of attempted checks that reached a supported verdict.
-Only teams outside this project can answer that. This page explains how the maintainer records
-their runs. The published answer is <a href="../generated/application-measures.html">generated from the sheet</a>
-and says &quot;not measured&quot; until two teams have rows.</p>
+<h1>Adopter study</h1><p class="lede">How the maintainer records two independent teams' consented runs and generates adoption measures, separate from stable 1.0 release criteria</p><p>The <a href="../product-status.html#adoption-measures">F6 adoption measure</a> covers two independent teams running locked checks on their own application. It is not a stable 1.0 release criterion. This page explains how the maintainer records their runs and consent. The published application measures are <a href="../generated/application-measures.html">generated from the sheet</a> and read &quot;not measured&quot;: 0 of 2 teams have recorded runs. Pilot invitations remain open; the maintainer-run retrieval proof uses the reference application in <code>examples/retrieval_pilot/</code>, while the adoption pilot uses a team's own target.</p>
 <h2 id="one-run">One run</h2>
 <ul>
 <li>The team runs its own application through a recipe whose <code>kind</code> is <code>application</code>,

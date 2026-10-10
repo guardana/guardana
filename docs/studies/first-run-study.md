@@ -1,13 +1,13 @@
 ---
 title: "First-run study"
 nav_order: 13
-summary: "How the maintainer runs the five first-run sessions required before 1.0, records consent, and generates the published measure"
+summary: "How the maintainer records five consented first-run sessions and generates the adoption measure, separate from stable 1.0 release criteria"
 status: stable
 ---
 
 # First-run study
 
-The [F2 release criterion](../product-status.md#before-the-first-stable-release) asks whether a new user can get a failing result, fix it, keep the evidence and edit one check, offline, within ten minutes. Only people new to Guardana can answer that question. This page explains how the maintainer runs those sessions. The published answer is [generated from the sheet](../generated/first-run.md) and says "not measured" until five consented sessions are recorded.
+The [F2 adoption measure](../product-status.md#adoption-measures) covers five consented sessions with people new to Guardana, with a target of at least four of five completing a failure, a fix and one custom check in ten minutes without help. It is not a stable 1.0 release criterion. This page explains how the maintainer runs those sessions and records consent. The published measure is [generated from the sheet](../generated/first-run.md) and reads "not measured": 0 of 5 sessions are recorded. Invitations remain open.
 
 ## One session
 
