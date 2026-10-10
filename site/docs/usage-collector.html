@@ -673,6 +673,7 @@ toy configuration and none for the real one.</p>
 <h2 id="the-http-api">The HTTP API</h2>
 <p>The optional collector stores and serves results submitted by Guardana runs. It starts no scan, probe or other job. Runs execute where Guardana runs (the CLI, CI, the Python API), and the CLI submits them with <code>--reporter server://&lt;collector URL&gt;</code>.</p>
 <p><code>/openapi.json</code> lists routes, key permissions and refusals: <code>401</code> for a missing or unaccepted key, <code>403</code> for insufficient permission, and <code>503</code> when the database cannot be reached to check the key.</p>
+<p>The collector serves no interactive API viewer (<code>/docs</code>, <code>/redoc</code> and <code>/docs/oauth2-redirect</code> answer <code>404</code>), because FastAPI's default viewers load their scripts, styles and fonts from third-party hosts. To browse the API, download the document (<code>curl --fail --show-error &quot;$COLLECTOR_URL/openapi.json&quot; -o openapi.json</code>) and open the file in an OpenAPI viewer installed on your own machine.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -718,7 +719,7 @@ toy configuration and none for the real one.</p>
 <td>—</td>
 </tr>
 <tr>
-<td><code>/openapi.json</code>, and FastAPI's <code>/docs</code> and <code>/redoc</code> viewers</td>
+<td><code>/openapi.json</code></td>
 <td>None (public)</td>
 <td>—</td>
 </tr>
