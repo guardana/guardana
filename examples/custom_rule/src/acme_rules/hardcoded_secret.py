@@ -18,6 +18,32 @@ _SUFFIXES = (".env", ".yaml", ".yml", ".ini", ".cfg")
 # is deliberately narrow to keep the example precise and dependency-free.
 _ACME_KEY = re.compile(r"ACME_LIVE_KEY_[A-Za-z0-9]{16,}")
 
+# Explicit bound for example file reads: a config file nobody can fully
+# read is reported, never silently skipped or truncated.
+_READ_LIMIT_BYTES = 256 * 1024
+
+
+def _read_guarded(path: Path) -> tuple[str | None, str | None]:
+    """Read a config file with a regular-file guard, a size bound, and strict decoding.
+
+    Returns (text, None) on success, or (None, reason) when the file must be
+    reported instead of scanned. Only stdlib Path operations are used, so the
+    rule stays on the supported extension surface.
+    """
+    try:
+        if not path.is_file():
+            return None, "not a regular file"
+        with path.open("rb") as handle:
+            raw = handle.read(_READ_LIMIT_BYTES + 1)
+    except OSError as exc:
+        return None, f"could not read: {exc}"
+    if len(raw) > _READ_LIMIT_BYTES:
+        return None, f"larger than {_READ_LIMIT_BYTES} bytes"
+    try:
+        return raw.decode("utf-8"), None
+    except UnicodeDecodeError as exc:
+        return None, f"not valid UTF-8: {exc}"
+
 
 def _scan_text(text: str) -> Iterator[re.Match[str]]:
     yield from _ACME_KEY.finditer(text)
@@ -60,9 +86,8 @@ class HardcodedAcmeKeyRule(Rule):
             yield from self._scan(path)
 
     def _scan(self, path: Path) -> Iterator[Finding]:
-        try:
-            text = path.read_text(errors="ignore")
-        except OSError as exc:
+        text, reason = _read_guarded(path)
+        if text is None:
             # A config file we could not read is not a config file we cleared —
             # silence here would be the fail-open this project exists to avoid.
             yield Finding(
@@ -71,7 +96,7 @@ class HardcodedAcmeKeyRule(Rule):
                 title=self.meta.title,
                 taxonomy=self.meta.taxonomy,
                 target_ref=str(path),
-                evidence=Evidence(summary=f"could not read {path.name}: {exc}"),
+                evidence=Evidence(summary=f"could not read {path.name}: {reason}"),
                 verdict=Verdict("inconclusive", 0.0, "file unreadable", self.meta.id),
             )
             return
