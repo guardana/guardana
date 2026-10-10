@@ -148,6 +148,14 @@ Cards (`.well-known/mcp.json`) are not read. An A2A agent is spoken to over the 
 binding of version `1.0` only, on the origin you named: HTTP+JSON, gRPC and an interface
 on another origin are not examined, and agent-card signatures are not verified.
 
+### An archive with more than 100,000 entries is not scanned
+
+`pickle_opcode` and `keras_lambda` refuse a `.zip`, `.tar` or `.keras` before opening it
+when listing it would cost more than listing a model. An archive of more than 100,000 entries
+is reported not scanned (exit `2`) even when it holds no model, such as an image dataset.
+Exclude it with `.guardanaignore` or `rules.paths_exclude`, or scan
+the model's directory instead. [`guardana scan`](usage-scan.md) lists every bound.
+
 ### `monitor` is scheduled, not passive
 
 It re-runs checks on an interval. It does not observe production traffic, cannot

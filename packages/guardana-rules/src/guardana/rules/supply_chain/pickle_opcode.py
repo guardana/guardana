@@ -35,7 +35,17 @@ from guardana.rules.supply_chain._npy import (
     read_npy_header,
 )
 from guardana.rules.supply_chain._reading import read_bytes_bounded
-from guardana.rules.supply_chain._tar import TarListing, TarListingError, holds_file_data
+from guardana.rules.supply_chain._tar import (
+    TarListing,
+    TarListingError,
+    holds_file_data,
+    listing_refusal,
+)
+from guardana.rules.supply_chain._zip import (
+    ARCHIVE_MAX_ENTRIES,
+    ZIP_DIRECTORY_MAX_BYTES,
+)
+from guardana.rules.supply_chain._zip import listing_refusal as zip_listing_refusal
 
 _NUMPY_SUFFIXES = (".npy", ".npz")
 _SUFFIXES = (
@@ -228,6 +238,8 @@ checkpoint never reaches the bound; a deflated member of repeated opcodes reache
 """
 _ARCHIVE_MAX_MEMBERS = 100_000
 """Members read from one archive; `torch.save` writes one per tensor storage, far fewer."""
+_ARCHIVE_MAX_ENTRIES = ARCHIVE_MAX_ENTRIES
+_ZIP_DIRECTORY_MAX_BYTES = ZIP_DIRECTORY_MAX_BYTES
 # A raw pickle stream is read whole because `pickletools` needs it, so the read
 # is capped: a model checkpoint is a zip container (streamed from disk below),
 # and a half-gigabyte *raw* pickle is anomalous rather than routine. Reading
@@ -749,9 +761,11 @@ class PickleOpcodeRule(ArtifactRule):
     A raw tensor storage beside a `data.pkl`, which `torch.load` never
     unpickles, is reported only when it holds a pickle or a nested archive, so tensor
     values that parse as opcodes are not noise. One archive is read up to a member count
-    and an opcode budget shared by its members. A file gets one finding naming every
-    callable it imports. Anything it cannot fully parse, or stops reading at a bound,
-    becomes a visible unverified result and a coverage shortfall, never a silent clean.
+    and an opcode budget shared by its members, and one that declares more entries, a
+    larger zip central directory or larger tar extended headers than its bounds is refused
+    before it is opened. A file gets one finding naming every callable it imports.
+    Anything it cannot fully parse, or stops reading at a bound, becomes a visible
+    unverified result and a coverage shortfall, never a silent clean.
     """
 
     meta = RuleMeta(
@@ -973,7 +987,8 @@ class PickleOpcodeRule(ArtifactRule):
 
         A model archive has every member read. A plain `.zip` has only the members named
         as models read, and is a model only when it holds one. The member bound counts
-        only the members read.
+        only the members read; a zip whose end records declare more entries, or a larger
+        central directory, than one archive may list is refused before it is opened.
         """
         # Opened from the path, not from bytes in memory: a checkpoint for a 7B
         # model is a multi-GB zip, and holding it whole just to list its members
@@ -981,6 +996,14 @@ class PickleOpcodeRule(ArtifactRule):
         path = report.path
         every_member = not report.plain_zip
         try:
+            refusal = zip_listing_refusal(
+                path,
+                max_entries=_ARCHIVE_MAX_ENTRIES,
+                max_directory_bytes=_ZIP_DIRECTORY_MAX_BYTES,
+            )
+            if refusal is not None:
+                report.unscanned(f"{refusal}; not scanned")
+                return True
             budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + path.stat().st_size)
             with zipfile.ZipFile(path) as archive:
                 # Every entry, not every name: two members may share a name, and
@@ -1013,11 +1036,18 @@ class PickleOpcodeRule(ArtifactRule):
 
         Every header is read first and the members after, each up to the member bound,
         into memory and never to disk. The member bound counts only the members read,
-        and a member several links name is read once for each way it is judged.
+        and a member several links name is read once for each way it is judged. A tar
+        whose headers declare more members, or larger extended headers, than one archive
+        may list is refused before it is opened.
         """
         report.container = "tar"
         path = report.path
         try:
+            with path.open("rb", buffering=0) as handle:
+                refusal = listing_refusal(handle, max_entries=_ARCHIVE_MAX_ENTRIES)
+            if refusal is not None:
+                report.unscanned(f"{refusal}; not scanned")
+                return True
             budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + path.stat().st_size)
             with tarfile.open(path, mode="r:") as archive:
                 listing = TarListing.read(archive)
@@ -1038,7 +1068,7 @@ class PickleOpcodeRule(ArtifactRule):
         except TarListingError as error:
             report.unscanned(f"{error}; not scanned")
             return True
-        except (tarfile.TarError, OSError, EOFError, ValueError, RecursionError):
+        except (tarfile.TarError, OSError, EOFError, ValueError, IndexError, RecursionError):
             report.unscanned("malformed tar archive; not scanned")
             return True
         return report.path.name.lower().endswith(_TORCH_TAR_NAMES) or bool(chosen)

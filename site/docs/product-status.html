@@ -352,6 +352,12 @@ supply, never fetched, and what a server reports about its version is its own cl
 Cards (<code>.well-known/mcp.json</code>) are not read. An A2A agent is spoken to over the JSON-RPC
 binding of version <code>1.0</code> only, on the origin you named: HTTP+JSON, gRPC and an interface
 on another origin are not examined, and agent-card signatures are not verified.</p>
+<h3 id="an-archive-with-more-than-100000-entries-is-not-scanned">An archive with more than 100,000 entries is not scanned</h3>
+<p><code>pickle_opcode</code> and <code>keras_lambda</code> refuse a <code>.zip</code>, <code>.tar</code> or <code>.keras</code> before opening it
+when listing it would cost more than listing a model. An archive of more than 100,000 entries
+is reported not scanned (exit <code>2</code>) even when it holds no model, such as an image dataset.
+Exclude it with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>, or scan
+the model's directory instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
 <h3 id="monitor-is-scheduled-not-passive"><code>monitor</code> is scheduled, not passive</h3>
 <p>It re-runs checks on an interval. It does not observe production traffic, cannot
 see what your real users are doing, and is not an inline control. Watching live

@@ -22,6 +22,11 @@ from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import unread_component, unscanned_verdict
 from guardana.rules.supply_chain._reading import read_bytes_bounded
+from guardana.rules.supply_chain._zip import (
+    ARCHIVE_MAX_ENTRIES,
+    ZIP_DIRECTORY_MAX_BYTES,
+    listing_refusal,
+)
 
 # A Keras `Lambda` layer wraps an arbitrary Python callable that runs on
 # `load_model` — a code-execution primitive, no inference needed. `safe_mode` is
@@ -128,6 +133,14 @@ class KerasLambdaRule(ArtifactRule):
             ctx.examined(path)
 
     def _scan_keras(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
+        refusal = listing_refusal(
+            path, max_entries=ARCHIVE_MAX_ENTRIES, max_directory_bytes=ZIP_DIRECTORY_MAX_BYTES
+        )
+        if refusal is not None:
+            # Listing an archive that declares this much costs more than any model does,
+            # so it is never opened; its first bytes are still searched for the marker.
+            yield from self._byte_scan(path, ctx, fallback_reason=refusal)
+            return
         config = _read_keras_config(path)
         if config is None:
             # Real `.keras` files are zip archives. A file that is not one is

@@ -85,7 +85,8 @@ named by its file: a pickle, archive or graph that does not parse, a pickle impo
 name the scanner cannot resolve, a pickle naming a callable by an extension-registry
 code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file whose header is malformed, a file cut by a
-read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports
+read bound, an archive refused before it is opened (below), a PMML document past the
+bound, a notebook that is not JSON. The rule reports
 two things for it: an inconclusive "not scanned" result on the unverified channel, and an
 `unexamined_component` shortfall whose name is the file's path and whose detail reads
 `<rule id> could not read it: <reason>`. The file is not named a second time by format.
@@ -98,6 +99,19 @@ Python after their options are removed; `%system` and `%sx` lines are read as sh
 escapes, like `!`, and `%%sx`, `%%system` and `%%!` cells as shell cells, like `%%bash`,
 whose magic is found on the first non-blank line; other magics are skipped. A magic whose
 statement does not parse makes the cell inconclusive.
+
+An archive is refused before it is opened when listing it would cost more than listing a
+model does. A zip, a `.keras` included, is refused when its end records declare more than
+100,000 entries or a central directory over 25,600,000 bytes, or when that directory holds
+more than 100,000 entries. A tar is refused when it holds more than 100,000 members or
+more than 400,000 headers; more than 8 extended headers, or more than 1 MiB of them, in
+front of one member; more than 1,000,000 global PAX records applied, counting the records
+in force once for every member and PAX header after them; sparse maps listing more than
+100,000 regions in all, or one stored in a member's data over 1 MiB; or a header the
+scanner cannot follow. A sparse member within those bounds is read like any other. An
+archive that holds no model but exceeds the entry bound, such as an image dataset,
+is reported not scanned like any other refused archive. Exclude it from the scan
+with `.guardanaignore` or `rules.paths_exclude`, or scan the model's directory instead.
 
 Shortfall names are relative to the working directory, as finding locations are, and the
 scan root is removed from their detail, so a saved run names the same file on a laptop
