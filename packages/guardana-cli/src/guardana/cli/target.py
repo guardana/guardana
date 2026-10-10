@@ -15,7 +15,7 @@ from guardana.cli._connection import (
     resolve_flags,
 )
 from guardana.cli._errors import EndpointFlag, run_against_endpoint
-from guardana.cli._formats import HumanJsonFormatOption, OutputFormat
+from guardana.cli._formats import ReportFormat
 from guardana.cli._plugins import (
     AllowPluginOption,
     PluginsOption,
@@ -107,7 +107,7 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
     api_key_env: ApiKeyEnvOption = None,
     provider: ProviderOption = None,
     adapter: AdapterOption = None,
-    format: HumanJsonFormatOption = "human",
+    format: Annotated[ReportFormat, typer.Option(help="human|json")] = ReportFormat.human,
     require: Annotated[
         str | None,
         typer.Option(
@@ -178,7 +178,7 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
         accepts=(EndpointFlag.ADAPTER, EndpointFlag.API_KEY_ENV),
     )
     unrunnable = unrunnable_rules(report, registry)
-    if format == OutputFormat.json:
+    if format is ReportFormat.json:
         typer.echo(_render_json(report, unrunnable))
     else:
         typer.echo(_render_human(report, unrunnable, endpoint_rule_count(registry)))

@@ -33,7 +33,8 @@ def test_unsupported_format_is_refused_before_configuration_is_read(
 
     assert result.exit_code == ExitCode.INVALID_USAGE, result.output
     text = " ".join(_ANSI.sub("", result.output).split())
-    assert "supported formats: human, json" in text
+    assert "Invalid value for" in text
+    assert "is not one of 'human', 'json'" in text
     assert output_format in text
 
 
