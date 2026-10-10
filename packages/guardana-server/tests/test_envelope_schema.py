@@ -20,7 +20,14 @@ from guardana.core.redaction import EvidenceMode
 from guardana.core.report import SkipReason
 from guardana.core.reporter import ENVELOPE_SCHEMA_VERSION, _serialize
 from guardana.core.severity import Severity
-from guardana.server.envelope import SCHEMA_VERSION, Submission
+from guardana.server.envelope import (
+    SCHEMA_VERSION,
+    EvidenceModeName,
+    GateName,
+    OutcomeName,
+    SeverityName,
+    Submission,
+)
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel
 from test_historical_envelopes import stored_envelopes
@@ -216,3 +223,18 @@ def _enum_at(path: str) -> list[str]:
 def test_a_published_enum_is_the_engine_s_own(path: str, values: list[str]) -> None:
     """A value the engine gains is an envelope change, so it raises the version first."""
     assert sorted(_enum_at(path)) == sorted(values)
+
+
+@pytest.mark.parametrize(
+    ("path", "accepted"),
+    [
+        ("findings.severity", SeverityName),
+        ("summary.max_severity", SeverityName),
+        ("findings.verdict.outcome", OutcomeName),
+        ("run.gate", GateName),
+        ("run.evidence_mode", EvidenceModeName),
+    ],
+)
+def test_the_collector_accepts_exactly_a_published_enum(path: str, accepted: object) -> None:
+    """A value the schema refuses is one the collector would otherwise store and rank."""
+    assert sorted(get_args(accepted)) == sorted(_enum_at(path))

@@ -6,7 +6,9 @@ makes that independence safe — an agent and a collector can be upgraded apart,
 and a version the collector does not understand is rejected, never guessed at.
 """
 
-from typing import Annotated
+import math
+import re
+from typing import Annotated, Literal, NamedTuple, get_args
 
 from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, field_validator
 
@@ -22,8 +24,21 @@ SUPPORTED_SCHEMA_VERSIONS = frozenset({2, 3, 4, 5, 6, 7, 8})
 # make Pydantic reject an oversized body at the door, before anything is stored.
 _MAX_FINDINGS = 5_000
 _MAX_SKIPPED = 5_000
-_Str = Annotated[str, StringConstraints(max_length=4_096)]
-_Text = Annotated[str, StringConstraints(max_length=65_536)]
+MAX_STRING_LENGTH = 4_096
+MAX_TEXT_LENGTH = 65_536
+_Str = Annotated[str, StringConstraints(max_length=MAX_STRING_LENGTH)]
+_Text = Annotated[str, StringConstraints(max_length=MAX_TEXT_LENGTH)]
+
+# The published schema's enums, which are the engine's own values. The engine only
+# ever added to them, so an older agent's values are among them and it is held to them too.
+SeverityName = Literal["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+OutcomeName = Literal["pass", "fail", "inconclusive"]
+GateName = Literal["pass", "fail", "indeterminate"]
+EvidenceModeName = Literal["metadata_only", "redacted", "full"]
+SkipReasonName = Literal[
+    "missing_capability", "unsafe_mode", "not_applicable", "not_recorded", "not_offered"
+]
+_IDENTITY = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 class TaxonomyRefIn(BaseModel):
@@ -233,3 +248,83 @@ class Submission(BaseModel):
     # agent still submits and is stored as a run that did not say — never as one
     # that passed.
     run: RunIn | None = None
+
+
+class OffSchemaValue(NamedTuple):
+    """One value a submission carries that the published envelope schema does not allow."""
+
+    loc: tuple[str | int, ...]
+    message: str
+    value: object
+
+
+def off_schema_values(submission: Submission) -> list[OffSchemaValue]:
+    """Every value in `submission` outside the published schema's enums, bounds and patterns.
+
+    Checked at ingest only. The models stay as loose as every earlier collector, so a
+    row one of them stored still reads back; a new value outside the schema is refused
+    before it is stored.
+    """
+    found: list[OffSchemaValue] = []
+    for channel in ("findings", "unverified"):
+        for index, finding in enumerate(getattr(submission, channel)):
+            _finding_values(found, (channel, index), finding)
+    if submission.summary is not None:
+        _summary_values(found, submission.summary)
+    run = submission.run
+    if run is not None:
+        _one_of(found, ("run", "gate"), run.gate, GateName)
+        _one_of(found, ("run", "evidence_mode"), run.evidence_mode, EvidenceModeName)
+        for name in ("requests", "input_tokens", "output_tokens", "wall_time_seconds"):
+            _bounded(found, ("run", name), getattr(run, name))
+    return found
+
+
+def _finding_values(
+    found: list[OffSchemaValue], loc: tuple[str | int, ...], finding: FindingIn
+) -> None:
+    _one_of(found, (*loc, "severity"), finding.severity, SeverityName)
+    if finding.identity is not None and not _IDENTITY.fullmatch(finding.identity):
+        message = "Input should match sha256:<64 hex>"
+        found.append(OffSchemaValue((*loc, "identity"), message, finding.identity))
+    if finding.verdict is not None:
+        verdict_loc = (*loc, "verdict")
+        _one_of(found, (*verdict_loc, "outcome"), finding.verdict.outcome, OutcomeName)
+        _bounded(found, (*verdict_loc, "confidence"), finding.verdict.confidence, 1.0)
+
+
+def _summary_values(found: list[OffSchemaValue], summary: SummaryIn) -> None:
+    _one_of(found, ("summary", "max_severity"), summary.max_severity, SeverityName)
+    for name in ("rules_run", "unverified", "errors"):
+        _bounded(found, ("summary", name), getattr(summary, name))
+    for index, skipped in enumerate(summary.rules_skipped):
+        if isinstance(skipped, SkippedIn):
+            loc = ("summary", "rules_skipped", index, "reason")
+            _one_of(found, loc, skipped.reason, SkipReasonName)
+
+
+def _one_of(
+    found: list[OffSchemaValue], loc: tuple[str | int, ...], value: str | None, allowed: object
+) -> None:
+    choices = get_args(allowed)
+    if value is not None and value not in choices:
+        listed = ", ".join(repr(choice) for choice in choices)
+        found.append(OffSchemaValue(loc, f"Input should be one of {listed}", value))
+
+
+def _bounded(
+    found: list[OffSchemaValue],
+    loc: tuple[str | int, ...],
+    value: float | None,
+    maximum: float | None = None,
+) -> None:
+    if value is None:
+        return
+    if not math.isfinite(value):
+        found.append(OffSchemaValue(loc, "Input should be a finite number", value))
+    elif value < 0:
+        found.append(OffSchemaValue(loc, "Input should be greater than or equal to 0", value))
+    elif maximum is not None and value > maximum:
+        found.append(
+            OffSchemaValue(loc, f"Input should be less than or equal to {maximum:g}", value)
+        )

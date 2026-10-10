@@ -57,6 +57,23 @@ def test_by_source_worst_severity_and_unverified() -> None:
     assert source.worst_severity == "HIGH"
 
 
+def test_an_unknown_severity_is_never_reported_as_the_worst() -> None:
+    """An earlier collector stored whatever severity it was sent."""
+    records = [_rec(1.0, _sub("a", [("guardana.x", "banana")]))]
+
+    (source,) = compute_stats(records).by_source
+
+    assert source.worst_severity is None
+
+
+def test_an_unknown_severity_does_not_outrank_a_known_one() -> None:
+    records = [_rec(1.0, _sub("a", [("guardana.x", "LOW"), ("guardana.y", "banana")]))]
+
+    (source,) = compute_stats(records).by_source
+
+    assert source.worst_severity == "LOW"
+
+
 def test_unverified_counted_separately_from_findings() -> None:
     stats = compute_stats([_rec(1.0, _sub("a", [], unverified=3))])
     assert stats.totals.findings == 0
