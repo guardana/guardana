@@ -9,6 +9,7 @@ in `503` against the unreachable address below.
 import json
 import re
 from collections.abc import Iterator
+from html import unescape
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -112,6 +113,52 @@ def test_health_and_the_catalog_stay_public(authenticated: FastAPI) -> None:
     paths = authenticated.openapi()["paths"]
     assert "security" not in paths["/healthz"]["get"]
     assert "security" not in paths["/readyz"]["get"]
+
+
+_VIEWERS = ("/docs", "/redoc", "/docs/oauth2-redirect")
+# Absolute and protocol-relative URL literals; `// ` with a space is a script comment.
+_ANY_HOST = re.compile(r"""(?:https?:)?//[^\s/'"]""", re.IGNORECASE)
+
+
+@pytest.mark.parametrize("keyed", [False, True])
+@pytest.mark.parametrize("dashboard", [False, True])
+def test_served_pages_reference_no_external_host(
+    monkeypatch: pytest.MonkeyPatch, keyed: bool, dashboard: bool
+) -> None:
+    for name in (
+        "GUARDANA_DASHBOARD",
+        "GUARDANA_ALLOW_UNAUTHENTICATED",
+        "GUARDANA_MIGRATE_ON_START",
+        "GUARDANA_STORAGE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", _UNREACHABLE)
+    app = create_app(
+        None if keyed else InMemoryStore(),
+        dashboard=dashboard,
+        allow_unauthenticated=not keyed,
+    )
+    client = TestClient(app, raise_server_exceptions=False)
+
+    for path in _VIEWERS:
+        assert client.get(path).status_code == 404, path
+    spec = client.get("/openapi.json")
+    assert spec.status_code == 200
+    assert spec.json() == app.openapi()
+
+    pages: set[str] = set()
+    for route in app.routes:
+        path = str(getattr(route, "path", ""))
+        if "GET" not in (getattr(route, "methods", None) or ()):
+            continue
+        response = client.get(path)
+        if "text/html" not in response.headers.get("content-type", ""):
+            continue
+        assert response.status_code == 200, path
+        pages.add(path)
+        assert not _ANY_HOST.search(unescape(response.text)), path
+    # A scan that found no page proves nothing, so the dashboard has to be among them.
+    assert pages == ({"/"} if dashboard else set())
 
 
 def test_the_documented_http_example_is_accepted_and_speaks_the_newest_envelope() -> None:

@@ -20,7 +20,7 @@ to judges or guards under `evaluators:`; when an MCP target requires authorizati
 also read its advertised protected-resource metadata and the metadata of the authorization
 server it names, possibly on other hosts. Guardana itself contacts nothing else; a package admitted with `--plugins` runs with your privileges and can open its own connections ([threat model, T3](threat-model.md#t3--a-malicious-plugin-or-rule-pack)). The collector, or a reporter
 an installed package adds, receives results only when `--reporter` names it, and a reporter never
-receives kept exchanges ([installed outputs](outputs.md#what-an-output-receives)). The collector also [redacts](usage-collector.md#what-the-collector-refuses-and-redacts-on-ingest) recognisable secrets in a submission's evidence text using the engine's patterns before storing it, so those secrets do not enter the database even when a third-party sender or an older agent does not redact them.
+receives kept exchanges ([installed outputs](outputs.md#what-an-output-receives)). Before storing a submission, the collector also [redacts](usage-collector.md#what-the-collector-refuses-and-redacts-on-ingest) recognisable secrets in its evidence text using the engine's patterns. Those secrets stay out of the database even when a third-party sender or an older agent does not redact them. The collector's pages load no third-party browser assets. It serves its OpenAPI document at `/openapi.json` and bundles no interactive API viewer.
 
 ```yaml
 privacy:

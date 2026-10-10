@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — breaking
+
+- **The collector's `/docs`, `/redoc` and `/docs/oauth2-redirect` routes now return `404`.** FastAPI's default viewers loaded scripts, styles, fonts and an icon from cdn.jsdelivr.net, fonts.googleapis.com and fastapi.tiangolo.com in the reader's browser. This contradicted the promise that Guardana contacts only destinations a run names. `/openapi.json` remains public. To browse it, download the document and open it in a locally installed OpenAPI viewer ([HTTP API](docs/usage-collector.md#the-http-api)). Every HTML page the collector serves is now tested for references to external hosts; none are allowed.
+
 ### Changed
 
 - **The public security documentation says what each protection does not cover.** The threat model names the collector database and its backups as an asset (whoever holds the credential bypasses tenancy, keys and the audit log), says the audit log is not tamper-evident, adds T12 for a reply that steers the judge grading it, and lists the release controls behind T10; `docs/deployment.md` says what to do when the database credential leaks. `SECURITY.md` states a 90-day default disclosure window, what is published after a fix, what happens to pins when a release is withdrawn, and what plugin trust and a pack lock do not prove. `docs/usage-probe.md` lists what the MCP authorization checks cannot see. `docs/usage-run.md` no longer calls `case_id` safe in a redacted report: like a placeholder digest it is an unsalted 12-hex hash that can confirm a guessed low-entropy value.

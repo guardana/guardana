@@ -121,9 +121,6 @@ _UNGUARDED_BY_DESIGN = frozenset(
         "/",  # the dashboard shell: static HTML, no findings
         "/catalog",  # this build's own rule documentation, about nobody's deployment
         "/openapi.json",
-        "/docs",
-        "/redoc",
-        "/docs/oauth2-redirect",
     }
 )
 

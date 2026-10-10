@@ -530,6 +530,8 @@ The optional collector stores and serves results submitted by Guardana runs. It 
 
 `/openapi.json` lists routes, key permissions and refusals: `401` for a missing or unaccepted key, `403` for insufficient permission, and `503` when the database cannot be reached to check the key.
 
+The collector serves no interactive API viewer (`/docs`, `/redoc` and `/docs/oauth2-redirect` answer `404`), because FastAPI's default viewers load their scripts, styles and fonts from third-party hosts. To browse the API, download the document (`curl --fail --show-error "$COLLECTOR_URL/openapi.json" -o openapi.json`) and open the file in an OpenAPI viewer installed on your own machine.
+
 | Route | Permission | Session cookie accepted |
 | --- | --- | --- |
 | `POST /findings` | `ingest` | No |
@@ -539,7 +541,7 @@ The optional collector stores and serves results submitted by Guardana runs. It 
 | `/healthz`, `/readyz` | None (public) | — |
 | `/catalog`, `/` (dashboard only) | None (public) | — |
 | `POST /session`, `DELETE /session` (dashboard only) | None; `POST` takes a `read` key in its body | — |
-| `/openapi.json`, and FastAPI's `/docs` and `/redoc` viewers | None (public) | — |
+| `/openapi.json` | None (public) | — |
 
 Send keys as `Authorization: Bearer <key>`. Read routes also accept the `guardana_session` cookie set by the dashboard after `POST /session`; a `Bearer` header takes precedence. Permissions belong to keys, not OAuth2 scopes.
 
