@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`guardana probe` given flags of another target names every conflicting flag in one refusal**, and its advice no longer leads to a second refusal.
 - **A probe whose kept exchanges cannot be written no longer saves a run that claims their digest.** It removes the part-written sidecar, rewrites the saved run with `exchanges: null`, or removes the run when that fails, and still exits `3`.
 - **Baselines are written whole.** `baseline create`, `baseline update` and `scan --write-baseline` write through a temporary file and a rename, so an approved baseline survives a write that fails part-way, and `baseline create` and `baseline update` exit `3` with an error instead of a traceback when the file cannot be written.
+- **Fixed negative token counts disabling token ceilings.** Negative counts reported by a provider were added to the sum, so `--max-input-tokens`/`--max-output-tokens` never fired. The saved run recorded negative usage that failed the run document's own schema. A negative count is now read as not reported, so a token ceiling that depends on it stops the run as an exhausted budget (exit `6`).
+- **Fixed unrecorded applicability hook exceptions and applicability checks on excluded rules.** A third-party rule whose `not_applicable_to` raised was run without a record of the hook failure, while a hook returning a wrong type was already an error. A raising hook is now recorded as an error in the run and the plan at stage `applicability`, so the default `fail_on_error` makes the run indeterminate. Only rules the profile selects are asked, so an excluded rule no longer makes a run indeterminate through its hook.
 
 ### Security
 

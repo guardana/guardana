@@ -80,13 +80,17 @@ it tool endpoints that write to a scratch environment.
 
 **Bound the run.** Concurrency is bounded (`--concurrency`, default 4 for probe) and
 rate limits are retried with backoff rather than hammered. Request, token and
-duration budgets are hard ceilings: `--max-requests`, `--max-input-tokens`,
-`--max-output-tokens` and `--max-duration` stop the run, which exits `6` with an
-`indeterminate` gate, so an exhausted budget can never be mistaken for a clean
-result. The request budget counts each request Guardana makes, not each redirect hop
-the transport follows for one (at most ten per request, each held to the same
-address rules). `--max-requests-per-minute` paces the requests. `guardana plan`
-prices the run before it sends anything.
+duration budgets are ceilings: `--max-requests` is
+[checked](profiles.md#budgets--a-ceiling-on-what-a-run-may-spend) before each
+request, so the run never sends more than the ceiling; `--max-input-tokens`,
+`--max-output-tokens` and `--max-duration` can only be checked once a request has
+been answered, so the request that crosses a ceiling completes and the next one is
+not sent; a ceiling that stops the run exits `6` with an `indeterminate` gate, so an
+exhausted budget is never mistaken for a clean result. The request budget counts
+each request Guardana makes, not each redirect hop the transport follows for one (at
+most ten per request, each held to the same address rules).
+`--max-requests-per-minute` paces the requests. `guardana plan` prices the run
+before it sends anything.
 
 **Run deep checks on a schedule, not on every pull request.** A fast static gate
 belongs in a PR. Endpoint probing belongs at deployment time and nightly. This

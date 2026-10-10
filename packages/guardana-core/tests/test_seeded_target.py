@@ -248,10 +248,27 @@ def test_a_rule_with_nothing_to_check_is_skipped_as_not_applicable_in_the_run_an
     assert target.usage().requests == 0
 
 
-def test_a_broken_applicability_hook_runs_the_rule_instead_of_skipping_it() -> None:
-    result = Runner(_registry(_Asks(broken_hook=True)), default_profile()).run(_seeded())
+def test_a_broken_applicability_hook_runs_the_rule_and_records_an_error_in_run_and_plan() -> None:
+    registry = _registry(_Asks(broken_hook=True))
+
+    result = Runner(registry, default_profile()).run(_seeded())
+    plan = build_plan(registry, default_profile(), _seeded())
 
     assert result.rules_run == ("acme.seeded.asks",)
+    assert [(e.source, e.stage) for e in result.errors] == [("acme.seeded.asks", "applicability")]
+    assert "the hook is broken" in result.errors[0].reason
+    assert plan.errors == result.errors
+
+
+@pytest.mark.parametrize("hook", ["raises", "answers nonsense"])
+def test_a_rule_the_profile_leaves_out_is_never_asked_whether_it_applies(hook: str) -> None:
+    rule = _Asks(broken_hook=True) if hook == "raises" else _Answers(False)
+    left_out = replace(default_profile(), policy=Policy(exclude=("acme.seeded.asks",)))
+
+    result = Runner(_registry(rule), left_out).run(_seeded())
+
+    assert result.errors == ()
+    assert result.rules_run == ()
 
 
 class _Answers(_Asks):

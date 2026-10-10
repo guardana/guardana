@@ -257,13 +257,17 @@ production only insofar as the model, system prompt, and tool manifest match.</p
 it tool endpoints that write to a scratch environment.</p>
 <p><strong>Bound the run.</strong> Concurrency is bounded (<code>--concurrency</code>, default 4 for probe) and
 rate limits are retried with backoff rather than hammered. Request, token and
-duration budgets are hard ceilings: <code>--max-requests</code>, <code>--max-input-tokens</code>,
-<code>--max-output-tokens</code> and <code>--max-duration</code> stop the run, which exits <code>6</code> with an
-<code>indeterminate</code> gate, so an exhausted budget can never be mistaken for a clean
-result. The request budget counts each request Guardana makes, not each redirect hop
-the transport follows for one (at most ten per request, each held to the same
-address rules). <code>--max-requests-per-minute</code> paces the requests. <code>guardana plan</code>
-prices the run before it sends anything.</p>
+duration budgets are ceilings: <code>--max-requests</code> is
+<a href="profiles.html#budgets--a-ceiling-on-what-a-run-may-spend">checked</a> before each
+request, so the run never sends more than the ceiling; <code>--max-input-tokens</code>,
+<code>--max-output-tokens</code> and <code>--max-duration</code> can only be checked once a request has
+been answered, so the request that crosses a ceiling completes and the next one is
+not sent; a ceiling that stops the run exits <code>6</code> with an <code>indeterminate</code> gate, so an
+exhausted budget is never mistaken for a clean result. The request budget counts
+each request Guardana makes, not each redirect hop the transport follows for one (at
+most ten per request, each held to the same address rules).
+<code>--max-requests-per-minute</code> paces the requests. <code>guardana plan</code> prices the run
+before it sends anything.</p>
 <p><strong>Run deep checks on a schedule, not on every pull request.</strong> A fast static gate
 belongs in a PR. Endpoint probing belongs at deployment time and nightly. This
 keeps cost predictable and stops a noisy check from blocking every merge.</p>
