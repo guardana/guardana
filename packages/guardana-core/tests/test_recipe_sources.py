@@ -1231,6 +1231,26 @@ def test_an_editable_path_file_inside_its_directory_is_pinned(tmp_path: Path, si
 
 
 @pytest.mark.parametrize(
+    "mapped", ["build/acme_pack", ".venv/lib/acme_pack", "src/acme_pack.egg-info/acme_pack"]
+)
+def test_an_editable_finder_mapping_into_a_directory_the_pin_leaves_out_leaves_it_unpinned(
+    tmp_path: Path, site: Path, mapped: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    (root / mapped).mkdir(parents=True, exist_ok=True)
+    finder = _finder({"acme_pack": str(root / mapped)}, {})
+    _editable_with(
+        site,
+        root,
+        {"_acme_pack.pth": f"import {_FINDER}; {_FINDER}.install()\n", f"{_FINDER}.py": finder},
+    )
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its {_FINDER}.py loads code from {root / mapped}, which the pin leaves out"
+    )
+
+
+@pytest.mark.parametrize(
     ("line", "hook"),
     [
         ("import _editable_impl_acme_pack", "_editable_impl_acme_pack"),
