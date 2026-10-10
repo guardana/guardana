@@ -101,7 +101,9 @@ trust (with whether the profile stated it), the contracts and calibrations the p
 names with what each file loaded, and
 the privacy policy digest that a run manifest also records, so a saved run can be
 matched back to the configuration that produced it. A named file that does not load is
-printed as an error, listed under `problems` in the JSON form, and exits `3`.
+printed as an error, listed under `problems` in the JSON form, and exits `3`. Only
+`human` and `json` are accepted: any other `--format` is refused (exit `3`) before
+the profile is read.
 
 ## See also
 

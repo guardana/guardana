@@ -2,6 +2,8 @@
 
 from enum import StrEnum
 
+import typer
+from guardana.cli.exit_codes import ExitCode
 from guardana.core.output import SelectedRenderer, select_renderer
 from guardana.core.plugins import PluginTrust
 
@@ -37,3 +39,24 @@ def resolve_format(value: str, trust: PluginTrust) -> OutputFormat | SelectedRen
 def format_name(chosen: OutputFormat | SelectedRenderer) -> str:
     """Return the name the format was selected by."""
     return chosen.value if isinstance(chosen, OutputFormat) else chosen.name
+
+
+_HUMAN_JSON = (OutputFormat.human, OutputFormat.json)
+"""The formats of a command that renders a preview, not findings: nothing else has a shape."""
+
+
+def refuse_unsupported_format(command: str, value: OutputFormat) -> None:
+    """Exit `3` naming the supported formats when `command` cannot produce `value`.
+
+    Called before the command does any other work — reading a profile, loading
+    rules, sending a request — so a format with no shape here never costs anything
+    and never prints a human report in its place. The accepted values stay
+    `human|json`; anything else, `sarif` and `junit` included, is refused.
+    """
+    if value in _HUMAN_JSON:
+        return
+    typer.echo(
+        f"error: {command} cannot write --format {value} — supported formats: human, json",
+        err=True,
+    )
+    raise typer.Exit(code=ExitCode.INVALID_USAGE)

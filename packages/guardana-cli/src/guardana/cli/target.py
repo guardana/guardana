@@ -15,7 +15,7 @@ from guardana.cli._connection import (
     resolve_flags,
 )
 from guardana.cli._errors import EndpointFlag, run_against_endpoint
-from guardana.cli._formats import OutputFormat
+from guardana.cli._formats import OutputFormat, refuse_unsupported_format
 from guardana.cli._plugins import (
     AllowPluginOption,
     PluginsOption,
@@ -107,7 +107,9 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
     api_key_env: ApiKeyEnvOption = None,
     provider: ProviderOption = None,
     adapter: AdapterOption = None,
-    format: Annotated[OutputFormat, typer.Option(help="human|json")] = OutputFormat.human,
+    format: Annotated[OutputFormat, typer.Option(help="human|json", metavar="human|json")] = (
+        OutputFormat.human
+    ),
     require: Annotated[
         str | None,
         typer.Option(
@@ -134,6 +136,7 @@ def inspect_target(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag;
     proxy can drop the system message — either of which turns a rule into a check
     that runs and proves nothing.
     """
+    refuse_unsupported_format("target inspect", format)
     prof = resolve_profile(profile, None)
     resolved = resolve_trust(plugins, allow_plugin, prof)
     registry = Registry.discover(resolved.trust)

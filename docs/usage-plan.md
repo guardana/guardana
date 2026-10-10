@@ -52,7 +52,7 @@ run they are pricing would use, so both take the same plugin-trust flags
 |---|---|---|
 | `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file; all three subcommands |
 | `--preset [ci\|pre-training\|monitor\|release]` | none | Named policy preset (mutually exclusive with `--profile`); all three subcommands |
-| `--format [human\|json]` | `human` | Output format; all three subcommands |
+| `--format [human\|json]` | `human` | Output format; all three subcommands. `plan scan` refuses any other name (exit `3`) before anything else runs |
 | `--rules PATH` | none | Directory or file of custom YAML rules; repeatable; all three subcommands |
 | `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe`; all three subcommands |
 | `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist`; all three subcommands |
