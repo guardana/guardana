@@ -14,6 +14,7 @@ import sys
 from collections.abc import Iterator
 from contextlib import redirect_stderr
 from pathlib import Path
+from typing import IO
 from urllib.error import URLError
 
 import guardana.cli._endpoint as endpoint_module
@@ -378,6 +379,27 @@ def test_a_failed_format_keeps_a_read_only_sidecar_beside_its_output(
     ]
 
 
+def test_a_failed_format_keeps_exchanges_the_run_it_replaced_did_not_record(
+    site: FakeSite, endpoint: RefusingTransport, tmp_path: Path
+) -> None:
+    saved = tmp_path / "run.json"
+    sidecar = _probe_that_kept_exchanges(saved)
+    sidecar.write_bytes(sidecar.read_bytes() + b"\n")
+    kept = sidecar.read_bytes()
+    _table(site, rendered="''")
+
+    result = _probe("--format", "acme-table", "--output", str(saved), *_ADMIT)
+
+    assert result.exit_code == ExitCode.OUTPUT_FAILED, result.output
+    assert not saved.exists()
+    assert sidecar.read_bytes() == kept
+    assert _lines(result.output)[-2:] == [
+        f"removed {saved}: this run did not write it",
+        f"warning: kept {sidecar}: no run saved at {saved} before this one recorded it, so it "
+        f"is not an earlier run's exchanges",
+    ]
+
+
 def test_a_sidecar_that_cannot_be_removed_is_a_warning(
     site: FakeSite,
     endpoint: RefusingTransport,
@@ -450,6 +472,40 @@ def test_a_probe_that_cannot_remove_an_earlier_sidecar_warns_and_keeps_its_verdi
     ) in _lines(result.output)
 
 
+def _fill_the_disk_writing(monkeypatch: pytest.MonkeyPatch, destination: Path) -> None:
+    """Make the file staged to replace `destination` stop part way, as a full disk does."""
+    open_file = Path.open
+
+    class _Full:
+        def __init__(self, handle: IO[bytes]) -> None:
+            self.handle = handle
+
+        def __enter__(self) -> "_Full":
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            self.handle.close()
+
+        def write(self, data: bytes) -> int:
+            self.handle.write(data[:10])
+            raise OSError("No space left on device")
+
+    def opening(  # noqa: PLR0913, PLR0917 — Path.open's own parameters
+        path: Path,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> object:
+        handle = open_file(path, mode, buffering, encoding, errors, newline)
+        if "x" in mode and path.name.startswith(f".{destination.name}."):
+            return _Full(handle)
+        return handle
+
+    monkeypatch.setattr(Path, "open", opening)
+
+
 @pytest.mark.parametrize(
     ("budget", "code"),
     [((), ExitCode.INVALID_USAGE), (("--max-requests", "1"), ExitCode.BUDGET_EXHAUSTED)],
@@ -467,15 +523,7 @@ def test_exchanges_that_cannot_be_written_send_nothing_and_remove_nothing(  # no
     hook = _hook(site, "return Delivery(DeliveryStatus.DELIVERED)")
     saved = tmp_path / "run.json"
     sidecar = exchanges_path(saved)
-    write_bytes = Path.write_bytes
-
-    def fill_the_disk(path: Path, data: bytes) -> int:
-        if path == sidecar:
-            write_bytes(path, data[:10])
-            raise OSError("No space left on device")
-        return write_bytes(path, data)
-
-    monkeypatch.setattr(Path, "write_bytes", fill_the_disk)
+    _fill_the_disk_writing(monkeypatch, sidecar)
 
     result = _probe(
         "--keep-exchanges",

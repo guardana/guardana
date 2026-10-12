@@ -102,7 +102,7 @@ def _probe(tmp_path: Path, profile: Profile, transport: _ByQuestion) -> Path:
     return run
 
 
-def test_a_saved_sidecar_matches_its_digest_where_text_gets_crlf(
+def test_a_saved_run_and_sidecar_are_written_as_bytes_where_text_gets_crlf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     write_text = Path.write_text
@@ -122,7 +122,7 @@ def test_a_saved_sidecar_matches_its_digest_where_text_gets_crlf(
 
     run = _probe(tmp_path, _profile(), _ByQuestion(_ANSWERS))
 
-    assert b"\r\n" in run.read_bytes(), "the run went through the translating write"
+    assert b"\r\n" not in run.read_bytes(), "the run went through a translating text write"
     manifest = load_report(run).manifest
     assert manifest.exchanges is not None
     kept = exchanges_path(run).read_bytes()
@@ -296,8 +296,8 @@ def test_a_probe_that_kept_nothing_writes_no_sidecar(tmp_path: Path) -> None:
     verification = Verifier(trust=_BUILTINS, profile=profile).run(
         _endpoint(_ByQuestion(_ANSWERS), profile)
     )
-    run = tmp_path / "run.json"
-    exchanges_path(run).write_text("kept by an earlier run\n", encoding="utf-8")
+    run = _probe(tmp_path, _profile(), _ByQuestion(_ANSWERS))
+    assert exchanges_path(run).is_file()
     verification.save(run)
 
     assert verification.exchanges is None

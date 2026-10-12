@@ -324,8 +324,9 @@ guardana run migrate old-run.json          # in place
 <code>&lt;stem&gt;.exchanges.jsonl</code> is copied beside the new output first, identical exchanges
 already there are kept, different ones are refused with exit <code>3</code> and nothing is written,
 and stderr warns when the original sidecar is missing or does not match the recorded
-digest. A run that kept no exchanges removes the ones an earlier run left beside that
-output, and says so on stderr. The migrated run's own sidecar stays when migrated in
+digest. A run that kept no exchanges removes the ones the saved run it replaces at that
+output recorded by digest, and says so on stderr; exchanges no run saved there recorded
+are kept with a warning. The migrated run's own sidecar stays when migrated in
 place or from <code>run.json</code> to <code>run</code>, which share one. An <code>--output</code> whose sidecar
 path is the input file is refused with exit <code>3</code> before anything is written.</p>
 <p>This is a convenience, not a requirement. Nothing needs migrating to be compared.</p>

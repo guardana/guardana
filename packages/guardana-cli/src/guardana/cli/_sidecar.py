@@ -1,5 +1,6 @@
 """The exchanges a probe keeps beside its saved run, as every command that reads one finds it."""
 
+import hashlib
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import typer
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.recording import Recording
 from guardana.core.report import ReportLoadError, load_report
-from guardana.core.verify import exchanges_path
+from guardana.core.verify import exchanges_path, exchanges_recorded_by
 
 _SIDECAR_SUFFIX = ".exchanges.jsonl"
 
@@ -59,6 +60,20 @@ def refuse_writing_over_named_inputs(
     for name, given in named:
         if given is not None:
             refuse_writing_over_an_input(output, [given], what=f"{given}, which {name} names")
+
+
+def kept_by_a_run(sidecar: Path) -> bool:
+    """Whether a saved run beside `sidecar` (`run.json` or `run`) records exactly its bytes."""
+    return any(exchanges_recorded_by(run) is not None for run in runs_beside(sidecar))
+
+
+def digest_of(path: Path) -> str | None:
+    """Return the sha256 digest of the file at `path` as a run records it, or None if unreadable."""
+    try:
+        with path.open("rb") as handle:
+            return f"sha256:{hashlib.file_digest(handle, 'sha256').hexdigest()}"
+    except OSError:
+        return None
 
 
 def runs_beside(recording: Path) -> tuple[Path, ...]:

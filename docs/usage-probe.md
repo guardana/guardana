@@ -872,15 +872,20 @@ records the file's SHA-256, its line count and how many replies redaction change
 - Keeping is off by default. The file holds every reply, passes included, so it widens
   what a leaked run exposes; the collector never receives it. See [privacy](privacy.md).
 - A probe that kept nothing writes no file and says so on stderr.
-- Any command writing at `--output` removes an earlier `<stem>.exchanges.jsonl` unless this
-  run writes its own there: `scan`, `grade`, `analyze-trace`, `import-observations`,
-  `run migrate` (which keeps the migrated run's own) and a probe that keeps nothing.
-  Removal also applies when an installed `--format` or redaction fails and writes nothing
-  new; stderr says `removed …`. A failed removal warns without changing the exit code.
+- Any command writing at `--output` removes the `<stem>.exchanges.jsonl` beside it when the
+  saved run it replaces there recorded exactly those bytes, unless this run writes its own
+  there: `scan`, `grade`, `analyze-trace`, `import-observations`, `run migrate` (which
+  keeps the migrated run's own) and a probe that keeps nothing. Removal also applies when
+  an installed `--format` or redaction fails and writes nothing new; stderr says
+  `removed …`. A sidecar no run saved at `--output` recorded — no file was there, it is not
+  a Guardana run, it records no exchanges or another digest — is kept, and stderr says
+  `warning: kept …`; its name alone never makes it a run's. A failed removal warns without changing the exit code.
   A report or sidecar that cannot be written removes nothing. `run` and `run.json` share
   one sidecar path; a sidecar the other saved run records by digest is kept with a warning,
   and a probe that keeps exchanges refuses with exit `3`, before sending anything, to
-  overwrite it. An `--output` whose sidecar path is a file named on the command line is
+  overwrite it. It refuses the same way to overwrite a sidecar no run saved at `--output`
+  recorded; it replaces only the exchanges that run kept, and a link at the sidecar path,
+  which it never writes through. An `--output` whose sidecar path is a file named on the command line is
   refused with exit `3`; see [exit codes](exit-codes.md). `guardana grade` warns when no
   saved run beside a sidecar records its digest, and grades it as given; `guardana diff`
   compares runs by that digest.

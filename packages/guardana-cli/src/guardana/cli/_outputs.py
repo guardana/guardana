@@ -5,7 +5,6 @@ exit `3` that cost nothing. From the moment a reporter is prepared, `RunOutputs`
 its delivery line: the command prints exactly one, whether it delivered or ended first.
 """
 
-import hashlib
 import os
 from pathlib import Path
 from types import TracebackType
@@ -17,7 +16,7 @@ from guardana.cli._formats import OutputFormat, format_name, is_built_in_format,
 from guardana.cli._output import emit
 from guardana.cli._plugins import admission_forms
 from guardana.cli._reporting import split_reporter
-from guardana.cli._sidecar import same_file
+from guardana.cli._sidecar import digest_of
 from guardana.cli.exit_codes import ExitCode, code_for
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import GateOutcome
@@ -38,8 +37,13 @@ from guardana.core.output import (
     select_reporter,
 )
 from guardana.core.plugins import PluginTrust
-from guardana.core.report import ReportLoadError, load_report
-from guardana.core.verify import UnenforceableBudgetError, Verification, exchanges_path
+from guardana.core.verify import (
+    UnenforceableBudgetError,
+    Verification,
+    exchanges_path,
+    exchanges_recorded_by,
+    recorded_by_partner,
+)
 from guardana.report import get_renderer
 
 MONITOR_REFUSAL = (
@@ -380,13 +384,14 @@ def emit_report(
 ) -> None:
     """Print a run's report or write it to `output`, beside no other run's exchanges.
 
-    Once written, exchanges an earlier run kept beside `output` are removed unless
+    Once written, exchanges the run it replaced kept beside `output` are removed unless
     `keeps_exchanges` says the caller writes this run's own there. A write that fails
     exits `3` as `emit` does and removes nothing, since what is at `output` may be no run.
     """
+    owned = earlier_run_kept(output) if output is not None else None
     emit(rendered, output, output_format, verbatim=verbatim)
     if output is not None and not keeps_exchanges:
-        remove_earlier_exchanges(output)
+        remove_earlier_exchanges(output, owned=owned)
 
 
 def _remove_earlier(output: Path | None) -> None:
@@ -399,25 +404,47 @@ def _remove_earlier(output: Path | None) -> None:
         return
     if _protected(output):
         return
+    owned = earlier_run_kept(output)
     _remove(
         output,
         removed=f"removed {output}: this run did not write it",
         kept=f"{output} still holds what was there before this run",
     )
-    remove_earlier_exchanges(output, keep_protected=True)
+    remove_earlier_exchanges(output, owned=owned, keep_protected=True)
 
 
-def remove_earlier_exchanges(output: Path, *, keep_protected: bool = False) -> None:
-    """Remove the exchanges an earlier run kept beside `output`, or warn that they remain.
+def earlier_run_kept(output: Path) -> str | None:
+    """Return the digest of the exchanges beside `output` the run saved there records, if any.
 
-    `run` and `run.json` share one sidecar, so exchanges the other of the two recorded are
-    kept, and said to be. With `keep_protected`, a sidecar this process may not write to is
-    kept too, with a warning.
+    Only the run being replaced can establish that the sidecar was an earlier run's, so a
+    caller asks before it writes or removes anything at `output`.
+    """
+    return exchanges_recorded_by(output)
+
+
+def remove_earlier_exchanges(
+    output: Path, *, owned: str | None, keep_protected: bool = False
+) -> None:
+    """Remove the exchanges the replaced run at `output` kept beside it, or warn that they remain.
+
+    `owned` is `earlier_run_kept(output)`, read before `output` was replaced, and the sidecar
+    is removed only while it still holds those bytes. Any other file there is kept, and said
+    to be: its name alone says nothing of whose it is. `run` and `run.json` share one
+    sidecar, so exchanges the other of the two recorded are kept too. With `keep_protected`,
+    a sidecar this process may not write to is kept as well, with a warning.
     """
     sidecar = exchanges_path(output)
-    partner = recorded_by_partner(output, sidecar)
+    partner = recorded_by_partner(output)
     if partner is not None:
         typer.echo(f"warning: kept {sidecar}: it holds the exchanges {partner} recorded", err=True)
+        return
+    if owned is None or digest_of(sidecar) != owned:
+        if sidecar.is_file() or sidecar.is_symlink():
+            typer.echo(
+                f"warning: kept {sidecar}: no run saved at {output} before this one recorded "
+                f"it, so it is not an earlier run's exchanges",
+                err=True,
+            )
         return
     if keep_protected and _protected(sidecar):
         return
@@ -441,25 +468,6 @@ def _protected(path: Path) -> bool:
         err=True,
     )
     return True
-
-
-def recorded_by_partner(output: Path, sidecar: Path) -> Path | None:
-    """Return the run sharing `output`'s sidecar that recorded exactly its bytes, if any."""
-    if not sidecar.is_file():
-        return None
-    name = output.stem if output.suffix == ".json" else f"{output.name}.json"
-    partner = output.with_name(name)
-    if exchanges_path(partner) != sidecar or not partner.is_file():
-        return None
-    if same_file(partner, output):
-        return None
-    try:
-        record = load_report(partner).manifest.exchanges
-        with sidecar.open("rb") as handle:
-            digest = f"sha256:{hashlib.file_digest(handle, 'sha256').hexdigest()}"
-    except (ReportLoadError, OSError):
-        return None
-    return partner if record is not None and record.digest == digest else None
 
 
 def _remove(path: Path, *, removed: str, kept: str) -> None:

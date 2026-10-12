@@ -168,8 +168,9 @@ Migrating to another `--output` brings the exchanges the run records: their
 `<stem>.exchanges.jsonl` is copied beside the new output first, identical exchanges
 already there are kept, different ones are refused with exit `3` and nothing is written,
 and stderr warns when the original sidecar is missing or does not match the recorded
-digest. A run that kept no exchanges removes the ones an earlier run left beside that
-output, and says so on stderr. The migrated run's own sidecar stays when migrated in
+digest. A run that kept no exchanges removes the ones the saved run it replaces at that
+output recorded by digest, and says so on stderr; exchanges no run saved there recorded
+are kept with a warning. The migrated run's own sidecar stays when migrated in
 place or from `run.json` to `run`, which share one. An `--output` whose sidecar
 path is the input file is refused with exit `3` before anything is written.
 

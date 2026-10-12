@@ -164,7 +164,10 @@ file, recording, trace or results file, `--profile`, a `--rules` file or a rule 
 or one the profile names under `rules.paths`, `contracts:`, `calibrations:` or a judge's or
 guard's `adapter`; `recipe run` refuses the same profile files inside its
 `output.directory`; `analyze-trace` also exits `3` when `--write-trace` is `--output`, its
-sidecar path or such a file. `run migrate` exits `3` when the sidecar path of `--output`
+sidecar path or such a file, a file in a `--rules` or `--contract` directory included.
+After scanning and before writing, `scan` exits `3` when `--output` or its sidecar path is
+a file it scanned, other than an earlier saved run and the exchanges a saved run beside it
+records by digest. `run migrate` exits `3` when the sidecar path of `--output`
 is its input; writing over the input itself is migrating in place. It also exits `3`
 when `--output` is the input's own sidecar or the destination cannot be written; the
 destination is then left as it was. `scan --write-baseline` and
@@ -172,7 +175,8 @@ destination is then left as it was. `scan --write-baseline` and
 written; `probe` exits `3` for an MCP-only flag without `--mcp`; `recipe run` exits `3`
 for a recipe that names a file inside its own `output.directory`.
 `probe --keep-exchanges` exits `3` before sending anything when its sidecar path holds
-exchanges the other saved run of the pair (`<stem>` or `<stem>.json`) records.
+exchanges the other saved run of the pair (`<stem>` or `<stem>.json`) records, or a file
+the run saved at `--output` does not record by digest.
 `analyze-trace` adds one route to `2` the others do not have: demanded coverage that
 was not available, and a security contract that turned out to be about a different
 AI system than the one under test. `baseline create`, `baseline update` and

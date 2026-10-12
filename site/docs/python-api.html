@@ -361,7 +361,7 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 </tr>
 <tr>
 <td><code>document()</code>, <code>save(path)</code></td>
-<td>The saved-run document, in the current run schema (<a href="usage-run.html">saved runs</a>); <code>save</code> also writes kept exchanges to <code>exchanges_path(path)</code> (<code>run.json</code> → <code>run.exchanges.jsonl</code>).</td>
+<td>The saved-run document, in the current run schema (<a href="usage-run.html">saved runs</a>); <code>save</code> also writes kept exchanges to <code>exchanges_path(path)</code> (<code>run.json</code> → <code>run.exchanges.jsonl</code>). It writes the exchanges first and the document second, each whole through a file beside it, so a failed save (<code>OSError</code>) leaves no document naming exchanges that are not there. A failed save leaves the earlier run and its exchanges as they were. It replaces or removes only the exchanges the run it replaces at <code>path</code> recorded by digest, and replaces a link there without writing through it. <code>run</code> and <code>run.json</code> share one sidecar, so exchanges the other of the two recorded are never replaced or removed. Keeping exchanges beside any other file raises <code>FileExistsError</code> before anything is written; a run that kept none leaves such a file in place and warns with a <code>UserWarning</code> (Python's <code>warnings</code> module).</td>
 </tr>
 </tbody>
 </table></div>

@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 from guardana.cli._atomic import write_whole
-from guardana.cli._outputs import remove_earlier_exchanges
+from guardana.cli._outputs import earlier_run_kept, remove_earlier_exchanges
 from guardana.cli._sidecar import refuse_writing_over_an_input, same_file
 from guardana.core.manifest import RunManifest
 from guardana.core.manifest.load import ManifestLoadError
@@ -207,8 +207,8 @@ def migrate(
     on disk without paying to re-run. A run already at the current schema is copied
     unchanged to another `--output`. A run that kept exchanges has them copied beside
     another `--output`, and is refused when other exchanges are already there; otherwise
-    exchanges an earlier run kept there are removed. The migrated run's own stay where
-    they are.
+    exchanges the run saved there recorded are removed, and others are kept with a
+    warning. The migrated run's own stay where they are.
     """
     refuse_writing_over_an_input(output, [path], in_place=True)
     if output is not None and same_file(output, exchanges_path(path)):
@@ -277,14 +277,15 @@ def _write(
 
     `run` is the document being written. When it records exchanges and `destination` keeps
     its own elsewhere, the sidecar beside `path` is copied there first, so the copy never
-    names exchanges that are not beside it; otherwise exchanges an earlier run kept there
-    are removed. A failed write exits `3` and changes nothing: the file at `destination` is
-    replaced whole or not at all, and the sidecar beside it still belongs to whatever run
-    is there.
+    names exchanges that are not beside it; otherwise exchanges the run it replaces at
+    `destination` recorded are removed. A failed write exits `3` and changes nothing: the
+    file at `destination` is replaced whole or not at all, and the sidecar beside it still
+    belongs to whatever run is there.
     """
     own, beside = exchanges_path(path), exchanges_path(destination)
     shared = same_file(beside, own)
     copy = None if shared else _exchanges_to_copy(path, destination, _recorded_digest(run))
+    owned = earlier_run_kept(destination)
     if isinstance(copy, bytes):
         try:
             write_whole(beside, copy)
@@ -302,7 +303,7 @@ def _write(
     if isinstance(copy, bytes):
         typer.echo(f"copied the exchanges {path} records → {beside}", err=True)
     elif copy is None and not shared:
-        remove_earlier_exchanges(destination)
+        remove_earlier_exchanges(destination, owned=owned)
 
 
 def _recorded_digest(run: dict[str, object]) -> str | None:

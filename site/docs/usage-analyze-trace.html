@@ -472,7 +472,7 @@ session that ends when the process does is <code>unterminated</code> by construc
 </tr>
 <tr>
 <td><code>--write-trace PATH</code></td>
-<td>Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits <code>3</code></td>
+<td>Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits <code>3</code>. A <code>PATH</code> that is <code>--output</code>, its <code>&lt;stem&gt;.exchanges.jsonl</code>, or a file the command reads — the trace, <code>--profile</code>, a <code>--rules</code> or <code>--contract</code> file or one read from such a directory, or a file the profile names under <code>rules.paths</code>, <code>contracts:</code>, <code>calibrations:</code> or a judge's <code>adapter</code> — exits <code>3</code> before any rule is loaded or run</td>
 </tr>
 <tr>
 <td><code>--profile</code>, <code>--preset</code></td>

@@ -338,6 +338,14 @@ guardana scan .  --format json --output run.json
 Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
 on the other end cannot parse that.
 
+A scan never writes its report over a file it scanned. An `--output` that is, or whose
+`<stem>.exchanges.jsonl` is, a file the scan read exits `3` after the scan and writes
+nothing. Two files are exempt, each recognised by its content and never by its name: an
+earlier saved run, which `guardana scan . --format json --output run.json` replaces when
+run again, and the exchanges a saved run beside it (`<stem>.json` or `<stem>`) records by
+digest. A recording named `customer.exchanges.jsonl` that no saved run records is refused
+like any other scanned file.
+
 **`--format json` is not optional here.** `--output` on its own writes whatever
 `--format` says, and that defaults to human text — a file named like a saved run
 that `guardana diff` refuses. Since 0.7.1 saving any other format says so at the
