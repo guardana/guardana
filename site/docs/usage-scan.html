@@ -348,7 +348,8 @@ with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>, which the
 install a rule that reads the format.</p>
 <p>A model or notebook a rule tried to read and could not is a shortfall of the same kind,
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
-name the scanner cannot resolve, a model file that cannot be opened (a <code>.bin</code> included,
+name the scanner cannot resolve, a pickle of any protocol naming a callable by an
+extension-registry code (<code>EXT1</code>, <code>EXT2</code>, <code>EXT4</code>), a model file that cannot be opened (a <code>.bin</code> included,
 since it may be a model), a safetensors file whose header is malformed, a file cut by a
 read bound, a PMML document past the bound, a notebook that is not JSON, a notebook whose
 <code>kernelspec.language</code> or <code>language_info.name</code> is not Python. The rule reports
@@ -450,7 +451,7 @@ model config is read from the first 16 MiB, so a file whose signature or config 
 that is reported as not scanned rather than clean. A file with no suffix is not sniffed,
 so an HDF5 model saved without one is neither listed nor read. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
 a model (<code>pickle</code>, <code>data.pkl</code>, <code>*.pt</code>, <code>*.pth.tar</code>, <code>*.pkl.gz</code>), every member of a <code>.zip</code>
-whose first bytes are an NPY array or a pickle header whatever its name, and every member
+whose first bytes are an NPY array or a pickle <code>PROTO</code> opcode whatever its name, and every member
 of a <code>.tar</code> that is in fact a zip; a member named as a model that is itself an archive is a coverage
 shortfall, and one <code>pickle.load</code> would read is still read as a stream. A member named as a
 model it does not open inside an archive (<code>*.safetensors</code>, <code>*.gguf</code>, <code>*.onnx</code>, <code>*.keras</code>,
@@ -515,8 +516,17 @@ callable the file imports, sorted and each once, after a digest of that set
 summary, so a file that imports a different callable is a new finding, even when the
 listing is long enough to be cut by the evidence bound. Callables found in the members
 read before a member that failed are still reported. A pickle that imports a callable
-and then one whose name the scanner cannot resolve, or that is cut by a read bound, is
-reported both ways: the finding for what was found, and the file as unread.</p>
+and then one whose name the scanner cannot resolve, or names one by an extension-registry
+code, or that is cut by a read bound, is reported both ways: the finding for what was
+found, and the file as unread. An extension code counts where a loader reads the bytes
+as a pickle: from the first byte of a file or member named as one (<code>*.pkl</code>, <code>*.pt</code>,
+<code>data.pkl</code>, an object array); in the four pickles that follow a first pickle holding the
+legacy <code>torch.save</code> magic number; in a file or member named <code>.bin</code>, <code>.sav</code>, <code>.p</code> or
+<code>.model</code> when its stream goes on to a clean STOP or imports a callable after the code;
+and wherever a pickle opens with a <code>PROTO</code> opcode of any protocol. It stays data in a
+tensor storage beside a checkpoint's <code>data.pkl</code>, a numeric array, everything after those
+four pickles in a file that opens with the magic number, whatever the file is named, a
+member named as no model, and after a complete pickle without a <code>PROTO</code> opcode.</p>
 <h2 id="other-formats">Other formats</h2>
 <pre><code class="language-bash">guardana scan . --format json    # machine-readable findings + summary
 guardana scan . --format sarif   # SARIF 2.1.0, for GitHub code-scanning upload

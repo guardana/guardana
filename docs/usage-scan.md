@@ -94,7 +94,8 @@ install a rule that reads the format.
 
 A model or notebook a rule tried to read and could not is a shortfall of the same kind,
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
-name the scanner cannot resolve, a model file that cannot be opened (a `.bin` included,
+name the scanner cannot resolve, a pickle of any protocol naming a callable by an
+extension-registry code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file whose header is malformed, a file cut by a
 read bound, a PMML document past the bound, a notebook that is not JSON, a notebook whose
 `kernelspec.language` or `language_info.name` is not Python. The rule reports
@@ -161,7 +162,7 @@ model config is read from the first 16 MiB, so a file whose signature or config 
 that is reported as not scanned rather than clean. A file with no suffix is not sniffed,
 so an HDF5 model saved without one is neither listed nor read. `pickle_opcode` also reads a `.tar` or `.zip` by its content: the members named like
 a model (`pickle`, `data.pkl`, `*.pt`, `*.pth.tar`, `*.pkl.gz`), every member of a `.zip`
-whose first bytes are an NPY array or a pickle header whatever its name, and every member
+whose first bytes are an NPY array or a pickle `PROTO` opcode whatever its name, and every member
 of a `.tar` that is in fact a zip; a member named as a model that is itself an archive is a coverage
 shortfall, and one `pickle.load` would read is still read as a stream. A member named as a
 model it does not open inside an archive (`*.safetensors`, `*.gguf`, `*.onnx`, `*.keras`,
@@ -236,8 +237,17 @@ os.system`). Its detail names the archive member each was found in
 summary, so a file that imports a different callable is a new finding, even when the
 listing is long enough to be cut by the evidence bound. Callables found in the members
 read before a member that failed are still reported. A pickle that imports a callable
-and then one whose name the scanner cannot resolve, or that is cut by a read bound, is
-reported both ways: the finding for what was found, and the file as unread.
+and then one whose name the scanner cannot resolve, or names one by an extension-registry
+code, or that is cut by a read bound, is reported both ways: the finding for what was
+found, and the file as unread. An extension code counts where a loader reads the bytes
+as a pickle: from the first byte of a file or member named as one (`*.pkl`, `*.pt`,
+`data.pkl`, an object array); in the four pickles that follow a first pickle holding the
+legacy `torch.save` magic number; in a file or member named `.bin`, `.sav`, `.p` or
+`.model` when its stream goes on to a clean STOP or imports a callable after the code;
+and wherever a pickle opens with a `PROTO` opcode of any protocol. It stays data in a
+tensor storage beside a checkpoint's `data.pkl`, a numeric array, everything after those
+four pickles in a file that opens with the magic number, whatever the file is named, a
+member named as no model, and after a complete pickle without a `PROTO` opcode.
 
 ## Other formats
 

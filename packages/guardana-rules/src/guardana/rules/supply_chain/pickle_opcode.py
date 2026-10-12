@@ -253,16 +253,16 @@ _STRING_OPS = frozenset(
 _MEMO_PUT_INDEXED = frozenset({"BINPUT", "LONG_BINPUT", "PUT"})
 _MEMO_GET = frozenset({"BINGET", "LONG_BINGET", "GET"})
 _IMPORTS_BY_ARG = frozenset({"GLOBAL", "INST"})
-# An extension code names a global through the loading process's copyreg registry,
-# which is empty unless that process filled it, so an unpickler refuses the code and a
-# file cannot change that. Failing closed here would flag random tensor bytes, three of
-# whose 256 values are extension opcodes.
+# An extension code names a global through the loading process's copyreg registry, which
+# no file shows, so what it imports is unknown. It counts only in a stream read as a
+# pickle: three of every 256 random tensor bytes are extension opcodes.
 _EXTENSION_OPS = frozenset({"EXT1", "EXT2", "EXT4"})
 # The C unpickler reaches the list or dict under these items without honouring the
 # MARK fence, so the model does the same rather than stopping where it would not.
 _UNFENCED_OPS = frozenset({"APPEND", "SETITEM"})
 _BOOKKEEPING_OPS = frozenset({"PROTO", "FRAME", "MEMOIZE", "PUT", "BINPUT", "LONG_BINPUT", "STOP"})
 _BINARY_INT_OPS = frozenset({"BININT", "BININT1", "BININT2", "LONG1", "LONG4"})
+_TEXT_INT_OPS = frozenset({"INT", "LONG"})
 _BOOL_OPS = {"NEWTRUE": True, "NEWFALSE": False}
 _CALL_OPS = frozenset(
     {"REDUCE", "BUILD", "INST", "OBJ", "NEWOBJ", "NEWOBJ_EX", "PERSID", "BINPERSID"}
@@ -360,6 +360,10 @@ class _RefusedError(Exception):
     """
 
 
+class _ExtensionCodeError(_RefusedError):
+    """An extension code, which imports whatever the loading process registered under it."""
+
+
 def _is_allowed(module: str, qualname: str) -> bool:
     if module in _BUILTIN_MODULES:
         return qualname in _SAFE_BUILTINS
@@ -383,6 +387,10 @@ class _Shape:
     first: int | None = None
     """The integer the first such opcode pushes, when it is a binary integer or a bool."""
 
+    holds_legacy_magic: bool = False
+    """Whether any opcode pushes the number a legacy `torch.save` file opens with, in any
+    protocol's form: what the pickle returns is not followed, so holding it is enough."""
+
     globals: set[tuple[str, str]] = field(default_factory=set)
     """The globals it names, up to two: one is all a storage's arguments name."""
 
@@ -391,6 +399,8 @@ class _Shape:
 
     def note(self, name: str, arg: object) -> None:
         """Count one opcode."""
+        if name in _BINARY_INT_OPS | _TEXT_INT_OPS and arg == _LEGACY_MAGIC:
+            self.holds_legacy_magic = True
         if name in _BOOKKEEPING_OPS:
             return
         self.values += 1
@@ -431,6 +441,15 @@ class _PickleMachine:
 
     refs: list[str]
     shape: _Shape | None = None
+    tentative: bool = False
+    """Read on past an extension code, pushing an object of unknown value, instead of ending."""
+
+    passed: bool = False
+    """Whether it read on past an extension code."""
+
+    kept: tuple[int, int] | None = None
+    """The imports and embedded STOPs recorded before the first code it read on past."""
+
     stack: list[str | None] = field(default_factory=list)
     marks: list[int] = field(default_factory=list)
     memo: dict[int, str | None] = field(default_factory=dict)
@@ -446,7 +465,13 @@ class _PickleMachine:
             self._imports(*self._stack_global())
             self.stack.append(None)
         elif name in _EXTENSION_OPS:
-            raise _RefusedError(f"{name} names a global through an unseen registry")
+            # An unpickler refuses a code of zero or below before it consults any registry.
+            if not isinstance(arg, int) or arg <= 0:
+                raise _RefusedError(f"{name} with code {arg!r}, which no registry holds")
+            if not self.tentative:
+                raise _ExtensionCodeError(f"{name} names a global through an unseen registry")
+            self.passed = True
+            self.stack.append(None)
         elif not self._step_marks_and_memo(name, arg):
             if name in _IMPORTS_BY_ARG and isinstance(arg, str):
                 module, _, qualname = arg.partition(" ")
@@ -549,19 +574,46 @@ class _PickleMachine:
         del self.stack[keep:]
 
 
+class _AsPickle(Enum):
+    """Where an extension code in a byte stream is one an unpickler would resolve."""
+
+    NAMED = "named"
+    """From the first byte: the file or member is named as a pickle a loader unpickles."""
+
+    SNIFFED = "sniffed"
+    """Named by a suffix other formats share: the first stream counts one when it goes on to
+    a clean STOP, which a few random bytes rarely reach."""
+
+    DATA = "data"
+    """Only where a stream opens with a PROTO opcode."""
+
+    RAW = "raw"
+    """Nowhere: bytes no loader unpickles, such as a tensor storage beside its `data.pkl`."""
+
+
+_LEGACY_MAGIC = 0x1950A86A20F9469CFC6C
+"""The first pickle of a legacy `torch.save` file."""
+_LEGACY_PICKLES = 4
+"""Pickles `torch.load` unpickles after the magic: the protocol version, the system info, the
+object and its storage keys. The storage bytes after them are data, whatever the file is
+named, since `torch.load` reads any file that opens with the magic as a legacy checkpoint."""
+
+
 class ParseEnd(StrEnum):
     """How reading a byte stream as pickle opcodes ended.
 
-    The distinctions exist because "I could not read this" has four meanings, and
-    three of them are evidence of something unexamined. A member of a real
+    The distinctions exist because "I could not read this" has several meanings, and
+    all but one are evidence of something unexamined. A member of a real
     checkpoint is raw tensor data and is `NOT_PICKLE` within its first few bytes —
     reporting that would put a finding on every tensor in every honest model, and so
     is a stream an unpickler would refuse part-way, since nothing after that runs. A
     stream that was still parsing when the buffer ended (`RAN_OUT`), or one the
     pickle machine could not model an operand for (`UNRESOLVABLE`), is a pickle this
     rule did not finish proving clean, and so is one cut off by the archive's opcode
-    budget (`OVER_BUDGET`), and one with a read that crosses the end of a frame
-    (`CROSSED_FRAME`), which unpicklers resume from different places.
+    budget (`OVER_BUDGET`), one with a read that crosses the end of a frame
+    (`CROSSED_FRAME`), which unpicklers resume from different places, and one read as a
+    pickle that names a callable by an extension-registry code (`EXTENSION`), which only
+    the loading process can resolve.
     """
 
     COMPLETE = "complete"
@@ -570,6 +622,7 @@ class ParseEnd(StrEnum):
     UNRESOLVABLE = "unresolvable"
     OVER_BUDGET = "over_budget"
     CROSSED_FRAME = "crossed_frame"
+    EXTENSION = "extension"
 
 
 @dataclass(slots=True)
@@ -583,17 +636,19 @@ class _OpcodeBudget:
 
 
 _PICKLE_HEADERS = (b"\x80\x02", b"\x80\x03", b"\x80\x04", b"\x80\x05")
+_PROTOCOL_HEADERS = (b"\x80\x00", b"\x80\x01", *_PICKLE_HEADERS)
+"""A PROTO opcode an unpickler accepts, which only protocol 2 and later write."""
 _IDENTIFIER = re.compile(r"[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)+")
 _BIN_PROBE_BYTES = 64 * 1024
 """How much of a `.bin` is read to decide whether it is a pickle at all."""
 
 
-_UNFOLLOWED_ENDS = frozenset({ParseEnd.UNRESOLVABLE, ParseEnd.CROSSED_FRAME})
+_UNFOLLOWED_ENDS = frozenset({ParseEnd.UNRESOLVABLE, ParseEnd.CROSSED_FRAME, ParseEnd.EXTENSION})
 
 
 def _unproven_pickle(scan: "_OpcodeScan") -> bool:
-    """Whether a stream ended where a pickle hides an operand or reads across a frame's end."""
-    return scan.end is ParseEnd.CROSSED_FRAME or (
+    """Whether a stream ended where a pickle hides an operand, crosses a frame or uses a code."""
+    return scan.end in {ParseEnd.CROSSED_FRAME, ParseEnd.EXTENSION} or (
         scan.end is ParseEnd.UNRESOLVABLE and not scan.short_stack
     )
 
@@ -632,8 +687,8 @@ def _maybe_a_file(path: Path) -> bool:
 def _left_a_pickle_unproven(end: ParseEnd, *, cut: bool) -> bool:
     """Whether this member is a pickle the rule stopped short of clearing.
 
-    `UNRESOLVABLE` always is: the pickle machine reached an operand it cannot model,
-    and an unpickler may well resolve what this could not.
+    `UNRESOLVABLE` and `EXTENSION` always are: the pickle machine reached an operand or
+    an extension code it cannot resolve, and an unpickler may well resolve it.
 
     `RAN_OUT` only counts when the read was actually cut. Any short stretch of
     non-pickle bytes ends where the buffer does — `archive/version` in a torch
@@ -658,7 +713,9 @@ class _OpcodeScan:
         return self.end is not ParseEnd.COMPLETE
 
 
-def _scan_opcodes(data: bytes, budget: _OpcodeBudget | None = None) -> _OpcodeScan:
+def _scan_opcodes(
+    data: bytes, budget: _OpcodeBudget | None = None, *, as_pickle: _AsPickle = _AsPickle.DATA
+) -> _OpcodeScan:
     """Read `data` as one or more pickle opcode streams, keeping whatever they prove.
 
     Parses opcodes lazily and keeps what it found even if the stream breaks
@@ -673,15 +730,45 @@ def _scan_opcodes(data: bytes, budget: _OpcodeBudget | None = None) -> _OpcodeSc
 
     With a `budget`, every opcode read spends one, and the read ends `OVER_BUDGET`
     before the opcode that would overspend it.
+
+    An extension code ends a read as `EXTENSION` where `as_pickle` says the stream is read as
+    a pickle, in the four pickles after a legacy `torch.save` magic number, and, but for
+    `RAW` bytes and the storage bytes after those four, wherever a stream opens with a
+    PROTO opcode. Elsewhere it is data.
     """
     refs: list[str] = []
     stream = io.BytesIO(data)
     fork_budget = budget or _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + len(data))
     starts = _Starts(len(data))
+    legacy = 0
     while starts.pending:
-        start, after_complete, forked = starts.pending.popleft()
+        start, after_complete, forked, ordinal = starts.pending.popleft()
         stream.seek(start)
-        one = _scan_one(stream, refs, fork_budget if forked else budget)
+        storage_data = legacy > 0 and ordinal is not None and ordinal > legacy
+        headed = (
+            as_pickle is not _AsPickle.RAW
+            and not storage_data
+            and data.startswith(_PROTOCOL_HEADERS, start)
+        )
+        named = (ordinal == 0 and as_pickle is _AsPickle.NAMED) or (
+            ordinal is not None and 0 < ordinal <= legacy
+        )
+        machine = _PickleMachine(
+            refs,
+            _Shape() if ordinal == 0 else None,
+            tentative=ordinal == 0 and as_pickle is _AsPickle.SNIFFED and not headed,
+        )
+        one = _scan_one(stream, machine, fork_budget if forked else budget)
+        if one.end is ParseEnd.EXTENSION and not (named or headed or machine.passed):
+            one.end = ParseEnd.NOT_PICKLE
+        if (
+            ordinal == 0
+            and one.end is ParseEnd.COMPLETE
+            and as_pickle is not _AsPickle.RAW
+            and machine.shape is not None
+            and machine.shape.holds_legacy_magic
+        ):
+            legacy = _LEGACY_PICKLES
         for stop in one.embedded:
             # Read from the end of the embedded pickle afresh too, as a loader that
             # restarts there would.
@@ -695,7 +782,8 @@ def _scan_opcodes(data: bytes, budget: _OpcodeBudget | None = None) -> _OpcodeSc
             continue
         after = stream.tell()
         if after > start:
-            starts.add(after, forked=forked, first=True)
+            following = None if ordinal is None else ordinal + 1
+            starts.add(after, forked=forked, first=True, ordinal=following)
         if one.frame_end > after:
             # A STOP inside a frame: an unpickler that read the whole frame from the file
             # resumes at its end, one that buffers ahead resumes after the STOP.
@@ -708,25 +796,28 @@ class _Starts:
     """The offsets a byte stream is read from as a pickle, and the worst way one ended."""
 
     size: int
-    pending: collections.deque[tuple[int, bool, bool]] = field(
-        default_factory=lambda: collections.deque([(0, False, False)])
+    pending: collections.deque[tuple[int, bool, bool, int | None]] = field(
+        default_factory=lambda: collections.deque([(0, False, False, 0)])
     )
-    """Each offset, whether a complete pickle precedes it, and whether a frame or an
-    embedded pickle led to it rather than the plain sequence of STOPs."""
+    """Each offset, whether a complete pickle precedes it, whether a frame or an embedded
+    pickle led to it rather than the plain sequence of STOPs, and its place in that
+    sequence, None when it is not in it."""
 
     seen: set[int] = field(default_factory=lambda: {0})
     frames: int = 0
     worst: tuple[ParseEnd, bool] = (ParseEnd.COMPLETE, False)
 
-    def add(self, offset: int, *, forked: bool, first: bool = False) -> None:
+    def add(
+        self, offset: int, *, forked: bool, first: bool = False, ordinal: int | None = None
+    ) -> None:
         """Read from `offset` too, once, when bytes are left there; `first` reads it next."""
         if offset >= self.size or offset in self.seen:
             return
         self.seen.add(offset)
         if first:
-            self.pending.appendleft((offset, True, forked))
+            self.pending.appendleft((offset, True, forked, ordinal))
         else:
-            self.pending.append((offset, True, forked))
+            self.pending.append((offset, True, forked, ordinal))
 
     def frame(self, frame_end: int) -> None:
         """Read from where a frame ends past its STOP, within the bound on such reads."""
@@ -749,6 +840,7 @@ _SEVERITY = {
     ParseEnd.RAN_OUT: 2,
     ParseEnd.UNRESOLVABLE: 3,
     ParseEnd.CROSSED_FRAME: 4,
+    ParseEnd.EXTENSION: 4,
     ParseEnd.OVER_BUDGET: 5,
 }
 
@@ -774,10 +866,20 @@ class _OneScan:
     """Where each STOP that ended a pickle read in the middle of this one falls."""
 
 
-def _step(machine: _PickleMachine, op: pickletools.OpcodeInfo, arg: object) -> _OneScan | None:
-    """Apply one opcode; return how the pickle ended when it cannot go on, else None."""
+def _step(
+    machine: _PickleMachine, op: pickletools.OpcodeInfo, arg: object, *, stops: int
+) -> _OneScan | None:
+    """Apply one opcode; return how the pickle ended when it cannot go on, else None.
+
+    `stops` counts the embedded STOPs read so far, kept with the imports when this is the
+    first extension code a tentative machine reads on past.
+    """
     try:
         machine.step(op, arg)
+        if machine.passed and machine.kept is None:
+            machine.kept = (len(machine.refs), stops)
+    except _ExtensionCodeError:
+        return _OneScan(ParseEnd.EXTENSION)
     except _RefusedError:
         return _OneScan(ParseEnd.NOT_PICKLE)
     except _ShortStackError:
@@ -789,20 +891,42 @@ def _step(machine: _PickleMachine, op: pickletools.OpcodeInfo, arg: object) -> _
 
 def _scan_one(
     stream: io.BytesIO,
-    refs: list[str],
+    machine: _PickleMachine,
     budget: _OpcodeBudget | None,
-    shape: _Shape | None = None,
     *,
     embedded: bool = True,
 ) -> _OneScan:
-    """Read one pickle from `stream`'s position to its STOP, with its own stack and memo.
+    """Read one pickle from `stream`'s position to its STOP with `machine`, a fresh one.
 
     With `embedded`, a STOP that leaves objects below it ends a pickle a loader read in the
     middle of this one, as joblib reads an object array, and this one is read on past it.
+    A `tentative` machine that read on past an extension code ends `EXTENSION` when the
+    pickle reaches a clean STOP or imports a callable with a real dotted name after the
+    code; otherwise it ends where the code stood, as bytes that are no pickle, and keeps
+    nothing it read after it.
     """
+    one = _read_one(stream, machine, budget, embedded=embedded)
+    if not machine.passed or machine.kept is None:
+        return one
+    if one.end is ParseEnd.COMPLETE:
+        one.end = ParseEnd.EXTENSION
+        return one
+    refs, stops = machine.kept
+    if any(_IDENTIFIER.fullmatch(ref) for ref in machine.refs[refs:]):
+        # An import with a real dotted name past the code is no accident of random bytes,
+        # and an unpickler imports it before it reaches whatever breaks the stream.
+        one.end = ParseEnd.EXTENSION
+        return one
+    del machine.refs[refs:]
+    return _OneScan(ParseEnd.NOT_PICKLE, embedded=one.embedded[:stops])
+
+
+def _read_one(
+    stream: io.BytesIO, machine: _PickleMachine, budget: _OpcodeBudget | None, *, embedded: bool
+) -> _OneScan:
+    """Read one pickle as `_scan_one` does, without judging a code it read on past."""
     with stream.getbuffer() as view:
         size = len(view)
-    machine = _PickleMachine(refs, shape)
     ops = read_opcodes(stream)
     frame_end = 0
     stops: list[int] = []
@@ -834,7 +958,7 @@ def _scan_one(
             return _OneScan(ParseEnd.CROSSED_FRAME, frame_end=frame_end, embedded=stops)
         if op.name == "FRAME" and isinstance(arg, int):
             frame_end = stream.tell() + arg
-        stopped = _step(machine, op, arg)
+        stopped = _step(machine, op, arg, stops=len(stops))
         if stopped is not None:
             stopped.frame_end, stopped.embedded = frame_end, stops
             return stopped
@@ -907,7 +1031,7 @@ class _LegacyReader:
     def pickle(self) -> _Shape:
         """Read the next pickle and what it is; a pickle that does not end cleanly ends the walk."""
         shape = _Shape()
-        one = _scan_one(self.stream, self.refs, self.budget, shape, embedded=False)
+        one = _scan_one(self.stream, _PickleMachine(self.refs, shape), self.budget, embedded=False)
         end, frame_end = one.end, one.frame_end
         if end is not ParseEnd.COMPLETE:
             raise _WalkEnd(_LegacyWalk(self.refs, end, cut=self.cut and end is ParseEnd.RAN_OUT))
@@ -988,6 +1112,25 @@ def _model_named(member: str) -> bool:
         or base.endswith(_COMPRESSED_MODEL_ENDINGS)
         or _member_suffix(base) in _MODEL_MEMBER_SUFFIXES
     )
+
+
+def _pickle_named(member: str) -> bool:
+    """Whether an archive member is named as a file a loader unpickles, not one it sniffs."""
+    return _model_named(member) and _member_suffix(member) not in _SNIFFED_SUFFIXES
+
+
+def _file_reading(*, by_content: bool) -> _AsPickle:
+    """How a file's stream is read for an extension code; see `PickleOpcodeRule._scan`."""
+    return _AsPickle.SNIFFED if by_content else _AsPickle.NAMED
+
+
+def _member_reading(kind: "_Member", names: tuple[str, ...]) -> _AsPickle:
+    """How a member's stream is read for an extension code, by its kind and every name."""
+    if kind is _Member.STORAGE:
+        return _AsPickle.RAW
+    if kind is _Member.SNIFFED:
+        return _AsPickle.SNIFFED
+    return _AsPickle.NAMED if any(_pickle_named(each) for each in names) else _AsPickle.DATA
 
 
 def _unread_model(member: str, *, plain: bool = False) -> bool:
@@ -1086,7 +1229,7 @@ def _unicode_paths(info: zipfile.ZipInfo) -> Iterator[str]:
 
 
 def _starts_as_array_or_pickle(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> bool:
-    """Whether a member's first bytes are an NPY array or a pickle header.
+    """Whether a member's first bytes are an NPY array or a PROTO opcode of any protocol.
 
     `np.load` reads any key of a zip it opens as `.npz`, whatever the member is named. A
     damaged member counts, so the failure to read it is reported; an encrypted one or one
@@ -1099,7 +1242,7 @@ def _starts_as_array_or_pickle(archive: zipfile.ZipFile, info: zipfile.ZipInfo) 
         return False
     except _ZIP_ERRORS:
         return True
-    return head.startswith((NPY_MAGIC, *_PICKLE_HEADERS))
+    return head.startswith((NPY_MAGIC, *_PROTOCOL_HEADERS))
 
 
 def _zip_member_kind(
@@ -1398,7 +1541,7 @@ class PickleOpcodeRule(ArtifactRule):
                 f"{inflated.codec}-compressed file this scanner cannot decompress; not scanned"
             )
             return True
-        scan = _scan_opcodes(inflated.data)
+        scan = _scan_opcodes(inflated.data, as_pickle=_file_reading(by_content=by_content))
         if by_content and _bin_verdict(inflated.data, scan, cut=inflated.cut) is False:
             return False
         self._report_stream(
@@ -1422,7 +1565,8 @@ class PickleOpcodeRule(ArtifactRule):
             if probe is None:
                 report.unscanned(_UNREADABLE)
                 return True
-            verdict = _bin_verdict(probe[0], _scan_opcodes(probe[0]), cut=probe[1])
+            scan = _scan_opcodes(probe[0], as_pickle=_AsPickle.SNIFFED)
+            verdict = _bin_verdict(probe[0], scan, cut=probe[1])
             if verdict is False:
                 return False
         prefix = read_bytes_bounded(path, _MAX_PICKLE_BYTES)
@@ -1430,7 +1574,7 @@ class PickleOpcodeRule(ArtifactRule):
             report.unscanned(_UNREADABLE)
             return True
         data, oversized = prefix
-        scan = _scan_opcodes(data)
+        scan = _scan_opcodes(data, as_pickle=_file_reading(by_content=by_content))
         if by_content and _bin_verdict(data, scan, cut=oversized) is False:
             return False
         self._report_stream(
@@ -1465,6 +1609,11 @@ class PickleOpcodeRule(ArtifactRule):
             )
         elif scan.end is ParseEnd.CROSSED_FRAME:
             report.unscanned(_CROSSED_FRAME_SUMMARY)
+        elif scan.end is ParseEnd.EXTENSION:
+            report.unscanned(
+                "pickle names a callable by an extension-registry code this scanner cannot "
+                "resolve; not scanned past it"
+            )
         elif scan.truncated and not scan.refs:
             report.unscanned(f"{unparsed}; not scanned")
 
@@ -1497,7 +1646,7 @@ class PickleOpcodeRule(ArtifactRule):
         data, oversized = whole
         self._report_stream(
             report,
-            _scan_opcodes(data[header.data_offset :]),
+            _scan_opcodes(data[header.data_offset :], as_pickle=_AsPickle.NAMED),
             cut_summary=_oversized_summary(oversized),
             unparsed="array of Python objects whose data is not a pickle stream",
         )
@@ -1650,7 +1799,7 @@ class PickleOpcodeRule(ArtifactRule):
         if raw is None:
             report.unscanned(f"tar member could not be read ({name}); not scanned")
             return False
-        return self._scan_member_data(report, name, raw, reading.budget, kind=kind)
+        return self._scan_member_data(report, (name,), raw, reading.budget, kind=kind)
 
     def _scan_member(
         self,
@@ -1671,12 +1820,21 @@ class PickleOpcodeRule(ArtifactRule):
             # pass as clean — the bytes we couldn't read become a visible finding.
             report.unscanned(f"zip member could not be read ({name}); not scanned")
             return False
-        return self._scan_member_data(report, name, raw, budget, kind=kind)
+        return self._scan_member_data(report, _zip_names(info), raw, budget, kind=kind)
 
     def _scan_member_data(
-        self, report: _FileReport, name: str, raw: bytes, budget: _OpcodeBudget, *, kind: _Member
+        self,
+        report: _FileReport,
+        names: tuple[str, ...],
+        raw: bytes,
+        budget: _OpcodeBudget,
+        *,
+        kind: _Member,
     ) -> bool:
-        """Scan the bytes read from one member; see `_scan_member`.
+        """Scan the bytes read from one member, known by `names`, the first named in a reason.
+
+        A member named as a pickle a loader unpickles is read as one from its first byte,
+        whatever that byte is; see `_scan_opcodes`.
 
         A member joblib would decompress is decompressed first. A member that starts as an
         NPY array file is read as one, since `np.load` reads it whatever it is named. One
@@ -1684,6 +1842,8 @@ class PickleOpcodeRule(ArtifactRule):
         still read as a stream, since its bytes may be both. A legacy `storages` or
         `tensors` member of a tar is also read as torch reads it, pickles between raw bytes.
         """
+        name = names[0]
+        as_pickle = _member_reading(kind, names)
         limit = _MEMBER_MAX_BYTES
         member_data, cut = raw[:limit], len(raw) > limit
         unpacked = self._inflate_member(report, name, member_data, budget, kind=kind)
@@ -1697,7 +1857,7 @@ class PickleOpcodeRule(ArtifactRule):
             report.unscanned(f"{report.container} member is a nested archive ({name}); not scanned")
             if kind is not _Member.PICKLE:
                 return False
-        scan = _scan_opcodes(member_data, budget)
+        scan = _scan_opcodes(member_data, budget, as_pickle=as_pickle)
         if scan.end is not ParseEnd.OVER_BUDGET and (
             (kind is _Member.STORAGE and not _holds_a_pickle(member_data, scan, cut=cut))
             or (kind is _Member.SNIFFED and _bin_verdict(member_data, scan, cut=cut) is False)
@@ -1823,7 +1983,7 @@ class PickleOpcodeRule(ArtifactRule):
             return True
         if not header.holds_objects:
             return False
-        scan = _scan_opcodes(data[header.data_offset :], budget)
+        scan = _scan_opcodes(data[header.data_offset :], budget, as_pickle=_AsPickle.NAMED)
         report.found(scan.refs, name)
         if scan.end is ParseEnd.OVER_BUDGET:
             report.unscanned(self._over_budget(report, budget, name))
@@ -1853,6 +2013,11 @@ class PickleOpcodeRule(ArtifactRule):
             )
         if end is ParseEnd.CROSSED_FRAME:
             return f"{member} holds a {_CROSSED_FRAME_SUMMARY} ({name})"
+        if end is ParseEnd.EXTENSION:
+            return (
+                f"{member} is a pickle that names a callable by an extension-registry code "
+                f"this scanner cannot resolve ({name})"
+            )
         return f"{member} is a pickle with an operand this scanner cannot resolve ({name})"
 
     def _critical(self, report: _FileReport) -> Finding | None:
