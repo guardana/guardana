@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -520,11 +524,18 @@ time exits <code>3</code>, since the run would stop before its last request, and
 <p>The JSON carries both as <code>budgets.max_requests_per_minute</code> and
 <code>budgets.minimum_wall_time_seconds</code>, null when no rate is set.</p>
 <h2 id="a-run-that-could-not-pass">A run that could not pass</h2>
+<p>A <code>rules.include</code> pattern that matches no registered rule refuses the plan with exit <code>3</code>
+before selection, just as it refuses the run. This applies even when another pattern
+matches, whatever <code>fail_on</code> says (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).
+The check covers every rule the run would register, including rules loaded by
+<code>--rules</code> and <code>rules.paths</code> and assertions of the profile's <code>contracts:</code>. It also covers
+every pass a probe splits into, so a canary rule priced in its own pass still matches
+its pattern.</p>
 <p>The plan exits <code>3</code> as well when the run it describes could not pass, and says why
 on stderr, one line per cause:</p>
 <ul>
-<li><strong>no rule would run</strong> — the profile, the flags and the target select none, and a
-run that verifies nothing reports no verdict;</li>
+<li><strong>no rule would run</strong> — every include pattern matches a rule, but the exclusions, the
+flags and the target select none, and a run that verifies nothing reports no verdict;</li>
 <li><strong>a coverage shortfall</strong> — a check the run's fixtures demand that it would not select,
 a graded recording whose run stopped, or, for <code>plan scan</code>, a path that holds no file
 other than <code>.guardanaignore</code> files (<code>empty_target</code>, the shortfall <code>scan</code> records);</li>

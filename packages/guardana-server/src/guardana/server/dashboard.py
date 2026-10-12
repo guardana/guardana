@@ -112,6 +112,7 @@ _PAGE = """<!doctype html>
   .sev-CRITICAL { background: var(--sev-critical); } .sev-HIGH { background: var(--sev-high); }
   .sev-MEDIUM { background: var(--sev-medium); } .sev-LOW { background: var(--sev-low); }
   .sev-INFO { background: var(--sev-info); }
+  .sev-ERROR, .sev-SKIPPED, .sev-INDETERMINATE { background: var(--muted); }
   .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .legend b { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
     margin-right: 4px; vertical-align: middle; }
@@ -222,6 +223,7 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const el = id => document.getElementById(id);
 let CATALOG = {};  // rule_id -> {name, description}, from /catalog
+let GATES = {};  // recorded gate -> submissions, from /stats
 const friendlyName = f => (CATALOG[f.rule_id] || {}).name || f.title || f.rule_id;
 
 function barRow(key, value, max, tone, mono) {
@@ -242,9 +244,12 @@ function fillBars(id, html) {
 function renderTiles(t, w) {
   const tile = (n, l, warn) => `<div class="card tile${warn ? " warn" : ""}">`
     + `<div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
+  const undecided = (GATES.indeterminate || 0);
   el("tiles").innerHTML = tile(t.findings, "findings")
-        + tile(t.errors || 0, "could not run")
+    + tile(t.errors || 0, "could not run")
     + tile(t.unverified, "unverified", t.unverified > 0)
+    + tile(t.skipped || 0, "skipped checks", t.skipped > 0)
+    + tile(undecided, "indeterminate gates", undecided > 0)
     + tile(t.sources, "sources")
     + tile(t.submissions, w && !w.complete
       ? "newest submissions (of more than " + w.limit + ")" : "submissions");
@@ -262,9 +267,10 @@ function renderSources(rows) {
   if (!rows.length) {
     el("sources").innerHTML = `<div class="empty">No sources yet.</div>`; return; }
   el("sources").innerHTML = `<table><thead><tr><th>source</th><th>find.</th>`
-    + `<th>unver.</th><th>worst</th></tr></thead><tbody>`
+    + `<th>unver.</th><th>skip.</th><th>gate</th><th>worst</th></tr></thead><tbody>`
     + rows.map(r => `<tr><td class="mono" title="${esc(r.source)}">${esc(r.source)}</td>`
-      + `<td>${esc(r.findings)}</td><td>${esc(r.unverified)}</td>`
+      + `<td>${esc(r.findings)}</td><td>${esc(r.unverified)}</td><td>${esc(r.skipped || 0)}</td>`
+      + `<td>${esc(r.gate || "gate not recorded")}</td>`
       + `<td>${sevPill(r.worst_severity)}</td></tr>`)
       .join("") + `</tbody></table>`;
 }
@@ -341,19 +347,38 @@ async function loadCatalog() {
   try { CATALOG = await readJson("catalog"); } catch (e) { CATALOG = {}; }
 }
 
+// Everything a submission says beyond "nothing found": a skipped check or an
+// undecided gate is listed beside the findings, so an empty list means none of them.
+function itemsOf(sub) {
+  const skipped = ((sub.summary || {}).rules_skipped || [])
+    .map(s => typeof s === "string" ? {rule_id: s, reason: "reason not recorded"} : s)
+    .filter(s => s.reason !== "not_applicable")
+    .map(s => ({
+      rule_id: s.rule_id, severity: "SKIPPED", target_ref: sub.source,
+      title: "check skipped (" + s.reason + ")",
+      evidence: {summary: (s.missing || []).length ? "missing: " + s.missing.join(", ") : ""}
+    }));
+  const gate = (sub.run || {}).gate;
+  const undecided = gate === "indeterminate" ? [{
+    rule_id: "run.gate", severity: "INDETERMINATE", target_ref: sub.source,
+    title: "gate indeterminate", evidence: {summary: "the run could not decide pass or fail"}
+  }] : [];
+  return (sub.findings || []).concat(
+    sub.unverified || [],
+    (sub.errors || []).map(e => ({
+      rule_id: e.source, severity: "ERROR", target_ref: sub.source,
+      title: "check did not run (" + e.stage + ")", evidence: {summary: e.reason}
+    })),
+    skipped,
+    undecided
+  );
+}
+
 async function loadFindings() {
   const src = el("source-filter").value;
   const url = "findings?limit=100" + (src ? "&source=" + encodeURIComponent(src) : "");
   const box = el("findings"), innerScroll = box.scrollTop;
-  const items = (await readJson(url))
-    
-      .flatMap(sub => (sub.findings || []).concat(
-        sub.unverified || [],
-        (sub.errors || []).map(e => ({
-          rule_id: e.source, severity: 'ERROR', target_ref: sub.source,
-          title: 'check did not run (' + e.stage + ')', evidence: {summary: e.reason}
-        }))
-      ));
+  const items = (await readJson(url)).flatMap(itemsOf);
   renderFindings(items.slice(0, 100));
   box.scrollTop = innerScroll;  // keep the reader's place across refresh
 }
@@ -371,6 +396,7 @@ async function readJson(path) {
 
 async function loadStats() {
   const s = await readJson("stats");
+  GATES = s.by_gate || {};
   renderTiles(s.totals, s.window); renderSeverity(s.by_severity);
   renderSources(s.by_source); renderRules(s.by_rule); renderSeries(s.series);
   populateSourceFilter(s.by_source);

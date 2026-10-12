@@ -335,3 +335,87 @@ def test_a_scan_report_written_over_a_file_the_scan_reads_is_refused(
     )
     assert _lines(result.stderr)[-1] == expected
     assert _files_under(tmp_path) == before
+
+
+@pytest.mark.parametrize("written", ["the recording", "beside the recording"])
+def test_a_scan_report_over_a_scanned_recording_named_like_exchanges_is_refused(
+    tmp_path: Path, written: str
+) -> None:
+    data = tmp_path / "data"
+    _a_file(data / "app.py", "print('hello')\n")
+    recording = _a_file(data / "customer.exchanges.jsonl", '{"messages": []}\n')
+    output = recording if written == "the recording" else data / "customer.json"
+    before = _files_under(tmp_path)
+
+    result = runner.invoke(app, ["scan", str(data), "--format", "json", "--output", str(output)])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert _lines(result.stderr)[-1] == (
+        f"error: --output {output} would replace {recording}, which this scan read — choose "
+        f"another --output"
+    )
+    assert _files_under(tmp_path) == before
+
+
+def _trace_reading_a_directory(tmp_path: Path, flag: str) -> tuple[list[str], Path, str]:
+    """Return analyze-trace's arguments, a file read from the flag's directory and the flag."""
+    trace = _a_file(tmp_path / "trace.jsonl", _TRACE)
+    if flag == "--rules":
+        folder = tmp_path / "rules"
+        given = _a_file(folder / "check.yaml", _ENDPOINT_RULE)
+        return ["analyze-trace", str(trace), "--rules", str(folder)], given, f"--rules {folder}"
+    folder = tmp_path / "contracts"
+    given = _a_file(folder / "checkout.yaml", "contract: 1\n")
+    return ["analyze-trace", str(trace), "--contract", str(folder)], given, "--contract"
+
+
+def _trace_written_over(given: Path, name: str) -> str:
+    return (
+        f"error: --write-trace {given} is {given}, which {name} names, and writing it would "
+        f"replace it — choose another --write-trace"
+    )
+
+
+@pytest.mark.parametrize("flag", ["--rules", "--contract"])
+def test_a_native_trace_written_over_a_file_in_a_directory_a_flag_names_is_refused(
+    tmp_path: Path, flag: str
+) -> None:
+    arguments, given, name = _trace_reading_a_directory(tmp_path, flag)
+    before = _files_under(tmp_path)
+
+    result = runner.invoke(app, [*arguments, "--write-trace", str(given)])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert _lines(result.stderr)[-1] == _trace_written_over(given, name)
+    assert _files_under(tmp_path) == before
+
+
+@pytest.mark.parametrize(
+    "key", ["rules.paths", "contracts", "calibrations", "evaluators.llm_judge.adapter"]
+)
+def test_a_native_trace_written_over_a_file_the_profile_names_is_refused(
+    tmp_path: Path, key: str
+) -> None:
+    arguments = _command(tmp_path, "analyze-trace")
+    profile, named = _profile_naming_files(tmp_path)
+    given = named[key]
+    before = _files_under(tmp_path)
+
+    result = runner.invoke(
+        app, [*arguments, "--profile", str(profile), "--write-trace", str(given)]
+    )
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert _lines(result.stderr)[-1] == _trace_written_over(given, f"the profile's {key}")
+    assert _files_under(tmp_path) == before
+
+
+def test_a_native_trace_written_beside_the_files_it_reads_is_written(tmp_path: Path) -> None:
+    arguments, given, _ = _trace_reading_a_directory(tmp_path, "--rules")
+    written = tmp_path / "native.jsonl"
+
+    result = runner.invoke(app, [*arguments, "--write-trace", str(written)])
+
+    assert result.exit_code != ExitCode.INVALID_USAGE, result.output
+    assert written.read_text(encoding="utf-8").startswith('{"guardana_trace"')
+    assert given.read_text(encoding="utf-8") == _ENDPOINT_RULE

@@ -209,7 +209,8 @@ def test_a_monitor_cycle_whose_rule_graded_nothing_is_indeterminate(
 
 
 def test_config_explain_lists_the_floor(tmp_path: Path) -> None:
-    floored = _profile(tmp_path, "fail_on:", "  min_graded_share: 0.8")
+    _rules(tmp_path)
+    floored = _profile(tmp_path, "  paths: [rules]", "fail_on:", "  min_graded_share: 0.8")
 
     result = runner.invoke(
         app, ["config", "explain", "--profile", str(floored), "--format", "json"]

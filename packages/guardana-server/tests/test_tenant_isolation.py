@@ -230,6 +230,28 @@ def test_over_http_each_key_reads_back_its_own(
     ]
 
 
+def test_over_http_skipped_checks_and_gates_stay_in_their_tenant(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GUARDANA_DASHBOARD", "1")
+    client, theirs, ours = _two_tenant_collector(database_url, monkeypatch)
+    undecided = {
+        **_SUBMISSION,
+        "summary": {"rules_skipped": [{"rule_id": "guardana.x", "reason": "missing_capability"}]},
+        "run": {"gate": "indeterminate"},
+    }
+    assert client.post("/findings", json=undecided, headers=_bearer(theirs)).status_code == _OK
+
+    their_stats = client.get("/stats", headers=_bearer(theirs)).json()
+    our_stats = client.get("/stats", headers=_bearer(ours)).json()
+
+    assert (their_stats["totals"]["skipped"], their_stats["by_gate"]) == (
+        1,
+        {"indeterminate": 1},
+    )
+    assert (our_stats["totals"]["skipped"], our_stats["by_gate"]) == (0, {})
+
+
 def test_the_ingest_response_names_the_project_it_wrote_to(
     database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

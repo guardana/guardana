@@ -62,6 +62,7 @@ Tags include the exact version, the moving minor used above, and `latest`. While
 
 ```bash
 pip install "guardana-server[serve]"   # `[serve]` adds the ASGI server
+export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana   # an existing PostgreSQL database
 guardana-collector migrate             # then: guardana-collector serve
 ```
 

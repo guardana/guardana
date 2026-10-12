@@ -38,7 +38,7 @@ def counts_up(ids: Sequence[str], *, ordered: bool) -> bool:
     """
     if len(ids) < 2:  # noqa: PLR2004 — one sample cannot show a sequence
         return False
-    shared = len(commonprefix(list(ids)))
+    shared = len(commonprefix(list(ids)))  # noqa: RUF071 — ids, not paths: the character prefix is the point
     tails = [value[shared:] for value in ids]
     if not all(tail.isdigit() for tail in tails):
         return False

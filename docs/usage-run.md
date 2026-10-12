@@ -14,6 +14,9 @@ guardana scan path/to/project --format json --output run.json
 guardana run inspect run.json
 ```
 
+A saved run is read only from a regular file of at most 256 MiB. A FIFO, a device or a larger
+file is refused with exit `3` before any of it is parsed.
+
 ```text
 run 0191d4c2-8f1a-7c3e-9b21-6f0a2d8e4c11
   started:   2026-08-02 09:14:02+00:00
@@ -141,14 +144,19 @@ A schema-13 run migrates to schema 14 with `recipe: null` and `configuration.pro
 no earlier schema recorded a recipe or the provider wire, so both are unknown, never "no
 recipe" or "the OpenAI wire". `inspect` prints no `recipe:` line for it.
 
-A schema-14 run migrates to schema 15 with `fixtures: null`: no earlier build took a fixtures
-file, so the run was given none.
+A schema-14 run migrates to schema 15 with `fixtures: null`: no earlier schema recorded a fixtures
+file, so the migration represents the run as having none.
 
 A schema-15 run migrates to schema 16 with `execution.max_requests_per_minute: null`: no
-earlier build paced its requests, so the run set no rate.
+earlier schema recorded a request rate, so the migration represents the run as setting no rate.
 
 A schema-16 run migrates to schema 17 with only its version changed: schema 17 adds the
-`not_offered` skip reason and the `target_changed` stop, and no earlier build wrote either.
+`not_offered` skip reason and the `target_changed` stop, and no earlier schema recorded either.
+
+A schema-17 run migrates to schema 18 with `scope.kept_models: []`, `scope.skipped_models:
+null` and `file: null` on every exclude: no earlier schema recorded kept or skipped models
+or where a pattern came from. A scan that wrote schema 17 kept no file its target's
+`.guardanaignore` matched, hence `[]`, and did not search the skipped directories, hence `null`.
 
 One thing *is* recovered: the **title** of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
@@ -168,8 +176,9 @@ Migrating to another `--output` brings the exchanges the run records: their
 `<stem>.exchanges.jsonl` is copied beside the new output first, identical exchanges
 already there are kept, different ones are refused with exit `3` and nothing is written,
 and stderr warns when the original sidecar is missing or does not match the recorded
-digest. A run that kept no exchanges removes the ones an earlier run left beside that
-output, and says so on stderr. The migrated run's own sidecar stays when migrated in
+digest. A run that kept no exchanges removes the ones the saved run it replaces at that
+output recorded by digest, and says so on stderr; exchanges no run saved there recorded
+are kept with a warning. The migrated run's own sidecar stays when migrated in
 place or from `run.json` to `run`, which share one. An `--output` whose sidecar
 path is the input file is refused with exit `3` before anything is written.
 
@@ -186,18 +195,14 @@ where it cannot create the temporary file, or an `--output` that is the input's 
 
 **A migration that cannot carry a field refuses, and writes nothing.** The default
 destination is the file itself, so a half-done migration would overwrite the only copy
-of the evidence. In 0.7.0 a version-1 run that never recorded its target kind was
-migrated into the literal string `"None"` — a document that fails this schema, written
-over the original, with exit `0`. Every unit test around migration passed, because
-they asserted on the objects the migration loaded and the objects were fine; what was
-published was the file. There is now a test that validates the *artifact*,
-parametrised over every field a version-1 run could be missing.
+of the evidence. A test validates the written *artifact*, not only the objects the
+migration loads, parametrised over every field a version-1 run could be missing.
 
 ## The document
 
 The saved-run schema lives at
-[`schemas/run-v17.schema.json`](../schemas/run-v17.schema.json), identified by
-`https://guardana.dev/schemas/run/v17.schema.json`, and the site serves every schema
+[`schemas/run-v18.schema.json`](../schemas/run-v18.schema.json), identified by
+`https://guardana.dev/schemas/run/v18.schema.json`, and the site serves every schema
 at the URL its identifier names. The version is in the identifier,
 so a consumer can tell which contract it is holding before parsing anything; it
 changes whenever the change is not backwards-compatible. A test validates what
@@ -240,17 +245,21 @@ target; and `run.execution.max_requests_per_minute`, the pace a run's requests w
 Version 17 records `not_offered` in `result_summary.rules_skipped[].reason`, a rule that
 found while it ran that the target does not offer what it examines, and `target_changed` in
 `result_summary.stopped_by`, a run whose target stopped accepting the protocol revision the
-run agreed with it.
+run agreed with it. Version 18 records `scope.excludes[].file`, the file supplying a
+pattern; `scope.kept_models`, files a model loader reads that the scan reads despite
+matching the target's `.guardanaignore`; and `scope.skipped_models`, model files named
+inside directories every scan skips.
 
 Top level:
 
 | Key | What it is |
 |---|---|
-| `schema_version` | `17`. Stated once, for the whole document. |
+| `schema_version` | `18`. Stated once, for the whole document. |
+| `$schema` | the identifier of the schema the document follows, `https://guardana.dev/schemas/run/v18.schema.json` |
 | `run` | the manifest — everything below |
-| `findings` / `unverified` / `waived` / `errors` / `observations` | the problem, evidence and inventory channels |
+| `findings` / `unverified` / `waived` / `errors` / `observations` | the problem, evidence and inventory channels — see [the finding channels](#the-finding-channels) |
 | `assessments` | what the run *measured*, pass included — see [assessments](#assessments) |
-| `scope` | for a file run, `{files, excludes, ignored_directories}`: every file it listed (so the document grows with the tree), spelled like a finding's location, each exclude pattern with its `source` (`profile` for `rules.paths_exclude`, `ignore_file` for `.guardanaignore`), and the directory names every scan skips; `null` for any other run. `excludes` is `null` when a third-party file target applied filtering it does not report |
+| `scope` | for a file run, `{files, excludes, ignored_directories, kept_models, skipped_models}`: every file it listed (so the document grows with the tree), spelled like a finding's location; each exclude pattern with its `source` (`profile` for `rules.paths_exclude`, `ignore_file` for `.guardanaignore`) and the `file` it was read from (`null` for a profile pattern); the directory names every scan skips; each file a model loader reads that `.guardanaignore` matched and the scan read anyway, with the pattern (`{path, pattern}`); and what a name-only search of the skipped directories found (`{directories: [{path, model_files}], searched_all}`, `searched_all` false when the search stopped at its bound). `null` for any other run. `excludes` is `null`, and `skipped_models` is `null`, when a third-party file target applied filtering it does not report |
 
 Inside `run`:
 
@@ -274,13 +283,60 @@ Inside `run`:
 | `recipe` | for a run started from a recipe, `{name, digest, lock_digest, kind, source, unpinned}`: the recipe's name, the SHA-256 of the recipe file and of the lock the run was held to (`null` when none was read), what the team declared answered (`kind`: `application` or `model_harness`), how the run reached it (`source`: `connection`, `recording` or `target`) and the rule ids it ran that the lock does not pin. `kind` is declared, not verified. `null` otherwise |
 | `fixtures` | for a run given a [fixtures file](usage-fixtures.md), `{name, digest, data, tenants, counts, markers}`: the file's `name`, the SHA-256 of its bytes, `data` as `{declared: "synthetic"}` — the team's statement, recorded and never verified —, the tenants it declares, `{documents, records, tools}` it declares, and the version of the algorithm that derived its markers. `null` otherwise |
 
-Three conventions hold everywhere in it:
+### The finding channels
+
+`findings`, `unverified` and `waived` use the same record structure. A finding failed the check.
+An unverified record describes a check that ran but could not decide. A waived record is a
+finding accepted by a baseline.
+
+| Field | Type | What it is |
+|---|---|---|
+| `rule_id` | string | the rule that produced it |
+| `severity` | string | `INFO`, `LOW`, `MEDIUM`, `HIGH` or `CRITICAL`, always uppercase |
+| `title` | string | the rule's title |
+| `taxonomy` | list of `{framework, id, title}` | the framework references the rule maps to; `framework` and `id` are the identity, and `title` is recorded so a reader without that catalogue can still show it |
+| `target_ref` | string | where: a file path, with `:line` when the rule names a line, or the target's reference |
+| `evidence` | `{summary, detail}`, both strings | what was seen, redacted under the run's evidence policy; `detail` may be empty |
+| `verdict` | `null`, or `{outcome, confidence, rationale, evaluator_id}` | the evaluator's verdict for a graded check: `outcome` is `pass`, `fail` or `inconclusive` and `confidence` is between `0` and `1`. `null` for a check that decides in its own code, such as a file rule |
+
+### Errors and observations
+
+Each `errors` entry is `{source, stage, reason}`, all strings: what could not run (a rule id
+or a file), the stage where it failed, such as `load`, `run` or `target`, and why. The list of
+stages is open. Each `observations` entry is `{kind, name, ref, attributes}`: a component the
+run saw (`model`, `dataset`, `dependency-manifest` or `notebook`), its name, its location, and
+string attributes such as `format` and `size_bytes`.
+
+### `result_summary`
+
+| Field | Type | What it is |
+|---|---|---|
+| `findings`, `unverified`, `waived`, `errors`, `observations` | integer | how many entries each channel holds |
+| `rules_run` | list of rule ids | the rules that ran |
+| `rules_skipped` | list of `{rule_id, reason, missing, detail}` | the rules that did not run. `reason` is `missing_capability`, `unsafe_mode`, `not_applicable`, `not_recorded` or `not_offered`; `missing` lists what the target lacked; `detail` is a sentence for a person. Every reason except `not_applicable` is a coverage gap |
+| `max_severity` | string or `null` | the highest severity in `findings`, `null` when there is none |
+| `gate` | `pass`, `fail` or `indeterminate` | the verdict the run's policy reached. It is stored rather than recomputed, so a reader uses this value instead of deriving one |
+| `stopped_by` | `null`, `budget_exhausted`, `interrupted`, `target_unavailable` or `target_changed` | why the run ended before its plan finished |
+| `assessments`, `measured` | integer | see [assessments](#assessments) |
+
+### `coverage.shortfall`
+
+Each entry is `{kind, name, detail}`: the kind of coverage the run lacked, what it concerned,
+and a sentence for a person. `kind` is `missing_dimension`, `contract_not_applicable`,
+`unexamined_component`, `incomplete_recording`, `demanded_check`, `seed_not_reached`,
+`empty_target` or `ungraded_cases`. A shortfall prevents a run from passing regardless of the
+`fail_on_*` switches. The gate is `indeterminate` unless a finding or a failed suite makes
+it `fail`. A stopped run is `indeterminate` either way.
+
+These conventions apply throughout the document:
 
 **Timestamps are UTC, RFC 3339.** A local-time timestamp in an evidence record is a
 bug waiting for a timezone.
 
-**Digests name their algorithm** — `sha256:…`, never a bare hex string, so a digest
-can be migrated when the algorithm moves.
+**Digests of a document or of content name their algorithm** — `sha256:…` — so a digest
+can be migrated when the algorithm changes. Two fields instead hold a shorter identifier of
+16 bare hex characters: `run.rules[].digest`, the digest of a rule's declaration, and
+`assessments[].dataset` when a YAML rule records its declaration digest there.
 
 **The target fingerprint says what it covers.** `target.fingerprint_inputs` lists the
 fields the digest was computed from. A digest of a URL and a model name identifies a
@@ -299,7 +355,7 @@ documents matched.
 
 The channel that is not about problems. Every other one — findings, unverified,
 errors, coverage shortfall — records something wrong; a check that ran and was
-satisfied used to leave nothing but its id in `rules_run`.
+satisfied would otherwise leave nothing but its id in `rules_run`.
 
 That is enough to gate a build and not enough to answer *did this get better*,
 because fewer findings has three causes and the count cannot separate them: the
@@ -462,10 +518,13 @@ without the namespace; `execution.seed` and `execution.temperature` match
 `gen_ai.request.*`. If you already collect those, the manifest needs no
 translation.
 
-The SARIF output carries the same facts in SARIF's own vocabulary: `runs[].invocations[0]`
+The SARIF output contains the same facts in SARIF's vocabulary: `runs[].invocations[0]`
 with `startTimeUtc`, `endTimeUtc`, `exitCode`, `exitCodeDescription` and
-`executionSuccessful`, which is `false` whenever the run leaves a question open, with a
-notification saying which (see [`usage-scan.md`](usage-scan.md#other-formats)).
+`executionSuccessful`. That flag is not the verdict. It is `false` for each unresolved question
+named in the run's output, with a notification identifying the question. A rule skipped for
+missing coverage only adds a `note` unless the gate refused the run because of it. Read
+`exitCode` for the verdict
+([reading results](reading-results.md#what-sarif-keeps), [`usage-scan.md`](usage-scan.md#other-formats)).
 
 ## See also
 

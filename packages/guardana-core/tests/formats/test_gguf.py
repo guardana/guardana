@@ -65,6 +65,20 @@ def test_rejects_a_version_older_than_the_supported_layout(tmp_path: Path) -> No
         read_gguf_metadata(path)
 
 
+@pytest.mark.parametrize("version", [4, 99, 3 << 24])
+def test_rejects_a_version_newer_than_the_supported_layouts(tmp_path: Path, version: int) -> None:
+    """A layout nobody has specified yet is unread, not read as if it were version 3."""
+    path = _write(tmp_path, build_gguf({_TEMPLATE_KEY: "hello"}, version=version))
+    with pytest.raises(FormatError, match=f"unsupported GGUF version {version}"):
+        read_gguf_metadata(path)
+
+
+@pytest.mark.parametrize("version", [2, 3])
+def test_reads_every_supported_version(tmp_path: Path, version: int) -> None:
+    path = _write(tmp_path, build_gguf({_TEMPLATE_KEY: "hello"}, version=version))
+    assert read_gguf_metadata(path).version == version
+
+
 def test_rejects_a_truncated_file(tmp_path: Path) -> None:
     path = _write(tmp_path, build_gguf({_TEMPLATE_KEY: "hello"})[:-3])
     with pytest.raises(FormatError, match="truncated"):
@@ -149,6 +163,12 @@ def test_rejects_metadata_that_outgrows_the_byte_budget(tmp_path: Path) -> None:
     tight = Limits(max_header_bytes=8 * 1024)
     with pytest.raises(FormatError, match="bound"):
         read_gguf_metadata(path, limits=tight)
+
+
+def test_an_empty_metadata_block_still_honours_the_byte_budget(tmp_path: Path) -> None:
+    path = _write(tmp_path, build_gguf({}))
+    with pytest.raises(FormatError, match="bound"):
+        read_gguf_metadata(path, limits=Limits(max_header_bytes=1))
 
 
 def test_rejects_a_deeply_nested_array(tmp_path: Path) -> None:

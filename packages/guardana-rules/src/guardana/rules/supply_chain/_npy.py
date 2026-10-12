@@ -18,6 +18,7 @@ NPY_MAX_HEADER_BYTES = 64 * 1024
 trusted, and parsing a literal costs far more memory than its bytes."""
 _NPY_KEYS = frozenset({"descr", "fortran_order", "shape"})
 _NPY_FIELD_LENGTHS = frozenset({2, 3})
+_TITLED_NAME_LENGTH = 2
 _NPY_OBJECT_DESCR = re.compile(r"[<>|=]?(?:O\d*|object)")
 _NPY_PLAIN_DESCR = re.compile(
     r"[<>|=]?(?:[?bBhHiIlLqQpPeEfdgFDG]|[biufc]\d+|[SUVa]\d*|[mM]8(?:\[\w+\])?)"
@@ -28,6 +29,10 @@ not classified, since `np.dtype("f4,O")` builds an object field from a plain-loo
 
 class NpyHeaderError(Exception):
     """Raised when an NPY header cannot be read, or declares a dtype this cannot classify."""
+
+
+class _UnclassifiedError(NpyHeaderError):
+    """A dtype string numpy may accept but this cannot tell holds objects or not."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,29 +49,48 @@ class NpyHeader:
 def _descr_holds_objects(descr: object) -> bool:
     """Whether an NPY `descr` can hold a Python object, at any depth of a structured dtype.
 
-    Raises `NpyHeaderError` for a descr this cannot classify, unless another field of it
-    already holds objects: that one makes the data a pickle whatever the others are.
+    Raises `NpyHeaderError` for a field numpy would refuse, and for a descr this cannot
+    classify unless another field of it already holds objects: that one makes the data a
+    pickle whatever the others are.
     """
     if isinstance(descr, str):
         if _NPY_OBJECT_DESCR.fullmatch(descr):
             return True
         if _NPY_PLAIN_DESCR.fullmatch(descr):
             return False
-        raise NpyHeaderError("dtype string this scanner cannot classify")
+        raise _UnclassifiedError("dtype string this scanner cannot classify")
     if not isinstance(descr, list):
         raise NpyHeaderError("dtype is neither a string nor a list of fields")
-    unclassified: NpyHeaderError | None = None
+    holds_objects = False
+    unclassified: _UnclassifiedError | None = None
     for entry in descr:
-        if not isinstance(entry, tuple | list) or len(entry) not in _NPY_FIELD_LENGTHS:
-            raise NpyHeaderError("structured dtype field is not a (name, dtype[, shape]) pair")
+        _check_field(entry)
         try:
-            if _descr_holds_objects(entry[1]):
-                return True
-        except NpyHeaderError as error:
+            holds_objects = _descr_holds_objects(entry[1]) or holds_objects
+        except _UnclassifiedError as error:
             unclassified = error
-    if unclassified is not None:
+    if unclassified is not None and not holds_objects:
         raise unclassified
-    return False
+    return holds_objects
+
+
+def _check_field(entry: object) -> None:
+    """Raise `NpyHeaderError` for a structured dtype field numpy would not build."""
+    if not isinstance(entry, tuple | list) or len(entry) not in _NPY_FIELD_LENGTHS:
+        raise NpyHeaderError("structured dtype field is not a (name, dtype[, shape]) pair")
+    name = entry[0]
+    titled = isinstance(name, tuple) and len(name) == _TITLED_NAME_LENGTH
+    if not (isinstance(name, str) or (titled and isinstance(name[1], str))):
+        raise NpyHeaderError("structured dtype field name is not a string")
+    if len(entry) == max(_NPY_FIELD_LENGTHS):
+        shape = entry[2]
+        dimensions = shape if isinstance(shape, tuple | list) else (shape,)
+        if not all(_is_count(dimension) for dimension in dimensions):
+            raise NpyHeaderError("structured dtype field shape is not a tuple of sizes")
+
+
+def _is_count(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
 def npy_header_span(head: bytes) -> tuple[int, int]:
@@ -107,4 +131,11 @@ def read_npy_header(head: bytes) -> NpyHeader:
         raise NpyHeaderError("header is not a Python literal") from error
     if not isinstance(fields, dict) or set(fields) != _NPY_KEYS:
         raise NpyHeaderError("header is not a dict of descr, fortran_order and shape")
+    # The checks numpy makes before it builds the dtype, so a header it refuses is never
+    # taken for a numeric array.
+    shape = fields["shape"]
+    if not isinstance(shape, tuple) or not all(isinstance(size, int) for size in shape):
+        raise NpyHeaderError("shape is not a tuple of integers")
+    if not isinstance(fields["fortran_order"], bool):
+        raise NpyHeaderError("fortran_order is not a bool")
     return NpyHeader(_descr_holds_objects(fields["descr"]), end)

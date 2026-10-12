@@ -87,6 +87,21 @@ _HOSTILE_SUFFIXES = (
     ".pickle.bz2",
     ".pkl.lzma",
     ".joblib.lz4",
+    ".th",
+    ".pkl3",
+    ".mdl",
+    ".dat",
+    "",
+    ".pkl.gzip",
+    ".npy.gz",
+    ".dat.gz",
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tbz",
+    ".tar.xz",
+    ".txz",
 )
 """Every extension a built-in artifact rule opens and reads the contents of.
 
@@ -111,6 +126,7 @@ _MAGICS = (
     b'{"__metadata__":',
     b"<PMML>",
     b'node { op: "Write\\',  # a SavedModel text graph, cut inside an escaped op name
+    b"\x12\x0bMatchingFilesB",  # a SavedModel op that reads a string constant, then its key
     b"\x1f\x8b\x08\x00",  # gzip
     b"\x78\x9c",  # zlib
     b"BZh9",
@@ -167,10 +183,14 @@ def test_no_artifact_rule_raises_on_bytes_nobody_wrote(
     # `.json` only under a config name and `.jinja`/`.j2` only under a
     # `chat_template` stem. Without the real names the reader below is never
     # reached and this test proves nothing about it.
-    # A SavedModel graph is read only under its own name in its text form.
+    # A SavedModel graph is read only under its own name in its text form; tf_keras
+    # metadata is read under its own name.
     stem = "saved_model" if suffix == ".pbtxt" else "model"
     name = _NAMES_BY_SUFFIX.get(suffix, f"{stem}{suffix}")
     (tmp_path / name).write_bytes(magic + body)
+    if suffix == ".pb":
+        (tmp_path / "saved_model.pb").write_bytes(magic + body)
+        (tmp_path / "keras_metadata.pb").write_bytes(magic + body)
     # Counters close over the module-level originals, not over the attribute on
     # `chat_template_module`: `monkeypatch` is function-scoped, so reading the
     # attribute here would pick up the previous example's wrapper and nest one

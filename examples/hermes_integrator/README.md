@@ -10,9 +10,9 @@ action, and whether that was a person.**
 
 ## This is an example, not an integration this project carries
 
-**Written against `hermes-agent` 0.19.0, read from the installed package on 2026-08-15.**
-Hermes is somebody else's project and moves on its own schedule; a later release may
-rename a hook or change a payload, and then this stops working.
+**Written against `hermes-agent` 0.19.0, read from the installed package.**
+Hermes is somebody else's project and moves on its own schedule; a release that
+renames a hook or changes a payload can break this example.
 
 `hermes-agent` is deliberately **not** a dependency of this package, and nothing here
 imports it: the payloads are copied from its documentation and its source. That is what
@@ -57,9 +57,12 @@ agent whose authentication this recording never mentions.
 ## Install and enable
 
 ```bash
-pip install hermes-agent guardana-core
+pip install "hermes-agent==0.19.0" guardana-core
 pip install ./examples/hermes_integrator
 ```
+
+This example was written against `hermes-agent==0.19.0`. Hook names and payloads are subject
+to change in later versions.
 
 Hermes finds pip-installed plugins through the `hermes_agent.plugins` entry-point group,
 and entry-point plugins are opt-in. In `~/.hermes/config.yaml`:
@@ -85,21 +88,34 @@ manager and driven through `invoke_hook`:
 {"guardana_trace_end": 3, "spans": 1}
 ```
 
-Graded against a contract that says a shell command needs a person:
+Graded against a contract saved as `shell-contract.yaml`, which requires a person for a shell
+command:
+
+```yaml
+schema_version: 1
+name: acme
+assertions:
+  - id: shell-needs-a-person
+    type: approval_required
+    title: A shell command is approved by a person before it runs
+    severity: high
+    sinks: [shell]
+    approvers: ["human:*"]
+```
 
 ```console
 $ guardana analyze-trace guardana-traces/sess_real.jsonl --contract shell-contract.yaml
 read 1 span(s) from guardana-traces/sess_real.jsonl as guardana (producer: guardana-hermes)
-note: this producer does not record messages, retrieval, handoff, identity, delegation,
-      consent, policy — the rules needing those dimensions were skipped rather than
-      reporting nothing found. Set fail_on_skipped to treat that as indeterminate
+note: this producer does not record messages, retrieval, handoff, identity, delegation, consent, policy — the rules needing those dimensions were skipped rather than reporting nothing found. Set fail_on_skipped to treat that as indeterminate
 contracts: 1 assertion(s) apply to this execution
 ✖ [HIGH] contract.acme.shell-needs-a-person — A shell command is approved by a person before it runs
-    contract acme (shell-contract.yaml) requires 'terminal' to be approved by human:*;
-    it was approved by automated:smart
+    contract acme (shell-contract.yaml) requires 'terminal' to be approved by human:*; it was approved by automated:smart  (guardana-traces/sess_real.jsonl#sess_real/call-1)
 
 1 finding(s); 3 rule(s) run, 7 skipped.
 ```
+
+To grade it without Hermes, save the three lines above as `guardana-traces/sess_real.jsonl`
+and run the same command.
 
 `rm -rf ./build` ran because a language model said it looked fine. Nothing about the
 agent changed between that run and a passing one — only which surface answered the

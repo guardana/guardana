@@ -97,6 +97,24 @@ def test_a_file_with_the_same_pixels_but_other_bytes_is_left_alone(tmp_path: Pat
     assert well_known.stale(site, security_md, _NOW) == []
 
 
+def test_an_icon_whose_chunk_crc_is_wrong_is_stale_and_rewritten(tmp_path: Path) -> None:
+    """Pixels behind a CRC a decoder refuses are not pixels anyone will see."""
+    site, security_md = _site(tmp_path)
+    well_known.write(site, security_md, _NOW)
+    touch = site / "apple-touch-icon.png"
+    original = touch.read_bytes()
+    ihdr_crc = 8 + 8 + 13
+    corrupt = bytearray(original)
+    corrupt[ihdr_crc] ^= 0xFF
+    touch.write_bytes(bytes(corrupt))
+
+    assert icon.png_pixels(bytes(corrupt)) is None
+    assert icon.png_pixels(original[:-4]) is None
+    assert well_known.stale(site, security_md, _NOW) != []
+    well_known.write(site, security_md, _NOW)
+    assert touch.read_bytes() == original
+
+
 def test_security_txt_names_the_reporting_channels_of_security_md_only(tmp_path: Path) -> None:
     site, security_md = _site(tmp_path)
     well_known.write(site, security_md, _NOW)

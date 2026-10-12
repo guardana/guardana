@@ -89,6 +89,8 @@ class ProtoReader:
         width = _FIXED_WIDTHS.get(wire_type)
         if width is None:
             raise FormatError(f"unsupported protobuf wire type {wire_type}")
+        if offset + width > end:
+            raise FormatError("protobuf fixed-width field runs past the end of its message")
         self._stream.seek(offset)
         raw = self._stream.read(width)
         if len(raw) != width:

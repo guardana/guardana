@@ -37,10 +37,29 @@ def test_refuses_a_group_wire_type() -> None:
         list(reader.fields(0, end))
 
 
-def test_refuses_a_truncated_fixed_width_field() -> None:
+def test_refuses_a_fixed_width_field_cut_off_by_the_end_of_the_file() -> None:
     reader, end = _reader(bytes([2 << 3 | WIRE_64BIT]) + b"\x01\x02")
     with pytest.raises(FormatError, match="truncated"):
-        list(reader.fields(0, end))
+        list(reader.fields(0, end + 6))
+
+
+@pytest.mark.parametrize("wire_type", [WIRE_32BIT, WIRE_64BIT])
+def test_refuses_a_fixed_width_field_that_crosses_the_end_of_its_message(wire_type: int) -> None:
+    """The bytes after a message belong to its parent, never to a field inside it."""
+    payload = bytes([1 << 3 | wire_type]) + b"\x00" * 8
+    reader, _ = _reader(payload)
+    with pytest.raises(FormatError, match="past the end"):
+        list(reader.fields(0, 3))
+
+
+def test_a_graph_whose_fixed_width_field_borrows_the_next_field_is_refused(
+    tmp_path: Path,
+) -> None:
+    """A one-byte graph holding a fixed32 tag would read its value out of the producer field."""
+    path = tmp_path / "m.onnx"
+    path.write_bytes(b"\x3a\x01\x0d\x12\x02ok")
+    with pytest.raises(FormatError, match="past the end"):
+        read_onnx_summary(path)
 
 
 def test_refuses_an_overlong_varint() -> None:

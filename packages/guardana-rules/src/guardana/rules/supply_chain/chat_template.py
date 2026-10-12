@@ -26,6 +26,7 @@ from guardana.rules.supply_chain._leads import unread_component, unscanned_verdi
 from guardana.rules.supply_chain._reading import (
     MAX_SCAN_BYTES,
     read_bytes_bounded,
+    read_model,
     read_text_prefix,
 )
 
@@ -43,6 +44,10 @@ _CONFIG_NAMES = frozenset({"tokenizer_config.json", "chat_template.json", "proce
 _CONFIG_KEY = "chat_template"
 _TEMPLATE_STEM = "chat_template"
 _TEMPLATE_SUFFIXES = (".jinja", ".j2")
+# transformers 5 also loads every `.jinja` in this directory as a named template, and
+# the one named `default` takes priority over `tokenizer_config.json`.
+_TEMPLATE_DIRECTORY = "additional_chat_templates"
+_ENTRIES_LISTED = 5
 
 
 _GADGET = "{{ lipsum.__globals__['os'].popen('id').read() }}"
@@ -98,14 +103,18 @@ class ChatTemplateRule(ArtifactRule):
         )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Scan every carrier of a chat template: GGUF metadata, tokenizer config, `.jinja`."""
+        """Scan every carrier of a chat template: GGUF metadata, tokenizer config, `.jinja`.
+
+        A `.jinja` counts when it is named `chat_template*` or sits in
+        `additional_chat_templates/`, where transformers finds its named templates.
+        """
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".gguf",)):
             yield from self._scan_gguf(path, ctx)
             ctx.examined(path)
         for path in target.iter_files(_TEMPLATE_SUFFIXES):
-            if path.stem.lower().startswith(_TEMPLATE_STEM):
+            if _is_template_file(path):
                 yield from self._scan_template_file(path, ctx)
         for path in target.iter_files((".json",)):
             if path.name.lower() in _CONFIG_NAMES:
@@ -113,7 +122,7 @@ class ChatTemplateRule(ArtifactRule):
 
     def _scan_gguf(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         try:
-            metadata = read_gguf_metadata(path)
+            metadata = read_model(read_gguf_metadata, path)
         except FormatError as exc:
             yield self._unscanned(path, str(exc), ctx)
             return
@@ -150,14 +159,18 @@ class ChatTemplateRule(ArtifactRule):
             return
         if _CONFIG_KEY not in document:
             return
-        templates = list(_config_templates(document[_CONFIG_KEY]))
-        if not templates:
+        value = document[_CONFIG_KEY]
+        templates = list(_config_templates(value))
+        if not templates and not isinstance(value, list):
             yield self._unscanned(
                 path, f"'{_CONFIG_KEY}' is present in a shape we cannot read", ctx
             )
             return
         for label, template in templates:
             yield from self._graded(path, label, template)
+        unreadable = _unreadable_entries(value)
+        if unreadable or not templates:
+            yield self._unscanned(path, _unreadable_entries_reason(unreadable), ctx)
 
     def _graded(self, path: Path, label: str, template: str) -> Iterator[Finding]:
         gadgets = list(jinja_gadgets(template))
@@ -194,10 +207,18 @@ class ChatTemplateRule(ArtifactRule):
         )
 
 
+def _is_template_file(path: Path) -> bool:
+    """Whether a `.jinja` file is one a tokenizer loads as a chat template."""
+    return (
+        path.stem.lower().startswith(_TEMPLATE_STEM)
+        or path.parent.name.lower() == _TEMPLATE_DIRECTORY
+    )
+
+
 def _json_object(raw: str) -> dict[str, object] | None:
     try:
         document = json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     return document if isinstance(document, dict) else None
 
@@ -220,3 +241,27 @@ def _config_templates(value: object) -> Iterator[tuple[str, str]]:
         for entry in value:
             if isinstance(entry, dict) and isinstance(entry.get("template"), str):
                 yield f"{_CONFIG_KEY}[{entry.get('name', '?')}]", entry["template"]
+
+
+def _readable_entry(entry: object) -> bool:
+    return isinstance(entry, dict) and isinstance(entry.get("template"), str)
+
+
+def _unreadable_entries(value: object) -> list[int]:
+    """Return the index of every entry of a named-template list that holds no template."""
+    if not isinstance(value, list):
+        return []
+    return [index for index, entry in enumerate(value) if not _readable_entry(entry)]
+
+
+def _unreadable_entries_reason(indexes: list[int]) -> str:
+    """Name, in one reason, the entries of a named-template list that could not be read."""
+    if not indexes:
+        return f"'{_CONFIG_KEY}' is an empty list of named templates"
+    listed = ", ".join(str(index) for index in indexes[:_ENTRIES_LISTED])
+    more = len(indexes) - _ENTRIES_LISTED
+    return (
+        f"'{_CONFIG_KEY}' {'entry' if len(indexes) == 1 else 'entries'} {listed}"
+        f"{f', and {more} more' if more > 0 else ''} of the named-template list "
+        "in a shape we cannot read"
+    )

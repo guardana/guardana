@@ -307,3 +307,61 @@ def test_respelling_the_scheme_does_not_buy_a_key_a_fresh_allowance(
 
     assert spent == [_OK] * 4
     assert respelled == [_TOO_MANY] * 3
+
+
+_FORBIDDEN = 403
+
+
+def test_a_key_keeps_its_history_when_its_acceptance_is_withdrawn() -> None:
+    """Withdrawing and restoring acceptance must not hand a key a fresh allowance."""
+    limiter = RateLimiter(Limits(max_body_bytes=1024, requests_per_minute=2), clock=lambda: 0.0)
+    limiter.vouch("token:a")
+    assert limiter.allows("token:a", path="/findings")
+    assert limiter.allows("token:a", path="/findings")
+
+    limiter.forget("token:a")
+    limiter.vouch("token:a")
+
+    assert not limiter.allows("token:a", path="/findings")
+
+
+def _key_collector(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, scopes: tuple[Scope, ...]
+) -> tuple[TestClient, dict[str, str]]:
+    """A collector allowing three requests a minute, and the bearer header of one key."""
+    _migrated(database_url)
+    token = _issue(database_url, "ci", scopes)
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    monkeypatch.setenv("GUARDANA_RATE_LIMIT_PER_MINUTE", "3")
+    return TestClient(create_app()), _bearer(token)
+
+
+def test_a_health_request_does_not_reset_a_keys_allowance(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A health route authenticates nobody, so it must not decide what a key has spent."""
+    client, headers = _key_collector(database_url, monkeypatch, (Scope.READ,))
+
+    spent = [client.get("/findings", headers=headers).status_code for _ in range(4)]
+    alternated = []
+    for _ in range(3):
+        assert client.get("/healthz", headers=headers).status_code == _OK
+        alternated.append(client.get("/findings", headers=headers).status_code)
+
+    assert spent == [_OK] * 4
+    assert alternated == [_TOO_MANY] * 3
+
+
+def test_a_refused_scope_does_not_reset_a_keys_allowance(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A key refused one route and accepted again resumes the history it already spent."""
+    client, headers = _key_collector(database_url, monkeypatch, (Scope.READ,))
+
+    statuses = [client.get("/findings", headers=headers).status_code for _ in range(3)]
+    statuses.append(client.post("/findings", json={}, headers=headers).status_code)
+    statuses.extend(client.get("/findings", headers=headers).status_code for _ in range(2))
+
+    # The first request and the one after the refusal are charged to the peer; the
+    # key's own three are spent by the time it is accepted again.
+    assert statuses == [_OK, _OK, _OK, _FORBIDDEN, _OK, _TOO_MANY]

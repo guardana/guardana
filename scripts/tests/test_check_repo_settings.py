@@ -120,6 +120,8 @@ def test_vulnerability_reporting_disabled_is_absent() -> None:
         {"enforcement": "evaluate"},
         {"conditions": {"ref_name": {"include": ["refs/tags/release-*"], "exclude": []}}},
         {"conditions": {"ref_name": {"include": ["~ALL"], "exclude": ["refs/tags/v*"]}}},
+        {"conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": ["refs/tags/v*rc*"]}}},
+        {"conditions": {"ref_name": {"include": ["refs/tags/v*.*.*"], "exclude": []}}},
         {"rules": [{"type": "update"}, {"type": "deletion"}]},
         {"rules": [{"type": "creation"}, {"type": "deletion"}]},
         {"rules": [{"type": "creation"}, {"type": "update"}]},
@@ -140,6 +142,8 @@ def test_vulnerability_reporting_disabled_is_absent() -> None:
         "not-enforced",
         "other-tags",
         "v-excluded",
+        "candidates-excluded",
+        "moving-tag-not-included",
         "no-creation-rule",
         "no-update-rule",
         "no-deletion-rule",
@@ -222,6 +226,47 @@ def test_a_ruleset_without_an_update_rule_is_absent_whatever_its_bypass_list() -
     }
 
     assert _outcome(_run(table), "tag ruleset") is check.Outcome.ABSENT
+
+
+@pytest.mark.parametrize(
+    "ref_name",
+    [
+        {"include": ["refs/tags/v[0-9]*"], "exclude": []},
+        {"include": ["refs/tags/v*"], "exclude": ["refs/tags/v99*"]},
+        {"include": ["~ALL"], "exclude": ["refs/*-legacy"]},
+    ],
+    ids=["narrower-include", "exclude-inside-v", "exclude-reaching-v"],
+)
+def test_patterns_that_may_leave_a_release_tag_out_are_not_checked(
+    ref_name: dict[str, object],
+) -> None:
+    """Every sample tag is covered, but the patterns do not prove every v* tag is."""
+    table = _healthy()
+    detail = table[f"repos/{REPO}/rulesets/9"]
+    assert isinstance(detail, dict)
+    table[f"repos/{REPO}/rulesets/9"] = {**detail, "conditions": {"ref_name": ref_name}}
+
+    assert _outcome(_run(table), "tag ruleset") is check.Outcome.NOT_CHECKED
+
+
+@pytest.mark.parametrize(
+    "ref_name",
+    [
+        {"include": ["refs/tags/v*"], "exclude": ["refs/tags/nightly-*", "refs/heads/*"]},
+        {"include": ["~ALL"], "exclude": ["refs/tags/release-*"]},
+        {"include": ["refs/tags/*"], "exclude": []},
+    ],
+    ids=["unrelated-excludes", "all-but-other-tags", "every-tag"],
+)
+def test_patterns_that_provably_cover_release_tags_are_present(
+    ref_name: dict[str, object],
+) -> None:
+    table = _healthy()
+    detail = table[f"repos/{REPO}/rulesets/9"]
+    assert isinstance(detail, dict)
+    table[f"repos/{REPO}/rulesets/9"] = {**detail, "conditions": {"ref_name": ref_name}}
+
+    assert _outcome(_run(table), "tag ruleset") is check.Outcome.PRESENT
 
 
 def test_no_tag_ruleset_at_all_is_absent() -> None:

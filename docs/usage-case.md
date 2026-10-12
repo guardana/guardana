@@ -119,8 +119,9 @@ most the number of cases, since its default of 30 refuses a small suite at load.
 
 ## Regrading
 
-A live run sends the case's input and grades the target's reply; it never reads `observed` or
-`accepted`, and neither is part of the case's identity.
+A live run sends the case's input and grades the target's reply. It never sends `observed` or
+`accepted` or grades either as the target's reply. It only regrades the pair offline as the
+list below describes. Neither is part of the case's identity.
 
 - `guardana rule test` regrades every pair of every selected suite with the rule as it is now,
   sending nothing, and names each case whose pair no longer holds: exit `1` when a side graded

@@ -23,6 +23,7 @@ from types import MappingProxyType
 from typing import Literal
 
 from guardana.core.fingerprint import DigestKind, DocumentDigest, digest_of
+from guardana.core.formats._stream import read_regular
 from guardana.core.redaction import holds_redaction_marker
 from guardana.core.subject import SubjectKind
 from guardana.core.target import ChatMessage
@@ -171,11 +172,11 @@ def messages_key(messages: Sequence[ChatMessage]) -> str:
 def read_recording(path: Path) -> Recording:
     """Read and validate the recording at `path`, refusing the whole file on any bad line.
 
-    Formats 1 to 3 are read; a format-1 file reads with `subject_kind` None.
+    Formats 1 to 3 are read; a format-1 file reads with `subject_kind` None. Only a
+    regular file is read, opened without waiting on a writer.
     """
     try:
-        with path.open("rb") as handle:
-            data = handle.read(MAX_TRACE_BYTES + 1)
+        data = read_regular(path, MAX_TRACE_BYTES)
     except OSError as exc:
         raise RecordingError(f"{path} could not be read: {exc}") from exc
     if len(data) > MAX_TRACE_BYTES:

@@ -58,12 +58,18 @@ def test_the_scope_and_the_trust_are_written() -> None:
     document = _document()
 
     assert document["scope"] == {
-        "files": ["model/weights.safetensors", "model/config.json"],
+        "files": ["model/weights.safetensors", "model/config.json", "model/old.pkl"],
         "excludes": [
-            {"pattern": "model/build/*", "source": "profile"},
-            {"pattern": "*.bak", "source": "ignore_file"},
+            {"pattern": "model/build/*", "source": "profile", "file": None},
+            {"pattern": "*.bak", "source": "ignore_file", "file": ".guardanaignore"},
+            {"pattern": "*.pkl", "source": "ignore_file", "file": ".guardanaignore"},
         ],
         "ignored_directories": [".git", "*.egg-info"],
+        "kept_models": [{"path": "model/old.pkl", "pattern": "*.pkl"}],
+        "skipped_models": {
+            "directories": [{"path": "env", "model_files": 2}],
+            "searched_all": False,
+        },
     }
     assert _configuration(document)["plugins"] == {"mode": "allowlist", "allowed": ["acme-rules"]}
 

@@ -9,14 +9,20 @@ one word is what somebody does at three in the morning in the wrong shell.
 """
 
 import datetime
+import threading
+import time
+from typing import Any
 
+import psycopg
 import pytest
 from conftest import DbConnection, _submission
 from guardana.server.audit import CLI, recent
 from guardana.server.db.migrations import apply_pending
+from guardana.server.envelope import FindingIn
 from guardana.server.lifecycle import list_tracked, set_status
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.retention import (
+    Removal,
     RetentionError,
     apply_retention,
     delete_organization,
@@ -137,6 +143,79 @@ def test_a_tracked_finding_outlives_its_occurrences(
     assert [(entry.status, entry.runs) for entry in tracked] == [("acknowledged", 0)]
 
 
+def _until_a_backend_waits_on_a_lock(database_url: str) -> None:
+    """Return once some session of this database is blocked on a row lock."""
+    deadline = time.monotonic() + 10
+    with psycopg.connect(database_url, autocommit=True) as observer:
+        while time.monotonic() < deadline:
+            with observer.cursor() as cursor:
+                cursor.execute(
+                    "select count(*) from pg_stat_activity "
+                    "where datname = current_database() and wait_event_type = 'Lock'"
+                )
+                row = cursor.fetchone()
+            if row is not None and int(row[0]):
+                return
+            time.sleep(0.01)
+    raise AssertionError("retention never reached the rows the rival transaction holds")
+
+
+def test_retention_reports_what_it_deleted_not_what_it_counted(
+    connection: DbConnection, database_url: str, project: int
+) -> None:
+    """A rival pass deletes the rows after this one counted them, so this one removed nothing."""
+    _store(database_url, project, days_ago=200, identity=_IDENTITY)
+    set_retention(connection, _PROJECT, 90, actor=_ACTOR)
+    connection.commit()
+    removals: list[Removal] = []
+
+    with psycopg.connect(database_url) as rival:
+        rival.execute("delete from submissions")
+        racing = threading.Thread(
+            target=lambda: removals.append(
+                apply_retention(connection, _PROJECT, actor=_ACTOR, now=_NOW)
+            )
+        )
+        racing.start()
+        _until_a_backend_waits_on_a_lock(database_url)
+        rival.commit()
+        racing.join(timeout=10)
+    connection.commit()
+
+    assert [removal.submissions for removal in removals] == [0]
+    with connection.cursor() as cursor:
+        cursor.execute("select detail from audit_events where action = 'retention.apply'")
+        assert [row[0]["submissions"] for row in cursor.fetchall()] == [0]
+
+
+def test_a_read_racing_retention_never_returns_a_submission_without_its_findings(
+    connection: DbConnection, database_url: str, project: int
+) -> None:
+    """A submission read before a prune keeps the findings it had when it was read."""
+    _store(database_url, project, days_ago=200, identity=_IDENTITY)
+    set_retention(connection, _PROJECT, 90, actor=_ACTOR)
+    connection.commit()
+
+    class _PrunedMidRead(PostgresStore):
+        """Commits a retention pass after the submissions are read, before their findings."""
+
+        @staticmethod
+        def _findings_for(
+            cursor: psycopg.Cursor[tuple[Any, ...]], submission_ids: list[int]
+        ) -> dict[int, dict[str, list[FindingIn]]]:
+            with psycopg.connect(database_url) as rival:
+                apply_retention(rival, _PROJECT, actor=_ACTOR, now=_NOW)
+            return PostgresStore._findings_for(cursor, submission_ids)
+
+    held = _PrunedMidRead(database_url).records(TenantScope.for_project(project))
+
+    assert [len(record.submission.findings) for record in held] == [1]
+    assert [len(record.submission.unverified) for record in held] == [1]
+    with connection.cursor() as cursor:
+        cursor.execute("select count(*) from submissions")
+        assert cursor.fetchall() == [(0,)]
+
+
 def test_deleting_a_project_takes_its_evidence_with_it(
     connection: DbConnection, database_url: str, project: int
 ) -> None:
@@ -151,6 +230,32 @@ def test_deleting_a_project_takes_its_evidence_with_it(
         assert cursor.fetchall() == [(0,)]
         cursor.execute("select count(*) from projects")
         assert cursor.fetchall() == [(0,)]
+
+
+def test_deleting_a_project_reports_what_it_deleted_not_what_it_counted(
+    connection: DbConnection, database_url: str, project: int
+) -> None:
+    """A rival transaction removes one of two submissions after the deletion counted both."""
+    _store(database_url, project, days_ago=1, identity=_IDENTITY)
+    _store(database_url, project, days_ago=2, identity=_IDENTITY)
+    connection.commit()
+    deleted: list[int] = []
+
+    with psycopg.connect(database_url) as rival:
+        rival.execute("delete from submissions where id = (select min(id) from submissions)")
+        racing = threading.Thread(
+            target=lambda: deleted.append(delete_project(connection, _PROJECT, actor=_ACTOR))
+        )
+        racing.start()
+        _until_a_backend_waits_on_a_lock(database_url)
+        rival.commit()
+        racing.join(timeout=10)
+    connection.commit()
+
+    assert deleted == [1]
+    with connection.cursor() as cursor:
+        cursor.execute("select detail from audit_events where action = 'project.delete'")
+        assert [row[0]["submissions"] for row in cursor.fetchall()] == [1]
 
 
 def test_deleting_a_project_leaves_a_record_that_survives_it(

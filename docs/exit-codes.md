@@ -96,7 +96,18 @@ the run has a result — an stdio MCP command that cannot be started, say — an
 that fails at any point, still exit `4` with nothing saved.
 
 **`3` is usage, not policy.** A malformed `guardana.yaml` must not look like a
-policy failure, or a typo in a config file reads as a security finding.
+policy failure, or a typo in a config file reads as a security finding. A
+`rules.include` pattern that matches no registered rule is such a typo, even beside a
+pattern that matches: the command refuses before any rule runs, whatever `fail_on`
+says, and names every such pattern
+([profiles](profiles.md#an-include-pattern-must-match-a-rule)):
+
+```text
+error: rules.include contains unmatched patterns: "guardana.supply_chain.code_executon" — check the spelling and registered rules.
+```
+
+A selection the policy narrows to nothing with every pattern matched — each rule
+excluded, or for another kind of target — still runs no rule and exits `2`.
 
 **`7` is honest partiality.** Ctrl-C is neither a pass nor a completed failure.
 Nothing the command had not yet written is written afterwards, and the code says
@@ -111,7 +122,10 @@ ran past its deadline. The bug report belongs to that distribution, so the code 
 and a run that stopped keeps `4`, `6` or `7`. A receiver that refused or did not answer is not
 `8` by default: the delivery line says so and the verdict keeps its code, as for the collector.
 When Guardana's own redaction fails before an output is called, nothing is written or sent and the
-code is `5`, under the same precedence; `GUARDANA_DEBUG=1` prints the traceback.
+code is `5`, under the same precedence; `GUARDANA_DEBUG=1` prints the traceback. A profile's
+`custom_patterns` entry that misses its time or size bound while the run's results are
+redacted ([privacy](privacy.md)) is the same failure: nothing is written or sent, and the code
+is `5` under the same precedence.
 
 **`8` is also a delivery a profile required.** A profile that sets `delivery.required: true`
 ([profiles](profiles.md#delivery)) asks that every delivery the run makes be acknowledged: the
@@ -153,7 +167,10 @@ file, recording, trace or results file, `--profile`, a `--rules` file or a rule 
 or one the profile names under `rules.paths`, `contracts:`, `calibrations:` or a judge's or
 guard's `adapter`; `recipe run` refuses the same profile files inside its
 `output.directory`; `analyze-trace` also exits `3` when `--write-trace` is `--output`, its
-sidecar path or such a file. `run migrate` exits `3` when the sidecar path of `--output`
+sidecar path or such a file, a file in a `--rules` or `--contract` directory included.
+After scanning and before writing, `scan` exits `3` when `--output` or its sidecar path is
+a file it scanned, other than an earlier saved run and the exchanges a saved run beside it
+records by digest. `run migrate` exits `3` when the sidecar path of `--output`
 is its input; writing over the input itself is migrating in place. It also exits `3`
 when `--output` is the input's own sidecar or the destination cannot be written; the
 destination is then left as it was. `scan --write-baseline` and
@@ -161,7 +178,8 @@ destination is then left as it was. `scan --write-baseline` and
 written; `probe` exits `3` for an MCP-only flag without `--mcp`; `recipe run` exits `3`
 for a recipe that names a file inside its own `output.directory`.
 `probe --keep-exchanges` exits `3` before sending anything when its sidecar path holds
-exchanges the other saved run of the pair (`<stem>` or `<stem>.json`) records.
+exchanges the other saved run of the pair (`<stem>` or `<stem>.json`) records, or a file
+the run saved at `--output` does not record by digest.
 `analyze-trace` adds one route to `2` the others do not have: demanded coverage that
 was not available, and a security contract that turned out to be about a different
 AI system than the one under test. `baseline create`, `baseline update` and

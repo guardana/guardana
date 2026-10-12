@@ -1,4 +1,4 @@
-"""`schemas/run-v17.schema.json` is a published contract, so it is tested.
+"""`schemas/run-v18.schema.json` is a published contract, so it is tested.
 
 A schema nothing validates against is a promise. This asserts the two directions
 that matter: what the engine writes satisfies the schema, and the schema refuses
@@ -47,7 +47,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from jsonschema import Draft202012Validator
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v17.schema.json"
+_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v18.schema.json"
 _NOW = datetime(2026, 8, 2, 10, 0, tzinfo=UTC)
 
 
@@ -358,7 +358,7 @@ def test_the_schema_requires_usage_keys_even_when_unknown() -> None:
 
 
 @pytest.mark.parametrize(
-    "version", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, "17"]
+    "version", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, "18"]
 )
 def test_the_schema_refuses_any_version_but_the_current_one(version: object) -> None:
     document = _document(_minimal())
