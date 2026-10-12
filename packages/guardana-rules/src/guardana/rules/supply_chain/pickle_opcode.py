@@ -2,6 +2,7 @@ import collections
 import hashlib
 import io
 import lzma
+import os
 import pickletools
 import posixpath
 import re
@@ -13,6 +14,7 @@ from collections.abc import Generator, Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from pathlib import Path
+from typing import IO
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
@@ -41,9 +43,20 @@ from guardana.rules.supply_chain._npy import (
     read_npy_header,
 )
 from guardana.rules.supply_chain._opcodes import read_opcodes
-from guardana.rules.supply_chain._reading import read_bytes_bounded
-from guardana.rules.supply_chain._tar import TarListing, TarListingError, holds_file_data
-from guardana.rules.supply_chain._zip import declared_directory_start, member_disagreement
+from guardana.rules.supply_chain._reading import open_regular, read_bytes_bounded
+from guardana.rules.supply_chain._tar import (
+    TarListing,
+    TarListingError,
+    holds_file_data,
+    listing_refusal,
+)
+from guardana.rules.supply_chain._zip import (
+    ARCHIVE_MAX_ENTRIES,
+    ZIP_DIRECTORY_MAX_BYTES,
+    declared_directory_start,
+    member_disagreement,
+)
+from guardana.rules.supply_chain._zip import listing_refusal as zip_listing_refusal
 
 _NUMPY_SUFFIXES = (".npy", ".npz")
 _SUFFIXES = (
@@ -319,6 +332,8 @@ checkpoint never reaches the bound; a deflated member of repeated opcodes reache
 """
 _ARCHIVE_MAX_MEMBERS = 100_000
 """Members read from one archive; `torch.save` writes one per tensor storage, far fewer."""
+_ARCHIVE_MAX_ENTRIES = ARCHIVE_MAX_ENTRIES
+_ZIP_DIRECTORY_MAX_BYTES = ZIP_DIRECTORY_MAX_BYTES
 # A raw pickle stream is read whole because `pickletools` needs it, so the read
 # is capped: a model checkpoint is a zip container (streamed from disk below),
 # and a half-gigabyte *raw* pickle is anomalous rather than routine. Reading
@@ -674,6 +689,15 @@ def _oversized_summary(oversized: bool) -> str | None:
     if not oversized:
         return None
     return f"raw pickle larger than {_MAX_PICKLE_BYTES} bytes; not scanned in full"
+
+
+def _is_zip(path: Path) -> bool:
+    """Whether `zipfile` finds a zip in the regular file at `path`, opened without blocking."""
+    try:
+        with open_regular(path) as handle:
+            return zipfile.is_zipfile(handle)
+    except OSError:
+        return False
 
 
 def _maybe_a_file(path: Path) -> bool:
@@ -1366,9 +1390,11 @@ class PickleOpcodeRule(ArtifactRule):
     A raw tensor storage beside a `data.pkl`, which `torch.load` never
     unpickles, is reported only when it holds a pickle or a nested archive, so tensor
     values that parse as opcodes are not noise. One archive is read up to a member count
-    and an opcode budget shared by its members. A file gets one finding naming every
-    callable it imports. Anything it cannot fully parse, or stops reading at a bound,
-    becomes a visible unverified result and a coverage shortfall, never a silent clean.
+    and an opcode budget shared by its members, and one that declares more entries, a
+    larger zip central directory or larger tar extended headers than its bounds is refused
+    before it is opened. A file gets one finding naming every callable it imports.
+    Anything it cannot fully parse, or stops reading at a bound, becomes a visible
+    unverified result and a coverage shortfall, never a silent clean.
     """
 
     meta = RuleMeta(
@@ -1484,7 +1510,7 @@ class PickleOpcodeRule(ArtifactRule):
         magic = sniffed[0]
         if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
             return self._scan_zip(report)
-        if report.plain_zip and zipfile.is_zipfile(path):
+        if report.plain_zip and _is_zip(path):
             # Whoever opens a plain `.zip` finds its members from the end record, wherever
             # the zip data starts, while `np.load` and `torch.load` go by the first bytes,
             # which are not a zip's: both readings are reported.
@@ -1656,67 +1682,83 @@ class PickleOpcodeRule(ArtifactRule):
 
         A model archive has every member read. A plain `.zip` has only the members named
         as models read, and is a model only when it holds one. The member bound counts
-        only the members read. A zip whose readers would disagree on its members is not
-        read at all, and a member named as a model no reader here opens is named unread.
+        only the members read. A zip whose end records declare more entries, or a larger
+        central directory, than one archive may list is refused before it is opened; one
+        whose readers would disagree on its members is not read at all, and a member named
+        as a model no reader here opens is named unread.
         """
         # Opened from the path, not from bytes in memory: a checkpoint for a 7B
         # model is a multi-GB zip, and holding it whole just to list its members
         # would make scanning a real model cost more RAM than serving it.
-        path = report.path
-        every_member = not report.plain_zip
         try:
-            budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + path.stat().st_size)
-            with zipfile.ZipFile(path) as archive, path.open("rb") as handle:
-                # `start_dir` is where `zipfile` found the central directory; it is
-                # public on `ZipFile` in every supported Python, unlike the end record.
-                declared = declared_directory_start(path)
-                if declared != archive.start_dir:
-                    report.unscanned(
-                        "zip readers would disagree on its members: its central directory "
-                        f"is read at byte {archive.start_dir}, while its end record declares "
-                        f"{'no readable offset' if declared is None else f'byte {declared}'}; "
-                        "not scanned"
-                    )
+            with io.BufferedReader(open_regular(report.path)) as handle:
+                refusal = zip_listing_refusal(
+                    handle,
+                    max_entries=_ARCHIVE_MAX_ENTRIES,
+                    max_directory_bytes=_ZIP_DIRECTORY_MAX_BYTES,
+                )
+                if refusal is not None:
+                    report.unscanned(f"{refusal}; not scanned")
                     return True
-                # Every entry, not every name: two members may share a name, and
-                # opening by name reads only the last of them.
-                members = archive.infolist()
-                names = frozenset(name for info in members for name in _zip_names(info))
-                unread = [
-                    info.orig_filename
-                    for info in members
-                    if any(_unread_model(n, plain=not every_member) for n in _zip_names(info))
-                ]
-                self._report_unread_models(report, unread)
-                # Peeking at a member costs one open, as listing it costs its header bytes,
-                # so it grows with the archive and is not bounded apart from it.
-                chosen = [
-                    info
-                    for info in members
-                    if every_member
-                    or any(_model_named(n) for n in _zip_names(info))
-                    or _starts_as_array_or_pickle(archive, info)
-                ]
-                for info in chosen[:_ARCHIVE_MAX_MEMBERS]:
-                    disagreement = member_disagreement(handle, info)
-                    if disagreement is not None:
-                        report.unscanned(
-                            f"zip member {disagreement} ({info.orig_filename}), so zip readers "
-                            "would read it differently; not scanned"
-                        )
-                        continue
-                    kind = _zip_member_kind(info, names, every_member=every_member)
-                    if self._scan_member(report, archive, info, budget, kind):
-                        return True
-                if len(chosen) > _ARCHIVE_MAX_MEMBERS:
-                    named = "members" if every_member else "members named or shaped as models"
-                    report.unscanned(
-                        f"zip holds {len(chosen)} {named}; members past the first "
-                        f"{_ARCHIVE_MAX_MEMBERS} not scanned"
-                    )
+                return self._scan_zip_members(report, handle)
         except _ZIP_ERRORS as error:
             report.unscanned(f"malformed zip container ({type(error).__name__}); not scanned")
             return True
+
+    def _scan_zip_members(self, report: _FileReport, handle: IO[bytes]) -> bool:
+        """Scan the members of the zip open on `handle`, whose listing bounds were checked."""
+        every_member = not report.plain_zip
+        budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + os.fstat(handle.fileno()).st_size)
+        with zipfile.ZipFile(handle) as archive:
+            # `start_dir` is where `zipfile` found the central directory; it is
+            # public on `ZipFile` in every supported Python, unlike the end record.
+            declared = declared_directory_start(handle)
+            if declared != archive.start_dir:
+                report.unscanned(
+                    "zip readers would disagree on its members: its central directory "
+                    f"is read at byte {archive.start_dir}, while its end record declares "
+                    f"{'no readable offset' if declared is None else f'byte {declared}'}; "
+                    "not scanned"
+                )
+                return True
+            # Every entry, not every name: two members may share a name, and
+            # opening by name reads only the last of them.
+            members = archive.infolist()
+            names = frozenset(name for info in members for name in _zip_names(info))
+            unread = [
+                info.orig_filename
+                for info in members
+                if any(_unread_model(n, plain=not every_member) for n in _zip_names(info))
+            ]
+            self._report_unread_models(report, unread)
+            # Peeking at a member costs one open, as listing it costs its header bytes,
+            # so it grows with the archive and is not bounded apart from it.
+            chosen = [
+                info
+                for info in members
+                if every_member
+                or any(_model_named(n) for n in _zip_names(info))
+                or _starts_as_array_or_pickle(archive, info)
+            ]
+            for info in chosen[:_ARCHIVE_MAX_MEMBERS]:
+                disagreement = member_disagreement(handle, info)
+                if disagreement is not None:
+                    report.unscanned(
+                        f"zip member {disagreement} ({info.orig_filename}), so zip readers "
+                        "would read it differently; not scanned"
+                    )
+                    continue
+                kind = _zip_member_kind(info, names, every_member=every_member)
+                if self._scan_member(report, archive, info, budget, kind):
+                    return True
+            # The listing bound refuses a zip of more entries first; this holds a member
+            # bound set below it.
+            if len(chosen) > _ARCHIVE_MAX_MEMBERS:
+                named = "members" if every_member else "members named or shaped as models"
+                report.unscanned(
+                    f"zip holds {len(chosen)} {named}; members past the first "
+                    f"{_ARCHIVE_MAX_MEMBERS} not scanned"
+                )
         return every_member or bool(chosen) or bool(unread)
 
     def _report_unread_models(self, report: _FileReport, members: list[str]) -> None:
@@ -1736,42 +1778,69 @@ class PickleOpcodeRule(ArtifactRule):
 
         Every header is read first and the members after, each up to the member bound,
         into memory and never to disk. The member bound counts only the members read,
-        and a member several links name is read once for each way it is judged.
+        and a member several links name is read once for each way it is judged. A tar
+        whose headers declare more members, or larger extended headers, than one archive
+        may list is refused before it is opened.
         """
         report.container = "tar"
-        path = report.path
-        plain = report.tar_named and not path.name.lower().endswith(_TORCH_TAR_NAMES)
         try:
-            budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + path.stat().st_size)
-            with tarfile.open(path, mode="r:") as archive:
-                listing = TarListing.read(archive)
-                unread = [
-                    entry.name
-                    for entry in listing.members
-                    if holds_file_data(entry) and _unread_model(entry.name, plain=plain)
-                ]
-                self._report_unread_models(report, unread)
-                chosen = [
-                    index
-                    for index, entry in enumerate(listing.members)
-                    if holds_file_data(entry) and _model_named(entry.name)
-                ]
-                reading = _TarReading(archive, listing, budget)
-                for index in chosen[:_ARCHIVE_MAX_MEMBERS]:
-                    if self._scan_tar_member(report, reading, index):
-                        return True
-                if len(chosen) > _ARCHIVE_MAX_MEMBERS:
-                    report.unscanned(
-                        f"tar holds {len(chosen)} members named as models; members past the "
-                        f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
-                    )
+            # The walk reads each header block raw, so it never pulls a buffer's worth of
+            # member data per header; `tarfile` then reads the same descriptor buffered.
+            with open_regular(report.path) as raw:
+                refusal = listing_refusal(raw, max_entries=_ARCHIVE_MAX_ENTRIES)
+                if refusal is not None:
+                    report.unscanned(f"{refusal}; not scanned")
+                    return True
+                budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + os.fstat(raw.fileno()).st_size)
+                raw.seek(0)
+                with (
+                    io.BufferedReader(raw) as handle,
+                    tarfile.open(fileobj=handle, mode="r:") as archive,
+                ):
+                    return self._scan_tar_members(report, archive, budget)
         except TarListingError as error:
             report.unscanned(f"{error}; not scanned")
             return True
-        except (tarfile.TarError, OSError, EOFError, ValueError, RecursionError):
+        except (
+            tarfile.TarError,
+            OSError,
+            EOFError,
+            ValueError,
+            OverflowError,
+            IndexError,
+            RecursionError,
+        ):
             report.unscanned("malformed tar archive; not scanned")
             return True
-        return report.path.name.lower().endswith(_TORCH_TAR_NAMES) or bool(chosen or unread)
+
+    def _scan_tar_members(
+        self, report: _FileReport, archive: tarfile.TarFile, budget: _OpcodeBudget
+    ) -> bool:
+        """Scan the members of the open tar `archive`, whose listing bounds were checked."""
+        torch_named = report.path.name.lower().endswith(_TORCH_TAR_NAMES)
+        listing = TarListing.read(archive)
+        unread = [
+            entry.name
+            for entry in listing.members
+            if holds_file_data(entry)
+            and _unread_model(entry.name, plain=report.tar_named and not torch_named)
+        ]
+        self._report_unread_models(report, unread)
+        chosen = [
+            index
+            for index, entry in enumerate(listing.members)
+            if holds_file_data(entry) and _model_named(entry.name)
+        ]
+        reading = _TarReading(archive, listing, budget)
+        for index in chosen[:_ARCHIVE_MAX_MEMBERS]:
+            if self._scan_tar_member(report, reading, index):
+                return True
+        if len(chosen) > _ARCHIVE_MAX_MEMBERS:
+            report.unscanned(
+                f"tar holds {len(chosen)} members named as models; members past the "
+                f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
+            )
+        return torch_named or bool(chosen or unread)
 
     def _scan_tar_member(self, report: _FileReport, reading: _TarReading, index: int) -> bool:
         """Scan one tar member and return whether the archive's opcode budget ran out in it.

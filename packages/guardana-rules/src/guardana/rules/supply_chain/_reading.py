@@ -4,6 +4,9 @@ A scanned repository is untrusted input: an unreadable, crafted-huge, or
 non-regular file must degrade to "skipped", never abort or stall the whole scan.
 """
 
+import io
+import os
+import stat
 from pathlib import Path
 
 # The read bound. `ast.parse` handles far larger files than this comfortably, so
@@ -32,6 +35,24 @@ def read_bytes_bounded(path: Path, limit: int = MAX_SCAN_BYTES) -> tuple[bytes, 
     except OSError:
         return None
     return raw[:limit], len(raw) > limit
+
+
+def open_regular(path: Path) -> io.FileIO:
+    """Open a regular file for raw binary reading; raise OSError for anything else.
+
+    A FIFO or device node blocks until a writer appears, and one swapped in after a check
+    by name would block the open itself, so the file is opened without blocking and judged
+    by its descriptor. The handle is unbuffered so each reader picks its own buffering.
+    """
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
+    try:
+        if stat.S_ISREG(os.fstat(fd).st_mode):
+            return io.FileIO(fd, "r")
+    except BaseException:
+        os.close(fd)
+        raise
+    os.close(fd)
+    raise OSError(f"{path.name} is not a regular file")
 
 
 def read_text_prefix(

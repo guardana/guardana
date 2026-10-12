@@ -1,9 +1,12 @@
+import io
 import json
 import os
 import re
+import struct
 import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import BinaryIO
 
 from guardana.core.formats import find_hdf5_signature
 from guardana.core.report import Evidence, Finding
@@ -23,7 +26,12 @@ from guardana.core.taxonomy import (
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import unread_component, unscanned_verdict
-from guardana.rules.supply_chain._reading import read_bytes_bounded
+from guardana.rules.supply_chain._reading import open_regular, read_bytes_bounded
+from guardana.rules.supply_chain._zip import (
+    ARCHIVE_MAX_ENTRIES,
+    ZIP_DIRECTORY_MAX_BYTES,
+    listing_refusal,
+)
 
 # A Keras `Lambda` layer wraps an arbitrary Python callable that runs on
 # `load_model` — a code-execution primitive, no inference needed. `safe_mode` is
@@ -231,11 +239,7 @@ class KerasLambdaRule(ArtifactRule):
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".keras",)):
-            # Real `.keras` files are zip archives. A file that is not one is
-            # malformed, so fall back to the byte marker — a payload inside a
-            # deliberately broken archive must not become invisible.
-            config = _read_keras_config(path)
-            yield from self._scan_config(path, config, ctx, "not a readable .keras archive")
+            yield from self._scan_keras(path, ctx)
             ctx.examined(path)
         for path in _directory_configs(target):
             config = _read_json_file(path)
@@ -248,6 +252,18 @@ class KerasLambdaRule(ArtifactRule):
             if _holds_hdf5_signature(path):
                 yield from self._byte_scan(path, ctx, fallback_reason=None)
                 ctx.examined(path)
+
+    def _scan_keras(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
+        refusal, config = _checked_keras_config(path)
+        if refusal is not None:
+            # Listing an archive that declares this much costs more than any model does,
+            # so it is never opened; its first bytes are still searched for the marker.
+            yield from self._byte_scan(path, ctx, fallback_reason=refusal)
+            return
+        # Real `.keras` files are zip archives. A file that is not one is malformed, so
+        # the byte marker is searched instead: a payload inside a deliberately broken
+        # archive must not become invisible.
+        yield from self._scan_config(path, config, ctx, "not a readable .keras archive")
 
     def _scan_config(
         self, path: Path, config: object | None, ctx: RuleContext, unreadable: str
@@ -354,19 +370,34 @@ def _read_json_file(path: Path) -> object | None:
     return parsed
 
 
-def _read_keras_config(path: Path) -> object | None:
+def _checked_keras_config(path: Path) -> tuple[str | None, object | None]:
+    """Why a `.keras` archive must not be listed, else its parsed `config.json`.
+
+    Both come from one open handle, so the archive `zipfile` lists is the one the bounds
+    were checked on. `(None, None)` when the file is not a regular file or cannot be read.
+    """
+    try:
+        with io.BufferedReader(open_regular(path)) as handle:
+            refusal = listing_refusal(
+                handle, max_entries=ARCHIVE_MAX_ENTRIES, max_directory_bytes=ZIP_DIRECTORY_MAX_BYTES
+            )
+            if refusal is not None:
+                return refusal, None
+            return None, _read_keras_config(handle)
+    except (OSError, ValueError, OverflowError, struct.error):
+        return None, None
+
+
+def _read_keras_config(handle: BinaryIO) -> object | None:
     """Read and parse `config.json` from a `.keras` archive; None if unreadable."""
     try:
-        # A FIFO or device node opens and then blocks on read, which would hang the scan.
-        if not path.is_file():
-            return None
-        with zipfile.ZipFile(path) as archive:
+        with zipfile.ZipFile(handle) as archive:
             if "config.json" not in archive.namelist():
                 return None
             with archive.open("config.json") as member:
                 raw = member.read(_MAX_CONFIG_BYTES)
         parsed: object = json.loads(raw)
-    except (zipfile.BadZipFile, OSError, ValueError, RecursionError):
+    except (zipfile.BadZipFile, OSError, ValueError, OverflowError, RecursionError):
         return None
     else:
         return parsed

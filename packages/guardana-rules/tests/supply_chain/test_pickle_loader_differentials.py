@@ -770,7 +770,8 @@ def test_zip64_records_that_declare_different_directories_have_no_declared_start
     path = tmp_path / "model.pt"
     path.write_bytes(data)
 
-    assert declared_directory_start(path) is None
+    with path.open("rb") as handle:
+        assert declared_directory_start(handle) is None
 
 
 @pytest.mark.parametrize(("archive", "build"), [("data.zip", _zip), ("data.tar", _tar)])
