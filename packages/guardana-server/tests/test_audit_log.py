@@ -142,8 +142,9 @@ def test_revoking_a_key_that_is_not_there_records_nothing(
     connection: DbConnection, project: int
 ) -> None:
     """A log that records attempts as if they were changes is a log that overstates itself."""
-    assert revoke_key(connection, "not-a-prefix", actor=CLI("alice@ops-1")) is False
+    revoked = revoke_key(connection, "not-a-prefix", actor=CLI("alice@ops-1"))
 
+    assert revoked is False
     assert recent(connection) == ()
 
 

@@ -1,0 +1,76 @@
+# Rebuilds a published release from its tag and compares every distribution with the
+# file PyPI serves, byte for byte (`scripts/reproduce_release.py`, `docs/reproducible-builds.md`).
+#
+# It runs after a successful run of the release workflow, and on demand for any version.
+# It never runs on a push: the files it compares do not exist on PyPI until a release has
+# published them, and a version PyPI does not list yet is reported NOT CHECKED, never a pass.
+
+name: Reproducibility
+
+on:
+  # Triggered by the workflow, not by its GitHub Release: a release created with the
+  # workflow's own token starts no other workflow.
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The released version to rebuild, e.g. 1.0.0 (the tag is v<version>)"
+        required: true
+        type: string
+
+# Read-only: it checks out, builds and downloads, and writes nowhere.
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: The version to rebuild
+        id: version
+        env:
+          DISPATCHED: ${{ inputs.version }}
+          # The tag the release workflow ran for; a tag push names it as the head branch.
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          version="${DISPATCHED:-$TAG}"
+          version="${version#v}"
+          # A whole-string match: a line-based one would accept a value with a newline in it.
+          pattern='^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?(\.post[0-9]+)?(\.dev[0-9]+)?$'
+          if [[ ! $version =~ $pattern ]]; then
+            echo "::error::'$version' is not a released version."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # The script comes from the commit this workflow runs from, so a release cut before
+      # the script existed can still be checked; the build comes from the tag alone.
+      - name: Check out the comparison script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: tooling
+          persist-credentials: false
+
+      - name: Check out the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: refs/tags/v${{ steps.version.outputs.version }}
+          path: release
+          persist-credentials: false
+
+      # The same interpreter the release builds with. No cache: the build environment
+      # is resolved fresh, as the release resolved it.
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: false
+
+      - name: Rebuild and compare with PyPI
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: uv run --no-project python tooling/scripts/reproduce_release.py "$VERSION" --source release

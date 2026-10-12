@@ -496,13 +496,32 @@ def test_a_recipe_inside_the_editable_project_it_pins_holds_from_lock_to_run(
 def test_a_recipe_that_selects_nothing_writes_no_lock(tmp_path: Path, wire: _Wire) -> None:
     recipe = _team(tmp_path, wire.url)
     (tmp_path / "guardana.yaml").write_text(
-        "rules:\n  paths: [rules]\n  include: ['nobody.*']\n", encoding="utf-8"
+        "rules:\n  paths: [rules]\n  exclude: ['*']\n", encoding="utf-8"
     )
 
     result = _invoke("lock", str(recipe))
 
     assert result.exit_code == ExitCode.INDETERMINATE
     assert not (tmp_path / "guardana-recipe.lock.yaml").exists()
+
+
+_MISSPELLED = "rules:\n  paths: [rules]\n  include: ['acme.*', 'acme.support.refuse']\n"
+_MISSPELLED_REFUSAL = (
+    'error: rules.include contains unmatched patterns: "acme.support.refuse" — check the '
+    "spelling and registered rules."
+)
+
+
+def test_a_misspelled_include_writes_no_lock_and_sends_nothing(tmp_path: Path, wire: _Wire) -> None:
+    recipe = _team(tmp_path, wire.url)
+    (tmp_path / "guardana.yaml").write_text(_MISSPELLED, encoding="utf-8")
+
+    result = _invoke("lock", str(recipe))
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert _MISSPELLED_REFUSAL in result.stderr.splitlines()
+    assert not (tmp_path / "guardana-recipe.lock.yaml").exists()
+    assert wire.requests == []
 
 
 def _status(recipe: Path) -> str:
@@ -537,12 +556,27 @@ def test_a_run_that_selects_nothing_is_refused_with_the_documented_code(
     recipe = _team(tmp_path, wire.url)
     _locked(recipe)
     (tmp_path / "guardana.yaml").write_text(
-        "rules:\n  paths: [rules]\n  include: ['nobody.*']\n", encoding="utf-8"
+        "rules:\n  paths: [rules]\n  exclude: ['*']\n", encoding="utf-8"
     )
 
     result = _invoke("run", str(recipe))
 
     assert result.exit_code == ExitCode.INVALID_USAGE
+    assert _status(recipe) == "refused"
+    assert wire.requests == []
+
+
+def test_a_misspelled_include_refuses_the_recipe_run_before_it_sends(
+    tmp_path: Path, wire: _Wire
+) -> None:
+    recipe = _team(tmp_path, wire.url)
+    _locked(recipe)
+    (tmp_path / "guardana.yaml").write_text(_MISSPELLED, encoding="utf-8")
+
+    result = _invoke("run", str(recipe))
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert _MISSPELLED_REFUSAL in result.stderr.splitlines()
     assert _status(recipe) == "refused"
     assert wire.requests == []
 

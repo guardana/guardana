@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import typer
+from guardana.cli._contracts import name_profile_contract_rules
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry, yaml_rule_files
 
@@ -10,7 +11,9 @@ def load_custom_rules(
 ) -> tuple[str, ...]:
     """Register YAML rules from the profile's `rules.paths` and any `--rules` flags.
 
-    Returns the id of every rule loaded, each once, in load order.
+    Returns the id of every rule loaded, each once, in load order. The rule ids the
+    profile's contracts compile to are named on `registry` too, so an include pattern
+    naming one is matched on every command, not only the run that grades the contract.
 
     A malformed or unloadable rule file never aborts the run — one bad custom rule
     must not take down the whole scan — but it is no longer only a warning either.
@@ -28,6 +31,7 @@ def load_custom_rules(
     outcome = registry.load_yaml_rule_dirs(paths)
     for error in outcome.errors:
         typer.echo(f"warning: could not load rule — {error.source}: {error.reason}", err=True)
+    name_profile_contract_rules(registry, profile)
     return tuple(dict.fromkeys(outcome.loaded))
 
 

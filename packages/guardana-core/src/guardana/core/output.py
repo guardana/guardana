@@ -700,7 +700,8 @@ def deliver(
     Raises `BoundaryError` when the boundary fails, before the reporter is called. Never
     raises for the reporter's sake: a reporter that raises, overruns the deadline,
     returns an invalid delivery, or returns `delivered` with no attempt or with an HTTP
-    status outside 2xx is `unknown`. A `KeyboardInterrupt` propagates. The detail
+    status outside 2xx is `unknown`. The deadline covers the delivery and the
+    `sent_secrets` hook read after it. A `KeyboardInterrupt` propagates. The detail
     is sanitised.
     """
     try:
@@ -712,8 +713,7 @@ def deliver(
     ran = _run_deliverer(prepared, sent, deadline)
     if ran is None:
         return Delivery(DeliveryStatus.UNKNOWN, detail=f"did not finish within {deadline:g} s")
-    outcome, raised = ran
-    secrets = _current_secrets(prepared)
+    outcome, raised, secrets = ran
     if raised:
         known = prepared.secrets if secrets is None else secrets
         return Delivery(DeliveryStatus.UNKNOWN, detail=sanitise_reason(_failure(raised[0]), known))
@@ -728,19 +728,26 @@ def deliver(
 
 def _run_deliverer(
     prepared: PreparedReporter, sent: Verification, deadline: float
-) -> tuple[list[object], list[Exception | SystemExit]] | None:
-    """Run the deliverer on a daemon thread; None when it is still running at `deadline`."""
+) -> tuple[list[object], list[Exception | SystemExit], tuple[str, ...] | None] | None:
+    """Run the delivery and then its `sent_secrets` hook on one daemon thread, in one deadline.
+
+    Returns what `deliver` returned or raised and the secrets known afterwards, or None
+    when the thread is still running at `deadline`.
+    """
     outcome: list[object] = []
     raised: list[Exception | SystemExit] = []
+    secrets: list[tuple[str, ...] | None] = []
     interrupted: list[KeyboardInterrupt] = []
 
     def attempt() -> None:
         try:
-            outcome.append(prepared.deliverer.deliver(sent))
+            try:
+                outcome.append(prepared.deliverer.deliver(sent))
+            except (Exception, SystemExit) as exc:
+                raised.append(exc)
+            secrets.append(_current_secrets(prepared))
         except KeyboardInterrupt as exc:
             interrupted.append(exc)
-        except (Exception, SystemExit) as exc:
-            raised.append(exc)
 
     worker = threading.Thread(target=attempt, name=f"guardana-deliver-{prepared.name}", daemon=True)
     worker.start()
@@ -750,7 +757,7 @@ def _run_deliverer(
         return None
     if interrupted:
         raise interrupted[0]
-    return outcome, raised
+    return outcome, raised, secrets[0] if secrets else None
 
 
 def _current_secrets(prepared: PreparedReporter) -> tuple[str, ...] | None:

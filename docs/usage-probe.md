@@ -315,10 +315,10 @@ what was graded before it ([below](#when-the-target-fails-part-way)):
 
 | The conversation's request ended with | Outcome | Exit |
 |---|---|---|
-| no reply: no connection, a timeout, a reset, an stdio server that exited or closed its output | the run stops (`stopped_by: target_unavailable`) | `4` |
+| no reply: no connection, a timeout, a reset, an stdio server that exited, closed its output or did not read a request within the timeout | the run stops (`stopped_by: target_unavailable`) | `4` |
 | `401`, `403` or `407` to a request carrying your `--mcp-token-env` token | the run stops | `4` |
 | `404` (once a legacy session was re-opened), `408`, `425`, `429` or `5xx` | the run stops | `4` |
-| a `2xx` that is not JSON-RPC, or an stdio line that is over-long or not JSON | the run stops | `4` |
+| a `2xx` that is not JSON-RPC, an stdio line that is over-long or not JSON, or an stdio server request whose id is not an integer or a string of at most 256 characters | the run stops | `4` |
 | `-32022` once a revision is agreed | the run stops (`stopped_by: target_changed`) | `4` |
 | another `4xx` | an error of the rule that sent it; later readers meet the same error without a second request | `2`, unless a finding fails it |
 | a JSON-RPC error | an answer the rules grade | — |
@@ -872,15 +872,21 @@ records the file's SHA-256, its line count and how many replies redaction change
 - Keeping is off by default. The file holds every reply, passes included, so it widens
   what a leaked run exposes; the collector never receives it. See [privacy](privacy.md).
 - A probe that kept nothing writes no file and says so on stderr.
-- Any command writing at `--output` removes an earlier `<stem>.exchanges.jsonl` unless this
-  run writes its own there: `scan`, `grade`, `analyze-trace`, `import-observations`,
-  `run migrate` (which keeps the migrated run's own) and a probe that keeps nothing.
-  Removal also applies when an installed `--format` or redaction fails and writes nothing
-  new; stderr says `removed …`. A failed removal warns without changing the exit code.
+- Any command writing at `--output` removes the adjacent `<stem>.exchanges.jsonl` only when
+  the saved run it replaces recorded exactly those bytes, unless this run writes its own
+  exchanges there: `scan`, `grade`, `analyze-trace`, `import-observations`, `run migrate`
+  (which keeps the migrated run's own) and a probe that keeps nothing. Removal also applies
+  when an installed `--format` or redaction fails and writes nothing new; stderr says
+  `removed …`. A sidecar is kept when no run saved at `--output` recorded it: no file was
+  there, the file is not a Guardana run, or it records no exchanges or another digest.
+  Stderr says `warning: kept …`; the name alone never establishes ownership.
+  A failed removal warns without changing the exit code.
   A report or sidecar that cannot be written removes nothing. `run` and `run.json` share
   one sidecar path; a sidecar the other saved run records by digest is kept with a warning,
   and a probe that keeps exchanges refuses with exit `3`, before sending anything, to
-  overwrite it. An `--output` whose sidecar path is a file named on the command line is
+  overwrite it. It refuses the same way to overwrite a sidecar no run saved at `--output`
+  recorded; it replaces only the exchanges that run kept, and a link at the sidecar path,
+  which it never writes through. An `--output` whose sidecar path is a file named on the command line is
   refused with exit `3`; see [exit codes](exit-codes.md). `guardana grade` warns when no
   saved run beside a sidecar records its digest, and grades it as given; `guardana diff`
   compares runs by that digest.

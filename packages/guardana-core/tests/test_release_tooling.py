@@ -4,12 +4,15 @@ this test locates them relative to `guardana-core` — the version-of-record the
 bump script reads."""
 
 import importlib.util
+import os
 import re
+import subprocess
 import sys
 import tomllib
 import types
 from fnmatch import fnmatch
 from pathlib import Path
+from typing import Any
 
 import guardana.core
 import pytest
@@ -805,3 +808,123 @@ def test_codeql_runs_on_every_push_and_on_a_schedule() -> None:
     assert "cron:" in workflow
     assert "security-events: write" in workflow
     assert "languages: python" in workflow
+
+
+def _reproducibility() -> dict[Any, Any]:
+    path = _repo_root() / ".github" / "workflows" / "reproducibility.yml"
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(loaded, dict)
+    return loaded
+
+
+def test_the_reproducibility_check_runs_after_a_release_and_on_demand_never_on_a_push() -> None:
+    """The files it compares exist on PyPI only once a release has published them."""
+    workflow = _reproducibility()
+    # PyYAML reads the bare key `on` as the boolean true.
+    triggers = workflow["on"] if "on" in workflow else workflow[True]
+
+    assert set(triggers) == {"workflow_run", "workflow_dispatch"}
+    assert triggers["workflow_run"] == {"workflows": ["Release"], "types": ["completed"]}
+    assert _workflow("release.yml")["name"] == "Release"
+    assert triggers["workflow_dispatch"]["inputs"]["version"]["required"] is True
+
+
+def test_the_reproducibility_check_follows_only_a_release_run_that_succeeded() -> None:
+    condition = _reproducibility()["jobs"]["reproduce"]["if"]
+
+    assert "github.event.workflow_run.conclusion == 'success'" in condition
+    assert "github.event_name == 'workflow_dispatch'" in condition
+
+
+def _version_step(environment: dict[str, str], tmp_path: Path) -> tuple[int, str]:
+    steps = _reproducibility()["jobs"]["reproduce"]["steps"]
+    script = next(step["run"] for step in steps if step.get("id") == "version")
+    output = tmp_path / "output"
+    output.touch()
+    done = subprocess.run(  # noqa: S603 — bash runs the workflow's own step
+        ["/bin/bash", "-c", script],
+        env={"PATH": os.environ["PATH"], "GITHUB_OUTPUT": str(output), **environment},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.returncode, output.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("environment", "version"),
+    [
+        ({"TAG": "v1.0.0rc1", "DISPATCHED": ""}, "1.0.0rc1"),
+        ({"TAG": "", "DISPATCHED": "1.2.3"}, "1.2.3"),
+        ({"TAG": "", "DISPATCHED": "v1.2.3.post1"}, "1.2.3.post1"),
+    ],
+)
+def test_the_version_comes_from_the_release_tag_or_the_dispatch(
+    environment: dict[str, str], version: str, tmp_path: Path
+) -> None:
+    assert _version_step(environment, tmp_path) == (0, f"version={version}\n")
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {"TAG": "main", "DISPATCHED": ""},
+        {"TAG": "v1.0", "DISPATCHED": ""},
+        {"TAG": "v1.0.0; echo hi", "DISPATCHED": ""},
+        {"TAG": "", "DISPATCHED": ""},
+        {"TAG": "", "DISPATCHED": "1.2.3\nversion=9.9.9"},
+        {"TAG": "", "DISPATCHED": "1.2.3\n"},
+    ],
+)
+def test_a_run_that_names_no_version_is_refused(
+    environment: dict[str, str], tmp_path: Path
+) -> None:
+    code, output = _version_step(environment, tmp_path)
+
+    assert code != 0
+    assert output == ""
+
+
+def test_the_reproducibility_check_is_read_only() -> None:
+    workflow = _reproducibility()
+
+    assert workflow["permissions"] == {"contents": "read"}
+    assert all("permissions" not in job for job in workflow["jobs"].values())
+    steps = workflow["jobs"]["reproduce"]["steps"]
+    checkouts = [step for step in steps if "actions/checkout" in str(step.get("uses"))]
+    assert checkouts
+    assert all(step["with"]["persist-credentials"] is False for step in checkouts)
+
+
+def test_the_reproducibility_check_pins_every_action_by_commit() -> None:
+    steps = _reproducibility()["jobs"]["reproduce"]["steps"]
+    uses = [str(step["uses"]) for step in steps if "uses" in step]
+
+    assert uses
+    assert all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref) for ref in uses), uses
+
+
+def test_the_reproducibility_check_builds_the_release_tag_with_the_script() -> None:
+    steps = _reproducibility()["jobs"]["reproduce"]["steps"]
+    refs = [str(step.get("with", {}).get("ref", "")) for step in steps]
+    run = steps[_index_of(steps, "scripts/reproduce_release.py")]
+
+    assert "refs/tags/v${{ steps.version.outputs.version }}" in refs
+    assert '"$VERSION" --source release' in str(run["run"])
+
+
+def test_every_package_builds_with_one_exactly_pinned_backend() -> None:
+    """A backend resolved fresh at build time makes a rebuild from the tag a different build."""
+    pyprojects = sorted((_repo_root() / "packages").glob("*/pyproject.toml"))
+    pyprojects += sorted((_repo_root() / "examples").glob("*/pyproject.toml"))
+    backends = {
+        str(path.relative_to(_repo_root())): tomllib.loads(path.read_text(encoding="utf-8"))[
+            "build-system"
+        ]["requires"]
+        for path in pyprojects
+    }
+    assert {f"packages/{package}/pyproject.toml" for package in _SIBLINGS} <= set(backends)
+    assert "examples/reference_pack/pyproject.toml" in backends
+
+    assert all(re.fullmatch(r"hatchling==[\d.]+", r) for (r,) in backends.values()), backends
+    assert len({requires[0] for requires in backends.values()}) == 1, backends

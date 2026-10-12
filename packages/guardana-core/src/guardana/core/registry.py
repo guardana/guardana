@@ -56,7 +56,10 @@ class RuleDirLoad:
 
 @dataclass(slots=True)
 class _LoadRecord:
-    """Everything a registry learned about what it could not load, kept as one value."""
+    """Everything a registry learned about what it could not load, kept as one value.
+
+    It also holds the rule ids it was told of without registering a rule for them.
+    """
 
     errors: list[CheckError] = field(default_factory=list)
     refused: list[InstalledEntryPoint] = field(default_factory=list)
@@ -68,6 +71,8 @@ class _LoadRecord:
     """Each entry point plugin trust let discovery import, whether it loaded or failed."""
     trust: PluginTrust | None = None
     """The trust discovery applied; None for a registry nothing discovered."""
+    named: set[str] = field(default_factory=set)
+    """Rule ids a document the run reads compiles to without this run registering them."""
 
     def copied(self) -> "_LoadRecord":
         """Return a copy whose containers are new and whose entries are shared.
@@ -576,3 +581,19 @@ def yaml_rule_files(path: Path) -> list[Path]:
     return sorted(
         p for p in path.iterdir() if p.is_file() and p.suffix.lower() in (".yaml", ".yml")
     )
+
+
+def name_rule_ids(registry: Registry, rule_ids: Iterable[str]) -> None:
+    """Count `rule_ids` as rules an include pattern may name, without registering any.
+
+    For the ids a document the run reads compiles to on another run, such as a contract
+    about another AI system: a pattern naming one is not misspelled, though this run
+    executes no such rule.
+    """
+    registry._load.named.update(rule_ids)  # noqa: SLF001 — load state this module owns
+
+
+def known_rule_ids(registry: Registry) -> frozenset[str]:
+    """Every id an include pattern may match: each registered rule's and each named one."""
+    named = registry._load.named  # noqa: SLF001 — load state this module owns
+    return frozenset(rule.meta.id for rule in registry.rules()) | named

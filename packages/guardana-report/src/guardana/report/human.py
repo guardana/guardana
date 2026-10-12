@@ -12,6 +12,7 @@ from guardana.core.manifest.records import (
 from guardana.core.report import Finding, ScanResult, SkippedRule, SkipReason
 from guardana.core.suite import describe
 from guardana.core.target import TargetKind
+from guardana.core.target.scope import IGNORE_FILE, ExcludeSource
 from guardana.core.trials import CONFIDENCE, wilson_interval
 from guardana.report._refusal import recorded_gate, refusal_clause, unnamed_refusal
 from guardana.report._subject import fixtures_line, subject_line
@@ -61,13 +62,59 @@ class HumanRenderer:
         for gap in result.coverage_shortfall:
             lines.append(f"! [COVERAGE] coverage missing ({gap.kind}): {gap.name}")
             lines.append(f"    {gap.detail}")
-        for block in (_trials_block(result, self._run), _measured_block(result)):
+        for block in (
+            _scope_block(result),
+            _trials_block(result, self._run),
+            _measured_block(result),
+        ):
             if block:
                 lines.append("")
                 lines.extend(block)
         lines.append("")
         lines.append(_summary(result, self._run))
         return "\n".join(printable(line) for line in lines)
+
+
+_KEPT_NAMED = 10
+"""How many kept files the terminal names; the saved run lists every one."""
+
+
+def _scope_block(result: ScanResult) -> list[str]:
+    """Name what the scanned target excluded, what it could not, and unlisted model files.
+
+    A pattern the target ships for itself decides what is examined as much as the
+    profile does, so the reader sees it; so are model files in directories every scan
+    skips, which leave no other trace in a passing run.
+    """
+    scope = result.scope
+    if scope is None:
+        return []
+    lines: list[str] = []
+    by_file: dict[str, list[str]] = {}
+    for exclude in scope.excludes or ():
+        if exclude.source is ExcludeSource.IGNORE_FILE:
+            by_file.setdefault(exclude.file or IGNORE_FILE, []).append(exclude.pattern)
+    lines.extend(
+        f"  excluded by the scanned target's {name}: {', '.join(patterns)}"
+        for name, patterns in by_file.items()
+    )
+    if scope.kept_models:
+        shown = scope.kept_models[:_KEPT_NAMED]
+        kept = ", ".join(f"{k.path} ({k.pattern})" for k in shown)
+        if len(scope.kept_models) > len(shown):
+            kept += f" and {len(scope.kept_models) - len(shown)} more (scope.kept_models)"
+        lines.append(
+            f"  scanned anyway, since only the profile's rules.paths_exclude may exclude "
+            f"a file a model loader reads: {kept}"
+        )
+    skipped = scope.skipped_models
+    if skipped is not None and skipped.directories:
+        named = ", ".join(f"{d.path} ({d.model_files})" for d in skipped.directories)
+        partial = "" if skipped.searched_all else " (searched by name and in part)"
+        lines.append(
+            f"  model files not scanned, inside directories every scan skips: {named}{partial}"
+        )
+    return ["Scope", *lines] if lines else []
 
 
 def _trials_block(result: ScanResult, run: RunManifest | None) -> list[str]:

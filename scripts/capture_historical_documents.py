@@ -468,6 +468,9 @@ def yaml_blocks(markdown: str) -> list[str]:
     return blocks
 
 
+_TOP_LEVEL_KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:", re.MULTILINE)
+
+
 def is_profile_example(document: object) -> bool:
     """Say whether a parsed block is a profile: only profile keys, and more than a name."""
     if not isinstance(document, dict) or not document:
@@ -476,13 +479,25 @@ def is_profile_example(document: object) -> bool:
     return keys <= PROFILE_KEYS and bool(keys - {"name", "schema_version"})
 
 
+def _names_profile_keys(text: str) -> bool:
+    """Say whether a block YAML cannot read names only profile keys at its top level."""
+    keys = set(_TOP_LEVEL_KEY.findall(text))
+    return bool(keys) and keys <= PROFILE_KEYS and bool(keys - {"name", "schema_version"})
+
+
 def examples_in(tag: str, doc: str, markdown: str) -> list[Example]:
-    """Return every profile example in one documentation page, numbered among its YAML blocks."""
+    """Return every profile example in one documentation page, numbered among its YAML blocks.
+
+    A block YAML cannot read is kept when its top-level keys are profile keys, so the
+    release's refusal of a broken example is recorded instead of the example vanishing.
+    """
     found: list[Example] = []
     for block, text in enumerate(yaml_blocks(markdown), start=1):
         try:
             document = yaml.safe_load(text)
         except yaml.YAMLError:
+            if _names_profile_keys(text):
+                found.append(Example(tag=tag, doc=doc, block=block, text=text))
             continue
         if is_profile_example(document):
             found.append(Example(tag=tag, doc=doc, block=block, text=text))
@@ -512,6 +527,14 @@ def _git(*args: str) -> str:
     return done.stdout
 
 
+def _parsed(text: str) -> object:
+    """Parse an example, or return None for one YAML cannot read; the release says why."""
+    try:
+        return yaml.safe_load(text)
+    except yaml.YAMLError:
+        return None
+
+
 def example_env(text: str) -> dict[str, str]:
     """Return a placeholder for every environment variable a profile example names.
 
@@ -519,7 +542,7 @@ def example_env(text: str) -> dict[str, str]:
     profile names the variable holding a judge's key.
     """
     names = set(_ENV_REFERENCE.findall(text))
-    stack: list[object] = [yaml.safe_load(text)]
+    stack: list[object] = [_parsed(text)]
     while stack:
         node = stack.pop()
         if isinstance(node, dict):
@@ -571,7 +594,7 @@ def named_files(text: str) -> list[str]:
         elif isinstance(node, str) and _is_relative_file(node) and node not in found:
             found.append(node)
 
-    walk(yaml.safe_load(text))
+    walk(_parsed(text))
     return found
 
 
@@ -1423,7 +1446,7 @@ class Corpus:
             leaks = leaked_markers(example.text)
             if leaks:
                 entry["withheld"] = f"holds {', '.join(leaks)}"
-            elif self.selection.keep_new(Kind.PROFILE, yaml.safe_load(example.text)):
+            elif self.selection.keep_new(Kind.PROFILE, _parsed(example.text)):
                 stored = f"{Kind.PROFILE}/{release.version}-{n}.{EXTENSIONS[Kind.PROFILE]}"
                 self.files[stored] = example.text
             entry["stored"] = stored

@@ -9,6 +9,7 @@ from a reporter's words is sanitised, and the delivery line keeps its documented
 
 import sys
 import threading
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 
@@ -201,6 +202,41 @@ def test_a_reporter_past_its_deadline_is_unknown(released: threading.Event) -> N
     delivery = deliver(_prepared(deliverer), _verification(), deadline=0.05)
 
     assert delivery == Delivery(DeliveryStatus.UNKNOWN, detail="did not finish within 0.05 s")
+
+
+def test_a_reporter_whose_secrets_hook_overruns_the_deadline_is_unknown(
+    released: threading.Event,
+) -> None:
+    class SlowSecrets(_Deliverer):
+        def sent_secrets(self) -> tuple[str, ...]:
+            released.wait(5)
+            return self.secrets
+
+    deliverer = SlowSecrets(lambda v: Delivery(DeliveryStatus.DELIVERED, attempts=1))
+    started = time.monotonic()
+
+    delivery = deliver(_prepared(deliverer), _verification(), deadline=0.05)
+
+    assert time.monotonic() - started < 2
+    assert delivery == Delivery(DeliveryStatus.UNKNOWN, detail="did not finish within 0.05 s")
+
+
+def test_one_deadline_covers_the_delivery_and_the_secrets_hook_together(
+    released: threading.Event,
+) -> None:
+    # Each hook alone finishes inside the deadline; the two in turn do not.
+    class SlowSecrets(_Deliverer):
+        def sent_secrets(self) -> tuple[str, ...]:
+            released.wait(0.3)
+            return self.secrets
+
+    def slow_delivery(_: Verification) -> Delivery:
+        released.wait(0.3)
+        return Delivery(DeliveryStatus.DELIVERED, attempts=1)
+
+    delivery = deliver(_prepared(SlowSecrets(slow_delivery)), _verification(), deadline=0.5)
+
+    assert delivery == Delivery(DeliveryStatus.UNKNOWN, detail="did not finish within 0.5 s")
 
 
 def test_the_deadline_is_thirty_seconds_and_says_so() -> None:

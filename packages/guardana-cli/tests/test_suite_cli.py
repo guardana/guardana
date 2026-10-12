@@ -125,7 +125,7 @@ def test_a_probe_saves_what_the_suite_concluded_and_reads_it_back(
 
     assert code == 0, output
     document = json.loads(out.read_text(encoding="utf-8"))
-    assert document["schema_version"] == 17
+    assert document["schema_version"] == 18
     record = next(r for r in document["run"]["rules"] if r["id"] == _SUITE_ID)
     assert record["trial_summary"] is None
     assert record["suite"]["outcome"] == "pass"

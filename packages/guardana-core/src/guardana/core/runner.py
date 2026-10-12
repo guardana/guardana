@@ -1,7 +1,9 @@
+import json
 import reprlib
 import threading
 from collections.abc import Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from fnmatch import fnmatch
 from pathlib import Path, PurePath
 from urllib.error import URLError
 
@@ -12,9 +14,10 @@ from guardana.core.gate import GateOutcome, gate, gate_outcome
 from guardana.core.inventory import observe
 from guardana.core.manifest.records import CalibrationRecord, SuiteSummary
 from guardana.core.observation import Observation, ObservationKind
-from guardana.core.profile.model import Profile
+from guardana.core.profile.errors import ProfileError
+from guardana.core.profile.model import Policy, Profile
 from guardana.core.redaction import EvidenceMode, MessageQuoting
-from guardana.core.registry import Registry
+from guardana.core.registry import Registry, known_rule_ids
 from guardana.core.regression import broken_pairs
 from guardana.core.report import CheckError, Finding, ScanResult, StopReason, split_ref
 from guardana.core.report.check_error import bounded_reason
@@ -298,6 +301,13 @@ class Runner:
     remedies: FailureRemedies = field(default_factory=FailureRemedies)
     """What a recorded failure advises for a refused credential and for a rate limit."""
 
+    inventory: Registry | None = None
+    """Every rule the whole run registered, when `registry` is one pass of a split run.
+
+    Include patterns are checked against it, so a pattern another pass matches is not
+    refused here; None checks them against `registry`.
+    """
+
     def concurrency_for(self, kind: TargetKind) -> int:
         """How many rules may run at once against this kind of target.
 
@@ -327,7 +337,9 @@ class Runner:
         # the target that has to hold it. A target that cannot enforce it refuses
         # here rather than letting the run proceed under a ceiling nothing watches.
         target.apply_budgets(self.profile.budgets)
-        plan, selection_skips = select_rules(self.registry, self.profile, target)
+        plan, selection_skips = select_rules(
+            self.registry, self.profile, target, inventory=self.inventory
+        )
         skipped = list(selection_skips)
 
         findings: list[Finding] = []
@@ -692,14 +704,19 @@ def _target_stop(exc: URLError | EndpointError) -> StopReason:
 
 
 def select_rules(
-    registry: Registry, profile: Profile, target: Target
+    registry: Registry, profile: Profile, target: Target, *, inventory: Registry | None = None
 ) -> tuple[tuple[Rule, ...], tuple[SkippedRule, ...]]:
     """Choose the rules a run of `profile` against `target` executes, and the ones it skips.
 
     The one selection `Runner.run` and `guardana plan` both make: a filter added here
     reaches the plan too, so the plan never describes a run that selects differently.
     A rule of another target kind, or one the policy does not match, is neither.
+
+    Raises `ProfileError` before selecting anything when an include pattern matches no
+    rule of `inventory`: every rule the run registered, `registry` itself unless it is
+    one pass of a split run.
     """
+    refuse_unmatched_includes(profile, registry if inventory is None else inventory)
     capabilities = target.capabilities()
     selected: list[Rule] = []
     skipped: list[SkippedRule] = []
@@ -720,6 +737,36 @@ def select_rules(
             continue
         selected.append(rule)
     return tuple(selected), tuple(skipped)
+
+
+def refuse_unmatched_includes(profile: Profile, registry: Registry) -> None:
+    """Raise `ProfileError` naming every include pattern no rule of `registry` matches.
+
+    Checked against every registered rule and every id named on `registry` without a
+    rule, before exclusions, target kind or any skip: a misspelled pattern beside a
+    correct one would otherwise narrow the run to what the correct one selects and let
+    it pass. No `fail_on` setting relaxes it.
+    """
+    unmatched = _unmatched_includes(profile.policy, sorted(known_rule_ids(registry)))
+    if unmatched:
+        named = ", ".join(json.dumps(pattern, ensure_ascii=False) for pattern in unmatched)
+        raise ProfileError(
+            f"rules.include contains unmatched patterns: {named} — check the spelling and "
+            f"registered rules."
+        )
+
+
+def _unmatched_includes(policy: Policy, rule_ids: Sequence[str]) -> tuple[str, ...]:
+    """Return each include glob no id in `rule_ids` matches, once, in profile order.
+
+    A bare `*` is never unmatched: it cannot be misspelled, and with nothing registered
+    the run itself reports that no rule ran.
+    """
+    return tuple(
+        pattern
+        for pattern in dict.fromkeys(policy.include)
+        if pattern != "*" and not any(fnmatch(rule_id, pattern) for rule_id in rule_ids)
+    )
 
 
 def _unrecorded(rule: Rule, target: RecordedTarget) -> SkippedRule | None:
@@ -1101,6 +1148,7 @@ __all__ = [
     "gate_outcome",
     "incomplete_recording",
     "protocol_refusal",
+    "refuse_unmatched_includes",
     "refused_by_this_run",
     "safety_refusal",
     "target_failures",

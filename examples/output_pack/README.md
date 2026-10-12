@@ -39,10 +39,12 @@ delivery: rejected — acme-webhook to https://hooks.example.com (HTTP 410, 1 at
 delivery: unreachable — acme-webhook to https://hooks.example.com (3 attempts): connection refused
 ```
 
-Only `scheme://host[:port]` is shown, never the path or the query. The webhook connects
-straight to the destination and ignores `HTTP_PROXY`, `HTTPS_PROXY` and their lowercase
-forms, so no proxy sees the signed summary. A receiver that
-refuses or cannot be reached keeps the run's exit code; the webhook makes at most three
+Only `scheme://host[:port]` is shown, never the path or query. The webhook connects directly
+to the destination and ignores `HTTP_PROXY`, `HTTPS_PROXY` and their lowercase forms, so no
+proxy sees the signed summary. By default, the command keeps the run's exit code if a receiver
+refuses delivery or cannot be reached. Under `delivery.required`, the command exits `8`
+instead. A delivery with the outcome `unknown` exits `8` either way
+([delivery status](../../docs/outputs.md#delivery-status)). The webhook makes at most three
 attempts within 25 seconds and retries only on no answer, `408`, `429` and `5xx`.
 
 ## What the webhook sends

@@ -42,8 +42,24 @@ RELEASE_WORKFLOW = ".github/workflows/release.yml"
 GATE_JOB = "ci-passed"
 PUBLISH_JOB = "publish"
 ENVIRONMENT = "pypi"
-RELEASE_TAGS = ("refs/tags/v1.2.3", "refs/tags/v1.2")
-"""A full release tag and a moving `vX.Y` tag; a tag ruleset has to cover both."""
+RELEASE_TAGS = (
+    "refs/tags/v1.2.3",
+    "refs/tags/v1.2",
+    "refs/tags/v1.0.0rc1",
+    "refs/tags/v1.0.0a1",
+    "refs/tags/v1.0.0b1",
+    "refs/tags/v1.0.0.post1",
+    "refs/tags/v1.0.0.dev1",
+    "refs/tags/v10.20.30",
+)
+"""Release tag shapes a tag ruleset has to cover: a final release, the moving `vX.Y` tag
+and each PEP 440 pre-, post- and development release."""
+_WHOLE_RELEASE_NAMESPACE = frozenset(
+    {"~ALL", "refs/tags/*", "refs/tags/**", "refs/tags/**/*", "refs/tags/v*"}
+)
+"""Include patterns that match every `refs/tags/v*` ref, whatever follows the `v`."""
+_RELEASE_PREFIX = "refs/tags/v"
+_LITERAL_PREFIX = re.compile(r"[^*?\[]*")
 TAG_RULES = (("creation", "creating"), ("update", "updating"), ("deletion", "deleting"))
 """The ruleset rules a safe release relies on, each with what it restricts."""
 _MAINTAINER_ROLES = frozenset({2, 5})
@@ -172,14 +188,42 @@ def vulnerability_reporting(api: Api, repo: str) -> Finding:
     return (Outcome.PRESENT, "") if enabled else (Outcome.ABSENT, "disabled")
 
 
-def _covers_release_tags(ref_name: dict[str, object]) -> bool:
+def _may_reach_release_tags(pattern: str) -> bool:
+    """Whether a ref pattern could match some `refs/tags/v*` ref, judged by its literal prefix."""
+    if pattern == "~ALL":
+        return True
+    prefix = _LITERAL_PREFIX.match(pattern)
+    literal = prefix.group(0) if prefix else ""
+    return _RELEASE_PREFIX.startswith(literal) or literal.startswith(_RELEASE_PREFIX)
+
+
+def _release_tag_gap(name: object, ref_name: dict[str, object]) -> str | None:
+    """Say which release tags a ruleset leaves out, or None when it provably covers them all.
+
+    Raises `NotCheckedError` when the patterns cover every sample tag but a narrower include
+    or an exclude reaching into `refs/tags/v*` may still leave a release tag out.
+    """
     include = _strings(ref_name.get("include"), "ruleset include")
     exclude = _strings(ref_name.get("exclude"), "ruleset exclude")
 
     def matched(patterns: list[str], ref: str) -> bool:
         return any(pattern == "~ALL" or fnmatchcase(ref, pattern) for pattern in patterns)
 
-    return all(matched(include, ref) and not matched(exclude, ref) for ref in RELEASE_TAGS)
+    missed = [ref for ref in RELEASE_TAGS if not matched(include, ref) or matched(exclude, ref)]
+    if missed:
+        shown = ", ".join(ref.removeprefix("refs/tags/") for ref in missed)
+        return f"ruleset {name} does not cover the release tags {shown}"
+    if not _WHOLE_RELEASE_NAMESPACE.intersection(include):
+        raise NotCheckedError(
+            f"ruleset {name} includes only {', '.join(include)}, which may leave a "
+            f"refs/tags/v* tag out"
+        )
+    reaching = [pattern for pattern in exclude if _may_reach_release_tags(pattern)]
+    if reaching:
+        raise NotCheckedError(
+            f"ruleset {name} excludes {', '.join(reaching)}, which may leave a refs/tags/v* tag out"
+        )
+    return None
 
 
 def _ruleset_gap(detail: dict[str, object]) -> str | None:
@@ -192,8 +236,9 @@ def _ruleset_gap(detail: dict[str, object]) -> str | None:
         return f"ruleset {name} is not enforced"
     conditions = _mapping(detail.get("conditions") or {}, "ruleset conditions")
     ref_name = _mapping(conditions.get("ref_name") or {}, "ruleset ref_name")
-    if not _covers_release_tags(ref_name):
-        return f"ruleset {name} does not cover refs/tags/v*"
+    tag_gap = _release_tag_gap(name, ref_name)
+    if tag_gap is not None:
+        return tag_gap
     rules = [_mapping(rule, "ruleset rule") for rule in _sequence(detail.get("rules"), "rules")]
     types = {rule.get("type") for rule in rules}
     for rule_type, verb in TAG_RULES:

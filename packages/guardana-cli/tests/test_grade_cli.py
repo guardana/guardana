@@ -228,6 +228,41 @@ def test_a_hand_written_recording_is_graded(tmp_path: Path) -> None:
     assert result.exit_code == ExitCode.OK, result.output
 
 
+def test_a_misspelled_include_refuses_the_grade_and_grades_nothing(tmp_path: Path) -> None:
+    recording = tmp_path / "answers.jsonl"
+    lines: list[dict[str, object]] = [
+        {"guardana_recording": 1, "name": "b", "version": "1", "verbatim": True, "rule": _SUITE}
+    ]
+    lines += [{"input": question, "reply": reply} for question, reply in _ANSWERS.items()]
+    recording.write_text("\n".join(json.dumps(line) for line in lines) + "\n", encoding="utf-8")
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("rules:\n  include: ['acme.*', 'acme.quality.answer']\n", encoding="utf-8")
+    output = tmp_path / "run.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "grade",
+            str(recording),
+            "--rules",
+            str(_rules(tmp_path)),
+            "--profile",
+            str(profile),
+            "--format",
+            "json",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert result.stderr.splitlines()[-1] == (
+        'error: rules.include contains unmatched patterns: "acme.quality.answer" — check the '
+        "spelling and registered rules."
+    )
+    assert not output.exists()
+
+
 def test_an_unreadable_recording_is_invalid_usage(tmp_path: Path) -> None:
     broken = tmp_path / "broken.jsonl"
     broken.write_text('{"guardana_recording": 1}\n', encoding="utf-8")

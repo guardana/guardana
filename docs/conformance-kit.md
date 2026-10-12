@@ -67,9 +67,9 @@ def test_the_webhook_keeps_the_output_contract(monkeypatch):
         )
 ```
 
-`name` is the entry point's name, and `spec.name` must equal it. Left out, the spec's own name
-is checked. A name must be lowercase letters, digits and `-`, at most 40 characters, and must
-not be reserved.
+`name` is the entry point's name, and `spec.name` must equal it. If `name` is omitted, the
+spec's own name is checked. A name must match `[a-z][a-z0-9-]*`, be at most 40 characters long,
+and not be reserved for its kind ([installed outputs](outputs.md#write-your-own)).
 
 **`assert_renderer_conforms(spec)`** calls `render` through `guardana.core.output.render`, so
 the format sees what `--format` hands it, redacted a second time. It fails when `render`

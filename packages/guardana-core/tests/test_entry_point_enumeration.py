@@ -24,7 +24,7 @@ from guardana.core.entrypoints import (
 from guardana.core.gate import GateOutcome
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile import Policy, Profile
-from guardana.core.registry import Registry
+from guardana.core.registry import Registry, known_rule_ids, name_rule_ids
 from guardana.core.report import CheckError
 from guardana.testing import SecurityAssertionError, assert_secure
 
@@ -250,9 +250,11 @@ def test_a_registry_emptied_for_reuse_copies_every_load_field_apart(site: FakeSi
     parent = Registry.discover(
         PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"Acme_Admitted"}))
     )
+    name_rule_ids(parent, ["acme.contract.elsewhere"])
 
     child = parent.empty_with_load_state()
     child.record_load_error(CheckError(source="later.yaml", stage="load", reason="bad"))
+    name_rule_ids(child, ["acme.contract.later"])
 
     for record_field in fields(parent._load):
         original = getattr(parent._load, record_field.name)
@@ -260,6 +262,8 @@ def test_a_registry_emptied_for_reuse_copies_every_load_field_apart(site: FakeSi
         assert original, record_field.name
         assert carried is not original, record_field.name
     assert "later.yaml" not in [e.source for e in parent.load_errors]
+    assert "acme.contract.elsewhere" in known_rule_ids(child)
+    assert "acme.contract.later" not in known_rule_ids(parent)
 
 
 def test_a_failure_is_paired_with_its_own_entry_point_when_another_group_shares_its_name(

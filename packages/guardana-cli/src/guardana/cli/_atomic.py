@@ -22,6 +22,29 @@ def write_whole(destination: Path, document: bytes) -> None:
         mode = None
     if mode is not None and not os.access(target, os.W_OK):
         raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(destination))
+    _rename_over(target, document, mode)
+
+
+def replace_whole(destination: Path, document: bytes) -> None:
+    """Put `document` at `destination` as `write_whole` does, replacing a link there.
+
+    A link at `destination` is replaced by the new file and never followed, so the file it
+    names is left as it was; so is any other name a hard link gives the replaced file.
+    """
+    try:
+        found = destination.lstat()
+    except FileNotFoundError:
+        found = None
+    mode = None
+    if found is not None and stat.S_ISREG(found.st_mode):
+        mode = stat.S_IMODE(found.st_mode)
+        if not os.access(destination, os.W_OK):
+            raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(destination))
+    _rename_over(destination, document, mode)
+
+
+def _rename_over(target: Path, document: bytes, mode: int | None) -> None:
+    """Write `document` to a new file beside `target`, then rename it over `target`."""
     staged = target.with_name(f".{target.name}.{secrets.token_hex(8)}.tmp")
     handle = staged.open("xb")
     try:

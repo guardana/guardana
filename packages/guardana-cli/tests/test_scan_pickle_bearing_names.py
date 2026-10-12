@@ -94,7 +94,7 @@ _CASES: dict[str, tuple[str, Callable[[], bytes], ExitCode]] = {
     "sagemaker": (
         "model.tar.gz",
         lambda: _tar({"model.pkl": _SYSTEM}, mode="w:gz"),
-        ExitCode.INDETERMINATE,
+        ExitCode.POLICY_FAILED,
     ),
     "torch-tar-in-zip": (
         "release.zip",

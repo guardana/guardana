@@ -1,5 +1,6 @@
 import importlib.metadata
 import io
+import json
 import os
 import pickle
 import zipfile
@@ -201,13 +202,64 @@ def test_scanning_an_empty_directory_is_indeterminate_under_every_preset(
 
 
 def test_a_directory_holding_only_its_ignore_file_is_indeterminate(tmp_path: Path) -> None:
-    (tmp_path / "model.pkl").write_bytes(b"x")
-    (tmp_path / ".guardanaignore").write_text("*.pkl\n", encoding="utf-8")
+    (tmp_path / "notes.txt").write_bytes(b"x")
+    (tmp_path / ".guardanaignore").write_text("*.txt\n", encoding="utf-8")
 
     result = runner.invoke(app, ["scan", str(tmp_path)])
 
     assert result.exit_code == ExitCode.INDETERMINATE
     assert "empty_target" in result.output
+
+
+def test_a_model_file_the_scanned_target_ignores_is_scanned_and_named(tmp_path: Path) -> None:
+    (tmp_path / "m.pkl").write_bytes(pickle.dumps(_Evil()))
+    (tmp_path / "app.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / ".guardanaignore").write_text("*.pkl\n", encoding="utf-8")
+
+    human = runner.invoke(app, ["scan", str(tmp_path)])
+    saved = runner.invoke(app, ["scan", str(tmp_path), "--format", "json"])
+
+    text = " ".join(human.stdout.split())
+    assert human.exit_code == ExitCode.POLICY_FAILED
+    assert "pickle_opcode" in text
+    assert "excluded by the scanned target's" in text
+    assert "*.pkl" in text
+    assert "scanned anyway, since only the profile's rules.paths_exclude may exclude" in text
+    scope = json.loads(saved.stdout)["scope"]
+    assert [kept["pattern"] for kept in scope["kept_models"]] == ["*.pkl"]
+    assert scope["kept_models"][0]["path"].endswith("m.pkl")
+
+
+def test_the_profile_may_still_exclude_a_model_file(tmp_path: Path) -> None:
+    (tmp_path / "scanned").mkdir()
+    (tmp_path / "scanned" / "m.pkl").write_bytes(pickle.dumps(_Evil()))
+    (tmp_path / "scanned" / "app.py").write_text("x = 1\n", encoding="utf-8")
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("name: t\nrules:\n  paths_exclude: ['*.pkl']\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["scan", str(tmp_path / "scanned"), "--profile", str(profile)])
+
+    assert result.exit_code == ExitCode.OK
+    assert "scanned anyway" not in " ".join(result.stdout.split())
+
+
+def test_a_model_file_in_a_skipped_directory_is_noted_and_the_gate_holds(tmp_path: Path) -> None:
+    (tmp_path / "env").mkdir()
+    (tmp_path / "env" / "model.pkl").write_bytes(pickle.dumps(_Evil()))
+    (tmp_path / "app.py").write_text("x = 1\n", encoding="utf-8")
+
+    human = runner.invoke(app, ["scan", str(tmp_path)])
+    saved = runner.invoke(app, ["scan", str(tmp_path), "--format", "json"])
+
+    text = " ".join(human.stdout.split())
+    assert human.exit_code == ExitCode.OK
+    assert "model files not scanned, inside directories every scan skips:" in text
+    assert f"{tmp_path / 'env'} (1)" in text
+    skipped = json.loads(saved.stdout)["scope"]["skipped_models"]
+    assert skipped["searched_all"] is True
+    assert [(d["path"], d["model_files"]) for d in skipped["directories"]] == [
+        (str(tmp_path / "env"), 1)
+    ]
 
 
 def test_a_directory_whose_every_file_the_profile_excludes_is_indeterminate(

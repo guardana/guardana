@@ -16,6 +16,7 @@ from guardana.core.report._ref import split_ref
 from guardana.core.report.finding import Finding
 from guardana.core.report.result import ScanResult
 from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
+from guardana.core.target.scope import FileScope
 
 _NAMED_BY_PATH = frozenset({ShortfallKind.UNEXAMINED_COMPONENT, ShortfallKind.EMPTY_TARGET})
 """Shortfall kinds whose name may be a file or a target path rather than a label."""
@@ -70,6 +71,32 @@ def _without_root(text: str, base: Path) -> str:
     return text
 
 
+def _relativize_scope(scope: FileScope, base: Path) -> FileScope:
+    """Rewrite every path a file scope names relative to `base`, as its listing is."""
+    skipped = scope.skipped_models
+    return replace(
+        scope,
+        files=tuple(relativize(path, base) for path in scope.files),
+        excludes=None
+        if scope.excludes is None
+        else tuple(
+            e if e.file is None else replace(e, file=relativize(e.file, base))
+            for e in scope.excludes
+        ),
+        kept_models=tuple(
+            replace(kept, path=relativize(kept.path, base)) for kept in scope.kept_models
+        ),
+        skipped_models=None
+        if skipped is None
+        else replace(
+            skipped,
+            directories=tuple(
+                replace(d, path=relativize(d.path, base)) for d in skipped.directories
+            ),
+        ),
+    )
+
+
 def relativize_findings(result: ScanResult, base: Path) -> ScanResult:
     """Return a copy of `result` with every file location made relative to `base`.
 
@@ -94,11 +121,7 @@ def relativize_findings(result: ScanResult, base: Path) -> ScanResult:
         observations=tuple(replace(o, ref=relativize(o.ref, base)) for o in result.observations),
         # The listing too, or a finding's location and the file it was found in
         # would be spelled two ways and every comparison would read the file as gone.
-        scope=None
-        if result.scope is None
-        else replace(
-            result.scope, files=tuple(relativize(path, base) for path in result.scope.files)
-        ),
+        scope=None if result.scope is None else _relativize_scope(result.scope, base),
         # A file the run could not read is named the way its finding is, or a saved run
         # would name one file two ways and carry the checkout path the findings dropped.
         coverage_shortfall=tuple(

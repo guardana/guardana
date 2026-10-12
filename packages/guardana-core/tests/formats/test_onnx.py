@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from _onnx_carriers import (
@@ -82,6 +83,30 @@ def test_rejects_a_length_that_runs_past_the_message(tmp_path: Path) -> None:
     # field 7 (graph), wire type 2, declaring a payload far longer than the file.
     with pytest.raises(FormatError, match="past"):
         read_onnx_summary(_write(tmp_path, bytes([7 << 3 | 2]) + b"\xff\x7f" + b"\x00" * 4))
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [b"", _length_field(2, b"pytorch"), _length_field(14, _length_field(1, b"k"))],
+    ids=["empty file", "producer only", "metadata only"],
+)
+def test_rejects_a_model_without_a_graph(tmp_path: Path, payload: bytes) -> None:
+    """An empty file parses as an empty message; returning it would read as a clean model."""
+    with pytest.raises(FormatError, match="ONNX model without a graph"):
+        read_onnx_summary(_write(tmp_path, payload))
+
+
+def test_an_empty_main_graph_is_a_graph(tmp_path: Path) -> None:
+    summary = read_onnx_summary(_write(tmp_path, build_onnx()))
+    assert summary.node_domains == ()
+    assert summary.truncated is False
+
+
+def test_a_walk_cut_short_before_the_graph_is_partial_not_graph_less(tmp_path: Path) -> None:
+    metadata = b"".join(_length_field(14, _length_field(1, b"k")) for _ in range(50))
+    payload = metadata + build_onnx(nodes=(("Conv", "com.evil"),))
+    summary = read_onnx_summary(_write(tmp_path, payload), limits=Limits(max_entries=20))
+    assert summary.truncated is True
 
 
 def test_stops_and_says_so_when_the_field_budget_runs_out(tmp_path: Path) -> None:
@@ -200,3 +225,44 @@ def test_the_densest_possible_graph_spends_one_field_per_two_bytes(tmp_path: Pat
 
     assert read_onnx_summary(path, limits=Limits(max_entries=size // 2)).truncated is False
     assert read_onnx_summary(path, limits=Limits(max_entries=size // 2 - 1)).truncated is True
+
+
+def test_node_domains_past_the_header_limit_are_not_kept_and_mark_the_walk_partial(
+    tmp_path: Path,
+) -> None:
+    """Strings within the per-string bound still add up, so the kept total has its own bound."""
+    payload = model_with_graph(graph_of(*(node(CUSTOM_DOMAIN) for _ in range(1_000))))
+
+    summary = read_onnx_summary(_write(tmp_path, payload), limits=Limits(max_header_bytes=64))
+
+    assert 0 < sum(len(domain) for domain in summary.node_domains) <= 64
+    assert set(summary.node_domains) == {CUSTOM_DOMAIN}
+    assert summary.truncated is True
+
+
+@pytest.mark.parametrize(
+    "carrier",
+    [
+        {"producer": "p" * 40},
+        {"opset_domains": ("o" * 40,)},
+        {"nodes": (("Detect", "n" * 40),)},
+        {"external_paths": ("e" * 40,)},
+    ],
+)
+def test_every_kept_string_counts_against_the_header_limit(
+    tmp_path: Path, carrier: dict[str, Any]
+) -> None:
+    path = _write(tmp_path, build_onnx(**carrier))
+
+    assert read_onnx_summary(path, limits=Limits(max_header_bytes=4_096)).truncated is False
+    assert read_onnx_summary(path, limits=Limits(max_header_bytes=30)).truncated is True
+
+
+def test_metadata_does_not_crowd_graph_strings_out_of_the_header_limit(tmp_path: Path) -> None:
+    metadata = {f"key{index}": "v" * 40 for index in range(10)}
+    payload = build_onnx(nodes=(("Detect", CUSTOM_DOMAIN),), metadata=metadata)
+
+    summary = read_onnx_summary(_write(tmp_path, payload), limits=Limits(max_header_bytes=128))
+
+    assert summary.node_domains == (CUSTOM_DOMAIN,)
+    assert summary.truncated is True

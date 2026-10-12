@@ -5,8 +5,8 @@ the module and calls `register(ctx)`. `ctx.register_hook(name, callback)` is the
 whole surface used here; the four hooks are in `VALID_HOOKS` and their payloads are
 documented in `agent/shell_hooks.py` upstream.
 
-Written against **hermes-agent 0.19.0**, read from the installed package on
-2026-08-15. A later release may change these payloads; see `README.md`.
+Written against **hermes-agent 0.19.0**, read from the installed package. A later
+release may change these payloads; see `README.md`.
 """
 
 import os

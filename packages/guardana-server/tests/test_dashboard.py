@@ -136,3 +136,47 @@ def test_the_page_says_when_the_counts_cover_only_the_newest_window() -> None:
 
     assert "w && !w.complete" in page
     assert "newest submissions (of more than" in page
+
+
+_SKIPPED_AND_UNDECIDED = {
+    "schema_version": 7,
+    "source": "https://chat.example/v1",
+    "summary": {
+        "rules_skipped": [
+            {
+                "rule_id": "guardana.agent.tool_use",
+                "reason": "missing_capability",
+                "missing": ["tool_calls"],
+            }
+        ]
+    },
+    "run": {"gate": "indeterminate"},
+}
+
+
+def test_stats_carries_skipped_checks_and_recorded_gates() -> None:
+    """A run with nothing found, a check skipped and no decision is not a clean run."""
+    client = TestClient(create_app(InMemoryStore(), dashboard=True, allow_unauthenticated=True))
+    assert client.post("/findings", json=_SKIPPED_AND_UNDECIDED).status_code == _OK
+
+    stats = client.get("/stats").json()
+
+    assert stats["totals"]["findings"] == 0
+    assert stats["totals"]["skipped"] == 1
+    assert stats["by_gate"] == {"indeterminate": 1}
+    assert stats["by_source"][0]["skipped"] == 1
+    assert stats["by_source"][0]["gate"] == "indeterminate"
+
+
+def test_the_page_lists_skipped_checks_and_undecided_gates_beside_findings() -> None:
+    from guardana.server.dashboard import render_dashboard  # noqa: PLC0415
+
+    page = render_dashboard(30)
+
+    assert ".flatMap(itemsOf)" in page
+    assert "(sub.summary || {}).rules_skipped" in page
+    assert 's.reason !== "not_applicable"' in page
+    assert 'gate === "indeterminate"' in page
+    assert "skipped checks" in page
+    assert "indeterminate gates" in page
+    assert "gate not recorded" in page

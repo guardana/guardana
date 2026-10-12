@@ -130,6 +130,25 @@ _IPYTHON_INERT = frozenset(
 )  # fmt: skip
 # Methods that return a magic function; calling the result runs that magic.
 _MAGIC_FINDERS = frozenset({"find_line_magic", "find_cell_magic", "find_magic"})
+# Builtins that only inspect, compare or print an object, so handing them the IPython
+# object runs none of its methods.
+_INSPECTING_BUILTINS = frozenset(
+    {
+        "bool",
+        "callable",
+        "dir",
+        "hasattr",
+        "id",
+        "isinstance",
+        "issubclass",
+        "print",
+        "repr",
+        "str",
+        "type",
+    }
+)
+HANDED_OUT = "code handed the IPython object"
+"""The label of a call given the IPython object, whose use of it is not followed."""
 _CELL_MAGIC_ARGUMENTS = 2
 
 
@@ -735,10 +754,39 @@ def ipython_calls(tree: ast.Module, state: NotebookState) -> Iterator[tuple[str,
             call = _call_on_ipython(node, state, consumed)
             if call is not None:
                 yield call
+            elif id(node) not in consumed and _hands_out_ipython(node, state):
+                yield HANDED_OUT, None
             continue
         target = _ipython_method_target(node, state) if isinstance(node, ast.expr) else None
         if target is not None and target[0] not in _IPYTHON_INERT:
             yield f"get_ipython().{target[0] or 'getattr'}", None
+
+
+def _hands_out_ipython(node: ast.Call, state: NotebookState) -> bool:
+    """Whether a call is given the IPython object, or `get_ipython` itself, as an argument.
+
+    What the callee does with it is not followed. A builtin that only inspects or prints
+    its argument is no such call unless the notebook rebound its name.
+    """
+    function = node.func
+    if (
+        isinstance(function, ast.Name)
+        and function.id in _INSPECTING_BUILTINS
+        and function.id not in state.bound
+    ):
+        return False
+    values = [*node.args, *(kw.value for kw in node.keywords)]
+    return any(
+        _is_ipython_object(value, state) or _is_ipython_getter(value, state)
+        for value in (each.value if isinstance(each, ast.Starred) else each for each in values)
+    )
+
+
+def _is_ipython_getter(node: ast.expr, state: NotebookState) -> bool:
+    """Whether `node` is `get_ipython` itself, under any name it was given, uncalled."""
+    if isinstance(node, ast.Name):
+        return node.id in state.get_ipython_names
+    return isinstance(node, ast.Attribute) and node.attr == "get_ipython"
 
 
 def _call_on_ipython(
@@ -763,3 +811,145 @@ def _call_on_ipython(
         if handed_out[0] not in _IPYTHON_INERT:
             return f"get_ipython().{handed_out[0] or 'getattr'}", None
     return None
+
+
+_COMMAND_SEPARATORS = frozenset({";", ";;", "&", "&&", "|", "||", "|&", "(", ")"})
+_COMMAND_WRAPPERS = frozenset(
+    {"builtin", "command", "env", "exec", "nice", "nohup", "sudo", "time"}
+)
+_WRAPPER_VALUED_OPTIONS = frozenset({"-u", "-g", "-n"})
+_SOURCE_COMMANDS = frozenset({"source", "."})
+_SCRIPT_SUFFIXES = (".sh", ".bash", ".zsh", ".ksh", ".py")
+_ASSIGNMENT = re.compile(r"[A-Za-z_]\w*=")
+_SHELL_VALUED_OPTIONS = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "--init-file"})
+_PYTHON_VALUED_OPTIONS = frozenset({"-W", "-X", "--check-hash-based-pycs"})
+_STDIN = "<"
+_MAX_INLINE_DEPTH = 4
+"""How deep `sh -c` programs nested in one another are read for scripts."""
+
+
+def _shell_words(command: str) -> list[str]:
+    """Split a shell command into words and operators as a POSIX shell tokenises it."""
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    try:
+        return list(lexer)
+    except ValueError:
+        return command.split()
+
+
+def _simple_commands(words: list[str]) -> Iterator[tuple[list[str], str | None]]:
+    """Yield each simple command's words, without redirections, and the file it reads as stdin."""
+    current: list[str] = []
+    stdin: str | None = None
+    redirect: str | None = None
+    for word in words:
+        if redirect is not None:
+            stdin = word if redirect == _STDIN else stdin
+            redirect = None
+        elif word in _COMMAND_SEPARATORS:
+            yield current, stdin
+            current, stdin = [], None
+        elif word and set(word) <= set("<>&|"):
+            redirect = word
+        else:
+            current.append(word)
+    yield current, stdin
+
+
+def _unwrapped(words: list[str]) -> list[str]:
+    """Drop leading assignments and the wrappers that run the command after them."""
+    index = 0
+    while index < len(words):
+        word = words[index]
+        if _ASSIGNMENT.match(word):
+            index += 1
+        elif word.rsplit("/", 1)[-1] in _COMMAND_WRAPPERS:
+            index += 1
+            while index < len(words) and words[index].startswith("-"):
+                index += 2 if words[index] in _WRAPPER_VALUED_OPTIONS else 1
+        else:
+            break
+    return words[index:]
+
+
+@dataclass(frozen=True)
+class _Invocation:
+    """What an interpreter's arguments say it runs."""
+
+    script: str | None = None
+    inline: str | None = None
+    """The program given as text (`sh -c '...'`), read for scripts in turn."""
+
+    named: bool = False
+    """Whether the arguments name what it runs, so it does not read its standard input."""
+
+
+def _interpreter_run(words: list[str], valued: frozenset[str], inline: str) -> _Invocation:
+    """Read an interpreter's arguments: the script it runs, or the program it is given.
+
+    An option letter in `inline` takes the program as text (`-c`) or names a module
+    (`-m`), so there is no script file.
+    """
+    index = 0
+    while index < len(words):
+        word = words[index]
+        following = words[index + 1] if index + 1 < len(words) else None
+        if word == "--":
+            return _Invocation(script=following, named=following is not None)
+        if word in ("-", "+"):
+            return _Invocation()
+        if not word.startswith(("-", "+")):
+            return _Invocation(script=word, named=True)
+        letters = set(word[1:]) if not word.startswith("--") else set()
+        if letters & set(inline):
+            return _Invocation(inline=following if "c" in letters else None, named=True)
+        index += 2 if word in valued else 1
+    return _Invocation()
+
+
+def _names_a_script(word: str) -> bool:
+    """Whether a command word is a file run as a program rather than a tool on the path.
+
+    A relative path is a local file; a bare name or an absolute path counts only with a
+    script suffix, since system tools are run by both.
+    """
+    if word.lower().endswith(_SCRIPT_SUFFIXES):
+        return True
+    return "/" in word and not word.startswith("/")
+
+
+def local_scripts(command: str, depth: int = 0) -> list[str]:
+    """Return the local script files a shell command runs, as they are written in it.
+
+    A script is the file a shell or Python interpreter is given to run, by argument or as
+    its standard input, a file sourced into the shell, or a path run as the command
+    itself. A tool run by name, `python -m` and an interpreter given its program inline
+    name none; the program given inline is read for scripts in turn.
+    """
+    scripts: list[str] = []
+    for raw, stdin in _simple_commands(_shell_words(command)):
+        words = _unwrapped(raw)
+        if not words:
+            continue
+        program, arguments = words[0], words[1:]
+        name = program.rsplit("/", 1)[-1]
+        inline = None
+        if name in _SHELL_INTERPRETERS or _PYTHON_INTERPRETER.fullmatch(name):
+            shell = name in _SHELL_INTERPRETERS
+            run = _interpreter_run(
+                arguments,
+                _SHELL_VALUED_OPTIONS if shell else _PYTHON_VALUED_OPTIONS,
+                "c" if shell else "cm",
+            )
+            script = run.script if run.named else stdin
+            inline = run.inline
+        elif name in _SOURCE_COMMANDS:
+            script = arguments[0] if arguments else None
+        else:
+            script = program if _names_a_script(program) else None
+        if script is not None:
+            scripts.append(script)
+        if inline is not None and depth < _MAX_INLINE_DEPTH:
+            scripts.extend(local_scripts(inline, depth + 1))
+    return scripts

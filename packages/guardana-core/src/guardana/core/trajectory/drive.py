@@ -124,4 +124,13 @@ def _answer(
 
 
 def _history_bytes(messages: Sequence[ChatMessage]) -> int:
-    return sum(len(m.content.encode("utf-8")) for m in messages)
+    """Count every text the next request re-sends, the tool calls each turn carried included."""
+    return sum(
+        _utf8(message.role, message.content, message.tool_call_id or "")
+        + sum(_utf8(call.name, call.arguments, call.id) for call in message.tool_calls)
+        for message in messages
+    )
+
+
+def _utf8(*texts: str) -> int:
+    return sum(len(text.encode("utf-8")) for text in texts)

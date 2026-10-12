@@ -21,7 +21,7 @@ from guardana.core.testing import files_target
 from guardana.rules._base import ArtifactRule
 from guardana.rules.prompt._injection_markers import OVERRIDE_PHRASE, has_smuggled_char
 from guardana.rules.supply_chain._leads import unscanned_verdict
-from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefix
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_model, read_text_prefix
 
 # Files an AI coding assistant or a model loader reads as *instructions* or as
 # trusted context: agent rule files, and Markdown docs / model cards. A payload
@@ -191,7 +191,7 @@ class HiddenInstructionsRule(ArtifactRule):
 
     def _scan_safetensors(self, path: Path) -> Iterator[Finding]:
         try:
-            header = read_safetensors_header(path)
+            header = read_model(read_safetensors_header, path)
         except FormatError as exc:
             yield self._unscanned(path, str(exc))
             return

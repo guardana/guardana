@@ -28,7 +28,7 @@ Each later nonblank line is a case. The case fields are:
 | `accepted` | Optional, with `observed`: a correct reply, which its expectation must grade `pass`. |
 
 `observed` and `accepted` come together or not at all, and only in the suite's own dataset,
-never in a fixture dataset. A run never sends or reads them, and they are not part of a
+never in a fixture dataset. A run never sends them or grades them as the target's reply. They are not part of a
 case's identity: [`guardana case add`](usage-case.md) writes them, and `guardana rule test`,
 every `guardana recipe` command and every run that selects the suite regrade them. A format-1 dataset
 (`"guardana_dataset": 1`) is still read, without `observed` and `accepted`. The formats are
@@ -118,4 +118,4 @@ The saved run includes a suite summary; see [suite summaries](usage-run.md#suite
 - The collector receives the target's request count, not `usage.judge`.
 - `diff` pairs cases across runs but does not test a suite's rate statistically.
 - A file holds one calibration per evaluator id.
-- `regex` grades a reply of up to 65,536 characters; a longer reply is `inconclusive`. There is no time bound: a pattern that backtracks can hang on a crafted reply, so avoid nested quantifiers and several `.*` in a row, or use possessive quantifiers and atomic groups.
+- `regex` grades replies up to 65,536 characters; longer replies are `inconclusive`. Each search runs in a separate worker process for at most 2 seconds. A longer search stops with `inconclusive` ("regex search exceeded 2 s; not evaluated"), never a pass. Like any `inconclusive` result, it makes the run `indeterminate` (exit `2`) when `fail_on_inconclusive` is on. Backtracking patterns, such as nested quantifiers or several `.*` in a row, can still exhaust this time on a crafted reply. Use possessive quantifiers or atomic groups instead.

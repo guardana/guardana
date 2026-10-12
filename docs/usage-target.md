@@ -15,12 +15,15 @@ one turns a rule into a check that runs, proves nothing, and reports a pass.
 guardana target inspect --url https://api.example.com --model gpt-4o-mini
 ```
 
-An installed endpoint target with a locator uses the same inspection:
+An installed endpoint target with a locator uses the same inspection. This assumes that the
+distribution `acme-gateway` registers the `acme-gateway` scheme and is admitted by name, because
+every command starts with only Guardana's own distributions:
 
 ```bash
 guardana target inspect \
   --target acme-gateway://llm.internal/v1 \
-  --target-option model=support-v3
+  --target-option model=support-v3 \
+  --plugins allowlist --allow-plugin acme-gateway
 ```
 
 ```text
@@ -125,7 +128,10 @@ warning about coverage.
 
 ## What it costs
 
-Three requests, stated in the output. An inspection is cheap next to a probe, and
+Up to three requests, one per testable capability (chat, a planted system prompt,
+tool calling). Capabilities the target does not implement are reported without a
+request. The output states the count. A transport retry after a `429` or `5xx` resends
+a request and is excluded from that count. An inspection is cheap next to a probe, and
 a team paying per token is entitled to know the price of every command.
 
 ## See also
