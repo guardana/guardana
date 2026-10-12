@@ -214,6 +214,16 @@ def test_a_config_json_is_a_model_only_inside_a_keras_model_directory(tmp_path: 
     assert observed == {str(model / "config.json"): "keras-directory"}
 
 
+def test_a_config_json_beside_npz_weights_is_a_keras_model_directory(tmp_path: Path) -> None:
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "model.weights.npz").write_bytes(b"PK\x05\x06" + bytes(18))
+
+    assert _model_formats(tmp_path) == {
+        "config.json": "keras-directory",
+        "model.weights.npz": "numpy-zip",
+    }
+
+
 def test_an_hdf5_file_behind_a_userblock_is_a_model(tmp_path: Path) -> None:
     (tmp_path / "near.bin").write_bytes(bytes(1024) + b"\x89HDF\r\n\x1a\n" + bytes(16))
     with (tmp_path / "far.weights").open("wb") as handle:

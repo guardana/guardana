@@ -133,7 +133,7 @@ _UNREAD_MODEL_NAMES = frozenset({"model.tar.gz", "saved_model.pb", "saved_model.
 """Model files the inventory recognises that no reader here opens inside an archive."""
 _DATASET_SHARED_SUFFIXES = frozenset({".h5", ".hdf5", ".hdf", ".weights", ".tf"})
 """HDF5 holds datasets as often as Keras models, so inside a plain archive it is not named."""
-_KERAS_DIRECTORY_FILES = frozenset({"config.json", "model.weights.h5"})
+_KERAS_DIRECTORY_FILES = frozenset({"config.json", "model.weights.h5", "model.weights.npz"})
 """Files of a Keras model directory, named inside a model archive only, where no data sits."""
 _UNREAD_MODELS_LISTED = 5
 _LEGACY_STORAGES = "storages"

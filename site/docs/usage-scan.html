@@ -471,7 +471,7 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.onnx_graph</code></td>
 </tr>
 <tr>
-<td><code>.keras</code>, <code>.h5</code>, <code>.hdf5</code>; a <code>.bin</code>, <code>.model</code>, <code>.hdf</code>, <code>.weights</code> or <code>.tf</code> that holds the HDF5 signature at its start or after a userblock; a file with no suffix that holds it in its first 64 KiB; a <code>config.json</code> beside <code>metadata.json</code> or <code>model.weights.h5</code> (an unzipped Keras model directory)</td>
+<td><code>.keras</code>, <code>.h5</code>, <code>.hdf5</code>; a <code>.bin</code>, <code>.model</code>, <code>.hdf</code>, <code>.weights</code> or <code>.tf</code> that holds the HDF5 signature at its start or after a userblock; a file with no suffix that holds it in its first 64 KiB; a <code>config.json</code> beside <code>metadata.json</code>, <code>model.weights.h5</code> or <code>model.weights.npz</code> (an unzipped Keras model directory); a tf_keras SavedModel's <code>keras_metadata.pb</code></td>
 <td><code>guardana.supply_chain.keras_lambda</code></td>
 </tr>
 <tr>
@@ -514,7 +514,36 @@ arithmetic namespaces, or array functions such as <code>reshape</code> and <code
 <code>io.write_file</code>; so is a <code>ClassMethod</code> layer, which calls the method its config names on
 the class it names, unless it builds a tensor (<code>RaggedTensor.from_row_splits</code> and the other
 <code>RaggedTensor</code> constructors, <code>SparseTensor.from_value</code>). A layer of either kind that names
-nothing it calls, or whose config cannot be decoded, is reported as not scanned. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
+nothing it calls, or whose config cannot be decoded, is reported as not scanned. A
+marshalled function (<code>&quot;class_name&quot;: &quot;__lambda__&quot;</code>) anywhere in a config, which Keras 3 runs
+on load without a Lambda layer around it, is a <code>high</code> finding, and so is an object naming a
+callable in <code>os</code>, <code>subprocess</code>, <code>builtins</code> or another module a model has no use for (<code>sys</code>,
+<code>socket</code>, <code>shutil</code>, <code>pty</code>, <code>importlib</code>, <code>posix</code>, <code>nt</code>, <code>runpy</code>, <code>ctypes</code>, <code>pickle</code>,
+<code>marshal</code>, <code>code</code>), which Keras before 3.9 imports on load; a callable in any other module
+outside Keras, such as a project's own, is not reported. A <code>TFSMLayer</code> is a <code>high</code> finding
+naming the SavedModel it loads, which <code>load_model</code> in Keras through 3.11 loads whatever
+<code>safe_mode</code> says; one
+naming no path, or whose config cannot be decoded, is reported as not scanned. A layer counts
+as a Lambda or a <code>TFSMLayer</code> when its <code>class_name</code> or its <code>registered_name</code> names one, since
+Keras 3.8 builds the class <code>registered_name</code> names when <code>class_name</code> names nothing in the
+layer's module. A <code>StringLookup</code>, <code>IntegerLookup</code> or <code>TextVectorization</code> layer reads a
+string <code>vocabulary</code> as a file while Keras builds it, <code>safe_mode</code> or not; one naming an absolute path, a <code>..</code> path or a URL (<code>gs://</code> too) is a <code>medium</code> lead, the
+same judgement <code>saved_model_ops</code> makes of a table's file below, and a list or a relative path
+stays quiet. A tf_keras SavedModel's <code>keras_metadata.pb</code> is searched like an HDF5 model. Keras metadata that an
+older SavedModel keeps inside <code>saved_model.pb</code> is not read, and neither is a <code>config.json</code>
+with none of Keras' own files beside it, although <code>keras.saving.load_model</code> loads such a
+directory. <code>saved_model_ops</code> reports <code>ReadFile</code> and <code>WriteFile</code> as <code>medium</code> leads wherever
+they sit. <code>MatchingFiles</code>, <code>InitializeTableFromTextFile</code> and <code>InitializeTableFromTextFileV2</code>
+are <code>medium</code> leads only when the graph also holds a string constant naming a file outside
+the model: an absolute path, a <code>..</code> path or a URL (<code>file://</code>, <code>gs://</code>, <code>s3://</code>, which
+TensorFlow opens alike) whose file name is not one the model ships under its own <code>assets/</code>,
+so a vocabulary read from <code>assets/vocab.txt</code> stays quiet. <code>Save</code>, <code>SaveV2</code> and
+<code>MergeV2Checkpoints</code> are not reported: every SavedModel's saver writes its checkpoint with
+them. <code>PrintV2</code> is a <code>medium</code> lead only when the graph also holds a <code>file://</code> string (in
+the text form, a <code>file://</code> string attribute), the output stream it writes to. The operator and
+the string are not tied through the graph: a constant naming a file elsewhere beside an op
+that reads another file is reported, and a path the graph builds from pieces none of which
+looks like one, or a constant of fewer than five characters, is not. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
 a model (<code>pickle</code>, <code>data.pkl</code>, <code>*.pt</code>, <code>*.pth.tar</code>, <code>*.pkl.gz</code>; a <code>*.bin</code>, <code>*.sav</code>, <code>*.p</code>,
 <code>*.model</code> or <code>*.dat</code> member only when its bytes are a pickle), every member of a <code>.zip</code>
 whose first bytes are an NPY array or a pickle <code>PROTO</code> opcode whatever its name, and every member
@@ -526,7 +555,7 @@ so a pickle saved under such a name inside one is not found. A member named as
 a model that is itself an archive is a coverage shortfall, and one <code>pickle.load</code> would read is still read as a stream. A member named as a
 model it does not open inside an archive (<code>*.safetensors</code>, <code>*.gguf</code>, <code>*.onnx</code>, <code>*.keras</code>,
 <code>model.tar.gz</code> and the rest of the last row above, and HDF5 files (<code>*.h5</code>, <code>*.hdf5</code>, <code>*.hdf</code>, <code>*.weights</code>, <code>*.tf</code>) and a Keras directory's
-<code>config.json</code> or <code>model.weights.h5</code> inside a model archive, though not inside a plain
+<code>config.json</code>, <code>model.weights.h5</code> or <code>model.weights.npz</code> inside a model archive, though not inside a plain
 <code>.zip</code> or <code>.tar</code>, where HDF5 is as often a dataset) is a
 coverage shortfall that names it; a zip member counts under its directory name and under an
 Info-ZIP Unicode Path alike. A file or member it reads whose first bytes are a zlib, gzip,

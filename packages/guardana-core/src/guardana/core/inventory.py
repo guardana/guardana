@@ -122,7 +122,7 @@ _HEAD_SNIFFED_SUFFIXES = frozenset({""})
 of the file's head rather than wherever a userblock may put it."""
 _KERAS_HDF5 = "keras-hdf5"
 _MODEL_DIRECTORY_FILES: dict[str, tuple[tuple[str, ...], str]] = {
-    "config.json": (("metadata.json", "model.weights.h5"), "keras-directory"),
+    "config.json": (("metadata.json", "model.weights.h5", "model.weights.npz"), "keras-directory"),
 }
 """Files that are a model only beside one of the named siblings: an unzipped Keras model
 keeps its `config.json` next to Keras' own files, while a lone `config.json` is anyone's."""

@@ -639,7 +639,9 @@ def test_every_model_name_the_inventory_knows_is_read_or_named_inside_an_archive
     ] == []
 
 
-@pytest.mark.parametrize("member", ["model.hdf", "model.weights", "model.tf", "config.json"])
+@pytest.mark.parametrize(
+    "member", ["model.hdf", "model.weights", "model.tf", "config.json", "model.weights.npz"]
+)
 def test_keras_files_in_a_model_archive_are_named_and_in_a_plain_one_are_not(
     tmp_path: Path, member: str
 ) -> None:

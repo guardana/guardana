@@ -29,7 +29,7 @@ from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget
-from guardana.rules.supply_chain import _ast_names, keras_lambda, pickle_opcode
+from guardana.rules.supply_chain import _ast_names, keras_lambda, pickle_opcode, saved_model_ops
 
 _SOURCE_FILES = 6
 # The one walk belongs to the target; every rule filters its listing.
@@ -197,6 +197,7 @@ def _opens_by_reader(
         for name, module in (
             ("pickle_opcode", pickle_opcode),
             ("keras_lambda", keras_lambda),
+            ("saved_model_ops", saved_model_ops),
             ("inventory", inventory),
         )
         if module.__file__ is not None
@@ -251,4 +252,54 @@ def test_a_file_whose_name_says_nothing_costs_each_reader_one_read(
     assert all(count <= 1 for count in opens.values()), (
         f"opens per file and reader: {dict(opens)} — a reader opens a file whose name says "
         f"nothing more than once to find out it is no model"
+    )
+
+
+def _varint(value: int) -> bytes:
+    out = bytearray()
+    while True:
+        low, value = value & 0x7F, value >> 7
+        out.append(low | (0x80 if value else 0))
+        if not value:
+            return bytes(out)
+
+
+def _field(number: int, payload: bytes) -> bytes:
+    return _varint(number << 3 | 2) + _varint(len(payload)) + payload
+
+
+def test_an_honest_keras_directory_and_savedmodel_cost_each_reader_one_read(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A Keras directory with `.npz` weights and a tf_keras SavedModel are read for what
+    # they run on load; an honest one must stay clean for one read of each file.
+    keras_dir = repo / "keras_model"
+    keras_dir.mkdir()
+    (keras_dir / "config.json").write_text(
+        '{"class_name": "Sequential", "config": {"layers": [{"class_name": "Dense"}]}}',
+        encoding="utf-8",
+    )
+    (keras_dir / "model.weights.npz").write_bytes(b"PK\x05\x06" + bytes(18))
+    saved = repo / "saved"
+    (saved / "variables").mkdir(parents=True)
+    saver = _field(1, b"save/SaveV2") + _field(2, b"SaveV2") + _field(3, b"save/Const")
+    vocab = _field(1, b"vocab") + _field(2, b"Const") + _field(8, b"assets/vocab.txt")
+    table = _field(1, b"init") + _field(2, b"InitializeTableFromTextFileV2") + _field(3, b"vocab")
+    graph = b"".join(_field(1, node) for node in (saver, vocab, table))
+    (saved / "saved_model.pb").write_bytes(b"\x08\x01" + _field(2, _field(2, graph)))
+    (saved / "keras_metadata.pb").write_bytes(
+        _field(1, _field(5, b'{"class_name": "Dense", "config": {"units": 1}}'))
+    )
+    watched = {"config.json", "saved_model.pb", "keras_metadata.pb"}
+    opens = _opens_by_reader(monkeypatch, watched)
+    result = _runner().run(ArtifactTarget(repo))
+    model_rules = {
+        "guardana.supply_chain.keras_lambda",
+        "guardana.supply_chain.saved_model_ops",
+    }
+    assert not [f for f in result.findings if f.rule_id in model_rules]
+    assert {("config.json", "keras_lambda"), ("keras_metadata.pb", "keras_lambda")} <= set(opens)
+    assert ("saved_model.pb", "saved_model_ops") in opens
+    assert all(count <= 1 for (_name, reader), count in opens.items() if reader != "other"), (
+        f"opens per file and reader: {dict(opens)}"
     )
