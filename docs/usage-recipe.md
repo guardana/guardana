@@ -144,7 +144,32 @@ imports it is.
   install's `RECORD` lists are read first: a path they add or map outside the directory, or
   into a directory the tree pin leaves out (such as `build/`, where a setuptools strict
   editable install maps its packages, `.venv/` or `*.egg-info/`), is code the pin would not
-  cover, so the distribution stays unpinned. Bytecode under `__pycache__/` is not pinned, but
+  cover, so the distribution stays unpinned. A finder is read only when it is the template a
+  setuptools release 64.0.0 through 84.0.0 writes, with nothing but its mapping, namespaces
+  and own name filled in, and the mapping and namespaces as absolute paths; a `.pth` file
+  imports the finder, which runs all of it, so a finder with any other code leaves the
+  distribution unpinned, and one from a later setuptools whose template differs does too,
+  with that reason. A `.pth` file is read as UTF-8 as `site` reads it, past a byte order
+  mark; setuptools writes it in the locale's encoding, so under a locale that is not UTF-8
+  a `.pth` file naming a path outside ASCII cannot be read and leaves the distribution
+  unpinned. Otherwise each is also pinned by its content and each package
+  and path it maps, relative to the directory. Where they name the directory's absolute path,
+  followed by a path separator, a quote or a line end, that path is pinned as a placeholder,
+  so moving the project and installing it editable again keeps the pin; a `.pth` line written
+  relative to the environment is pinned as written, so it moves with the environment. An
+  editable digest is never that of a plain directory, even when `RECORD` lists no `.pth`
+  file or finder. Editing a finder or `.pth` file, or mapping a package elsewhere, changes
+  it; the bytecode check below applies to each finder too. A `.pth` file imports its finder
+  by name, so anything else importable under that name beside the finder (a package, a
+  directory, an extension module, legacy bytecode) or in a `sys.path` entry listed before it
+  leaves the distribution unpinned, as does an entry listed before it that is, or lies inside,
+  an archive or other file, which Guardana does not look into; the pin sees only the `sys.path` of the process that
+  pins, not entries the environment adds when the recipe runs (`PYTHONPATH`, another `.pth`
+  file, `sitecustomize`). A directory the pin leaves out
+  whose name is a Python identifier — `node_modules` and `__pycache__` at any depth, and
+  `venv`, `build`, `dist` and `htmlcov` at the top when a `.pth` file adds the directory
+  itself to `sys.path` — stays importable by name, and what is imported from it is not
+  pinned. Bytecode under `__pycache__/` is not pinned, but
   bytecode this interpreter would load in place of a pinned source (hash-based bytecode,
   whatever hash it records, or bytecode recording the source's modification time and size)
   leaves the distribution unpinned unless it is what that source compiles to; bytecode only
@@ -182,10 +207,14 @@ imports it is.
   path) has its generated scripts hashed too, so its pin can differ by installer.
 
 A distribution stays under `unpinned`, with the reason, when it holds more than 20,000 files or
-256 MiB, when a symlink leads outside its directory, when its editable install loads code from
-outside its directory or maps its packages in a way Guardana cannot read, when it has no
+256 MiB (an editable install's `.pth` files and finders count toward both), when one of those
+`.pth` files or finders is larger than 64 KiB, when a symlink leads outside its directory, when
+a file in its editable directory is not a regular file (a FIFO, a device, a socket) or changes
+between the listing of the directory and its hashing, when its editable install loads code
+from outside its directory or maps its packages in a way Guardana cannot read, when it has no
 `RECORD` to read, when its `RECORD` lists an entry inside the install root without a hash, or
-when a file it installed outside the install root cannot be read or is not a regular file (a FIFO, a device, a socket). `unpinned` maps each
+when a file it installed outside the install root cannot be read or is not a regular file (a
+FIFO, a device, a socket). `unpinned` maps each
 `rule:<id>`, `evaluator:<id>` and `target:<scheme>` it registers — or `distribution:<name>`
 when it registers none of them — to that reason. `recipe run` computes the lock again on every
 run, so it hashes each editable tree again, within the same bounds.
