@@ -35,7 +35,7 @@ Every reader in the package makes the same four promises.
 | **Offline** | It reads the one file it was given. No network, ever. |
 | **Bounded** | Sizes claimed *inside* a file are checked against `Limits` before anything is allocated. A header claiming 2⁶⁴ entries costs a `FormatError`, not the scan. |
 | **Deterministic** | Same bytes, same result, on every platform and locale. |
-| **Fail-closed** | Anything it cannot parse raises `FormatError`. A reader never returns "empty" to mean "clean". |
+| **Fail-closed** | Anything it cannot parse raises `FormatError`. The ONNX reader can also return a partial summary with `truncated` set at its budget or nesting-depth limit (see the ONNX section below). Treat that as incomplete coverage. A reader never returns "empty" to mean "clean". |
 
 And one non-promise, which is the point: **a reader returns data, never a
 verdict.** It has no opinion about whether what it found is dangerous. That is

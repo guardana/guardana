@@ -445,7 +445,8 @@ another distribution registers is that distribution's code, not the pack's: <cod
 refuses to write and names both the pack and the distribution, and <code>--check</code> reports the id
 <code>removed</code>. Two distributions registering a target class of the same name is a load error
 naming both, so both commands exit <code>2</code> rather than pin either.</p>
-<p><code>unlocked:</code> lists extensions registered by a package that declares <strong>no manifest</strong>.
+<p><code>unlocked:</code> lists installed extensions that <strong>no manifest declares</strong>: extensions from packages
+with no manifest, and extensions a package registers but omits from its own manifest.
 They are recorded and not attributed to a pack, and the command says so on stderr —
 a lock that stayed silent about them would read as a fully pinned repository that
 is not one.</p>

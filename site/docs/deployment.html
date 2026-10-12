@@ -247,21 +247,23 @@ three in the morning wants one instruction (<code>rollback</code>), not a restar
 different environment variable. <code>/readyz</code> fails while a migration is pending, so a
 half-upgraded collector never quietly serves traffic.</p>
 <h2 id="standing-one-up">Standing one up</h2>
+<p>Copy <code>deploy/env.example</code> to <code>deploy/.env</code> and fill in every value: it has no
+defaults. Then migrate the schema, start the collector and bootstrap the first tenant:</p>
 <pre><code class="language-bash">cp deploy/env.example deploy/.env
-$EDITOR deploy/.env                    # it has no defaults; fill them in
+$EDITOR deploy/.env
 
 docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
 docker compose -f deploy/docker-compose.yml up -d
 docker compose -f deploy/docker-compose.yml run --rm collector \
-  bootstrap --org acme --project web   # prints the key, once
+  bootstrap --org acme --project web
 </code></pre>
 <p><code>bootstrap</code> creates the organization, the project and the first API key together.
 Store the key immediately: only a digest is kept, and there is no command that
 prints it again — a credential a system can re-read is a credential that leaks
 through every path that reads it.</p>
 <p>Check what you have:</p>
-<pre><code class="language-bash">curl -fsS http://127.0.0.1:8000/healthz    # the process answers
-curl -fsS http://127.0.0.1:8000/readyz     # storage reachable, schema current
+<pre><code class="language-bash">curl -fsS http://127.0.0.1:8000/healthz
+curl -fsS http://127.0.0.1:8000/readyz
 </code></pre>
 <p>They are separate on purpose. <code>/healthz</code> is liveness. <code>/readyz</code> is the one that
 fails while a migration is pending or the database is unreachable — point an
@@ -294,34 +296,40 @@ TLS with whatever you already run:</p>
 </code></pre>
 <p>If the proxy connects from outside loopback, set <code>FORWARDED_ALLOW_IPS</code> in the collector's environment to the client address shown in its access log for a forwarded request. Uvicorn trusts <code>X-Forwarded-Proto</code> and <code>X-Forwarded-For</code> only from those addresses; the default is <code>127.0.0.1,::1</code>. This applies to a proxy in another container or a host proxy reaching a Compose published port through Docker's gateway. Without that trust, the dashboard session cookie lacks <code>Secure</code> and per-address limits count requests as coming from the proxy. Never use <code>*</code> on a port others can reach, since callers could claim <code>https</code> and any client address.</p>
 <p>Then point pipelines at the public name — the URL keeps its own scheme, and a
-bare <code>host:port</code> is refused rather than guessed:</p>
-<pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…     # a masked/secret CI variable
+bare <code>host:port</code> is refused rather than guessed. Keep the token in a masked secret
+CI variable:</p>
+<pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…
 guardana scan . --ai-system support-agent --environment production \
   --reporter server://https://collector.example.com
 </code></pre>
 <h2 id="upgrading">Upgrading</h2>
 <pre><code class="language-bash">docker compose -f deploy/docker-compose.yml pull
-docker compose -f deploy/docker-compose.yml stop collector     # nothing writes while the schema changes
+docker compose -f deploy/docker-compose.yml stop collector
 docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
 docker compose -f deploy/docker-compose.yml up -d
-curl -fsS https://collector.example.com/readyz                 # ready once storage and schema agree
+curl -fsS https://collector.example.com/readyz
 </code></pre>
 <p>In that order, and never with the migration skipped. The old collector stops before the
-schema changes, because a collector refuses a database written by a newer build, and the
-new image starts only after the migration. Send traffic back once <code>/readyz</code> answers. What protects you if it
+schema changes: an old collector left running keeps writing into a schema
+written by a newer build. The new image starts only after migration. Send traffic back once <code>/readyz</code> answers. What protects you if it
 goes wrong is built into the migration runner: every migration ships a rollback,
 each runs in its own committed transaction under an advisory lock, and the runner
 <strong>refuses</strong> a migration edited after it was applied, one numbered below the
 highest applied, or a database written by a newer build than the one you are
-running. So a collector pointed at a database from the future stops rather than
-writing into it.</p>
+running. A running collector pointed at a database from a newer build stays
+up and answers <code>/readyz</code> with <code>503</code>. That readiness response keeps traffic away:
+use it to route traffic at the proxy or orchestrator. Keep the collector stopped until
+the image and schema match.</p>
 <p>To undo one step:</p>
 <pre><code class="language-bash">docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate rollback --steps 1
-docker compose -f deploy/docker-compose.yml status   # or: guardana-collector status
+docker compose -f deploy/docker-compose.yml run --rm collector status
 </code></pre>
-<p>Roll the <em>image</em> back to the matching tag at the same time. A collector older
+<p>Outside Compose, the second command is <code>guardana-collector status</code>. Roll the <em>image</em>
+back to the matching tag at the same time. A collector older
 than its schema is exactly the situation <code>/readyz</code> and the version check exist to
-stop, and they will stop it.</p>
+report: <code>migrate</code> and <code>status</code> refuse such a database, and <code>/readyz</code> answers <code>503</code>.
+Neither stops the process or refuses its writes. Keep the collector stopped until
+the two match.</p>
 <p><strong>Pin the image to a minor tag</strong> (<code>:0.30</code>) rather than <code>latest</code>. You want fixes
 without a schema you did not plan for; <code>latest</code> gives you both.</p>
 <h2 id="backups-and-restoring-one">Backups, and restoring one</h2>
@@ -338,24 +346,26 @@ docker compose -f deploy/docker-compose.yml exec -T db \
   &gt; &quot;$BACKUP&quot;
 </code></pre>
 <p>Restore it — into an <strong>empty</strong> database, which is what a rebuild on a new machine
-actually looks like. Name the dump you are restoring and check that it reads before
-anything is dropped:</p>
+actually looks like. Name the dump to restore. The sequence checks that it
+reads, stops the collector to prevent writes mid-restore, recreates the database,
+restores, and checks <code>/readyz</code> (storage reachable, schema current). Each step requires
+the preceding step to succeed. An unreadable dump stops everything before the database
+is dropped. A failed restore leaves the collector stopped. Set <code>BACKUP</code> to the dump
+to restore:</p>
 <pre><code class="language-bash">set -a; . deploy/.env; set +a
-BACKUP=guardana-2026-08-05.dump                                 # the dump to restore
-docker compose -f deploy/docker-compose.yml exec -T db pg_restore --list &lt; &quot;$BACKUP&quot; &gt; /dev/null
+BACKUP=guardana-2026-08-05.dump
 
-docker compose -f deploy/docker-compose.yml stop collector     # nothing writes mid-restore
-
+docker compose -f deploy/docker-compose.yml exec -T db pg_restore --list &lt; &quot;$BACKUP&quot; &gt; /dev/null &amp;&amp;
+docker compose -f deploy/docker-compose.yml stop collector &amp;&amp;
 docker compose -f deploy/docker-compose.yml exec -T db psql -U &quot;$POSTGRES_USER&quot; -d postgres \
+  -v ON_ERROR_STOP=1 \
   -c &quot;drop database if exists \&quot;$POSTGRES_DB\&quot; with (force)&quot; \
-  -c &quot;create database \&quot;$POSTGRES_DB\&quot;&quot;
-
+  -c &quot;create database \&quot;$POSTGRES_DB\&quot;&quot; &amp;&amp;
 docker compose -f deploy/docker-compose.yml exec -T db \
   pg_restore -U &quot;$POSTGRES_USER&quot; -d &quot;$POSTGRES_DB&quot; --clean --if-exists \
-  &lt; &quot;$BACKUP&quot;
-
-docker compose -f deploy/docker-compose.yml start collector
-curl -fsS http://127.0.0.1:8000/readyz     # storage reachable, schema current
+  &lt; &quot;$BACKUP&quot; &amp;&amp;
+docker compose -f deploy/docker-compose.yml start collector &amp;&amp;
+curl -fsS http://127.0.0.1:8000/readyz
 </code></pre>
 <p>Three things this procedure is deliberate about:</p>
 <p><strong>Run <code>pg_dump</code> inside the database container.</strong> Not because it is tidier —
@@ -383,11 +393,11 @@ may have leaked. Both keys work until the old one is revoked, allowing pipelines
 <code>--environment</code> as the one it replaces. <code>key list</code> shows both: the scopes, and the
 environment in brackets after the project. Repeat them, because <code>--scope</code> defaults
 to <code>ingest</code> alone and a key created without <code>--environment</code> may write to any
-environment of the project:</p>
+environment of the project. <code>key create</code> prints the new key once:</p>
 <pre><code class="language-bash">docker compose -f deploy/docker-compose.yml run --rm collector key list --project acme/web
 docker compose -f deploy/docker-compose.yml run --rm collector \
   key create --project acme/web --name github-actions-2 \
-  --scope ingest --environment production   # the old key's values; prints the key, once
+  --scope ingest --environment production
 </code></pre>
 </li>
 <li>
@@ -472,8 +482,8 @@ limit, rate-limit at the proxy that already terminates TLS.</p>
 <td>the only endpoint that knows about storage and pending migrations</td>
 </tr>
 <tr>
-<td>container restarts</td>
-<td>a collector that cannot reach its database exits rather than serving half a service</td>
+<td><code>503</code> from <code>/readyz</code> and from authenticated routes</td>
+<td>A collector that cannot reach its database stays running and answers <code>503</code>. It does not exit, so container restarts do not show a database outage.</td>
 </tr>
 <tr>
 <td><code>guardana-collector status</code></td>
@@ -491,8 +501,7 @@ volume grows for as long as agents report: <code>--forever</code> is the default
 because silently deleting a customer's evidence is the worse failure. To bound the
 growth, run <code>apply</code> on a schedule and alert when it fails:</p>
 <pre><code class="language-bash"># cron, daily at 03:00; --dry-run first, by hand, to see what would go
-0 3 * * * cd /srv/guardana &amp;&amp; docker compose -f deploy/docker-compose.yml run --rm collector \
-  retention apply --project acme/web || logger -t guardana &quot;retention apply failed&quot;
+0 3 * * * cd /srv/guardana &amp;&amp; docker compose -f deploy/docker-compose.yml run --rm collector retention apply --project acme/web || logger -t guardana &quot;retention apply failed&quot;
 </code></pre>
 <h2 id="what-this-deployment-does-not-give-you-yet">What this deployment does not give you yet</h2>
 <p>Being explicit, because a deployment guide that oversells is worse than none:</p>

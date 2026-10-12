@@ -90,7 +90,7 @@ expect:
 | `severity` | yes | `info\|low\|medium\|high\|critical` (case-insensitive) | Maps to `guardana.core.severity.Severity`. |
 | `target_kind` | yes | `artifact\|endpoint` | Which `Target` kind this rule runs against. YAML rules only ever run against `endpoint` today (`YamlRule.run` returns immediately if the target isn't an `EndpointTarget`) — static artifact checks are currently authored as Python plugins (see Path 2). |
 | `taxonomy` | no (default `[]`) | list of references | OWASP/MITRE/NIST references, e.g. `[LLM01:2025, AML.T0051]`. **A reference names its edition where the framework publishes them** (`LLM07:2025`, `ASI06:2026`); a framework with no editions keeps its bare id (`AML.T0051`, `supply-chain`). Every reference must resolve through `guardana.core.taxonomy.resolve()` — an unknown one is rejected at load time, not silently dropped, so a typo fails loudly, and a bare `LLM07` is rejected too, naming the editions that define it rather than picking one. Run [`guardana taxonomy`](usage-taxonomy.md) to list what is installed. Beyond the built-in frameworks you can register your own with the `guardana.taxonomies` entry point and then name it here. |
-| `evaluator` | yes | string | The evaluator id this rule's prompts are graded with, e.g. `keyword`, `canary`, or an evaluator your own package registers, e.g. `acme.severity_classifier`. A rule using `canary` must set `expect.canary`, and one using `llm_judge` must set `expect.goal` — the loader rejects it otherwise. `llm_judge` and `guard` also need an `evaluators:` block in `guardana.yaml` telling Guardana where their model lives (see [`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)); without it, the rule's run records a `RuleLoadError` (`unknown evaluator`) error instead of grading. |
+| `evaluator` | yes | string | The evaluator id this rule's prompts are graded with, e.g. `keyword`, `canary`, or an evaluator your own package registers, e.g. `acme.severity_classifier`. A rule using `canary` must set `expect.canary`, and one using `llm_judge` must set `expect.goal` — the loader rejects it otherwise. `llm_judge` and `guard` also need an `evaluators:` block in `guardana.yaml` telling Guardana where their model lives (see [`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)); without it, the rule's run records a `RuleLoadError` (`unknown evaluator`) error instead of grading. `fail_on_error` (on by default) counts that error against the gate. |
 | `requires` | no (default `[]`) | list of capability names | Capabilities the target must support, e.g. `[chat]` or `[chat, plant_system_prompt]`. Maps to `guardana.core.target.Capability` (case-insensitive). The `Runner` skips the rule (not a crash) if the target lacks any of these. |
 | `prompts` | yes (at least one) | list of strings | The corpus sent to the target, one `chat()` call per prompt and trial. A scalar string is rejected — it would explode into single-character prompts — and so is a prompt listed twice, because a prompt is its own case id. |
 | `expect` | no (default `{}`) | mapping | Passed straight to the evaluator as an `Expectation`: `canary` (string, the marker the `canary` evaluator looks for), `goal` (string, free-text used by `llm_judge`'s prompt template), and the fields the rule's evaluator declares, such as `refusal_markers` for `keyword` and `answered` (see [Refusals in another language](#refusals-in-another-language)). Unknown keys are rejected. |
@@ -134,8 +134,8 @@ a `Verdict` against the rule's `Expectation`. A `"fail"` verdict yields a
 `Finding`; an `"inconclusive"` verdict (the evaluator could not actually
 grade — say, an empty reply) is routed to the result's `unverified` channel
 instead of being dropped; only a real `"pass"` yields nothing. An evaluator
-id that resolves to nothing is a loud error (a visible skip), never a rule
-that silently passes everything.
+id that resolves to nothing is a loud error recorded in the run's `errors`, never a
+rule that silently passes everything.
 
 When the target reports reply metadata (an adapter's `metadata_paths:`), the rule asks
 through `chat_reply` and the `Exchange` carries it in `meta`. A request the application
@@ -479,7 +479,7 @@ multiplies the cost of the whole scan by the number of rules:
 
 ```python
 for path in target.iter_files((".py",)):
-    source = target.python_source(path)   # read, parsed and indexed once per scan
+    source = target.python_source(path)   # parsed once per scan while it fits the cache
     if source is None:
         continue                          # unreadable or unparseable — not "clean"
     for node in source.nodes(ast.Call):   # no ast.walk: the index is already built

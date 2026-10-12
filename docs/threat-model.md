@@ -11,8 +11,6 @@ What Guardana defends against, what it deliberately does not, and where the
 trust boundaries sit. A security tool without a stated threat model is asking to
 be trusted on vibes.
 
-**Status:** first published for v0.7.
-
 ## The shape of the system
 
 ```
@@ -82,7 +80,7 @@ answers into something that can aim the scanner.
 
 **Stance:** responses are size-bounded and timed out; a hang is an error, not a
 pass. Model output is treated as untrusted throughout — it is never executed, and
-since v0.7 it is redacted before it reaches any output path.
+it is redacted before it reaches any output path.
 
 The address a target *chooses* is a different question from the address an
 operator *types*, and they are answered differently.
@@ -206,9 +204,9 @@ for an installed reporter, since the reporter's own code makes the connection; t
 **Scenario:** a rule finds a leaked API key, records it as evidence, and the
 report is committed to a repository or uploaded to a collector.
 
-**Stance:** evidence is redacted, and after v0.7 centrally rather than by
+**Stance:** evidence is redacted centrally rather than by
 convention (see [privacy](privacy.md)). Prompts and
-responses are not stored by default; `full` evidence mode warns loudly.
+responses are not stored by default. `guardana doctor` warns when a profile selects `full` evidence mode. Commands that run checks do not repeat the warning.
 
 **Residual risk:** a third-party rule that writes a secret into a field the
 redactor does not know about. Mitigated by redacting at one seam every output path
@@ -221,7 +219,7 @@ inventory of weaknesses: it should go only where the report itself may go.
 
 **Scenario:** a CI secret leaks; the holder can write findings to the collector.
 
-**Stance (v0.7):** keys are scoped to a project, revocable, hashed at rest, shown
+**Stance:** keys are scoped to a project, revocable, hashed at rest, shown
 once. A runner key can **write runs, not read other projects** — so a leaked CI
 key does not become a read of the whole fleet's findings.
 
@@ -233,7 +231,7 @@ detecting a fabricated *finding*, and is an open problem. Anyone with database w
 
 **Scenario:** one organization reads another's findings by guessing an id.
 
-**Stance (v0.7):** tenancy enforced at the query boundary, not in handlers; no
+**Stance:** tenancy enforced at the query boundary, not in handlers; no
 unscoped query exists. Tested per entity, both read and write.
 
 **Residual risk:** tenancy is enforced only in the API. Anyone with the database credential or a backup can read every project. Database write access can add API keys, rewrite submissions and edit the audit log. Stored API keys are digests, so a leak does not expose existing keys.
@@ -278,8 +276,8 @@ rate limits on ingest, bounded submission counts in storage.
 **Scenario:** a probe against a production agent calls a real tool, writes to real
 memory, sends a real email.
 
-**Stance:** tool calls go to doubles; Guardana never executes a real tool. After
-v0.7, rules declare `impact` and destructive checks require an explicit
+**Stance:** tool calls go to doubles; Guardana never executes a real tool. Rules
+declare `impact` and destructive checks require an explicit
 `--allow-destructive`. Documented in [safe testing](safe-testing.md).
 
 **Residual risk:** a *model* wired to real tools by its own deployment can take
@@ -332,7 +330,7 @@ declares, not on who signed it. Only the JSON-RPC binding is spoken.
 
 **Stance:** prefer deterministic evaluators (`canary`, `tool_call` and the equality checks). A judge-graded rate is corrected only with a calibration that measures the judge's error per class. Otherwise it reads `uncorrected` and declines. An evaluator that does not declare itself `deterministic` is treated as a judge.
 
-**Residual risk:** correction assumes the judge errs the same way on the calibration corpus as on this run's replies. One model's refusals do not calibrate a judge reading another model's jailbreaks. The corpus digest is printed beside the rate so a reader can check it. The judge receives the conversation as `role: content` lines: a role label a reply writes inside its own text cannot be distinguished from a real turn, so a reply can make its own content look like another speaker's. Deterministic evaluators (`canary`, `tool_call`, the equality checks) do not read the transcript this way.
+**Residual risk:** correction assumes the judge errs the same way on the calibration corpus and this run's replies. One model's refusals do not calibrate a judge reading another model's jailbreaks. The corpus digest is printed beside the rate for readers to check. With the default prompt version `2026.1`, `llm_judge` receives the conversation as one JSON-encoded string on a single line between `TRANSCRIPT BEGIN` and `TRANSCRIPT END`. A reply cannot end that block or start its own line. The prompt tells the judge everything inside is data. Within the string, turns remain `role: content` lines joined by encoded line breaks. A role label within a reply looks like a real turn, so the reply can impersonate another speaker and argue for a verdict. With the opt-in `prompt_version: "2025.1"`, the judge receives those lines as raw text without a surrounding block. A reply can also write text that looks like the transcript's end. Deterministic evaluators (`canary`, `tool_call`, the equality checks) do not read the transcript this way.
 
 ## Explicit non-goals
 

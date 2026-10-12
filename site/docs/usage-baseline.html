@@ -214,9 +214,10 @@ waivers:
     approved_by: security@example.com
     expires: 2026-12-31
 </code></pre>
-<p><strong>A generated baseline is deliberately not usable as-is.</strong> Every waiver carries
-placeholder text for the reason and the approver, and <code>verify</code> fails while it is
-still there. A baseline nobody edited is a list of findings somebody silenced in a
+<p><strong>A generated baseline waives its findings as soon as a scan reads it and states
+that it is unreviewed.</strong> Every waiver has placeholder text for its reason and
+approver. <code>scan</code> warns about each such waiver; <code>verify</code> fails while the text
+remains. Gate on <code>guardana baseline verify</code> to require review. An unedited baseline lists findings somebody silenced in a
 hurry, and it should look like one.</p>
 <h2 id="flags">Flags</h2>
 <p><code>create</code> and <code>update</code> both run a scan, so both take the same plugin-trust flags

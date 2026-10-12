@@ -14,7 +14,8 @@ way a finding leaves the process goes through it.
 
 ## Defaults
 
-Every command defaults to `redacted`; artifact scans send nothing, and Guardana sends no
+Every command defaults to `redacted`; artifact scans send nothing unless `--reporter` names a
+destination, and Guardana sends no
 telemetry and needs no account. Probes contact the named target and send graded exchanges
 to judges or guards under `evaluators:`; when an MCP target requires authorization, they
 also read its advertised protected-resource metadata and the metadata of the authorization

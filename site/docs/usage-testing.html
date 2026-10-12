@@ -340,8 +340,9 @@ indeterminate result rather than a pass. <code>guardana target inspect</code> sh
 the two you have.</li>
 <li><strong>Token budgets need a model that reports usage.</strong> When the reply carries
 <code>usage_metadata</code> the tokens are counted; when it does not, the count is recorded
-as unknown rather than zero — so a <em>token</em> ceiling over such a model can never
-fire, while a <em>request</em> ceiling always can.</li>
+as unknown rather than zero. A <em>token</em> ceiling over such a model cannot be
+enforced. The first reply missing the required count stops the run as budget
+exhausted (exit <code>6</code>). A <em>request</em> ceiling works as usual.</li>
 </ul>
 <h2 id="a-run-your-framework-already-performed">A run your framework already performed</h2>
 <p>The adapters above <em>drive</em> a model. These translate the record of a run that

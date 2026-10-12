@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - **The CLI usage pages document the options they were missing.** `usage-baseline` (`--file`, `--profile`, `--preset`), `usage-collector` (`bootstrap --key-name`, `--scope`), `usage-doctor` (`--profile`, `--preset`), `usage-grade` (`--concurrency`, `--plugins`, `--allow-plugin`), `usage-recipe` (`--concurrency`) and `usage-rules` (`--surface`); all defaults taken from the commands themselves.
+- **Docs now match the code, so readers do not rely on unsupported guarantees.** Shell examples in `docs/deployment.md` and `docs/integrations.md` work as written. A restore stops before anything is dropped if the dump does not read. Corrected statements cover collector schema and database failures, generated baselines, unconfigured judges, missing token counts, `import-observations` exit codes, coverage shortfalls, scan and probe destinations, calibration and empty-reply grading, reader and cache bounds, `target inspect` cost, the `full` evidence warning, `unlocked:` pack entries, regression-pair regrading, recipe artifacts, and how each judge prompt version carries the transcript (T12 in `docs/threat-model.md`).
 
 ### Fixed
 

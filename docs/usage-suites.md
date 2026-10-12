@@ -28,7 +28,7 @@ Each later nonblank line is a case. The case fields are:
 | `accepted` | Optional, with `observed`: a correct reply, which its expectation must grade `pass`. |
 
 `observed` and `accepted` come together or not at all, and only in the suite's own dataset,
-never in a fixture dataset. A run never sends or reads them, and they are not part of a
+never in a fixture dataset. A run never sends them or grades them as the target's reply. They are not part of a
 case's identity: [`guardana case add`](usage-case.md) writes them, and `guardana rule test`,
 every `guardana recipe` command and every run that selects the suite regrade them. A format-1 dataset
 (`"guardana_dataset": 1`) is still read, without `observed` and `accepted`. The formats are

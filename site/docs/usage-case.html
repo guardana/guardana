@@ -365,8 +365,9 @@ most the number of cases, since its default of 30 refuses a small suite at load.
 <code>regression</code> tag is a label: a case that carries it without a pair changes no gate. See
 <a href="usage-suites.html">quality suites</a>.</p>
 <h2 id="regrading">Regrading</h2>
-<p>A live run sends the case's input and grades the target's reply; it never reads <code>observed</code> or
-<code>accepted</code>, and neither is part of the case's identity.</p>
+<p>A live run sends the case's input and grades the target's reply. It never sends <code>observed</code> or
+<code>accepted</code> or grades either as the target's reply. It only regrades the pair offline as the
+list below describes. Neither is part of the case's identity.</p>
 <ul>
 <li><code>guardana rule test</code> regrades every pair of every selected suite with the rule as it is now,
 sending nothing, and names each case whose pair no longer holds: exit <code>1</code> when a side graded

@@ -16,7 +16,7 @@ guardana probe --url https://staging.example.com --model my-app --max-requests 5
 ```
 
 1. `plan probe` estimates the cost and lists what would run without sending a request.
-2. `target inspect` sends three requests to find out what the endpoint can do, and lists what it declares but could not confirm. It informs you; it does not configure the probe. A rule whose capability the target does not declare is skipped and recorded as skipped; a capability the target declares but inspection could not confirm still lets its rules run, so settle those before trusting the probe. `--require` exits `2` when a named capability is not confirmed ([target inspection](usage-target.md#declared-versus-verified)).
+2. `target inspect` sends up to three requests to check endpoint capabilities. It lists declared capabilities it cannot confirm. It informs you; it does not configure the probe. A rule whose capability the target does not declare is skipped and recorded as skipped. Rules for declared but unconfirmed capabilities still run. Resolve those uncertainties before trusting the probe. `--require` exits `2` when a named capability is not confirmed ([target inspection](usage-target.md#declared-versus-verified)).
 3. `probe` sends at most `--max-requests` requests and saves the run. The saved run records the plugin trust in force (`run.configuration.plugins`).
 
 Probe staging, not production. Your application can act on the model's output, and real probe requests can cost money. Read [safe testing](safe-testing.md) first. Run your own checks, such as the starter's `checks/`, with `--rules checks`.

@@ -301,7 +301,7 @@ expect:
 <td><code>evaluator</code></td>
 <td>yes</td>
 <td>string</td>
-<td>The evaluator id this rule's prompts are graded with, e.g. <code>keyword</code>, <code>canary</code>, or an evaluator your own package registers, e.g. <code>acme.severity_classifier</code>. A rule using <code>canary</code> must set <code>expect.canary</code>, and one using <code>llm_judge</code> must set <code>expect.goal</code> — the loader rejects it otherwise. <code>llm_judge</code> and <code>guard</code> also need an <code>evaluators:</code> block in <code>guardana.yaml</code> telling Guardana where their model lives (see <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>); without it, the rule's run records a <code>RuleLoadError</code> (<code>unknown evaluator</code>) error instead of grading.</td>
+<td>The evaluator id this rule's prompts are graded with, e.g. <code>keyword</code>, <code>canary</code>, or an evaluator your own package registers, e.g. <code>acme.severity_classifier</code>. A rule using <code>canary</code> must set <code>expect.canary</code>, and one using <code>llm_judge</code> must set <code>expect.goal</code> — the loader rejects it otherwise. <code>llm_judge</code> and <code>guard</code> also need an <code>evaluators:</code> block in <code>guardana.yaml</code> telling Guardana where their model lives (see <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>); without it, the rule's run records a <code>RuleLoadError</code> (<code>unknown evaluator</code>) error instead of grading. <code>fail_on_error</code> (on by default) counts that error against the gate.</td>
 </tr>
 <tr>
 <td><code>requires</code></td>
@@ -365,8 +365,8 @@ a <code>Verdict</code> against the rule's <code>Expectation</code>. A <code>&quo
 <code>Finding</code>; an <code>&quot;inconclusive&quot;</code> verdict (the evaluator could not actually
 grade — say, an empty reply) is routed to the result's <code>unverified</code> channel
 instead of being dropped; only a real <code>&quot;pass&quot;</code> yields nothing. An evaluator
-id that resolves to nothing is a loud error (a visible skip), never a rule
-that silently passes everything.</p>
+id that resolves to nothing is a loud error recorded in the run's <code>errors</code>, never a
+rule that silently passes everything.</p>
 <p>When the target reports reply metadata (an adapter's <code>metadata_paths:</code>), the rule asks
 through <code>chat_reply</code> and the <code>Exchange</code> carries it in <code>meta</code>. A request the application
 declines (an adapter's <code>declines:</code>) is graded rather than raised: the exchange ends on the
@@ -743,7 +743,7 @@ whatever the profile selects, unless <code>not_applicable_to</code> says it has 
 every rule over the same tree, so a rule that reads and parses a file for itself
 multiplies the cost of the whole scan by the number of rules:</p>
 <pre><code class="language-python">for path in target.iter_files((&quot;.py&quot;,)):
-    source = target.python_source(path)   # read, parsed and indexed once per scan
+    source = target.python_source(path)   # parsed once per scan while it fits the cache
     if source is None:
         continue                          # unreadable or unparseable — not &quot;clean&quot;
     for node in source.nodes(ast.Call):   # no ast.walk: the index is already built

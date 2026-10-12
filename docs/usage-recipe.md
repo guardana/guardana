@@ -253,8 +253,9 @@ at the end of `report.txt` and in `guardana run inspect`.
 error ("the run did not finish") and a `report.txt` saying so. When the run ends it replaces
 the directory whole. An interrupted run leaves the placeholder; a refused run writes the
 refusal into the same two files; a run its target stopped part-way replaces it with the
-partial run and exits `4`. A CI step that uploads the directory therefore never shows an
-earlier run's green.
+partial run and exits `4`. A CI step that uploads the directory after such a run
+does not show an earlier run's green. Exceptions are the refusals below that must not
+rewrite an input.
 
 | File | What it is |
 |---|---|

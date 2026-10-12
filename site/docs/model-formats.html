@@ -238,7 +238,7 @@ template = metadata.text(&quot;tokenizer.chat_template&quot;)
 </tr>
 <tr>
 <td><strong>Fail-closed</strong></td>
-<td>Anything it cannot parse raises <code>FormatError</code>. A reader never returns &quot;empty&quot; to mean &quot;clean&quot;.</td>
+<td>Anything it cannot parse raises <code>FormatError</code>. The ONNX reader can also return a partial summary with <code>truncated</code> set at its budget or nesting-depth limit (see the ONNX section below). Treat that as incomplete coverage. A reader never returns &quot;empty&quot; to mean &quot;clean&quot;.</td>
 </tr>
 </tbody>
 </table></div>

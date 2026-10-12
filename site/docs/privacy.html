@@ -204,7 +204,8 @@ the prompt that worked, the reply that leaked, the tool argument that carried a
 key. Since 0.7 that text passes through <strong>one redactor at one seam</strong>, and every
 way a finding leaves the process goes through it.</p>
 <h2 id="defaults">Defaults</h2>
-<p>Every command defaults to <code>redacted</code>; artifact scans send nothing, and Guardana sends no
+<p>Every command defaults to <code>redacted</code>; artifact scans send nothing unless <code>--reporter</code> names a
+destination, and Guardana sends no
 telemetry and needs no account. Probes contact the named target and send graded exchanges
 to judges or guards under <code>evaluators:</code>; when an MCP target requires authorization, they
 also read its advertised protected-resource metadata and the metadata of the authorization

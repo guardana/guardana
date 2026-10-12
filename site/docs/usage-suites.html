@@ -236,7 +236,7 @@
 </tbody>
 </table></div>
 <p><code>observed</code> and <code>accepted</code> come together or not at all, and only in the suite's own dataset,
-never in a fixture dataset. A run never sends or reads them, and they are not part of a
+never in a fixture dataset. A run never sends them or grades them as the target's reply. They are not part of a
 case's identity: <a href="usage-case.html"><code>guardana case add</code></a> writes them, and <code>guardana rule test</code>,
 every <code>guardana recipe</code> command and every run that selects the suite regrade them. A format-1 dataset
 (<code>&quot;guardana_dataset&quot;: 1</code>) is still read, without <code>observed</code> and <code>accepted</code>. The formats are

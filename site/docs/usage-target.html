@@ -348,7 +348,10 @@ When you are paying for coverage you expect to get, turn that on:</p>
 outranks it, because a fact somebody has to fix should not be buried under a
 warning about coverage.</p>
 <h2 id="what-it-costs">What it costs</h2>
-<p>Three requests, stated in the output. An inspection is cheap next to a probe, and
+<p>Up to three requests, one per testable capability (chat, a planted system prompt,
+tool calling). Capabilities the target does not implement are reported without a
+request. The output states the count. A transport retry after a <code>429</code> or <code>5xx</code> resends
+a request and is excluded from that count. An inspection is cheap next to a probe, and
 a team paying per token is entitled to know the price of every command.</p>
 <h2 id="see-also">See also</h2>
 <ul>

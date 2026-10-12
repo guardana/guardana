@@ -224,7 +224,8 @@ refuses to write and names both the pack and the distribution, and `--check` rep
 `removed`. Two distributions registering a target class of the same name is a load error
 naming both, so both commands exit `2` rather than pin either.
 
-`unlocked:` lists extensions registered by a package that declares **no manifest**.
+`unlocked:` lists installed extensions that **no manifest declares**: extensions from packages
+with no manifest, and extensions a package registers but omits from its own manifest.
 They are recorded and not attributed to a pack, and the command says so on stderr —
 a lock that stayed silent about them would read as a fully pinned repository that
 is not one.

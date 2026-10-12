@@ -249,8 +249,9 @@ per-rule declaration; <code>guardana rules</code> groups by it and takes <code>-
 <p>Built-ins: <code>ArtifactTarget</code> (walks a directory, exposing <code>iter_files(suffixes)</code>
 over model files, dependency manifests, and source, skipping <code>.git</code>,
 <code>.venv</code>, <code>node_modules</code>, etc., plus <code>python_source(path)</code> — a Python file read,
-parsed and indexed <strong>once per scan</strong> rather than once per rule, so scan cost
-grows with the target instead of with the rule count) and <code>EndpointTarget</code> (a live chat endpoint,
+parsed and indexed <strong>once per scan</strong>, not once per rule, while parsed sources
+fit an 8 MiB cache. Within that budget, scan cost grows with the target, not the
+rule count. Beyond it, each further read reparses the file) and <code>EndpointTarget</code> (a live chat endpoint,
 exposing <code>chat(messages) -&gt; str</code>, with a pluggable <code>ChatTransport</code> so tests
 never hit the network). The transport is selected by a provider name —
 <code>openai</code> (the default, any OpenAI-compatible server), <code>ollama</code> (native
@@ -322,9 +323,11 @@ class Verdict:
 message sequence plus <code>reply_text</code> (the last assistant reply, <code>None</code> when
 there is nothing to grade) and <code>transcript</code> (the whole conversation, so a
 multi-turn scenario's &quot;across the conversation&quot; goal is gradable). Every
-built-in evaluator fails closed on <code>reply_text is None</code>: the verdict is
-<code>inconclusive</code>, never a silent pass.</p>
-<p>Shipped evaluators: <code>keyword</code> (cheap refusal-marker matching — honestly
+built-in evaluator that grades reply text fails closed on <code>reply_text is None</code>:
+the verdict is <code>inconclusive</code>, never a silent pass. <code>tool_call</code> grades actions,
+even when a run has tool calls but no text. Its verdict is
+<code>inconclusive</code> when required action evidence is missing.</p>
+<p>Shipped evaluators include <code>keyword</code> (cheap refusal-marker matching — honestly
 low-confidence, ~0.5–0.6), <code>canary</code> (near-perfect detection of a planted marker
 verbatim, ~0.9–0.99), <code>length</code> (grades a reply by length — a runaway answer to a
 divergence prompt is a lead, for the unbounded-consumption check), <code>amplification</code>
@@ -335,9 +338,11 @@ confidence is measured as agreement across <code>min_agreement</code> samples, a
 version is stamped into <code>evaluator_id</code> — <code>llm_judge@2026.1</code> — so grading stays
 reproducible as the rubric evolves), and <code>guard</code> (an opt-in external
 safety-classifier — see
-<a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>).
-<code>guardana calibrate</code> measures and corrects for errors in <code>keyword</code>, <code>guard</code>, and
-<code>llm_judge</code>; the other evaluators are deterministic and need no such correction. A
+<a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>); the
+<a href="generated/evaluator-catalog.html">evaluator catalog</a> lists every one.
+<code>guardana calibrate</code> measures and corrects errors in <code>keyword</code>, <code>answered</code>,
+<code>guard</code>, <code>llm_judge</code> and <code>reference_judge</code>, each under its own evaluator id. Other
+evaluators are deterministic and need no such correction. A
 rule references an evaluator by its string <code>id</code>, resolved from the registry at run
 time; swapping which evaluator grades a rule requires no change to the rule
 itself.</p>

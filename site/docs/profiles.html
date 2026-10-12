@@ -402,7 +402,7 @@ delivery:                       # optional; see &quot;delivery:&quot; below
 <td><code>evaluators</code></td>
 <td>mapping</td>
 <td><code>{}</code></td>
-<td>Config blocks for evaluators that need a model of their own, keyed by evaluator id — <code>llm_judge</code> and <code>guard</code>; any other block name is refused. <code>probe</code>, <code>grade</code>, <code>monitor</code>, <code>calibrate</code> and <code>rule test</code> build and register them from this block at startup, and <code>plan</code> builds them to price their calls without sending any; see the next section. With no block, a rule naming that evaluator is skipped <strong>visibly</strong>, never silently passed.</td>
+<td>Config blocks for evaluators with their own model, keyed by evaluator id: <code>llm_judge</code> and <code>guard</code>. Other block names are refused. <code>probe</code>, <code>grade</code>, <code>monitor</code>, <code>calibrate</code> and <code>rule test</code> build and register them from this block at startup. <code>plan</code> builds them to price calls without sending any; see the next section. Without a block, a rule naming that evaluator is recorded as a rule error, never silently passed. The default <code>fail_on_error: true</code> makes that error fail the gate.</td>
 </tr>
 <tr>
 <td><code>budgets</code></td>
