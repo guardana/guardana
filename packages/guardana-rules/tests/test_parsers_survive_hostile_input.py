@@ -95,6 +95,13 @@ _HOSTILE_SUFFIXES = (
     ".pkl.gzip",
     ".npy.gz",
     ".dat.gz",
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tbz",
+    ".tar.xz",
+    ".txz",
 )
 """Every extension a built-in artifact rule opens and reads the contents of.
 

@@ -342,6 +342,20 @@ error, and every rule that reads Python reports it as an inconclusive &quot;not 
 result with an <code>unexamined_component</code> shortfall. The run is <code>indeterminate</code> (exit <code>2</code>)
 whenever such a rule runs, even with <code>fail_on_error: false</code>. Scan with a Python that parses the file, or exclude it
 with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>.</p>
+<h2 id="chat-templates-and-model-configs">Chat templates and model configs</h2>
+<p><code>chat_template</code> reads a chat template wherever a loader takes one from: GGUF metadata
+(<code>tokenizer.chat_template</code> and its named variants), the <code>chat_template</code> key of
+<code>tokenizer_config.json</code>, <code>chat_template.json</code> or <code>processor_config.json</code> (a string or a list of
+named templates), a <code>.jinja</code> or <code>.j2</code> file whose name starts with <code>chat_template</code>, and every
+<code>.jinja</code> or <code>.j2</code> file in an <code>additional_chat_templates/</code> directory, which transformers 5 loads
+as named templates, the one named <code>default</code> ahead of the rest.</p>
+<p><code>remote_code_config</code> reads every <code>*config.json</code>. A Hub kernel repository named in
+<code>_attn_implementation_internal</code> or <code>_attn_implementation</code> is <code>critical</code>: transformers sets
+either field from the config without consulting <code>trust_remote_code</code>, then downloads and imports
+the kernel. It is read in every form the loader accepts: <code>org/repo</code>, with a <code>@revision</code>, a
+<code>:function</code> or a prefix such as <code>paged|</code>; a dict keyed by sub-config name (<code>{&quot;&quot;: &quot;org/repo&quot;}</code>);
+and inside a nested sub-config such as <code>text_config</code> or <code>decoder</code>. A kernel named in the
+documented <code>attn_implementation</code> field is a <code>medium</code> lead.</p>
 <h2 id="model-files-no-rule-reads">Model files no rule reads</h2>
 <p>Every model file the scan observes must be read by a rule that ran. One that no rule
 read is a coverage shortfall named <code>unexamined_component</code>, one per format, so the run
@@ -363,7 +377,8 @@ list entry that holds no template (each one, beside whatever its siblings hold),
 by a read bound, an archive refused
 before it is opened (below), a PMML document past the bound, a notebook that is not JSON
 or has a cell that is not an object or a code cell whose source is not text, a notebook whose
-<code>kernelspec.language</code> or <code>language_info.name</code> is not Python.
+<code>cells</code> or <code>worksheets</code> is not a list or has a worksheet that holds no list of cells, a
+notebook whose <code>kernelspec.language</code> or <code>language_info.name</code> is not Python.
 A Git LFS pointer (<code>version https://git-lfs.github.com/spec/v1</code>, what a clone without the
 LFS objects holds; the whole file, not a model that merely opens with one) named as a model a rule reads, a <code>.pb</code>, <code>.bin</code>, <code>.sav</code>, <code>.p</code> or <code>.model</code>
 included, is reported with the reason <code>a Git LFS pointer, not the model; fetch the LFS object</code>. It is reported as not scanned, never as a checked model. A pointer named as a
@@ -376,7 +391,12 @@ two things for it: an inconclusive &quot;not scanned&quot; result on the unverif
 <code>unexamined_component</code> shortfall whose name is the file's path and whose detail reads
 <code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format.
 With no switch over it, a scan holding one such file is <code>indeterminate</code> (exit <code>2</code>) under
-every preset, <code>ci</code> included, unless a finding fails it. A notebook cell that does not
+every preset, <code>ci</code> included, unless a finding fails it. Every cell a notebook reader runs is
+read: the top-level <code>cells</code> by their <code>source</code>; the <code>code</code> of a v1 code cell, which nbformat
+runs from a notebook that declares no version; and the cells of each <code>worksheets</code> entry by
+their <code>input</code>, which nbformat runs instead of the top-level cells when it upgrades a v2 or v3
+notebook. Each of these readings is scanned on its own, so a name bound in one does not
+change how another is read. A notebook cell that does not
 parse as Python is not one: the notebook was read, and the cell is reported as an
 unverified result only. A cell too complex for the Python parser to hold is inconclusive
 and a shortfall. The IPython line magics <code>%time</code>, <code>%timeit</code>, <code>%prun</code> and <code>%debug</code>,
@@ -427,7 +447,7 @@ piped to a shell stays the <code>high</code> finding it was.</p>
 model does. A zip, a <code>.keras</code> included, is refused when its end records declare more than
 100,000 entries or a central directory over 25,600,000 bytes, or when that directory holds
 more than 100,000 entries. A tar is refused when it holds more than 100,000 members or
-more than 400,000 headers; more than 8 extended headers, or more than 1 MiB of them, in
+more than 400,000 headers, a compressed tar's headers included; more than 8 extended headers, or more than 1 MiB of them, in
 front of one member; more than 1,000,000 global PAX records applied, counting the records
 in force once for every member and PAX header after them; sparse maps listing more than
 100,000 regions in all, or one stored in a member's data over 1 MiB; or a header the
@@ -463,7 +483,7 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
-<td>a <code>.dat</code>, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a <code>.dat.gz</code> or <code>.dat</code> with another codec above, read when it decompresses to a pickle</td>
+<td>a <code>.dat</code>, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a <code>.dat.gz</code> or <code>.dat</code> with another codec above, or a file named only by a codec (<code>clf.gz</code>, as <code>joblib.dump</code> writes it, or <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code>, <code>.lzma</code>, <code>.lz4</code>), read when it decompresses to a pickle</td>
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
@@ -487,14 +507,18 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.saved_model_ops</code></td>
 </tr>
 <tr>
-<td><code>.tflite</code>, <code>.mar</code>, <code>.nemo</code>, <code>.llamafile</code>, <code>model.tar.gz</code>, a <code>.bin</code> that starts like GGUF or GGML</td>
+<td><code>model.tar.gz</code> (a SageMaker model), read for its members like any compressed tar (below); one holding no member named as a model is still a shortfall</td>
+<td><code>guardana.supply_chain.pickle_opcode</code></td>
+</tr>
+<tr>
+<td><code>.tflite</code>, <code>.mar</code>, <code>.nemo</code>, <code>.llamafile</code>, a <code>.bin</code> that starts like GGUF or GGML</td>
 <td>no built-in rule</td>
 </tr>
 </tbody>
 </table></div>
 <p>A <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or a file with no suffix, whose first bytes match
-none of those is not listed as a model. A <code>.dat</code> or a file with no suffix costs <code>pickle_opcode</code>
-one read of its first 64 KiB, and a file with no suffix the same one read for
+none of those is not listed as a model. A <code>.dat</code>, a file with no suffix or a file named only by
+a codec costs <code>pickle_opcode</code> one read of its first 64 KiB, and a file with no suffix the same one read for
 <code>keras_lambda</code>: a pickle, a compressed pickle, an NPY array or an archive holding a model is
 read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
 them, is left alone without a result. A zip or tar under such a name is read like a plain
@@ -551,10 +575,25 @@ of a <code>.tar</code> that is in fact a zip. The first bytes of a <code>.zip</c
 the first 10,000 of them, and for no more than 64 MiB of local headers and first blocks;
 the members past either bound are a coverage shortfall that counts them. A member of a plain
 <code>.tar</code> with no suffix and no legacy torch name (<code>pickle</code>, <code>storages</code>, <code>tensors</code>) is not read,
-so a pickle saved under such a name inside one is not found. A member named as
+so a pickle saved under such a name inside one is not found. A <code>.tar.gz</code>, <code>.tgz</code>, <code>.tar.bz2</code>,
+<code>.tbz2</code>, <code>.tbz</code>, <code>.tar.xz</code> or <code>.txz</code> is decompressed as <code>tar</code> decompresses it, as gzip, bz2 or
+xz by its first bytes and across streams written back to back, in memory and never to disk,
+and its members are read like those of a plain <code>.tar</code>, under the same bounds. At most 32 bytes
+are decompressed for each byte of the file, and at least 64 MiB; a compressed tar past that
+bound, damaged or cut before its end, or with a header <code>tarfile</code> stops listing at before the
+end of the archive, is a coverage shortfall, and so is a link named as a model inside one,
+which is not followed. One that is a plain tar under that name is read as a <code>.tar</code>, and one
+that holds no tar is read as <code>joblib.load</code> reads a file, by its first bytes: a pickle in it,
+compressed or not, is found, and anything else is left alone. <code>tar</code> detects the compression
+from the content, so a <code>.tar</code> whose bytes are gzip, bz2 or xz, a file named only by a codec
+(<code>bundle.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code>, <code>.lzma</code>, <code>.lz4</code>) and a <code>.dat</code> or a file with no
+suffix are read as a compressed tar when they decompress to one, found in the same first
+read that looks for a pickle. A compressed tar whose decompressed bytes start like a pickle
+is also read as the stream <code>joblib.load</code> would unpickle from them. A <code>.bin</code> whose bytes are a
+compressed tar is not read as one. A member named as
 a model that is itself an archive is a coverage shortfall, and one <code>pickle.load</code> would read is still read as a stream. A member named as a
 model it does not open inside an archive (<code>*.safetensors</code>, <code>*.gguf</code>, <code>*.onnx</code>, <code>*.keras</code>,
-<code>model.tar.gz</code> and the rest of the last row above, and HDF5 files (<code>*.h5</code>, <code>*.hdf5</code>, <code>*.hdf</code>, <code>*.weights</code>, <code>*.tf</code>) and a Keras directory's
+a nested <code>model.tar.gz</code> and the rest of the last row above, and HDF5 files (<code>*.h5</code>, <code>*.hdf5</code>, <code>*.hdf</code>, <code>*.weights</code>, <code>*.tf</code>) and a Keras directory's
 <code>config.json</code>, <code>model.weights.h5</code> or <code>model.weights.npz</code> inside a model archive, though not inside a plain
 <code>.zip</code> or <code>.tar</code>, where HDF5 is as often a dataset) is a
 coverage shortfall that names it; a zip member counts under its directory name and under an

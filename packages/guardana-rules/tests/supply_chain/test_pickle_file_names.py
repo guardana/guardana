@@ -7,10 +7,13 @@ read, so the data files that share those names stay quiet. Everything here is bu
 code; nothing is unpickled.
 """
 
+import bz2
 import gzip
 import io
+import lzma
 import tarfile
 import zipfile
+import zlib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -212,6 +215,60 @@ def test_dat_members_of_a_plain_archive_that_hold_data_stay_quiet(
     (tmp_path / name).write_bytes(
         pack({"table.dat": bytes(range(256)) * 4, "values.dat": b"1.0 2.0\n" * 10})
     )
+    findings, ctx = _scan(tmp_path)
+    assert findings == []
+    assert _unread(ctx) == []
+
+
+_JOBLIB_CODECS: dict[str, Callable[[bytes], bytes]] = {
+    "clf.gz": gzip.compress,
+    "clf.gzip": gzip.compress,
+    "clf.z": zlib.compress,
+    "clf.xz": lzma.compress,
+    "clf.bz2": bz2.compress,
+    "clf.lzma": lambda data: lzma.compress(data, format=lzma.FORMAT_ALONE),
+}
+
+
+@pytest.mark.parametrize("name", list(_JOBLIB_CODECS))
+def test_a_pickle_named_only_by_its_codec_is_read_as_joblib_loads_it(
+    tmp_path: Path, name: str
+) -> None:
+    """`joblib.dump(obj, "clf.gz")` picks the codec from the suffix and writes no other name."""
+    (tmp_path / name).write_bytes(_JOBLIB_CODECS[name](_SYSTEM))
+    findings, ctx = _scan(tmp_path)
+    assert findings == [(_CRITICAL, name)]
+    assert ctx.examined_paths() == {str(tmp_path / name)}
+
+
+def test_a_clean_pickle_named_only_by_its_codec_is_examined_and_clean(tmp_path: Path) -> None:
+    (tmp_path / "clf.gz").write_bytes(gzip.compress(_CLEAN))
+    findings, ctx = _scan(tmp_path)
+    assert findings == []
+    assert ctx.examined_paths() == {str(tmp_path / "clf.gz")}
+
+
+def test_an_lz4_file_named_only_by_its_codec_is_not_scanned(tmp_path: Path) -> None:
+    """joblib writes `clf.lz4` with lz4, which this scanner cannot decompress."""
+    (tmp_path / "clf.lz4").write_bytes(b"\x04\x22\x4d\x18" + bytes(32))
+    findings, ctx = _scan(tmp_path)
+    assert findings == [(_UNSCANNED, "clf.lz4")]
+    assert _unread(ctx) == [str(tmp_path / "clf.lz4")]
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("rows.csv.gz", gzip.compress(b"a,b\n1,2\n" * 1000)),
+        ("server.log.gz", gzip.compress(b"GET / 200\n" * 1000)),
+        ("notes.xz", lzma.compress(b"plain text\n" * 100)),
+        ("corpus.bz2", bz2.compress(bytes(range(256)) * 100)),
+    ],
+)
+def test_data_named_only_by_its_codec_stays_quiet(
+    tmp_path: Path, name: str, content: bytes
+) -> None:
+    (tmp_path / name).write_bytes(content)
     findings, ctx = _scan(tmp_path)
     assert findings == []
     assert _unread(ctx) == []

@@ -32,7 +32,13 @@ from guardana.core.taxonomy import (
 )
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
-from guardana.rules.supply_chain._compressed import compressed, inflate
+from guardana.rules.supply_chain._compressed import (
+    InflateError,
+    InflatingReader,
+    compressed,
+    inflate,
+    tar_codec,
+)
 from guardana.rules.supply_chain._leads import unread_component, unscanned_verdict
 from guardana.rules.supply_chain._npy import (
     NPY_MAGIC,
@@ -53,6 +59,7 @@ from guardana.rules.supply_chain._tar import (
     TarListingError,
     holds_file_data,
     listing_refusal,
+    stream_listing,
 )
 from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
@@ -107,13 +114,20 @@ _HEAD_READ_SUFFIXES = (_DATA_SUFFIX, "")
 """Names that say nothing of the format, which `pickle.load` and `torch.load` open all the
 same: such a file counts only when one bounded read of its first bytes shows a pickle, a
 compressed one, an array or an archive holding a model."""
-_HEAD_READ_COMPRESSED_ENDINGS = tuple(f"{_DATA_SUFFIX}{codec}" for codec in _CODEC_SUFFIXES)
+_COMPRESSED_TAR_ENDINGS = (".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tbz", ".tar.xz", ".txz")
+"""Names of a tar `tar` decompresses before it extracts the members a person then loads."""
 _COMPRESSED_SUFFIXES = tuple(
     dict.fromkeys(
         f".{end.rsplit('.', 1)[1]}"
-        for end in (*_COMPRESSED_MODEL_ENDINGS, *_HEAD_READ_COMPRESSED_ENDINGS)
+        for end in (
+            *_COMPRESSED_MODEL_ENDINGS,
+            *_COMPRESSED_TAR_ENDINGS,
+        )
     )
 )
+"""Codec suffixes; a file named by one and nothing that says what it compresses
+(`clf.gz`, which `joblib.dump` writes compressed by that suffix) is read by its first
+bytes, like a file whose name says nothing of its format."""
 _UNREAD_MODEL_SUFFIXES = frozenset(
     {
         ".gguf",
@@ -351,6 +365,13 @@ _ZIP_DIRECTORY_MAX_BYTES = ZIP_DIRECTORY_MAX_BYTES
 # without a cap turned a multi-GB `.pt` — or a symlink to /dev/zero — into an
 # out-of-memory kill of the whole scan.
 _MAX_PICKLE_BYTES = 512 * 1024 * 1024
+_COMPRESSED_TAR_MIN_BYTES = _MEMBER_MAX_BYTES
+_COMPRESSED_TAR_MAX_RATIO = 32
+"""Decompressed bytes a compressed tar may be read to, per byte on disk, above the minimum.
+
+Each pass over it costs that many bytes decoded, so the cost grows with the file rather
+than with what a few crafted bytes expand into; a model or a dataset compresses far less.
+"""
 _TAR_MAGIC = b"ustar"
 _TAR_MAGIC_OFFSET = 257
 _MAGIC_SNIFF_BYTES = tarfile.BLOCKSIZE
@@ -1252,6 +1273,28 @@ def _opens_as_tar(head: bytes) -> bool:
     return True
 
 
+def _may_hold_a_tar(head: bytes, *, cut: bool) -> bool:
+    """Whether a compressed file whose first bytes are `head` may decompress to a tar.
+
+    `cut` says the file goes on past the head. A head that decompresses to less than one
+    tar header without failing, from a file that goes on, cannot tell, as when a long gzip
+    header fills it.
+    """
+    inflated = inflate(io.BytesIO(head), head, limit=_MAGIC_SNIFF_BYTES, input_limit=len(head))
+    if inflated is None or inflated.data is None:
+        return False
+    block = inflated.data
+    if len(block) < _MAGIC_SNIFF_BYTES:
+        return cut and inflated.shortfall is None
+    return _opens_as_tar(block) or _has_ustar_magic(block)
+
+
+def _may_be_a_pickle(head: bytes) -> bool:
+    """Whether bytes that go on past `head` may be a pickle stream; see `_bin_verdict`."""
+    scan = _scan_opcodes(head, as_pickle=_AsPickle.SNIFFED)
+    return _bin_verdict(head, scan, cut=True) is not False
+
+
 def _nested_archive(data: bytes, kind: "_Member") -> bool:
     """Whether a member's bytes are an archive a loader would open instead of unpickling.
 
@@ -1376,6 +1419,9 @@ class _FileReport:
     """Whether the file's name says nothing of its format, so it is read only for what its
     first bytes show, and an archive it turns out to be is read as a person's archive."""
 
+    compressed_tar: bool = False
+    """Whether the file is named as a compressed tar, which a person extracts with `tar`."""
+
     @property
     def numpy(self) -> bool:
         """Whether the file is named as a NumPy array file, which `np.load` reads."""
@@ -1384,7 +1430,7 @@ class _FileReport:
     @property
     def tar_named(self) -> bool:
         """Whether the file is named as a tar, which a legacy `torch.save` writes, or as nothing."""
-        return self.head_only or self.path.suffix.lower() == _TAR_SUFFIX
+        return self.head_only or self.compressed_tar or self.path.suffix.lower() == _TAR_SUFFIX
 
     @property
     def plain_zip(self) -> bool:
@@ -1441,6 +1487,9 @@ class PickleOpcodeRule(ArtifactRule):
     unpickle read, by their names, without extracting anything to disk; a tar is also read
     as the one stream `pickle.load` would read from the same bytes, and its legacy
     `storages` and `tensors` members as torch reads them, pickles between raw bytes. A
+    compressed tar (`.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, or a `.tar` or a file named only
+    by a codec whose bytes decompress to a tar) is decompressed in memory, up to a bound that
+    grows with its size, and its members are read as `tar` extracts them. A
     NumPy array file is a pickle when its header declares a dtype that holds Python
     objects; its header is parsed as a literal, and a numeric array is not a pickle. A
     file or member joblib would decompress by its first bytes is decompressed first.
@@ -1514,8 +1563,9 @@ class PickleOpcodeRule(ArtifactRule):
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every pickle-shaped file under the target, and every other one that is one.
 
-        A file named as a compressed pickle (`model.pkl.gz`) is read as joblib reads it, and
-        one whose name says nothing of its format by its first bytes.
+        A file named as a compressed pickle (`model.pkl.gz`) is read as joblib reads it, one
+        named as a compressed tar (`weights.tar.gz`) as `tar` extracts it, and one whose name
+        says nothing of its format, or only its codec (`clf.gz`), by its first bytes.
         """
         if not isinstance(target, FileReader):
             return
@@ -1529,13 +1579,21 @@ class PickleOpcodeRule(ArtifactRule):
             elif (yield from self._scan(_FileReport(path, ctx), by_content=True)):
                 ctx.examined(path)
         for path in target.iter_files(_COMPRESSED_SUFFIXES):
-            name = path.name.lower()
-            if name.endswith(_COMPRESSED_MODEL_ENDINGS):
-                yield from self._scan(_FileReport(path, ctx))
-                ctx.examined(path)
-            elif name.endswith(_HEAD_READ_COMPRESSED_ENDINGS):
-                yield from self._scan_head_read(path, ctx)
+            yield from self._scan_compressed_name(path, ctx)
         for path in target.iter_files(_HEAD_READ_SUFFIXES):
+            yield from self._scan_head_read(path, ctx)
+
+    def _scan_compressed_name(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
+        """Scan a file with a codec suffix by what the rest of its name says it compresses."""
+        name = path.name.lower()
+        if name.endswith(_COMPRESSED_MODEL_ENDINGS):
+            yield from self._scan(_FileReport(path, ctx))
+            ctx.examined(path)
+        elif name.endswith(_COMPRESSED_TAR_ENDINGS):
+            report = _FileReport(path, ctx, compressed_tar=True)
+            if (yield from self._scan(report, by_content=True)):
+                ctx.examined(path)
+        else:
             yield from self._scan_head_read(path, ctx)
 
     def _scan_head_read(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
@@ -1553,11 +1611,10 @@ class PickleOpcodeRule(ArtifactRule):
         that cannot be opened is reported as unscanned, since it may be either.
         """
         try:
-            read = (
-                self._read_head(report)
-                if report.head_only
-                else self._read(report, by_content=by_content)
-            )
+            if report.head_only:
+                read = self._read_head(report)
+            else:
+                read = self._read(report, by_content=by_content)
         except Exception:
             # What the members before the failure imported is as real as it would be
             # after a clean read, and the runner keeps what a rule yielded before raising.
@@ -1599,15 +1656,152 @@ class PickleOpcodeRule(ArtifactRule):
             as_zip = self._scan_zip(report)
             as_stream = self._read_unarchived(report, magic, by_content=True)
             return as_zip or as_stream
+        # `tar` decompresses a file by its first bytes and `tarfile` tries it as a plain tar
+        # first; a gzip header can be crafted to pass for both, so both readings are made.
+        codec = tar_codec(magic) if report.tar_named else None
+        as_compressed_tar = None if codec is None else self._scan_compressed_tar(report, codec)
         if not (_opens_as_tar(magic) or (report.tar_named and _has_ustar_magic(magic))):
-            return self._read_unarchived(report, magic, by_content=by_content)
+            return (
+                self._read_unarchived(report, magic, by_content=by_content)
+                if as_compressed_tar is None
+                else as_compressed_tar
+            )
         # `torch.load` opens any file that is not a zip as a tar first, whatever it is
         # named, while `pickle.load` reads the same bytes as one stream: both are read.
         # A tar that held a model is a checkpoint, whose header no loader unpickles, so
         # its stream is read only if its bytes are a pickle.
         as_tar = self._scan_tar(report)
         as_stream = self._read_unarchived(report, magic, by_content=by_content or as_tar)
-        return as_tar or as_stream
+        return bool(as_compressed_tar) or as_tar or as_stream
+
+    def _read_head_compressed_tar(self, report: _FileReport, head: bytes, *, cut: bool) -> bool:
+        """Scan a file whose `head` decompresses to a tar as one; `cut` says the file goes on.
+
+        The head is decompressed in memory first, so a compressed file that holds no tar costs
+        no further read. One that cannot be decompressed is left to the stream reading, which
+        reports it.
+        """
+        codec = tar_codec(head)
+        if codec is None or not _may_hold_a_tar(head, cut=cut):
+            return False
+        return bool(self._scan_compressed_tar(report, codec))
+
+    def _scan_compressed_tar(self, report: _FileReport, codec: str) -> bool | None:
+        """Scan a file `tar` decompresses with `codec`; None when it decompresses to no tar.
+
+        The archive is decompressed in memory a piece at a time, never to disk, up to a bound
+        that grows with its size. Its headers are walked first, as `_scan_tar` walks a tar's,
+        and the members are read on a second pass, forward, as `tar` extracts them. The same
+        bytes are also read as the stream joblib would unpickle when they start like a pickle,
+        unless the file is read by its head, whose own stream reading covers that.
+        """
+        try:
+            with open_regular(report.path) as raw:
+                size = os.fstat(raw.fileno()).st_size
+                limit = max(_COMPRESSED_TAR_MIN_BYTES, _COMPRESSED_TAR_MAX_RATIO * size)
+                head = InflatingReader(raw, codec, limit=limit).read(_MAGIC_SNIFF_BYTES)
+                if not (_opens_as_tar(head) or _has_ustar_magic(head)):
+                    return None
+                report.container = "tar"
+                as_tar = self._scan_compressed_tar_members(report, raw, codec, limit)
+                raw.seek(0)
+                magic = raw.read(_MAGIC_SNIFF_BYTES)
+        except InflateError as error:
+            report.unscanned(f"{codec}-compressed tar {error}; not scanned")
+            return True
+        except (
+            tarfile.TarError,
+            OSError,
+            EOFError,
+            ValueError,
+            OverflowError,
+            IndexError,
+            RecursionError,
+        ):
+            report.unscanned(f"malformed {codec}-compressed tar archive; not scanned")
+            return True
+        if report.head_only or not _may_be_a_pickle(head):
+            return as_tar
+        return bool(self._scan_compressed(report, magic, by_content=True)) or as_tar
+
+    def _scan_compressed_tar_members(
+        self, report: _FileReport, raw: IO[bytes], codec: str, limit: int
+    ) -> bool:
+        """Walk a compressed tar's headers, then read its members; see `_scan_compressed_tar`."""
+        walk = InflatingReader(raw, codec, limit=limit)
+        refusal, end = stream_listing(walk, max_entries=_ARCHIVE_MAX_ENTRIES)
+        if refusal is not None:
+            report.unscanned(f"{codec}-compressed {refusal}; not scanned")
+            return True
+        budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + walk.tell())
+        with (
+            io.BufferedReader(InflatingReader(raw, codec, limit=limit)) as handle,
+            tarfile.open(fileobj=handle, mode="r|") as archive,
+        ):
+            return self._scan_streamed_tar(report, archive, budget, end)
+
+    def _scan_streamed_tar(
+        self, report: _FileReport, archive: tarfile.TarFile, budget: _OpcodeBudget, end: int
+    ) -> bool:
+        """Scan the members of a tar read once, forward, whose headers end at offset `end`.
+
+        A member is read as its header is reached. A link is reported unscanned rather than
+        followed, since the member it names may lie behind the point the stream has reached.
+        """
+        unread: list[str] = []
+        chosen = 0
+        exhausted = False
+        while not exhausted and (entry := archive.next()) is not None:
+            if not holds_file_data(entry):
+                continue
+            if _unread_model(entry.name, plain=True):
+                unread.append(entry.name)
+            if not _model_named(entry.name):
+                continue
+            chosen += 1
+            if chosen <= _ARCHIVE_MAX_MEMBERS:
+                exhausted = self._scan_streamed_member(report, archive, entry, budget)
+        self._report_unread_models(report, unread)
+        if exhausted:
+            return True
+        if archive.offset < end:
+            # `tarfile` stops listing at a header it cannot parse, which `tar` warns about
+            # and extracts past.
+            report.unscanned(f"tar has a damaged header at byte {archive.offset}; not scanned")
+        if chosen > _ARCHIVE_MAX_MEMBERS:
+            report.unscanned(
+                f"tar holds {chosen} members named as models; members past the "
+                f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
+            )
+        return bool(chosen or unread)
+
+    def _scan_streamed_member(
+        self,
+        report: _FileReport,
+        archive: tarfile.TarFile,
+        entry: tarfile.TarInfo,
+        budget: _OpcodeBudget,
+    ) -> bool:
+        """Scan the member a streamed tar has reached; return whether the budget ran out in it."""
+        name = entry.name
+        if entry.islnk() or entry.issym():
+            report.unscanned(
+                f"tar member is a link a compressed tar is not read back for ({name}); not scanned"
+            )
+            return False
+        raw: bytes | None = None
+        try:
+            handle = archive.extractfile(entry)
+            if handle is not None:
+                with handle:
+                    raw = handle.read(_MEMBER_MAX_BYTES + 1)
+        except (KeyError, tarfile.TarError, OSError, EOFError):
+            raw = None
+        if raw is None:
+            report.unscanned(f"tar member could not be read ({name}); not scanned")
+            return False
+        kind = _Member.SNIFFED if _member_suffix(name) in _SNIFFED_SUFFIXES else _Member.PICKLE
+        return self._scan_member_data(report, (name,), raw, budget, kind=kind)
 
     def _read_head(self, report: _FileReport) -> bool:
         """Read a file whose name says nothing of its format, by its first bytes.
@@ -1627,6 +1821,7 @@ class PickleOpcodeRule(ArtifactRule):
             self._scan_npy(report)
             return True
         as_tar = _opens_as_tar(magic) and self._scan_tar(report)
+        as_tar = self._read_head_compressed_tar(report, data, cut=cut) or as_tar
         return self._read_head_stream(report, data, cut=cut) or as_tar
 
     def _read_head_stream(self, report: _FileReport, head: bytes, *, cut: bool) -> bool:

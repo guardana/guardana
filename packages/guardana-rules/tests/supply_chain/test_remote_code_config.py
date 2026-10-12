@@ -82,6 +82,74 @@ def test_flags_the_internal_kernel_field_as_critical(tmp_path: Path) -> None:
     assert "CVE-2026-4372" in findings[0].evidence.summary
 
 
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("_attn_implementation", {"": "attacker/kernel-repo"}),
+        ("_attn_implementation", {"text_config": "attacker/kernel-repo"}),
+        ("_attn_implementation", "attacker/kernel-repo"),
+        ("_attn_implementation_internal", "attacker/kernel-repo@main"),
+        ("_attn_implementation_internal", "attacker/kernel-repo:attention"),
+        ("_attn_implementation_internal", "attacker/kernel-repo@v1:attention"),
+        ("_attn_implementation_internal", "paged|attacker/kernel-repo"),
+    ],
+)
+def test_every_kernel_reference_transformers_accepts_is_critical(
+    tmp_path: Path, key: str, value: object
+) -> None:
+    """The private fields reach the kernel loader through the config's generic setattr.
+
+    The attribute setter takes a dict keyed by sub-config, and the loader accepts a
+    revision after `@` and a function after `:`.
+    """
+    (tmp_path / "config.json").write_text(json.dumps({"model_type": "llama", key: value}))
+
+    findings = _run(tmp_path)
+
+    assert [f.severity for f in findings] == [Severity.CRITICAL]
+    assert "attacker/kernel-repo" in findings[0].evidence.summary
+
+
+def test_a_kernel_reference_inside_a_sub_config_is_critical(tmp_path: Path) -> None:
+    """A composite config that builds its sub-configs after its own init keeps the field."""
+    document = {
+        "model_type": "encoder-decoder",
+        "encoder": {"model_type": "bert"},
+        "decoder": {"model_type": "bert", "_attn_implementation_internal": "attacker/kernel"},
+    }
+    (tmp_path / "config.json").write_text(json.dumps(document))
+
+    findings = _run(tmp_path)
+
+    assert [f.severity for f in findings] == [Severity.CRITICAL]
+    assert "decoder._attn_implementation_internal" in findings[0].evidence.summary
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "flash_attention_2",
+        "paged|sdpa",
+        {"": "sdpa", "vision_config": "eager"},
+        "attacker/kernel/extra",
+        ["attacker/kernel-repo"],
+    ],
+)
+def test_a_value_the_kernel_loader_would_not_fetch_is_not_flagged(
+    tmp_path: Path, value: object
+) -> None:
+    (tmp_path / "config.json").write_text(json.dumps({"_attn_implementation": value}))
+
+    assert _run(tmp_path) == []
+
+
+def test_a_config_nested_too_deep_to_parse_is_quiet(tmp_path: Path) -> None:
+    """A loader cannot parse it either, so it configures nothing."""
+    (tmp_path / "config.json").write_text("[" * 200_000)
+
+    assert _run(tmp_path) == []
+
+
 def test_a_normal_model_reference_is_not_a_kernel_reference(tmp_path: Path) -> None:
     # `_name_or_path` holds an `owner/repo` string in a large share of real
     # configs on the Hub. Matching on shape alone would flag almost every model.

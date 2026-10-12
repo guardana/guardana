@@ -43,24 +43,107 @@ _SCRIPTS_LISTED = 5
 
 @dataclass
 class _NotebookScan:
-    """One notebook being scanned: its path, the state its cells build, what was unread."""
+    """One reading of a notebook's cells: its path, the state its cells build, what was unread."""
 
     path: Path
     ctx: RuleContext
+    unread: set[str]
+    """What was reported unread in any reading of the notebook, named once per notebook."""
     state: NotebookState = field(default_factory=NotebookState)
-    unread: set[str] = field(default_factory=set)
     scripts: list[str] = field(default_factory=list)
     """The local scripts the cell being read runs, as written."""
 
 
-def _cell_source(cell: object) -> str | None:
-    """Return a code cell's source (str or list-of-lines joined), else None."""
-    if not isinstance(cell, dict) or cell.get("cell_type") != "code":
+@dataclass(frozen=True, slots=True)
+class _Cell:
+    """One code cell as one reader of the notebook format runs it."""
+
+    ref: str
+    """Where the cell sits, as a finding's target names it: `cell3`, `worksheet0.cell3`."""
+    label: str
+    source: str | None
+    """The code the cell runs; None when the cell is malformed and runs nothing readable."""
+    problem: str | None = None
+
+
+# Each reading is the cells one reader runs and the field it takes their code from:
+# nbformat 4 readers run `source`; nbformat upgrades a notebook that declares no
+# version as v1, taking `code`, and a v2 or v3 one by replacing its cells with those
+# of its worksheets, taking `input`. A reader that ignores the version runs the
+# top-level cells, so every reading is scanned rather than the one the version names.
+_V4_FIELD = "source"
+_V1_FIELD = "code"
+_V3_FIELD = "input"
+
+
+def _text(value: object) -> str | None:
+    """Return a cell field as the code it holds: a string, or a list of lines joined."""
+    if isinstance(value, list) and all(isinstance(line, str) for line in value):
+        return "".join(value)
+    return value if isinstance(value, str) else None
+
+
+def _code_cell(cell: object, ref: str, label: str, name: str, *, required: bool) -> _Cell | None:
+    """Read field `name` of one cell; None for a cell that runs no code in this reading."""
+    if not isinstance(cell, dict):
+        return _Cell(ref, label, None, "is not a JSON object")
+    if cell.get("cell_type") != "code" or (name not in cell and not required):
         return None
-    source = cell.get("source")
-    if isinstance(source, list):
-        return "".join(s for s in source if isinstance(s, str))
-    return source if isinstance(source, str) else None
+    source = _text(cell.get(name))
+    problem = None if source is not None else "has a source that is not text"
+    return _Cell(ref, label, source, problem)
+
+
+def _top_level_readings(cells: list[object]) -> list[list[_Cell]]:
+    """Read the top-level cells as nbformat 4 and as nbformat 1 run them."""
+    current: list[_Cell] = []
+    legacy: list[_Cell] = []
+    for index, cell in enumerate(cells):
+        ref, label = f"cell{index}", f"cell {index}"
+        # A v1 code cell holds its code in `code` alone, so its missing `source` hides nothing.
+        legacy_only = isinstance(cell, dict) and _V1_FIELD in cell and _V4_FIELD not in cell
+        read = _code_cell(cell, ref, label, _V4_FIELD, required=not legacy_only)
+        if read is not None:
+            current.append(read)
+        if isinstance(cell, dict):
+            old = _code_cell(cell, ref, label, _V1_FIELD, required=False)
+            if old is not None:
+                legacy.append(old)
+    return [current, legacy]
+
+
+def _worksheet_reading(worksheets: list[object]) -> list[_Cell]:
+    """Read the worksheet cells, flattened in order, as nbformat's v3 upgrade runs them."""
+    reading: list[_Cell] = []
+    for number, worksheet in enumerate(worksheets):
+        cells = worksheet.get("cells") if isinstance(worksheet, dict) else None
+        if not isinstance(cells, list):
+            ref, label = f"worksheet{number}", f"worksheet {number}"
+            reading.append(_Cell(ref, label, None, "holds no list of cells"))
+            continue
+        for index, cell in enumerate(cells):
+            ref, label = f"worksheet{number}.cell{index}", f"worksheet {number} cell {index}"
+            read = _code_cell(cell, ref, label, _V3_FIELD, required=False)
+            if read is not None:
+                reading.append(read)
+    return reading
+
+
+def _readings(doc: dict[str, object]) -> tuple[list[list[_Cell]], str | None]:
+    """Return every reading of the notebook's cells, or why it has no cells to read."""
+    cells, worksheets = doc.get("cells"), doc.get("worksheets")
+    readings: list[list[_Cell]] = []
+    if isinstance(cells, list):
+        readings.extend(_top_level_readings(cells))
+    elif "cells" in doc:
+        readings.append([_Cell("cells", "cells", None, "is not a list")])
+    if isinstance(worksheets, list):
+        readings.append(_worksheet_reading(worksheets))
+    elif "worksheets" in doc:
+        readings.append([_Cell("worksheets", "worksheets", None, "is not a list")])
+    if not readings:
+        return [], "the notebook declares no list of cells"
+    return readings, None
 
 
 def _languages(doc: dict[str, object]) -> list[str]:
@@ -82,20 +165,6 @@ def _languages(doc: dict[str, object]) -> list[str]:
     ]
 
 
-def _malformed_cell(cell: object) -> str | None:
-    """Say how a cell breaks the notebook format in a way that would hide code; else None."""
-    if not isinstance(cell, dict):
-        return "is not a JSON object"
-    if cell.get("cell_type") != "code":
-        return None
-    source = cell.get("source")
-    if isinstance(source, str):
-        return None
-    if isinstance(source, list) and all(isinstance(line, str) for line in source):
-        return None
-    return "has a source that is not text"
-
-
 def _is_python(language: str) -> bool:
     return re.fullmatch(r"i?python[\d.]*", language.strip().lower().replace(" ", "")) is not None
 
@@ -105,12 +174,14 @@ class NotebookPayloadRule(ArtifactRule):
 
     Notebooks are a primary ML distribution format, yet the `.py` scanners never
     see inside them. This applies the shared code-sink detection to each code
-    cell, and catches the notebook-only channels — a `!curl … | sh` escape, a
-    `%%bash` cell or a `%alias`. A cell that runs a local script (`!sh setup.sh`,
-    `%%bash` running `./run`) gets one low finding naming it. A cell whose Python cannot
-    be parsed, a magic that runs code the rule does not read (`%run`, `%pip`, `%%perl`),
-    code handed the IPython object and a notebook whose kernel is not Python are reported
-    as inconclusive, never silently skipped: an un-analyzable cell is not a proven-clean one.
+    cell, and catches the notebook-only channels: a `!curl … | sh` escape, a
+    `%%bash` cell or a `%alias`. The cells nbformat runs from an older notebook are
+    read too: a v1 cell's `code` and the cells of v2 and v3 worksheets. A cell that runs
+    a local script (`!sh setup.sh`, `%%bash` running `./run`) gets one low finding naming
+    it. A cell whose Python cannot be parsed, a magic that runs code the rule does not
+    read (`%run`, `%pip`, `%%perl`), code handed the IPython object and a notebook whose
+    kernel is not Python are reported as inconclusive, never silently skipped: an
+    un-analyzable cell is not a proven-clean one.
     """
 
     meta = RuleMeta(
@@ -178,31 +249,37 @@ class NotebookPayloadRule(ArtifactRule):
             return
         try:
             doc = json.loads(raw)
-        except ValueError:
+        except (ValueError, RecursionError):
             # Not one cell was examined, so a malformed notebook is no cleaner than
             # one that holds a payload.
             yield self._unscanned(path, "the notebook could not be parsed as JSON", ctx)
             return
-        cells = doc.get("cells") if isinstance(doc, dict) else None
-        if not isinstance(cells, list):
-            yield self._unscanned(path, "the notebook declares no list of cells", ctx)
+        readings, empty = _readings(doc) if isinstance(doc, dict) else ([], "not a JSON object")
+        if empty is not None:
+            yield self._unscanned(path, empty, ctx)
             return
         foreign = next((name for name in _languages(doc) if not _is_python(name)), None)
         if foreign is not None:
             reason = f"its kernel language is {foreign}, which this rule does not read"
             yield self._unscanned(path, reason, ctx)
             return
-        scan = _NotebookScan(path, ctx)
+        yield from self._scan_readings(path, readings, ctx)
+
+    def _scan_readings(
+        self, path: Path, readings: list[list[_Cell]], ctx: RuleContext
+    ) -> Iterator[Finding]:
+        """Scan each reading of a notebook's cells; report the first malformed cell once."""
+        unread: set[str] = set()
         malformed: str | None = None
-        for index, cell in enumerate(cells):
-            problem = _malformed_cell(cell)
-            if problem is not None:
-                malformed = malformed or f"cell {index} {problem}"
-                continue
-            source = _cell_source(cell)
-            if source is not None:
-                yield from self._scan_cell(scan, index, read_cell(source, scan.state))
-                yield from self._local_scripts(scan, index)
+        for reading in readings:
+            # Each reader runs its own cells, so names one reading binds bind nothing in another.
+            scan = _NotebookScan(path, ctx, unread)
+            for cell in reading:
+                if cell.source is None:
+                    malformed = malformed or f"{cell.label} {cell.problem}"
+                    continue
+                yield from self._scan_cell(scan, cell, read_cell(cell.source, scan.state))
+                yield from self._local_scripts(scan, cell)
         if malformed is not None:
             yield self._unscanned(path, malformed, ctx)
 
@@ -222,19 +299,19 @@ class NotebookPayloadRule(ArtifactRule):
         )
 
     def _scan_cell(
-        self, scan: _NotebookScan, index: int, cell: CellReading, depth: int = 0
+        self, scan: _NotebookScan, where: _Cell, cell: CellReading, depth: int = 0
     ) -> Iterator[Finding]:
         path = scan.path
         scan.state.bound |= cell.bound
         for line in cell.shell:
             if PIPE_TO_SHELL.search(line):
                 yield self._finding(
-                    path, index, Severity.HIGH, "shell escape pipes a download into a shell"
+                    path, where, Severity.HIGH, "shell escape pipes a download into a shell"
                 )
             scan.scripts.extend(local_scripts(line))
         for label in dict.fromkeys(cell.unread):
-            yield self._unread(scan, index, label)
-        tree = yield from self._parse(scan, index, cell)
+            yield self._unread(scan, where, label)
+        tree = yield from self._parse(scan, where, cell)
         if tree is None:
             return
         bind_names(tree, scan.state)
@@ -243,16 +320,16 @@ class NotebookPayloadRule(ArtifactRule):
         # second shape to understand.
         for _lineno, why, lead in code_sinks(PythonSource(path, cell.python, tree)):
             yield self._finding(
-                path, index, Severity.HIGH, why, lead_verdict(why) if lead else None
+                path, where, Severity.HIGH, why, lead_verdict(why) if lead else None
             )
         for kind, text in ipython_calls(tree, scan.state):
             if text is None or depth >= _MAX_IPYTHON_NESTING:
-                yield self._unread(scan, index, kind)
+                yield self._unread(scan, where, kind)
                 continue
             nested = read_shell_command(text) if kind == "shell" else read_cell(text, scan.state)
-            yield from self._scan_cell(scan, index, nested, depth + 1)
+            yield from self._scan_cell(scan, where, nested, depth + 1)
 
-    def _local_scripts(self, scan: _NotebookScan, index: int) -> Iterator[Finding]:
+    def _local_scripts(self, scan: _NotebookScan, where: _Cell) -> Iterator[Finding]:
         """Name, in one low finding, the local scripts a cell runs, whose code is not read."""
         scripts = list(dict.fromkeys(scan.scripts))
         scan.scripts.clear()
@@ -263,12 +340,12 @@ class NotebookPayloadRule(ArtifactRule):
         noun = "local script" if len(scripts) == 1 else "local scripts"
         yield self._finding(
             scan.path,
-            index,
+            where,
             Severity.LOW,
             f"cell runs {noun}: {listed}{f', and {more} more' if more > 0 else ''}",
         )
 
-    def _unread(self, scan: _NotebookScan, index: int, label: str) -> Finding:
+    def _unread(self, scan: _NotebookScan, where: _Cell, label: str) -> Finding:
         """Report something a cell runs that was not read; name it once per notebook."""
         if label not in scan.unread:
             scan.unread.add(label)
@@ -276,14 +353,14 @@ class NotebookPayloadRule(ArtifactRule):
             scan.ctx.shortfall(unread_component(self.meta.id, scan.path, reason))
         return self._finding(
             scan.path,
-            index,
+            where,
             Severity.LOW,
             f"cell runs {label}, which this rule does not read",
             unscanned_verdict(f"what {label} runs was not read, so it was not cleared"),
         )
 
     def _parse(
-        self, scan: _NotebookScan, index: int, cell: CellReading
+        self, scan: _NotebookScan, where: _Cell, cell: CellReading
     ) -> Generator[Finding, None, ast.Module | None]:
         """Parse a cell's Python; return its tree, or None after reporting why there is none."""
         try:
@@ -293,7 +370,7 @@ class NotebookPayloadRule(ArtifactRule):
         except SyntaxError:
             yield self._finding(
                 scan.path,
-                index,
+                where,
                 Severity.LOW,
                 "notebook cell could not be parsed as Python; not analyzed",
                 unscanned_verdict("the cell could not be parsed, so nothing in it was cleared"),
@@ -306,7 +383,7 @@ class NotebookPayloadRule(ArtifactRule):
                 scan.ctx.shortfall(unread_component(self.meta.id, scan.path, reason))
             yield self._finding(
                 scan.path,
-                index,
+                where,
                 Severity.LOW,
                 "notebook cell is too complex to parse as Python; not analyzed",
                 unscanned_verdict("the cell could not be parsed, so nothing in it was cleared"),
@@ -316,7 +393,7 @@ class NotebookPayloadRule(ArtifactRule):
     def _finding(
         self,
         path: Path,
-        index: int,
+        where: _Cell,
         severity: Severity,
         summary: str,
         verdict: Verdict | None = None,
@@ -326,7 +403,7 @@ class NotebookPayloadRule(ArtifactRule):
             severity=severity,
             title=self.meta.title,
             taxonomy=self.meta.taxonomy,
-            target_ref=f"{path}:cell{index}",
-            evidence=Evidence(summary=summary, detail=f"{path.name} cell {index}"),
+            target_ref=f"{path}:{where.ref}",
+            evidence=Evidence(summary=summary, detail=f"{path.name} {where.label}"),
             verdict=verdict,
         )

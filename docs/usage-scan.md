@@ -84,6 +84,23 @@ result with an `unexamined_component` shortfall. The run is `indeterminate` (exi
 whenever such a rule runs, even with `fail_on_error: false`. Scan with a Python that parses the file, or exclude it
 with `.guardanaignore` or `rules.paths_exclude`.
 
+## Chat templates and model configs
+
+`chat_template` reads a chat template wherever a loader takes one from: GGUF metadata
+(`tokenizer.chat_template` and its named variants), the `chat_template` key of
+`tokenizer_config.json`, `chat_template.json` or `processor_config.json` (a string or a list of
+named templates), a `.jinja` or `.j2` file whose name starts with `chat_template`, and every
+`.jinja` or `.j2` file in an `additional_chat_templates/` directory, which transformers 5 loads
+as named templates, the one named `default` ahead of the rest.
+
+`remote_code_config` reads every `*config.json`. A Hub kernel repository named in
+`_attn_implementation_internal` or `_attn_implementation` is `critical`: transformers sets
+either field from the config without consulting `trust_remote_code`, then downloads and imports
+the kernel. It is read in every form the loader accepts: `org/repo`, with a `@revision`, a
+`:function` or a prefix such as `paged|`; a dict keyed by sub-config name (`{"": "org/repo"}`);
+and inside a nested sub-config such as `text_config` or `decoder`. A kernel named in the
+documented `attn_implementation` field is a `medium` lead.
+
 ## Model files no rule reads
 
 Every model file the scan observes must be read by a rule that ran. One that no rule
@@ -107,7 +124,8 @@ list entry that holds no template (each one, beside whatever its siblings hold),
 by a read bound, an archive refused
 before it is opened (below), a PMML document past the bound, a notebook that is not JSON
 or has a cell that is not an object or a code cell whose source is not text, a notebook whose
-`kernelspec.language` or `language_info.name` is not Python.
+`cells` or `worksheets` is not a list or has a worksheet that holds no list of cells, a
+notebook whose `kernelspec.language` or `language_info.name` is not Python.
 A Git LFS pointer (`version https://git-lfs.github.com/spec/v1`, what a clone without the
 LFS objects holds; the whole file, not a model that merely opens with one) named as a model a rule reads, a `.pb`, `.bin`, `.sav`, `.p` or `.model`
 included, is reported with the reason `a Git LFS pointer, not the model; fetch the LFS
@@ -121,7 +139,12 @@ two things for it: an inconclusive "not scanned" result on the unverified channe
 `unexamined_component` shortfall whose name is the file's path and whose detail reads
 `<rule id> could not read it: <reason>`. The file is not named a second time by format.
 With no switch over it, a scan holding one such file is `indeterminate` (exit `2`) under
-every preset, `ci` included, unless a finding fails it. A notebook cell that does not
+every preset, `ci` included, unless a finding fails it. Every cell a notebook reader runs is
+read: the top-level `cells` by their `source`; the `code` of a v1 code cell, which nbformat
+runs from a notebook that declares no version; and the cells of each `worksheets` entry by
+their `input`, which nbformat runs instead of the top-level cells when it upgrades a v2 or v3
+notebook. Each of these readings is scanned on its own, so a name bound in one does not
+change how another is read. A notebook cell that does not
 parse as Python is not one: the notebook was read, and the cell is reported as an
 unverified result only. A cell too complex for the Python parser to hold is inconclusive
 and a shortfall. The IPython line magics `%time`, `%timeit`, `%prun` and `%debug`,
@@ -174,7 +197,7 @@ An archive is refused before it is opened when listing it would cost more than l
 model does. A zip, a `.keras` included, is refused when its end records declare more than
 100,000 entries or a central directory over 25,600,000 bytes, or when that directory holds
 more than 100,000 entries. A tar is refused when it holds more than 100,000 members or
-more than 400,000 headers; more than 8 extended headers, or more than 1 MiB of them, in
+more than 400,000 headers, a compressed tar's headers included; more than 8 extended headers, or more than 1 MiB of them, in
 front of one member; more than 1,000,000 global PAX records applied, counting the records
 in force once for every member and PAX header after them; sparse maps listing more than
 100,000 regions in all, or one stored in a member's data over 1 MiB; or a header the
@@ -193,17 +216,18 @@ and in CI. A format name (`tflite`) is not a path and stays as it is.
 | `.npy`, and each `.npy` inside a `.npz`, or a `.bin`, `.sav`, `.p` or `.model` that starts with the NPY magic: an object array holds a pickle stream, a numeric one cannot | `guardana.supply_chain.pickle_opcode` |
 | `.bin` whose first bytes are a zip or a pickle stream (`pytorch_model.bin`); `.sav`, `.p` or `.model` whose first bytes are a pickle stream | `guardana.supply_chain.pickle_opcode` |
 | a compressed pickle, checkpoint or array (`.pkl`, `.pickle` or `.joblib` followed by `.gz`, `.gzip`, `.z`, `.xz`, `.bz2` or `.lzma`; `.joblib.lz4`; `.pt.gz`; `.pth.gz`; `.ckpt.gz`; `.npy.gz`, read as an NPY array when it decompresses to one) | `guardana.supply_chain.pickle_opcode` |
-| a `.dat`, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a `.dat.gz` or `.dat` with another codec above, read when it decompresses to a pickle | `guardana.supply_chain.pickle_opcode` |
+| a `.dat`, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a `.dat.gz` or `.dat` with another codec above, or a file named only by a codec (`clf.gz`, as `joblib.dump` writes it, or `.gzip`, `.z`, `.xz`, `.bz2`, `.lzma`, `.lz4`), read when it decompresses to a pickle | `guardana.supply_chain.pickle_opcode` |
 | `.onnx` | `guardana.supply_chain.onnx_graph` |
 | `.keras`, `.h5`, `.hdf5`; a `.bin`, `.model`, `.hdf`, `.weights` or `.tf` that holds the HDF5 signature at its start or after a userblock; a file with no suffix that holds it in its first 64 KiB; a `config.json` beside `metadata.json`, `model.weights.h5` or `model.weights.npz` (an unzipped Keras model directory); a tf_keras SavedModel's `keras_metadata.pb` | `guardana.supply_chain.keras_lambda` |
 | `.gguf` | `guardana.supply_chain.chat_template` |
 | `.safetensors`, `.pmml` | `guardana.supply_chain.model_format` |
 | `saved_model.pb`, `saved_model.pbtxt` (the text form TensorFlow loads when there is no `.pb`; its `op` values are decoded as protobuf decodes them, and one that cannot be decoded is a shortfall) | `guardana.supply_chain.saved_model_ops` |
-| `.tflite`, `.mar`, `.nemo`, `.llamafile`, `model.tar.gz`, a `.bin` that starts like GGUF or GGML | no built-in rule |
+| `model.tar.gz` (a SageMaker model), read for its members like any compressed tar (below); one holding no member named as a model is still a shortfall | `guardana.supply_chain.pickle_opcode` |
+| `.tflite`, `.mar`, `.nemo`, `.llamafile`, a `.bin` that starts like GGUF or GGML | no built-in rule |
 
 A `.bin`, `.sav`, `.p`, `.model` or `.dat`, or a file with no suffix, whose first bytes match
-none of those is not listed as a model. A `.dat` or a file with no suffix costs `pickle_opcode`
-one read of its first 64 KiB, and a file with no suffix the same one read for
+none of those is not listed as a model. A `.dat`, a file with no suffix or a file named only by
+a codec costs `pickle_opcode` one read of its first 64 KiB, and a file with no suffix the same one read for
 `keras_lambda`: a pickle, a compressed pickle, an NPY array or an archive holding a model is
 read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
 them, is left alone without a result. A zip or tar under such a name is read like a plain
@@ -260,10 +284,25 @@ of a `.tar` that is in fact a zip. The first bytes of a `.zip`'s other members a
 the first 10,000 of them, and for no more than 64 MiB of local headers and first blocks;
 the members past either bound are a coverage shortfall that counts them. A member of a plain
 `.tar` with no suffix and no legacy torch name (`pickle`, `storages`, `tensors`) is not read,
-so a pickle saved under such a name inside one is not found. A member named as
+so a pickle saved under such a name inside one is not found. A `.tar.gz`, `.tgz`, `.tar.bz2`,
+`.tbz2`, `.tbz`, `.tar.xz` or `.txz` is decompressed as `tar` decompresses it, as gzip, bz2 or
+xz by its first bytes and across streams written back to back, in memory and never to disk,
+and its members are read like those of a plain `.tar`, under the same bounds. At most 32 bytes
+are decompressed for each byte of the file, and at least 64 MiB; a compressed tar past that
+bound, damaged or cut before its end, or with a header `tarfile` stops listing at before the
+end of the archive, is a coverage shortfall, and so is a link named as a model inside one,
+which is not followed. One that is a plain tar under that name is read as a `.tar`, and one
+that holds no tar is read as `joblib.load` reads a file, by its first bytes: a pickle in it,
+compressed or not, is found, and anything else is left alone. `tar` detects the compression
+from the content, so a `.tar` whose bytes are gzip, bz2 or xz, a file named only by a codec
+(`bundle.gz`, `.gzip`, `.z`, `.xz`, `.bz2`, `.lzma`, `.lz4`) and a `.dat` or a file with no
+suffix are read as a compressed tar when they decompress to one, found in the same first
+read that looks for a pickle. A compressed tar whose decompressed bytes start like a pickle
+is also read as the stream `joblib.load` would unpickle from them. A `.bin` whose bytes are a
+compressed tar is not read as one. A member named as
 a model that is itself an archive is a coverage shortfall, and one `pickle.load` would read is still read as a stream. A member named as a
 model it does not open inside an archive (`*.safetensors`, `*.gguf`, `*.onnx`, `*.keras`,
-`model.tar.gz` and the rest of the last row above, and HDF5 files (`*.h5`, `*.hdf5`, `*.hdf`, `*.weights`, `*.tf`) and a Keras directory's
+a nested `model.tar.gz` and the rest of the last row above, and HDF5 files (`*.h5`, `*.hdf5`, `*.hdf`, `*.weights`, `*.tf`) and a Keras directory's
 `config.json`, `model.weights.h5` or `model.weights.npz` inside a model archive, though not inside a plain
 `.zip` or `.tar`, where HDF5 is as often a dataset) is a
 coverage shortfall that names it; a zip member counts under its directory name and under an

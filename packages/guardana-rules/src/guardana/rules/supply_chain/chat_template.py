@@ -44,6 +44,9 @@ _CONFIG_NAMES = frozenset({"tokenizer_config.json", "chat_template.json", "proce
 _CONFIG_KEY = "chat_template"
 _TEMPLATE_STEM = "chat_template"
 _TEMPLATE_SUFFIXES = (".jinja", ".j2")
+# transformers 5 also loads every `.jinja` in this directory as a named template, and
+# the one named `default` takes priority over `tokenizer_config.json`.
+_TEMPLATE_DIRECTORY = "additional_chat_templates"
 _ENTRIES_LISTED = 5
 
 
@@ -100,14 +103,18 @@ class ChatTemplateRule(ArtifactRule):
         )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Scan every carrier of a chat template: GGUF metadata, tokenizer config, `.jinja`."""
+        """Scan every carrier of a chat template: GGUF metadata, tokenizer config, `.jinja`.
+
+        A `.jinja` counts when it is named `chat_template*` or sits in
+        `additional_chat_templates/`, where transformers finds its named templates.
+        """
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".gguf",)):
             yield from self._scan_gguf(path, ctx)
             ctx.examined(path)
         for path in target.iter_files(_TEMPLATE_SUFFIXES):
-            if path.stem.lower().startswith(_TEMPLATE_STEM):
+            if _is_template_file(path):
                 yield from self._scan_template_file(path, ctx)
         for path in target.iter_files((".json",)):
             if path.name.lower() in _CONFIG_NAMES:
@@ -200,10 +207,18 @@ class ChatTemplateRule(ArtifactRule):
         )
 
 
+def _is_template_file(path: Path) -> bool:
+    """Whether a `.jinja` file is one a tokenizer loads as a chat template."""
+    return (
+        path.stem.lower().startswith(_TEMPLATE_STEM)
+        or path.parent.name.lower() == _TEMPLATE_DIRECTORY
+    )
+
+
 def _json_object(raw: str) -> dict[str, object] | None:
     try:
         document = json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     return document if isinstance(document, dict) else None
 

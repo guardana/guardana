@@ -232,12 +232,14 @@ def test_a_file_whose_name_says_nothing_costs_each_reader_one_read(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # A file with no suffix, or a `.dat`, may be a pickle or an HDF5 model a loader opens
-    # by its content; finding out that it is neither must cost one bounded read, or every
-    # LICENSE and data file in a repository is read in full by each rule that asks.
+    # by its content, and one named only by a codec may be a tar `tar` extracts; finding
+    # out that it is none of those must cost one bounded read, or every LICENSE and data
+    # file in a repository is read in full by each rule that asks.
     honest = {
         "LICENSE": b"x" * 200_000,
         "table.dat": bytes(range(256)) * 800,
         "values.dat.gz": gzip.compress(b"1.0 2.0\n" * 50_000),
+        "rows.csv.gz": gzip.compress(b"a,b\n1,2\n" * 50_000),
     }
     for name, content in honest.items():
         (repo / name).write_bytes(content)
@@ -249,6 +251,7 @@ def test_a_file_whose_name_says_nothing_costs_each_reader_one_read(
     )
     readers = {reader for _name, reader in opens}
     assert {"pickle_opcode", "inventory"} <= readers
+    assert ("rows.csv.gz", "pickle_opcode") in opens
     assert all(count <= 1 for count in opens.values()), (
         f"opens per file and reader: {dict(opens)} — a reader opens a file whose name says "
         f"nothing more than once to find out it is no model"

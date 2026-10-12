@@ -162,6 +162,39 @@ def test_template_inclusion_is_high_not_critical(tmp_path: Path) -> None:
     assert _severities(tmp_path) == [Severity.HIGH.name]
 
 
+def test_every_additional_chat_template_is_read(tmp_path: Path) -> None:
+    """transformers loads each `additional_chat_templates/*.jinja`, `default` ahead of the rest."""
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps({"chat_template": "{{ x }}"}))
+    extra = tmp_path / "additional_chat_templates"
+    extra.mkdir()
+    (extra / "default.jinja").write_text(_PAYLOAD)
+    (extra / "tool_use.jinja").write_text("{{ cycler.__init__.__globals__ }}")
+    (extra / "rag.jinja").write_text(_REAL_TEMPLATE)
+
+    findings = _run(tmp_path)
+
+    assert sorted(Path(f.target_ref).name for f in findings) == ["default.jinja", "tool_use.jinja"]
+    assert {f.severity for f in findings} == {Severity.CRITICAL}
+
+
+def test_an_unreadable_additional_chat_template_is_not_cleared(tmp_path: Path) -> None:
+    extra = tmp_path / "additional_chat_templates"
+    extra.mkdir()
+    (extra / "default.jinja").write_text("{{ 'x' }}\n" + " " * (MAX_SCAN_BYTES + 1))
+
+    assert _unread(tmp_path) == [str(extra / "default.jinja")]
+
+
+def test_a_jinja_file_beside_a_template_directory_of_another_name_is_not_read(
+    tmp_path: Path,
+) -> None:
+    pages = tmp_path / "templates"
+    pages.mkdir()
+    (pages / "default.jinja").write_text("{% include 'base.jinja' %}")
+
+    assert _run(tmp_path) == []
+
+
 def test_an_unrelated_jinja_file_is_not_a_chat_template(tmp_path: Path) -> None:
     # A web template using `{% extends %}` is not this rule's business; scanning
     # every `.jinja` in a repo would be general template security, not AI risk.
@@ -238,6 +271,12 @@ def test_a_gadget_and_every_unreadable_entry_beside_it_are_both_reported(tmp_pat
 def test_a_config_that_is_not_a_json_object_is_not_cleared(tmp_path: Path) -> None:
     (tmp_path / "tokenizer_config.json").write_text("[1, 2, 3]")
     assert _severities(tmp_path) == [Severity.LOW.name]
+
+
+def test_a_config_nested_too_deep_to_parse_is_not_cleared(tmp_path: Path) -> None:
+    (tmp_path / "tokenizer_config.json").write_text("[" * 200_000)
+
+    assert _unread(tmp_path) == [str(tmp_path / "tokenizer_config.json")]
 
 
 def test_a_config_without_a_template_is_clean(tmp_path: Path) -> None:

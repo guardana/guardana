@@ -17,7 +17,7 @@ import re
 import struct
 import tarfile
 from dataclasses import dataclass, field
-from typing import BinaryIO
+from typing import Protocol
 
 TAR_MAX_HEADERS = 1_000_000
 """Headers read from one tar; each costs a 512-byte block, and a checkpoint holds a few."""
@@ -69,6 +69,18 @@ _BLANK_CHECKSUM = 8 * ord(" ")
 _BASE256_POSITIVE = 0o200
 _BASE256_NEGATIVE = 0o377
 _SIGNED_BYTES = struct.Struct("148b8x356b")
+
+
+class TarSource(Protocol):
+    """What the header walk reads a tar through: a file, or a decompressed stream."""
+
+    def read(self, size: int = -1, /) -> bytes:
+        """Read up to `size` bytes."""
+        ...
+
+    def seek(self, offset: int, whence: int = os.SEEK_SET, /) -> int:
+        """Move to `offset`; the walk only ever moves forward."""
+        ...
 
 
 class TarListingError(Exception):
@@ -298,10 +310,11 @@ class _Chain:
 class _HeaderWalk:
     """The position and counts of a walk through a tar's headers."""
 
-    handle: BinaryIO
+    handle: TarSource
     max_entries: int
-    size: int
-    """The archive's size: a header declared past it is no position `tarfile` can read."""
+    size: int | None
+    """The archive's size: a header declared past it is no position `tarfile` can read.
+    None for a stream whose size is known only at its end, where a read comes back short."""
 
     position: int = 0
     members: int = 0
@@ -313,7 +326,7 @@ class _HeaderWalk:
     """Global records in force, summed over the members and PAX headers read so far."""
 
     def _block(self, at: int) -> bytes:
-        if at > self.size:
+        if self.size is not None and at > self.size:
             raise _RefusedError(f"tar reaches byte {at}, past its {self.size}-byte end")
         self.handle.seek(at)
         return self.handle.read(tarfile.BLOCKSIZE)
@@ -490,7 +503,28 @@ class _HeaderWalk:
         self._apply_globals(start)
 
 
-def listing_refusal(handle: BinaryIO, *, max_entries: int) -> str | None:
+def _walk(handle: TarSource, max_entries: int, size: int | None) -> tuple[str | None, int]:
+    """Walk every header; return why the archive is refused, and where the walk stopped."""
+    walk = _HeaderWalk(handle, max_entries, size)
+    try:
+        while walk.member():
+            pass
+    except _RefusedError as refusal:
+        return str(refusal), walk.position
+    return None, walk.position
+
+
+def stream_listing(handle: TarSource, *, max_entries: int) -> tuple[str | None, int]:
+    """Walk a decompressed tar read forward from its start, as `listing_refusal` walks a file.
+
+    Returns why `tarfile` must not list it, or None, and the offset of the block that ends
+    the archive, where `tarfile` must stop listing too: a stream is read once, so a header
+    `tarfile` stops at early is found by comparing where it stopped with this offset.
+    """
+    return _walk(handle, max_entries, None)
+
+
+def listing_refusal(handle: TarSource, *, max_entries: int) -> str | None:
     """Why `tarfile` must not list this archive, or None when it may.
 
     Walks the header blocks where `tarfile` would read them, reading one block per header
@@ -503,10 +537,4 @@ def listing_refusal(handle: BinaryIO, *, max_entries: int) -> str | None:
     blocks past `TAR_EXTENDED_HEADER_MAX_BYTES`; and any header the walk cannot follow.
     A PAX header within the bound is read to follow the size it gives its member.
     """
-    walk = _HeaderWalk(handle, max_entries, handle.seek(0, os.SEEK_END))
-    try:
-        while walk.member():
-            pass
-    except _RefusedError as refusal:
-        return str(refusal)
-    return None
+    return _walk(handle, max_entries, handle.seek(0, os.SEEK_END))[0]
