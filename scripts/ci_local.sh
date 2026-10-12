@@ -110,6 +110,7 @@ step "Site build"          uv run python scripts/build_site.py --check
 step "llms.txt"            uv run python scripts/generate_llms_txt.py --check
 step "Sitemap"             uv run python scripts/generate_sitemap.py --check
 step "Well-known files"    uv run python scripts/generate_well_known.py --check
+step "Image requirements"  uv run python scripts/export_image_requirements.py --check
 
 # The third-party story, isolated on purpose; --no-cache is load-bearing (a cached
 # wheel hides exactly the data files an extension change touches). No -q here: the

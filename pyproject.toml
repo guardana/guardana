@@ -206,6 +206,11 @@ filterwarnings = [
 default-groups = ["dev", "docs", "conformance"]
 
 [dependency-groups]
+# The build backend of every package, locked so the container images build the local
+# packages without build isolation and with hashes, like their dependencies. Not a
+# default group: nothing in the development environment imports it.
+# `scripts/export_image_requirements.py` exports it to deploy/docker/.
+image-build = ["hatchling==1.32.4"]
 docs = [
     # Renders docs/**.md into site/docs/**.html. Its own dependency is `mdurl` and
     # nothing else, it is CommonMark-compliant, and it exposes the token stream —
