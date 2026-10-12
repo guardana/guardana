@@ -172,7 +172,7 @@ def test_the_inventory_does_not_depend_on_which_rules_run(tmp_path: Path) -> Non
     ).run(ArtifactTarget(root))
     nothing = Runner(
         registry=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)),
-        profile=Profile(name="t", policy=Policy(include=("nonexistent.*",))),
+        profile=Profile(name="t", policy=Policy(exclude=("*",))),
     ).run(ArtifactTarget(root))
     assert nothing.rules_run_count == 0
     assert {i.ref for i in nothing.observations} == {i.ref for i in everything.observations}

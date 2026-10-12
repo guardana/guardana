@@ -96,7 +96,18 @@ the run has a result — an stdio MCP command that cannot be started, say — an
 that fails at any point, still exit `4` with nothing saved.
 
 **`3` is usage, not policy.** A malformed `guardana.yaml` must not look like a
-policy failure, or a typo in a config file reads as a security finding.
+policy failure, or a typo in a config file reads as a security finding. A
+`rules.include` pattern that matches no registered rule is such a typo, even beside a
+pattern that matches: the command refuses before any rule runs, whatever `fail_on`
+says, and names every such pattern
+([profiles](profiles.md#an-include-pattern-must-match-a-rule)):
+
+```text
+error: rules.include contains unmatched patterns: "guardana.supply_chain.code_executon" — check the spelling and registered rules.
+```
+
+A selection the policy narrows to nothing with every pattern matched — each rule
+excluded, or for another kind of target — still runs no rule and exits `2`.
 
 **`7` is honest partiality.** Ctrl-C is neither a pass nor a completed failure.
 Nothing the command had not yet written is written afterwards, and the code says

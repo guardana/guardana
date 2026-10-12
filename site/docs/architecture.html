@@ -485,7 +485,10 @@ class Runner:
 
     def run(self, target: Target) -&gt; ScanResult: ...
 </code></pre>
-<p>For each registered rule: skip it if <code>target.kind</code> doesn't match
+<p>Before it selects anything, the runner refuses with <code>ProfileError</code> an include pattern
+that matches no registered rule, naming each one
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).
+For each registered rule: skip it if <code>target.kind</code> doesn't match
 <code>meta.target_kind</code>, or the profile's <code>Policy.matches(rule_id)</code> excludes it;
 skip it (recording it under <code>rules_skipped</code>) if the target can't satisfy
 <code>meta.required_capabilities</code>; otherwise run it, catching any <code>Exception</code> or

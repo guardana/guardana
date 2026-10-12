@@ -251,6 +251,12 @@ silently is what must not happen.</li>
 <li><strong>whether the files the profile names load.</strong> Each contract, calibration and
 rule under <code>rules.paths</code> goes through the loader a run uses, the rules after the same
 plugin discovery; one a run would refuse is a failure here too.</li>
+<li><strong>whether every <code>rules.include</code> pattern matches a rule.</strong> A pattern that matches none
+of the discovered rules, the rules under <code>rules.paths</code> and the rules the profile's
+<code>contracts:</code> compile to is a failure, as it refuses every run
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>). <code>doctor</code> takes no
+<code>--rules</code> or <code>--contract</code>: a rule or contract a run is given only on its command
+line is not seen, so list it under <code>rules.paths</code> or <code>contracts:</code> to check it.</li>
 <li><strong>whether each <code>plugins.allow</code> entry loads anything.</strong> A name that is not installed,
 or installs no Guardana entry point, is a warning: its checks would simply be absent.</li>
 </ul>
@@ -260,7 +266,13 @@ they are things worth knowing, not faults.</p>
 <h2 id="config-validate--fail-before-you-pay"><code>config validate</code> — fail before you pay</h2>
 <p>Parses the profile, then loads every contract, calibration file and rule under
 <code>rules.paths</code> it names with the loaders a run uses, the rules after discovering the
-plugins the profile trusts. Each problem is printed and the command
+plugins the profile trusts, and checks that every <code>rules.include</code> pattern matches one
+of those rules or an assertion of those contracts, whichever AI system each contract
+is about, as every run counts them. It knows only what the profile names: rules a run
+loads only with <code>--rules</code>, contracts <code>analyze-trace</code> is given only with <code>--contract</code>,
+and plugins admitted only by a run's <code>--plugins</code> or <code>--allow-plugin</code> are not seen;
+list such rules under <code>rules.paths</code> and such contracts under <code>contracts:</code> to validate
+them. Each problem is printed and the command
 exits <code>3</code>, as the run would. Useful as an early pipeline step: a typo in
 <code>guardana.yaml</code> should fail in a second rather than after a probe has spent its
 budget finding out.</p>
@@ -295,8 +307,10 @@ is <em>in force</em>, and most of a gate is defaults — including the ones nobo
 trust (with whether the profile stated it), the contracts and calibrations the profile
 names with what each file loaded, and
 the privacy policy digest that a run manifest also records, so a saved run can be
-matched back to the configuration that produced it. A named file that does not load is
-printed as an error, listed under <code>problems</code> in the JSON form, and exits <code>3</code>.</p>
+matched back to the configuration that produced it. A named file that does not load, or
+an include pattern that matches no rule, is printed as an error, listed under <code>problems</code>
+in the JSON form, and exits <code>3</code>. It checks the patterns against the same rules
+<code>validate</code> does.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="profiles.html"><code>profiles.md</code></a> — what each setting means</li>

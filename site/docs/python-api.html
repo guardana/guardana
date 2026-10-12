@@ -312,7 +312,7 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 <li><code>A2aAgentTarget(url, *, credential=None, other_credential=None, sender=None)</code> takes the http(s) URL of the agent's card (ending in <code>.json</code>) or of its origin; any other path, a second credential without the first, or the same value twice, raises <code>ValueError</code>. <code>sender</code> is a <code>Sender</code>.</li>
 <li>A server that stops accepting the agreed revision mid-run returns the <code>Verification</code> with <code>result.stopped_by</code> <code>target_changed</code> and exit code <code>4</code>.</li>
 </ul>
-<p>A target runs once. Running the same object again, starting a second run while the first is under way, or running one that already sent requests raises <code>TargetReusedError</code>: build a fresh target for each run, so its usage, its budget and whatever it cached describe that run alone. A run refused before anything was sent, over its calibrations or a budget, leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.</p>
+<p>A target runs once. Running the same object again, starting a second run while the first is under way, or running one that already sent requests raises <code>TargetReusedError</code>: build a fresh target for each run, so its usage, its budget and whatever it cached describe that run alone. A run refused before anything was sent, over its calibrations, a budget or its profile, leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.</p>
 <h2 id="read-a-result">Read a result</h2>
 <p><code>Verification</code> is frozen.</p>
 <div class="table-wrap"><table>
@@ -421,7 +421,7 @@ sending anything: <code>render(select_renderer(name, trust), load_verification(p
 </tr>
 </tbody>
 </table></div>
-<p>A profile that does not load raises <code>ProfileError</code> from <code>guardana.core.profile</code>. Ctrl-C propagates as <code>KeyboardInterrupt</code>.</p>
+<p>A profile that does not load raises <code>ProfileError</code> from <code>guardana.core.profile</code>. So does every <code>scan</code>, <code>run</code> and <code>grade</code> whose profile has a <code>rules.include</code> pattern that matches none of the rules the <code>Verifier</code> registered — discovered, passed as <code>rules</code>, or loaded from <code>rule_paths</code> and <code>rules.paths</code> — even when another pattern matches (a <code>Verifier</code> compiles no contract, so a pattern naming only a contract assertion is unmatched here); no <code>Verification</code> is returned, no rule runs, nothing is sent and the target stays free to run (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>). Ctrl-C propagates as <code>KeyboardInterrupt</code>.</p>
 <h2 id="serve-your-applications-tools-in-ci">Serve your application's tools in CI</h2>
 <p><code>guardana.core.doubles</code> is public too: <code>open_doubles(FILE, trace=PATH)</code> returns <code>Doubles</code> over the tools and records a fixtures file declares, with <code>acting_as(tenant)</code>, <code>call(name, **arguments)</code>, <code>tool(name)</code> and <code>close()</code>, and raises <code>DoublesError</code> for a call or a setup it refuses. Its behaviour and its trace are described in <a href="usage-doubles.html"><code>usage-doubles.md</code></a>.</p>
 <h2 id="what-is-supported">What is supported</h2>

@@ -522,11 +522,17 @@ time exits <code>3</code>, since the run would stop before its last request, and
 <p>The JSON carries both as <code>budgets.max_requests_per_minute</code> and
 <code>budgets.minimum_wall_time_seconds</code>, null when no rate is set.</p>
 <h2 id="a-run-that-could-not-pass">A run that could not pass</h2>
+<p>A <code>rules.include</code> pattern that matches no registered rule refuses the plan with exit <code>3</code>
+before it selects anything, as it refuses the run, even when another pattern matches and
+whatever <code>fail_on</code> says (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).
+The pattern is checked against every rule the run would register, including the rules
+<code>--rules</code> and <code>rules.paths</code> load and the assertions of the profile's <code>contracts:</code>, and against every pass a probe splits into, so a
+canary rule priced in a pass of its own still matches its pattern.</p>
 <p>The plan exits <code>3</code> as well when the run it describes could not pass, and says why
 on stderr, one line per cause:</p>
 <ul>
-<li><strong>no rule would run</strong> — the profile, the flags and the target select none, and a
-run that verifies nothing reports no verdict;</li>
+<li><strong>no rule would run</strong> — every include pattern matches a rule, but the exclusions, the
+flags and the target select none, and a run that verifies nothing reports no verdict;</li>
 <li><strong>a coverage shortfall</strong> — a check the run's fixtures demand that it would not select,
 a graded recording whose run stopped, or, for <code>plan scan</code>, a path that holds no file
 other than <code>.guardanaignore</code> files (<code>empty_target</code>, the shortfall <code>scan</code> records);</li>

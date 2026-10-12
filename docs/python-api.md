@@ -91,7 +91,7 @@ agent = A2aAgentTarget("https://agent.example.com", credential=alice, other_cred
 - `A2aAgentTarget(url, *, credential=None, other_credential=None, sender=None)` takes the http(s) URL of the agent's card (ending in `.json`) or of its origin; any other path, a second credential without the first, or the same value twice, raises `ValueError`. `sender` is a `Sender`.
 - A server that stops accepting the agreed revision mid-run returns the `Verification` with `result.stopped_by` `target_changed` and exit code `4`.
 
-A target runs once. Running the same object again, starting a second run while the first is under way, or running one that already sent requests raises `TargetReusedError`: build a fresh target for each run, so its usage, its budget and whatever it cached describe that run alone. A run refused before anything was sent, over its calibrations or a budget, leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.
+A target runs once. Running the same object again, starting a second run while the first is under way, or running one that already sent requests raises `TargetReusedError`: build a fresh target for each run, so its usage, its budget and whatever it cached describe that run alone. A run refused before anything was sent, over its calibrations, a budget or its profile, leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.
 
 ## Read a result
 
@@ -135,7 +135,7 @@ Every error derives from `VerificationError`.
 | `UnsupportedTargetError` | A trace target. Its unreadable records and its contracts are read by [`guardana analyze-trace`](usage-analyze-trace.md), which this module does not run. Also an endpoint target not built on the built-in `EndpointTarget` under `privacy.keep_exchanges`. | `3` for `probe --keep-exchanges` |
 | `TargetReusedError` | The target already ran, here or by sending requests elsewhere. | — |
 
-A profile that does not load raises `ProfileError` from `guardana.core.profile`. Ctrl-C propagates as `KeyboardInterrupt`.
+A profile that does not load raises `ProfileError` from `guardana.core.profile`. So does every `scan`, `run` and `grade` whose profile has a `rules.include` pattern that matches none of the rules the `Verifier` registered — discovered, passed as `rules`, or loaded from `rule_paths` and `rules.paths` — even when another pattern matches (a `Verifier` compiles no contract, so a pattern naming only a contract assertion is unmatched here); no `Verification` is returned, no rule runs, nothing is sent and the target stays free to run ([profiles](profiles.md#an-include-pattern-must-match-a-rule)). Ctrl-C propagates as `KeyboardInterrupt`.
 
 ## Serve your application's tools in CI
 

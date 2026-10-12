@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
-_SELECTS_NOTHING = "name: audit\nrules:\n  include: ['never.matches.*']\n"
+_SELECTS_NOTHING = "name: audit\nrules:\n  exclude: ['*']\n"
 
 _BROKEN_RULE = """
 id: acme.broken.rule

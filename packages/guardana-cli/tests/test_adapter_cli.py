@@ -23,12 +23,12 @@ def test_probe_adapter_without_prompt_slot_is_clean_error(tmp_path: Path) -> Non
 
 
 def test_probe_adapter_wires_without_contacting_network(tmp_path: Path) -> None:
-    # A valid adapter builds; a profile matching no rule runs zero rules, so the
+    # A valid adapter builds; a profile excluding every rule runs zero rules, so the
     # probe never contacts the endpoint — this exercises the adapter wiring end to
     # end offline, and the zero-rules gate then fails (exit 1) by design.
     path = _write(tmp_path, 'body:\n  message: "{{prompt}}"\nresponse_path: reply\n')
     profile = tmp_path / "guardana.yaml"
-    profile.write_text('rules:\n  include: ["guardana.nonexistent.rule"]\n')
+    profile.write_text('rules:\n  exclude: ["*"]\n')
     result = runner.invoke(
         app,
         [

@@ -86,7 +86,7 @@ def test_a_rule_file_that_does_not_load_refuses_the_plan(
 def test_a_plan_that_selects_no_rule_is_refused(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, command: str
 ) -> None:
-    profile = _profile(tmp_path, "name: t\nrules:\n  include: ['nobody.*']\n")
+    profile = _profile(tmp_path, "name: t\nrules:\n  exclude: ['*']\n")
 
     result = _plan(monkeypatch, command, tmp_path, "--profile", str(profile))
 
@@ -137,7 +137,7 @@ def test_zero_rules_is_refused_even_with_fail_on_error_off(
 ) -> None:
     profile = _profile(
         tmp_path,
-        "name: t\nrules:\n  include: ['nobody.*']\nfail_on:\n  fail_on_error: false\n",
+        "name: t\nrules:\n  exclude: ['*']\nfail_on:\n  fail_on_error: false\n",
     )
 
     result = _plan(monkeypatch, "probe", tmp_path, "--profile", str(profile))

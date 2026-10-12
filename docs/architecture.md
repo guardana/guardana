@@ -317,6 +317,9 @@ class Runner:
     def run(self, target: Target) -> ScanResult: ...
 ```
 
+Before it selects anything, the runner refuses with `ProfileError` an include pattern
+that matches no registered rule, naming each one
+([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
 For each registered rule: skip it if `target.kind` doesn't match
 `meta.target_kind`, or the profile's `Policy.matches(rule_id)` excludes it;
 skip it (recording it under `rules_skipped`) if the target can't satisfy

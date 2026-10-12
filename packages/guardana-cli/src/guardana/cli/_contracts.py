@@ -10,6 +10,7 @@ an operator states outright. That difference decides what happens when a policy
 excludes the compiled rule: the implication goes with it, the stated demand does not.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,12 +18,12 @@ import typer
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.contract import ContractError, SecurityContract, load_contract
 from guardana.core.profile import Profile
-from guardana.core.registry import Registry
+from guardana.core.registry import Registry, name_rule_ids
 from guardana.core.rule import Rule
 from guardana.core.runner import refused_by_this_run
 from guardana.core.target import dimensions_of
 from guardana.core.trace import Dimension
-from guardana.rules.contract import ContractCompilation, compile_contracts
+from guardana.rules.contract import ContractCompilation, compile_contract, compile_contracts
 
 _SUFFIXES = (".yaml", ".yml")
 
@@ -127,6 +128,7 @@ def wire_contracts(
     operator's explicit `trace.require` without either side knowing about the other.
     """
     contracts = load_contracts_or_exit(paths)
+    name_contract_rules(registry, contracts)
     try:
         compiled = compile_contracts(contracts, ai_system)
     except ContractError as exc:
@@ -138,6 +140,28 @@ def wire_contracts(
     running = [rule for rule in compiled.rules if rule.meta.id not in refused]
     excluded = tuple(rule.meta.id for rule in compiled.rules if rule.meta.id in refused)
     return profile.demanding(_dimensions_needed_by(running)), WiredContracts(compiled, excluded)
+
+
+def name_contract_rules(registry: Registry, contracts: Sequence[SecurityContract]) -> None:
+    """Name on `registry` every rule id the contracts compile to, whatever system each is about.
+
+    An include pattern naming an assertion then matches on every run of the profile, the
+    run about another AI system and a run that grades no trace included, while only the
+    run about the contract's own system registers and executes the rule. A contract that
+    does not compile names nothing; the command that reads it refuses it.
+    """
+    for contract in contracts:
+        try:
+            compiled = compile_contract(contract, contract.applies_to.ai_system)
+        except ContractError:
+            continue
+        name_rule_ids(registry, (rule.meta.id for rule in compiled.rules))
+        name_rule_ids(registry, (skip.rule_id for skip in compiled.skipped))
+
+
+def name_profile_contract_rules(registry: Registry, profile: Profile) -> None:
+    """Name on `registry` the rule ids of every contract the profile names that reads."""
+    name_contract_rules(registry, read_contracts(contract_paths(profile, [])).contracts)
 
 
 def _dimensions_needed_by(rules: list[Rule]) -> tuple[Dimension, ...]:

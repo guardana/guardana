@@ -311,7 +311,15 @@ because a larger budget would not have let the run finish. A target that fails b
 the run has a result — an stdio MCP command that cannot be started, say — and a judge
 that fails at any point, still exit <code>4</code> with nothing saved.</p>
 <p><strong><code>3</code> is usage, not policy.</strong> A malformed <code>guardana.yaml</code> must not look like a
-policy failure, or a typo in a config file reads as a security finding.</p>
+policy failure, or a typo in a config file reads as a security finding. A
+<code>rules.include</code> pattern that matches no registered rule is such a typo, even beside a
+pattern that matches: the command refuses before any rule runs, whatever <code>fail_on</code>
+says, and names every such pattern
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>):</p>
+<pre><code class="language-text">error: rules.include contains unmatched patterns: &quot;guardana.supply_chain.code_executon&quot; — check the spelling and registered rules.
+</code></pre>
+<p>A selection the policy narrows to nothing with every pattern matched — each rule
+excluded, or for another kind of target — still runs no rule and exits <code>2</code>.</p>
 <p><strong><code>7</code> is honest partiality.</strong> Ctrl-C is neither a pass nor a completed failure.
 Nothing the command had not yet written is written afterwards, and the code says
 the run did not finish. Stopping <code>guardana monitor</code> with Ctrl-C exits <code>7</code> too, even

@@ -109,7 +109,7 @@ delivery:                       # optional; see "delivery:" below
 |---|---|---|---|
 | `schema_version` | integer | `1` | The profile schema the file was written for. See [Schema version](#schema-version). |
 | `name` | string | `"custom"` | A label for the profile (informational only) |
-| `rules.include` | list of glob patterns | `["*"]` | A rule's `id` must match at least one pattern here to run |
+| `rules.include` | list of glob patterns | `["*"]` | A rule's `id` must match at least one pattern here to run. Every pattern must match at least one registered rule, or the command is refused with exit `3` before any rule runs; see [below](#an-include-pattern-must-match-a-rule). |
 | `rules.exclude` | list of glob patterns | `[]` | A rule's `id` matching any of these is dropped, even if included |
 | `rules.paths` | list of paths | `[]` | Directories (or single files) of custom declarative YAML rules to load, in addition to anything passed via the repeatable `--rules PATH` flag on `scan`/`probe`/`monitor`. A relative path is read beside the profile file, not from the current working directory, like `contracts` and `calibrations`; when it only exists in the working directory, the warning names both paths. A rule file that does not load never aborts the run: it is recorded in `errors`, which leaves the run indeterminate unless `fail_on.fail_on_error` is `false`. So is a directory that holds no `.yaml` or `.yml` file at its top level; rule files in its subdirectories are not read. See [`writing-rules.md`](writing-rules.md). |
 | `plugins.mode` | `all\|builtins\|allowlist\|disabled` | not stated: `builtins` | Which installed plugins every command given this profile imports. See [Plugin trust](#plugin-trust-plugins). |
@@ -133,7 +133,42 @@ delivery:                       # optional; see "delivery:" below
 the rule's `id`, so namespacing rules (`guardana.*` for built-ins, `acme.*`
 for a company's own) lets one profile mix and match cleanly — see
 [`examples/guardana.yaml`](../examples/guardana.yaml) for a profile that
-includes both.
+includes both. A pattern is a whole id or a glob: `guardana.supply_chain` is not a
+prefix and matches no rule, while `guardana.supply_chain.*` matches the namespace.
+
+### An include pattern must match a rule
+
+Every `rules.include` pattern must match at least one registered rule once every rule
+is loaded: built-in and installed rules and the YAML rules under `rules.paths` and
+`--rules`. The assertions of every contract under `contracts:`, and of every contract
+`analyze-trace` is given with `--contract`, count too, whichever AI system each is
+about: only an `analyze-trace` run about that system executes them, but a pattern
+naming one matches on every command, so one profile serves `scan`, `probe` and the
+trace runs of each system. A pattern that matches none refuses `scan`, `probe`,
+`grade`, `monitor`, `analyze-trace`, `baseline`, `recipe` and `plan` with exit `3`,
+even when another pattern matches, before any rule runs, before anything is sent and
+before `probe` starts an MCP server:
+
+```text
+error: rules.include contains unmatched patterns: "guardana.supply_chain.code_executon" — check the spelling and registered rules.
+```
+
+Every unmatched pattern is named once, quoted, in profile order. No `fail_on_*`
+setting relaxes it: a misspelled id would otherwise narrow the run to the rules spelled
+correctly and let it pass. A pattern is checked against registered rules before
+`rules.exclude`, the target's kind, safety limits or capabilities narrow the selection,
+so a pattern whose rules are all excluded, or all for another kind of target, is not
+unmatched; a run left with no rule exits `2` and its plan `3`, as for any selection that
+verifies nothing. The
+bare `*`, the default, is never unmatched. The rules of a plugin pack that
+[`plugins:`](#plugin-trust-plugins) does not admit are not registered, so a pattern
+naming only them is unmatched: admit the pack, or remove the pattern.
+`guardana config validate` checks the patterns the same way before a run, against the
+rules the profile itself names: the built-in and installed rules its `plugins:` trust
+admits, the rules under `rules.paths` and the assertions of every contract under
+`contracts:`. It does not see rules a run loads only with `--rules`, or contracts only
+`--contract` names; list them under `rules.paths` and `contracts:` to validate them
+([`config validate`](usage-doctor.md)).
 
 ## Plugin trust: `plugins:`
 

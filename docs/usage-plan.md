@@ -303,11 +303,18 @@ The JSON carries both as `budgets.max_requests_per_minute` and
 
 ## A run that could not pass
 
+A `rules.include` pattern that matches no registered rule refuses the plan with exit `3`
+before it selects anything, as it refuses the run, even when another pattern matches and
+whatever `fail_on` says ([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
+The pattern is checked against every rule the run would register, including the rules
+`--rules` and `rules.paths` load and the assertions of the profile's `contracts:`, and against every pass a probe splits into, so a
+canary rule priced in a pass of its own still matches its pattern.
+
 The plan exits `3` as well when the run it describes could not pass, and says why
 on stderr, one line per cause:
 
-- **no rule would run** — the profile, the flags and the target select none, and a
-  run that verifies nothing reports no verdict;
+- **no rule would run** — every include pattern matches a rule, but the exclusions, the
+  flags and the target select none, and a run that verifies nothing reports no verdict;
 - **a coverage shortfall** — a check the run's fixtures demand that it would not select,
   a graded recording whose run stopped, or, for `plan scan`, a path that holds no file
   other than `.guardanaignore` files (`empty_target`, the shortfall `scan` records);

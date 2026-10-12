@@ -55,8 +55,8 @@ def test_runner_runs_matching_rule_and_skips_wrong_target_kind(tmp_path: Path) -
 
 
 def test_runner_respects_policy_include(tmp_path: Path) -> None:
-    policy = Policy(include=("guardana.other.*",))
-    result = _runner(_Fires(), policy=policy).run(ArtifactTarget(tmp_path))
+    policy = Policy(include=("guardana.ep.*",))
+    result = _runner(_Fires(), _EndpointOnly(), policy=policy).run(ArtifactTarget(tmp_path))
     assert result.findings == ()
 
 

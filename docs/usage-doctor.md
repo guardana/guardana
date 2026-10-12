@@ -72,6 +72,12 @@ It answers the questions that are otherwise guessed at:
 - **whether the files the profile names load.** Each contract, calibration and
   rule under `rules.paths` goes through the loader a run uses, the rules after the same
   plugin discovery; one a run would refuse is a failure here too.
+- **whether every `rules.include` pattern matches a rule.** A pattern that matches none
+  of the discovered rules, the rules under `rules.paths` and the rules the profile's
+  `contracts:` compile to is a failure, as it refuses every run
+  ([profiles](profiles.md#an-include-pattern-must-match-a-rule)). `doctor` takes no
+  `--rules` or `--contract`: a rule or contract a run is given only on its command
+  line is not seen, so list it under `rules.paths` or `contracts:` to check it.
 - **whether each `plugins.allow` entry loads anything.** A name that is not installed,
   or installs no Guardana entry point, is a warning: its checks would simply be absent.
 
@@ -83,7 +89,13 @@ they are things worth knowing, not faults.
 
 Parses the profile, then loads every contract, calibration file and rule under
 `rules.paths` it names with the loaders a run uses, the rules after discovering the
-plugins the profile trusts. Each problem is printed and the command
+plugins the profile trusts, and checks that every `rules.include` pattern matches one
+of those rules or an assertion of those contracts, whichever AI system each contract
+is about, as every run counts them. It knows only what the profile names: rules a run
+loads only with `--rules`, contracts `analyze-trace` is given only with `--contract`,
+and plugins admitted only by a run's `--plugins` or `--allow-plugin` are not seen;
+list such rules under `rules.paths` and such contracts under `contracts:` to validate
+them. Each problem is printed and the command
 exits `3`, as the run would. Useful as an early pipeline step: a typo in
 `guardana.yaml` should fail in a second rather than after a probe has spent its
 budget finding out.
@@ -107,8 +119,10 @@ is *in force*, and most of a gate is defaults — including the ones nobody type
 trust (with whether the profile stated it), the contracts and calibrations the profile
 names with what each file loaded, and
 the privacy policy digest that a run manifest also records, so a saved run can be
-matched back to the configuration that produced it. A named file that does not load is
-printed as an error, listed under `problems` in the JSON form, and exits `3`.
+matched back to the configuration that produced it. A named file that does not load, or
+an include pattern that matches no rule, is printed as an error, listed under `problems`
+in the JSON form, and exits `3`. It checks the patterns against the same rules
+`validate` does.
 
 ## See also
 

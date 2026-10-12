@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 from guardana.cli._atomic import write_whole
+from guardana.cli._exit import refuse_invalid_profile
 from guardana.cli._plugins import (
     AllowPluginOption,
     PluginsOption,
@@ -22,7 +23,7 @@ from guardana.cli._sidecar import same_file
 from guardana.cli._target_locator import resolve_target
 from guardana.cli.exit_codes import ExitCode, code_for
 from guardana.core.gate import GateOutcome, open_questions, refused_by
-from guardana.core.profile import Policy, Profile
+from guardana.core.profile import Policy, Profile, ProfileError
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import (
@@ -69,7 +70,10 @@ def _scan(
         kind=TargetKind.ARTIFACT,
         fallback=lambda: _path_target(path, prof.path_excludes),
     )
-    result = Runner(registry=registry, profile=prof).run(target)
+    try:
+        result = Runner(registry=registry, profile=prof).run(target)
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     result = relativize_findings(result, Path.cwd())
     return EvidenceRedactor(prof.privacy).redact_result(result)
 

@@ -312,7 +312,7 @@ delivery:                       # optional; see &quot;delivery:&quot; below
 <td><code>rules.include</code></td>
 <td>list of glob patterns</td>
 <td><code>[&quot;*&quot;]</code></td>
-<td>A rule's <code>id</code> must match at least one pattern here to run</td>
+<td>A rule's <code>id</code> must match at least one pattern here to run. Every pattern must match at least one registered rule, or the command is refused with exit <code>3</code> before any rule runs; see <a href="#an-include-pattern-must-match-a-rule">below</a>.</td>
 </tr>
 <tr>
 <td><code>rules.exclude</code></td>
@@ -428,7 +428,37 @@ delivery:                       # optional; see &quot;delivery:&quot; below
 the rule's <code>id</code>, so namespacing rules (<code>guardana.*</code> for built-ins, <code>acme.*</code>
 for a company's own) lets one profile mix and match cleanly — see
 <a href="https://github.com/guardana/guardana/blob/main/examples/guardana.yaml"><code>examples/guardana.yaml</code></a> for a profile that
-includes both.</p>
+includes both. A pattern is a whole id or a glob: <code>guardana.supply_chain</code> is not a
+prefix and matches no rule, while <code>guardana.supply_chain.*</code> matches the namespace.</p>
+<h3 id="an-include-pattern-must-match-a-rule">An include pattern must match a rule</h3>
+<p>Every <code>rules.include</code> pattern must match at least one registered rule once every rule
+is loaded: built-in and installed rules and the YAML rules under <code>rules.paths</code> and
+<code>--rules</code>. The assertions of every contract under <code>contracts:</code>, and of every contract
+<code>analyze-trace</code> is given with <code>--contract</code>, count too, whichever AI system each is
+about: only an <code>analyze-trace</code> run about that system executes them, but a pattern
+naming one matches on every command, so one profile serves <code>scan</code>, <code>probe</code> and the
+trace runs of each system. A pattern that matches none refuses <code>scan</code>, <code>probe</code>,
+<code>grade</code>, <code>monitor</code>, <code>analyze-trace</code>, <code>baseline</code>, <code>recipe</code> and <code>plan</code> with exit <code>3</code>,
+even when another pattern matches, before any rule runs, before anything is sent and
+before <code>probe</code> starts an MCP server:</p>
+<pre><code class="language-text">error: rules.include contains unmatched patterns: &quot;guardana.supply_chain.code_executon&quot; — check the spelling and registered rules.
+</code></pre>
+<p>Every unmatched pattern is named once, quoted, in profile order. No <code>fail_on_*</code>
+setting relaxes it: a misspelled id would otherwise narrow the run to the rules spelled
+correctly and let it pass. A pattern is checked against registered rules before
+<code>rules.exclude</code>, the target's kind, safety limits or capabilities narrow the selection,
+so a pattern whose rules are all excluded, or all for another kind of target, is not
+unmatched; a run left with no rule exits <code>2</code> and its plan <code>3</code>, as for any selection that
+verifies nothing. The
+bare <code>*</code>, the default, is never unmatched. The rules of a plugin pack that
+<a href="#plugin-trust-plugins"><code>plugins:</code></a> does not admit are not registered, so a pattern
+naming only them is unmatched: admit the pack, or remove the pattern.
+<code>guardana config validate</code> checks the patterns the same way before a run, against the
+rules the profile itself names: the built-in and installed rules its <code>plugins:</code> trust
+admits, the rules under <code>rules.paths</code> and the assertions of every contract under
+<code>contracts:</code>. It does not see rules a run loads only with <code>--rules</code>, or contracts only
+<code>--contract</code> names; list them under <code>rules.paths</code> and <code>contracts:</code> to validate them
+(<a href="usage-doctor.html"><code>config validate</code></a>).</p>
 <h2 id="plugin-trust-plugins">Plugin trust: <code>plugins:</code></h2>
 <p>Every command starts by trusting only Guardana's own distributions (<code>builtins</code>). <code>guardana doctor</code> lists installed packs. Guardana refuses a pack until you admit it and records its entry points as errors, so while a pack stays refused every run is <code>indeterminate</code> under the default <code>fail_on_error</code>, whether or not it would have used the pack. Use <code>plugins:</code> to set trust for every command given this profile:</p>
 <pre><code class="language-yaml">plugins:

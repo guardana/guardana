@@ -108,11 +108,20 @@ def test_a_run_that_executed_no_rules_exits_two(tmp_path: Path) -> None:
     # Nothing was verified. Non-zero either way; the point is that a pipeline can
     # tell this from a target that got worse.
     profile = tmp_path / "guardana.yaml"
-    profile.write_text("name: x\nrules:\n  include: ['nothing.matches.this']\n", encoding="utf-8")
+    profile.write_text("name: x\nrules:\n  exclude: ['*']\n", encoding="utf-8")
 
     result = runner.invoke(app, ["scan", str(tmp_path), "--profile", str(profile)])
 
     assert result.exit_code == ExitCode.INDETERMINATE
+
+
+def test_an_include_that_matches_no_rule_exits_three(tmp_path: Path) -> None:
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("name: x\nrules:\n  include: ['nothing.matches.this']\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["scan", str(tmp_path), "--profile", str(profile)])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE
 
 
 def test_an_unreadable_run_exits_three(tmp_path: Path) -> None:

@@ -55,7 +55,7 @@ from guardana.core.redaction import (
 )
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
-from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY
+from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY, refuse_unmatched_includes
 from guardana.core.target import Target, TargetKind, display_url
 from guardana.core.target.connection import ResolvedConnection
 from guardana.core.target.endpoint import secrets_sent_by
@@ -361,6 +361,10 @@ def monitor(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this i
     except ProfileError as exc:
         raise refuse_invalid_profile(exc) from exc
     load_custom_rules(registry, prof, rules)
+    try:
+        refuse_unmatched_includes(prof, registry)
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     registry.apply_trials(prof.trials)
     records = {key: value.as_record() for key, value in calibrations_or_exit(prof).items()}
 

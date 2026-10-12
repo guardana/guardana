@@ -54,7 +54,7 @@ from guardana.core.manifest.records import (
 from guardana.core.manifest.usage import JudgeUsage
 from guardana.core.plugins import PluginTrust
 from guardana.core.probe import run_target_probe
-from guardana.core.profile import Policy, Profile, default_profile
+from guardana.core.profile import Policy, Profile, ProfileError, default_profile
 from guardana.core.recording import (
     Recording,
     RecordingError,
@@ -75,6 +75,7 @@ from guardana.core.runner import (
     DEFAULT_ENDPOINT_CONCURRENCY,
     Runner,
     applicability_refusal,
+    refuse_unmatched_includes,
     select_rules,
     target_failures,
 )
@@ -378,8 +379,9 @@ class Verifier:
         closes it. A target runs once: a second run, or one started while the first is
         under way, raises `TargetReusedError`, because its meter and whatever it cached
         would describe both runs. A run refused before anything was sent, over its
-        calibrations or a budget, leaves the target free; a target that cannot be weakly
-        referenced is checked by its meter alone.
+        calibrations, a budget or its profile, leaves the target free; a target that
+        cannot be weakly referenced is checked by its meter alone. A `rules.include`
+        pattern that matches no registered rule raises `ProfileError` before any rule runs.
         """
         return self._verify(
             target,
@@ -440,6 +442,7 @@ class Verifier:
         try:
             calibrations = self._calibrations()
             registry = self._registry().copied()
+            refuse_unmatched_includes(self.profile, registry)
             registry.apply_trials(self.profile.trials)
             if isinstance(target, RecordedTarget):
                 refuse_other_trials(target.recording, registry)
@@ -453,7 +456,7 @@ class Verifier:
             result, identity = self._execute(
                 target, registry, calibrations, endpoint=endpoint, withheld=withheld
             )
-        except (CalibrationError, UnenforceableBudgetError, RecordingRefusedError):
+        except (CalibrationError, UnenforceableBudgetError, RecordingRefusedError, ProfileError):
             # Each is refused before the first request, which leaves the target unused.
             if keeping is not None:
                 keeping.stop_keeping()

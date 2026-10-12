@@ -18,7 +18,7 @@ from guardana.cli._contracts import (
     describe_contracts,
     wire_contracts,
 )
-from guardana.cli._exit import refuse_unenforceable_budget
+from guardana.cli._exit import refuse_invalid_profile, refuse_unenforceable_budget
 from guardana.cli._formats import FORMAT_HELP
 from guardana.cli._outputs import select_outputs, warn_without_a_reporter
 from guardana.cli._plugins import (
@@ -48,6 +48,7 @@ from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
 from guardana.core.manifest import SourceKind
+from guardana.core.profile import ProfileError
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
@@ -184,6 +185,8 @@ def analyze_trace(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface pl
             result = Runner(registry=registry, profile=prof).run(selected)
         except BudgetExhausted as exc:
             raise refuse_unenforceable_budget(exc) from exc
+        except ProfileError as exc:
+            raise refuse_invalid_profile(exc) from exc
         # The observations the trace itself supplies — which models actually answered —
         # are merged in here rather than produced by a rule: they are a fact about the
         # file, not a judgement about it.

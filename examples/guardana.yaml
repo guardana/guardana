@@ -4,7 +4,8 @@
 #   guardana scan . --profile examples/guardana.yaml
 #
 # after installing the example package (`uv pip install -e examples/custom_rule`
-# or equivalent) so its rules are present in the registry.
+# or equivalent) so its rules are present in the registry. Without it the profile is
+# refused with exit 3: `acme.*` would match no rule.
 
 name: pre-deploy
 

@@ -291,7 +291,8 @@ def test_an_unrecorded_case_is_an_ungraded_trial_never_a_pass(tmp_path: Path) ->
 
 
 def test_a_probe_that_kept_nothing_writes_no_sidecar(tmp_path: Path) -> None:
-    profile = _profile("acme.nothing.*")
+    profile = _profile("*")
+    profile = replace(profile, policy=replace(profile.policy, exclude=("*",)))
     verification = Verifier(trust=_BUILTINS, profile=profile).run(
         _endpoint(_ByQuestion(_ANSWERS), profile)
     )

@@ -71,6 +71,7 @@ from guardana.core.profile import Profile, ProfileError
 from guardana.core.recording import render_recording
 from guardana.core.redaction import EvidenceMode
 from guardana.core.registry import Registry
+from guardana.core.runner import refuse_unmatched_includes
 from guardana.core.target import EndpointTarget, SeededTarget, Target, TargetKind, display_url
 from guardana.core.target.connection import Connection
 from guardana.core.usage import UsageMeter
@@ -338,6 +339,11 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
         except ProfileError as exc:
             raise refuse_invalid_profile(exc) from exc
         load_custom_rules(registry, prof, rules)
+        # Before any target is built: a stdio server starts as its target is constructed.
+        try:
+            refuse_unmatched_includes(prof, registry)
+        except ProfileError as exc:
+            raise refuse_invalid_profile(exc) from exc
         registry.apply_trials(prof.trials)
         # Read before anything is sent, and once: the rules correct with these while they
         # run, and the manifest records the very same ones.
@@ -618,6 +624,8 @@ def _carried_out(run: Callable[[], _Run]) -> _Run:
         return run()
     except UnenforceableBudgetError as exc:
         raise refuse_unenforceable_budget(exc) from exc
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     except UnsupportedTargetError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
