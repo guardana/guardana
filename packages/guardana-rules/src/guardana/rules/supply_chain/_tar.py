@@ -76,11 +76,9 @@ class TarSource(Protocol):
 
     def read(self, size: int = -1, /) -> bytes:
         """Read up to `size` bytes."""
-        ...
 
     def seek(self, offset: int, whence: int = os.SEEK_SET, /) -> int:
         """Move to `offset`; the walk only ever moves forward."""
-        ...
 
 
 class TarListingError(Exception):
