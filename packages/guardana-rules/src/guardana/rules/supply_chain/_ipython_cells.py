@@ -9,6 +9,7 @@ shell commands and the parts it cannot read, carrying the notebook-wide state
 
 import ast
 import builtins
+import contextlib
 import keyword
 import re
 import shlex
@@ -286,13 +287,11 @@ def _expansions(text: str) -> list[str]:
     Python expression evaluates nothing: IPython runs the command unexpanded instead.
     """
     expressions: list[str] = []
-    try:
+    with contextlib.suppress(ValueError):
         for _literal, name, spec, _conversion in string.Formatter().parse(text):
             expression = f"{name}:{spec}" if spec else name
             if expression is not None and expression.strip():
                 expressions.append(expression)
-    except ValueError:
-        pass
     return expressions
 
 

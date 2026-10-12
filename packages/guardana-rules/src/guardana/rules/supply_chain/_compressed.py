@@ -34,21 +34,17 @@ class _Stream(Protocol):
     @property
     def eof(self) -> bool:
         """Whether the stream has ended."""
-        ...
 
     @property
     def unused_data(self) -> bytes:
         """Input past the end of the stream."""
-        ...
 
     @property
     def needs_input(self) -> bool:
         """Whether more output needs more input."""
-        ...
 
     def feed(self, data: bytes, room: int) -> bytes:
         """Decode `data` after what was fed before, returning at most `room` bytes."""
-        ...
 
 
 class _ZlibStream:
@@ -119,7 +115,7 @@ class _Codec:
     strong: Callable[[bytes], bool]
     """Whether a head this codec rejects is still a compressed file rather than other bytes."""
 
-    refused: Callable[[bytes], bool] = _never
+    refused: Callable[[bytes], bool]
     """Whether a head declares more than this scanner decodes, so it is not decoded at all."""
 
 
@@ -128,19 +124,20 @@ def _large_dictionary(head: bytes) -> bool:
 
 
 _CODECS = (
-    _Codec("zlib", b"\x78", lambda: _ZlibStream(zlib.MAX_WBITS), _never),
-    _Codec("gzip", b"\x1f\x8b", lambda: _ZlibStream(16 + zlib.MAX_WBITS), _always),
+    _Codec("zlib", b"\x78", lambda: _ZlibStream(zlib.MAX_WBITS), _never, _never),
+    _Codec("gzip", b"\x1f\x8b", lambda: _ZlibStream(16 + zlib.MAX_WBITS), _always, _never),
     _Codec(
         "bz2",
         b"BZ",
         lambda: _BufferedStream(bz2.BZ2Decompressor()),
         lambda head: _STRONG_BZ2.match(head) is not None,
+        _never,
     ),
-    _Codec("lzma", b"\x5d\x00", _lzma, _never, refused=_large_dictionary),
-    _Codec("xz", b"\xfd7zXZ", _lzma, _always),
-    _Codec("lz4", b"\x04\x22\x4d\x18", None, _always),
+    _Codec("lzma", b"\x5d\x00", _lzma, _never, _large_dictionary),
+    _Codec("xz", b"\xfd7zXZ", _lzma, _always, _never),
+    _Codec("lz4", b"\x04\x22\x4d\x18", None, _always, _never),
 )
-_LEGACY = _Codec("joblib-zlib", _LEGACY_MAGIC, lambda: _ZlibStream(zlib.MAX_WBITS), _never)
+_LEGACY = _Codec("joblib-zlib", _LEGACY_MAGIC, lambda: _ZlibStream(zlib.MAX_WBITS), _never, _never)
 
 
 @dataclass(frozen=True, slots=True)

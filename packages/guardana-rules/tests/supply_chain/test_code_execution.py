@@ -132,8 +132,20 @@ def test_a_harmless_dynamic_import_is_clean(tmp_path: Path, source: str) -> None
 @pytest.mark.parametrize(
     "source",
     [
-        "import os\n\n\ndef helper():\n    os = __import__('json')\n    return os\n\n\n"
-        "os.system('id')\n",
+        "\n".join(
+            [
+                "import os",
+                "",
+                "",
+                "def helper():",
+                "    os = __import__('json')",
+                "    return os",
+                "",
+                "",
+                "os.system('id')",
+                "",
+            ]
+        ),
         "os = __import__('json')\nimport os\nos.system('id')\n",
         "import os as shell\nshell = __import__('json')\nshell.system('id')\n",
     ],
