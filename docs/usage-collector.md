@@ -275,6 +275,12 @@ a collector that removes evidence because nobody said not to.
 collector, so "what deleted my evidence" is answerable from the audit log rather
 than from source. Run it yourself, or from a cron you wrote.
 
+`apply` reports and audits the submissions its delete actually removed, so two
+passes started together never both claim the same rows. `--dry-run` reports how
+many would go at that moment. A read that overlaps a retention pass returns each
+submission with the findings it held when the read began, never a submission
+emptied halfway through.
+
 Two things retention deliberately does not touch:
 
 - **The audit log.** A log pruned by the policy it describes cannot answer
@@ -393,7 +399,10 @@ at the proxy that already terminates your TLS.
 A credential is charged on its own only after the collector has accepted it; every
 other request — no key, a rejected key, a key no route checked — is charged to the
 peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
-inventing a new token per request cannot buy a fresh one. The limiter tracks at
+inventing a new token per request cannot buy a fresh one. Whether a key is
+accepted and what it has spent are kept apart: a route that checks no key, such as
+`/healthz` or `/readyz`, leaves the key's count where it was, and a key refused by
+one route and accepted again resumes the minute it was already in. The limiter tracks at
 most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its `Bearer` scheme; an Authorization header with a scheme other than `Bearer` is charged to the peer address.
 
 ## Choosing where submissions go
@@ -515,6 +524,16 @@ its whole history, so a refresh costs the same on a collector that has held a
 project for years. The response says which: `window.limit` is the bound, and
 `window.complete` is `false` when older submissions exist that the totals leave
 out. `guardana-collector run list --limit N` still lists the older runs.
+
+Nothing found is not the same as nothing missed, so `/stats` also counts what a run
+did not check. `totals.skipped` counts the rules runs skipped for any reason other
+than `not_applicable`; a bare rule id from an agent older than skip reasons counts
+too, because it does not say why. `by_gate` counts submissions per recorded gate,
+with `not_recorded` for a run that sent none. Each `by_source` row carries its
+`skipped` count and the `gate` of its newest run (`null` when that run sent none).
+The page shows skipped checks and indeterminate gates as their own tiles and lists
+each one beside the findings, so a run with a skipped check or an undecided gate
+never reads as "No findings".
 
 ### A database outage is not a rejected key
 

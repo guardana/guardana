@@ -253,7 +253,7 @@ The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs
 - scoped, hashed, revocable, and expiring API keys;
 - run and finding history, lifecycle states, expiring waivers, and audit events;
 - retention and deletion commands, backup/restore checks, health, and readiness;
-- a read-only dashboard authenticated with a read-scoped session.
+- a read-only dashboard authenticated with a read-scoped session, which shows skipped checks and indeterminate gates next to the findings.
 
 The collector is optional. Local and CI verification do not depend on it. It does
 not yet provide quality-assessment trends, human SSO/RBAC or a supported

@@ -442,12 +442,14 @@ def _mount_limits(app: FastAPI) -> None:
         oversized = await _reject_oversized(request, limits.max_body_bytes)
         if oversized is not None:
             return oversized
-        request.state.credential_accepted = False
+        request.state.credential_accepted = None
         response = await call_next(request)
         if credential is not None:
-            if request.state.credential_accepted:
+            # `None` is a route that never checked the key, such as a health probe;
+            # it says nothing about the key either way.
+            if request.state.credential_accepted is True:
                 limiter.vouch(credential)
-            else:
+            elif request.state.credential_accepted is False:
                 limiter.forget(credential)
         return response
 
@@ -570,10 +572,14 @@ def _peer(request: Request) -> str:
 def _noting_acceptance(
     admit: Callable[[Request], Authenticated | None],
 ) -> Callable[[Request], Authenticated | None]:
-    """Wrap a route guard so the rate limiter learns which credentials it accepted."""
+    """Wrap a route guard so the rate limiter learns which credentials it accepted or refused."""
 
     def admitted(request: Request) -> Authenticated | None:
-        identity = admit(request)
+        try:
+            identity = admit(request)
+        except HTTPException:
+            request.state.credential_accepted = False
+            raise
         if identity is not None:
             request.state.credential_accepted = True
         return identity

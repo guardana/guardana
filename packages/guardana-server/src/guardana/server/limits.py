@@ -76,28 +76,35 @@ class RateLimiter:
     until then its requests are charged to the peer address. The limiter runs
     before authentication, so keying on whatever token a request presents would
     let one peer buy a fresh allowance per invented token.
+
+    Whether a credential is accepted and what it has spent are kept apart:
+    withdrawing acceptance leaves the history in place, so a key accepted again
+    resumes the window it was in instead of starting an empty one.
     """
 
     limits: Limits
     clock: Callable[[], float] = time.monotonic
     _seen: dict[str, deque[float]] = field(default_factory=dict)
+    _accepted: set[str] = field(default_factory=set)
 
     def caller_for(self, peer: str, credential: str | None) -> str:
         """Who to charge: the credential if it was accepted before, else the peer."""
-        if credential is not None and credential in self._seen:
+        if credential is not None and credential in self._accepted:
             return credential
         return peer
 
     def vouch(self, credential: str) -> None:
         """Record that the collector accepted this credential, so it earns its own allowance."""
-        if self.limits.requests_per_minute == _UNLIMITED or credential in self._seen:
+        if self.limits.requests_per_minute == _UNLIMITED or credential in self._accepted:
             return
-        self._make_room(self.clock())
-        self._seen[credential] = deque()
+        if credential not in self._seen:
+            self._make_room(self.clock())
+            self._seen[credential] = deque()
+        self._accepted.add(credential)
 
     def forget(self, credential: str) -> None:
-        """Stop treating this credential as accepted: it was refused, or was never checked."""
-        self._seen.pop(credential, None)
+        """Stop treating this credential as accepted, keeping what it has already spent."""
+        self._accepted.discard(credential)
 
     def allows(self, caller: str, *, path: str) -> bool:
         """Whether this caller may make one more request now."""
@@ -127,6 +134,7 @@ class RateLimiter:
         overflow = len(self._seen) - (_MAX_TRACKED_CALLERS - _MAX_TRACKED_CALLERS // 10)
         for caller in list(self._seen)[: max(0, overflow)]:
             del self._seen[caller]
+        self._accepted &= self._seen.keys()
 
     def _forget_the_quiet(self, now: float) -> None:
         """Drop callers whose window has emptied.

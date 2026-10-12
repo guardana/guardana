@@ -465,6 +465,11 @@ a collector that removes evidence because nobody said not to.</p>
 <p><strong>Applying is a command, never a background job.</strong> There is no scheduler in the
 collector, so &quot;what deleted my evidence&quot; is answerable from the audit log rather
 than from source. Run it yourself, or from a cron you wrote.</p>
+<p><code>apply</code> reports and audits the submissions its delete actually removed, so two
+passes started together never both claim the same rows. <code>--dry-run</code> reports how
+many would go at that moment. A read that overlaps a retention pass returns each
+submission with the findings it held when the read began, never a submission
+emptied halfway through.</p>
 <p>Two things retention deliberately does not touch:</p>
 <ul>
 <li><strong>The audit log.</strong> A log pruned by the policy it describes cannot answer
@@ -573,7 +578,10 @@ at the proxy that already terminates your TLS.</p>
 <p>A credential is charged on its own only after the collector has accepted it; every
 other request — no key, a rejected key, a key no route checked — is charged to the
 peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
-inventing a new token per request cannot buy a fresh one. The limiter tracks at
+inventing a new token per request cannot buy a fresh one. Whether a key is
+accepted and what it has spent are kept apart: a route that checks no key, such as
+<code>/healthz</code> or <code>/readyz</code>, leaves the key's count where it was, and a key refused by
+one route and accepted again resumes the minute it was already in. The limiter tracks at
 most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its <code>Bearer</code> scheme; an Authorization header with a scheme other than <code>Bearer</code> is charged to the peer address.</p>
 <h2 id="choosing-where-submissions-go">Choosing where submissions go</h2>
 <p>There is no default, on purpose. A store nobody chose is a store somebody
@@ -667,6 +675,15 @@ its whole history, so a refresh costs the same on a collector that has held a
 project for years. The response says which: <code>window.limit</code> is the bound, and
 <code>window.complete</code> is <code>false</code> when older submissions exist that the totals leave
 out. <code>guardana-collector run list --limit N</code> still lists the older runs.</p>
+<p>Nothing found is not the same as nothing missed, so <code>/stats</code> also counts what a run
+did not check. <code>totals.skipped</code> counts the rules runs skipped for any reason other
+than <code>not_applicable</code>; a bare rule id from an agent older than skip reasons counts
+too, because it does not say why. <code>by_gate</code> counts submissions per recorded gate,
+with <code>not_recorded</code> for a run that sent none. Each <code>by_source</code> row carries its
+<code>skipped</code> count and the <code>gate</code> of its newest run (<code>null</code> when that run sent none).
+The page shows skipped checks and indeterminate gates as their own tiles and lists
+each one beside the findings, so a run with a skipped check or an undecided gate
+never reads as &quot;No findings&quot;.</p>
 <h3 id="a-database-outage-is-not-a-rejected-key">A database outage is not a rejected key</h3>
 <p>If the collector cannot reach its database while checking a key, it answers <code>503</code>,
 not <code>401</code>. A fleet told its credentials were rejected goes and rotates credentials

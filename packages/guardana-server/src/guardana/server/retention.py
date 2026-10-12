@@ -95,30 +95,38 @@ def apply_retention(
     moment = now or datetime.datetime.now(tz=datetime.UTC)
     cutoff = moment - datetime.timedelta(days=keep_days)
     with connection.cursor() as cursor:
-        cursor.execute(
-            "select count(*) from submissions where project_id = %s and received_at < %s",
-            (resolved.id, cutoff),
-        )
-        row = cursor.fetchone()
-        doomed = 0 if row is None else int(str(row[0]))
-        if not dry_run and doomed:
-            # The findings go with them (`on delete cascade`); `tracked_findings`
-            # does not, on purpose — the triage outlives the evidence.
+        if dry_run:
             cursor.execute(
-                "delete from submissions where project_id = %s and received_at < %s",
+                "select count(*) from submissions where project_id = %s and received_at < %s",
                 (resolved.id, cutoff),
             )
-    if not dry_run:
-        record(
-            connection,
-            actor=actor,
-            action="retention.apply",
-            subject=resolved.reference,
-            project_id=resolved.id,
-            detail={"keep_days": keep_days, "submissions": doomed},
+            row = cursor.fetchone()
+            estimate = 0 if row is None else int(str(row[0]))
+            return Removal(
+                project_ref=resolved.reference,
+                keep_days=keep_days,
+                submissions=estimate,
+                dry_run=True,
+            )
+        # The findings go with them (`on delete cascade`); `tracked_findings`
+        # does not, on purpose — the triage outlives the evidence.
+        cursor.execute(
+            "delete from submissions where project_id = %s and received_at < %s",
+            (resolved.id, cutoff),
         )
+        # The rows this statement removed, not a count taken before it: a concurrent
+        # pass may have deleted them in between, and both must not claim them.
+        removed = max(0, cursor.rowcount)
+    record(
+        connection,
+        actor=actor,
+        action="retention.apply",
+        subject=resolved.reference,
+        project_id=resolved.id,
+        detail={"keep_days": keep_days, "submissions": removed},
+    )
     return Removal(
-        project_ref=resolved.reference, keep_days=keep_days, submissions=doomed, dry_run=dry_run
+        project_ref=resolved.reference, keep_days=keep_days, submissions=removed, dry_run=False
     )
 
 
@@ -133,10 +141,8 @@ def delete_project(
     """
     resolved = resolve_project(connection, project)
     with connection.cursor() as cursor:
-        cursor.execute("select count(*) from submissions where project_id = %s", (resolved.id,))
-        row = cursor.fetchone()
-        submissions = 0 if row is None else int(str(row[0]))
         cursor.execute("delete from submissions where project_id = %s", (resolved.id,))
+        submissions = max(0, cursor.rowcount)
         cursor.execute("delete from tracked_findings where project_id = %s", (resolved.id,))
         cursor.execute("delete from api_keys where project_id = %s", (resolved.id,))
         cursor.execute("select organization_id from projects where id = %s", (resolved.id,))
