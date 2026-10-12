@@ -1,7 +1,7 @@
 # `guardana-reference-pack`
 
 A Guardana extension pack that uses all six extension points and imports nothing outside
-the [supported surface](../../docs/compatibility.md). It has its own version (`0.1.1`),
+the [supported surface](../../docs/compatibility.md). It has its own version (`0.1.2`),
 depends on `guardana-core>=0.41` with no upper bound, and declares the `extension_api` and
 `output_api` ranges it runs on in its manifest. `guardana pack validate` checks those ranges;
 installing the pack or running a scan does not. A CI job that depends on the pack therefore
