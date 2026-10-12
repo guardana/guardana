@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The custom-rule example reports files it cannot read instead of hanging, truncating or decoding lossily.** `_read_guarded()` refuses non-regular files (FIFOs, sockets, directories), reports files larger than 256 KiB as inconclusive instead of scanning a prefix, and decodes strict UTF-8 instead of dropping undecodable bytes.
 - **A backtracking `regex` pattern can no longer hang a run.** Each search runs in a worker process started once and reused for every reply. After 2 seconds, a running search is stopped and its worker replaced for the next reply. The verdict is `inconclusive` ("regex search exceeded 2 s; not evaluated"), so a run with `fail_on_inconclusive` on ends `indeterminate` (exit `2`) instead of waiting. Replies over 65,536 characters remain `inconclusive`. The worker stops when the evaluator is closed or garbage-collected, or when the run exits, including after an interrupt.
+- **`scripts/check_repo_settings.py` reports the tag ruleset as present only when it provably covers every release tag.** It tried two sample tags, so a ruleset that left out `refs/tags/v1.0.0rc*` read as present while candidate tags stayed unprotected. It now tries final, moving, pre-, post- and development release tags, and reports an include narrower than `refs/tags/v*` or an exclude that reaches into it as `NOT CHECKED`.
 
 ## [1.0.0rc2] - 2026-10-11 — the second release candidate
 
