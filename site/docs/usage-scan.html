@@ -313,6 +313,42 @@ system-prompt leak, output-secrets) are not selected by <code>scan</code> — th
 live model, so use <code>guardana probe</code> for those. A local endpoint rule loaded
 with <code>--rules</code> or <code>rules.paths</code> does not run either, and <code>scan</code> prints a note
 naming it.</p>
+<h2 id="what-the-scan-leaves-out">What the scan leaves out</h2>
+<p>Three things keep a file out of a directory scan:</p>
+<ul>
+<li><strong><code>rules.paths_exclude</code></strong> in the profile (<a href="profiles.html"><code>profiles.md</code></a>): glob patterns
+matched against each path relative to the scanned directory. A matching directory is not
+walked. This is the policy you chose, and it may exclude any file, a model file included.</li>
+<li><strong><code>.guardanaignore</code></strong> at the root of the scanned directory: one glob pattern per line,
+blank lines and <code>#</code> comments skipped, matched the same way. The file ships with the
+target, so whoever controls the target writes it. It excludes ordinary files, but never a
+file a model loader reads: a file the scan observes as a model (every row of the table
+under <a href="#model-files-no-rule-reads">model files no rule reads</a>, an unzipped Keras model's
+<code>config.json</code> and <code>metadata.json</code> included), an archive or compressed file (<code>.zip</code>,
+<code>.tar</code>, <code>.tgz</code>, <code>.tbz2</code>, <code>.tbz</code>, <code>.txz</code>, or a name ending in <code>.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>,
+<code>.bz2</code>, <code>.lzma</code> or <code>.lz4</code>) whatever it is named, and, in a directory
+that holds a model or a tokenizer (<code>tokenizer_config.json</code> or <code>tokenizer.json</code>), every
+<code>*config.json</code>, <code>chat_template.json</code>, <code>chat_template*.jinja</code>, <code>chat_template*.j2</code> and
+<code>keras_metadata.pb</code>, with the templates in its <code>additional_chat_templates/</code>. A link is
+judged by its name alone. A directory it matches is still walked for such files. A file
+it matches that a model loader reads is scanned anyway and named in the output: <code>Scope</code>
+in the terminal (the first ten, then a count), <code>scope.kept_models</code> in the saved run with
+the pattern that matched it.
+Every pattern it applied is named there too, with the file it came from
+(<code>scope.excludes[].file</code>). It still excludes a notebook, source code and a configuration
+with no model or tokenizer beside it. To leave a model file
+out, use <code>rules.paths_exclude</code>.</li>
+<li><strong>Directories every scan skips</strong>, wherever they occur: <code>.git</code>, <code>.venv</code>, <code>venv</code>, <code>env</code>,
+<code>__pycache__</code>, <code>.mypy_cache</code>, <code>.ruff_cache</code>, <code>.pytest_cache</code>, <code>node_modules</code>, <code>.tox</code>,
+<code>.eggs</code>, <code>dist</code>, <code>build</code>, <code>.idea</code>, <code>.vscode</code> and <code>*.egg-info</code>. They stay skipped, and the
+gate does not change, but the scan searches them by file name for model files, without
+opening a file and within a bound of 10,000 entries shared across them, shallowest first.
+A <code>.bin</code>, <code>.model</code> or <code>.sav</code> counts by its name there; a file with no suffix is not
+counted.
+A skipped directory holding model files is named in the terminal with their count, and in
+the saved run as <code>scope.skipped_models</code>; <code>searched_all</code> is <code>false</code> there when the search
+stopped at its bound. To scan such a model, scan its directory directly.</li>
+</ul>
 <h2 id="a-path-with-no-file-to-scan">A path with no file to scan</h2>
 <p>A scan whose path holds no file other than <code>.guardanaignore</code> files is a coverage
 shortfall named <code>empty_target</code>, naming the scanned path: the directory is empty, or
@@ -360,8 +396,8 @@ documented <code>attn_implementation</code> field is a <code>medium</code> lead.
 <p>Every model file the scan observes must be read by a rule that ran. One that no rule
 read is a coverage shortfall named <code>unexamined_component</code>, one per format, so the run
 is <code>indeterminate</code> (exit <code>2</code>) and never clean. There is no switch: exclude the file
-with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>, which the saved run then records, or
-install a rule that reads the format.</p>
+with <code>rules.paths_exclude</code>, which the saved run then records, or install a rule that reads
+the format. <code>.guardanaignore</code> does not exclude a model file.</p>
 <p>A model or notebook a rule tried to read and could not is a shortfall of the same kind,
 named by its file: a pickle, archive or graph that does not parse, an archive member named
 as a pickle (<code>data.pkl</code>, <code>*.pkl</code>, a legacy tar's <code>pickle</code>) that ends before its STOP, an
@@ -454,7 +490,8 @@ in force once for every member and PAX header after them; sparse maps listing mo
 scanner cannot follow. A sparse member within those bounds is read like any other. An
 archive that holds no model but exceeds the entry bound, such as an image dataset,
 is reported not scanned like any other refused archive. Exclude it from the scan
-with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>, or scan the model's directory instead.</p>
+with <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an archive), or
+scan the model's directory instead.</p>
 <p>Shortfall names are relative to the working directory, as finding locations are, and the
 scan root is removed from their detail, so a saved run names the same file on a laptop
 and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.</p>

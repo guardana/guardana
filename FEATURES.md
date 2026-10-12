@@ -84,8 +84,10 @@ severity bar: how bad an unmeasured thing is has no answer, so `fail_on_inconclu
 governs all of them or none, and a check that went dark between two runs is a
 regression at any severity. Saved runs carry versions, policy identity (the profile's digest),
 target identity, the plugin trust in force, protocol versions, usage, redaction mode, rule
-provenance, and for a file scan every file it listed and the excludes it applied with
-their source. `diff` calls a finding resolved only where the second run listed its file;
+provenance, and for a file scan every file it listed, the excludes it applied with
+their source, the files a model loader reads that the target's own `.guardanaignore` could
+not exclude, and
+the model files named inside the directories every scan skips. `diff` calls a finding resolved only where the second run listed its file;
 one that was deleted, moved, renamed or excluded is a `left_scan` regression.
 Usage keeps the judges configured under `evaluators:` on their own meters, apart from
 the target. `guardana plan probe` prices those judge calls before the run, names what

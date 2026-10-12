@@ -306,3 +306,53 @@ def test_an_honest_keras_directory_and_savedmodel_cost_each_reader_one_read(
     assert all(count <= 1 for (_name, reader), count in opens.items() if reader != "other"), (
         f"opens per file and reader: {dict(opens)}"
     )
+
+
+def test_a_skipped_directory_is_searched_by_name_within_a_bound(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The search for model files in `.venv`, `build` and the rest lists names and opens
+    # nothing, and stops at its bound however large the directory is.
+    venv = repo / ".venv"
+    for package in range(40):
+        (venv / f"pkg{package:02}" / "data").mkdir(parents=True)
+        (venv / f"pkg{package:02}" / "data" / "fixture.pkl").write_bytes(b"x")
+    (repo / "build").mkdir()
+    (repo / "build" / "model.pkl").write_bytes(b"x")
+    bound = 30
+    listings = 0
+    opened: list[str] = []
+    real_scandir = os.scandir
+    real_path_open = Path.open
+    real_os_open = os.open
+
+    def counting_scandir(path: str | Path = ".") -> object:
+        nonlocal listings
+        if venv in Path(path).parents or Path(path) == venv:
+            listings += 1
+        return real_scandir(path)
+
+    def path_open(self: Path, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        if venv in self.parents:
+            opened.append(str(self))
+        return real_path_open(self, *args, **kwargs)
+
+    def os_open(path: Any, *args: Any, **kwargs: Any) -> int:  # noqa: ANN401
+        if venv in Path(path).parents:
+            opened.append(str(path))
+        return real_os_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "scandir", counting_scandir)
+    monkeypatch.setattr(Path, "open", path_open)
+    monkeypatch.setattr(os, "open", os_open)
+    result = _runner().run(ArtifactTarget(repo, skipped_search_entries=bound))
+
+    assert result.scope is not None
+    skipped = result.scope.skipped_models
+    assert skipped is not None
+    assert [Path(d.path).name for d in skipped.directories] == ["build"], (
+        "the shallow model in build/ was not found first, so the bound measures nothing"
+    )
+    assert not skipped.searched_all
+    assert opened == []
+    assert listings <= bound, f"{listings} listings inside .venv for a bound of {bound} entries"

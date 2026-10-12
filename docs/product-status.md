@@ -153,8 +153,8 @@ on another origin are not examined, and agent-card signatures are not verified.
 `pickle_opcode` and `keras_lambda` refuse a `.zip`, `.tar` or `.keras` before opening it
 when listing it would cost more than listing a model. An archive of more than 100,000 entries
 is reported not scanned (exit `2`) even when it holds no model, such as an image dataset.
-Exclude it with `.guardanaignore` or `rules.paths_exclude`, or scan
-the model's directory instead. [`guardana scan`](usage-scan.md) lists every bound.
+Exclude it with `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an
+archive), or scan the model's directory instead. [`guardana scan`](usage-scan.md) lists every bound.
 
 ### `monitor` is scheduled, not passive
 

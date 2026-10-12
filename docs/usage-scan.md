@@ -50,6 +50,43 @@ live model, so use `guardana probe` for those. A local endpoint rule loaded
 with `--rules` or `rules.paths` does not run either, and `scan` prints a note
 naming it.
 
+## What the scan leaves out
+
+Three things keep a file out of a directory scan:
+
+- **`rules.paths_exclude`** in the profile ([`profiles.md`](profiles.md)): glob patterns
+  matched against each path relative to the scanned directory. A matching directory is not
+  walked. This is the policy you chose, and it may exclude any file, a model file included.
+- **`.guardanaignore`** at the root of the scanned directory: one glob pattern per line,
+  blank lines and `#` comments skipped, matched the same way. The file ships with the
+  target, so whoever controls the target writes it. It excludes ordinary files, but never a
+  file a model loader reads: a file the scan observes as a model (every row of the table
+  under [model files no rule reads](#model-files-no-rule-reads), an unzipped Keras model's
+  `config.json` and `metadata.json` included), an archive or compressed file (`.zip`,
+  `.tar`, `.tgz`, `.tbz2`, `.tbz`, `.txz`, or a name ending in `.gz`, `.gzip`, `.z`, `.xz`,
+  `.bz2`, `.lzma` or `.lz4`) whatever it is named, and, in a directory
+  that holds a model or a tokenizer (`tokenizer_config.json` or `tokenizer.json`), every
+  `*config.json`, `chat_template.json`, `chat_template*.jinja`, `chat_template*.j2` and
+  `keras_metadata.pb`, with the templates in its `additional_chat_templates/`. A link is
+  judged by its name alone. A directory it matches is still walked for such files. A file
+  it matches that a model loader reads is scanned anyway and named in the output: `Scope`
+  in the terminal (the first ten, then a count), `scope.kept_models` in the saved run with
+  the pattern that matched it.
+  Every pattern it applied is named there too, with the file it came from
+  (`scope.excludes[].file`). It still excludes a notebook, source code and a configuration
+  with no model or tokenizer beside it. To leave a model file
+  out, use `rules.paths_exclude`.
+- **Directories every scan skips**, wherever they occur: `.git`, `.venv`, `venv`, `env`,
+  `__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `node_modules`, `.tox`,
+  `.eggs`, `dist`, `build`, `.idea`, `.vscode` and `*.egg-info`. They stay skipped, and the
+  gate does not change, but the scan searches them by file name for model files, without
+  opening a file and within a bound of 10,000 entries shared across them, shallowest first.
+  A `.bin`, `.model` or `.sav` counts by its name there; a file with no suffix is not
+  counted.
+  A skipped directory holding model files is named in the terminal with their count, and in
+  the saved run as `scope.skipped_models`; `searched_all` is `false` there when the search
+  stopped at its bound. To scan such a model, scan its directory directly.
+
 ## A path with no file to scan
 
 A scan whose path holds no file other than `.guardanaignore` files is a coverage
@@ -106,8 +143,8 @@ documented `attn_implementation` field is a `medium` lead.
 Every model file the scan observes must be read by a rule that ran. One that no rule
 read is a coverage shortfall named `unexamined_component`, one per format, so the run
 is `indeterminate` (exit `2`) and never clean. There is no switch: exclude the file
-with `.guardanaignore` or `rules.paths_exclude`, which the saved run then records, or
-install a rule that reads the format.
+with `rules.paths_exclude`, which the saved run then records, or install a rule that reads
+the format. `.guardanaignore` does not exclude a model file.
 
 A model or notebook a rule tried to read and could not is a shortfall of the same kind,
 named by its file: a pickle, archive or graph that does not parse, an archive member named
@@ -204,7 +241,8 @@ in force once for every member and PAX header after them; sparse maps listing mo
 scanner cannot follow. A sparse member within those bounds is read like any other. An
 archive that holds no model but exceeds the entry bound, such as an image dataset,
 is reported not scanned like any other refused archive. Exclude it from the scan
-with `.guardanaignore` or `rules.paths_exclude`, or scan the model's directory instead.
+with `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an archive), or
+scan the model's directory instead.
 
 Shortfall names are relative to the working directory, as finding locations are, and the
 scan root is removed from their detail, so a saved run names the same file on a laptop

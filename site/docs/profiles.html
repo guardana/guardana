@@ -235,10 +235,12 @@ rules:
   paths_exclude: [&quot;data/*&quot;, &quot;archive&quot;]  # optional; globs (matched relative to the
                                          # scan root) of files/dirs to skip. A
                                          # `.guardanaignore` file at the root adds
-                                         # more, one glob per line. Exclude here a
-                                         # `.py` file the scanning interpreter cannot
-                                         # decode or parse; otherwise it leaves the
-                                         # run indeterminate.
+                                         # more, one glob per line, but cannot
+                                         # exclude a file a model loader reads
+                                         # (usage-scan.md); only this key can.
+                                         # Exclude here a `.py` file the scanning
+                                         # interpreter cannot decode or parse;
+                                         # otherwise it leaves the run indeterminate.
 
 plugins:                        # optional; which installed plugins a run imports
   mode: allowlist               # all | builtins | allowlist | disabled

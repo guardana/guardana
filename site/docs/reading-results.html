@@ -338,7 +338,7 @@ jq -r '.errors[] | &quot;error: \(.source) (\(.stage)): \(.reason)&quot;' &quot;
 jq -r '.run.result_summary.rules_skipped[] | &quot;skipped: \(.rule_id) (\(.reason))&quot;' &quot;$run&quot;
 jq -r '.run.coverage.shortfall[] | &quot;shortfall: \(.kind) \(.name): \(.detail)&quot;' &quot;$run&quot;
 </code></pre>
-<p>The script reads schema 17 only. <a href="usage-run.html"><code>guardana run migrate</code></a> converts an older run
+<p>The script reads schema 18 only. <a href="usage-run.html"><code>guardana run migrate</code></a> converts an older run
 to the current schema. To list only the skips that are coverage gaps, add
 <code>select(.reason != &quot;not_applicable&quot;)</code> to the <code>rules_skipped</code> filter.</p>
 <h2 id="what-sarif-keeps">What SARIF keeps</h2>

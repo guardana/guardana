@@ -153,6 +153,11 @@ earlier build paced its requests, so the run set no rate.
 A schema-16 run migrates to schema 17 with only its version changed: schema 17 adds the
 `not_offered` skip reason and the `target_changed` stop, and no earlier build wrote either.
 
+A schema-17 run migrates to schema 18 with `scope.kept_models: []`, `scope.skipped_models:
+null` and `file: null` on every exclude: an earlier build let the target's `.guardanaignore`
+exclude any file, never searched the skipped directories and did not record where a pattern
+came from.
+
 One thing *is* recovered: the **title** of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
 catalogue for the exact `(framework, id)` pair the document already carries, so
@@ -200,8 +205,8 @@ parametrised over every field a version-1 run could be missing.
 ## The document
 
 The saved-run schema lives at
-[`schemas/run-v17.schema.json`](../schemas/run-v17.schema.json), identified by
-`https://guardana.dev/schemas/run/v17.schema.json`, and the site serves every schema
+[`schemas/run-v18.schema.json`](../schemas/run-v18.schema.json), identified by
+`https://guardana.dev/schemas/run/v18.schema.json`, and the site serves every schema
 at the URL its identifier names. The version is in the identifier,
 so a consumer can tell which contract it is holding before parsing anything; it
 changes whenever the change is not backwards-compatible. A test validates what
@@ -244,18 +249,21 @@ target; and `run.execution.max_requests_per_minute`, the pace a run's requests w
 Version 17 records `not_offered` in `result_summary.rules_skipped[].reason`, a rule that
 found while it ran that the target does not offer what it examines, and `target_changed` in
 `result_summary.stopped_by`, a run whose target stopped accepting the protocol revision the
-run agreed with it.
+run agreed with it. Version 18 records `scope.excludes[].file`, the file a pattern was read
+from, `scope.kept_models`, the files a model loader reads that the target's `.guardanaignore`
+matched and the scan read anyway, and `scope.skipped_models`, the model files named inside the directories every
+scan skips.
 
 Top level:
 
 | Key | What it is |
 |---|---|
-| `schema_version` | `17`. Stated once, for the whole document. |
-| `$schema` | the identifier of the schema the document follows, `https://guardana.dev/schemas/run/v17.schema.json` |
+| `schema_version` | `18`. Stated once, for the whole document. |
+| `$schema` | the identifier of the schema the document follows, `https://guardana.dev/schemas/run/v18.schema.json` |
 | `run` | the manifest — everything below |
 | `findings` / `unverified` / `waived` / `errors` / `observations` | the problem, evidence and inventory channels — see [the finding channels](#the-finding-channels) |
 | `assessments` | what the run *measured*, pass included — see [assessments](#assessments) |
-| `scope` | for a file run, `{files, excludes, ignored_directories}`: every file it listed (so the document grows with the tree), spelled like a finding's location, each exclude pattern with its `source` (`profile` for `rules.paths_exclude`, `ignore_file` for `.guardanaignore`), and the directory names every scan skips; `null` for any other run. `excludes` is `null` when a third-party file target applied filtering it does not report |
+| `scope` | for a file run, `{files, excludes, ignored_directories, kept_models, skipped_models}`: every file it listed (so the document grows with the tree), spelled like a finding's location; each exclude pattern with its `source` (`profile` for `rules.paths_exclude`, `ignore_file` for `.guardanaignore`) and the `file` it was read from (`null` for a profile pattern); the directory names every scan skips; each file a model loader reads that `.guardanaignore` matched and the scan read anyway, with the pattern (`{path, pattern}`); and what a name-only search of the skipped directories found (`{directories: [{path, model_files}], searched_all}`, `searched_all` false when the search stopped at its bound). `null` for any other run. `excludes` is `null`, and `skipped_models` is `null`, when a third-party file target applied filtering it does not report |
 
 Inside `run`:
 

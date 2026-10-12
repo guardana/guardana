@@ -32,6 +32,7 @@ from guardana.core.manifest.migrations import (
     migrate_v14,
     migrate_v15,
     migrate_v16,
+    migrate_v17,
 )
 from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.usage import RunUsage
@@ -44,7 +45,14 @@ from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
-from guardana.core.target.scope import ExcludePattern, ExcludeSource, FileScope
+from guardana.core.target.scope import (
+    ExcludePattern,
+    ExcludeSource,
+    FileScope,
+    KeptModel,
+    SkippedDirectory,
+    SkippedModels,
+)
 from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 from guardana.core.usage import TargetUsage
 
@@ -72,6 +80,7 @@ _MIGRATIONS = {
     14: migrate_v14,
     15: migrate_v15,
     16: migrate_v16,
+    17: migrate_v17,
 }
 """One step forward per version, keyed by the version the document *is*.
 
@@ -231,6 +240,11 @@ def _result(raw: dict[str, Any], manifest: RunManifest, path: Path) -> ScanResul
 _EXCLUDE_SOURCES = frozenset(str(source) for source in ExcludeSource)
 
 
+_SCOPE_KEYS = frozenset(
+    {"files", "excludes", "ignored_directories", "kept_models", "skipped_models"}
+)
+
+
 def _scope(raw: dict[str, Any], path: Path) -> FileScope | None:
     """Read what a file run listed and excluded, refusing a shape no writer produces.
 
@@ -240,10 +254,9 @@ def _scope(raw: dict[str, Any], path: Path) -> FileScope | None:
     block = raw.get("scope")
     if block is None:
         return None
-    if not isinstance(block, dict) or set(block) != {"files", "excludes", "ignored_directories"}:
+    if not isinstance(block, dict) or set(block) != _SCOPE_KEYS:
         raise ReportLoadError(
-            f"{path}: 'scope' must be null or an object with files, excludes and "
-            f"ignored_directories"
+            f"{path}: 'scope' must be null or an object with {', '.join(sorted(_SCOPE_KEYS))}"
         )
     return FileScope(
         files=_str_tuple(block["files"], "scope.files", path),
@@ -251,6 +264,10 @@ def _scope(raw: dict[str, Any], path: Path) -> FileScope | None:
         ignored_directories=_str_tuple(
             block["ignored_directories"], "scope.ignored_directories", path
         ),
+        kept_models=_kept_models(block["kept_models"], path),
+        skipped_models=None
+        if block["skipped_models"] is None
+        else _skipped_models(block["skipped_models"], path),
     )
 
 
@@ -261,16 +278,63 @@ def _excludes(raw: object, path: Path) -> tuple[ExcludePattern, ...]:
     for entry in raw:
         if (
             not isinstance(entry, dict)
-            or set(entry) != {"pattern", "source"}
+            or set(entry) != {"pattern", "source", "file"}
             or not isinstance(entry["pattern"], str)
             or entry["source"] not in _EXCLUDE_SOURCES
+            or not (entry["file"] is None or isinstance(entry["file"], str))
         ):
             raise ReportLoadError(
-                f"{path}: every entry in 'scope.excludes' needs a string pattern and a source "
-                f"of {sorted(_EXCLUDE_SOURCES)}"
+                f"{path}: every entry in 'scope.excludes' needs a string pattern, a source "
+                f"of {sorted(_EXCLUDE_SOURCES)} and a file that is a string or null"
             )
-        patterns.append(ExcludePattern(entry["pattern"], ExcludeSource(entry["source"])))
+        patterns.append(
+            ExcludePattern(entry["pattern"], ExcludeSource(entry["source"]), entry["file"])
+        )
     return tuple(patterns)
+
+
+def _kept_models(raw: object, path: Path) -> tuple[KeptModel, ...]:
+    if not isinstance(raw, list) or not all(
+        isinstance(entry, dict)
+        and set(entry) == {"path", "pattern"}
+        and isinstance(entry["path"], str)
+        and isinstance(entry["pattern"], str)
+        for entry in raw
+    ):
+        raise ReportLoadError(
+            f"{path}: 'scope.kept_models' must be a list of objects with a string path and pattern"
+        )
+    return tuple(KeptModel(entry["path"], entry["pattern"]) for entry in raw)
+
+
+def _skipped_models(raw: object, path: Path) -> SkippedModels:
+    if (
+        not isinstance(raw, dict)
+        or set(raw) != {"directories", "searched_all"}
+        or not isinstance(raw["searched_all"], bool)
+        or not isinstance(raw["directories"], list)
+        or not all(_skipped_directory(entry) for entry in raw["directories"])
+    ):
+        raise ReportLoadError(
+            f"{path}: 'scope.skipped_models' must be null or an object with a boolean "
+            f"searched_all and directories, each a string path and a positive model_files"
+        )
+    return SkippedModels(
+        directories=tuple(
+            SkippedDirectory(entry["path"], entry["model_files"]) for entry in raw["directories"]
+        ),
+        searched_all=raw["searched_all"],
+    )
+
+
+def _skipped_directory(entry: object) -> bool:
+    return (
+        isinstance(entry, dict)
+        and set(entry) == {"path", "model_files"}
+        and isinstance(entry["path"], str)
+        and type(entry["model_files"]) is int
+        and entry["model_files"] > 0
+    )
 
 
 def _assessments(raw: object, path: Path) -> tuple[Assessment, ...]:

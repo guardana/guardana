@@ -314,6 +314,9 @@ file, so the run was given none.</p>
 earlier build paced its requests, so the run set no rate.</p>
 <p>A schema-16 run migrates to schema 17 with only its version changed: schema 17 adds the
 <code>not_offered</code> skip reason and the <code>target_changed</code> stop, and no earlier build wrote either.</p>
+<p>A schema-17 run migrates to schema 18 with <code>scope.kept_models: []</code>, <code>scope.skipped_models: null</code> and <code>file: null</code> on every exclude: an earlier build let the target's <code>.guardanaignore</code>
+exclude any file, never searched the skipped directories and did not record where a pattern
+came from.</p>
 <p>One thing <em>is</em> recovered: the <strong>title</strong> of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
 catalogue for the exact <code>(framework, id)</code> pair the document already carries, so
@@ -352,8 +355,8 @@ published was the file. There is now a test that validates the <em>artifact</em>
 parametrised over every field a version-1 run could be missing.</p>
 <h2 id="the-document">The document</h2>
 <p>The saved-run schema lives at
-<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v17.schema.json"><code>schemas/run-v17.schema.json</code></a>, identified by
-<code>https://guardana.dev/schemas/run/v17.schema.json</code>, and the site serves every schema
+<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v18.schema.json"><code>schemas/run-v18.schema.json</code></a>, identified by
+<code>https://guardana.dev/schemas/run/v18.schema.json</code>, and the site serves every schema
 at the URL its identifier names. The version is in the identifier,
 so a consumer can tell which contract it is holding before parsing anything; it
 changes whenever the change is not backwards-compatible. A test validates what
@@ -395,7 +398,10 @@ target; and <code>run.execution.max_requests_per_minute</code>, the pace a run's
 Version 17 records <code>not_offered</code> in <code>result_summary.rules_skipped[].reason</code>, a rule that
 found while it ran that the target does not offer what it examines, and <code>target_changed</code> in
 <code>result_summary.stopped_by</code>, a run whose target stopped accepting the protocol revision the
-run agreed with it.</p>
+run agreed with it. Version 18 records <code>scope.excludes[].file</code>, the file a pattern was read
+from, <code>scope.kept_models</code>, the files a model loader reads that the target's <code>.guardanaignore</code>
+matched and the scan read anyway, and <code>scope.skipped_models</code>, the model files named inside the directories every
+scan skips.</p>
 <p>Top level:</p>
 <div class="table-wrap"><table>
 <thead>
@@ -407,11 +413,11 @@ run agreed with it.</p>
 <tbody>
 <tr>
 <td><code>schema_version</code></td>
-<td><code>17</code>. Stated once, for the whole document.</td>
+<td><code>18</code>. Stated once, for the whole document.</td>
 </tr>
 <tr>
 <td><code>$schema</code></td>
-<td>the identifier of the schema the document follows, <code>https://guardana.dev/schemas/run/v17.schema.json</code></td>
+<td>the identifier of the schema the document follows, <code>https://guardana.dev/schemas/run/v18.schema.json</code></td>
 </tr>
 <tr>
 <td><code>run</code></td>
@@ -427,7 +433,7 @@ run agreed with it.</p>
 </tr>
 <tr>
 <td><code>scope</code></td>
-<td>for a file run, <code>{files, excludes, ignored_directories}</code>: every file it listed (so the document grows with the tree), spelled like a finding's location, each exclude pattern with its <code>source</code> (<code>profile</code> for <code>rules.paths_exclude</code>, <code>ignore_file</code> for <code>.guardanaignore</code>), and the directory names every scan skips; <code>null</code> for any other run. <code>excludes</code> is <code>null</code> when a third-party file target applied filtering it does not report</td>
+<td>for a file run, <code>{files, excludes, ignored_directories, kept_models, skipped_models}</code>: every file it listed (so the document grows with the tree), spelled like a finding's location; each exclude pattern with its <code>source</code> (<code>profile</code> for <code>rules.paths_exclude</code>, <code>ignore_file</code> for <code>.guardanaignore</code>) and the <code>file</code> it was read from (<code>null</code> for a profile pattern); the directory names every scan skips; each file a model loader reads that <code>.guardanaignore</code> matched and the scan read anyway, with the pattern (<code>{path, pattern}</code>); and what a name-only search of the skipped directories found (<code>{directories: [{path, model_files}], searched_all}</code>, <code>searched_all</code> false when the search stopped at its bound). <code>null</code> for any other run. <code>excludes</code> is <code>null</code>, and <code>skipped_models</code> is <code>null</code>, when a third-party file target applied filtering it does not report</td>
 </tr>
 </tbody>
 </table></div>

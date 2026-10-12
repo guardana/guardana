@@ -119,7 +119,7 @@ This file is generated from the documentation map; do not edit it by hand.
 - [Guardana Recipe Lock v2](https://guardana.dev/schemas/recipe-lock/v2.schema.json): guardana-recipe.lock.yaml: what a recipe's run is pinned to, written by `guardana recipe lock`.
 - [Guardana Recipe v3](https://guardana.dev/schemas/recipe/v3.schema.json): guardana-recipe.yaml: the profile a team's checks come from, what answers them, and where the artifact goes.
 - [Guardana Recording v3](https://guardana.dev/schemas/recording/v3.schema.json): One record of a Guardana recording: what an application answered, graded later without calling it.
-- [Guardana Saved Run v17](https://guardana.dev/schemas/run/v17.schema.json): One Guardana run written to disk: the manifest (what was verified, against what, under which configuration and limits, at what cost, with what reach, and with what verdict) plus the finding channels.
+- [Guardana Saved Run v18](https://guardana.dev/schemas/run/v18.schema.json): One Guardana run written to disk: the manifest (what was verified, against what, under which configuration and limits, at what cost, with what reach, and with what verdict) plus the finding channels.
 - [Guardana Trace v3](https://guardana.dev/schemas/trace/v3.schema.json): One record of a Guardana native trace file.
 
 ## Related project

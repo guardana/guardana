@@ -54,7 +54,13 @@ pickle, a zip bomb, a 40 GB "model", or a file designed to exploit a parser.
 **Stance:** scanning must never execute what it reads. Model-format readers are
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
 fails becomes an `errors` entry rather than an exception or a silent skip. Pickle
-is parsed at the opcode level, never unpickled.
+is parsed at the opcode level, never unpickled. The repository cannot hide its own
+model files: a `.guardanaignore` it ships excludes ordinary files only, never a file a
+model loader reads (a model, an archive or compressed file, and the configuration, chat
+templates and Keras metadata beside a model or tokenizer), every pattern it applied is
+named in the output, and model files inside the directories every scan skips (`build`,
+`env`, `node_modules`, …) are named with their count. Only the profile's
+`rules.paths_exclude` excludes such a file.
 
 **Residual risk:** a parser bug is still a parser bug. Since 0.22.0 every rule that
 opens a file is property-tested against generated input — arbitrary bytes behind

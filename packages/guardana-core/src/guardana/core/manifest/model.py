@@ -15,7 +15,7 @@ from guardana.core.manifest.records import (
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-MANIFEST_SCHEMA_VERSION = 17
+MANIFEST_SCHEMA_VERSION = 18
 """Version of the run document, moved independently of the CLI.
 
 A run written by 0.7.3 and one written by 0.9.0 are the same document if the
@@ -76,6 +76,11 @@ Version 16 records a run its target stopped (`stopped_by: target_unavailable`), 
 
 Version 17 records a rule the target does not offer (`rules_skipped[].reason:
 not_offered`) and a run whose target changed under it (`stopped_by: target_changed`).
+
+Version 18 records the file each exclude pattern was read from (`scope.excludes[].file`),
+the model files the scanned target's ignore file matched and the scan read anyway
+(`scope.kept_models`) and the model files named inside the directories every scan skips
+(`scope.skipped_models`).
 """
 
 
