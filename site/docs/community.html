@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -246,6 +248,29 @@ listing is distinct from a hands-on review; a fork or star is distinct from a
 deployment. A quotation or named application story needs the author's consent
 and a reproducible, redacted result. Suggested links are reviewed for identity,
 accuracy and source context before publication.</p>
+<h2 id="build-on-guardanas-output">Build on Guardana's output</h2>
+<p>Tools can read Guardana's output in four forms:</p>
+<ul>
+<li>the saved run, written with <code>--format json --output run.json</code>: a JSON document that identifies
+its schema in <code>schema_version</code> and <code>$schema</code>, with the matching JSON Schema in
+<a href="https://github.com/guardana/guardana/tree/main/schemas"><code>schemas/</code></a>;</li>
+<li>SARIF 2.1.0 and JUnit XML, written with <code>--format sarif</code> and <code>--format junit</code>;</li>
+<li><code>load_verification</code> in Python, which reads a saved run with its recorded verdict;</li>
+<li>the optional collector's <a href="usage-collector.html#the-http-api">HTTP API</a>, which serves stored runs.</li>
+</ul>
+<p><a href="reading-results.html">Reading results</a> shows all four forms and what SARIF, JUnit and the
+collector leave out. The <a href="usage-run.html#the-document">saved-run reference</a> lists every field. A
+package can also add its own format or reporter (<a href="outputs.html">installed outputs</a>).</p>
+<p>The <a href="compatibility.html">compatibility page</a> states what stays stable. Every persisted document
+carries its version. The saved run's version changes whenever a change to it is not
+backwards-compatible; earlier run schemas stay published in <code>schemas/</code>. Two guarantees apply
+only from the final 1.0 release: incompatible changes to the supported surface occur only in a
+major release, and every 1.x release reads documents written by earlier releases. Before the
+final 1.0 release, the <code>1.0.0rcN</code> candidates carry fixes only.</p>
+<p>If you have built something on Guardana's output, tell the project in
+<a href="https://github.com/guardana/guardana/discussions">GitHub Discussions</a>. Open an
+<a href="https://github.com/guardana/guardana/issues">issue</a> when the output does not let you do
+something you need.</p>
 <h2 id="follow-changes">Follow changes</h2>
 <p>Watch <a href="https://github.com/guardana/guardana/releases">GitHub releases</a>, subscribe
 to the <a href="https://github.com/guardana/guardana/releases.atom">release feed</a>, or read

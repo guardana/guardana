@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Read results from your own tool — Guardana documentation</title>
+<meta name="description" content="read a saved run from Python or jq — the recorded verdict, then each channel on its own — and what SARIF, JUnit and the collector keep and leave out">
+<link rel="canonical" href="https://guardana.dev/docs/reading-results">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API<span class="tag">beta</span></a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html" aria-current="page">Read results from your own tool<span class="tag">beta</span></a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility<span class="tag">beta</span></a></li>
+<li><a href="conformance-kit.html">Conformance kit<span class="tag">beta</span></a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs<span class="tag">beta</span></a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Read results from your own tool</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API<span class="tag">beta</span></a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html" aria-current="page">Read results from your own tool<span class="tag">beta</span></a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility<span class="tag">beta</span></a></li>
+<li><a href="conformance-kit.html">Conformance kit<span class="tag">beta</span></a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs<span class="tag">beta</span></a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main>
+<h1>Read results from your own tool<span class="status beta">beta</span></h1><p class="lede">read a saved run from Python or jq — the recorded verdict, then each channel on its own — and what SARIF, JUnit and the collector keep and leave out</p><p>A saved run is the complete record of one run. Write it with <code>--format json --output</code>, read
+the recorded verdict, then read each channel separately. SARIF, JUnit and the collector each
+contain part of a run. A tool that needs the whole result reads the saved run.</p>
+<pre><code class="language-bash">guardana scan examples/vulnerable-model --format json --output run.json
+</code></pre>
+<p><code>examples/vulnerable-model</code> is deliberately malicious, so this scan exits <code>1</code> and records the
+gate <code>fail</code>.</p>
+<h2 id="read-the-verdict-the-run-recorded">Read the verdict the run recorded</h2>
+<p><code>run.result_summary.gate</code> is <code>pass</code>, <code>fail</code> or <code>indeterminate</code>. Read it rather than deriving a
+verdict from <code>findings</code>. A run with no findings may still be <code>indeterminate</code> because a check
+could not run, the target contained nothing to scan, or the run stopped early.
+<code>run.result_summary.stopped_by</code> is <code>null</code> or gives the reason the run ended before completing
+its plan: <code>budget_exhausted</code>, <code>interrupted</code>, <code>target_unavailable</code> or <code>target_changed</code>. A stopped
+run is always <code>indeterminate</code>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Exit code of the command that wrote the run</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pass</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>fail</code></td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td><code>indeterminate</code></td>
+<td><code>2</code>; <code>4</code> when the target stopped or changed under the run, <code>6</code> when the budget ran out, <code>7</code> when the run was interrupted</td>
+</tr>
+</tbody>
+</table></div>
+<p>Codes <code>3</code>, <code>5</code> and <code>8</code> describe the command rather than a result: invalid configuration, an
+internal error, and an installed output that failed, respectively (<a href="exit-codes.html">exit codes</a>).</p>
+<h2 id="read-each-channel-on-its-own">Read each channel on its own</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Where</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>findings</code></td>
+<td>checks that reached a failing verdict</td>
+</tr>
+<tr>
+<td><code>unverified</code></td>
+<td>checks that ran and could not decide: their verdict is <code>inconclusive</code></td>
+</tr>
+<tr>
+<td><code>waived</code></td>
+<td>findings a baseline accepted</td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td>checks that could not run, as <code>{source, stage, reason}</code></td>
+</tr>
+<tr>
+<td><code>run.result_summary.rules_skipped</code></td>
+<td>rules that did not run, each with its <code>reason</code>; every reason except <code>not_applicable</code> is a coverage gap</td>
+</tr>
+<tr>
+<td><code>run.coverage.shortfall</code></td>
+<td>coverage the verdict needed and did not get, each with its <code>kind</code></td>
+</tr>
+<tr>
+<td><code>observations</code>, <code>assessments</code>, <code>scope</code></td>
+<td>what the run saw, what it measured, and which files it listed</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every field is in the <a href="usage-run.html#the-document">saved-run reference</a>.</p>
+<h3 id="from-python">From Python</h3>
+<p><code>load_verification</code> reads a saved run in any schema this build supports and returns the run's
+recorded gate. Save this as <code>read_run.py</code>:</p>
+<pre><code class="language-python">import sys
+from pathlib import Path
+
+from guardana.core.report.load import ReportLoadError
+from guardana.core.verify import load_verification
+
+try:
+    run = load_verification(Path(sys.argv[1]))
+except ReportLoadError as exc:
+    sys.exit(f&quot;not read: {exc}&quot;)
+
+result = run.result
+print(f&quot;gate: {run.gate}, exit code {run.exit_code}&quot;)
+if result.stopped_by is not None:
+    print(f&quot;stopped: {result.stopped_by}&quot;)
+for question in run.open_questions:
+    print(f&quot;open question: {question}&quot;)
+for finding in result.findings:
+    print(f&quot;finding: {finding.severity.name} {finding.rule_id} at {finding.target_ref}&quot;)
+for finding in result.unverified:
+    print(f&quot;inconclusive: {finding.rule_id} at {finding.target_ref}&quot;)
+for error in result.errors:
+    print(f&quot;error: {error.source} ({error.stage}): {error.reason}&quot;)
+for skip in result.rules_skipped:
+    print(f&quot;skipped: {skip.rule_id} ({skip.reason})&quot;)
+for gap in result.coverage_shortfall:
+    print(f&quot;shortfall: {gap.kind} {gap.name}: {gap.detail}&quot;)
+</code></pre>
+<p>Run <code>python read_run.py run.json</code>. For the scan above, it prints <code>gate: fail, exit code 1</code> and
+one <code>finding:</code> line per finding.</p>
+<p><code>load_verification</code> raises <code>ReportLoadError</code> for a file it cannot read as a run: a missing
+file, a file that is not a run, a run whose <code>schema_version</code> this build does not know, or a run
+that records no gate. <code>load_verification</code> and <code>Verification</code> are in the
+<a href="compatibility.html#the-supported-surface">supported surface</a>. <code>ReportLoadError</code>, from
+<code>guardana.core.report.load</code>, is outside it. While your code imports it, pin the exact
+<code>guardana-core</code> version you tested.</p>
+<h3 id="with-jq">With jq</h3>
+<p>Save this as <code>read_run.sh</code> and run it beside <code>run.json</code>:</p>
+<pre><code class="language-bash">run=run.json
+version=$(jq '.schema_version' &quot;$run&quot;)
+if [ &quot;$version&quot; != 17 ]; then
+  echo &quot;run schema $version: this reader expects 17&quot; &gt;&amp;2
+  exit 3
+fi
+gate=$(jq -r '.run.result_summary.gate' &quot;$run&quot;)
+case &quot;$gate&quot; in
+  pass | fail | indeterminate) echo &quot;gate: $gate&quot; ;;
+  *) echo &quot;no gate recorded, which is not a pass&quot; &gt;&amp;2; exit 2 ;;
+esac
+jq -r '.run.result_summary.stopped_by // empty | &quot;stopped: \(.)&quot;' &quot;$run&quot;
+jq -r '.findings[] | &quot;finding: \(.severity) \(.rule_id) at \(.target_ref)&quot;' &quot;$run&quot;
+jq -r '.unverified[] | &quot;inconclusive: \(.rule_id) at \(.target_ref)&quot;' &quot;$run&quot;
+jq -r '.errors[] | &quot;error: \(.source) (\(.stage)): \(.reason)&quot;' &quot;$run&quot;
+jq -r '.run.result_summary.rules_skipped[] | &quot;skipped: \(.rule_id) (\(.reason))&quot;' &quot;$run&quot;
+jq -r '.run.coverage.shortfall[] | &quot;shortfall: \(.kind) \(.name): \(.detail)&quot;' &quot;$run&quot;
+</code></pre>
+<p>The script reads schema 17 only. <a href="usage-run.html"><code>guardana run migrate</code></a> converts an older run
+to the current schema. To list only the skips that are coverage gaps, add
+<code>select(.reason != &quot;not_applicable&quot;)</code> to the <code>rules_skipped</code> filter.</p>
+<h2 id="what-sarif-keeps">What SARIF keeps</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>In the run</th>
+<th>In SARIF</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a finding</td>
+<td>a <code>result</code> with <code>ruleId</code>, <code>message.text</code> (the title, then the evidence summary), a location and <code>partialFingerprints.guardanaFingerprint/v1</code>. <code>level</code> is <code>error</code> for <code>CRITICAL</code> and <code>HIGH</code>, <code>warning</code> for <code>MEDIUM</code>, and <code>note</code> for <code>LOW</code> and <code>INFO</code></td>
+</tr>
+<tr>
+<td>an unverified check</td>
+<td>a <code>result</code> with <code>level</code> <code>note</code> and <code>kind</code> <code>review</code></td>
+</tr>
+<tr>
+<td>a waived finding</td>
+<td>a <code>result</code> with <code>suppressions</code> <code>[{&quot;kind&quot;: &quot;external&quot;}]</code></td>
+</tr>
+<tr>
+<td>an error, a coverage shortfall, a stopped run, a run that verified or measured nothing, a declined suite, unverified checks</td>
+<td>an entry in <code>invocations[0].toolExecutionNotifications</code>, and <code>executionSuccessful</code> <code>false</code></td>
+</tr>
+<tr>
+<td>a skip that is a coverage gap</td>
+<td>a <code>note</code> notification <code>guardana.skipped.&lt;reason&gt;</code>; <code>executionSuccessful</code> turns <code>false</code> only when the gate refused the run over it</td>
+</tr>
+<tr>
+<td>the exit code</td>
+<td><code>invocations[0].exitCode</code> and <code>exitCodeDescription</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>executionSuccessful</code> is not the verdict. Unverified checks accepted by the policy leave it
+<code>false</code> alongside exit code <code>0</code>, and a skip accepted by the policy leaves it <code>true</code>. Read
+<code>exitCode</code> for the verdict and the notifications for the reasons. SARIF does not contain the
+five severity names, the taxonomy references, an evaluator's verdict (outcome, confidence,
+rationale), <code>evidence.detail</code>, observations, assessments, the file listing, or suite and trial
+summaries.</p>
+<h2 id="what-junit-keeps">What JUnit keeps</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>In the run</th>
+<th>JUnit testcase</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a finding</td>
+<td><code>name</code> is the rule id, <code>classname</code> the finding's <code>target_ref</code>, and <code>&lt;failure&gt;</code> holds the title and the evidence summary</td>
+</tr>
+<tr>
+<td>an unverified check</td>
+<td>the same names, with <code>&lt;skipped&gt;</code> holding the verdict's rationale, or the evidence summary when there is no verdict</td>
+</tr>
+<tr>
+<td>a waived finding</td>
+<td>the same names, with <code>&lt;skipped&gt;</code> holding <code>waived:</code> and the evidence summary</td>
+</tr>
+<tr>
+<td>a skip that is a coverage gap</td>
+<td><code>name</code> is the rule id, <code>classname</code> <code>guardana.skipped.&lt;reason&gt;</code>, with <code>&lt;skipped&gt;</code></td>
+</tr>
+<tr>
+<td>an error</td>
+<td><code>name</code> is its <code>source</code>, <code>classname</code> <code>guardana.&lt;stage&gt;</code>, with <code>&lt;error&gt;</code></td>
+</tr>
+<tr>
+<td>a coverage shortfall</td>
+<td><code>name</code> is the shortfall's name, <code>classname</code> <code>guardana.coverage.&lt;kind&gt;</code>, with <code>&lt;error&gt;</code></td>
+</tr>
+<tr>
+<td>a stopped run, a run that verified or measured nothing, unverified checks beside verdicts, a gate refusal</td>
+<td>one <code>&lt;error&gt;</code> testcase each, named <code>guardana.stopped</code>, <code>guardana.run</code>, <code>guardana.nothing_measured</code>, <code>guardana.unverified</code>, and <code>guardana.gate</code> or <code>guardana.skipped</code></td>
+</tr>
+<tr>
+<td>a quality suite</td>
+<td>one testcase: empty on a pass, <code>&lt;failure&gt;</code> below its bar, <code>&lt;error&gt;</code> when it declined</td>
+</tr>
+</tbody>
+</table></div>
+<p>A rule that ran and found nothing has no testcase. The suite's <code>tests</code> attribute counts the
+rules that ran plus the coverage-gap skips, not the testcase elements. JUnit carries no
+severity, taxonomy reference, verdict confidence or <code>evidence.detail</code>.</p>
+<h2 id="what-the-collector-keeps">What the collector keeps</h2>
+<p>The collector stores a smaller envelope with its own version, rather than the saved run.
+<a href="usage-collector.html#what-the-envelope-leaves-out">The collector's HTTP API</a> explains what it
+leaves out and how to read it back.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="usage-run.html#the-document"><code>usage-run.md</code></a> — every field of the saved run</li>
+<li><a href="python-api.html#read-a-saved-run-back"><code>python-api.md</code></a> — <code>load_verification</code> and <code>Verification</code></li>
+<li><a href="compatibility.html"><code>compatibility.md</code></a> — what stays stable, and from when</li>
+<li><a href="community.html#build-on-guardanas-output"><code>community.md</code></a> — tell the project about your integration</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/reading-results.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

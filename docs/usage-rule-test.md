@@ -10,12 +10,16 @@ status: stable
 `guardana rule test` checks positive, negative, and inconclusive samples when you need to verify a rule's classifications.
 
 ```bash
-guardana rule test 'acme.*'
+guardana rule test 'acme.*' --plugins allowlist --allow-plugin acme-guardana-rules
 ```
 
 ```
 5 rule(s); 15 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
 ```
+
+That is the output for [`examples/custom_rule`](../examples/custom_rule/README.md), installed as
+the distribution `acme-guardana-rules`. Every command starts with only Guardana's own
+distributions, so an installed pack is admitted by name.
 
 Scripted fixtures send nothing over the network. They test classification, but cannot show whether prompts or tool results carry an attack.
 
@@ -227,9 +231,14 @@ A fixture set, once run, *is* a labelled corpus — so an evaluator author gets 
 without hand-writing it:
 
 ```bash
-guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl
-guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl
+guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
+guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
 ```
+
+`examples/custom_rule` installs the evaluator `acme.strict_refusal`. A rule under
+`./my-rules/` that uses it for grading needs the same distribution admitted.
 
 `finding` becomes `attack_succeeded: true`, `clean` becomes `false`, and
 **`inconclusive` is left out and counted**: calibration measures a judge's
@@ -272,4 +281,4 @@ gate lists it as exempt with the reason it can never decline.
 | `--profile PATH` | resolve `rules.paths` and evaluator config from a `guardana.yaml` |
 | `--write-corpus PATH` | write the fixtures out as a labelled corpus, whole: through a temporary file and a rename, so a failed write leaves an earlier corpus as it was and exits `3` |
 | `--unsampled-ok` | do not go indeterminate over unsampled rules; says so in the output |
-| `--plugins`, `--allow-plugin` | the usual plugin-trust controls; `builtins` unless the flag or the profile's `plugins:` says otherwise. While an installed pack is refused, every selector exits `2`, so a pack author admits their own distribution: `--plugins allowlist --allow-plugin <distribution>` |
+| `--plugins`, `--allow-plugin` | the usual plugin-trust controls; `builtins` unless the flag or the profile's `plugins:` says otherwise. While an installed pack is refused, a selector that matches only its rules, such as `'acme.*'`, matches nothing and exits `3`; a selector that matches admitted rules exits `2` when a refused pack or a rule that failed to load leaves a gap. A pack author admits their own distribution: `--plugins allowlist --allow-plugin <distribution>` |

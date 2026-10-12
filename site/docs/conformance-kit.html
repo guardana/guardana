@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -283,9 +285,9 @@ def test_the_webhook_keeps_the_output_contract(monkeypatch):
             receiver=served,
         )
 </code></pre>
-<p><code>name</code> is the entry point's name, and <code>spec.name</code> must equal it. Left out, the spec's own name
-is checked. A name must be lowercase letters, digits and <code>-</code>, at most 40 characters, and must
-not be reserved.</p>
+<p><code>name</code> is the entry point's name, and <code>spec.name</code> must equal it. If <code>name</code> is omitted, the
+spec's own name is checked. A name must match <code>[a-z][a-z0-9-]*</code>, be at most 40 characters long,
+and not be reserved for its kind (<a href="outputs.html#write-your-own">installed outputs</a>).</p>
 <p><strong><code>assert_renderer_conforms(spec)</code></strong> calls <code>render</code> through <code>guardana.core.output.render</code>, so
 the format sees what <code>--format</code> hands it, redacted a second time. It fails when <code>render</code>
 raises or returns anything but text holding more than whitespace for any sample.</p>

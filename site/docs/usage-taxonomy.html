@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -334,11 +336,14 @@ instead of a rule that maps to nothing.
   1 entry · no catalogue digest: a package registers references, not a catalogue file
     ACME-14          Internal data does not leave the support boundary
 </code></pre>
-<p><strong>Your entries carry no digest, and that is deliberate.</strong> A package registers
-references; a catalogue file is what gets hashed and pinned into a run manifest, so
-there is nothing here to pin and inventing a value would claim a provenance nobody
-has. In <code>--format json</code> the entry appears in the same list as the built-in
-catalogues with <code>&quot;digest&quot;: null</code>, which is how a script tells the two apart.</p>
+<p><strong>The listing shows no catalogue digest for your entries, and that is deliberate.</strong> A
+package registers references rather than a catalogue file, so there is no file to hash.
+Inventing a file digest would claim a provenance nobody has. In <code>--format json</code>, the entry
+appears in the same list as the built-in catalogues with <code>&quot;digest&quot;: null</code>, which lets a script
+tell the two apart.</p>
+<p>The content a package registers is still pinned. For each framework, a run manifest records
+a digest of the references registered by installed packages (<code>run.coverage.taxonomies</code>).
+<code>guardana pack lock</code> pins the same digest (<a href="usage-pack.html">catalogues in a lock</a>).</p>
 <p>See <a href="extending.html"><code>extending.md</code></a>.</p>
 
 </main>

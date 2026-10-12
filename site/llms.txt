@@ -37,6 +37,7 @@ This file is generated from the documentation map; do not edit it by hand.
 ## Evidence and regression
 
 - [usage-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-run.md): inspect and migrate saved runs
+- [reading-results.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/reading-results.md): read a saved run, SARIF or JUnit from your own tool
 - [usage-diff.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-diff.md): compare runs without hiding coverage changes
 - [usage-baseline.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-baseline.md): accept risk with an expiry
 - [usage-monitor.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-monitor.md): schedule active re-verification

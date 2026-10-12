@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -217,7 +219,9 @@ for finding in verification.result.findings:
     print(finding.severity.name, finding.rule_id, finding.target_ref)
 verification.save(Path(&quot;run.json&quot;))  # the document `--format json --output` writes
 </code></pre>
-<p><code>PluginTrust</code>, <code>PluginMode</code> and <code>load_profile</code> are needed to build a <code>Verifier</code> but sit outside the <a href="compatibility.html#the-supported-surface">supported surface</a>: a minor release may change them, so pin <code>guardana-core</code> to a minor while your code imports them.</p>
+<p><code>PluginTrust</code>, <code>PluginMode</code> and <code>load_profile</code> are needed to build a <code>Verifier</code> but are outside
+the <a href="compatibility.html#the-supported-surface">supported surface</a>. They are subject to change in
+any release. While your code imports them, pin the exact <code>guardana-core</code> version you tested.</p>
 <p>A run that fails, stays indeterminate, or is stopped by its budget or by its target failing part-way is returned like one that passed. Read <code>verification.gate</code>, <code>verification.exit_code</code> or <code>verification.open_questions</code>; nothing is raised for an outcome.</p>
 <p>To keep runs in the optional collector, the CLI sends them with <code>--reporter server://&lt;collector URL&gt;</code>; the collector's <a href="usage-collector.html#the-http-api">HTTP API</a> stores and serves results without starting runs. <code>verification.save(path)</code> writes the same run document as <code>--format json --output</code>.</p>
 <h2 id="configure-a-run">Configure a run</h2>
@@ -337,7 +341,7 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 </tr>
 <tr>
 <td><code>exit_code</code></td>
-<td>The code <code>guardana</code> gives this result: <code>0</code>, <code>1</code>, <code>2</code>, <code>4</code> when its target stopped it (<code>target_unavailable</code> or <code>target_changed</code>), or <code>6</code> (<a href="exit-codes.html">exit codes</a>).</td>
+<td>The code <code>guardana</code> gives this result: <code>0</code>, <code>1</code>, <code>2</code>, <code>4</code> when its target stopped it (<code>target_unavailable</code> or <code>target_changed</code>), <code>6</code> when its budget did, or <code>7</code> when the run was interrupted, which only a saved run read back with <code>load_verification</code> records. <code>3</code>, <code>5</code> and <code>8</code> describe a command with no result or a failed installed output, never a <code>Verification</code> (<a href="exit-codes.html">exit codes</a>).</td>
 </tr>
 <tr>
 <td><code>passed</code></td>
@@ -368,11 +372,12 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 <p>SARIF, JUnit and the terminal report are rendered by <code>guardana-report</code>: <code>guardana.report.get_renderer(&quot;sarif&quot;, run=verification.manifest).render(verification.result)</code>.</p>
 <h2 id="read-a-saved-run-back">Read a saved run back</h2>
 <p><code>load_verification(path)</code> reads a run saved by <code>--format json --output</code> or <code>save()</code>, of any
-run schema, into a <code>Verification</code> with the gate the run recorded; <code>exchanges</code> is <code>None</code>. A run
+run schema, into a <code>Verification</code> with the run's recorded gate. <code>exchanges</code> is <code>None</code>. A run
 that recorded no gate raises <code>ReportLoadError</code> from <code>guardana.core.report.load</code>. An
 <a href="outputs.html#export-a-saved-run-from-python">installed format</a> can then export it without
 sending anything: <code>render(select_renderer(name, trust), load_verification(path))</code> from
-<code>guardana.core.output</code>.</p>
+<code>guardana.core.output</code>. <a href="reading-results.html">Reading results</a> shows how to read a saved run
+from Python and from <code>jq</code>, reading each channel separately.</p>
 <h2 id="when-a-run-cannot-be-carried-out">When a run cannot be carried out</h2>
 <p>Every error derives from <code>VerificationError</code>.</p>
 <div class="table-wrap"><table>

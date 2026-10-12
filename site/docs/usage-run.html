@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -408,12 +410,16 @@ run agreed with it.</p>
 <td><code>17</code>. Stated once, for the whole document.</td>
 </tr>
 <tr>
+<td><code>$schema</code></td>
+<td>the identifier of the schema the document follows, <code>https://guardana.dev/schemas/run/v17.schema.json</code></td>
+</tr>
+<tr>
 <td><code>run</code></td>
 <td>the manifest — everything below</td>
 </tr>
 <tr>
 <td><code>findings</code> / <code>unverified</code> / <code>waived</code> / <code>errors</code> / <code>observations</code></td>
-<td>the problem, evidence and inventory channels</td>
+<td>the problem, evidence and inventory channels — see <a href="#the-finding-channels">the finding channels</a></td>
 </tr>
 <tr>
 <td><code>assessments</code></td>
@@ -504,11 +510,123 @@ run agreed with it.</p>
 </tr>
 </tbody>
 </table></div>
-<p>Three conventions hold everywhere in it:</p>
+<h3 id="the-finding-channels">The finding channels</h3>
+<p><code>findings</code>, <code>unverified</code> and <code>waived</code> use the same record structure. A finding failed the check.
+An unverified record describes a check that ran but could not decide. A waived record is a
+finding accepted by a baseline.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rule_id</code></td>
+<td>string</td>
+<td>the rule that produced it</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td>string</td>
+<td><code>INFO</code>, <code>LOW</code>, <code>MEDIUM</code>, <code>HIGH</code> or <code>CRITICAL</code>, always uppercase</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>string</td>
+<td>the rule's title</td>
+</tr>
+<tr>
+<td><code>taxonomy</code></td>
+<td>list of <code>{framework, id, title}</code></td>
+<td>the framework references the rule maps to; <code>framework</code> and <code>id</code> are the identity, and <code>title</code> is recorded so a reader without that catalogue can still show it</td>
+</tr>
+<tr>
+<td><code>target_ref</code></td>
+<td>string</td>
+<td>where: a file path, with <code>:line</code> when the rule names a line, or the target's reference</td>
+</tr>
+<tr>
+<td><code>evidence</code></td>
+<td><code>{summary, detail}</code>, both strings</td>
+<td>what was seen, redacted under the run's evidence policy; <code>detail</code> may be empty</td>
+</tr>
+<tr>
+<td><code>verdict</code></td>
+<td><code>null</code>, or <code>{outcome, confidence, rationale, evaluator_id}</code></td>
+<td>the evaluator's verdict for a graded check: <code>outcome</code> is <code>pass</code>, <code>fail</code> or <code>inconclusive</code> and <code>confidence</code> is between <code>0</code> and <code>1</code>. <code>null</code> for a check that decides in its own code, such as a file rule</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="errors-and-observations">Errors and observations</h3>
+<p>Each <code>errors</code> entry is <code>{source, stage, reason}</code>, all strings: what could not run (a rule id
+or a file), the stage where it failed, such as <code>load</code>, <code>run</code> or <code>target</code>, and why. The list of
+stages is open. Each <code>observations</code> entry is <code>{kind, name, ref, attributes}</code>: a component the
+run saw (<code>model</code>, <code>dataset</code>, <code>dependency-manifest</code> or <code>notebook</code>), its name, its location, and
+string attributes such as <code>format</code> and <code>size_bytes</code>.</p>
+<h3 id="result_summary"><code>result_summary</code></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>findings</code>, <code>unverified</code>, <code>waived</code>, <code>errors</code>, <code>observations</code></td>
+<td>integer</td>
+<td>how many entries each channel holds</td>
+</tr>
+<tr>
+<td><code>rules_run</code></td>
+<td>list of rule ids</td>
+<td>the rules that ran</td>
+</tr>
+<tr>
+<td><code>rules_skipped</code></td>
+<td>list of <code>{rule_id, reason, missing, detail}</code></td>
+<td>the rules that did not run. <code>reason</code> is <code>missing_capability</code>, <code>unsafe_mode</code>, <code>not_applicable</code>, <code>not_recorded</code> or <code>not_offered</code>; <code>missing</code> lists what the target lacked; <code>detail</code> is a sentence for a person. Every reason except <code>not_applicable</code> is a coverage gap</td>
+</tr>
+<tr>
+<td><code>max_severity</code></td>
+<td>string or <code>null</code></td>
+<td>the highest severity in <code>findings</code>, <code>null</code> when there is none</td>
+</tr>
+<tr>
+<td><code>gate</code></td>
+<td><code>pass</code>, <code>fail</code> or <code>indeterminate</code></td>
+<td>the verdict the run's policy reached. It is stored rather than recomputed, so a reader uses this value instead of deriving one</td>
+</tr>
+<tr>
+<td><code>stopped_by</code></td>
+<td><code>null</code>, <code>budget_exhausted</code>, <code>interrupted</code>, <code>target_unavailable</code> or <code>target_changed</code></td>
+<td>why the run ended before its plan finished</td>
+</tr>
+<tr>
+<td><code>assessments</code>, <code>measured</code></td>
+<td>integer</td>
+<td>see <a href="#assessments">assessments</a></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="coverageshortfall"><code>coverage.shortfall</code></h3>
+<p>Each entry is <code>{kind, name, detail}</code>: the kind of coverage the run lacked, what it concerned,
+and a sentence for a person. <code>kind</code> is <code>missing_dimension</code>, <code>contract_not_applicable</code>,
+<code>unexamined_component</code>, <code>incomplete_recording</code>, <code>demanded_check</code>, <code>seed_not_reached</code>,
+<code>empty_target</code> or <code>ungraded_cases</code>. A shortfall prevents a run from passing regardless of the
+<code>fail_on_*</code> switches. The gate is <code>indeterminate</code> unless a finding or a failed suite makes
+it <code>fail</code>. A stopped run is <code>indeterminate</code> either way.</p>
+<p>These conventions apply throughout the document:</p>
 <p><strong>Timestamps are UTC, RFC 3339.</strong> A local-time timestamp in an evidence record is a
 bug waiting for a timezone.</p>
-<p><strong>Digests name their algorithm</strong> — <code>sha256:…</code>, never a bare hex string, so a digest
-can be migrated when the algorithm moves.</p>
+<p><strong>Digests of a document or of content name their algorithm</strong> — <code>sha256:…</code> — so a digest
+can be migrated when the algorithm changes. Two fields instead hold a shorter identifier of
+16 bare hex characters: <code>run.rules[].digest</code>, the digest of a rule's declaration, and
+<code>assessments[].dataset</code> when a YAML rule records its declaration digest there.</p>
 <p><strong>The target fingerprint says what it covers.</strong> <code>target.fingerprint_inputs</code> lists the
 fields the digest was computed from. A digest of a URL and a model name identifies a
 <em>declared</em> target; it attests nothing about the weights behind it, and the document
@@ -780,10 +898,13 @@ convention's <a href="https://opentelemetry.io/docs/specs/semconv/registry/attri
 without the namespace; <code>execution.seed</code> and <code>execution.temperature</code> match
 <code>gen_ai.request.*</code>. If you already collect those, the manifest needs no
 translation.</p>
-<p>The SARIF output carries the same facts in SARIF's own vocabulary: <code>runs[].invocations[0]</code>
+<p>The SARIF output contains the same facts in SARIF's vocabulary: <code>runs[].invocations[0]</code>
 with <code>startTimeUtc</code>, <code>endTimeUtc</code>, <code>exitCode</code>, <code>exitCodeDescription</code> and
-<code>executionSuccessful</code>, which is <code>false</code> whenever the run leaves a question open, with a
-notification saying which (see <a href="usage-scan.html#other-formats"><code>usage-scan.md</code></a>).</p>
+<code>executionSuccessful</code>. That flag is not the verdict. It is <code>false</code> for each unresolved question
+named in the run's output, with a notification identifying the question. A rule skipped for
+missing coverage only adds a <code>note</code> unless the gate refused the run because of it. Read
+<code>exitCode</code> for the verdict
+(<a href="reading-results.html#what-sarif-keeps">reading results</a>, <a href="usage-scan.html#other-formats"><code>usage-scan.md</code></a>).</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="usage-diff.html"><code>usage-diff.md</code></a> — comparing two saved runs</li>

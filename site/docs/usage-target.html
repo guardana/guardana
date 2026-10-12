@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -204,10 +206,13 @@
 one turns a rule into a check that runs, proves nothing, and reports a pass.</p>
 <pre><code class="language-bash">guardana target inspect --url https://api.example.com --model gpt-4o-mini
 </code></pre>
-<p>An installed endpoint target with a locator uses the same inspection:</p>
+<p>An installed endpoint target with a locator uses the same inspection. This assumes that the
+distribution <code>acme-gateway</code> registers the <code>acme-gateway</code> scheme and is admitted by name, because
+every command starts with only Guardana's own distributions:</p>
 <pre><code class="language-bash">guardana target inspect \
   --target acme-gateway://llm.internal/v1 \
-  --target-option model=support-v3
+  --target-option model=support-v3 \
+  --plugins allowlist --allow-plugin acme-gateway
 </code></pre>
 <pre><code class="language-text">endpoint https://api.example.com#gpt-4o-mini
 

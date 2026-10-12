@@ -217,11 +217,10 @@ legitimate thing to do and a surprise is not.
 | Lives | next to the code, in git | in the collector, shared by the team |
 | Answers | "should this pipeline fail today" | "did anybody decide anything about this" |
 
-The collector never tells an agent what to do. A gate that asked a server whether
-to fail would be a gate that fails open when the network does — so if you want a
-build to stop failing, that is still `guardana baseline`
-([usage-baseline.md](usage-baseline.md)). Exporting a project's collector waivers
-*as* a baseline file is a natural next step and is deliberately not here yet.
+The collector never tells an agent what to do. A gate that relies on a server to decide
+whether to fail fails open when the network fails. To stop a build from failing, use
+`guardana baseline` ([usage-baseline.md](usage-baseline.md)). The collector does not export
+its waivers as a baseline file.
 
 ## The audit log
 
@@ -240,13 +239,13 @@ recorded — a log that grows with every dashboard refresh is a log nobody reads
 | `key` | `key:prod-ci (id 4)` | **verified** — the credential was presented and matched |
 | `cli` | `cli:alice@ops-1` | **asserted** — an operator with database access said so |
 
-A CLI actor is the operating-system user, taken from the environment rather than
-typed, and `--actor` overrides it for a shared operations account. It is not
-authentication: anybody who can reach the database can write any name. It is
-recorded anyway, because "what happened, roughly when, by which route" is the
-question a log usually answers — and labelling an assertion as proof would be the
-same false green this tool refuses in a verdict. Real identities arrive with users
-and RBAC.
+A CLI actor is the operating-system user, taken from the environment rather than typed.
+`--actor` overrides it for a shared operations account. This is not authentication: anybody
+who can reach the database can write any name. The log still records the actor because a log
+usually answers what happened, roughly when, and by which route. Labelling this assertion as
+proof would be the same false green the tool refuses in a verdict. The
+collector has no user accounts or role-based access control, so the log records no verified
+person.
 
 - **The audit log is not tamper-evident.** It has no per-row signature or hash chain. Anyone with database write access can edit or delete rows. It records actions; it does not prove them.
 
@@ -503,9 +502,9 @@ guardana-collector key create --project acme/web --name panel --scope read
 # then open the collector and paste the key once
 ```
 
-The key goes into an `HttpOnly`, `SameSite=Strict` cookie the page itself cannot
-read; `key revoke` ends the session, and an expiring key ends it on its own. There
-are no user accounts — those arrive with RBAC and replace this.
+The key is stored in an `HttpOnly`, `SameSite=Strict` cookie that the page itself cannot read.
+`key revoke` ends the session, and the session also ends when the key expires. There are no
+user accounts: the key is the page's only identity.
 
 **The cookie holds the read-scoped API key itself.** Stealing it gives read access until the key is revoked or expires. It is marked `Secure` only when the request reaches the collector as `https`, directly or through a trusted `X-Forwarded-Proto`; over plain http the key travels in clear. It is a browser-session cookie with no remember-me, refresh or idle timeout. Bound its lifetime with `--expires-in-days` on the panel key.
 
@@ -534,6 +533,26 @@ with `not_recorded` for a run that sent none. Each `by_source` row carries its
 The page shows skipped checks and indeterminate gates as their own tiles and lists
 each one beside the findings, so a run with a skipped check or an undecided gate
 never reads as "No findings".
+
+`GET /stats` responds only while the dashboard is mounted, to a read key or a signed-in
+browser:
+
+```bash
+curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/stats
+```
+
+| Key | What it holds |
+|---|---|
+| `window` | `{limit, complete}`: the bound, `1000`, and whether every submission fitted inside it |
+| `totals` | `{submissions, sources, findings, unverified, errors, skipped}` over the window. `submissions` counts submissions and `sources` distinct sources; `findings`, `unverified` and `errors` count entries; `skipped` counts skipped rules whose reason is not `not_applicable` |
+| `by_severity` | findings per severity name |
+| `by_gate` | submissions per recorded gate, with `not_recorded` for a run that sent none |
+| `by_source` | one row per source, most findings first: `{source, findings, unverified, errors, skipped, gate, worst_severity, last_seen}`; `gate` is the newest run's |
+| `by_rule` | the 10 rules with the most findings, as `{rule_id, count}` |
+| `series` | up to 24 equal time buckets across the window, each `{t, findings, unverified, errors}`; empty when nothing is stored |
+
+`last_seen` and `t` are Unix times in seconds, taken when the collector received a submission;
+a bucket's `t` is its start time.
 
 ### A database outage is not a rejected key
 
@@ -590,6 +609,34 @@ curl -s -X POST https://collector.example.com/findings \
 curl -s -H "Authorization: Bearer $READ_KEY" "https://collector.example.com/findings?limit=1"
 curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/trend   # {"HIGH": 1} on a fresh project
 ```
+
+### Reading results back
+
+`GET /findings` returns the newest submissions the key may read, newest first, as a JSON list
+of envelopes in their stored form. It takes two query parameters:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `limit` | `100` | how many submissions, from `1` to `1000`; anything else is refused with `422` |
+| `source` | none | only submissions whose `source` is exactly this value |
+
+There is no cursor or offset. A reader gets at most the newest 1,000 matching submissions;
+older submissions are not accessible through this route.
+`guardana-collector run list --limit N` lists older runs for an operator with database access.
+`GET /trend` returns finding counts by severity across everything the key's project stores.
+
+### What the envelope leaves out
+
+The envelope is smaller than the saved run and has its own version (8). The collector keeps
+only what the envelope contains: `source`, `findings`, `unverified`, `errors`, a `summary`
+(`rules_run`, `rules_executed`, `rules_skipped` as `{rule_id, reason, missing}`,
+`max_severity`, and the `unverified` and `errors` counts), the declared `deployment`, and a
+`run` block (`run_id`, `started_at`, `completed_at`, `tool_version`, `gate`,
+`evidence_mode`, `requests`, `input_tokens`, `output_tokens`, `wall_time_seconds`). It does
+not contain waived findings, observations, assessments, the file listing, coverage shortfalls,
+why a run stopped, a skip's `detail`, or the manifest's rule, suite and trial records. A
+`gate` of `indeterminate` means the run did not pass; the saved run explains why. A tool that
+needs the whole result reads the saved run ([reading results](reading-results.md)).
 
 ## Migrations
 

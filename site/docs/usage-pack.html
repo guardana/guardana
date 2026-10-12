@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -245,14 +247,14 @@ read from what they installed cannot be checked at the only moment that matters 
 which is also why the declaration is not <code>[tool.guardana]</code> in <code>pyproject.toml</code>.</p>
 <h2 id="extension_api-is-not-the-product-version"><code>extension_api</code> is not the product version</h2>
 <p>This is the field worth understanding before you pin anything.</p>
-<p>Guardana's own version breaks API on every minor while it is pre-1.0, by design. A
-pack pinned to <code>guardana&gt;=0.17,&lt;0.18</code> would need re-releasing on every minor even
-when nothing it touches has moved. <strong><code>extension_api</code> moves only when <code>Rule</code>,
-<code>Evaluator</code>, <code>Target</code> or <code>Finding</code> actually change shape</strong>, so it is the thing a
-pack can usefully bind to. API 2 adds CLI target locators. Guardana retains API
-1 alongside it, so a rule/evaluator pack declaring <code>&gt;=1,&lt;2</code> continues to load;
-a pack using <code>Target.scheme</code> and <code>from_locator</code> declares <code>&gt;=2,&lt;3</code> and is refused
-by older builds that cannot make its target selectable.</p>
+<p>Before 1.0, a minor release of Guardana may contain a documented breaking change. The
+<code>1.0.0rcN</code> candidates carry fixes only (<a href="compatibility.html#versioning">compatibility</a>). A pack
+pinned to one minor version of the product needs a new release for every minor version, even
+when nothing it uses has changed. <strong><code>extension_api</code> moves only when <code>Rule</code>,
+<code>Evaluator</code>, <code>Target</code> or <code>Finding</code> actually change shape</strong>, so a pack can bind to it. API 2
+adds CLI target locators. Guardana retains API 1 alongside it, so a rule/evaluator pack
+declaring <code>&gt;=1,&lt;2</code> continues to load. A pack using <code>Target.scheme</code> and <code>from_locator</code> declares
+<code>&gt;=2,&lt;3</code>; older builds refuse it because they cannot make its target selectable.</p>
 <p>Both ends are required. An open range claims compatibility with an API nobody has
 written yet.</p>
 <p><strong>Both directions refuse, with different messages and one outcome:</strong></p>

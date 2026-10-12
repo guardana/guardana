@@ -56,13 +56,20 @@ not this recorder's business.
 pip install guardana-core ./examples/shell_hook_integrator
 ```
 
-The hook needs three environment variables, and one of them has no default on purpose:
+The hook reads three environment variables. Two are deliberately required and have no
+default; the hook refuses to record without them:
 
-| Variable | Meaning |
-|---|---|
-| `GUARDANA_TRACE_DIR` | where sessions are written, one file each |
-| `GUARDANA_TRACE_SINKS` | `terminal=shell,write_file=filesystem,send_email=email` — which of *your* tools reach where |
-| `GUARDANA_TRACE_DEFAULT_SINK` | where an unmapped tool lands. **Required.** `other` is a valid answer and a deliberate one; it is on no consequential list, so inheriting it silently would file "nobody classified this tool" under "this tool is harmless" |
+| Variable | Required | Meaning |
+|---|---|---|
+| `GUARDANA_TRACE_DIR` | yes | where sessions are written, one file each |
+| `GUARDANA_TRACE_DEFAULT_SINK` | yes | where an unmapped tool lands. `other` is a valid answer and a deliberate one; it is on no consequential list, so inheriting it silently would file "nobody classified this tool" under "this tool is harmless" |
+| `GUARDANA_TRACE_SINKS` | no, empty by default | `terminal=shell,write_file=filesystem,send_email=email` — which of *your* tools reach where |
+
+```bash
+export GUARDANA_TRACE_DIR=traces
+export GUARDANA_TRACE_SINKS=terminal=shell
+export GUARDANA_TRACE_DEFAULT_SINK=other
+```
 
 A sink name this build does not know is refused rather than folded into `other`, for
 the reason the trace reader refuses an unknown dimension: a typo becomes a sink no rule
@@ -87,8 +94,27 @@ every rule that found nothing decline instead of passing.
 
 ## What it produces
 
-Real output, written by three separate processes driven through Hermes' own shell-hook
-bridge:
+This is real output written by three separate processes driven through Hermes' own shell-hook
+bridge. Without Hermes, you can send the same three events by hand, one process per event,
+with the variables above exported:
+
+```bash
+guardana-trace-hook <<'JSON'
+{"hook_event_name": "post_approval_response", "tool_name": null, "tool_input": null, "session_id": "", "cwd": ".",
+ "extra": {"command": "rm -rf ./build", "surface": "smart", "choice": "smart_approve",
+           "session_key": "sess_shell", "tool_call_id": "call-1"}}
+JSON
+guardana-trace-hook <<'JSON'
+{"hook_event_name": "post_tool_call", "tool_name": "terminal", "tool_input": {"command": "rm -rf ./build"},
+ "session_id": "sess_shell", "cwd": ".", "extra": {"status": "ok", "tool_call_id": "call-1"}}
+JSON
+guardana-trace-hook <<'JSON'
+{"hook_event_name": "on_session_end", "tool_name": null, "tool_input": null, "session_id": "sess_shell",
+ "cwd": ".", "extra": {"completed": true}}
+JSON
+```
+
+Either way, `traces/sess_shell.jsonl` holds:
 
 ```jsonl
 {"guardana_trace": 3, "instrumented": ["approval", "effects", "tools"], "producer": {"name": "guardana-trace-hook"}, "terminated": true, "trace_id": "sess_shell"}
@@ -96,21 +122,33 @@ bridge:
 {"guardana_trace_end": 3, "spans": 1}
 ```
 
-Graded against a contract that says a shell command needs a person:
+Graded against a contract saved as `shell-contract.yaml`, which requires a person for a shell
+command:
+
+```yaml
+schema_version: 1
+name: acme
+assertions:
+  - id: shell-needs-a-person
+    type: approval_required
+    title: A shell command is approved by a person before it runs
+    severity: high
+    sinks: [shell]
+    approvers: ["human:*"]
+```
 
 ```console
 $ guardana analyze-trace traces/sess_shell.jsonl --contract shell-contract.yaml
 read 1 span(s) from traces/sess_shell.jsonl as guardana (producer: guardana-trace-hook)
-note: this producer does not record messages, retrieval, handoff, identity, delegation,
-      consent, policy — the rules needing those dimensions were skipped rather than
-      reporting nothing found. Set fail_on_skipped to treat that as indeterminate
+note: this producer does not record messages, retrieval, handoff, identity, delegation, consent, policy — the rules needing those dimensions were skipped rather than reporting nothing found. Set fail_on_skipped to treat that as indeterminate
 contracts: 1 assertion(s) apply to this execution
 ✖ [HIGH] contract.acme.shell-needs-a-person — A shell command is approved by a person before it runs
-    contract acme (shell-contract.yaml) requires 'terminal' to be approved by human:*;
-    it was approved by automated:smart
+    contract acme (shell-contract.yaml) requires 'terminal' to be approved by human:*; it was approved by automated:smart  (traces/sess_shell.jsonl#sess_shell/call-1)
 
 1 finding(s); 3 rule(s) run, 7 skipped.
 ```
+
+The command exits `1`: the finding fails the run.
 
 The approval crossed a process boundary and still landed on the call it authorised —
 and it still says a language model made the decision, not a person.
@@ -128,14 +166,18 @@ uv run --isolated --no-cache \
   pytest examples/shell_hook_integrator/tests -q
 ```
 
-To check it against a real agent, install `hermes-agent`, register the hooks as above,
-and drive the bridge directly:
+To check it against a real agent, install the version this example was written against
+(`pip install "hermes-agent==0.19.0"`), register the hooks as above, and drive the bridge
+directly:
 
 ```python
+from pathlib import Path
+
 from agent import shell_hooks
 from hermes_cli.plugins import invoke_hook
 from utils import fast_safe_load
 
+config_yaml = Path("~/.hermes/config.yaml").expanduser().read_text(encoding="utf-8")
 shell_hooks.register_from_config(fast_safe_load(config_yaml), accept_hooks=True)
 invoke_hook("post_tool_call", tool_name="terminal", args={"command": "..."},
             status="ok", session_id="sess", tool_call_id="call-1")

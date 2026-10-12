@@ -15,12 +15,15 @@ one turns a rule into a check that runs, proves nothing, and reports a pass.
 guardana target inspect --url https://api.example.com --model gpt-4o-mini
 ```
 
-An installed endpoint target with a locator uses the same inspection:
+An installed endpoint target with a locator uses the same inspection. This assumes that the
+distribution `acme-gateway` registers the `acme-gateway` scheme and is admitted by name, because
+every command starts with only Guardana's own distributions:
 
 ```bash
 guardana target inspect \
   --target acme-gateway://llm.internal/v1 \
-  --target-option model=support-v3
+  --target-option model=support-v3 \
+  --plugins allowlist --allow-plugin acme-gateway
 ```
 
 ```text

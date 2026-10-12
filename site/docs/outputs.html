@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -288,7 +290,7 @@ output cannot decide that a run with open questions is clean.</p>
 <tbody>
 <tr>
 <td><code>delivered</code></td>
-<td>the receiver acknowledged it: a 2xx answer to at least one attempt</td>
+<td>the receiver acknowledged it, after at least one attempt; a reporter that names an HTTP status names a 2xx one, and one that writes locally, such as to a file, names none</td>
 <td>the verdict's</td>
 </tr>
 <tr>
@@ -344,7 +346,10 @@ trust = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({&quot;acme-gua
 table = render(select_renderer(&quot;acme-table&quot;, trust), load_verification(Path(&quot;run.json&quot;)))
 Path(&quot;run.csv&quot;).write_text(table, encoding=&quot;utf-8&quot;, newline=&quot;&quot;)
 </code></pre>
-<p><code>PluginTrust</code> and <code>PluginMode</code> sit outside the <a href="compatibility.html#the-supported-surface">supported surface</a>: a minor release may change them, so pin <code>guardana-core</code> to a minor while your code imports them.</p>
+<p><code>render</code>, <code>select_renderer</code> and <code>load_verification</code> are in the
+<a href="compatibility.html#the-supported-surface">supported surface</a>. <code>PluginTrust</code> and <code>PluginMode</code> are
+outside it and subject to change in any release. While your code imports them, pin the exact
+<code>guardana-core</code> version you tested.</p>
 <p><code>guardana recipe run</code> saves <code>run.json</code> in its artifact directory; export it the same way.</p>
 <h2 id="the-reference-webhook">The reference webhook</h2>
 <p><code>acme-webhook</code> follows <a href="https://github.com/standard-webhooks/standard-webhooks">Standard Webhooks</a>:
@@ -374,10 +379,11 @@ acme-table = &quot;acme_outputs:provide_table&quot;
 [project.entry-points.&quot;guardana.reporters&quot;]
 acme-webhook = &quot;acme_outputs:provide_webhook&quot;
 </code></pre>
-<p>Name the package module, not a submodule, so <code>guardana pack validate</code> finds your manifest, and
-import heavy code inside the provider so selecting one output never imports another. A name is
-lowercase letters, digits and <code>-</code>, at most 40 characters; <code>human</code>, <code>json</code>, <code>sarif</code>, <code>junit</code>,
-<code>server</code>, <code>http</code>, <code>https</code> and any name starting with <code>guardana</code> are reserved.</p>
+<p>Name the package module, not a submodule, so <code>guardana pack validate</code> finds your manifest.
+Import heavy code inside the provider so selecting one output never imports another. A name
+matches <code>[a-z][a-z0-9-]*</code>: a lowercase letter followed by lowercase letters, digits and <code>-</code>,
+with at most 40 characters in total. A format cannot use <code>human</code>, <code>json</code>, <code>sarif</code> or <code>junit</code>;
+a reporter cannot use <code>server</code>, <code>http</code> or <code>https</code>. No output name may start with <code>guardana</code>.</p>
 <pre><code class="language-python">from guardana.core.output import Delivery, DeliveryStatus, RendererSpec, ReporterSpec
 
 def provide_table() -&gt; RendererSpec:

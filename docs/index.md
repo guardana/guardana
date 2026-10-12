@@ -63,6 +63,7 @@ More in [exit codes](exit-codes.md) and [the gate](profiles.md#the-gate).
 ## Evidence and regression
 
 - [`usage-run.md`](usage-run.md) — inspect and migrate saved runs
+- [`reading-results.md`](reading-results.md) — read a saved run, SARIF or JUnit from your own tool
 - [`usage-diff.md`](usage-diff.md) — compare runs without hiding coverage changes
 - [`usage-baseline.md`](usage-baseline.md) — accept risk with an expiry
 - [`usage-monitor.md`](usage-monitor.md) — schedule active re-verification

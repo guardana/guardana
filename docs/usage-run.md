@@ -251,8 +251,9 @@ Top level:
 | Key | What it is |
 |---|---|
 | `schema_version` | `17`. Stated once, for the whole document. |
+| `$schema` | the identifier of the schema the document follows, `https://guardana.dev/schemas/run/v17.schema.json` |
 | `run` | the manifest — everything below |
-| `findings` / `unverified` / `waived` / `errors` / `observations` | the problem, evidence and inventory channels |
+| `findings` / `unverified` / `waived` / `errors` / `observations` | the problem, evidence and inventory channels — see [the finding channels](#the-finding-channels) |
 | `assessments` | what the run *measured*, pass included — see [assessments](#assessments) |
 | `scope` | for a file run, `{files, excludes, ignored_directories}`: every file it listed (so the document grows with the tree), spelled like a finding's location, each exclude pattern with its `source` (`profile` for `rules.paths_exclude`, `ignore_file` for `.guardanaignore`), and the directory names every scan skips; `null` for any other run. `excludes` is `null` when a third-party file target applied filtering it does not report |
 
@@ -278,13 +279,60 @@ Inside `run`:
 | `recipe` | for a run started from a recipe, `{name, digest, lock_digest, kind, source, unpinned}`: the recipe's name, the SHA-256 of the recipe file and of the lock the run was held to (`null` when none was read), what the team declared answered (`kind`: `application` or `model_harness`), how the run reached it (`source`: `connection`, `recording` or `target`) and the rule ids it ran that the lock does not pin. `kind` is declared, not verified. `null` otherwise |
 | `fixtures` | for a run given a [fixtures file](usage-fixtures.md), `{name, digest, data, tenants, counts, markers}`: the file's `name`, the SHA-256 of its bytes, `data` as `{declared: "synthetic"}` — the team's statement, recorded and never verified —, the tenants it declares, `{documents, records, tools}` it declares, and the version of the algorithm that derived its markers. `null` otherwise |
 
-Three conventions hold everywhere in it:
+### The finding channels
+
+`findings`, `unverified` and `waived` use the same record structure. A finding failed the check.
+An unverified record describes a check that ran but could not decide. A waived record is a
+finding accepted by a baseline.
+
+| Field | Type | What it is |
+|---|---|---|
+| `rule_id` | string | the rule that produced it |
+| `severity` | string | `INFO`, `LOW`, `MEDIUM`, `HIGH` or `CRITICAL`, always uppercase |
+| `title` | string | the rule's title |
+| `taxonomy` | list of `{framework, id, title}` | the framework references the rule maps to; `framework` and `id` are the identity, and `title` is recorded so a reader without that catalogue can still show it |
+| `target_ref` | string | where: a file path, with `:line` when the rule names a line, or the target's reference |
+| `evidence` | `{summary, detail}`, both strings | what was seen, redacted under the run's evidence policy; `detail` may be empty |
+| `verdict` | `null`, or `{outcome, confidence, rationale, evaluator_id}` | the evaluator's verdict for a graded check: `outcome` is `pass`, `fail` or `inconclusive` and `confidence` is between `0` and `1`. `null` for a check that decides in its own code, such as a file rule |
+
+### Errors and observations
+
+Each `errors` entry is `{source, stage, reason}`, all strings: what could not run (a rule id
+or a file), the stage where it failed, such as `load`, `run` or `target`, and why. The list of
+stages is open. Each `observations` entry is `{kind, name, ref, attributes}`: a component the
+run saw (`model`, `dataset`, `dependency-manifest` or `notebook`), its name, its location, and
+string attributes such as `format` and `size_bytes`.
+
+### `result_summary`
+
+| Field | Type | What it is |
+|---|---|---|
+| `findings`, `unverified`, `waived`, `errors`, `observations` | integer | how many entries each channel holds |
+| `rules_run` | list of rule ids | the rules that ran |
+| `rules_skipped` | list of `{rule_id, reason, missing, detail}` | the rules that did not run. `reason` is `missing_capability`, `unsafe_mode`, `not_applicable`, `not_recorded` or `not_offered`; `missing` lists what the target lacked; `detail` is a sentence for a person. Every reason except `not_applicable` is a coverage gap |
+| `max_severity` | string or `null` | the highest severity in `findings`, `null` when there is none |
+| `gate` | `pass`, `fail` or `indeterminate` | the verdict the run's policy reached. It is stored rather than recomputed, so a reader uses this value instead of deriving one |
+| `stopped_by` | `null`, `budget_exhausted`, `interrupted`, `target_unavailable` or `target_changed` | why the run ended before its plan finished |
+| `assessments`, `measured` | integer | see [assessments](#assessments) |
+
+### `coverage.shortfall`
+
+Each entry is `{kind, name, detail}`: the kind of coverage the run lacked, what it concerned,
+and a sentence for a person. `kind` is `missing_dimension`, `contract_not_applicable`,
+`unexamined_component`, `incomplete_recording`, `demanded_check`, `seed_not_reached`,
+`empty_target` or `ungraded_cases`. A shortfall prevents a run from passing regardless of the
+`fail_on_*` switches. The gate is `indeterminate` unless a finding or a failed suite makes
+it `fail`. A stopped run is `indeterminate` either way.
+
+These conventions apply throughout the document:
 
 **Timestamps are UTC, RFC 3339.** A local-time timestamp in an evidence record is a
 bug waiting for a timezone.
 
-**Digests name their algorithm** — `sha256:…`, never a bare hex string, so a digest
-can be migrated when the algorithm moves.
+**Digests of a document or of content name their algorithm** — `sha256:…` — so a digest
+can be migrated when the algorithm changes. Two fields instead hold a shorter identifier of
+16 bare hex characters: `run.rules[].digest`, the digest of a rule's declaration, and
+`assessments[].dataset` when a YAML rule records its declaration digest there.
 
 **The target fingerprint says what it covers.** `target.fingerprint_inputs` lists the
 fields the digest was computed from. A digest of a URL and a model name identifies a
@@ -466,10 +514,13 @@ without the namespace; `execution.seed` and `execution.temperature` match
 `gen_ai.request.*`. If you already collect those, the manifest needs no
 translation.
 
-The SARIF output carries the same facts in SARIF's own vocabulary: `runs[].invocations[0]`
+The SARIF output contains the same facts in SARIF's vocabulary: `runs[].invocations[0]`
 with `startTimeUtc`, `endTimeUtc`, `exitCode`, `exitCodeDescription` and
-`executionSuccessful`, which is `false` whenever the run leaves a question open, with a
-notification saying which (see [`usage-scan.md`](usage-scan.md#other-formats)).
+`executionSuccessful`. That flag is not the verdict. It is `false` for each unresolved question
+named in the run's output, with a notification identifying the question. A rule skipped for
+missing coverage only adds a `note` unless the gate refused the run because of it. Read
+`exitCode` for the verdict
+([reading results](reading-results.md#what-sarif-keeps), [`usage-scan.md`](usage-scan.md#other-formats)).
 
 ## See also
 

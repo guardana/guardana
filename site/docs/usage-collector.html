@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -137,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -404,11 +406,10 @@ legitimate thing to do and a surprise is not.</p>
 </tr>
 </tbody>
 </table></div>
-<p>The collector never tells an agent what to do. A gate that asked a server whether
-to fail would be a gate that fails open when the network does — so if you want a
-build to stop failing, that is still <code>guardana baseline</code>
-(<a href="usage-baseline.html">usage-baseline.md</a>). Exporting a project's collector waivers
-<em>as</em> a baseline file is a natural next step and is deliberately not here yet.</p>
+<p>The collector never tells an agent what to do. A gate that relies on a server to decide
+whether to fail fails open when the network fails. To stop a build from failing, use
+<code>guardana baseline</code> (<a href="usage-baseline.html">usage-baseline.md</a>). The collector does not export
+its waivers as a baseline file.</p>
 <h2 id="the-audit-log">The audit log</h2>
 <pre><code class="language-bash">guardana-collector audit list [--project acme/web] [--limit 50]
 </code></pre>
@@ -437,13 +438,13 @@ recorded — a log that grows with every dashboard refresh is a log nobody reads
 </tr>
 </tbody>
 </table></div>
-<p>A CLI actor is the operating-system user, taken from the environment rather than
-typed, and <code>--actor</code> overrides it for a shared operations account. It is not
-authentication: anybody who can reach the database can write any name. It is
-recorded anyway, because &quot;what happened, roughly when, by which route&quot; is the
-question a log usually answers — and labelling an assertion as proof would be the
-same false green this tool refuses in a verdict. Real identities arrive with users
-and RBAC.</p>
+<p>A CLI actor is the operating-system user, taken from the environment rather than typed.
+<code>--actor</code> overrides it for a shared operations account. This is not authentication: anybody
+who can reach the database can write any name. The log still records the actor because a log
+usually answers what happened, roughly when, and by which route. Labelling this assertion as
+proof would be the same false green the tool refuses in a verdict. The
+collector has no user accounts or role-based access control, so the log records no verified
+person.</p>
 <ul>
 <li><strong>The audit log is not tamper-evident.</strong> It has no per-row signature or hash chain. Anyone with database write access can edit or delete rows. It records actions; it does not prove them.</li>
 </ul>
@@ -658,9 +659,9 @@ bearer token and every panel would have loaded empty. Now the browser signs in:<
 <pre><code class="language-bash">guardana-collector key create --project acme/web --name panel --scope read
 # then open the collector and paste the key once
 </code></pre>
-<p>The key goes into an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie the page itself cannot
-read; <code>key revoke</code> ends the session, and an expiring key ends it on its own. There
-are no user accounts — those arrive with RBAC and replace this.</p>
+<p>The key is stored in an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie that the page itself cannot read.
+<code>key revoke</code> ends the session, and the session also ends when the key expires. There are no
+user accounts: the key is the page's only identity.</p>
 <p><strong>The cookie holds the read-scoped API key itself.</strong> Stealing it gives read access until the key is revoked or expires. It is marked <code>Secure</code> only when the request reaches the collector as <code>https</code>, directly or through a trusted <code>X-Forwarded-Proto</code>; over plain http the key travels in clear. It is a browser-session cookie with no remember-me, refresh or idle timeout. Bound its lifetime with <code>--expires-in-days</code> on the panel key.</p>
 <p><strong>The cookie authenticates reads and nothing else.</strong> Ingest takes a bearer header
 only, so a page on another origin cannot make a signed-in browser submit findings.
@@ -684,6 +685,50 @@ with <code>not_recorded</code> for a run that sent none. Each <code>by_source</c
 The page shows skipped checks and indeterminate gates as their own tiles and lists
 each one beside the findings, so a run with a skipped check or an undecided gate
 never reads as &quot;No findings&quot;.</p>
+<p><code>GET /stats</code> responds only while the dashboard is mounted, to a read key or a signed-in
+browser:</p>
+<pre><code class="language-bash">curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; https://collector.example.com/stats
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>window</code></td>
+<td><code>{limit, complete}</code>: the bound, <code>1000</code>, and whether every submission fitted inside it</td>
+</tr>
+<tr>
+<td><code>totals</code></td>
+<td><code>{submissions, sources, findings, unverified, errors, skipped}</code> over the window. <code>submissions</code> counts submissions and <code>sources</code> distinct sources; <code>findings</code>, <code>unverified</code> and <code>errors</code> count entries; <code>skipped</code> counts skipped rules whose reason is not <code>not_applicable</code></td>
+</tr>
+<tr>
+<td><code>by_severity</code></td>
+<td>findings per severity name</td>
+</tr>
+<tr>
+<td><code>by_gate</code></td>
+<td>submissions per recorded gate, with <code>not_recorded</code> for a run that sent none</td>
+</tr>
+<tr>
+<td><code>by_source</code></td>
+<td>one row per source, most findings first: <code>{source, findings, unverified, errors, skipped, gate, worst_severity, last_seen}</code>; <code>gate</code> is the newest run's</td>
+</tr>
+<tr>
+<td><code>by_rule</code></td>
+<td>the 10 rules with the most findings, as <code>{rule_id, count}</code></td>
+</tr>
+<tr>
+<td><code>series</code></td>
+<td>up to 24 equal time buckets across the window, each <code>{t, findings, unverified, errors}</code>; empty when nothing is stored</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>last_seen</code> and <code>t</code> are Unix times in seconds, taken when the collector received a submission;
+a bucket's <code>t</code> is its start time.</p>
 <h3 id="a-database-outage-is-not-a-rejected-key">A database outage is not a rejected key</h3>
 <p>If the collector cannot reach its database while checking a key, it answers <code>503</code>,
 not <code>401</code>. A fleet told its credentials were rejected goes and rotates credentials
@@ -766,6 +811,45 @@ curl -s -X POST https://collector.example.com/findings \
 curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; &quot;https://collector.example.com/findings?limit=1&quot;
 curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; https://collector.example.com/trend   # {&quot;HIGH&quot;: 1} on a fresh project
 </code></pre>
+<h3 id="reading-results-back">Reading results back</h3>
+<p><code>GET /findings</code> returns the newest submissions the key may read, newest first, as a JSON list
+of envelopes in their stored form. It takes two query parameters:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>limit</code></td>
+<td><code>100</code></td>
+<td>how many submissions, from <code>1</code> to <code>1000</code>; anything else is refused with <code>422</code></td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>none</td>
+<td>only submissions whose <code>source</code> is exactly this value</td>
+</tr>
+</tbody>
+</table></div>
+<p>There is no cursor or offset. A reader gets at most the newest 1,000 matching submissions;
+older submissions are not accessible through this route.
+<code>guardana-collector run list --limit N</code> lists older runs for an operator with database access.
+<code>GET /trend</code> returns finding counts by severity across everything the key's project stores.</p>
+<h3 id="what-the-envelope-leaves-out">What the envelope leaves out</h3>
+<p>The envelope is smaller than the saved run and has its own version (8). The collector keeps
+only what the envelope contains: <code>source</code>, <code>findings</code>, <code>unverified</code>, <code>errors</code>, a <code>summary</code>
+(<code>rules_run</code>, <code>rules_executed</code>, <code>rules_skipped</code> as <code>{rule_id, reason, missing}</code>,
+<code>max_severity</code>, and the <code>unverified</code> and <code>errors</code> counts), the declared <code>deployment</code>, and a
+<code>run</code> block (<code>run_id</code>, <code>started_at</code>, <code>completed_at</code>, <code>tool_version</code>, <code>gate</code>,
+<code>evidence_mode</code>, <code>requests</code>, <code>input_tokens</code>, <code>output_tokens</code>, <code>wall_time_seconds</code>). It does
+not contain waived findings, observations, assessments, the file listing, coverage shortfalls,
+why a run stopped, a skip's <code>detail</code>, or the manifest's rule, suite and trial records. A
+<code>gate</code> of <code>indeterminate</code> means the run did not pass; the saved run explains why. A tool that
+needs the whole result reads the saved run (<a href="reading-results.html">reading results</a>).</p>
 <h2 id="migrations">Migrations</h2>
 <pre><code class="language-bash">guardana-collector status      # what is applied, what is pending
 guardana-collector migrate     # apply everything pending

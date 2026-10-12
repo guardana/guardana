@@ -67,14 +67,14 @@ which is also why the declaration is not `[tool.guardana]` in `pyproject.toml`.
 
 This is the field worth understanding before you pin anything.
 
-Guardana's own version breaks API on every minor while it is pre-1.0, by design. A
-pack pinned to `guardana>=0.17,<0.18` would need re-releasing on every minor even
-when nothing it touches has moved. **`extension_api` moves only when `Rule`,
-`Evaluator`, `Target` or `Finding` actually change shape**, so it is the thing a
-pack can usefully bind to. API 2 adds CLI target locators. Guardana retains API
-1 alongside it, so a rule/evaluator pack declaring `>=1,<2` continues to load;
-a pack using `Target.scheme` and `from_locator` declares `>=2,<3` and is refused
-by older builds that cannot make its target selectable.
+Before 1.0, a minor release of Guardana may contain a documented breaking change. The
+`1.0.0rcN` candidates carry fixes only ([compatibility](compatibility.md#versioning)). A pack
+pinned to one minor version of the product needs a new release for every minor version, even
+when nothing it uses has changed. **`extension_api` moves only when `Rule`,
+`Evaluator`, `Target` or `Finding` actually change shape**, so a pack can bind to it. API 2
+adds CLI target locators. Guardana retains API 1 alongside it, so a rule/evaluator pack
+declaring `>=1,<2` continues to load. A pack using `Target.scheme` and `from_locator` declares
+`>=2,<3`; older builds refuse it because they cannot make its target selectable.
 
 Both ends are required. An open range claims compatibility with an API nobody has
 written yet.
