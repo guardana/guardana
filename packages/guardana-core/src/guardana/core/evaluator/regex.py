@@ -32,12 +32,18 @@ _START_TIMEOUT_SECONDS = 30.0
 
 _EXIT_TIMEOUT_SECONDS = 1.0
 
+_SPAN_FIELDS = 4
+
 _BACKSTOP_FACTOR = 2.0
 """The worker gives up a search on its own after this many bounds, should its parent be gone."""
 
 
 class _NotSearchedError(Exception):
     """The worker did not say whether the pattern occurs; the message says why."""
+
+
+class _SearchTimeoutError(_NotSearchedError):
+    """The search outlived its bound and its worker was stopped."""
 
 
 @functools.cache
@@ -78,28 +84,50 @@ class _SearchWorker:
 
     def search(self, pattern: str, text: str) -> bool:
         """Return whether `pattern` occurs in `text`; raise `_NotSearchedError` if unknown."""
+        result = self._ask(pattern, text)
+        if isinstance(result, bool):
+            return result
+        raise _NotSearchedError(f"regex search failed in its worker ({result}); not evaluated")
+
+    def spans(self, pattern: str, text: str) -> tuple[tuple[int, int, int, int], ...]:
+        """Return every non-empty match of `pattern` in `text` as `(start, end, *value)`.
+
+        `value` is the span of the pattern's `value` group, or the match's own when it has
+        none or the group took no part. Raise `_NotSearchedError` when the worker did not
+        answer with spans that fit `text`, so a caller can never read a failed search as no
+        match.
+        """
+        result = self._ask(pattern, text, "spans")
+        if not isinstance(result, list):
+            raise _NotSearchedError(f"regex search failed in its worker ({result}); not evaluated")
+        spans: list[tuple[int, int, int, int]] = []
+        for item in result:
+            span = _span(item, len(text))
+            if span is None:
+                raise _NotSearchedError("regex worker answered a span that does not fit the text")
+            spans.append(span)
+        return tuple(spans)
+
+    def _ask(self, pattern: str, text: str, *kind: str) -> object:
+        """Send one request and return the worker's answer to it, within the bound."""
         with self._lock:
             try:
                 process, replies = self._running()
                 self._sequence += 1
-                self._send(process, [self._sequence, pattern, text])
+                self._send(process, [self._sequence, pattern, text, *kind])
                 answer = self._next(replies, self.timeout)
             except BaseException:
                 self.stop()
                 raise
+            if answer is None:
+                raise _SearchTimeoutError(
+                    f"regex search exceeded {self.timeout:g} s; not evaluated"
+                )
             match answer:
-                case None:
-                    raise _NotSearchedError(
-                        f"regex search exceeded {self.timeout:g} s; not evaluated"
-                    )
                 case [int() as sequence, result] if sequence == self._sequence:
-                    pass
-                case _:
-                    self.stop()
-                    raise _NotSearchedError("regex worker answered out of turn; not evaluated")
-        if isinstance(result, bool):
-            return result
-        raise _NotSearchedError(f"regex search failed in its worker ({result}); not evaluated")
+                    return result
+            self.stop()
+            raise _NotSearchedError("regex worker answered out of turn; not evaluated")
 
     def stop(self) -> None:
         """Kill the worker, if one is running, and reap it.
@@ -188,6 +216,18 @@ class _SearchWorker:
                 "regex worker answered something unreadable; not evaluated"
             ) from exc
         return result
+
+
+def _span(item: object, length: int) -> tuple[int, int, int, int] | None:
+    """Return one answered span when it is four offsets that fit a text of `length`, else None."""
+    if not isinstance(item, list) or len(item) != _SPAN_FIELDS:
+        return None
+    if not all(isinstance(offset, int) and not isinstance(offset, bool) for offset in item):
+        return None
+    start, end, value_start, value_end = item
+    if not 0 <= start < end <= length or not 0 <= value_start <= value_end <= length:
+        return None
+    return start, end, value_start, value_end
 
 
 def _relay(process: subprocess.Popen[bytes], replies: queue.Queue[bytes]) -> None:

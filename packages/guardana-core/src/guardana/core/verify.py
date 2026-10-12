@@ -66,7 +66,7 @@ from guardana.core.recording import (
     read_recording,
     render_recording,
 )
-from guardana.core.redaction import EvidenceRedactor, MessageQuoting
+from guardana.core.redaction import EvidenceRedactor, MessageQuoting, RedactionBoundError
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
 from guardana.core.report.baseline import Baseline, apply_baseline
@@ -74,6 +74,7 @@ from guardana.core.report.load import ReportLoadError, load_report
 from guardana.core.report.location import relativize, relativize_findings
 from guardana.core.report.serialize import run_to_dict
 from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
+from guardana.core.report.stop import StopReason
 from guardana.core.rule import Rule
 from guardana.core.runner import (
     DEFAULT_ENDPOINT_CONCURRENCY,
@@ -784,10 +785,14 @@ class Verifier:
         the gate.
         """
         stop_messages = target_failures(result)
+        stopped = result.stopped_by
         if relative_to is not None:
             result = relativize_findings(result, relative_to)
         redactor = EvidenceRedactor(self.profile.privacy, secrets=withheld)
-        result = redactor.redact_result(result)
+        try:
+            result = redactor.redact_result(result)
+        except RedactionBoundError as exc:
+            raise _after_stop(exc, stopped) from exc
         if baseline is not None:
             result = apply_baseline(result, baseline.active())
         result = replace(
@@ -800,19 +805,22 @@ class Verifier:
         )
         gate = gate_outcome(result, self.profile.policy)
         run_id = str(uuid.uuid4())
-        exchanges = (
-            None
-            if kept is None
-            else self._kept_recording(
-                kept,
-                redactor,
-                run_id=run_id,
-                subject=reference,
-                started_at=started_at,
-                gate=gate,
-                result=result,
+        try:
+            exchanges = (
+                None
+                if kept is None
+                else self._kept_recording(
+                    kept,
+                    redactor,
+                    run_id=run_id,
+                    subject=reference,
+                    started_at=started_at,
+                    gate=gate,
+                    result=result,
+                )
             )
-        )
+        except RedactionBoundError as exc:
+            raise _after_stop(exc, stopped) from exc
         manifest = build_run_manifest(
             registry,
             self.profile,
@@ -1078,6 +1086,11 @@ def _release(target: Target) -> None:
     with _RAN_LOCK:
         if _RAN.get(id(target)) is target:
             del _RAN[id(target)]
+
+
+def _after_stop(error: RedactionBoundError, stopped: StopReason | None) -> RedactionBoundError:
+    """Return `error` stating the stop the run had already met, so the stop keeps its code."""
+    return RedactionBoundError(error.pattern, error.failure, stopped_by=stopped)
 
 
 __all__ = [

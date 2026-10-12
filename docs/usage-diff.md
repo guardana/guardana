@@ -23,6 +23,9 @@ guardana probe --url http://localhost:11434 --model llama4 \
 guardana diff monday.json friday.json
 ```
 
+A side that cannot be read — not a regular file, over 256 MiB, or not a Guardana run — makes
+the pair incomparable (exit `2`).
+
 Use `--output` rather than a shell redirect. A redirect in PowerShell writes
 UTF-16, which the reader on the other end cannot parse, and the corruption
 surfaces a day later far from its cause.

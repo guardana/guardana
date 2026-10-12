@@ -202,6 +202,8 @@
 <h1><code>guardana import-observations</code> — carry another tool's results in as claims</h1><p class="lede"><code>guardana import-observations</code>: carry garak, promptfoo or your own harness's results in as unverified claims</p><p><code>guardana import-observations</code> brings external test results into Guardana when you need to review them beside its findings. It keeps results from garak, promptfoo, or an internal harness attributed to their source.</p>
 <pre><code class="language-bash">guardana import-observations garak.report.jsonl --target https://llm.internal/v1
 </code></pre>
+<p>The file is read only when it is a regular file of at most 64 MiB; a FIFO, a device or a larger
+file is refused with exit <code>3</code> before anything is imported.</p>
 <h2 id="this-command-never-exits-0-and-that-is-the-design">This command never exits 0, and that is the design</h2>
 <p>Guardana did not send those prompts, did not see the replies, and cannot grade what it did
 not observe. So every imported result lands in the <strong><code>unverified</code></strong> channel, no rule ran,

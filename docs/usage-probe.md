@@ -315,10 +315,10 @@ what was graded before it ([below](#when-the-target-fails-part-way)):
 
 | The conversation's request ended with | Outcome | Exit |
 |---|---|---|
-| no reply: no connection, a timeout, a reset, an stdio server that exited or closed its output | the run stops (`stopped_by: target_unavailable`) | `4` |
+| no reply: no connection, a timeout, a reset, an stdio server that exited, closed its output or did not read a request within the timeout | the run stops (`stopped_by: target_unavailable`) | `4` |
 | `401`, `403` or `407` to a request carrying your `--mcp-token-env` token | the run stops | `4` |
 | `404` (once a legacy session was re-opened), `408`, `425`, `429` or `5xx` | the run stops | `4` |
-| a `2xx` that is not JSON-RPC, or an stdio line that is over-long or not JSON | the run stops | `4` |
+| a `2xx` that is not JSON-RPC, an stdio line that is over-long or not JSON, or an stdio server request whose id is not an integer or a string of at most 256 characters | the run stops | `4` |
 | `-32022` once a revision is agreed | the run stops (`stopped_by: target_changed`) | `4` |
 | another `4xx` | an error of the rule that sent it; later readers meet the same error without a second request | `2`, unless a finding fails it |
 | a JSON-RPC error | an answer the rules grade | — |

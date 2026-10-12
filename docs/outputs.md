@@ -68,7 +68,7 @@ delivery: <status> — <name> to <destination>[ (HTTP <code>, <n> attempt|attemp
 | `rejected` | the receiver answered and did not accept it | the verdict's; `8` under `delivery.required` |
 | `unreachable` | the receiver did not answer | the verdict's; `8` under `delivery.required` |
 | `not_sent` | nothing left the machine: the run ended before its report existed, or the reporter declined to send | the verdict's, or the code the command ended with before delivery; `8` under `delivery.required` once the run produced its report |
-| `unknown` | the reporter failed, ran past 30 seconds, or said `delivered` with no attempt or with a status outside 2xx; whether anything left is unknown | `8` |
+| `unknown` | the reporter failed, ran past 30 seconds (its `sent_secrets()` read after the delivery included), or said `delivered` with no attempt or with a status outside 2xx; whether anything left is unknown | `8` |
 
 The destination is shown without a path, query or credential: Guardana reduces a URL to
 `scheme://host[:port]` before printing it, whatever the reporter gave, and withholds the
@@ -167,7 +167,8 @@ def provide_webhook() -> ReporterSpec:
 - `prepare(ReporterRequest(locator))` checks the destination and credentials and sends
   nothing; raise `ValueError` with the reason to refuse. It returns an object with
   `destination` (shown in the delivery line), `sent_secrets()` (withheld from every line) and
-  `deliver(verification) -> Delivery`.
+  `deliver(verification) -> Delivery`. `sent_secrets()` is read again after `deliver`, within
+  the same deadline.
 - `deliver` should connect straight to the destination the operator named and ignore
   `HTTP_PROXY`, `HTTPS_PROXY` and their lowercase forms, as the reference webhook does with
   `ProxyHandler({})`. A proxy the environment names sees everything sent and can answer in the

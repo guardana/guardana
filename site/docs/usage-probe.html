@@ -658,7 +658,7 @@ what was graded before it (<a href="#when-the-target-fails-part-way">below</a>):
 </thead>
 <tbody>
 <tr>
-<td>no reply: no connection, a timeout, a reset, an stdio server that exited or closed its output</td>
+<td>no reply: no connection, a timeout, a reset, an stdio server that exited, closed its output or did not read a request within the timeout</td>
 <td>the run stops (<code>stopped_by: target_unavailable</code>)</td>
 <td><code>4</code></td>
 </tr>
@@ -673,7 +673,7 @@ what was graded before it (<a href="#when-the-target-fails-part-way">below</a>):
 <td><code>4</code></td>
 </tr>
 <tr>
-<td>a <code>2xx</code> that is not JSON-RPC, or an stdio line that is over-long or not JSON</td>
+<td>a <code>2xx</code> that is not JSON-RPC, an stdio line that is over-long or not JSON, or an stdio server request whose id is not an integer or a string of at most 256 characters</td>
 <td>the run stops</td>
 <td><code>4</code></td>
 </tr>

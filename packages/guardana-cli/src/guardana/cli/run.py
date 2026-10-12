@@ -9,12 +9,14 @@ import typer
 from guardana.cli._atomic import write_whole
 from guardana.cli._outputs import earlier_run_kept, remove_earlier_exchanges
 from guardana.cli._sidecar import refuse_writing_over_an_input, same_file
+from guardana.core.formats._stream import read_regular
 from guardana.core.manifest import RunManifest
 from guardana.core.manifest.load import ManifestLoadError
 from guardana.core.manifest.serialize import manifest_to_dict
 from guardana.core.report import ReportLoadError, load_report
-from guardana.core.report.load import MIGRATABLE_VERSIONS, migrate_forward
+from guardana.core.report.load import MAX_REPORT_BYTES, MIGRATABLE_VERSIONS, migrate_forward
 from guardana.core.report.run import REPORT_SCHEMA_VERSION
+from guardana.core.trace.limits import MAX_TRACE_BYTES
 from guardana.core.verify import exchanges_path
 
 _INVALID_USAGE = 3
@@ -219,7 +221,14 @@ def migrate(
         )
         raise typer.Exit(code=_INVALID_USAGE)
     try:
-        data = path.read_bytes()
+        data = read_regular(path, MAX_REPORT_BYTES)
+        if len(data) > MAX_REPORT_BYTES:
+            typer.echo(
+                f"error: {path} is over the {MAX_REPORT_BYTES}-byte ceiling for a saved run; "
+                f"it is refused rather than read in part",
+                err=True,
+            )
+            raise typer.Exit(code=_INVALID_USAGE)
         raw = json.loads(data.decode("utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         typer.echo(f"error: {path} is not a readable Guardana run: {exc}", err=True)
@@ -314,6 +323,15 @@ def _recorded_digest(run: dict[str, object]) -> str | None:
     return digest if isinstance(digest, str) else None
 
 
+def _exchanges_bytes(path: Path) -> bytes | None:
+    """Return the exchanges file at `path`; None unless it is a regular file within the ceiling."""
+    try:
+        data = read_regular(path, MAX_TRACE_BYTES)
+    except OSError:
+        return None
+    return data if len(data) <= MAX_TRACE_BYTES else None
+
+
 def _exchanges_to_copy(path: Path, destination: Path, digest: str | None) -> bytes | bool | None:
     """Decide what a run recording `digest` needs beside `destination`, before anything is written.
 
@@ -324,10 +342,7 @@ def _exchanges_to_copy(path: Path, destination: Path, digest: str | None) -> byt
     if digest is None:
         return None
     own, beside = exchanges_path(path), exchanges_path(destination)
-    try:
-        kept: bytes | None = own.read_bytes()
-    except OSError:
-        kept = None
+    kept = _exchanges_bytes(own)
     if kept is None or _digest_of(kept) != digest:
         typer.echo(
             f"warning: {own} is not the exchanges {path} records, so none were copied "
@@ -337,10 +352,7 @@ def _exchanges_to_copy(path: Path, destination: Path, digest: str | None) -> byt
         return None
     if not (beside.exists() or beside.is_symlink()):
         return kept
-    try:
-        there = beside.read_bytes() if beside.is_file() else None
-    except OSError:
-        there = None
+    there = _exchanges_bytes(beside)
     if there is not None and _digest_of(there) == digest:
         return True
     typer.echo(

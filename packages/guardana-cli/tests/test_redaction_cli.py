@@ -8,9 +8,15 @@ that would fail silently.
 import json
 from pathlib import Path
 
+import guardana.cli._endpoint as endpoint_module
+import pytest
+from guardana.cli import main as cli_main
+from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
+from guardana.core import redaction
 from guardana.core.report import load_report
-from guardana.core.testing import fake_aws_key
+from guardana.core.testing import ScriptedTransport, fake_aws_key
+from guardana.core.verify import exchanges_path
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -83,3 +89,68 @@ def test_a_baseline_written_by_the_cli_still_waives_what_it_recorded(tmp_path: P
     result = runner.invoke(app, ["scan", str(tmp_path), "--baseline", str(baseline)])
 
     assert "waived" in result.output.lower() or result.exit_code == 0, result.output
+
+
+def test_a_profile_pattern_past_its_bound_ends_the_run_with_nothing_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # `(a+)+$` backtracks for seconds over a run of `a` that does not end the text, so the
+    # finding's location is a text the pattern cannot finish within the bound.
+    monkeypatch.setattr(redaction, "CUSTOM_PATTERN_TIMEOUT_SECONDS", 0.3)
+    scanned = tmp_path / "tree"
+    scanned.mkdir()
+    (scanned / ("a" * 24 + "!.py")).write_text(_SOURCE, encoding="utf-8")
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("privacy:\n  custom_patterns: ['(a+)+$']\n", encoding="utf-8")
+    out = tmp_path / "run.json"
+
+    with pytest.raises(SystemExit) as stopped:
+        cli_main.main(
+            [
+                "scan",
+                str(scanned),
+                "--profile",
+                str(profile),
+                "--format",
+                "json",
+                "--output",
+                str(out),
+            ]
+        )
+
+    assert stopped.value.code == int(ExitCode.INTERNAL_ERROR)
+    assert not out.exists()
+    assert " ".join(capsys.readouterr().err.split()) == (
+        "error: the run's results could not be redacted: custom_patterns[0] did not finish "
+        "within 0.3 s on one text — nothing was written or sent"
+    )
+
+
+def test_a_profile_pattern_past_its_bound_keeps_the_code_of_a_run_that_stopped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The budget stops the probe after one request, and the reply that request kept is
+    # the text the pattern cannot finish on: the stop outranks the failed redaction.
+    monkeypatch.setattr(redaction, "CUSTOM_PATTERN_TIMEOUT_SECONDS", 0.3)
+    reply = ScriptedTransport("a" * 24 + "!")
+    monkeypatch.setattr(endpoint_module, "transport_factory", lambda: reply)
+    profile = tmp_path / "guardana.yaml"
+    profile.write_text("privacy:\n  custom_patterns: ['(a+)+$']\n", encoding="utf-8")
+    out = tmp_path / "run.json"
+
+    with pytest.raises(SystemExit) as stopped:
+        cli_main.main(
+            [
+                *("probe", "--url", "http://fake", "--model", "m", "--keep-exchanges"),
+                *("--max-requests", "1", "--profile", str(profile)),
+                *("--format", "json", "--output", str(out)),
+            ]
+        )
+
+    assert stopped.value.code == int(ExitCode.BUDGET_EXHAUSTED)
+    assert not out.exists()
+    assert not exchanges_path(out).exists()
+    assert " ".join(capsys.readouterr().err.split()) == (
+        "error: the run's results could not be redacted: custom_patterns[0] did not finish "
+        "within 0.3 s on one text — nothing was written or sent"
+    )

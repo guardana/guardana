@@ -13,6 +13,9 @@ status: stable
 guardana import-observations garak.report.jsonl --target https://llm.internal/v1
 ```
 
+The file is read only when it is a regular file of at most 64 MiB; a FIFO, a device or a larger
+file is refused with exit `3` before anything is imported.
+
 ## This command never exits 0, and that is the design
 
 Guardana did not send those prompts, did not see the replies, and cannot grade what it did

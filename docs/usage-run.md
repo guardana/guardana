@@ -14,6 +14,9 @@ guardana scan path/to/project --format json --output run.json
 guardana run inspect run.json
 ```
 
+A saved run is read only from a regular file of at most 256 MiB. A FIFO, a device or a larger
+file is refused with exit `3` before any of it is parsed.
+
 ```text
 run 0191d4c2-8f1a-7c3e-9b21-6f0a2d8e4c11
   started:   2026-08-02 09:14:02+00:00

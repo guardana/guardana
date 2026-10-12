@@ -332,7 +332,10 @@ ran past its deadline. The bug report belongs to that distribution, so the code 
 and a run that stopped keeps <code>4</code>, <code>6</code> or <code>7</code>. A receiver that refused or did not answer is not
 <code>8</code> by default: the delivery line says so and the verdict keeps its code, as for the collector.
 When Guardana's own redaction fails before an output is called, nothing is written or sent and the
-code is <code>5</code>, under the same precedence; <code>GUARDANA_DEBUG=1</code> prints the traceback.</p>
+code is <code>5</code>, under the same precedence; <code>GUARDANA_DEBUG=1</code> prints the traceback. A profile's
+<code>custom_patterns</code> entry that misses its time or size bound while the run's results are
+redacted (<a href="privacy.html">privacy</a>) is the same failure: nothing is written or sent, and the code
+is <code>5</code> under the same precedence.</p>
 <p><strong><code>8</code> is also a delivery a profile required.</strong> A profile that sets <code>delivery.required: true</code>
 (<a href="profiles.html#delivery">profiles</a>) asks that every delivery the run makes be acknowledged: the
 collector's, which answers with its own acknowledgement and not merely a <code>2xx</code>, and an installed

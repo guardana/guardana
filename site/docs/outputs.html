@@ -308,7 +308,7 @@ output cannot decide that a run with open questions is clean.</p>
 </tr>
 <tr>
 <td><code>unknown</code></td>
-<td>the reporter failed, ran past 30 seconds, or said <code>delivered</code> with no attempt or with a status outside 2xx; whether anything left is unknown</td>
+<td>the reporter failed, ran past 30 seconds (its <code>sent_secrets()</code> read after the delivery included), or said <code>delivered</code> with no attempt or with a status outside 2xx; whether anything left is unknown</td>
 <td><code>8</code></td>
 </tr>
 </tbody>
@@ -392,7 +392,8 @@ def provide_webhook() -&gt; ReporterSpec:
 <li><code>prepare(ReporterRequest(locator))</code> checks the destination and credentials and sends
 nothing; raise <code>ValueError</code> with the reason to refuse. It returns an object with
 <code>destination</code> (shown in the delivery line), <code>sent_secrets()</code> (withheld from every line) and
-<code>deliver(verification) -&gt; Delivery</code>.</li>
+<code>deliver(verification) -&gt; Delivery</code>. <code>sent_secrets()</code> is read again after <code>deliver</code>, within
+the same deadline.</li>
 <li><code>deliver</code> should connect straight to the destination the operator named and ignore
 <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code> and their lowercase forms, as the reference webhook does with
 <code>ProxyHandler({})</code>. A proxy the environment names sees everything sent and can answer in the

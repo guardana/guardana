@@ -315,7 +315,8 @@ reply's metadata:</p>
 sends: same roles, same text. Several lines for one question are trials, read in file order.
 Two rules asking the same question each need their own lines. Unknown or repeated keys, a line
 over 1 MiB, a file over 64 MiB, a header with no lines, and text that is not UTF-8 are refused
-with the line at fault (exit <code>3</code>).</p>
+with the line at fault (exit <code>3</code>). A path that is not a regular file, such as a FIFO, is refused
+the same way, without waiting for anything to be written to it.</p>
 <h2 id="what-is-graded-and-what-is-not">What is graded, and what is not</h2>
 <p><code>grade</code> runs against a target that answers chat from the recording and supports nothing else.</p>
 <div class="table-wrap"><table>

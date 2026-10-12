@@ -7,10 +7,12 @@ eventually reads the output and decides something.
 """
 
 import hashlib
+import importlib
 import json
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import guardana.cli._endpoint as endpoint_module
@@ -23,6 +25,7 @@ from guardana.core.verify import exchanges_path
 from typer.testing import CliRunner, Result
 
 runner = CliRunner()
+run_module = importlib.import_module("guardana.cli.run")
 
 _INVALID_USAGE = 3
 
@@ -530,6 +533,50 @@ def test_migrate_of_a_run_without_its_sidecar_copies_nothing_and_says_so(
     assert (
         f"warning: {sidecar} is not the exchanges {path} records, so none were copied beside {out}"
     ) in " ".join(result.stderr.split())
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_migrate_of_a_run_whose_sidecar_is_a_fifo_copies_nothing_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, sidecar = _probe_that_kept_exchanges(tmp_path, monkeypatch)
+    sidecar.unlink()
+    os.mkfifo(sidecar)
+    out = tmp_path / "copy" / "run.json"
+    out.parent.mkdir()
+    outcome: list[Result] = []
+    worker = threading.Thread(
+        target=lambda: outcome.append(
+            runner.invoke(app, ["run", "migrate", str(path), "--output", str(out)])
+        ),
+        daemon=True,
+    )
+
+    worker.start()
+    worker.join(10)
+    if worker.is_alive():
+        os.close(os.open(sidecar, os.O_WRONLY | os.O_NONBLOCK))
+        pytest.fail("run migrate blocked on the FIFO standing in for the exchanges")
+
+    assert outcome[0].exit_code == 0, outcome[0].output
+    assert not exchanges_path(out).exists()
+    assert f"warning: {sidecar} is not the exchanges {path} records" in " ".join(
+        outcome[0].stderr.split()
+    )
+
+
+def test_migrate_refuses_a_run_over_the_saved_run_ceiling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _write_v1(tmp_path)
+    monkeypatch.setattr(run_module, "MAX_REPORT_BYTES", path.stat().st_size - 1)
+    out = tmp_path / "new.json"
+
+    result = runner.invoke(app, ["run", "migrate", str(path), "--output", str(out)])
+
+    assert result.exit_code == _INVALID_USAGE, result.output
+    assert "ceiling" in result.stderr
+    assert not out.exists()
 
 
 def test_migrate_whose_run_cannot_be_written_removes_the_sidecar_it_copied(

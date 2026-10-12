@@ -203,6 +203,8 @@
 <pre><code class="language-bash">guardana scan path/to/project --format json --output run.json
 guardana run inspect run.json
 </code></pre>
+<p>A saved run is read only from a regular file of at most 256 MiB. A FIFO, a device or a larger
+file is refused with exit <code>3</code> before any of it is parsed.</p>
 <pre><code class="language-text">run 0191d4c2-8f1a-7c3e-9b21-6f0a2d8e4c11
   started:   2026-08-02 09:14:02+00:00
   completed: 2026-08-02 09:14:03+00:00

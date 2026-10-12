@@ -45,6 +45,15 @@ privacy:
 including this one. There is no useful reading of "keep the credential": the
 finding is that a secret appeared, not what it was.
 
+**`custom_patterns` run in a separate process, within bounds.** Each pattern gets at most
+2 seconds per text, and a text over 16 Mi characters is not searched. A pattern that misses
+either bound fails the redaction rather than release the text it was meant to clean: when the
+run's results are redacted, nothing is written or sent and the command exits `5`, or the code
+of the stop when the run had already stopped ([exit codes](exit-codes.md)). The
+error names the entry by its position, such as `custom_patterns[0]`, never by its text, and says
+which bound it missed. A pattern that backtracks without end, such as `(a+)+$`, does this on a
+long enough run of `a`.
+
 `redact_secrets: false` is **refused at load time**, with a message saying why.
 Until 0.7.1 the switch existed and took effect only at `full` — so its single
 reachable outcome was writing a working credential into a report, while this page

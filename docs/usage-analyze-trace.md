@@ -210,6 +210,10 @@ Full mapping to OWASP and MITRE ATLAS:
 
 ## A truncated trace is not a shorter one
 
+The read ceilings count the bytes in the file: 64 MiB in all, blank lines and line endings
+included, and 1 MiB for one record, in UTF-8. A path that is not a regular file, such as a FIFO,
+is refused with exit `3` without waiting for anything to be written to it.
+
 If the header says `truncated`, or the file exceeds a read ceiling, then a rule that
 **found** something still reports it — the evidence is real — and a rule that found
 nothing reports `inconclusive`, because the step it needed may be in the part that is

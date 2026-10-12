@@ -31,6 +31,8 @@ from guardana.cli.scan import scan
 from guardana.cli.target import target_app
 from guardana.cli.taxonomy import taxonomy
 from guardana.cli.trace import trace_app
+from guardana.core.gate import stop_exit_code
+from guardana.core.redaction import RedactionBoundError
 
 _DISTRIBUTIONS = ("guardana-cli", "guardana-core", "guardana-rules", "guardana-report")
 """What `--version` reports: the product first, then each distribution it runs on."""
@@ -163,6 +165,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise
     except KeyboardInterrupt:
         _exit_interrupted()
+    except RedactionBoundError as error:
+        _exit_redaction_bound(error)
     except Exception as error:
         _exit_internal_error(error)
 
@@ -170,6 +174,22 @@ def main(argv: Sequence[str] | None = None) -> None:
 def _exit_interrupted() -> NoReturn:
     typer.echo("guardana: interrupted before the command finished.", err=True)
     raise SystemExit(int(ExitCode.INTERRUPTED))
+
+
+def _exit_redaction_bound(error: RedactionBoundError) -> NoReturn:
+    """End as a failed output boundary does, saying the profile pattern that missed.
+
+    The code is `5`, unless the run had already stopped: a stop keeps its own code.
+    """
+    print_debug_traceback(error)
+    typer.echo(
+        f"error: the run's results could not be redacted: {error.pattern} {error.failure} "
+        "— nothing was written or sent",
+        err=True,
+    )
+    stopped = error.stopped_by
+    code = ExitCode.INTERNAL_ERROR if stopped is None else ExitCode(stop_exit_code(stopped))
+    raise SystemExit(int(code))
 
 
 def _exit_internal_error(error: Exception) -> NoReturn:

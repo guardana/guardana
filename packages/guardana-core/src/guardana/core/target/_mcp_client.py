@@ -79,8 +79,14 @@ notification is skipped, uncounted, and the request's deadline bounds how long t
 _SERVER_REQUESTS = 16
 """How many of its own requests an stdio server may make per request; more is unreadable.
 
-Each is answered with a blocking write, and a server that never reads its input would fill
-the pipe and stall the run past any deadline; this many answers fit in any pipe buffer.
+Each answer is written within the request's deadline; this many short answers fit in any
+pipe buffer, so a server that asks and never reads stalls nothing.
+"""
+_MAX_REFLECTED_ID_CHARS = 256
+"""The longest id of a server's own request that is echoed back; a longer one is unreadable.
+
+The answer repeats the id, so an unbounded one would make every answer as large as the
+server chose.
 """
 _METHOD_NOT_FOUND = -32601
 
@@ -444,6 +450,8 @@ class StdioMcpTransport:
             )
         except OSError as exc:
             raise EndpointUnreachable(f"could not start MCP server {command[0]!r}: {exc}") from exc
+        if self._process.stdin is not None:
+            os.set_blocking(self._process.stdin.fileno(), False)
 
     def speak(self, wire: Wire) -> None:
         """Adopt the negotiated revision for every later request."""
@@ -453,8 +461,8 @@ class StdioMcpTransport:
         """Write one JSON-RPC line and read lines until the one answering it, in one deadline."""
         self._last_id += 1
         asked = self._last_id
-        self._write(self._wire.body(method, params, request_id=asked))
         deadline = time.monotonic() + self._timeout
+        self._write(self._wire.body(method, params, request_id=asked), deadline)
         stale = 0
         answered = 0
         while stale <= _STALE_LINES:
@@ -470,7 +478,7 @@ class StdioMcpTransport:
                                 f"for its reply"
                             )
                         )
-                    self._answer(payload)
+                    self._answer(payload, deadline)
                 continue
             if payload.get("id") != asked:
                 stale += 1
@@ -496,25 +504,57 @@ class StdioMcpTransport:
 
     def notify(self, method: str) -> None:
         """Write one notification line; nothing is read for it."""
-        self._write(self._wire.notification(method))
+        self._write(self._wire.notification(method), time.monotonic() + self._timeout)
 
-    def _answer(self, asked: Mapping[str, object]) -> None:
+    def _answer(self, asked: Mapping[str, object], deadline: float) -> None:
         """Answer one of the server's own requests: `ping` with `{}`, anything else as unknown."""
-        answer: dict[str, object] = {"jsonrpc": "2.0", "id": asked.get("id")}
+        asked_id = asked.get("id")
+        reflectable = isinstance(asked_id, int) and not isinstance(asked_id, bool)
+        if isinstance(asked_id, str):
+            reflectable = len(asked_id) <= _MAX_REFLECTED_ID_CHARS
+        if not reflectable:
+            raise self._fail(
+                UnreadableReply(
+                    f"the MCP server at {self._ref} made a request whose id is neither an "
+                    f"integer nor a string of at most {_MAX_REFLECTED_ID_CHARS} characters"
+                )
+            )
+        answer: dict[str, object] = {"jsonrpc": "2.0", "id": asked_id}
         if asked.get("method") == "ping":
             answer["result"] = {}
         else:
             answer["error"] = {"code": _METHOD_NOT_FOUND, "message": "Method not found"}
-        self._write(json.dumps(answer).encode("utf-8"))
+        self._write(json.dumps(answer).encode("utf-8"), deadline)
 
-    def _write(self, line: bytes) -> None:
-        if self._process.stdin is None or self._process.stdout is None:
+    def _write(self, line: bytes, deadline: float) -> None:
+        """Write one line by `deadline` on the non-blocking pipe, or give up on the stream.
+
+        A server that stops reading its input fills the pipe, and a blocking write would
+        then wait for it past any deadline. A line cut short leaves the stream with no
+        known boundary, so a missed deadline ends the conversation.
+        """
+        stdin = self._process.stdin
+        if stdin is None or self._process.stdout is None:
             raise EndpointUnreachable(f"the MCP server at {self._ref} has no usable pipes")
         if self._broken is not None:
             raise UnreadableReply(self._broken)
+        pending = memoryview(line + b"\n")
         try:
-            self._process.stdin.write(line + b"\n")
-            self._process.stdin.flush()
+            with selectors.DefaultSelector() as selector:
+                selector.register(stdin.fileno(), selectors.EVENT_WRITE)
+                while pending:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0 or not selector.select(remaining):
+                        message = (
+                            f"the MCP server at {self._ref} did not read its input within "
+                            f"{self._timeout} seconds"
+                        )
+                        self._broken = message
+                        raise EndpointUnreachable(message)
+                    try:
+                        pending = pending[os.write(stdin.fileno(), pending) :]
+                    except BlockingIOError:
+                        continue
         except OSError as exc:
             raise EndpointUnreachable(
                 f"the MCP server at {self._ref} did not answer: {exc}"

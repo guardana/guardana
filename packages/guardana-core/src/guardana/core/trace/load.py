@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
 from guardana.core.fingerprint import DigestKind, DocumentDigest
+from guardana.core.formats._stream import open_regular_raw
 from guardana.core.trace import _native, otel
 from guardana.core.trace._parse import TraceLoadError, mapping_of
 from guardana.core.trace.limits import MAX_RECORD_BYTES, MAX_SPANS, MAX_TRACE_BYTES
@@ -67,7 +68,9 @@ def detect_dialect(path: Path) -> Dialect:
     is the shape a mistyped path takes.
     """
     try:
-        handle = path.open("r", encoding="utf-8")
+        handle = io.TextIOWrapper(
+            io.BufferedReader(open_regular_raw(path)), encoding="utf-8", newline=""
+        )
     except OSError as exc:
         raise TraceLoadError(f"{path} could not be read: {exc}") from exc
     with handle:
@@ -99,10 +102,10 @@ def read_trace(path: Path, dialect: Dialect | None = None) -> TraceRead:
     """
     chosen = dialect if dialect is not None else detect_dialect(path)
     try:
-        raw = _HashingReader(path.open("rb", buffering=0))
+        raw = _HashingReader(open_regular_raw(path))
     except OSError as exc:
         raise TraceLoadError(f"{path} could not be read: {exc}") from exc
-    with io.TextIOWrapper(io.BufferedReader(raw), encoding="utf-8") as handle:
+    with io.TextIOWrapper(io.BufferedReader(raw), encoding="utf-8", newline="") as handle:
         records = _records(path, handle)
         if chosen is Dialect.GUARDANA:
             read = _read_native(path, records)
@@ -353,7 +356,9 @@ def _records(path: Path, handle: TextIO) -> _Records:
 
     A line is read in pieces no longer than the record ceiling, so neither ceiling can
     be outrun by a single line: the part of an oversized line past the ceiling is
-    consumed and discarded, never held.
+    consumed and discarded, never held. Both ceilings count UTF-8 bytes, and the trace
+    ceiling counts every byte read, blank lines and line endings included; a handle
+    opened with `newline=""` hands the line endings over as they were written.
     """
     read = 0
     try:
@@ -361,8 +366,6 @@ def _records(path: Path, handle: TextIO) -> _Records:
             line = _bounded_line(handle, read)
             if line is None:
                 return
-            if line.size == 0:
-                continue
             read += line.size
             if read > MAX_TRACE_BYTES:
                 yield _Overflow()
@@ -372,7 +375,8 @@ def _records(path: Path, handle: TextIO) -> _Records:
                     f"record is {line.length} bytes, over the {MAX_RECORD_BYTES}-byte ceiling"
                 )
                 continue
-            yield line.text
+            if line.text:
+                yield line.text
     except OSError as exc:
         raise TraceLoadError(f"{path} could not be read: {exc}") from exc
     except UnicodeDecodeError as exc:
@@ -383,10 +387,10 @@ def _records(path: Path, handle: TextIO) -> _Records:
 
 @dataclass(frozen=True, slots=True)
 class _Line:
-    """One line read in bounded pieces.
+    """One line read in bounded pieces, measured in UTF-8 bytes.
 
-    `size` is the characters it occupies, newline included, and zero for a blank line;
-    `length` is its content without surrounding whitespace; `text` is that content, or
+    `size` is the bytes it occupies, line ending included; `length` is its content
+    without surrounding whitespace; `text` is that content, empty for a blank line, or
     `None` when it is over the record ceiling and was therefore never kept.
     """
 
@@ -411,28 +415,35 @@ def _bounded_line(handle: TextIO, read: int) -> _Line | None:
         piece = handle.readline(piece_limit)
         if not piece:
             break
+        piece_size = _utf8_size(piece)
         if first is None:
             body = piece.lstrip()
             if body:
-                first = size + len(piece) - len(body)
+                body_size = _utf8_size(body)
+                first = size + piece_size - body_size
                 kept.append(body)
-                kept_length = len(body)
+                kept_length = body_size
         elif kept_length <= MAX_RECORD_BYTES:
             kept.append(piece)
-            kept_length += len(piece)
+            kept_length += piece_size
         content = piece.rstrip()
         if content:
-            last = size + len(content)
-        size += len(piece)
-        if piece.endswith("\n") or (first is not None and read + size > MAX_TRACE_BYTES):
+            last = size + _utf8_size(content)
+        size += piece_size
+        if piece.endswith(("\n", "\r")) or read + size > MAX_TRACE_BYTES:
             break
     if size == 0:
         return None
     if first is None:
-        return _Line(size=0, length=0, text="")
+        return _Line(size=size, length=0, text="")
     length = last - first
     text = "".join(kept).strip() if length <= MAX_RECORD_BYTES else None
     return _Line(size=size, length=length, text=text)
+
+
+def _utf8_size(text: str) -> int:
+    """Count the bytes `text` was read from, without encoding text that is all ASCII."""
+    return len(text) if text.isascii() else len(text.encode("utf-8"))
 
 
 def _parse(raw: str, number: int) -> object:

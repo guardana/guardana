@@ -435,6 +435,9 @@ half.</p>
 <p>Full mapping to OWASP and MITRE ATLAS:
 <a href="generated/rule-catalog.html">the generated catalog</a>.</p>
 <h2 id="a-truncated-trace-is-not-a-shorter-one">A truncated trace is not a shorter one</h2>
+<p>The read ceilings count the bytes in the file: 64 MiB in all, blank lines and line endings
+included, and 1 MiB for one record, in UTF-8. A path that is not a regular file, such as a FIFO,
+is refused with exit <code>3</code> without waiting for anything to be written to it.</p>
 <p>If the header says <code>truncated</code>, or the file exceeds a read ceiling, then a rule that
 <strong>found</strong> something still reports it — the evidence is real — and a rule that found
 nothing reports <code>inconclusive</code>, because the step it needed may be in the part that is

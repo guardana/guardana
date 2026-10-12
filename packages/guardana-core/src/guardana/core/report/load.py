@@ -13,6 +13,7 @@ from typing import Any, cast
 
 from guardana.core.assessment import Assessment, AssessmentStatus, Direction, UnmeasuredReason
 from guardana.core.evaluator.base import Outcome, Verdict
+from guardana.core.formats._stream import read_regular
 from guardana.core.manifest.load import ManifestLoadError, manifest_from_dict
 from guardana.core.manifest.migrations import (
     migrate_v1,
@@ -46,6 +47,9 @@ from guardana.core.severity import Severity
 from guardana.core.target.scope import ExcludePattern, ExcludeSource, FileScope
 from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 from guardana.core.usage import TargetUsage
+
+MAX_REPORT_BYTES = 256 * 1024 * 1024
+"""Bytes read from one saved run; a larger file is refused before any of it is parsed."""
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
 _ASSESSMENT_STATUSES = frozenset(str(s) for s in AssessmentStatus)
@@ -113,11 +117,21 @@ def load_report(path: Path) -> RunReport:
     including every run a user still has on disk — rather than reading it as a run
     that found nothing. An older *declared* version is migrated forward in memory
     instead, because refusing it would strand the evidence somebody kept.
+
+    Only a regular file is read, opened without waiting on a writer, and one over
+    `MAX_REPORT_BYTES` is refused before it is parsed.
     """
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        data = read_regular(path, MAX_REPORT_BYTES)
     except OSError as exc:
         raise ReportLoadError(f"cannot read run {path}: {exc}") from exc
+    if len(data) > MAX_REPORT_BYTES:
+        raise ReportLoadError(
+            f"{path} is over the {MAX_REPORT_BYTES}-byte ceiling for a saved run; it is "
+            f"refused rather than read in part"
+        )
+    try:
+        raw = json.loads(data.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ReportLoadError(f"{path} is not a readable Guardana run: {exc}") from exc
     if not isinstance(raw, dict):
