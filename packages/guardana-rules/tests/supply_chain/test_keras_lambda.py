@@ -504,3 +504,61 @@ def test_an_hdf5_signature_past_the_read_bound_is_not_cleared(tmp_path: Path) ->
     assert [severity for severity, _ in findings] == ["LOW"]
     assert "first" in findings[0][1]
     assert _unread(tmp_path) == [str(path)]
+
+
+_BOUND = 16 * 1024 * 1024
+
+
+def _write_keras_config(path: Path, config: bytes) -> None:
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("config.json", config)
+        zf.writestr("metadata.json", json.dumps({"keras_version": "3.0.0"}))
+
+
+def test_a_keras_config_past_the_read_bound_is_not_cleared(tmp_path: Path) -> None:
+    complete = json.dumps({"class_name": "Sequential", "config": {"layers": []}}).encode()
+    config = complete + b" " * _BOUND + b'{"class_name": "Lambda"}'
+    _write_keras_config(tmp_path / "model.keras", config)
+
+    findings = _findings(tmp_path)
+
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert f"larger than {_BOUND} bytes" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.keras")]
+
+
+def test_a_keras_config_of_exactly_the_read_bound_is_read_whole(tmp_path: Path) -> None:
+    complete = json.dumps({"class_name": "Sequential", "config": {"layers": []}}).encode()
+    _write_keras_config(tmp_path / "model.keras", complete + b" " * (_BOUND - len(complete)))
+
+    assert _findings(tmp_path) == []
+    assert _unread(tmp_path) == []
+
+
+def test_a_lambda_before_the_bound_of_a_long_keras_config_keeps_both_outcomes(
+    tmp_path: Path,
+) -> None:
+    lambda_layer = b'{"class_name": "Lambda", "config": {"function": "len"}}'
+    _write_keras_config(tmp_path / "model.keras", lambda_layer + b" " * _BOUND + b"]")
+
+    findings = _findings(tmp_path)
+
+    assert [severity for severity, _ in findings] == ["HIGH", "LOW"]
+    assert f"larger than {_BOUND} bytes" in findings[1][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.keras")]
+
+
+def test_a_lambda_in_the_read_part_of_a_long_h5_does_not_hide_the_unread_rest(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "model.h5"
+    with path.open("wb") as handle:
+        handle.write(_hdf5_with_config(_DIRECTORY_LAMBDA))
+        handle.seek(_BOUND + 1024)
+        handle.write(b"\x00")
+
+    findings = _findings(tmp_path)
+
+    assert [severity for severity, _ in findings] == ["HIGH", "LOW"]
+    assert "first" in findings[1][1]
+    assert _unread(tmp_path) == [str(path)]

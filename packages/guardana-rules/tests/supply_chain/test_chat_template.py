@@ -207,6 +207,34 @@ def test_a_named_list_of_unreadable_entries_is_not_cleared(tmp_path: Path) -> No
     assert _severities(tmp_path) == [Severity.LOW.name]
 
 
+@pytest.mark.parametrize(
+    "entry",
+    [42, {"name": "tools"}, {"name": "tools", "template": 7}, "bare string"],
+    ids=["number", "no-template", "template-not-a-string", "string"],
+)
+def test_a_readable_template_does_not_hide_an_unreadable_sibling(
+    tmp_path: Path, entry: object
+) -> None:
+    document = {"chat_template": [{"name": "default", "template": "plain"}, entry]}
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps(document))
+
+    findings = _run(tmp_path)
+
+    assert [f.severity for f in findings] == [Severity.LOW]
+    assert "entry 1" in findings[0].evidence.summary
+    assert _unread(tmp_path) == [str(tmp_path / "tokenizer_config.json")]
+
+
+def test_a_gadget_and_every_unreadable_entry_beside_it_are_both_reported(tmp_path: Path) -> None:
+    document = {"chat_template": [42, {"name": "rag", "template": _PAYLOAD}, None]}
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps(document))
+
+    findings = _run(tmp_path)
+
+    assert [f.severity for f in findings] == [Severity.CRITICAL, Severity.LOW]
+    assert "entries 0, 2" in findings[1].evidence.summary
+
+
 def test_a_config_that_is_not_a_json_object_is_not_cleared(tmp_path: Path) -> None:
     (tmp_path / "tokenizer_config.json").write_text("[1, 2, 3]")
     assert _severities(tmp_path) == [Severity.LOW.name]

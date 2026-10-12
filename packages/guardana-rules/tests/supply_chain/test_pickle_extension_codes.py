@@ -293,6 +293,27 @@ def test_a_magic_number_a_first_pickle_returns_in_any_form_starts_the_legacy_pic
     assert _unread(ctx) == [str(tmp_path / name)]
 
 
+_NOT_RETURNED = {
+    "popped": b"\x80\x02\x8a\x0a" + _MAGIC + b"0N.",
+    "inside-a-list": b"\x80\x02]\x8a\x0a" + _MAGIC + b"a.",
+    "as-a-call-argument": b"\x80\x02cbuiltins\nint\n\x8a\x0a" + _MAGIC + b"\x85R.",
+    "in-a-tuple": b"\x80\x02\x8a\x0a" + _MAGIC + b"N\x86.",
+}
+
+
+@pytest.mark.parametrize("first", _NOT_RETURNED.values(), ids=_NOT_RETURNED.keys())
+def test_a_magic_number_the_first_pickle_does_not_return_starts_no_legacy_pickles(
+    tmp_path: Path, first: bytes
+) -> None:
+    """`torch.load` refuses a file whose first pickle returns anything but the magic."""
+    content = first + b"\x80\x02N." * 4 + _stream(_EXTENSION_CODES["EXT1"])
+
+    findings, ctx = _run(tmp_path, "model.pkl", content)
+
+    assert (_UNSCANNED, _RAW_EXTENSION) in findings
+    assert _unread(ctx) == [str(tmp_path / "model.pkl")]
+
+
 @pytest.mark.parametrize("name", ["model.pt", "pytorch_model.bin"])
 @pytest.mark.parametrize("position", range(len(_LEGACY_FOLLOWING)))
 def test_a_headerless_extension_code_in_a_pickle_torch_reads_after_its_magic_is_unscanned(
@@ -602,6 +623,45 @@ def test_a_sniffed_stream_read_past_an_extension_code_counts_at_stop_or_at_a_rea
     assert [title for title, _summary in called] == [critical, _UNSCANNED]
     assert data == []
     assert _unread(data_ctx) == []
+
+
+_CALLED = {
+    "reduce": b"\x82\x01X\x02\x00\x00\x00id\x85R\xff\xff",
+    "reduce-through-the-memo": b"\x82\x01q\x000h\x00)R\xff",
+    "duplicated": b"\x82\x012)R\xff",
+    "newobj": b"\x82\x01)\x81\xff",
+    "newobj-ex": b"\x82\x01)}\x92\xff",
+    "obj": b"(\x82\x01o\xff",
+}
+
+
+@pytest.mark.parametrize("stream", _CALLED.values(), ids=_CALLED.keys())
+@pytest.mark.parametrize("name", _SNIFFED_NAMES)
+def test_a_sniffed_stream_that_calls_what_an_extension_code_named_is_unscanned(
+    tmp_path: Path, name: str, stream: bytes
+) -> None:
+    """`pickle.load` calls the registered callable before the bytes after it break the load."""
+    findings, ctx = _run(tmp_path, name, stream)
+
+    assert findings == [(_UNSCANNED, _RAW_EXTENSION)]
+    assert _unread(ctx) == [str(tmp_path / name)]
+
+
+_NOT_CALLED = {
+    "an-argument": b"cbuiltins\nlist\n\x82\x01\x85R\xff",
+    "built-on": b"\x82\x01}b\xff",
+    "never-used": b"\x82\x01N\xff",
+}
+
+
+@pytest.mark.parametrize("stream", _NOT_CALLED.values(), ids=_NOT_CALLED.keys())
+def test_a_sniffed_stream_that_never_calls_what_an_extension_code_named_stays_quiet(
+    tmp_path: Path, stream: bytes
+) -> None:
+    findings, ctx = _run(tmp_path, "model.p", stream)
+
+    assert findings == []
+    assert _unread(ctx) == []
 
 
 @pytest.mark.parametrize("seed", range(64))

@@ -1104,6 +1104,46 @@ def test_a_torch_pickle_that_ends_before_its_stop_is_unscanned(tmp_path: Path) -
     assert list(ctx.shortfalls())
 
 
+_SHORT_PICKLES = {
+    "empty": b"",
+    "protocol-2-header-only": b"\x80\x02",
+    "protocol-1-header": b"\x80\x01}",
+    "protocol-0-dict": b"(dp0\n",
+    "headerless-list": b"]",
+}
+
+
+_SHORT_MEMBER_HOLDERS: dict[str, tuple[str, str, str, Callable[[bytes], bytes]]] = {
+    "checkpoint": ("model.pt", "zip", "archive/data.pkl", _torch_zip),
+    "plain-zip": ("bundle.zip", "zip", "model.pkl", lambda stream: _zip(("model.pkl", stream))),
+    "legacy-tar": ("checkpoint.tar", "tar", "pickle", lambda stream: _tar(("pickle", stream))),
+}
+
+
+@pytest.mark.parametrize("stream", _SHORT_PICKLES.values(), ids=_SHORT_PICKLES.keys())
+@pytest.mark.parametrize("holder", _SHORT_MEMBER_HOLDERS.values(), ids=_SHORT_MEMBER_HOLDERS.keys())
+def test_a_member_named_as_a_pickle_that_ends_before_its_stop_is_unscanned(
+    tmp_path: Path, holder: tuple[str, str, str, Callable[[bytes], bytes]], stream: bytes
+) -> None:
+    name, kind, member, wrap = holder
+
+    findings, ctx = _run(tmp_path, name, wrap(stream))
+
+    assert _unscanned(findings) == [
+        f"{kind} member is a pickle that ends before its STOP ({member}); not scanned past its end"
+    ]
+    assert list(ctx.shortfalls())
+
+
+def test_a_short_member_no_loader_unpickles_stays_quiet(tmp_path: Path) -> None:
+    findings, ctx = _run(
+        tmp_path, "model.pt", _zip(("archive/data.pkl", _PLAIN), ("archive/byteorder", b"("))
+    )
+
+    assert findings == []
+    assert list(ctx.shortfalls()) == []
+
+
 def _empty_end_record(at: int) -> bytes:
     return struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 0, 0, 0, at, 0)
 

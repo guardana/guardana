@@ -371,6 +371,22 @@ class _ExtensionCodeError(_RefusedError):
     """An extension code, which imports whatever the loading process registered under it."""
 
 
+class _Tracked(Enum):
+    """An object on the stack whose origin matters beyond its being a string."""
+
+    LEGACY_MAGIC = "legacy_magic"
+    """The integer a legacy `torch.save` file opens with."""
+
+    EXTENSION = "extension"
+    """What an extension code named, pushed by a machine reading on past the code."""
+
+
+_Value = str | _Tracked | None
+# Where each call opcode finds what it calls, counted from the top of the stack; OBJ finds
+# its class right above its MARK, and INST names its class in its argument.
+_CALLABLE_DEPTH = {"REDUCE": 2, "NEWOBJ": 2, "NEWOBJ_EX": 3}
+
+
 def _is_allowed(module: str, qualname: str) -> bool:
     if module in _BUILTIN_MODULES:
         return qualname in _SAFE_BUILTINS
@@ -394,10 +410,6 @@ class _Shape:
     first: int | None = None
     """The integer the first such opcode pushes, when it is a binary integer or a bool."""
 
-    holds_legacy_magic: bool = False
-    """Whether any opcode pushes the number a legacy `torch.save` file opens with, in any
-    protocol's form: what the pickle returns is not followed, so holding it is enough."""
-
     globals: set[tuple[str, str]] = field(default_factory=set)
     """The globals it names, up to two: one is all a storage's arguments name."""
 
@@ -406,8 +418,6 @@ class _Shape:
 
     def note(self, name: str, arg: object) -> None:
         """Count one opcode."""
-        if name in _BINARY_INT_OPS | _TEXT_INT_OPS and arg == _LEGACY_MAGIC:
-            self.holds_legacy_magic = True
         if name in _BOOKKEEPING_OPS:
             return
         self.values += 1
@@ -442,8 +452,9 @@ class _PickleMachine:
     Every opcode moves the stack by the effect `pickletools` declares for it, so
     STACK_GLOBAL takes the operands an unpickler would. `None` is an object whose
     value is not tracked; a string is kept only while it is the string an unpickler
-    holds. MARKs are kept apart from the objects, as the C unpickler keeps them: a
-    pop never reaches below the newest one.
+    holds, and a `_Tracked` object while it is the object it stands for. MARKs are
+    kept apart from the objects, as the C unpickler keeps them: a pop never reaches
+    below the newest one.
     """
 
     refs: list[str]
@@ -457,9 +468,12 @@ class _PickleMachine:
     kept: tuple[int, int] | None = None
     """The imports and embedded STOPs recorded before the first code it read on past."""
 
-    stack: list[str | None] = field(default_factory=list)
+    returns_legacy_magic: bool = False
+    """Whether the last STOP returned the legacy magic number, and nothing was left below it."""
+
+    stack: list[_Value] = field(default_factory=list)
     marks: list[int] = field(default_factory=list)
-    memo: dict[int, str | None] = field(default_factory=dict)
+    memo: dict[int, _Value] = field(default_factory=dict)
 
     def step(self, op: pickletools.OpcodeInfo, arg: object) -> None:
         """Apply one opcode; raise where an unpickler would, or where this cannot follow."""
@@ -471,19 +485,45 @@ class _PickleMachine:
         elif name == "STACK_GLOBAL":
             self._imports(*self._stack_global())
             self.stack.append(None)
-        elif name in _EXTENSION_OPS:
+        elif not (self._step_tracked(name, arg) or self._step_marks_and_memo(name, arg)):
+            if name in _IMPORTS_BY_ARG and isinstance(arg, str):
+                module, _, qualname = arg.partition(" ")
+                self._imports(module, qualname)
+            self._before_effect(name)
+            self._apply_declared_effect(op)
+
+    def _step_tracked(self, name: str, arg: object) -> bool:
+        """Apply an opcode that pushes a `_Tracked` object; return False for any other."""
+        if name in _EXTENSION_OPS:
             # An unpickler refuses a code of zero or below before it consults any registry.
             if not isinstance(arg, int) or arg <= 0:
                 raise _RefusedError(f"{name} with code {arg!r}, which no registry holds")
             if not self.tentative:
                 raise _ExtensionCodeError(f"{name} names a global through an unseen registry")
             self.passed = True
-            self.stack.append(None)
-        elif not self._step_marks_and_memo(name, arg):
-            if name in _IMPORTS_BY_ARG and isinstance(arg, str):
-                module, _, qualname = arg.partition(" ")
-                self._imports(module, qualname)
-            self._apply_declared_effect(op)
+            self.stack.append(_Tracked.EXTENSION)
+        elif name in _BINARY_INT_OPS | _TEXT_INT_OPS and arg == _LEGACY_MAGIC:
+            self.stack.append(_Tracked.LEGACY_MAGIC)
+        else:
+            return False
+        return True
+
+    def _before_effect(self, name: str) -> None:
+        """Note what a STOP returns; refuse a call of what an extension code named."""
+        if name == "STOP":
+            self.returns_legacy_magic = not self.marks and self.stack == [_Tracked.LEGACY_MAGIC]
+        elif self._called(name) is _Tracked.EXTENSION:
+            raise _ExtensionCodeError(f"{name} calls what an extension code named")
+
+    def _called(self, name: str) -> _Value:
+        """Return what the call opcode `name` would call, when it is on the stack."""
+        if name == "OBJ":
+            fence = self._fence()
+            return self.stack[fence] if self.marks and len(self.stack) > fence else None
+        depth = _CALLABLE_DEPTH.get(name)
+        if depth is None or len(self.stack) - self._fence() < depth:
+            return None
+        return self.stack[-depth]
 
     def _imports(self, module: str, qualname: str) -> None:
         self.refs.extend(_maybe_dangerous(module, qualname))
@@ -514,12 +554,12 @@ class _PickleMachine:
     def _fence(self) -> int:
         return self.marks[-1] if self.marks else 0
 
-    def _pop(self) -> str | None:
+    def _pop(self) -> _Value:
         if len(self.stack) <= self._fence():
             raise _RefusedError(f"stack underflow at a {len(self.stack)}-deep stack")
         return self.stack.pop()
 
-    def _top(self) -> str | None:
+    def _top(self) -> _Value:
         if len(self.stack) <= self._fence():
             raise _RefusedError("no object above the newest MARK")
         return self.stack[-1]
@@ -748,7 +788,8 @@ def _scan_opcodes(
     before the opcode that would overspend it.
 
     An extension code ends a read as `EXTENSION` where `as_pickle` says the stream is read as
-    a pickle, in the four pickles after a legacy `torch.save` magic number, and, but for
+    a pickle, in the four pickles after a first pickle that returns the legacy `torch.save`
+    magic number, and, but for
     `RAW` bytes and the storage bytes after those four, wherever a stream opens with a
     PROTO opcode. Elsewhere it is data.
     """
@@ -781,8 +822,7 @@ def _scan_opcodes(
             ordinal == 0
             and one.end is ParseEnd.COMPLETE
             and as_pickle is not _AsPickle.RAW
-            and machine.shape is not None
-            and machine.shape.holds_legacy_magic
+            and machine.returns_legacy_magic
         ):
             legacy = _LEGACY_PICKLES
         for stop in one.embedded:
@@ -917,14 +957,16 @@ def _scan_one(
     With `embedded`, a STOP that leaves objects below it ends a pickle a loader read in the
     middle of this one, as joblib reads an object array, and this one is read on past it.
     A `tentative` machine that read on past an extension code ends `EXTENSION` when the
-    pickle reaches a clean STOP or imports a callable with a real dotted name after the
-    code; otherwise it ends where the code stood, as bytes that are no pickle, and keeps
-    nothing it read after it.
+    pickle reaches a clean STOP, calls what the code named, or imports a callable with a
+    real dotted name after the code; otherwise it ends where the code stood, as bytes that
+    are no pickle, and keeps nothing it read after it.
     """
     one = _read_one(stream, machine, budget, embedded=embedded)
     if not machine.passed or machine.kept is None:
         return one
-    if one.end is ParseEnd.COMPLETE:
+    if one.end in {ParseEnd.COMPLETE, ParseEnd.EXTENSION}:
+        # A machine reading on past a code ends `EXTENSION` only where it calls what the
+        # code named, which an unpickler does before whatever breaks the stream later.
         one.end = ParseEnd.EXTENSION
         return one
     refs, stops = machine.kept
@@ -1937,9 +1979,14 @@ class PickleOpcodeRule(ArtifactRule):
         report.found(scan.refs, name)
         if scan.end is ParseEnd.OVER_BUDGET:
             report.unscanned(self._over_budget(report, budget, name))
-        elif scan.end is ParseEnd.RAN_OUT and not cut and member_data.startswith(_PICKLE_HEADERS):
+        elif (
+            scan.end is ParseEnd.RAN_OUT
+            and not cut
+            and (as_pickle is _AsPickle.NAMED or member_data.startswith(_PICKLE_HEADERS))
+        ):
             # Readers that disagree on a member's length show one a pickle cut short;
-            # a loader reading the longer one goes on past where this read ended.
+            # a loader reading the longer one goes on past where this read ended. A
+            # member a loader unpickles by its name is a pickle whatever it opens with.
             report.unscanned(
                 f"{report.container} member is a pickle that ends before its STOP ({name}); "
                 "not scanned past its end"

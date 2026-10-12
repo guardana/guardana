@@ -93,14 +93,18 @@ with `.guardanaignore` or `rules.paths_exclude`, which the saved run then record
 install a rule that reads the format.
 
 A model or notebook a rule tried to read and could not is a shortfall of the same kind,
-named by its file: a pickle, archive or graph that does not parse, a pickle import whose
+named by its file: a pickle, archive or graph that does not parse, an archive member named
+as a pickle (`data.pkl`, `*.pkl`, a legacy tar's `pickle`) that ends before its STOP, an
+NPY header whose `descr`, `shape` or `fortran_order` numpy would refuse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
 extension-registry code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file with a malformed header (including a tensor entry
 with a missing or mistyped `dtype`, `shape` or `data_offsets`, and tensors that do not
 describe the payload exactly), a GGUF file declaring an unsupported version, an ONNX
 file without a graph (including an empty file), a `.keras` archive or Keras model directory
-whose `config.json` is not a JSON object and declares no Lambda layer, a file cut by a read bound, an archive refused
+whose `config.json` is not a JSON object and declares no Lambda layer, a `chat_template`
+list entry that holds no template (each one, beside whatever its siblings hold), a file cut
+by a read bound, an archive refused
 before it is opened (below), a PMML document past the bound, a notebook that is not JSON
 or has a cell that is not an object or a code cell whose source is not text, a notebook whose
 `kernelspec.language` or `language_info.name` is not Python.
@@ -186,7 +190,8 @@ A `.bin`, `.sav`, `.p` or `.model` whose first bytes match none of those is not 
 model. The HDF5 signature is looked for where the HDF5 library looks: at the start and
 after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file. The
 model config is read from the first 16 MiB, so a file whose signature or config lies past
-that is reported as not scanned rather than clean. A file with no suffix is not sniffed,
+that, or a `.keras` whose `config.json` is longer, is reported as not scanned rather than
+clean, also when a Lambda layer was found in the part read. A file with no suffix is not sniffed,
 so an HDF5 model saved without one is neither listed nor read. `pickle_opcode` also reads a `.tar` or `.zip` by its content: the members named like
 a model (`pickle`, `data.pkl`, `*.pt`, `*.pth.tar`, `*.pkl.gz`), every member of a `.zip`
 whose first bytes are an NPY array or a pickle `PROTO` opcode whatever its name, and every member
@@ -268,12 +273,14 @@ and then one whose name the scanner cannot resolve, or names one by an extension
 code, or that is cut by a read bound, is reported both ways: the finding for what was
 found, and the file as unread. An extension code counts where a loader reads the bytes
 as a pickle: from the first byte of a file or member named as one (`*.pkl`, `*.pt`,
-`data.pkl`, an object array); in the four pickles that follow a first pickle holding the
+`data.pkl`, an object array); in the four pickles that follow a first pickle returning the
 legacy `torch.save` magic number; in a file or member named `.bin`, `.sav`, `.p` or
-`.model` when its stream goes on to a clean STOP or imports a callable after the code;
+`.model` when its stream goes on to a clean STOP, calls what the code named, or imports a
+callable after the code;
 and wherever a pickle opens with a `PROTO` opcode of any protocol. It stays data in a
 tensor storage beside a checkpoint's `data.pkl`, a numeric array, everything after those
-four pickles in a file that opens with the magic number, whatever the file is named, a
+four pickles in a file whose first pickle returns the magic number, whatever the file is
+named, a
 member named as no model, and after a complete pickle without a `PROTO` opcode.
 
 ## Other formats

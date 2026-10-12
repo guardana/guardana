@@ -5,6 +5,7 @@ import re
 import struct
 import zipfile
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
@@ -110,6 +111,14 @@ def _is_lambda_class(class_name: object) -> bool:
 
 # Not None: a config whose JSON is `null` was read, and is no model either.
 _UNREADABLE = object()
+_PARTLY_READ = f"only the first {_MAX_CONFIG_BYTES} bytes were read"
+
+
+@dataclass(frozen=True, slots=True)
+class _OversizedConfig:
+    """A `config.json` longer than the read bound, of which only `prefix` was read."""
+
+    prefix: bytes
 
 
 def _iter_lambda_configs(node: object) -> Iterator[object]:
@@ -270,6 +279,17 @@ class KerasLambdaRule(ArtifactRule):
             # so it is never opened; its first bytes are still searched for the marker.
             yield from self._byte_scan(path, ctx, fallback_reason=refusal)
             return
+        if isinstance(config, _OversizedConfig):
+            # A prefix that parses is not the document Keras parses, which may go on to
+            # declare anything, so the part read is searched and the rest named unread.
+            yield from self._judge_bytes(
+                path,
+                config.prefix,
+                ctx,
+                fallback_reason=None,
+                cut=f"its config.json is larger than {_MAX_CONFIG_BYTES} bytes; {_PARTLY_READ}",
+            )
+            return
         # Real `.keras` files are zip archives. A file that is not one is malformed, so
         # the byte marker is searched instead: a payload inside a deliberately broken
         # archive must not become invisible.
@@ -304,7 +324,30 @@ class KerasLambdaRule(ArtifactRule):
             yield self._unscanned(path, "file could not be read", ctx)
             return
         data, truncated = prefix
-        if _CLASS_MARKER.search(data) is not None:
+        yield from self._judge_bytes(
+            path,
+            data,
+            ctx,
+            fallback_reason=fallback_reason,
+            cut=_PARTLY_READ if truncated else None,
+        )
+
+    def _judge_bytes(
+        self,
+        path: Path,
+        data: bytes,
+        ctx: RuleContext,
+        *,
+        fallback_reason: str | None,
+        cut: str | None,
+    ) -> Iterator[Finding]:
+        """Search bytes read from `path` for the class marker; `cut` says why the rest was not read.
+
+        A Lambda found in the part read says nothing about the part that was not, so a cut
+        is reported beside the finding.
+        """
+        found = _CLASS_MARKER.search(data) is not None
+        if found:
             # Firm, not a lead: the config declares the layer, and `load_model`
             # ignores `safe_mode` for the legacy format (CVE-2025-9905), so this
             # will execute.
@@ -313,12 +356,12 @@ class KerasLambdaRule(ArtifactRule):
             if module is not None:
                 summary += f"; references the {module!r} module (near-certain malicious)"
             yield self._finding(path, summary)
-        elif not truncated and is_lfs_pointer(data):
+        elif cut is None and is_lfs_pointer(data):
             yield self._unscanned(path, LFS_POINTER_REASON, ctx)
         elif fallback_reason is not None:
             yield self._unscanned(path, fallback_reason, ctx)
-        elif truncated:
-            yield self._unscanned(path, f"only the first {_MAX_CONFIG_BYTES} bytes were read", ctx)
+        if cut is not None and (found or fallback_reason is None):
+            yield self._unscanned(path, cut, ctx)
 
     def _finding(self, path: Path, summary: str) -> Finding:
         return Finding(
@@ -390,7 +433,8 @@ def _checked_keras_config(path: Path) -> tuple[str | None, object]:
 
     Both come from one open handle, so the archive `zipfile` lists is the one the bounds
     were checked on. The config is `_UNREADABLE` when the archive was refused, is not a
-    regular file or cannot be read.
+    regular file or cannot be read, and an `_OversizedConfig` when it is longer than the
+    read bound.
     """
     try:
         with io.BufferedReader(open_regular(path)) as handle:
@@ -405,13 +449,15 @@ def _checked_keras_config(path: Path) -> tuple[str | None, object]:
 
 
 def _read_keras_config(handle: BinaryIO) -> object:
-    """Read and parse `config.json` from a `.keras` archive; `_UNREADABLE` if it cannot be."""
+    """Read and parse `config.json` from a `.keras` archive; see `_checked_keras_config`."""
     try:
         with zipfile.ZipFile(handle) as archive:
             if "config.json" not in archive.namelist():
                 return _UNREADABLE
             with archive.open("config.json") as member:
-                raw = member.read(_MAX_CONFIG_BYTES)
+                raw = member.read(_MAX_CONFIG_BYTES + 1)
+        if len(raw) > _MAX_CONFIG_BYTES:
+            return _OversizedConfig(raw[:_MAX_CONFIG_BYTES])
         parsed: object = json.loads(raw)
     except (*ZIP_ERRORS, RecursionError):
         return _UNREADABLE

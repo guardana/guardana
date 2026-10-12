@@ -347,14 +347,18 @@ is <code>indeterminate</code> (exit <code>2</code>) and never clean. There is no
 with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>, which the saved run then records, or
 install a rule that reads the format.</p>
 <p>A model or notebook a rule tried to read and could not is a shortfall of the same kind,
-named by its file: a pickle, archive or graph that does not parse, a pickle import whose
+named by its file: a pickle, archive or graph that does not parse, an archive member named
+as a pickle (<code>data.pkl</code>, <code>*.pkl</code>, a legacy tar's <code>pickle</code>) that ends before its STOP, an
+NPY header whose <code>descr</code>, <code>shape</code> or <code>fortran_order</code> numpy would refuse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
 extension-registry code (<code>EXT1</code>, <code>EXT2</code>, <code>EXT4</code>), a model file that cannot be opened (a <code>.bin</code> included,
 since it may be a model), a safetensors file with a malformed header (including a tensor entry
 with a missing or mistyped <code>dtype</code>, <code>shape</code> or <code>data_offsets</code>, and tensors that do not
 describe the payload exactly), a GGUF file declaring an unsupported version, an ONNX
 file without a graph (including an empty file), a <code>.keras</code> archive or Keras model directory
-whose <code>config.json</code> is not a JSON object and declares no Lambda layer, a file cut by a read bound, an archive refused
+whose <code>config.json</code> is not a JSON object and declares no Lambda layer, a <code>chat_template</code>
+list entry that holds no template (each one, beside whatever its siblings hold), a file cut
+by a read bound, an archive refused
 before it is opened (below), a PMML document past the bound, a notebook that is not JSON
 or has a cell that is not an object or a code cell whose source is not text, a notebook whose
 <code>kernelspec.language</code> or <code>language_info.name</code> is not Python.
@@ -473,7 +477,8 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 model. The HDF5 signature is looked for where the HDF5 library looks: at the start and
 after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file. The
 model config is read from the first 16 MiB, so a file whose signature or config lies past
-that is reported as not scanned rather than clean. A file with no suffix is not sniffed,
+that, or a <code>.keras</code> whose <code>config.json</code> is longer, is reported as not scanned rather than
+clean, also when a Lambda layer was found in the part read. A file with no suffix is not sniffed,
 so an HDF5 model saved without one is neither listed nor read. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
 a model (<code>pickle</code>, <code>data.pkl</code>, <code>*.pt</code>, <code>*.pth.tar</code>, <code>*.pkl.gz</code>), every member of a <code>.zip</code>
 whose first bytes are an NPY array or a pickle <code>PROTO</code> opcode whatever its name, and every member
@@ -545,12 +550,14 @@ and then one whose name the scanner cannot resolve, or names one by an extension
 code, or that is cut by a read bound, is reported both ways: the finding for what was
 found, and the file as unread. An extension code counts where a loader reads the bytes
 as a pickle: from the first byte of a file or member named as one (<code>*.pkl</code>, <code>*.pt</code>,
-<code>data.pkl</code>, an object array); in the four pickles that follow a first pickle holding the
+<code>data.pkl</code>, an object array); in the four pickles that follow a first pickle returning the
 legacy <code>torch.save</code> magic number; in a file or member named <code>.bin</code>, <code>.sav</code>, <code>.p</code> or
-<code>.model</code> when its stream goes on to a clean STOP or imports a callable after the code;
+<code>.model</code> when its stream goes on to a clean STOP, calls what the code named, or imports a
+callable after the code;
 and wherever a pickle opens with a <code>PROTO</code> opcode of any protocol. It stays data in a
 tensor storage beside a checkpoint's <code>data.pkl</code>, a numeric array, everything after those
-four pickles in a file that opens with the magic number, whatever the file is named, a
+four pickles in a file whose first pickle returns the magic number, whatever the file is
+named, a
 member named as no model, and after a complete pickle without a <code>PROTO</code> opcode.</p>
 <h2 id="other-formats">Other formats</h2>
 <pre><code class="language-bash">guardana scan . --format json    # machine-readable findings + summary
