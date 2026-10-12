@@ -409,7 +409,20 @@ or cell they spell (<code>system</code>, <code>getoutput</code>, <code>run_line_
 <code>run_cell</code>, <code>run_cell_async</code>, a magic returned by <code>find_line_magic</code> and called, the same
 methods reached through <code>getattr</code>). Its namespaces, history and display data are inert.
 Any other method, an argument that is not a literal, or a method taken without being
-called is reported unscanned: inconclusive and a shortfall.</p>
+called is reported unscanned: inconclusive and a shortfall. So is a call handed the IPython
+object, or <code>get_ipython</code> itself, as an argument (<code>helper(get_ipython())</code>), since what the
+callee does with it is not followed; a builtin that only inspects or prints it (<code>print</code>,
+<code>isinstance</code>, <code>hasattr</code>, <code>type</code> and the like) is no such call, unless the notebook rebinds
+its name.</p>
+<p>A cell that runs a local script gets one <code>low</code> finding naming each script as it is written
+in the cell: a file given to <code>sh</code>, <code>bash</code> or another shell, or to <code>python</code>, as an argument or
+as standard input (<code>sh &lt; setup.sh</code>); a file passed to <code>source</code> or <code>.</code>; or a path run as the
+command itself (<code>./run</code>, <code>tools/stage2.sh</code>, or a bare or absolute name ending in <code>.sh</code> or
+<code>.py</code>). It counts wherever the shell command comes from: a <code>!</code> line, <code>%system</code>, a shell cell
+magic, a magic defined with <code>%alias_magic</code>, an automagic <code>system</code> line or a call on the
+IPython object. What the script runs is not read. <code>python -m</code>, <code>sh -c</code> with its command
+(which is read for scripts in turn) and a tool run by name are not scripts. A download
+piped to a shell stays the <code>high</code> finding it was.</p>
 <p>An archive is refused before it is opened when listing it would cost more than listing a
 model does. A zip, a <code>.keras</code> included, is refused when its end records declare more than
 100,000 entries or a central directory over 25,600,000 bytes, or when that directory holds
@@ -434,7 +447,7 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 </thead>
 <tbody>
 <tr>
-<td><code>.pkl</code>, <code>.pickle</code>, <code>.dill</code>, <code>.joblib</code>, <code>.pt</code>, <code>.pth</code>, <code>.ckpt</code>, <code>.ptl</code>, <code>.pdparams</code>, <code>.pth.tar</code>, <code>.pt.tar</code></td>
+<td><code>.pkl</code>, <code>.pkl3</code>, <code>.pickle</code>, <code>.dill</code>, <code>.joblib</code>, <code>.pt</code>, <code>.pth</code>, <code>.th</code>, <code>.ckpt</code>, <code>.ptl</code>, <code>.pdparams</code>, <code>.mdl</code>, <code>.pth.tar</code>, <code>.pt.tar</code></td>
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
@@ -446,7 +459,11 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
-<td>a compressed pickle or checkpoint (<code>.pkl</code>, <code>.pickle</code> or <code>.joblib</code> followed by <code>.gz</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code> or <code>.lzma</code>; <code>.joblib.lz4</code>; <code>.pt.gz</code>; <code>.pth.gz</code>)</td>
+<td>a compressed pickle, checkpoint or array (<code>.pkl</code>, <code>.pickle</code> or <code>.joblib</code> followed by <code>.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code> or <code>.lzma</code>; <code>.joblib.lz4</code>; <code>.pt.gz</code>; <code>.pth.gz</code>; <code>.ckpt.gz</code>; <code>.npy.gz</code>, read as an NPY array when it decompresses to one)</td>
+<td><code>guardana.supply_chain.pickle_opcode</code></td>
+</tr>
+<tr>
+<td>a <code>.dat</code>, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a <code>.dat.gz</code> or <code>.dat</code> with another codec above, read when it decompresses to a pickle</td>
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
@@ -454,7 +471,7 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.onnx_graph</code></td>
 </tr>
 <tr>
-<td><code>.keras</code>, <code>.h5</code>, <code>.hdf5</code>; a <code>.bin</code>, <code>.model</code>, <code>.hdf</code>, <code>.weights</code> or <code>.tf</code> that holds the HDF5 signature at its start or after a userblock; a <code>config.json</code> beside <code>metadata.json</code> or <code>model.weights.h5</code> (an unzipped Keras model directory)</td>
+<td><code>.keras</code>, <code>.h5</code>, <code>.hdf5</code>; a <code>.bin</code>, <code>.model</code>, <code>.hdf</code>, <code>.weights</code> or <code>.tf</code> that holds the HDF5 signature at its start or after a userblock; a file with no suffix that holds it in its first 64 KiB; a <code>config.json</code> beside <code>metadata.json</code> or <code>model.weights.h5</code> (an unzipped Keras model directory)</td>
 <td><code>guardana.supply_chain.keras_lambda</code></td>
 </tr>
 <tr>
@@ -475,17 +492,38 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 </tr>
 </tbody>
 </table></div>
-<p>A <code>.bin</code>, <code>.sav</code>, <code>.p</code> or <code>.model</code> whose first bytes match none of those is not listed as a
-model. The HDF5 signature is looked for where the HDF5 library looks: at the start and
-after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file. The
+<p>A <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or a file with no suffix, whose first bytes match
+none of those is not listed as a model. A <code>.dat</code> or a file with no suffix costs <code>pickle_opcode</code>
+one read of its first 64 KiB, and a file with no suffix the same one read for
+<code>keras_lambda</code>: a pickle, a compressed pickle, an NPY array or an archive holding a model is
+read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
+them, is left alone without a result. A zip or tar under such a name is read like a plain
+<code>.zip</code> or <code>.tar</code>. The HDF5 signature is looked for where the HDF5 library looks: at the
+start and after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file,
+and in a file with no suffix up to the end of its first 64 KiB. The
 model config is read from the first 16 MiB, so a file whose signature or config lies past
 that, or a <code>.keras</code> whose <code>config.json</code> is longer, is reported as not scanned rather than
-clean, also when a Lambda layer was found in the part read. A file with no suffix is not sniffed,
-so an HDF5 model saved without one is neither listed nor read. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
-a model (<code>pickle</code>, <code>data.pkl</code>, <code>*.pt</code>, <code>*.pth.tar</code>, <code>*.pkl.gz</code>), every member of a <code>.zip</code>
+clean, also when a Lambda layer was found in the part read. An HDF5 model saved with no
+suffix behind a userblock that ends past its first 64 KiB is neither listed nor read. An
+HDF5 file holding a fractal heap stored compressed, where an attribute such as the model
+config is kept as bytes no search can read, is reported as not scanned. A <code>TFOpLambda</code> or
+<code>SlicingOpLambda</code> layer, which tf_keras rebuilds by calling the TensorFlow function its
+config names, is a <code>high</code> finding, like a Lambda layer, when that function is more than
+tensor arithmetic (anything outside <code>math</code>, <code>nn</code>, <code>linalg</code>, <code>__operators__</code> and the other
+arithmetic namespaces, or array functions such as <code>reshape</code> and <code>concat</code>), such as
+<code>io.write_file</code>; so is a <code>ClassMethod</code> layer, which calls the method its config names on
+the class it names, unless it builds a tensor (<code>RaggedTensor.from_row_splits</code> and the other
+<code>RaggedTensor</code> constructors, <code>SparseTensor.from_value</code>). A layer of either kind that names
+nothing it calls, or whose config cannot be decoded, is reported as not scanned. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
+a model (<code>pickle</code>, <code>data.pkl</code>, <code>*.pt</code>, <code>*.pth.tar</code>, <code>*.pkl.gz</code>; a <code>*.bin</code>, <code>*.sav</code>, <code>*.p</code>,
+<code>*.model</code> or <code>*.dat</code> member only when its bytes are a pickle), every member of a <code>.zip</code>
 whose first bytes are an NPY array or a pickle <code>PROTO</code> opcode whatever its name, and every member
-of a <code>.tar</code> that is in fact a zip; a member named as a model that is itself an archive is a coverage
-shortfall, and one <code>pickle.load</code> would read is still read as a stream. A member named as a
+of a <code>.tar</code> that is in fact a zip. The first bytes of a <code>.zip</code>'s other members are read for
+the first 10,000 of them, and for no more than 64 MiB of local headers and first blocks;
+the members past either bound are a coverage shortfall that counts them. A member of a plain
+<code>.tar</code> with no suffix and no legacy torch name (<code>pickle</code>, <code>storages</code>, <code>tensors</code>) is not read,
+so a pickle saved under such a name inside one is not found. A member named as
+a model that is itself an archive is a coverage shortfall, and one <code>pickle.load</code> would read is still read as a stream. A member named as a
 model it does not open inside an archive (<code>*.safetensors</code>, <code>*.gguf</code>, <code>*.onnx</code>, <code>*.keras</code>,
 <code>model.tar.gz</code> and the rest of the last row above, and HDF5 files (<code>*.h5</code>, <code>*.hdf5</code>, <code>*.hdf</code>, <code>*.weights</code>, <code>*.tf</code>) and a Keras directory's
 <code>config.json</code> or <code>model.weights.h5</code> inside a model archive, though not inside a plain

@@ -66,14 +66,17 @@ from guardana.rules.supply_chain._zip import listing_refusal as zip_listing_refu
 _NUMPY_SUFFIXES = (".npy", ".npz")
 _SUFFIXES = (
     ".pkl",
+    ".pkl3",
     ".pickle",
     ".pt",
     ".pth",
+    ".th",
     ".ckpt",
     ".ptl",
     ".joblib",
     ".dill",
     ".pdparams",
+    ".mdl",
     *_NUMPY_SUFFIXES,
 )
 _BIN_SUFFIX = ".bin"
@@ -85,21 +88,31 @@ a file under one of these names that is neither a zip, a tar nor a pickle stream
 other file this rule has nothing to say about."""
 _TORCH_TAR_NAMES = (".pth.tar", ".pt.tar")
 """What `torch.save` is told to write as a tar: a model, whatever its first bytes are."""
-_SNIFFED_SUFFIXES = frozenset(_CONTENT_SUFFIXES) - {_TAR_SUFFIX, _PLAIN_ZIP_SUFFIX}
+_DATA_SUFFIX = ".dat"
+_SNIFFED_SUFFIXES = frozenset(_CONTENT_SUFFIXES) - {_TAR_SUFFIX, _PLAIN_ZIP_SUFFIX} | {_DATA_SUFFIX}
+"""Suffixes other formats share, whose file or archive member counts only when its bytes
+are a pickle."""
 _MODEL_MEMBER_SUFFIXES = frozenset(_SUFFIXES) | _SNIFFED_SUFFIXES
+_CODEC_SUFFIXES = (".gz", ".gzip", ".z", ".xz", ".bz2", ".lzma")
 _COMPRESSED_MODEL_ENDINGS = (
     ".pt.gz",
     ".pth.gz",
+    ".ckpt.gz",
+    ".npy.gz",
     ".joblib.lz4",
-    *(
-        f"{base}{codec}"
-        for base in (".pkl", ".pickle", ".joblib")
-        for codec in (".gz", ".z", ".xz", ".bz2", ".lzma")
-    ),
+    *(f"{base}{codec}" for base in (".pkl", ".pickle", ".joblib") for codec in _CODEC_SUFFIXES),
 )
-"""Names of a compressed pickle or checkpoint, read after decompressing it."""
+"""Names of a compressed pickle, checkpoint or array, read after decompressing it."""
+_HEAD_READ_SUFFIXES = (_DATA_SUFFIX, "")
+"""Names that say nothing of the format, which `pickle.load` and `torch.load` open all the
+same: such a file counts only when one bounded read of its first bytes shows a pickle, a
+compressed one, an array or an archive holding a model."""
+_HEAD_READ_COMPRESSED_ENDINGS = tuple(f"{_DATA_SUFFIX}{codec}" for codec in _CODEC_SUFFIXES)
 _COMPRESSED_SUFFIXES = tuple(
-    dict.fromkeys(f".{end.rsplit('.', 1)[1]}" for end in _COMPRESSED_MODEL_ENDINGS)
+    dict.fromkeys(
+        f".{end.rsplit('.', 1)[1]}"
+        for end in (*_COMPRESSED_MODEL_ENDINGS, *_HEAD_READ_COMPRESSED_ENDINGS)
+    )
 )
 _UNREAD_MODEL_SUFFIXES = frozenset(
     {
@@ -324,6 +337,12 @@ checkpoint never reaches the bound; a deflated member of repeated opcodes reache
 """
 _ARCHIVE_MAX_MEMBERS = 100_000
 """Members read from one archive; `torch.save` writes one per tensor storage, far fewer."""
+_PEEK_MAX_MEMBERS = 10_000
+"""Members of a plain zip, not named as models, whose first bytes are read to find an array
+or a pickle `np.load` would read whatever the name."""
+_PEEK_MAX_BYTES = 64 * 1024 * 1024
+"""Bytes those peeks may read: each reads a member's local header and a first block."""
+_LOCAL_HEADER_BYTES = 30
 _ARCHIVE_MAX_ENTRIES = ARCHIVE_MAX_ENTRIES
 _ZIP_DIRECTORY_MAX_BYTES = ZIP_DIRECTORY_MAX_BYTES
 # A raw pickle stream is read whole because `pickletools` needs it, so the read
@@ -1353,6 +1372,10 @@ class _FileReport:
     container: str = "zip"
     """The kind of archive the members named in a reason belong to."""
 
+    head_only: bool = False
+    """Whether the file's name says nothing of its format, so it is read only for what its
+    first bytes show, and an archive it turns out to be is read as a person's archive."""
+
     @property
     def numpy(self) -> bool:
         """Whether the file is named as a NumPy array file, which `np.load` reads."""
@@ -1360,13 +1383,13 @@ class _FileReport:
 
     @property
     def tar_named(self) -> bool:
-        """Whether the file is named as a tar, which a legacy `torch.save` writes."""
-        return self.path.suffix.lower() == _TAR_SUFFIX
+        """Whether the file is named as a tar, which a legacy `torch.save` writes, or as nothing."""
+        return self.head_only or self.path.suffix.lower() == _TAR_SUFFIX
 
     @property
     def plain_zip(self) -> bool:
-        """Whether the file is named as a plain zip, whose members a person extracts."""
-        return self.path.suffix.lower() == _PLAIN_ZIP_SUFFIX
+        """Whether the file is a zip whose members a person extracts: a `.zip`, or unnamed."""
+        return self.head_only or self.path.suffix.lower() == _PLAIN_ZIP_SUFFIX
 
     def found(self, refs: Iterable[str], member: str | None = None) -> None:
         """Keep the callables one stream imports."""
@@ -1421,10 +1444,14 @@ class PickleOpcodeRule(ArtifactRule):
     NumPy array file is a pickle when its header declares a dtype that holds Python
     objects; its header is parsed as a literal, and a numeric array is not a pickle. A
     file or member joblib would decompress by its first bytes is decompressed first.
+    A file whose name says nothing of its format (`model.dat`, `model`) is read only when
+    one bounded read of its first bytes shows a pickle, a compressed one, an array or an
+    archive, so the data files that share such names cost that one read and stay quiet.
     A raw tensor storage beside a `data.pkl`, which `torch.load` never
     unpickles, is reported only when it holds a pickle or a nested archive, so tensor
     values that parse as opcodes are not noise. One archive is read up to a member count
-    and an opcode budget shared by its members, and one that declares more entries, a
+    and an opcode budget shared by its members, a plain zip's members not named as models
+    are peeked at up to a count and a byte bound, and one that declares more entries, a
     larger zip central directory or larger tar extended headers than its bounds is refused
     before it is opened. A file gets one finding naming every callable it imports.
     Anything it cannot fully parse, or stops reading at a bound, becomes a visible
@@ -1487,7 +1514,8 @@ class PickleOpcodeRule(ArtifactRule):
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every pickle-shaped file under the target, and every other one that is one.
 
-        A file named as a compressed pickle (`model.pkl.gz`) is read as joblib reads it.
+        A file named as a compressed pickle (`model.pkl.gz`) is read as joblib reads it, and
+        one whose name says nothing of its format by its first bytes.
         """
         if not isinstance(target, FileReader):
             return
@@ -1501,9 +1529,19 @@ class PickleOpcodeRule(ArtifactRule):
             elif (yield from self._scan(_FileReport(path, ctx), by_content=True)):
                 ctx.examined(path)
         for path in target.iter_files(_COMPRESSED_SUFFIXES):
-            if path.name.lower().endswith(_COMPRESSED_MODEL_ENDINGS):
+            name = path.name.lower()
+            if name.endswith(_COMPRESSED_MODEL_ENDINGS):
                 yield from self._scan(_FileReport(path, ctx))
                 ctx.examined(path)
+            elif name.endswith(_HEAD_READ_COMPRESSED_ENDINGS):
+                yield from self._scan_head_read(path, ctx)
+        for path in target.iter_files(_HEAD_READ_SUFFIXES):
+            yield from self._scan_head_read(path, ctx)
+
+    def _scan_head_read(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
+        """Scan a file whose name says nothing of its format; count it when it held a model."""
+        if (yield from self._scan(_FileReport(path, ctx, head_only=True), by_content=True)):
+            ctx.examined(path)
 
     def _scan(
         self, report: _FileReport, *, by_content: bool = False
@@ -1515,7 +1553,11 @@ class PickleOpcodeRule(ArtifactRule):
         that cannot be opened is reported as unscanned, since it may be either.
         """
         try:
-            read = self._read(report, by_content=by_content)
+            read = (
+                self._read_head(report)
+                if report.head_only
+                else self._read(report, by_content=by_content)
+            )
         except Exception:
             # What the members before the failure imported is as real as it would be
             # after a clean read, and the runner keeps what a rule yielded before raising.
@@ -1567,6 +1609,62 @@ class PickleOpcodeRule(ArtifactRule):
         as_stream = self._read_unarchived(report, magic, by_content=by_content or as_tar)
         return as_tar or as_stream
 
+    def _read_head(self, report: _FileReport) -> bool:
+        """Read a file whose name says nothing of its format, by its first bytes.
+
+        One bounded read decides: a file that is no pickle, compressed pickle, NPY array,
+        zip or tar costs nothing more and is left alone, unreadable or not, as is a Git LFS
+        pointer or a 7z archive, which no loader opens. An archive is read as a plain one.
+        """
+        head = read_bytes_bounded(report.path, _BIN_PROBE_BYTES)
+        if head is None:
+            return False
+        data, cut = head
+        magic = data[:_MAGIC_SNIFF_BYTES]
+        if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
+            return self._scan_zip(report)
+        if magic.startswith(NPY_MAGIC):
+            self._scan_npy(report)
+            return True
+        as_tar = _opens_as_tar(magic) and self._scan_tar(report)
+        return self._read_head_stream(report, data, cut=cut) or as_tar
+
+    def _read_head_stream(self, report: _FileReport, head: bytes, *, cut: bool) -> bool:
+        """Judge a file's `head` as a pickle stream, compressed or not, and read on if it is one.
+
+        `cut` says the file goes on past the head. A compressed head is decompressed in
+        memory to judge it, so a compressed data file costs no read beyond the head.
+        """
+        stream, stream_cut = head, cut
+        inflated = (
+            inflate(io.BytesIO(head), head, limit=_BIN_PROBE_BYTES, input_limit=len(head))
+            if compressed(head)
+            else None
+        )
+        if inflated is not None:
+            if inflated.data is None:
+                report.unscanned(
+                    f"{inflated.codec}-compressed file this scanner cannot decompress, "
+                    "which joblib may load as a pickle; not scanned"
+                )
+                return True
+            stream, stream_cut = inflated.data, cut or inflated.cut
+        scan = _scan_opcodes(stream, as_pickle=_AsPickle.SNIFFED)
+        if _bin_verdict(stream, scan, cut=stream_cut) is False:
+            return False
+        if inflated is not None:
+            read = self._scan_compressed(report, head, by_content=True)
+            return read if read is not None else self._scan_stream(report, by_content=True)
+        if cut:
+            return self._scan_stream(report, by_content=True)
+        self._report_stream(
+            report,
+            scan,
+            cut_summary=None,
+            unparsed="could not parse as a pickle stream (may be a zip-based container)",
+        )
+        return True
+
     def _read_unarchived(self, report: _FileReport, magic: bytes, *, by_content: bool) -> bool:
         """Read a file as an array file, a 7z archive or a raw pickle stream; see `_scan`."""
         if magic.startswith(NPY_MAGIC):
@@ -1607,21 +1705,41 @@ class PickleOpcodeRule(ArtifactRule):
                 f"{inflated.codec}-compressed file this scanner cannot decompress; not scanned"
             )
             return True
+        cut_summary = (
+            None
+            if inflated.shortfall is None
+            else f"{inflated.codec}-compressed file {inflated.shortfall}; "
+            "not scanned past that point"
+        )
+        if not by_content and inflated.data.startswith(NPY_MAGIC):
+            self._scan_npy_bytes(report, inflated.data, cut_summary=cut_summary)
+            return True
         scan = _scan_opcodes(inflated.data, as_pickle=_file_reading(by_content=by_content))
         if by_content and _bin_verdict(inflated.data, scan, cut=inflated.cut) is False:
             return False
         self._report_stream(
             report,
             scan,
-            cut_summary=(
-                None
-                if inflated.shortfall is None
-                else f"{inflated.codec}-compressed file {inflated.shortfall}; "
-                "not scanned past that point"
-            ),
+            cut_summary=cut_summary,
             unparsed=f"{inflated.codec}-compressed file that is not a pickle stream",
         )
         return True
+
+    def _scan_npy_bytes(self, report: _FileReport, data: bytes, *, cut_summary: str | None) -> None:
+        """Read an NPY array decompressed from a file; see `_scan_npy`."""
+        try:
+            header = read_npy_header(data)
+        except NpyHeaderError as error:
+            report.unscanned(f"malformed NPY header ({error}); not scanned")
+            return
+        if not header.holds_objects:
+            return
+        self._report_stream(
+            report,
+            _scan_opcodes(data[header.data_offset :], as_pickle=_AsPickle.NAMED),
+            cut_summary=cut_summary,
+            unparsed="array of Python objects whose data is not a pickle stream",
+        )
 
     def _scan_stream(self, report: _FileReport, *, by_content: bool) -> bool:
         """Read the file as a raw pickle stream; see `_scan` for `by_content`."""
@@ -1771,15 +1889,13 @@ class PickleOpcodeRule(ArtifactRule):
                 if any(_unread_model(n, plain=not every_member) for n in _zip_names(info))
             ]
             self._report_unread_models(report, unread)
-            # Peeking at a member costs one open, as listing it costs its header bytes,
-            # so it grows with the archive and is not bounded apart from it.
-            chosen = [
-                info
-                for info in members
-                if every_member
-                or any(_model_named(n) for n in _zip_names(info))
-                or _starts_as_array_or_pickle(archive, info)
-            ]
+            chosen, unpeeked = self._choose_zip_members(archive, members, every_member=every_member)
+            if unpeeked:
+                report.unscanned(
+                    f"zip holds {unpeeked} member(s) not named as models whose first bytes "
+                    f"were not read, past the {_PEEK_MAX_MEMBERS} members or {_PEEK_MAX_BYTES} "
+                    "bytes read to find arrays and pickles by their first bytes; not scanned"
+                )
             for info in chosen[:_ARCHIVE_MAX_MEMBERS]:
                 disagreement = member_disagreement(handle, info)
                 if disagreement is not None:
@@ -1799,7 +1915,37 @@ class PickleOpcodeRule(ArtifactRule):
                     f"zip holds {len(chosen)} {named}; members past the first "
                     f"{_ARCHIVE_MAX_MEMBERS} not scanned"
                 )
-        return every_member or bool(chosen) or bool(unread)
+        return every_member or bool(chosen) or bool(unread) or bool(unpeeked)
+
+    def _choose_zip_members(
+        self, archive: zipfile.ZipFile, members: list[zipfile.ZipInfo], *, every_member: bool
+    ) -> tuple[list[zipfile.ZipInfo], int]:
+        """Pick the members to read, and count those left unpeeked past the peek bounds.
+
+        A plain zip has its members named as models read, and the others peeked at for an
+        NPY or pickle start; each peek reads a local header and a first block, so peeks are
+        bounded by count and by those bytes.
+        """
+        chosen: list[zipfile.ZipInfo] = []
+        peeks = peeked_bytes = unpeeked = 0
+        for info in members:
+            if every_member or any(_model_named(name) for name in _zip_names(info)):
+                chosen.append(info)
+                continue
+            cost = (
+                _LOCAL_HEADER_BYTES
+                + len(info.orig_filename.encode("utf-8", "surrogateescape"))
+                + len(info.extra)
+                + min(info.compress_size, zipfile.ZipExtFile.MIN_READ_SIZE)
+            )
+            if peeks >= _PEEK_MAX_MEMBERS or peeked_bytes + cost > _PEEK_MAX_BYTES:
+                unpeeked += 1
+                continue
+            peeks += 1
+            peeked_bytes += cost
+            if _starts_as_array_or_pickle(archive, info):
+                chosen.append(info)
+        return chosen, unpeeked
 
     def _report_unread_models(self, report: _FileReport, members: list[str]) -> None:
         """Name, in one result, the archive members named as models no reader here opens."""

@@ -87,6 +87,14 @@ _HOSTILE_SUFFIXES = (
     ".pickle.bz2",
     ".pkl.lzma",
     ".joblib.lz4",
+    ".th",
+    ".pkl3",
+    ".mdl",
+    ".dat",
+    "",
+    ".pkl.gzip",
+    ".npy.gz",
+    ".dat.gz",
 )
 """Every extension a built-in artifact rule opens and reads the contents of.
 

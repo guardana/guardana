@@ -154,7 +154,21 @@ or cell they spell (`system`, `getoutput`, `run_line_magic`, `run_cell_magic`,
 `run_cell`, `run_cell_async`, a magic returned by `find_line_magic` and called, the same
 methods reached through `getattr`). Its namespaces, history and display data are inert.
 Any other method, an argument that is not a literal, or a method taken without being
-called is reported unscanned: inconclusive and a shortfall.
+called is reported unscanned: inconclusive and a shortfall. So is a call handed the IPython
+object, or `get_ipython` itself, as an argument (`helper(get_ipython())`), since what the
+callee does with it is not followed; a builtin that only inspects or prints it (`print`,
+`isinstance`, `hasattr`, `type` and the like) is no such call, unless the notebook rebinds
+its name.
+
+A cell that runs a local script gets one `low` finding naming each script as it is written
+in the cell: a file given to `sh`, `bash` or another shell, or to `python`, as an argument or
+as standard input (`sh < setup.sh`); a file passed to `source` or `.`; or a path run as the
+command itself (`./run`, `tools/stage2.sh`, or a bare or absolute name ending in `.sh` or
+`.py`). It counts wherever the shell command comes from: a `!` line, `%system`, a shell cell
+magic, a magic defined with `%alias_magic`, an automagic `system` line or a call on the
+IPython object. What the script runs is not read. `python -m`, `sh -c` with its command
+(which is read for scripts in turn) and a tool run by name are not scripts. A download
+piped to a shell stays the `high` finding it was.
 
 An archive is refused before it is opened when listing it would cost more than listing a
 model does. A zip, a `.keras` included, is refused when its end records declare more than
@@ -175,28 +189,50 @@ and in CI. A format name (`tflite`) is not a path and stays as it is.
 
 | Observed as a model | Read by |
 |---|---|
-| `.pkl`, `.pickle`, `.dill`, `.joblib`, `.pt`, `.pth`, `.ckpt`, `.ptl`, `.pdparams`, `.pth.tar`, `.pt.tar` | `guardana.supply_chain.pickle_opcode` |
+| `.pkl`, `.pkl3`, `.pickle`, `.dill`, `.joblib`, `.pt`, `.pth`, `.th`, `.ckpt`, `.ptl`, `.pdparams`, `.mdl`, `.pth.tar`, `.pt.tar` | `guardana.supply_chain.pickle_opcode` |
 | `.npy`, and each `.npy` inside a `.npz`, or a `.bin`, `.sav`, `.p` or `.model` that starts with the NPY magic: an object array holds a pickle stream, a numeric one cannot | `guardana.supply_chain.pickle_opcode` |
 | `.bin` whose first bytes are a zip or a pickle stream (`pytorch_model.bin`); `.sav`, `.p` or `.model` whose first bytes are a pickle stream | `guardana.supply_chain.pickle_opcode` |
-| a compressed pickle or checkpoint (`.pkl`, `.pickle` or `.joblib` followed by `.gz`, `.z`, `.xz`, `.bz2` or `.lzma`; `.joblib.lz4`; `.pt.gz`; `.pth.gz`) | `guardana.supply_chain.pickle_opcode` |
+| a compressed pickle, checkpoint or array (`.pkl`, `.pickle` or `.joblib` followed by `.gz`, `.gzip`, `.z`, `.xz`, `.bz2` or `.lzma`; `.joblib.lz4`; `.pt.gz`; `.pth.gz`; `.ckpt.gz`; `.npy.gz`, read as an NPY array when it decompresses to one) | `guardana.supply_chain.pickle_opcode` |
+| a `.dat`, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a `.dat.gz` or `.dat` with another codec above, read when it decompresses to a pickle | `guardana.supply_chain.pickle_opcode` |
 | `.onnx` | `guardana.supply_chain.onnx_graph` |
-| `.keras`, `.h5`, `.hdf5`; a `.bin`, `.model`, `.hdf`, `.weights` or `.tf` that holds the HDF5 signature at its start or after a userblock; a `config.json` beside `metadata.json` or `model.weights.h5` (an unzipped Keras model directory) | `guardana.supply_chain.keras_lambda` |
+| `.keras`, `.h5`, `.hdf5`; a `.bin`, `.model`, `.hdf`, `.weights` or `.tf` that holds the HDF5 signature at its start or after a userblock; a file with no suffix that holds it in its first 64 KiB; a `config.json` beside `metadata.json` or `model.weights.h5` (an unzipped Keras model directory) | `guardana.supply_chain.keras_lambda` |
 | `.gguf` | `guardana.supply_chain.chat_template` |
 | `.safetensors`, `.pmml` | `guardana.supply_chain.model_format` |
 | `saved_model.pb`, `saved_model.pbtxt` (the text form TensorFlow loads when there is no `.pb`; its `op` values are decoded as protobuf decodes them, and one that cannot be decoded is a shortfall) | `guardana.supply_chain.saved_model_ops` |
 | `.tflite`, `.mar`, `.nemo`, `.llamafile`, `model.tar.gz`, a `.bin` that starts like GGUF or GGML | no built-in rule |
 
-A `.bin`, `.sav`, `.p` or `.model` whose first bytes match none of those is not listed as a
-model. The HDF5 signature is looked for where the HDF5 library looks: at the start and
-after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file. The
+A `.bin`, `.sav`, `.p`, `.model` or `.dat`, or a file with no suffix, whose first bytes match
+none of those is not listed as a model. A `.dat` or a file with no suffix costs `pickle_opcode`
+one read of its first 64 KiB, and a file with no suffix the same one read for
+`keras_lambda`: a pickle, a compressed pickle, an NPY array or an archive holding a model is
+read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
+them, is left alone without a result. A zip or tar under such a name is read like a plain
+`.zip` or `.tar`. The HDF5 signature is looked for where the HDF5 library looks: at the
+start and after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file,
+and in a file with no suffix up to the end of its first 64 KiB. The
 model config is read from the first 16 MiB, so a file whose signature or config lies past
 that, or a `.keras` whose `config.json` is longer, is reported as not scanned rather than
-clean, also when a Lambda layer was found in the part read. A file with no suffix is not sniffed,
-so an HDF5 model saved without one is neither listed nor read. `pickle_opcode` also reads a `.tar` or `.zip` by its content: the members named like
-a model (`pickle`, `data.pkl`, `*.pt`, `*.pth.tar`, `*.pkl.gz`), every member of a `.zip`
+clean, also when a Lambda layer was found in the part read. An HDF5 model saved with no
+suffix behind a userblock that ends past its first 64 KiB is neither listed nor read. An
+HDF5 file holding a fractal heap stored compressed, where an attribute such as the model
+config is kept as bytes no search can read, is reported as not scanned. A `TFOpLambda` or
+`SlicingOpLambda` layer, which tf_keras rebuilds by calling the TensorFlow function its
+config names, is a `high` finding, like a Lambda layer, when that function is more than
+tensor arithmetic (anything outside `math`, `nn`, `linalg`, `__operators__` and the other
+arithmetic namespaces, or array functions such as `reshape` and `concat`), such as
+`io.write_file`; so is a `ClassMethod` layer, which calls the method its config names on
+the class it names, unless it builds a tensor (`RaggedTensor.from_row_splits` and the other
+`RaggedTensor` constructors, `SparseTensor.from_value`). A layer of either kind that names
+nothing it calls, or whose config cannot be decoded, is reported as not scanned. `pickle_opcode` also reads a `.tar` or `.zip` by its content: the members named like
+a model (`pickle`, `data.pkl`, `*.pt`, `*.pth.tar`, `*.pkl.gz`; a `*.bin`, `*.sav`, `*.p`,
+`*.model` or `*.dat` member only when its bytes are a pickle), every member of a `.zip`
 whose first bytes are an NPY array or a pickle `PROTO` opcode whatever its name, and every member
-of a `.tar` that is in fact a zip; a member named as a model that is itself an archive is a coverage
-shortfall, and one `pickle.load` would read is still read as a stream. A member named as a
+of a `.tar` that is in fact a zip. The first bytes of a `.zip`'s other members are read for
+the first 10,000 of them, and for no more than 64 MiB of local headers and first blocks;
+the members past either bound are a coverage shortfall that counts them. A member of a plain
+`.tar` with no suffix and no legacy torch name (`pickle`, `storages`, `tensors`) is not read,
+so a pickle saved under such a name inside one is not found. A member named as
+a model that is itself an archive is a coverage shortfall, and one `pickle.load` would read is still read as a stream. A member named as a
 model it does not open inside an archive (`*.safetensors`, `*.gguf`, `*.onnx`, `*.keras`,
 `model.tar.gz` and the rest of the last row above, and HDF5 files (`*.h5`, `*.hdf5`, `*.hdf`, `*.weights`, `*.tf`) and a Keras directory's
 `config.json` or `model.weights.h5` inside a model archive, though not inside a plain

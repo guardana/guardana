@@ -251,3 +251,34 @@ def test_a_tensorflow_savedmodel_graph_is_listed_by_its_exact_name(tmp_path: Pat
         "saved_model.pb": "tensorflow-savedmodel",
         "saved_model.pbtxt": "tensorflow-savedmodel",
     }
+
+
+def test_a_pickle_under_a_name_a_loader_opens_is_a_model(tmp_path: Path) -> None:
+    for name in ("model.th", "clf.pkl3", "model.mdl"):
+        (tmp_path / name).write_bytes(b"\x00")
+    for name in ("model.pkl.gzip", "model.ckpt.gz", "arr.npy.gz"):
+        (tmp_path / name).write_bytes(b"\x1f\x8b")
+    for name in ("model.dat", "model"):
+        (tmp_path / name).write_bytes(b"\x80\x04\x95" + bytes(16))
+    (tmp_path / "my_model").write_bytes(bytes(1024) + b"\x89HDF\r\n\x1a\n" + bytes(16))
+
+    assert _model_formats(tmp_path) == {
+        "model.th": "pytorch",
+        "clf.pkl3": "pickle",
+        "model.mdl": "pickle",
+        "model.pkl.gzip": "compressed-pickle",
+        "model.ckpt.gz": "compressed-pytorch",
+        "arr.npy.gz": "compressed-numpy",
+        "model.dat": "pickle",
+        "model": "pickle",
+        "my_model": "keras-hdf5",
+    }
+
+
+def test_a_data_file_under_a_name_that_says_nothing_is_not_a_model(tmp_path: Path) -> None:
+    (tmp_path / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    (tmp_path / "table.dat").write_bytes(bytes(range(256)))
+    (tmp_path / "values.dat.gz").write_bytes(b"\x1f\x8b" + bytes(16))
+    (tmp_path / "data.dat").write_bytes(b"\x89HDF\r\n\x1a\n" + bytes(16))
+
+    assert _model_formats(tmp_path) == {}

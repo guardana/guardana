@@ -620,6 +620,9 @@ def test_every_model_name_the_inventory_knows_is_read_or_named_inside_an_archive
             f"model{suffix}"
             for key in _INVENTORY_SUFFIX_SETS
             for suffix in getattr(inventory, key, ())
+            # A member with no suffix is what `torch.save` writes beside its pickle
+            # (`archive/version`, a legacy tar's `storages`), judged by the archive it is in.
+            if suffix
         ),
         *(name for key in _INVENTORY_FILE_SETS for name in getattr(inventory, key, ())),
         "model.hdf",

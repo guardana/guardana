@@ -1,8 +1,12 @@
 """Find the HDF5 signature where the HDF5 library looks for it, without parsing the file."""
 
+import io
 from typing import BinaryIO
 
 HDF5_SIGNATURE = b"\x89HDF\r\n\x1a\n"
+HDF5_HEAD_BYTES = 64 * 1024
+"""The first bytes of a file whose name says nothing of its format searched for the signature,
+so finding out that such a file is no HDF5 file costs one bounded read."""
 _FIRST_USERBLOCK = 512
 
 
@@ -21,3 +25,12 @@ def find_hdf5_signature(handle: BinaryIO, size: int) -> int | None:
             return offset
         offset = offset * 2 if offset else _FIRST_USERBLOCK
     return None
+
+
+def find_hdf5_signature_in_head(head: bytes) -> int | None:
+    """Return the offset of the HDF5 signature among a file's first bytes `head`, or None.
+
+    The offsets `find_hdf5_signature` probes that lie inside `head`; a signature behind a
+    userblock that ends past it is not found.
+    """
+    return find_hdf5_signature(io.BytesIO(head), len(head))

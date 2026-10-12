@@ -28,6 +28,7 @@ from guardana.rules.supply_chain._ipython_cells import (
     NotebookState,
     bind_names,
     ipython_calls,
+    local_scripts,
     read_cell,
     read_shell_command,
 )
@@ -37,6 +38,7 @@ from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefi
 # How deep calls on the IPython object may nest inside the code they run before the
 # rest is reported unread.
 _MAX_IPYTHON_NESTING = 4
+_SCRIPTS_LISTED = 5
 
 
 @dataclass
@@ -47,6 +49,8 @@ class _NotebookScan:
     ctx: RuleContext
     state: NotebookState = field(default_factory=NotebookState)
     unread: set[str] = field(default_factory=set)
+    scripts: list[str] = field(default_factory=list)
+    """The local scripts the cell being read runs, as written."""
 
 
 def _cell_source(cell: object) -> str | None:
@@ -102,10 +106,11 @@ class NotebookPayloadRule(ArtifactRule):
     Notebooks are a primary ML distribution format, yet the `.py` scanners never
     see inside them. This applies the shared code-sink detection to each code
     cell, and catches the notebook-only channels — a `!curl … | sh` escape, a
-    `%%bash` cell or a `%alias`. A cell whose Python cannot be parsed, a magic that
-    runs code the rule does not read (`%run`, `%pip`, `%%perl`) and a notebook whose
-    kernel is not Python are reported as inconclusive, never silently skipped: an
-    un-analyzable cell is not a proven-clean one.
+    `%%bash` cell or a `%alias`. A cell that runs a local script (`!sh setup.sh`,
+    `%%bash` running `./run`) gets one low finding naming it. A cell whose Python cannot
+    be parsed, a magic that runs code the rule does not read (`%run`, `%pip`, `%%perl`),
+    code handed the IPython object and a notebook whose kernel is not Python are reported
+    as inconclusive, never silently skipped: an un-analyzable cell is not a proven-clean one.
     """
 
     meta = RuleMeta(
@@ -197,6 +202,7 @@ class NotebookPayloadRule(ArtifactRule):
             source = _cell_source(cell)
             if source is not None:
                 yield from self._scan_cell(scan, index, read_cell(source, scan.state))
+                yield from self._local_scripts(scan, index)
         if malformed is not None:
             yield self._unscanned(path, malformed, ctx)
 
@@ -225,6 +231,7 @@ class NotebookPayloadRule(ArtifactRule):
                 yield self._finding(
                     path, index, Severity.HIGH, "shell escape pipes a download into a shell"
                 )
+            scan.scripts.extend(local_scripts(line))
         for label in dict.fromkeys(cell.unread):
             yield self._unread(scan, index, label)
         tree = yield from self._parse(scan, index, cell)
@@ -244,6 +251,22 @@ class NotebookPayloadRule(ArtifactRule):
                 continue
             nested = read_shell_command(text) if kind == "shell" else read_cell(text, scan.state)
             yield from self._scan_cell(scan, index, nested, depth + 1)
+
+    def _local_scripts(self, scan: _NotebookScan, index: int) -> Iterator[Finding]:
+        """Name, in one low finding, the local scripts a cell runs, whose code is not read."""
+        scripts = list(dict.fromkeys(scan.scripts))
+        scan.scripts.clear()
+        if not scripts:
+            return
+        listed = ", ".join(scripts[:_SCRIPTS_LISTED])
+        more = len(scripts) - _SCRIPTS_LISTED
+        noun = "local script" if len(scripts) == 1 else "local scripts"
+        yield self._finding(
+            scan.path,
+            index,
+            Severity.LOW,
+            f"cell runs {noun}: {listed}{f', and {more} more' if more > 0 else ''}",
+        )
 
     def _unread(self, scan: _NotebookScan, index: int, label: str) -> Finding:
         """Report something a cell runs that was not read; name it once per notebook."""

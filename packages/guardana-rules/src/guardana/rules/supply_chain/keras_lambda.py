@@ -4,12 +4,16 @@ import os
 import re
 import struct
 import zipfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
-from guardana.core.formats import find_hdf5_signature
+from guardana.core.formats import (
+    HDF5_HEAD_BYTES,
+    find_hdf5_signature,
+    find_hdf5_signature_in_head,
+)
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
@@ -50,6 +54,9 @@ _LAMBDA = "Lambda"
 # the same line by whitelisting Keras-internal modules only.
 _DANGEROUS_MODULES = ("os", "subprocess", "sys", "socket", "shutil", "pty", "importlib")
 _MAX_CONFIG_BYTES = 16 * 1024 * 1024
+# A fractal heap header (signature, version 0, heap id length) declaring I/O filters: the
+# HDF5 library decompresses the attributes stored in it, which a byte search never sees.
+_FILTERED_HEAP = re.compile(rb"FRHP\x00[\s\S]{2}(?!\x00\x00)[\s\S]{2}")
 # The module hint on a byte-level match is best-effort: the finding never depends
 # on it, so its decoding is bounded per marker and in total parsed characters.
 _ATTEMPTS_PER_MARKER = 16
@@ -60,6 +67,9 @@ _HDF5_SUFFIXES = (".h5", ".hdf5")
 # tf_keras loads any HDF5 file as a model whatever it is called, so these names,
 # which other formats share, are read when their bytes are an HDF5 file.
 _HDF5_SNIFFED_SUFFIXES = (".bin", ".model", ".hdf", ".weights", ".tf")
+# tf_keras loads a file with no suffix as a model when it is an HDF5 file, so one whose
+# first bytes hold the signature is read; finding out costs one bounded read.
+_NO_SUFFIX = ("",)
 # An unzipped Keras model is a directory holding `config.json`; one beside either
 # of Keras' own files is read, while a lone `config.json` belongs to anything.
 _DIRECTORY_CONFIG = "config.json"
@@ -82,24 +92,104 @@ def _json_spelling(word: str) -> bytes:
 
 _JSON_STRING_CHAR = rb'(?:[^"\\]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))'
 
+
+def _class_marker(*words: str) -> re.Pattern[bytes]:
+    """Build the pattern of a `class_name` pair naming one of `words`, bare or dotted."""
+    return re.compile(
+        b'"'
+        + _json_spelling("class_name")
+        + b'"[ \t\n\r]*:[ \t\n\r]*"(?:'
+        + _JSON_STRING_CHAR
+        + b"*"
+        + _json_spelling(".")
+        + b")?(?:"
+        + b"|".join(_json_spelling(word) for word in words)
+        + b')"'
+    )
+
+
 # A Lambda layer declares itself with this key/value pair; matching the bare word
 # "Lambda" reported any layer a user happened to *name* "Lambda". Keras resolves a
 # dotted class name through its export registry (`layers.Lambda` under module
 # `keras`), and reads the config with `json.loads`, so the pattern accepts any
 # dotted prefix and every spelling that decoder turns into the pair: any character
 # as a unicode escape, JSON whitespace around the colon.
-_CLASS_MARKER = re.compile(
-    b'"'
-    + _json_spelling("class_name")
-    + b'"[ \t\n\r]*:[ \t\n\r]*"(?:'
-    + _JSON_STRING_CHAR
-    + b"*"
-    + _json_spelling(".")
-    + b")?"
-    + _json_spelling(_LAMBDA)
-    + b'"'
-)
+_CLASS_MARKER = _class_marker(_LAMBDA)
 _CLASS_MARKER_TEXT = re.compile(_CLASS_MARKER.pattern.decode("ascii"))
+# tf_keras rebuilds these layers by looking the TensorFlow function their config names up
+# in the `tf` namespace and calling it, so the config chooses what runs; `ClassMethod`
+# does the same with a class and the name of a method called on it.
+_TF_OP_LAYERS = ("TFOpLambda", "SlicingOpLambda")
+_CLASS_METHOD_LAYER = "ClassMethod"
+_TF_OP_MARKER = _class_marker(*_TF_OP_LAYERS, _CLASS_METHOD_LAYER)
+_TF_OP_MARKER_TEXT = re.compile(_TF_OP_MARKER.pattern.decode("ascii"))
+_TF_SYMBOL = re.compile(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")
+_TF_COMPAT_PREFIXES = ("compat.v1.", "compat.v2.")
+_PURE_TF_NAMESPACES = (
+    "__operators__.",
+    "bitwise.",
+    "dtypes.",
+    "experimental.numpy.",
+    "image.",
+    "linalg.",
+    "math.",
+    "nn.",
+    "quantization.",
+    "ragged.",
+    "random.",
+    "sets.",
+    "signal.",
+    "sparse.",
+    "strings.",
+)
+"""TensorFlow namespaces of tensor arithmetic only: nothing in them reads or writes a file,
+starts a process or calls back into Python."""
+_PURE_TF_FUNCTIONS = frozenset(
+    {
+        "abs", "add", "add_n", "argmax", "argmin", "argsort", "batch_to_space", "bitcast",
+        "boolean_mask", "broadcast_dynamic_shape", "broadcast_static_shape", "broadcast_to",
+        "cast", "clip_by_global_norm", "clip_by_norm", "clip_by_value", "complex", "concat",
+        "constant", "convert_to_tensor", "cos", "cumsum", "depth_to_space", "divide",
+        "dynamic_partition", "dynamic_stitch", "einsum", "ensure_shape", "equal", "exp",
+        "expand_dims", "extract_volume_patches", "eye", "fill", "floor", "floordiv",
+        "gather", "gather_nd", "greater", "greater_equal", "histogram_fixed_width",
+        "identity", "identity_n", "less", "less_equal", "linspace", "logical_and",
+        "logical_not", "logical_or", "matmul", "maximum", "meshgrid", "minimum", "multiply",
+        "negative", "norm", "not_equal", "one_hot", "ones", "ones_like", "pad", "pow",
+        "range", "rank", "realdiv", "reduce_all", "reduce_any", "reduce_logsumexp",
+        "reduce_max", "reduce_mean", "reduce_min", "reduce_prod", "reduce_std",
+        "reduce_sum", "reduce_variance", "repeat", "reshape", "reverse", "reverse_sequence",
+        "roll", "round", "scatter_nd", "searchsorted", "sequence_mask", "shape", "shape_n",
+        "sigmoid", "sign", "sin", "size", "slice", "sort", "space_to_batch",
+        "space_to_batch_nd", "space_to_depth", "split", "sqrt", "square", "squeeze",
+        "stack", "stop_gradient", "strided_slice", "subtract", "tan", "tanh",
+        "tensor_scatter_nd_add", "tensor_scatter_nd_max", "tensor_scatter_nd_min",
+        "tensor_scatter_nd_sub", "tensor_scatter_nd_update", "tensordot", "tile",
+        "transpose", "truediv", "unique", "unravel_index", "unstack", "where", "zeros",
+        "zeros_like",
+    }
+)  # fmt: skip
+"""Top-level TensorFlow functions that only compute on tensors."""
+_PURE_TF_CLASS_METHODS = {
+    "RaggedTensor": frozenset(
+        {
+            "from_nested_row_lengths",
+            "from_nested_row_splits",
+            "from_nested_value_rowids",
+            "from_row_lengths",
+            "from_row_limits",
+            "from_row_splits",
+            "from_row_starts",
+            "from_sparse",
+            "from_tensor",
+            "from_uniform_row_length",
+            "from_value_rowids",
+        }
+    ),
+    "SparseTensor": frozenset({"from_value"}),
+}
+"""Class methods that only build a tensor from tensors: the ones tf_keras records for a
+`ClassMethod` layer."""
 
 
 def _is_lambda_class(class_name: object) -> bool:
@@ -107,6 +197,71 @@ def _is_lambda_class(class_name: object) -> bool:
     return isinstance(class_name, str) and (
         class_name == _LAMBDA or class_name.endswith("." + _LAMBDA)
     )
+
+
+def _layer_class(class_name: object) -> str | None:
+    """Return which TF call layer a `class_name` names, bare or dotted; None for any other."""
+    if not isinstance(class_name, str):
+        return None
+    return next(
+        (
+            layer
+            for layer in (*_TF_OP_LAYERS, _CLASS_METHOD_LAYER)
+            if class_name == layer or class_name.endswith("." + layer)
+        ),
+        None,
+    )
+
+
+def _is_tf_call_class(class_name: object) -> bool:
+    """Whether a `class_name` names a layer that calls the TensorFlow callable it names."""
+    return _layer_class(class_name) is not None
+
+
+def _without_compat(symbol: str) -> str:
+    for prefix in _TF_COMPAT_PREFIXES:
+        symbol = symbol.removeprefix(prefix)
+    return symbol
+
+
+def _is_pure_tf_op(symbol: str) -> bool:
+    """Whether a TensorFlow name is a function that only computes on tensors."""
+    symbol = _without_compat(symbol)
+    return symbol in _PURE_TF_FUNCTIONS or (
+        symbol.startswith(_PURE_TF_NAMESPACES) and not symbol.endswith(".")
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _TfCall:
+    """What one TF call layer calls: its class, and the callable's `tf.` name, if it names one."""
+
+    layer: str
+    symbol: str | None
+    pure: bool = False
+
+
+def _tf_call(node: object) -> _TfCall:
+    """Read what a TF call layer's config makes tf_keras call when the model loads."""
+    layer = _layer_class(node.get("class_name")) if isinstance(node, dict) else None
+    config = node.get("config") if isinstance(node, dict) else None
+    if layer is None or not isinstance(config, dict):
+        return _TfCall(layer or _TF_OP_LAYERS[0], None)
+    if layer == _CLASS_METHOD_LAYER:
+        owner, method = config.get("cls_symbol"), config.get("method_name")
+        if not (
+            isinstance(owner, str)
+            and _TF_SYMBOL.fullmatch(owner)
+            and isinstance(method, str)
+            and method.isidentifier()
+        ):
+            return _TfCall(layer, None)
+        pure = method in _PURE_TF_CLASS_METHODS.get(_without_compat(owner), frozenset())
+        return _TfCall(layer, f"{owner}.{method}", pure)
+    function = config.get("function")
+    if not (isinstance(function, str) and _TF_SYMBOL.fullmatch(function)):
+        return _TfCall(layer, None)
+    return _TfCall(layer, function, _is_pure_tf_op(function))
 
 
 # Not None: a config whose JSON is `null` was read, and is no model either.
@@ -121,16 +276,27 @@ class _OversizedConfig:
     prefix: bytes
 
 
-def _iter_lambda_configs(node: object) -> Iterator[object]:
-    """Yield the `config` of every object in the tree whose `class_name` is Lambda."""
+def _iter_class_nodes(node: object, is_class: Callable[[object], bool]) -> Iterator[object]:
+    """Yield every object in the tree whose `class_name` `is_class` accepts."""
     if isinstance(node, dict):
-        if _is_lambda_class(node.get("class_name")):
-            yield node.get("config")
+        if is_class(node.get("class_name")):
+            yield node
         for value in node.values():
-            yield from _iter_lambda_configs(value)
+            yield from _iter_class_nodes(value, is_class)
     elif isinstance(node, list):
         for item in node:
-            yield from _iter_lambda_configs(item)
+            yield from _iter_class_nodes(item, is_class)
+
+
+def _iter_class_configs(node: object, is_class: Callable[[object], bool]) -> Iterator[object]:
+    """Yield the `config` of every object in the tree whose `class_name` `is_class` accepts."""
+    for found in _iter_class_nodes(node, is_class):
+        yield found.get("config") if isinstance(found, dict) else None
+
+
+def _iter_lambda_configs(node: object) -> Iterator[object]:
+    """Yield the `config` of every object in the tree whose `class_name` is Lambda."""
+    return _iter_class_configs(node, _is_lambda_class)
 
 
 def _dangerous_module(config: object) -> str | None:
@@ -162,44 +328,63 @@ def _last_brace(text: str, low: int, high: int) -> int:
     return text.rfind("{", low, high)
 
 
-def _module_in_marked_layers(data: bytes) -> str | None:
-    """Return a dangerous module a marked Lambda layer references, if one decodes.
+def _marked_layer_configs(
+    text: str, marker: re.Pattern[str], select: Callable[[object], Iterator[object]]
+) -> Iterator[list[object]]:
+    """Yield, for each marker in `text`, what `select` takes from the marked layers around it.
 
-    Walks back from each class marker to the nearest `{` whose object decodes and
-    holds a Lambda, the layer itself, so its body is read the way Keras reads it.
-    No search reaches below the previous marker and the decoder parses a bounded
-    multiple of the text, so the work stays linear in the bytes read.
+    Walks back from the marker to the nearest `{` whose object decodes and holds such a
+    layer, the layer itself, so its body is read the way Keras reads it; an empty list
+    where none does within the bounds. No search reaches below the previous marker and
+    the decoder parses a bounded multiple of the text, so the work stays linear in it.
     """
-    text = data.decode("utf-8", errors="replace")
     budget = _DECODE_BUDGET_FACTOR * len(text)
     floor = 0
-    for marker in _CLASS_MARKER_TEXT.finditer(text):
-        brace = marker.start()
+    for found in marker.finditer(text):
+        brace = found.start()
+        configs: list[object] = []
         for _ in range(_ATTEMPTS_PER_MARKER):
+            if budget <= 0:
+                break
             brace = _last_brace(text, floor, brace)
-            if brace < 0 or budget <= 0:
+            if brace < 0:
                 break
             layer, spent = _decode_from(text, brace)
             budget -= spent
             if layer is None:
                 continue
             try:
-                configs = list(_iter_lambda_configs(layer))
-                module = next(filter(None, map(_dangerous_module, configs)), None)
+                configs = list(select(layer))
             except RecursionError:
                 break
-            if module is not None:
-                return module
             if configs:
                 break
-        if budget <= 0:
-            break
-        floor = marker.start()
+        yield configs
+        floor = found.start()
+
+
+def _module_in_marked_layers(data: bytes) -> str | None:
+    """Return a dangerous module a marked Lambda layer references, if one decodes."""
+    text = data.decode("utf-8", errors="replace")
+    for configs in _marked_layer_configs(text, _CLASS_MARKER_TEXT, _iter_lambda_configs):
+        try:
+            module = next(filter(None, map(_dangerous_module, configs)), None)
+        except RecursionError:
+            continue
+        if module is not None:
+            return module
     return None
 
 
 class KerasLambdaRule(ArtifactRule):
-    """Flag a Keras `Lambda` layer — arbitrary Python that runs when the model loads."""
+    """Flag a Keras `Lambda` layer — arbitrary Python that runs when the model loads.
+
+    A `TFOpLambda` or `ClassMethod` layer, which calls the TensorFlow function or class
+    method its config names, is flagged when that callable is more than tensor arithmetic
+    or construction, and reported unread when it names none. An HDF5 model is found by its
+    signature under a shared name or none; one holding a compressed heap, which a byte
+    search cannot read, is reported unread.
+    """
 
     meta = RuleMeta(
         id="guardana.supply_chain.keras_lambda",
@@ -254,7 +439,7 @@ class KerasLambdaRule(ArtifactRule):
         )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Parse Keras configs structurally; scan HDF5 models for the class marker."""
+        """Parse Keras configs structurally; scan HDF5 models for the class markers."""
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".keras",)):
@@ -265,11 +450,15 @@ class KerasLambdaRule(ArtifactRule):
             yield from self._scan_config(path, config, ctx, "not a readable Keras config")
             ctx.examined(path)
         for path in target.iter_files(_HDF5_SUFFIXES):
-            yield from self._byte_scan(path, ctx, fallback_reason=None)
+            yield from self._byte_scan(path, ctx, fallback_reason=None, hdf5=True)
             ctx.examined(path)
         for path in target.iter_files(_HDF5_SNIFFED_SUFFIXES):
             if _holds_hdf5_signature(path):
-                yield from self._byte_scan(path, ctx, fallback_reason=None)
+                yield from self._byte_scan(path, ctx, fallback_reason=None, hdf5=True)
+                ctx.examined(path)
+        for path in target.iter_files(_NO_SUFFIX):
+            if _hdf5_in_head(path):
+                yield from self._byte_scan(path, ctx, fallback_reason=None, hdf5=True)
                 ctx.examined(path)
 
     def _scan_keras(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
@@ -303,6 +492,7 @@ class KerasLambdaRule(ArtifactRule):
             return
         try:
             modules = [_dangerous_module(found) for found in _iter_lambda_configs(config)]
+            tf_ops = list(_iter_class_nodes(config, _is_tf_call_class))
         except RecursionError:
             reason = "its model config is nested too deeply to walk"
             yield from self._byte_scan(path, ctx, fallback_reason=reason)
@@ -312,13 +502,40 @@ class KerasLambdaRule(ArtifactRule):
             if module is not None:
                 summary += f"; references the {module!r} module (near-certain malicious)"
             yield self._finding(path, summary)
-        if not modules and not isinstance(config, dict):
+        yield from self._judge_tf_ops(path, tf_ops, ctx)
+        if not modules and not tf_ops and not isinstance(config, dict):
             # Keras writes the model as one object; any other root holds no layer to clear.
             yield self._unscanned(path, "the model config is not a JSON object", ctx)
 
-    def _byte_scan(
-        self, path: Path, ctx: RuleContext, *, fallback_reason: str | None
+    def _judge_tf_ops(
+        self, path: Path, layers: list[object], ctx: RuleContext
     ) -> Iterator[Finding]:
+        """Report each TF call layer that calls more than tensor arithmetic, or names nothing.
+
+        Severity is the Lambda layer's: the config picks the code that runs on load, and a
+        callable outside the arithmetic allowlist can read or write files or run a process.
+        """
+        calls = dict.fromkeys(_tf_call(layer) for layer in layers)
+        for call in calls:
+            if call.symbol is not None and not call.pure:
+                yield self._finding(
+                    path,
+                    f"Keras {call.layer} layer calls tf.{call.symbol} on load, which is not a "
+                    "pure math or array op",
+                )
+        for layer in dict.fromkeys(call.layer for call in calls if call.symbol is None):
+            yield self._unscanned(
+                path, f"a {layer} layer names no TensorFlow callable it could be judged by", ctx
+            )
+
+    def _byte_scan(
+        self, path: Path, ctx: RuleContext, *, fallback_reason: str | None, hdf5: bool = False
+    ) -> Iterator[Finding]:
+        """Search a file's first bytes for the class markers.
+
+        An `hdf5` file holding a compressed heap, where an attribute is stored as bytes no
+        search can read, is reported unread beside whatever the search found.
+        """
         prefix = read_bytes_bounded(path, _MAX_CONFIG_BYTES)
         if prefix is None:
             yield self._unscanned(path, "file could not be read", ctx)
@@ -331,6 +548,12 @@ class KerasLambdaRule(ArtifactRule):
             fallback_reason=fallback_reason,
             cut=_PARTLY_READ if truncated else None,
         )
+        if hdf5 and _FILTERED_HEAP.search(data) is not None:
+            yield self._unscanned(
+                path,
+                "it holds an HDF5 heap stored compressed, where its model config may sit unread",
+                ctx,
+            )
 
     def _judge_bytes(
         self,
@@ -341,7 +564,7 @@ class KerasLambdaRule(ArtifactRule):
         fallback_reason: str | None,
         cut: str | None,
     ) -> Iterator[Finding]:
-        """Search bytes read from `path` for the class marker; `cut` says why the rest was not read.
+        """Search bytes read from `path` for class markers; `cut` says why the rest was not read.
 
         A Lambda found in the part read says nothing about the part that was not, so a cut
         is reported beside the finding.
@@ -360,8 +583,24 @@ class KerasLambdaRule(ArtifactRule):
             yield self._unscanned(path, LFS_POINTER_REASON, ctx)
         elif fallback_reason is not None:
             yield self._unscanned(path, fallback_reason, ctx)
+        if _TF_OP_MARKER.search(data) is not None:
+            yield from self._judge_marked_tf_ops(path, data, ctx)
         if cut is not None and (found or fallback_reason is None):
             yield self._unscanned(path, cut, ctx)
+
+    def _judge_marked_tf_ops(self, path: Path, data: bytes, ctx: RuleContext) -> Iterator[Finding]:
+        """Judge the TF op layers marked in raw bytes; one whose layer does not decode is unread."""
+        text = data.decode("utf-8", errors="replace")
+        marked = list(
+            _marked_layer_configs(
+                text, _TF_OP_MARKER_TEXT, lambda layer: _iter_class_nodes(layer, _is_tf_call_class)
+            )
+        )
+        yield from self._judge_tf_ops(path, [layer for each in marked for layer in each], ctx)
+        if not all(marked):
+            yield self._unscanned(
+                path, "a TFOpLambda, SlicingOpLambda or ClassMethod layer could not be decoded", ctx
+            )
 
     def _finding(self, path: Path, summary: str) -> Finding:
         return Finding(
@@ -398,6 +637,12 @@ def _directory_configs(target: FileReader) -> list[Path]:
         if path.name.lower() == _DIRECTORY_CONFIG
         and any((path.parent, sibling) in listed for sibling in _DIRECTORY_SIBLINGS)
     ]
+
+
+def _hdf5_in_head(path: Path) -> bool:
+    """Whether the first bytes of a file with no suffix hold the HDF5 signature; one read."""
+    head = read_bytes_bounded(path, HDF5_HEAD_BYTES)
+    return head is not None and find_hdf5_signature_in_head(head[0]) is not None
 
 
 def _holds_hdf5_signature(path: Path) -> bool:

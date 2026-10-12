@@ -562,3 +562,188 @@ def test_a_lambda_in_the_read_part_of_a_long_h5_does_not_hide_the_unread_rest(
     assert [severity for severity, _ in findings] == ["HIGH", "LOW"]
     assert "first" in findings[1][1]
     assert _unread(tmp_path) == [str(path)]
+
+
+def test_an_hdf5_model_with_no_suffix_is_read(tmp_path: Path) -> None:
+    (tmp_path / "my_model").write_bytes(_hdf5_with_config(_DIRECTORY_LAMBDA))
+    (tmp_path / "behind_a_userblock").write_bytes(
+        b"\x00" * 2048 + _hdf5_with_config(_DIRECTORY_LAMBDA)
+    )
+    rule = KerasLambdaRule()
+    ctx = RuleContext()
+    assert [f.severity.name for f in rule.run(ArtifactTarget(tmp_path), ctx)] == ["HIGH", "HIGH"]
+    assert ctx.examined_paths() == {
+        str(tmp_path / "my_model"),
+        str(tmp_path / "behind_a_userblock"),
+    }
+
+
+def test_a_file_with_no_suffix_that_is_not_hdf5_is_not_read(tmp_path: Path) -> None:
+    (tmp_path / "LICENSE").write_text('"class_name": "Lambda"\n', encoding="utf-8")
+    (tmp_path / "Makefile").write_bytes(b"\x7fELF" + _DIRECTORY_LAMBDA.encode())
+    rule = KerasLambdaRule()
+    ctx = RuleContext()
+    assert list(rule.run(ArtifactTarget(tmp_path), ctx)) == []
+    assert ctx.examined_paths() == frozenset()
+
+
+def _tf_op_layer(function: object, class_name: str = "TFOpLambda") -> dict[str, object]:
+    return {"class_name": class_name, "config": {"name": "op", "function": function}}
+
+
+@pytest.mark.parametrize(
+    "function", ["io.write_file", "compat.v1.io.write_file", "raw_ops.WriteFile", "py_function"]
+)
+def test_a_tf_op_layer_calling_more_than_array_math_is_a_finding(
+    tmp_path: Path, function: str
+) -> None:
+    _write_keras(
+        tmp_path / "model.keras",
+        {"class_name": "Functional", "config": {"layers": [_tf_op_layer(function)]}},
+    )
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["HIGH"]
+    assert f"tf.{function}" in findings[0][1]
+
+
+@pytest.mark.parametrize(
+    "layer",
+    [
+        _tf_op_layer("math.add"),
+        _tf_op_layer("reshape"),
+        _tf_op_layer("compat.v1.nn.relu"),
+        _tf_op_layer("__operators__.getitem", "SlicingOpLambda"),
+        _tf_op_layer("linalg.matmul", "keras.layers.TFOpLambda"),
+    ],
+)
+def test_a_tf_op_layer_doing_array_math_is_clean(tmp_path: Path, layer: dict[str, object]) -> None:
+    _write_keras(
+        tmp_path / "model.keras", {"class_name": "Functional", "config": {"layers": [layer]}}
+    )
+    (tmp_path / "model.h5").write_bytes(_hdf5_with_config(_sequential(json.dumps(layer))))
+    assert _findings(tmp_path) == []
+
+
+@pytest.mark.parametrize("function", [None, 42, "", "math..add", ["io.write_file"]])
+def test_a_tf_op_layer_whose_function_is_not_a_name_is_not_scanned(
+    tmp_path: Path, function: object
+) -> None:
+    _write_keras(
+        tmp_path / "model.keras",
+        {"class_name": "Functional", "config": {"layers": [_tf_op_layer(function)]}},
+    )
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert "TFOpLambda" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.keras")]
+
+
+def test_a_tf_op_layer_in_h5_calling_a_file_op_is_a_finding(tmp_path: Path) -> None:
+    layer = json.dumps(_tf_op_layer("io.write_file"))
+    (tmp_path / "model.h5").write_bytes(_hdf5_with_config(_sequential(layer)))
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["HIGH"]
+    assert "tf.io.write_file" in findings[0][1]
+
+
+def test_a_tf_op_layer_in_h5_whose_config_does_not_decode_is_not_scanned(tmp_path: Path) -> None:
+    (tmp_path / "model.h5").write_bytes(
+        _hdf5_with_config('{"class_name": "TFOpLambda", "config": {"function": "io.wr')
+    )
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert "TFOpLambda" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.h5")]
+
+
+def _fractal_heap(filter_bytes: int) -> bytes:
+    """A fractal heap header as HDF5 writes it, declaring `filter_bytes` of I/O filters."""
+    return b"FRHP\x00" + (8).to_bytes(2, "little") + filter_bytes.to_bytes(2, "little") + bytes(64)
+
+
+def test_an_hdf5_model_with_a_compressed_heap_is_not_cleared(tmp_path: Path) -> None:
+    (tmp_path / "model.h5").write_bytes(
+        _hdf5_with_config(_sequential('{"class_name": "Dense"}')) + _fractal_heap(12)
+    )
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert "compressed" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.h5")]
+
+
+def test_an_hdf5_model_with_an_uncompressed_heap_is_clean(tmp_path: Path) -> None:
+    (tmp_path / "model.h5").write_bytes(
+        _hdf5_with_config(_sequential('{"class_name": "Dense"}')) + _fractal_heap(0)
+    )
+    assert _findings(tmp_path) == []
+
+
+def _class_method_layer(owner: object, method: object) -> dict[str, object]:
+    return {
+        "class_name": "ClassMethod",
+        "config": {"name": "call", "cls_symbol": owner, "method_name": method},
+    }
+
+
+@pytest.mark.parametrize(
+    ("owner", "method"),
+    [("io.gfile.GFile", "write"), ("saved_model", "load"), ("RaggedTensor", "numpy")],
+)
+def test_a_class_method_layer_calling_more_than_tensor_construction_is_a_finding(
+    tmp_path: Path, owner: str, method: str
+) -> None:
+    layer = _class_method_layer(owner, method)
+    _write_keras(
+        tmp_path / "model.keras", {"class_name": "Functional", "config": {"layers": [layer]}}
+    )
+    (tmp_path / "model.h5").write_bytes(_hdf5_with_config(_sequential(json.dumps(layer))))
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["HIGH", "HIGH"]
+    assert all(f"tf.{owner}.{method}" in summary for _, summary in findings)
+
+
+@pytest.mark.parametrize(
+    ("owner", "method"),
+    [
+        ("RaggedTensor", "from_row_splits"),
+        ("compat.v1.RaggedTensor", "from_tensor"),
+        ("SparseTensor", "from_value"),
+    ],
+)
+def test_a_class_method_layer_building_a_tensor_is_clean(
+    tmp_path: Path, owner: str, method: str
+) -> None:
+    layer = _class_method_layer(owner, method)
+    _write_keras(
+        tmp_path / "model.keras", {"class_name": "Functional", "config": {"layers": [layer]}}
+    )
+    (tmp_path / "model.h5").write_bytes(_hdf5_with_config(_sequential(json.dumps(layer))))
+    assert _findings(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    ("owner", "method"), [(None, "from_tensor"), ("RaggedTensor", None), ("RaggedTensor", "a.b")]
+)
+def test_a_class_method_layer_that_names_no_callable_is_not_scanned(
+    tmp_path: Path, owner: object, method: object
+) -> None:
+    _write_keras(
+        tmp_path / "model.keras",
+        {"class_name": "Functional", "config": {"layers": [_class_method_layer(owner, method)]}},
+    )
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert "ClassMethod" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.keras")]
+
+
+def test_a_class_method_layer_in_h5_whose_config_does_not_decode_is_not_scanned(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "model.h5").write_bytes(
+        _hdf5_with_config('{"class_name": "ClassMethod", "config": {"cls_symbol": "io.gf')
+    )
+    findings = _findings(tmp_path)
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert "ClassMethod" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.h5")]

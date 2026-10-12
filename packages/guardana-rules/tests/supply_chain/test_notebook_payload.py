@@ -797,3 +797,114 @@ def test_an_ipython_object_use_the_rule_does_not_read_is_inconclusive(
 def test_an_inert_use_of_the_ipython_object_is_clean(tmp_path: Path, cell: str) -> None:
     (tmp_path / "nb.ipynb").write_text(_notebook(cell))
     assert _run(tmp_path) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "def run(shell):\n    shell.system('ls')\nrun(get_ipython())\n",
+        "ip = get_ipython()\nhelper(ip)\n",
+        "ip = get_ipython()\nhelpers.install(shell=ip)\n",
+        "launch(get_ipython)\n",
+    ],
+)
+def test_the_ipython_object_handed_to_a_call_is_inconclusive(tmp_path: Path, cell: str) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    findings, shortfalls = _run(tmp_path)
+    assert [(sev, outcome) for sev, _, outcome in findings] == [("LOW", "inconclusive")]
+    assert "IPython object" in findings[0][1]
+    assert len(shortfalls) == 1
+
+
+_KERNEL_CHECK_CELL = (
+    "ip = get_ipython()\n"
+    "if isinstance(ip, object) and hasattr(ip, 'kernel'):\n"
+    "    print(type(ip))\n"
+)
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "print(get_ipython())\n",
+        _KERNEL_CHECK_CELL,
+        "getattr(get_ipython(), 'execution_count')\n",
+    ],
+)
+def test_the_ipython_object_given_to_a_builtin_that_runs_nothing_is_clean(
+    tmp_path: Path, cell: str
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    assert _run(tmp_path) == ([], [])
+
+
+def test_a_builtin_name_the_notebook_rebinds_is_not_trusted_with_the_ipython_object(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(
+        _notebook("def print(shell):\n    shell.system('ls')\n", "print(get_ipython())\n")
+    )
+    findings, _ = _run(tmp_path)
+    assert [(sev, outcome) for sev, _, outcome in findings] == [("LOW", "inconclusive")]
+
+
+@pytest.mark.parametrize(
+    ("cells", "script"),
+    [
+        (("!sh setup.sh\n",), "setup.sh"),
+        (("!bash -x scripts/install.sh --fast\n",), "scripts/install.sh"),
+        (("!./run\n",), "./run"),
+        (("!cd repo && ./configure\n",), "./configure"),
+        (("%system tools/stage2.sh\n",), "tools/stage2.sh"),
+        (("system /srv/stage2.sh",), "/srv/stage2.sh"),
+        (("%%bash\nset -e\nbash payload.sh\n",), "payload.sh"),
+        (("%%sh\nsh<payload.sh\n",), "payload.sh"),
+        (("%alias_magic -c time bash", "%%time\nsh<payload.sh\n"), "payload.sh"),
+        (("!source env/activate.sh\n",), "env/activate.sh"),
+        (("!sudo -u builder /bin/bash build.sh\n",), "build.sh"),
+        (("!python train.py --epochs 3\n",), "train.py"),
+        (("get_ipython().system('sh setup.sh')\n",), "setup.sh"),
+    ],
+)
+def test_a_cell_that_runs_a_local_script_is_a_low_finding_naming_it(
+    tmp_path: Path, cells: tuple[str, ...], script: str
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(*cells))
+    findings, shortfalls = _run(tmp_path)
+    assert [(sev, outcome) for sev, _, outcome in findings] == [("LOW", None)]
+    assert findings[0][1].endswith(f": {script}")
+    assert shortfalls == []
+
+
+def test_every_script_a_cell_runs_is_named_in_one_finding(tmp_path: Path) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook("!sh a.sh\n!bash b.sh && sh a.sh\n"))
+    findings, _ = _run(tmp_path)
+    assert [(sev, summary) for sev, summary, _ in findings] == [
+        ("LOW", "cell runs local scripts: a.sh, b.sh")
+    ]
+
+
+def test_a_local_script_beside_a_download_piped_to_a_shell_keeps_the_high_finding(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(f"!{_PIPE}\n!sh setup.sh\n"))
+    findings, _ = _run(tmp_path)
+    assert sorted(sev for sev, _, _ in findings) == ["HIGH", "LOW"]
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "!python -m pip install numpy\n",
+        "!python3 -c 'print(1)'\n",
+        "!pip install -r requirements.txt\n",
+        "!ls -la /tmp > listing.txt 2>&1\n",
+        "!git clone https://example.invalid/repo.git\n",
+        "!/opt/conda/bin/pip install numpy\n",
+        "%%bash\nnvidia-smi\necho done\n",
+        "!sh -c 'echo hi'\n",
+    ],
+)
+def test_a_tool_run_without_a_script_file_is_not_a_local_script(tmp_path: Path, cell: str) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    assert _run(tmp_path) == ([], [])

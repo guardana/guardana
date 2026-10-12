@@ -13,19 +13,23 @@ rule can defend.
 """
 
 import ast
+import collections
+import gzip
 import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 from types import FrameType
+from typing import Any
 
 import pytest
+from guardana.core import inventory
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget
-from guardana.rules.supply_chain import _ast_names
+from guardana.rules.supply_chain import _ast_names, keras_lambda, pickle_opcode
 
 _SOURCE_FILES = 6
 # The one walk belongs to the target; every rule filters its listing.
@@ -181,4 +185,70 @@ def test_name_resolution_grows_linearly_with_a_method_chain(tmp_path: Path) -> N
     assert long <= 3 * short, (
         f"{short} resolver calls for 8 links but {long} for 16 — name resolution is not "
         f"linear in the chain"
+    )
+
+
+def _opens_by_reader(
+    monkeypatch: pytest.MonkeyPatch, watched: set[str]
+) -> collections.Counter[tuple[str, str]]:
+    """Count each open of a watched file name by the module that asked for it."""
+    readers = {
+        Path(module.__file__).name: name
+        for name, module in (
+            ("pickle_opcode", pickle_opcode),
+            ("keras_lambda", keras_lambda),
+            ("inventory", inventory),
+        )
+        if module.__file__ is not None
+    }
+    opens: collections.Counter[tuple[str, str]] = collections.Counter()
+    real_path_open = Path.open
+    real_os_open = os.open
+
+    def note(name: str) -> None:
+        if name not in watched:
+            return
+        frame = sys._getframe(2)
+        while frame is not None and Path(frame.f_code.co_filename).name not in readers:
+            frame = frame.f_back  # type: ignore[assignment]
+        reader = "other" if frame is None else readers[Path(frame.f_code.co_filename).name]
+        opens[name, reader] += 1
+
+    def path_open(self: Path, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        note(self.name)
+        return real_path_open(self, *args, **kwargs)
+
+    def os_open(path: Any, *args: Any, **kwargs: Any) -> int:  # noqa: ANN401
+        note(Path(path).name)
+        return real_os_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", path_open)
+    monkeypatch.setattr(os, "open", os_open)
+    return opens
+
+
+def test_a_file_whose_name_says_nothing_costs_each_reader_one_read(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A file with no suffix, or a `.dat`, may be a pickle or an HDF5 model a loader opens
+    # by its content; finding out that it is neither must cost one bounded read, or every
+    # LICENSE and data file in a repository is read in full by each rule that asks.
+    honest = {
+        "LICENSE": b"x" * 200_000,
+        "table.dat": bytes(range(256)) * 800,
+        "values.dat.gz": gzip.compress(b"1.0 2.0\n" * 50_000),
+    }
+    for name, content in honest.items():
+        (repo / name).write_bytes(content)
+    (repo / "model").write_bytes(b"\x80\x02cos\nsystem\nX\x02\x00\x00\x00id\x85R.")
+    opens = _opens_by_reader(monkeypatch, set(honest))
+    result = _runner().run(ArtifactTarget(repo))
+    assert "guardana.supply_chain.pickle_opcode" in {f.rule_id for f in result.findings}, (
+        "the pickle under no suffix was not read, so the counts measure nothing"
+    )
+    readers = {reader for _name, reader in opens}
+    assert {"pickle_opcode", "inventory"} <= readers
+    assert all(count <= 1 for count in opens.values()), (
+        f"opens per file and reader: {dict(opens)} — a reader opens a file whose name says "
+        f"nothing more than once to find out it is no model"
     )

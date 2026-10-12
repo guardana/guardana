@@ -14,7 +14,11 @@ import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
-from guardana.core.formats.hdf5 import find_hdf5_signature
+from guardana.core.formats.hdf5 import (
+    HDF5_HEAD_BYTES,
+    find_hdf5_signature,
+    find_hdf5_signature_in_head,
+)
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.target import Target
 from guardana.core.target.protocols import ChatEndpoint, FileReader
@@ -25,11 +29,14 @@ _MODEL_SUFFIXES: dict[str, str] = {
     ".onnx": "onnx",
     ".pt": "pytorch",
     ".pth": "pytorch",
+    ".th": "pytorch",
     ".ckpt": "pytorch",
     ".h5": "keras-hdf5",
     ".hdf5": "keras-hdf5",
     ".keras": "keras",
     ".pkl": "pickle",
+    ".pkl3": "pickle",
+    ".mdl": "pickle",
     ".pickle": "pickle",
     ".dill": "pickle",
     ".joblib": "joblib",
@@ -48,11 +55,13 @@ _MODEL_NAME_ENDINGS: tuple[tuple[str, str], ...] = (
     (".pt.tar", "pytorch"),
     (".pt.gz", "compressed-pytorch"),
     (".pth.gz", "compressed-pytorch"),
+    (".ckpt.gz", "compressed-pytorch"),
+    (".npy.gz", "compressed-numpy"),
     (".joblib.lz4", "compressed-pickle"),
     *(
         (f"{base}{codec}", "compressed-pickle")
         for base in (".pkl", ".pickle", ".joblib")
-        for codec in (".gz", ".z", ".xz", ".bz2", ".lzma")
+        for codec in (".gz", ".gzip", ".z", ".xz", ".bz2", ".lzma")
     ),
 )
 """Model files named by more than their last suffix, matched against the whole name."""
@@ -99,13 +108,18 @@ _SNIFFED_SUFFIXES: dict[str, tuple[tuple[bytes, str], ...]] = {
     ".sav": _PICKLE_SIGNATURES,
     ".p": _PICKLE_SIGNATURES,
     ".model": _PICKLE_SIGNATURES,
+    ".dat": _PICKLE_SIGNATURES,
+    "": _PICKLE_SIGNATURES,
     ".hdf": (),
     ".weights": (),
     ".tf": (),
 }
 """Suffixes other formats share, listed only when the first bytes name a model container."""
-_HDF5_SNIFFED_SUFFIXES = frozenset({".bin", ".model", ".hdf", ".weights", ".tf"})
+_HDF5_SNIFFED_SUFFIXES = frozenset({".bin", ".model", ".hdf", ".weights", ".tf", ""})
 """Suffixes also listed when they hold an HDF5 file, which a Keras loader opens by content."""
+_HEAD_SNIFFED_SUFFIXES = frozenset({""})
+"""Suffixes that name nothing at all, so the HDF5 signature is looked for in one bounded read
+of the file's head rather than wherever a userblock may put it."""
 _KERAS_HDF5 = "keras-hdf5"
 _MODEL_DIRECTORY_FILES: dict[str, tuple[tuple[str, ...], str]] = {
     "config.json": (("metadata.json", "model.weights.h5"), "keras-directory"),
@@ -145,18 +159,21 @@ def _regular_file(path: Path) -> bool:
 
 
 def _sniffed_format(
-    path: Path, signatures: tuple[tuple[bytes, str], ...], *, hdf5: bool
+    path: Path, signatures: tuple[tuple[bytes, str], ...], *, hdf5: bool, head_only: bool
 ) -> str | None:
     if not _regular_file(path):
         return None
     try:
         with path.open("rb") as handle:
-            head = handle.read(4)
+            head = handle.read(HDF5_HEAD_BYTES if head_only else 4)
             named = next((name for magic, name in signatures if head.startswith(magic)), None)
             if named is not None or not hdf5:
                 return named
-            size = os.fstat(handle.fileno()).st_size
-            return _KERAS_HDF5 if find_hdf5_signature(handle, size) is not None else None
+            if head_only:
+                found = find_hdf5_signature_in_head(head)
+            else:
+                found = find_hdf5_signature(handle, os.fstat(handle.fileno()).st_size)
+            return _KERAS_HDF5 if found is not None else None
     except OSError:
         return None
 
@@ -176,7 +193,10 @@ def _model_format(path: Path, suffix: str, name: str) -> str | None:
         return _MODEL_NAMES[name]
     if suffix in _SNIFFED_SUFFIXES:
         return _sniffed_format(
-            path, _SNIFFED_SUFFIXES[suffix], hdf5=suffix in _HDF5_SNIFFED_SUFFIXES
+            path,
+            _SNIFFED_SUFFIXES[suffix],
+            hdf5=suffix in _HDF5_SNIFFED_SUFFIXES,
+            head_only=suffix in _HEAD_SNIFFED_SUFFIXES,
         )
     return None
 
