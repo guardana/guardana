@@ -97,7 +97,8 @@ named by its file: a pickle, archive or graph that does not parse, a pickle impo
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
 extension-registry code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file with a malformed header (including a tensor entry
-with a missing or mistyped `dtype`, `shape` or `data_offsets`), an ONNX
+with a missing or mistyped `dtype`, `shape` or `data_offsets`, and tensors that do not
+describe the payload exactly), a GGUF file declaring an unsupported version, an ONNX
 file without a graph (including an empty file), a `.keras` archive or Keras model directory
 whose `config.json` is not a JSON object and declares no Lambda layer, a file cut by a read bound, an archive refused
 before it is opened (below), a PMML document past the bound, a notebook that is not JSON

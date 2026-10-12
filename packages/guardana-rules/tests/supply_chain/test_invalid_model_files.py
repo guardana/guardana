@@ -205,10 +205,10 @@ def test_a_git_lfs_pointer_named_as_a_plain_archive_is_left_alone(
 def test_safetensors_with_metadata_stays_clean(tmp_path: Path) -> None:
     tensors = {
         "embed.weight": {"dtype": "BF16", "shape": [2, 1], "data_offsets": [0, 4]},
-        "scale": {"dtype": "F32", "shape": [], "data_offsets": [0, 4]},
+        "scale": {"dtype": "F32", "shape": [], "data_offsets": [4, 8]},
     }
     (tmp_path / "model.safetensors").write_bytes(
-        build_safetensors(tensors, metadata={"format": "pt"})
+        build_safetensors(tensors, metadata={"format": "pt"}, data=b"\x00" * 8)
     )
 
     _assert_clean(ModelFormatRule(), tmp_path)

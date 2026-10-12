@@ -131,6 +131,10 @@ NOT_A_DOCUMENT: dict[str, str] = {
         "the oldest GGUF container this reader parses — somebody else's format, which "
         "Guardana reads and never writes"
     ),
+    "guardana.core.formats.gguf._MAX_VERSION": (
+        "the newest GGUF container this reader parses — somebody else's format, which "
+        "Guardana reads and never writes"
+    ),
     "guardana.core.evaluator.llm_judge.DEFAULT_PROMPT_VERSION": (
         "which judge prompt a run used, recorded inside the run manifest, which has its own gate"
     ),

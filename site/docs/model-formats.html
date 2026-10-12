@@ -230,7 +230,7 @@ template = metadata.text(&quot;tokenizer.chat_template&quot;)
 </tr>
 <tr>
 <td><strong>Bounded</strong></td>
-<td>Sizes claimed <em>inside</em> a file are checked against <code>Limits</code> before anything is allocated. A header claiming 2⁶⁴ entries costs a <code>FormatError</code>, not the scan.</td>
+<td>Every reader enforces the <code>Limits</code> you pass. <a href="#limits">The table under Limits</a> lists what each bound covers in each reader. Sizes claimed <em>inside</em> a file are checked before anything is allocated. A header claiming 2⁶⁴ entries raises <code>FormatError</code> instead of exhausting the scan.</td>
 </tr>
 <tr>
 <td><strong>Deterministic</strong></td>
@@ -262,6 +262,10 @@ class GgufMetadata:
 </code></pre>
 <p><code>text()</code> is the safe accessor: it returns <code>None</code> when the key is absent <em>or</em> is
 not a string, so a rule never has to type-check an entry itself.</p>
+<p>Versions 2 and 3 are supported. Any other version raises <code>FormatError</code>. Version 1
+uses a different layout, and later versions may also use a different layout.
+Reading either with the version 3 layout would misread every offset after the
+header.</p>
 <h3 id="safetensors--read_safetensors_headerpath--limitsdefault_limits---safetensorsheader">safetensors — <code>read_safetensors_header(path, *, limits=DEFAULT_LIMITS) -&gt; SafetensorsHeader</code></h3>
 <pre><code class="language-python">@dataclass(frozen=True)
 class SafetensorsHeader:
@@ -269,13 +273,18 @@ class SafetensorsHeader:
     tensors: Mapping[str, Mapping[str, object]]
     metadata: Mapping[str, str]           # the __metadata__ block, separated out
 </code></pre>
-<p>Every tensor entry must state a string <code>dtype</code>, a <code>shape</code> that is a list of
-non-negative integers, and <code>data_offsets</code> that lie inside the payload; an entry
-that does not meet these requirements raises <code>FormatError(&quot;malformed safetensors header: '&lt;name&gt;': &lt;what&gt;&quot;)</code>.</p>
 <p><code>metadata</code> is the format's one attacker-writable <em>text</em> channel, so it is
 separated from the tensor index rather than left mixed in with it. A non-string
 value is serialised rather than dropped — a writer smuggling a structure in
 there is exactly what a scanner needs to see.</p>
+<p>The header must describe the payload exactly. Every tensor entry must state a
+<code>dtype</code> defined by the format, a <code>shape</code> that is a list of non-negative integers,
+and <code>data_offsets</code> that lie inside the payload. The product of its <code>shape</code>
+dimensions, multiplied by the dtype's width, must equal the length of its
+<code>data_offsets</code> range. Together, the ranges must cover every payload byte exactly
+once, with no overlaps, gaps or undeclared bytes at the end. A header that breaks
+any of these raises <code>FormatError(&quot;malformed safetensors header: ...&quot;)</code>, naming the
+tensor where there is one.</p>
 <h3 id="onnx--read_onnx_summarypath--limitsdefault_limits---onnxsummary">ONNX — <code>read_onnx_summary(path, *, limits=DEFAULT_LIMITS) -&gt; OnnxSummary</code></h3>
 <pre><code class="language-python">@dataclass(frozen=True)
 class OnnxSummary:
@@ -300,7 +309,11 @@ protobuf message, and that is no model.
 the model will run.</p>
 <p><code>truncated</code> is the honest half of the bound — it says the walk did not finish:
 the field budget ran out, subgraphs were nested deeper than 32 levels, or the
-metadata passed <code>Limits.max_header_bytes</code>. The
+strings kept in the summary exceeded <code>Limits.max_header_bytes</code>. Metadata entries
+have one allowance of that size. The producer, domains and external-data paths
+share a separate allowance of the same size. This keeps a flood of metadata from
+excluding a graph's domains from the summary.
+The
 <code>guardana.supply_chain.onnx_graph</code> rule gives a file one field per two bytes of
 its size, never fewer than 1,000,000 and never more than 8,000,000, so a graph
 below the cap is walked in full. <strong>A partial walk has not cleared the model,
@@ -324,6 +337,44 @@ class Limits:
 <p>Defaults are sized off real models — a 20k-tensor safetensors index is ~1.5 MiB
 of JSON, a 256k-token GGUF vocabulary a few MiB — so honest files stay far
 inside them. Pass your own <code>Limits</code> to tighten them for a constrained runner.</p>
+<p>The table lists what each bound covers in each reader. Exceeding a bound raises
+<code>FormatError</code>, except where the table says the ONNX summary is <code>truncated</code>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>GGUF</th>
+<th>safetensors</th>
+<th>ONNX</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_header_bytes</code></td>
+<td>bytes from the start of the file to the end of the metadata block</td>
+<td>declared header length, checked before reading the header</td>
+<td>separate allowances for metadata entries and other strings kept; exceeding either makes the summary <code>truncated</code></td>
+</tr>
+<tr>
+<td><code>max_entries</code></td>
+<td>metadata entries</td>
+<td>keys in each JSON object in the header, including the tensor index and <code>__metadata__</code></td>
+<td>protobuf fields walked; exceeding the bound makes the summary <code>truncated</code></td>
+</tr>
+<tr>
+<td><code>max_string_bytes</code></td>
+<td>each key and string value</td>
+<td>each string in the header and each non-string <code>__metadata__</code> value after serialisation</td>
+<td>each string read</td>
+</tr>
+<tr>
+<td><code>max_array_items</code></td>
+<td>each array</td>
+<td>each array in the header, including <code>shape</code> and <code>data_offsets</code></td>
+<td>not used: the summary keeps no arrays</td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="writing-a-rule-on-top">Writing a rule on top</h2>
 <p>Every rule on a model format has one shape. Read the file, turn <code>FormatError</code>
 into a visible finding, grade what you got.</p>

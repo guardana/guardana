@@ -18,5 +18,6 @@ def test_refuses_a_value_the_format_cannot_carry() -> None:
 
 def test_safetensors_data_block_is_configurable(tmp_path: Path) -> None:
     path = tmp_path / "w.safetensors"
-    path.write_bytes(build_safetensors(data=b"\x01" * 16))
+    tensors = {"weight": {"dtype": "F32", "shape": [4], "data_offsets": [0, 16]}}
+    path.write_bytes(build_safetensors(tensors, data=b"\x01" * 16))
     assert read_safetensors_header(path).tensors["weight"]["dtype"] == "F32"

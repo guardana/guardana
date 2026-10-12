@@ -55,10 +55,11 @@ class OnnxSummary:
     Node domains and external-data paths are gathered from every graph the model
     carries: the main graph, subgraphs held in node attributes, model-local
     functions and training graphs. `truncated` reports a partial view — the field
-    budget ran out, subgraphs nested past the depth bound, or metadata exceeded
-    `max_header_bytes` — which a caller must not mistake for a complete one. A node
-    or opset import that states its domain more than once contributes every value,
-    and a metadata key stated more than once keeps every value, newline-joined.
+    budget ran out, subgraphs nested past the depth bound, or the metadata or the
+    other strings kept exceeded `max_header_bytes` — which a caller must not
+    mistake for a complete one. A node or opset import that states its domain more
+    than once contributes every value, and a metadata key stated more than once
+    keeps every value, newline-joined.
     """
 
     producer: str
@@ -90,9 +91,10 @@ def read_onnx_summary(path: Path, *, limits: Limits = DEFAULT_LIMITS) -> OnnxSum
             if field.wire_type != WIRE_LENGTH:
                 continue
             if field.number == _MODEL_PRODUCER:
-                producer = reader.text(field, limits.max_string_bytes)
+                kept = walk.kept_text(field)
+                producer = producer if kept is None else kept
             elif field.number == _MODEL_OPSET:
-                opset_domains.extend(_sub_texts(reader, field, _OPSET_DOMAIN, limits))
+                opset_domains.extend(walk.sub_texts(field, _OPSET_DOMAIN))
             elif field.number == _MODEL_METADATA:
                 metadata_bytes += field.end - field.start
                 if metadata_bytes > limits.max_header_bytes:
@@ -133,7 +135,11 @@ def _require_graph(*, has_graph: bool, partial: bool) -> None:
 
 
 class _GraphWalk:
-    """Collects node domains and external-data paths from every graph a model holds."""
+    """Collects node domains and external-data paths from every graph a model holds.
+
+    The strings it keeps share one byte allowance and metadata, counted by the
+    caller, has its own, so a flood of either cannot crowd the other out.
+    """
 
     def __init__(self, reader: ProtoReader, limits: Limits) -> None:
         self.reader = reader
@@ -141,6 +147,34 @@ class _GraphWalk:
         self.node_domains: list[str] = []
         self.external: list[str] = []
         self.truncated = False
+        self._kept_bytes = 0
+
+    def kept_text(self, field: ProtoField) -> str | None:
+        """Read a string the summary keeps, or None once kept strings pass `max_header_bytes`."""
+        if not self._keep(field):
+            return None
+        return self.reader.text(field, self.limits.max_string_bytes)
+
+    def sub_texts(self, parent: ProtoField, number: int) -> tuple[str, ...]:
+        """Read every occurrence of a string sub-field; an absent one is the empty default.
+
+        Protobuf keeps the last of a repeated singular field and other parsers the
+        first, so each stated value is reported rather than betting on one of them.
+        """
+        stated = [
+            field
+            for field in self.reader.fields(parent.start, parent.end)
+            if field.wire_type == WIRE_LENGTH and field.number == number
+        ]
+        texts = (self.kept_text(field) for field in stated)
+        return tuple(text for text in texts if text is not None) if stated else ("",)
+
+    def _keep(self, field: ProtoField) -> bool:
+        self._kept_bytes += field.end - field.start
+        if self._kept_bytes > self.limits.max_header_bytes:
+            self.truncated = True
+            return False
+        return True
 
     def graph(self, graph: ProtoField, *, depth: int) -> None:
         """Walk a `GraphProto`'s nodes and initializers, nested subgraphs included."""
@@ -157,14 +191,17 @@ class _GraphWalk:
 
     def node(self, node: ProtoField, *, depth: int) -> None:
         """Record a `NodeProto`'s domain and walk the tensors and graphs its attributes hold."""
-        domains: list[str] = []
+        stated: list[ProtoField] = []
         attributes: list[ProtoField] = []
         for field in self._messages(node):
             if field.number == _NODE_DOMAIN:
-                domains.append(self.reader.text(field, self.limits.max_string_bytes))
+                stated.append(field)
             elif field.number == _NODE_ATTRIBUTE:
                 attributes.append(field)
-        self.node_domains.extend(domains or ("",))
+        domains = (self.kept_text(field) for field in stated)
+        self.node_domains.extend(
+            (domain for domain in domains if domain is not None) if stated else ("",)
+        )
         for attribute in attributes:
             self.attribute(attribute, depth=depth)
 
@@ -201,7 +238,7 @@ class _GraphWalk:
     def tensor(self, tensor: ProtoField) -> None:
         """Record the file a `TensorProto` keeps its data in, if it names one."""
         for field in self._messages(tensor):
-            if field.number == _TENSOR_EXTERNAL_DATA:
+            if field.number == _TENSOR_EXTERNAL_DATA and self._keep(field):
                 key, value = _entry(self.reader, field, self.limits)
                 if key == _EXTERNAL_LOCATION_KEY:
                     self.external.append(value)
@@ -224,19 +261,3 @@ def _entry(reader: ProtoReader, entry: ProtoField, limits: Limits) -> tuple[str,
         elif field.number == _ENTRY_VALUE:
             value = reader.text(field, limits.max_string_bytes)
     return key, value
-
-
-def _sub_texts(
-    reader: ProtoReader, parent: ProtoField, number: int, limits: Limits
-) -> tuple[str, ...]:
-    """Read every occurrence of a string sub-field; an absent one is the empty default.
-
-    Protobuf keeps the last of a repeated singular field and other parsers the first,
-    so each stated value is reported rather than betting on one of them.
-    """
-    texts = tuple(
-        reader.text(field, limits.max_string_bytes)
-        for field in reader.fields(parent.start, parent.end)
-        if field.wire_type == WIRE_LENGTH and field.number == number
-    )
-    return texts or ("",)

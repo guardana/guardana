@@ -14,9 +14,10 @@ GgufValue = str | int | float | bool | tuple["GgufValue", ...]
 
 _MAGIC = b"GGUF"
 # v1 counted tensors and metadata entries in 32 bits; v2 widened them to 64.
-# Parsing a v1 file with the v2 layout misreads every subsequent offset, so the
-# older layout is refused rather than silently mis-parsed.
+# Parsing another layout as this one misreads every subsequent offset, so v1 and
+# any version newer than this reader knows are refused rather than mis-parsed.
 _MIN_VERSION = 2
+_MAX_VERSION = 3
 _U32_BYTES = 4
 _U64_BYTES = 8
 _MAX_ARRAY_DEPTH = 4
@@ -89,10 +90,11 @@ def _read_metadata(handle: BinaryIO, limits: Limits) -> GgufMetadata:
     if _exact(handle, len(_MAGIC)) != _MAGIC:
         raise FormatError("not a GGUF file (bad magic)")
     version = _uint(handle, _U32_BYTES)
-    if version < _MIN_VERSION:
+    if not _MIN_VERSION <= version <= _MAX_VERSION:
         raise FormatError(f"unsupported GGUF version {version}")
     tensor_count = _uint(handle, _U64_BYTES)
     entry_count = _uint(handle, _U64_BYTES)
+    _check_budget(handle, limits)
     if entry_count > limits.max_entries:
         raise FormatError(
             f"GGUF declares {entry_count} metadata entries, over the {limits.max_entries} limit"
