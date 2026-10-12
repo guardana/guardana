@@ -20,7 +20,11 @@ from guardana.core.taxonomy import (
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
-from guardana.rules.supply_chain._reading import read_bytes_bounded
+from guardana.rules.supply_chain._reading import (
+    LFS_POINTER_REASON,
+    is_lfs_pointer,
+    read_bytes_bounded,
+)
 
 # TensorFlow SavedModel graph operators that touch the filesystem on model load.
 # In a serialized GraphDef these op types appear verbatim as ASCII, so a bounded
@@ -186,6 +190,9 @@ class SavedModelOpsRule(ArtifactRule):
             yield self._unscanned(path, ctx, "the file could not be read", "was not read")
             return
         data, truncated = prefix
+        if not truncated and is_lfs_pointer(data):
+            yield self._unscanned(path, ctx, LFS_POINTER_REASON, "was not fetched")
+            return
         if truncated:
             # Past the bound the graph is unread, so an op sitting after it is
             # invisible, and silence about the tail reads exactly like a clean graph.

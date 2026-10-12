@@ -96,10 +96,22 @@ A model or notebook a rule tried to read and could not is a shortfall of the sam
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
 extension-registry code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
-since it may be a model), a safetensors file whose header is malformed, a file cut by a
-read bound, an archive refused before it is opened (below), a PMML document past the
-bound, a notebook that is not JSON, a notebook whose
-`kernelspec.language` or `language_info.name` is not Python. The rule reports
+since it may be a model), a safetensors file with a malformed header (including a tensor entry
+with a missing or mistyped `dtype`, `shape` or `data_offsets`), an ONNX
+file without a graph (including an empty file), a `.keras` archive or Keras model directory
+whose `config.json` is not a JSON object and declares no Lambda layer, a file cut by a read bound, an archive refused
+before it is opened (below), a PMML document past the bound, a notebook that is not JSON
+or has a cell that is not an object or a code cell whose source is not text, a notebook whose
+`kernelspec.language` or `language_info.name` is not Python.
+A Git LFS pointer (`version https://git-lfs.github.com/spec/v1`, what a clone without the
+LFS objects holds; the whole file, not a model that merely opens with one) named as a model a rule reads, a `.pb`, `.bin`, `.sav`, `.p` or `.model`
+included, is reported with the reason `a Git LFS pointer, not the model; fetch the LFS
+object`. It is reported as not scanned, never as a checked model. A pointer named as a
+format no rule reads is the per-format shortfall above. A plain `.zip` or `.tar` names no
+model: it is read by content, and a pointer under that name is not reported. In CI, fetch
+the LFS objects before the scan (`lfs: true` on `actions/checkout`, or `git lfs pull`), or
+exclude the file.
+The rule reports
 two things for it: an inconclusive "not scanned" result on the unverified channel, and an
 `unexamined_component` shortfall whose name is the file's path and whose detail reads
 `<rule id> could not read it: <reason>`. The file is not named a second time by format.

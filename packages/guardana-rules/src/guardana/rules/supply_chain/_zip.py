@@ -14,9 +14,11 @@ Every function reads the open file it is given, so a caller that lists the archi
 same handle lists what was checked.
 """
 
+import lzma
 import os
 import struct
 import zipfile
+import zlib
 from dataclasses import dataclass
 from typing import IO
 
@@ -29,6 +31,21 @@ that declares more is refused before it is opened.
 ZIP_DIRECTORY_MAX_BYTES = ARCHIVE_MAX_ENTRIES * 256
 """The central directory `zipfile` reads whole: 256 bytes for each entry an archive may list,
 room for the 46-byte fixed record, a long path and its extra fields."""
+
+ZIP_ERRORS = (
+    zipfile.BadZipFile,
+    OSError,
+    EOFError,
+    ValueError,
+    RuntimeError,
+    NotImplementedError,
+    OverflowError,
+    struct.error,
+    zlib.error,
+    lzma.LZMAError,
+)
+"""What `zipfile` raises for a crafted archive or member: a damaged stream, a name that is
+not in its declared encoding, an encrypted or unsupported member."""
 
 _END = struct.Struct("<4s4H2LH")
 _END_SIGNATURE = b"PK\x05\x06"

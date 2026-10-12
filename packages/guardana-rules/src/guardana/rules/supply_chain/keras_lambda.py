@@ -26,10 +26,16 @@ from guardana.core.taxonomy import (
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import unread_component, unscanned_verdict
-from guardana.rules.supply_chain._reading import open_regular, read_bytes_bounded
+from guardana.rules.supply_chain._reading import (
+    LFS_POINTER_REASON,
+    is_lfs_pointer,
+    open_regular,
+    read_bytes_bounded,
+)
 from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
     ZIP_DIRECTORY_MAX_BYTES,
+    ZIP_ERRORS,
     listing_refusal,
 )
 
@@ -100,6 +106,10 @@ def _is_lambda_class(class_name: object) -> bool:
     return isinstance(class_name, str) and (
         class_name == _LAMBDA or class_name.endswith("." + _LAMBDA)
     )
+
+
+# Not None: a config whose JSON is `null` was read, and is no model either.
+_UNREADABLE = object()
 
 
 def _iter_lambda_configs(node: object) -> Iterator[object]:
@@ -266,9 +276,9 @@ class KerasLambdaRule(ArtifactRule):
         yield from self._scan_config(path, config, ctx, "not a readable .keras archive")
 
     def _scan_config(
-        self, path: Path, config: object | None, ctx: RuleContext, unreadable: str
+        self, path: Path, config: object, ctx: RuleContext, unreadable: str
     ) -> Iterator[Finding]:
-        if config is None:
+        if config is _UNREADABLE:
             yield from self._byte_scan(path, ctx, fallback_reason=unreadable)
             return
         try:
@@ -282,6 +292,9 @@ class KerasLambdaRule(ArtifactRule):
             if module is not None:
                 summary += f"; references the {module!r} module (near-certain malicious)"
             yield self._finding(path, summary)
+        if not modules and not isinstance(config, dict):
+            # Keras writes the model as one object; any other root holds no layer to clear.
+            yield self._unscanned(path, "the model config is not a JSON object", ctx)
 
     def _byte_scan(
         self, path: Path, ctx: RuleContext, *, fallback_reason: str | None
@@ -300,6 +313,8 @@ class KerasLambdaRule(ArtifactRule):
             if module is not None:
                 summary += f"; references the {module!r} module (near-certain malicious)"
             yield self._finding(path, summary)
+        elif not truncated and is_lfs_pointer(data):
+            yield self._unscanned(path, LFS_POINTER_REASON, ctx)
         elif fallback_reason is not None:
             yield self._unscanned(path, fallback_reason, ctx)
         elif truncated:
@@ -358,23 +373,24 @@ def _holds_hdf5_signature(path: Path) -> bool:
         return False
 
 
-def _read_json_file(path: Path) -> object | None:
-    """Read and parse a JSON file within the read bound; None if unreadable or cut short."""
+def _read_json_file(path: Path) -> object:
+    """Read and parse a JSON file within the read bound; `_UNREADABLE` if unreadable or cut."""
     prefix = read_bytes_bounded(path, _MAX_CONFIG_BYTES)
     if prefix is None or prefix[1]:
-        return None
+        return _UNREADABLE
     try:
         parsed: object = json.loads(prefix[0])
     except (ValueError, RecursionError):
-        return None
+        return _UNREADABLE
     return parsed
 
 
-def _checked_keras_config(path: Path) -> tuple[str | None, object | None]:
+def _checked_keras_config(path: Path) -> tuple[str | None, object]:
     """Why a `.keras` archive must not be listed, else its parsed `config.json`.
 
     Both come from one open handle, so the archive `zipfile` lists is the one the bounds
-    were checked on. `(None, None)` when the file is not a regular file or cannot be read.
+    were checked on. The config is `_UNREADABLE` when the archive was refused, is not a
+    regular file or cannot be read.
     """
     try:
         with io.BufferedReader(open_regular(path)) as handle:
@@ -382,22 +398,22 @@ def _checked_keras_config(path: Path) -> tuple[str | None, object | None]:
                 handle, max_entries=ARCHIVE_MAX_ENTRIES, max_directory_bytes=ZIP_DIRECTORY_MAX_BYTES
             )
             if refusal is not None:
-                return refusal, None
+                return refusal, _UNREADABLE
             return None, _read_keras_config(handle)
     except (OSError, ValueError, OverflowError, struct.error):
-        return None, None
+        return None, _UNREADABLE
 
 
-def _read_keras_config(handle: BinaryIO) -> object | None:
-    """Read and parse `config.json` from a `.keras` archive; None if unreadable."""
+def _read_keras_config(handle: BinaryIO) -> object:
+    """Read and parse `config.json` from a `.keras` archive; `_UNREADABLE` if it cannot be."""
     try:
         with zipfile.ZipFile(handle) as archive:
             if "config.json" not in archive.namelist():
-                return None
+                return _UNREADABLE
             with archive.open("config.json") as member:
                 raw = member.read(_MAX_CONFIG_BYTES)
         parsed: object = json.loads(raw)
-    except (zipfile.BadZipFile, OSError, ValueError, OverflowError, RecursionError):
-        return None
+    except (*ZIP_ERRORS, RecursionError):
+        return _UNREADABLE
     else:
         return parsed

@@ -78,6 +78,20 @@ def _languages(doc: dict[str, object]) -> list[str]:
     ]
 
 
+def _malformed_cell(cell: object) -> str | None:
+    """Say how a cell breaks the notebook format in a way that would hide code; else None."""
+    if not isinstance(cell, dict):
+        return "is not a JSON object"
+    if cell.get("cell_type") != "code":
+        return None
+    source = cell.get("source")
+    if isinstance(source, str):
+        return None
+    if isinstance(source, list) and all(isinstance(line, str) for line in source):
+        return None
+    return "has a source that is not text"
+
+
 def _is_python(language: str) -> bool:
     return re.fullmatch(r"i?python[\d.]*", language.strip().lower().replace(" ", "")) is not None
 
@@ -174,10 +188,17 @@ class NotebookPayloadRule(ArtifactRule):
             yield self._unscanned(path, reason, ctx)
             return
         scan = _NotebookScan(path, ctx)
+        malformed: str | None = None
         for index, cell in enumerate(cells):
+            problem = _malformed_cell(cell)
+            if problem is not None:
+                malformed = malformed or f"cell {index} {problem}"
+                continue
             source = _cell_source(cell)
             if source is not None:
                 yield from self._scan_cell(scan, index, read_cell(source, scan.state))
+        if malformed is not None:
+            yield self._unscanned(path, malformed, ctx)
 
     def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
         """Say the notebook was not examined, rather than returning as if it were clean."""

@@ -350,10 +350,21 @@ install a rule that reads the format.</p>
 named by its file: a pickle, archive or graph that does not parse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
 extension-registry code (<code>EXT1</code>, <code>EXT2</code>, <code>EXT4</code>), a model file that cannot be opened (a <code>.bin</code> included,
-since it may be a model), a safetensors file whose header is malformed, a file cut by a
-read bound, an archive refused before it is opened (below), a PMML document past the
-bound, a notebook that is not JSON, a notebook whose
-<code>kernelspec.language</code> or <code>language_info.name</code> is not Python. The rule reports
+since it may be a model), a safetensors file with a malformed header (including a tensor entry
+with a missing or mistyped <code>dtype</code>, <code>shape</code> or <code>data_offsets</code>), an ONNX
+file without a graph (including an empty file), a <code>.keras</code> archive or Keras model directory
+whose <code>config.json</code> is not a JSON object and declares no Lambda layer, a file cut by a read bound, an archive refused
+before it is opened (below), a PMML document past the bound, a notebook that is not JSON
+or has a cell that is not an object or a code cell whose source is not text, a notebook whose
+<code>kernelspec.language</code> or <code>language_info.name</code> is not Python.
+A Git LFS pointer (<code>version https://git-lfs.github.com/spec/v1</code>, what a clone without the
+LFS objects holds; the whole file, not a model that merely opens with one) named as a model a rule reads, a <code>.pb</code>, <code>.bin</code>, <code>.sav</code>, <code>.p</code> or <code>.model</code>
+included, is reported with the reason <code>a Git LFS pointer, not the model; fetch the LFS object</code>. It is reported as not scanned, never as a checked model. A pointer named as a
+format no rule reads is the per-format shortfall above. A plain <code>.zip</code> or <code>.tar</code> names no
+model: it is read by content, and a pointer under that name is not reported. In CI, fetch
+the LFS objects before the scan (<code>lfs: true</code> on <code>actions/checkout</code>, or <code>git lfs pull</code>), or
+exclude the file.
+The rule reports
 two things for it: an inconclusive &quot;not scanned&quot; result on the unverified channel, and an
 <code>unexamined_component</code> shortfall whose name is the file's path and whose detail reads
 <code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format.

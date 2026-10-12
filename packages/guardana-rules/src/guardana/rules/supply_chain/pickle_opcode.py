@@ -1,7 +1,6 @@
 import collections
 import hashlib
 import io
-import lzma
 import os
 import pickletools
 import posixpath
@@ -43,7 +42,12 @@ from guardana.rules.supply_chain._npy import (
     read_npy_header,
 )
 from guardana.rules.supply_chain._opcodes import read_opcodes
-from guardana.rules.supply_chain._reading import open_regular, read_bytes_bounded
+from guardana.rules.supply_chain._reading import (
+    LFS_POINTER_REASON,
+    is_lfs_pointer,
+    open_regular,
+    read_bytes_bounded,
+)
 from guardana.rules.supply_chain._tar import (
     TarListing,
     TarListingError,
@@ -53,6 +57,7 @@ from guardana.rules.supply_chain._tar import (
 from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
     ZIP_DIRECTORY_MAX_BYTES,
+    ZIP_ERRORS,
     declared_directory_start,
     member_disagreement,
 )
@@ -288,20 +293,7 @@ _MAX_FRAME_STARTS = 16
 # member inside. nullifAI evaded torch.load AND picklescan with a 7z archive,
 # which we cannot decompress — so we flag it loud rather than pass it clean.
 _ZIP_MAGIC = b"PK\x03\x04"
-_ZIP_ERRORS = (
-    zipfile.BadZipFile,
-    OSError,
-    EOFError,
-    ValueError,
-    RuntimeError,
-    NotImplementedError,
-    OverflowError,
-    struct.error,
-    zlib.error,
-    lzma.LZMAError,
-)
-"""What `zipfile` raises for a crafted archive or member: a damaged stream, a name that is
-not in its declared encoding, an encrypted or unsupported member."""
+_ZIP_ERRORS = ZIP_ERRORS
 _EXTRA_HEADER = struct.Struct("<HH")
 _UNICODE_PATH_EXTRA = 0x7075
 _UNICODE_PATH_HEADER = struct.Struct("<BL")
@@ -1503,11 +1495,17 @@ class PickleOpcodeRule(ArtifactRule):
             # Not a regular file (a FIFO named `model.pkl` blocks a plain read forever)
             # or unreadable. Either way it is unexamined, not clean; a `.bin` only when
             # it is a file, since one that cannot be opened may well be a model.
-            if by_content and not _maybe_a_file(path):
-                return False
-            report.unscanned(_UNREADABLE)
-            return True
+            maybe_a_model = not by_content or _maybe_a_file(path)
+            if maybe_a_model:
+                report.unscanned(_UNREADABLE)
+            return maybe_a_model
         magic = sniffed[0]
+        # A `.bin` or `.model` is named as a model although it is read by content; a plain
+        # `.zip` or `.tar` names no model, so a pointer under that name is left alone.
+        named_as_model = not by_content or report.path.suffix.lower() in _SNIFFED_SUFFIXES
+        if named_as_model and not sniffed[1] and is_lfs_pointer(magic):
+            report.unscanned(LFS_POINTER_REASON)
+            return True
         if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
             return self._scan_zip(report)
         if report.plain_zip and _is_zip(path):

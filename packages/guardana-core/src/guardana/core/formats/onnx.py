@@ -6,6 +6,7 @@ from types import MappingProxyType
 
 from guardana.core.formats._protobuf import WIRE_LENGTH, ProtoField, ProtoReader
 from guardana.core.formats._stream import open_regular
+from guardana.core.formats.errors import FormatError
 from guardana.core.formats.limits import DEFAULT_LIMITS, Limits
 
 # ONNX field numbers, from the published `onnx.proto` schema. Only the handful a
@@ -73,7 +74,8 @@ def read_onnx_summary(path: Path, *, limits: Limits = DEFAULT_LIMITS) -> OnnxSum
 
     Streams from disk and seeks past tensor payloads, so a multi-gigabyte model
     costs a few kilobytes of reading. Raises `FormatError` when the bytes are not
-    a walkable protobuf message.
+    a walkable protobuf message, or when a message walked in full holds no graph:
+    an empty file parses as an empty message, and that is no model.
     """
     with open_regular(path) as handle:
         size = os.fstat(handle.fileno()).st_size
@@ -83,6 +85,7 @@ def read_onnx_summary(path: Path, *, limits: Limits = DEFAULT_LIMITS) -> OnnxSum
         opset_domains: list[str] = []
         metadata: dict[str, list[str]] = {}
         metadata_bytes = 0
+        has_graph = False
         for field in reader.fields(0, size):
             if field.wire_type != WIRE_LENGTH:
                 continue
@@ -100,11 +103,13 @@ def read_onnx_summary(path: Path, *, limits: Limits = DEFAULT_LIMITS) -> OnnxSum
                 # twice keeps every value, and one cannot hide the other.
                 metadata.setdefault(key, []).append(value)
             elif field.number == _MODEL_GRAPH:
+                has_graph = True
                 walk.graph(field, depth=0)
             elif field.number == _MODEL_FUNCTIONS:
                 walk.function(field)
             elif field.number == _MODEL_TRAINING_INFO:
                 walk.training_info(field)
+        _require_graph(has_graph=has_graph, partial=reader.truncated)
         return OnnxSummary(
             producer=producer,
             opset_domains=tuple(opset_domains),
@@ -115,6 +120,16 @@ def read_onnx_summary(path: Path, *, limits: Limits = DEFAULT_LIMITS) -> OnnxSum
             external_data_paths=tuple(walk.external),
             truncated=walk.truncated or reader.truncated,
         )
+
+
+def _require_graph(*, has_graph: bool, partial: bool) -> None:
+    """Refuse a model walked in full that holds no graph.
+
+    A walk the field budget cut short may have stopped before the graph, and it is
+    already reported as partial.
+    """
+    if not has_graph and not partial:
+        raise FormatError("ONNX model without a graph")
 
 
 class _GraphWalk:

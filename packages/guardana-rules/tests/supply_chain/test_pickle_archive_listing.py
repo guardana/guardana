@@ -837,7 +837,7 @@ def test_the_zip_listing_check_never_opens_a_fifo(tmp_path: Path) -> None:
         worker.join(timeout=10)
 
     assert not blocked
-    assert refusals == [(None, None)]
+    assert refusals == [(None, keras_lambda._UNREADABLE)]
 
 
 def _replaced_after(

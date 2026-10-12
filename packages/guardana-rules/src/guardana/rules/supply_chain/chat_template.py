@@ -26,6 +26,7 @@ from guardana.rules.supply_chain._leads import unread_component, unscanned_verdi
 from guardana.rules.supply_chain._reading import (
     MAX_SCAN_BYTES,
     read_bytes_bounded,
+    read_model,
     read_text_prefix,
 )
 
@@ -113,7 +114,7 @@ class ChatTemplateRule(ArtifactRule):
 
     def _scan_gguf(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         try:
-            metadata = read_gguf_metadata(path)
+            metadata = read_model(read_gguf_metadata, path)
         except FormatError as exc:
             yield self._unscanned(path, str(exc), ctx)
             return

@@ -116,3 +116,39 @@ def test_rejects_a_tensor_entry_that_is_not_an_object(tmp_path: Path, entry: obj
 def test_offsets_that_end_exactly_at_the_payload_end_are_accepted(tmp_path: Path) -> None:
     path = _raw_header(tmp_path, {"w": {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]}})
     assert set(read_safetensors_header(path).tensors) == {"w"}
+
+
+@pytest.mark.parametrize(
+    ("entry", "what"),
+    [
+        ({"shape": [1], "data_offsets": [0, 4]}, "'w': dtype is missing"),
+        ({"dtype": None, "shape": [1], "data_offsets": [0, 4]}, "'w': dtype is None"),
+        ({"dtype": ["F32"], "shape": [1], "data_offsets": [0, 4]}, "'w': dtype is ['F32']"),
+        ({"dtype": "F32", "data_offsets": [0, 4]}, "'w': shape is missing"),
+        ({"dtype": "F32", "shape": 1, "data_offsets": [0, 4]}, "'w': shape is 1"),
+        ({"dtype": "F32", "shape": ["1"], "data_offsets": [0, 4]}, "'w': shape is ['1']"),
+        ({"dtype": "F32", "shape": [-1], "data_offsets": [0, 4]}, "'w': shape is [-1]"),
+        ({"dtype": "F32", "shape": [True], "data_offsets": [0, 4]}, "'w': shape is [True]"),
+        ({"dtype": "F32", "shape": [1]}, "'w': data_offsets is missing"),
+    ],
+)
+def test_rejects_a_tensor_entry_with_a_missing_or_mistyped_field(
+    tmp_path: Path, entry: dict[str, object], what: str
+) -> None:
+    """An entry a loader cannot index is a malformed header, never a tensor read as clean."""
+    path = _raw_header(tmp_path, {"w": entry})
+    with pytest.raises(FormatError) as raised:
+        read_safetensors_header(path)
+    assert str(raised.value).startswith(f"malformed safetensors header: {what}")
+
+
+def test_a_scalar_tensor_with_an_empty_shape_is_accepted(tmp_path: Path) -> None:
+    path = _raw_header(tmp_path, {"w": {"dtype": "F32", "shape": [], "data_offsets": [0, 4]}})
+    assert set(read_safetensors_header(path).tensors) == {"w"}
+
+
+def test_a_huge_mistyped_value_is_quoted_short(tmp_path: Path) -> None:
+    path = _raw_header(tmp_path, {"w": {"dtype": "F32", "shape": "x" * 10_000}})
+    with pytest.raises(FormatError) as raised:
+        read_safetensors_header(path)
+    assert len(str(raised.value)) < 300
