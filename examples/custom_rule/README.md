@@ -8,19 +8,17 @@ public entry points the built-ins use — there is no built-in-vs-custom
 distinction at the registry level.
 
 **All four entry-point groups are registered here, and that is deliberate.** A
-documented group nothing registers is a seam nobody has run: `guardana.targets`
-sat in the contract from 0.1 with no example behind it, so `pack validate`
-shipped in 0.18.0 accusing every pack that had a target of not registering one,
-and there was nothing installed anywhere that could notice. `guardana.taxonomies`
-was in the same state until 0.19.0.
+documented group nothing registers is a seam nobody has run: a defect in how
+`pack validate` reads `guardana.targets` or `guardana.taxonomies` would go unnoticed,
+because nothing installed anywhere would exercise it. This package is that registrant
+for all four.
 
 `AcmePromptLibraryTarget` implements the surface it declares, and the tests prove
 it: `tests/test_prompt_library_target.py` runs `guardana.testing.assert_target_conforms`
 against it, then drives a real `Runner` over it and checks that the built-in
-artifact rules — not just Acme's own — actually ran. A target that only declared
-`READ_FILES` without a `FileReader` behind it used to pass every test in this
-package, because none of them ran the `Runner`; this is the one that would have
-caught it.
+artifact rules — not just Acme's own — actually ran. Tests that do not run the
+`Runner` can miss a target that declares `READ_FILES` without a `FileReader`
+behind it; this test checks that the declared surface works in execution.
 
 ## What it ships
 

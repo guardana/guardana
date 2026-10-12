@@ -264,10 +264,9 @@ class GgufMetadata:
 </code></pre>
 <p><code>text()</code> is the safe accessor: it returns <code>None</code> when the key is absent <em>or</em> is
 not a string, so a rule never has to type-check an entry itself.</p>
-<p>Versions 2 and 3 are supported. Any other version raises <code>FormatError</code>. Version 1
-uses a different layout, and later versions may also use a different layout.
-Reading either with the version 3 layout would misread every offset after the
-header.</p>
+<p>Versions 2 and 3 are supported; any other version raises <code>FormatError</code>. Version 1
+uses a different layout, and later versions may too. The version 3 layout would
+misread every offset after the header in either case.</p>
 <h3 id="safetensors--read_safetensors_headerpath--limitsdefault_limits---safetensorsheader">safetensors — <code>read_safetensors_header(path, *, limits=DEFAULT_LIMITS) -&gt; SafetensorsHeader</code></h3>
 <pre><code class="language-python">@dataclass(frozen=True)
 class SafetensorsHeader:
@@ -279,14 +278,12 @@ class SafetensorsHeader:
 separated from the tensor index rather than left mixed in with it. A non-string
 value is serialised rather than dropped — a writer smuggling a structure in
 there is exactly what a scanner needs to see.</p>
-<p>The header must describe the payload exactly. Every tensor entry must state a
-<code>dtype</code> defined by the format, a <code>shape</code> that is a list of non-negative integers,
-and <code>data_offsets</code> that lie inside the payload. The product of its <code>shape</code>
-dimensions, multiplied by the dtype's width, must equal the length of its
-<code>data_offsets</code> range. Together, the ranges must cover every payload byte exactly
-once, with no overlaps, gaps or undeclared bytes at the end. A header that breaks
-any of these raises <code>FormatError(&quot;malformed safetensors header: ...&quot;)</code>, naming the
-tensor where there is one.</p>
+<p>The header must describe the payload exactly. Every tensor entry must specify a
+format-defined <code>dtype</code>, a <code>shape</code> list of non-negative integers, and <code>data_offsets</code>
+inside the payload. The product of its <code>shape</code> dimensions times the dtype's width
+must equal its <code>data_offsets</code> range length. The ranges must cover every payload byte
+exactly once, with no overlaps, gaps or undeclared trailing bytes. A violation raises
+<code>FormatError(&quot;malformed safetensors header: ...&quot;)</code>, naming the tensor when there is one.</p>
 <h3 id="onnx--read_onnx_summarypath--limitsdefault_limits---onnxsummary">ONNX — <code>read_onnx_summary(path, *, limits=DEFAULT_LIMITS) -&gt; OnnxSummary</code></h3>
 <pre><code class="language-python">@dataclass(frozen=True)
 class OnnxSummary:
@@ -303,9 +300,9 @@ reads kilobytes. The walk covers every graph the model carries: the main graph
 and its sparse initializers, tensors and subgraphs held in node attributes
 (Constant values, If/Loop/Scan bodies), model-local functions and training
 graphs. <code>node_domains</code> and <code>external_data_paths</code> collect from all of them.
-A file whose top-level message, walked in full, holds no graph raises
-<code>FormatError(&quot;ONNX model without a graph&quot;)</code>: an empty file parses as an empty
-protobuf message, and that is no model.
+A file whose complete top-level message holds no graph raises
+<code>FormatError(&quot;ONNX model without a graph&quot;)</code>. An empty file parses as an empty
+protobuf message, which is not a model.
 <code>STANDARD_ONNX_DOMAINS</code> is exported alongside it: anything else in
 <code>node_domains</code> means the runtime must register a native operator library before
 the model will run.</p>

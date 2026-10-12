@@ -310,7 +310,7 @@ output cannot decide that a run with open questions is clean.</p>
 </tr>
 <tr>
 <td><code>unknown</code></td>
-<td>the reporter failed, ran past 30 seconds (its <code>sent_secrets()</code> read after the delivery included), or said <code>delivered</code> with no attempt or with a status outside 2xx; whether anything left is unknown</td>
+<td>the reporter failed, ran past 30 seconds including its post-delivery <code>sent_secrets()</code> read, or said <code>delivered</code> with no attempt or a status outside 2xx; whether anything left is unknown</td>
 <td><code>8</code></td>
 </tr>
 </tbody>

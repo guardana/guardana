@@ -29,10 +29,10 @@ before this one could work at all, and neither was obvious from the first:
 
 ## This is an example, not an integration this project carries
 
-**The envelope is `hermes-agent` 0.19.0's, read from the installed package on
-2026-08-15**, and the same shape is what agents with Claude-Code-style hooks emit —
-that dialect is one Hermes explicitly accepts on the response side. A later release of
-any of them may change a payload, and then this stops working.
+**The envelope is `hermes-agent` 0.19.0's, read from the installed package**, and the
+same shape is what agents with Claude-Code-style hooks emit — that dialect is one
+Hermes explicitly accepts on the response side. A release of any of them that
+changes a payload can break this example.
 
 Nothing here imports `hermes-agent`; the payloads are copied. That is what lets the
 tests run in CI without a green build depending on somebody else's release. Checking it

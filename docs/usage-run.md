@@ -144,19 +144,19 @@ A schema-13 run migrates to schema 14 with `recipe: null` and `configuration.pro
 no earlier schema recorded a recipe or the provider wire, so both are unknown, never "no
 recipe" or "the OpenAI wire". `inspect` prints no `recipe:` line for it.
 
-A schema-14 run migrates to schema 15 with `fixtures: null`: no earlier build took a fixtures
-file, so the run was given none.
+A schema-14 run migrates to schema 15 with `fixtures: null`: no earlier schema recorded a fixtures
+file, so the migration represents the run as having none.
 
 A schema-15 run migrates to schema 16 with `execution.max_requests_per_minute: null`: no
-earlier build paced its requests, so the run set no rate.
+earlier schema recorded a request rate, so the migration represents the run as setting no rate.
 
 A schema-16 run migrates to schema 17 with only its version changed: schema 17 adds the
-`not_offered` skip reason and the `target_changed` stop, and no earlier build wrote either.
+`not_offered` skip reason and the `target_changed` stop, and no earlier schema recorded either.
 
 A schema-17 run migrates to schema 18 with `scope.kept_models: []`, `scope.skipped_models:
-null` and `file: null` on every exclude: an earlier build let the target's `.guardanaignore`
-exclude any file, never searched the skipped directories and did not record where a pattern
-came from.
+null` and `file: null` on every exclude: no earlier schema recorded kept or skipped models
+or where a pattern came from. A scan that wrote schema 17 kept no file its target's
+`.guardanaignore` matched, hence `[]`, and did not search the skipped directories, hence `null`.
 
 One thing *is* recovered: the **title** of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
@@ -195,12 +195,8 @@ where it cannot create the temporary file, or an `--output` that is the input's 
 
 **A migration that cannot carry a field refuses, and writes nothing.** The default
 destination is the file itself, so a half-done migration would overwrite the only copy
-of the evidence. In 0.7.0 a version-1 run that never recorded its target kind was
-migrated into the literal string `"None"` — a document that fails this schema, written
-over the original, with exit `0`. Every unit test around migration passed, because
-they asserted on the objects the migration loaded and the objects were fine; what was
-published was the file. There is now a test that validates the *artifact*,
-parametrised over every field a version-1 run could be missing.
+of the evidence. A test validates the written *artifact*, not only the objects the
+migration loads, parametrised over every field a version-1 run could be missing.
 
 ## The document
 
@@ -249,10 +245,10 @@ target; and `run.execution.max_requests_per_minute`, the pace a run's requests w
 Version 17 records `not_offered` in `result_summary.rules_skipped[].reason`, a rule that
 found while it ran that the target does not offer what it examines, and `target_changed` in
 `result_summary.stopped_by`, a run whose target stopped accepting the protocol revision the
-run agreed with it. Version 18 records `scope.excludes[].file`, the file a pattern was read
-from, `scope.kept_models`, the files a model loader reads that the target's `.guardanaignore`
-matched and the scan read anyway, and `scope.skipped_models`, the model files named inside the directories every
-scan skips.
+run agreed with it. Version 18 records `scope.excludes[].file`, the file supplying a
+pattern; `scope.kept_models`, files a model loader reads that the scan reads despite
+matching the target's `.guardanaignore`; and `scope.skipped_models`, model files named
+inside directories every scan skips.
 
 Top level:
 
@@ -359,7 +355,7 @@ documents matched.
 
 The channel that is not about problems. Every other one — findings, unverified,
 errors, coverage shortfall — records something wrong; a check that ran and was
-satisfied used to leave nothing but its id in `rules_run`.
+satisfied would otherwise leave nothing but its id in `rules_run`.
 
 That is enough to gate a build and not enough to answer *did this get better*,
 because fewer findings has three causes and the count cannot separate them: the

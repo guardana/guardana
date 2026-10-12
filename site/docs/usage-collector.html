@@ -466,11 +466,10 @@ a collector that removes evidence because nobody said not to.</p>
 <p><strong>Applying is a command, never a background job.</strong> There is no scheduler in the
 collector, so &quot;what deleted my evidence&quot; is answerable from the audit log rather
 than from source. Run it yourself, or from a cron you wrote.</p>
-<p><code>apply</code> reports and audits the submissions its delete actually removed, so two
-passes started together never both claim the same rows. <code>--dry-run</code> reports how
-many would go at that moment. A read that overlaps a retention pass returns each
-submission with the findings it held when the read began, never a submission
-emptied halfway through.</p>
+<p><code>apply</code> reports and audits the submissions it actually deletes, so concurrent
+passes never claim the same rows. <code>--dry-run</code> reports how many would go at that moment.
+A read overlapping a retention pass returns each submission with its findings
+as they stood when the read began, never emptied halfway through.</p>
 <p>Two things retention deliberately does not touch:</p>
 <ul>
 <li><strong>The audit log.</strong> A log pruned by the policy it describes cannot answer
@@ -579,10 +578,10 @@ at the proxy that already terminates your TLS.</p>
 <p>A credential is charged on its own only after the collector has accepted it; every
 other request — no key, a rejected key, a key no route checked — is charged to the
 peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
-inventing a new token per request cannot buy a fresh one. Whether a key is
-accepted and what it has spent are kept apart: a route that checks no key, such as
-<code>/healthz</code> or <code>/readyz</code>, leaves the key's count where it was, and a key refused by
-one route and accepted again resumes the minute it was already in. The limiter tracks at
+inventing a new token per request cannot buy a fresh one. Key acceptance and
+usage are separate: a route that checks no key, such as <code>/healthz</code> or <code>/readyz</code>,
+leaves its count unchanged. A key refused by one route and accepted again resumes
+its existing minute. The limiter tracks at
 most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its <code>Bearer</code> scheme; an Authorization header with a scheme other than <code>Bearer</code> is charged to the peer address.</p>
 <h2 id="choosing-where-submissions-go">Choosing where submissions go</h2>
 <p>There is no default, on purpose. A store nobody chose is a store somebody
@@ -676,14 +675,13 @@ its whole history, so a refresh costs the same on a collector that has held a
 project for years. The response says which: <code>window.limit</code> is the bound, and
 <code>window.complete</code> is <code>false</code> when older submissions exist that the totals leave
 out. <code>guardana-collector run list --limit N</code> still lists the older runs.</p>
-<p>Nothing found is not the same as nothing missed, so <code>/stats</code> also counts what a run
-did not check. <code>totals.skipped</code> counts the rules runs skipped for any reason other
-than <code>not_applicable</code>; a bare rule id from an agent older than skip reasons counts
-too, because it does not say why. <code>by_gate</code> counts submissions per recorded gate,
-with <code>not_recorded</code> for a run that sent none. Each <code>by_source</code> row carries its
-<code>skipped</code> count and the <code>gate</code> of its newest run (<code>null</code> when that run sent none).
-The page shows skipped checks and indeterminate gates as their own tiles and lists
-each one beside the findings, so a run with a skipped check or an undecided gate
+<p><code>/stats</code> also counts what runs did not check. <code>totals.skipped</code> counts rules skipped
+for any reason except <code>not_applicable</code>. A bare rule id from an agent older than skip
+reasons also counts because it gives no reason. <code>by_gate</code> counts submissions per
+recorded gate, using <code>not_recorded</code> when a run sent none. Each <code>by_source</code> row carries
+its <code>skipped</code> count and its newest run's <code>gate</code> (<code>null</code> when that run sent none).
+The page gives skipped checks and indeterminate gates their own tiles and lists
+each beside the findings. A run with a skipped check or an undecided gate therefore
 never reads as &quot;No findings&quot;.</p>
 <p><code>GET /stats</code> responds only while the dashboard is mounted, to a read key or a signed-in
 browser:</p>
@@ -744,7 +742,7 @@ toy configuration and none for the real one.</p>
 <h2 id="the-http-api">The HTTP API</h2>
 <p>The optional collector stores and serves results submitted by Guardana runs. It starts no scan, probe or other job. Runs execute where Guardana runs (the CLI, CI, the Python API), and the CLI submits them with <code>--reporter server://&lt;collector URL&gt;</code>.</p>
 <p><code>/openapi.json</code> lists routes, key permissions and refusals: <code>401</code> for a missing or unaccepted key, <code>403</code> for insufficient permission, and <code>503</code> when the database cannot be reached to check the key.</p>
-<p>The collector serves no interactive API viewer (<code>/docs</code>, <code>/redoc</code> and <code>/docs/oauth2-redirect</code> answer <code>404</code>), because FastAPI's default viewers load their scripts, styles and fonts from third-party hosts. To browse the API, download the document (<code>curl --fail --show-error &quot;$COLLECTOR_URL/openapi.json&quot; -o openapi.json</code>) and open the file in an OpenAPI viewer installed on your own machine.</p>
+<p>The collector serves no interactive API viewer because FastAPI's default viewers load scripts, styles and fonts from third-party hosts. <code>/docs</code>, <code>/redoc</code> and <code>/docs/oauth2-redirect</code> return <code>404</code>. To browse the API, download the document (<code>curl --fail --show-error &quot;$COLLECTOR_URL/openapi.json&quot; -o openapi.json</code>) and open it in an OpenAPI viewer installed on your machine.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>

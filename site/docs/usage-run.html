@@ -308,15 +308,15 @@ judge is unknown, so <code>diff</code> does not read it as a change of judge.</p
 <p>A schema-13 run migrates to schema 14 with <code>recipe: null</code> and <code>configuration.provider: null</code>:
 no earlier schema recorded a recipe or the provider wire, so both are unknown, never &quot;no
 recipe&quot; or &quot;the OpenAI wire&quot;. <code>inspect</code> prints no <code>recipe:</code> line for it.</p>
-<p>A schema-14 run migrates to schema 15 with <code>fixtures: null</code>: no earlier build took a fixtures
-file, so the run was given none.</p>
+<p>A schema-14 run migrates to schema 15 with <code>fixtures: null</code>: no earlier schema recorded a fixtures
+file, so the migration represents the run as having none.</p>
 <p>A schema-15 run migrates to schema 16 with <code>execution.max_requests_per_minute: null</code>: no
-earlier build paced its requests, so the run set no rate.</p>
+earlier schema recorded a request rate, so the migration represents the run as setting no rate.</p>
 <p>A schema-16 run migrates to schema 17 with only its version changed: schema 17 adds the
-<code>not_offered</code> skip reason and the <code>target_changed</code> stop, and no earlier build wrote either.</p>
-<p>A schema-17 run migrates to schema 18 with <code>scope.kept_models: []</code>, <code>scope.skipped_models: null</code> and <code>file: null</code> on every exclude: an earlier build let the target's <code>.guardanaignore</code>
-exclude any file, never searched the skipped directories and did not record where a pattern
-came from.</p>
+<code>not_offered</code> skip reason and the <code>target_changed</code> stop, and no earlier schema recorded either.</p>
+<p>A schema-17 run migrates to schema 18 with <code>scope.kept_models: []</code>, <code>scope.skipped_models: null</code> and <code>file: null</code> on every exclude: no earlier schema recorded kept or skipped models
+or where a pattern came from. A scan that wrote schema 17 kept no file its target's
+<code>.guardanaignore</code> matched, hence <code>[]</code>, and did not search the skipped directories, hence <code>null</code>.</p>
 <p>One thing <em>is</em> recovered: the <strong>title</strong> of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
 catalogue for the exact <code>(framework, id)</code> pair the document already carries, so
@@ -347,12 +347,8 @@ where it cannot create the temporary file, or an <code>--output</code> that is t
 <code>&lt;stem&gt;.exchanges.jsonl</code> is refused the same way.</p>
 <p><strong>A migration that cannot carry a field refuses, and writes nothing.</strong> The default
 destination is the file itself, so a half-done migration would overwrite the only copy
-of the evidence. In 0.7.0 a version-1 run that never recorded its target kind was
-migrated into the literal string <code>&quot;None&quot;</code> — a document that fails this schema, written
-over the original, with exit <code>0</code>. Every unit test around migration passed, because
-they asserted on the objects the migration loaded and the objects were fine; what was
-published was the file. There is now a test that validates the <em>artifact</em>,
-parametrised over every field a version-1 run could be missing.</p>
+of the evidence. A test validates the written <em>artifact</em>, not only the objects the
+migration loads, parametrised over every field a version-1 run could be missing.</p>
 <h2 id="the-document">The document</h2>
 <p>The saved-run schema lives at
 <a href="https://github.com/guardana/guardana/blob/main/schemas/run-v18.schema.json"><code>schemas/run-v18.schema.json</code></a>, identified by
@@ -398,10 +394,10 @@ target; and <code>run.execution.max_requests_per_minute</code>, the pace a run's
 Version 17 records <code>not_offered</code> in <code>result_summary.rules_skipped[].reason</code>, a rule that
 found while it ran that the target does not offer what it examines, and <code>target_changed</code> in
 <code>result_summary.stopped_by</code>, a run whose target stopped accepting the protocol revision the
-run agreed with it. Version 18 records <code>scope.excludes[].file</code>, the file a pattern was read
-from, <code>scope.kept_models</code>, the files a model loader reads that the target's <code>.guardanaignore</code>
-matched and the scan read anyway, and <code>scope.skipped_models</code>, the model files named inside the directories every
-scan skips.</p>
+run agreed with it. Version 18 records <code>scope.excludes[].file</code>, the file supplying a
+pattern; <code>scope.kept_models</code>, files a model loader reads that the scan reads despite
+matching the target's <code>.guardanaignore</code>; and <code>scope.skipped_models</code>, model files named
+inside directories every scan skips.</p>
 <p>Top level:</p>
 <div class="table-wrap"><table>
 <thead>
@@ -647,7 +643,7 @@ documents matched.</p>
 <h2 id="assessments">Assessments</h2>
 <p>The channel that is not about problems. Every other one — findings, unverified,
 errors, coverage shortfall — records something wrong; a check that ran and was
-satisfied used to leave nothing but its id in <code>rules_run</code>.</p>
+satisfied would otherwise leave nothing but its id in <code>rules_run</code>.</p>
 <p>That is enough to gate a build and not enough to answer <em>did this get better</em>,
 because fewer findings has three causes and the count cannot separate them: the
 system improved, the test got weaker, or the sample changed.</p>

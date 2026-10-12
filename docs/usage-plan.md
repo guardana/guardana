@@ -304,11 +304,12 @@ The JSON carries both as `budgets.max_requests_per_minute` and
 ## A run that could not pass
 
 A `rules.include` pattern that matches no registered rule refuses the plan with exit `3`
-before it selects anything, as it refuses the run, even when another pattern matches and
-whatever `fail_on` says ([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
-The pattern is checked against every rule the run would register, including the rules
-`--rules` and `rules.paths` load and the assertions of the profile's `contracts:`, and against every pass a probe splits into, so a
-canary rule priced in a pass of its own still matches its pattern.
+before selection, just as it refuses the run. This applies even when another pattern
+matches, whatever `fail_on` says ([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
+The check covers every rule the run would register, including rules loaded by
+`--rules` and `rules.paths` and assertions of the profile's `contracts:`. It also covers
+every pass a probe splits into, so a canary rule priced in its own pass still matches
+its pattern.
 
 The plan exits `3` as well when the run it describes could not pass, and says why
 on stderr, one line per cause:

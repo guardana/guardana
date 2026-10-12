@@ -140,36 +140,35 @@ prefix and matches no rule, while `guardana.supply_chain.*` matches the namespac
 
 ### An include pattern must match a rule
 
-Every `rules.include` pattern must match at least one registered rule once every rule
-is loaded: built-in and installed rules and the YAML rules under `rules.paths` and
-`--rules`. The assertions of every contract under `contracts:`, and of every contract
-`analyze-trace` is given with `--contract`, count too, whichever AI system each is
-about: only an `analyze-trace` run about that system executes them, but a pattern
-naming one matches on every command, so one profile serves `scan`, `probe` and the
-trace runs of each system. A pattern that matches none refuses `scan`, `probe`,
+Every `rules.include` pattern must match at least one registered rule after all rules
+load: built-in and installed rules, and YAML rules under `rules.paths` and
+`--rules`. Assertions of every contract under `contracts:`, and every contract
+`analyze-trace` receives through `--contract`, also count, regardless of their AI
+system. Only an `analyze-trace` run for that system executes them, but a pattern
+naming one matches on every command. One profile can therefore serve `scan`, `probe`
+and trace runs of each system. A pattern that matches none refuses `scan`, `probe`,
 `grade`, `monitor`, `analyze-trace`, `baseline`, `recipe` and `plan` with exit `3`,
-even when another pattern matches, before any rule runs, before anything is sent and
-before `probe` starts an MCP server:
+even when another pattern matches. Refusal precedes any rule execution, anything
+sent and `probe` starting an MCP server:
 
 ```text
 error: rules.include contains unmatched patterns: "guardana.supply_chain.code_executon" — check the spelling and registered rules.
 ```
 
 Every unmatched pattern is named once, quoted, in profile order. No `fail_on_*`
-setting relaxes it: a misspelled id would otherwise narrow the run to the rules spelled
-correctly and let it pass. A pattern is checked against registered rules before
-`rules.exclude`, the target's kind, safety limits or capabilities narrow the selection,
-so a pattern whose rules are all excluded, or all for another kind of target, is not
-unmatched; a run left with no rule exits `2` and its plan `3`, as for any selection that
-verifies nothing. The
-bare `*`, the default, is never unmatched. The rules of a plugin pack that
-[`plugins:`](#plugin-trust-plugins) does not admit are not registered, so a pattern
-naming only them is unmatched: admit the pack, or remove the pattern.
-`guardana config validate` checks the patterns the same way before a run, against the
-rules the profile itself names: the built-in and installed rules its `plugins:` trust
-admits, the rules under `rules.paths` and the assertions of every contract under
-`contracts:`. It does not see rules a run loads only with `--rules`, or contracts only
-`--contract` names; list them under `rules.paths` and `contracts:` to validate them
+setting relaxes this check: a misspelled id would otherwise select only the correctly
+spelled rules and let the run pass. Patterns are checked before
+`rules.exclude`, target kind, safety limits or capabilities narrow the selection.
+A pattern whose rules are all excluded, or all for another target kind, is therefore
+not unmatched. A run left with no rule exits `2` and its plan `3`, as for any selection
+that verifies nothing. The bare `*` default is never unmatched. A plugin pack's rules
+are not registered unless [`plugins:`](#plugin-trust-plugins) admits the pack.
+A pattern naming only those rules is unmatched: admit the pack or remove the pattern.
+`guardana config validate` checks patterns the same way before a run, against rules
+the profile names: built-in and installed rules its `plugins:` trust admits, rules
+under `rules.paths` and assertions of every contract under `contracts:`.
+It cannot see rules loaded only with `--rules` or contracts named only by
+`--contract`; list them under `rules.paths` and `contracts:` to validate them
 ([`config validate`](usage-doctor.md)).
 
 ## Plugin trust: `plugins:`

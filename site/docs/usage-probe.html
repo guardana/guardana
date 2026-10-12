@@ -1209,14 +1209,15 @@ declined line holds no reply and is never <code>altered</code>.</li>
 <li>Keeping is off by default. The file holds every reply, passes included, so it widens
 what a leaked run exposes; the collector never receives it. See <a href="privacy.html">privacy</a>.</li>
 <li>A probe that kept nothing writes no file and says so on stderr.</li>
-<li>Any command writing at <code>--output</code> removes the <code>&lt;stem&gt;.exchanges.jsonl</code> beside it when the
-saved run it replaces there recorded exactly those bytes, unless this run writes its own
-there: <code>scan</code>, <code>grade</code>, <code>analyze-trace</code>, <code>import-observations</code>, <code>run migrate</code> (which
-keeps the migrated run's own) and a probe that keeps nothing. Removal also applies when
-an installed <code>--format</code> or redaction fails and writes nothing new; stderr says
-<code>removed …</code>. A sidecar no run saved at <code>--output</code> recorded — no file was there, it is not
-a Guardana run, it records no exchanges or another digest — is kept, and stderr says
-<code>warning: kept …</code>; its name alone never makes it a run's. A failed removal warns without changing the exit code.
+<li>Any command writing at <code>--output</code> removes the adjacent <code>&lt;stem&gt;.exchanges.jsonl</code> only when
+the saved run it replaces recorded exactly those bytes, unless this run writes its own
+exchanges there: <code>scan</code>, <code>grade</code>, <code>analyze-trace</code>, <code>import-observations</code>, <code>run migrate</code>
+(which keeps the migrated run's own) and a probe that keeps nothing. Removal also applies
+when an installed <code>--format</code> or redaction fails and writes nothing new; stderr says
+<code>removed …</code>. A sidecar is kept when no run saved at <code>--output</code> recorded it: no file was
+there, the file is not a Guardana run, or it records no exchanges or another digest.
+Stderr says <code>warning: kept …</code>; the name alone never establishes ownership.
+A failed removal warns without changing the exit code.
 A report or sidecar that cannot be written removes nothing. <code>run</code> and <code>run.json</code> share
 one sidecar path; a sidecar the other saved run records by digest is kept with a warning,
 and a probe that keeps exchanges refuses with exit <code>3</code>, before sending anything, to

@@ -274,11 +274,10 @@ a collector that removes evidence because nobody said not to.
 collector, so "what deleted my evidence" is answerable from the audit log rather
 than from source. Run it yourself, or from a cron you wrote.
 
-`apply` reports and audits the submissions its delete actually removed, so two
-passes started together never both claim the same rows. `--dry-run` reports how
-many would go at that moment. A read that overlaps a retention pass returns each
-submission with the findings it held when the read began, never a submission
-emptied halfway through.
+`apply` reports and audits the submissions it actually deletes, so concurrent
+passes never claim the same rows. `--dry-run` reports how many would go at that moment.
+A read overlapping a retention pass returns each submission with its findings
+as they stood when the read began, never emptied halfway through.
 
 Two things retention deliberately does not touch:
 
@@ -398,10 +397,10 @@ at the proxy that already terminates your TLS.
 A credential is charged on its own only after the collector has accepted it; every
 other request — no key, a rejected key, a key no route checked — is charged to the
 peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
-inventing a new token per request cannot buy a fresh one. Whether a key is
-accepted and what it has spent are kept apart: a route that checks no key, such as
-`/healthz` or `/readyz`, leaves the key's count where it was, and a key refused by
-one route and accepted again resumes the minute it was already in. The limiter tracks at
+inventing a new token per request cannot buy a fresh one. Key acceptance and
+usage are separate: a route that checks no key, such as `/healthz` or `/readyz`,
+leaves its count unchanged. A key refused by one route and accepted again resumes
+its existing minute. The limiter tracks at
 most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its `Bearer` scheme; an Authorization header with a scheme other than `Bearer` is charged to the peer address.
 
 ## Choosing where submissions go
@@ -524,14 +523,13 @@ project for years. The response says which: `window.limit` is the bound, and
 `window.complete` is `false` when older submissions exist that the totals leave
 out. `guardana-collector run list --limit N` still lists the older runs.
 
-Nothing found is not the same as nothing missed, so `/stats` also counts what a run
-did not check. `totals.skipped` counts the rules runs skipped for any reason other
-than `not_applicable`; a bare rule id from an agent older than skip reasons counts
-too, because it does not say why. `by_gate` counts submissions per recorded gate,
-with `not_recorded` for a run that sent none. Each `by_source` row carries its
-`skipped` count and the `gate` of its newest run (`null` when that run sent none).
-The page shows skipped checks and indeterminate gates as their own tiles and lists
-each one beside the findings, so a run with a skipped check or an undecided gate
+`/stats` also counts what runs did not check. `totals.skipped` counts rules skipped
+for any reason except `not_applicable`. A bare rule id from an agent older than skip
+reasons also counts because it gives no reason. `by_gate` counts submissions per
+recorded gate, using `not_recorded` when a run sent none. Each `by_source` row carries
+its `skipped` count and its newest run's `gate` (`null` when that run sent none).
+The page gives skipped checks and indeterminate gates their own tiles and lists
+each beside the findings. A run with a skipped check or an undecided gate therefore
 never reads as "No findings".
 
 `GET /stats` responds only while the dashboard is mounted, to a read key or a signed-in
@@ -576,7 +574,7 @@ The optional collector stores and serves results submitted by Guardana runs. It 
 
 `/openapi.json` lists routes, key permissions and refusals: `401` for a missing or unaccepted key, `403` for insufficient permission, and `503` when the database cannot be reached to check the key.
 
-The collector serves no interactive API viewer (`/docs`, `/redoc` and `/docs/oauth2-redirect` answer `404`), because FastAPI's default viewers load their scripts, styles and fonts from third-party hosts. To browse the API, download the document (`curl --fail --show-error "$COLLECTOR_URL/openapi.json" -o openapi.json`) and open the file in an OpenAPI viewer installed on your own machine.
+The collector serves no interactive API viewer because FastAPI's default viewers load scripts, styles and fonts from third-party hosts. `/docs`, `/redoc` and `/docs/oauth2-redirect` return `404`. To browse the API, download the document (`curl --fail --show-error "$COLLECTOR_URL/openapi.json" -o openapi.json`) and open it in an OpenAPI viewer installed on your machine.
 
 | Route | Permission | Session cookie accepted |
 | --- | --- | --- |

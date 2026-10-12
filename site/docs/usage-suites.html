@@ -331,7 +331,7 @@ fixtures:
 <li>The collector receives the target's request count, not <code>usage.judge</code>.</li>
 <li><code>diff</code> pairs cases across runs but does not test a suite's rate statistically.</li>
 <li>A file holds one calibration per evaluator id.</li>
-<li><code>regex</code> grades replies up to 65,536 characters; longer replies are <code>inconclusive</code>. Each search runs in a separate worker process for at most 2 seconds. Longer searches are stopped and marked <code>inconclusive</code> (&quot;regex search exceeded 2 s; not evaluated&quot;), never a pass. Like any <code>inconclusive</code> result, this makes the run <code>indeterminate</code> (exit <code>2</code>) when <code>fail_on_inconclusive</code> is on. Backtracking patterns, such as nested quantifiers or several <code>.*</code> in a row, can still exhaust this time on a crafted reply; use possessive quantifiers or atomic groups instead.</li>
+<li><code>regex</code> grades replies up to 65,536 characters; longer replies are <code>inconclusive</code>. Each search runs in a separate worker process for at most 2 seconds. A longer search stops with <code>inconclusive</code> (&quot;regex search exceeded 2 s; not evaluated&quot;), never a pass. Like any <code>inconclusive</code> result, it makes the run <code>indeterminate</code> (exit <code>2</code>) when <code>fail_on_inconclusive</code> is on. Backtracking patterns, such as nested quantifiers or several <code>.*</code> in a row, can still exhaust this time on a crafted reply. Use possessive quantifiers or atomic groups instead.</li>
 </ul>
 
 </main>

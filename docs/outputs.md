@@ -68,7 +68,7 @@ delivery: <status> — <name> to <destination>[ (HTTP <code>, <n> attempt|attemp
 | `rejected` | the receiver answered and did not accept it | the verdict's; `8` under `delivery.required` |
 | `unreachable` | the receiver did not answer | the verdict's; `8` under `delivery.required` |
 | `not_sent` | nothing left the machine: the run ended before its report existed, or the reporter declined to send | the verdict's, or the code the command ended with before delivery; `8` under `delivery.required` once the run produced its report |
-| `unknown` | the reporter failed, ran past 30 seconds (its `sent_secrets()` read after the delivery included), or said `delivered` with no attempt or with a status outside 2xx; whether anything left is unknown | `8` |
+| `unknown` | the reporter failed, ran past 30 seconds including its post-delivery `sent_secrets()` read, or said `delivered` with no attempt or a status outside 2xx; whether anything left is unknown | `8` |
 
 The destination is shown without a path, query or credential: Guardana reduces a URL to
 `scheme://host[:port]` before printing it, whatever the reporter gave, and withholds the

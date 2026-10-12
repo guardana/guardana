@@ -250,13 +250,12 @@ receives kept exchanges (<a href="outputs.html#what-an-output-receives">installe
 including this one. There is no useful reading of &quot;keep the credential&quot;: the
 finding is that a secret appeared, not what it was.</p>
 <p><strong><code>custom_patterns</code> run in a separate process, within bounds.</strong> Each pattern gets at most
-2 seconds per text, and a text over 16 Mi characters is not searched. A pattern that misses
-either bound fails the redaction rather than release the text it was meant to clean: when the
-run's results are redacted, nothing is written or sent and the command exits <code>5</code>, or the code
-of the stop when the run had already stopped (<a href="exit-codes.html">exit codes</a>). The
-error names the entry by its position, such as <code>custom_patterns[0]</code>, never by its text, and says
-which bound it missed. A pattern that backtracks without end, such as <code>(a+)+$</code>, does this on a
-long enough run of <code>a</code>.</p>
+2 seconds per text; texts over 16 Mi characters are not searched. A pattern that misses either bound
+fails the redaction without releasing the text. When the run's results are redacted, nothing
+is written or sent and the command exits <code>5</code>, or the stop's code when the run had already
+stopped (<a href="exit-codes.html">exit codes</a>). The error names the entry by position, such as
+<code>custom_patterns[0]</code>, never by its text, and states which bound it missed. A pattern that
+backtracks without end, such as <code>(a+)+$</code>, triggers this failure on a long enough run of <code>a</code>.</p>
 <p><code>redact_secrets: false</code> is <strong>refused at load time</strong>, with a message saying why.
 Until 0.7.1 the switch existed and took effect only at <code>full</code> — so its single
 reachable outcome was writing a working credential into a report, while this page

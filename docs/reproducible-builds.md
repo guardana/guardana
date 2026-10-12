@@ -1,7 +1,7 @@
 ---
 title: "Reproducible builds"
 nav_order: 325
-summary: "rebuild a release from its tag and check, file by file, that it matches what PyPI serves byte for byte"
+summary: "rebuild a release from its tag and compare every file with PyPI byte for byte"
 status: beta
 ---
 
@@ -11,7 +11,7 @@ status: beta
 with PyPI byte for byte. Each release publishes a wheel and a source distribution for
 every package under `packages/`, and for the reference pack (`examples/reference_pack`)
 when configured to publish it. A match means the published file is exactly what the
-tagged source builds into. You need not trust the machine that built it.
+tagged source builds. You need not trust the machine that built it.
 
 ## Run the check yourself
 
@@ -19,8 +19,8 @@ You need `git`, [uv](https://docs.astral.sh/uv/) and network access to `pypi.org
 `files.pythonhosted.org`.
 
 Run the script from a current checkout and point it at a clean checkout of the release
-tag. A tag released before the script existed has no copy of it, so the script always
-comes from the current checkout:
+tag. Some release tags contain no copy of the script, so always use the current
+checkout's copy:
 
 ```bash
 git clone https://github.com/guardana/guardana
@@ -29,8 +29,8 @@ git worktree add --detach ../guardana-v1.0.0rc2 v1.0.0rc2
 uv run --no-project python scripts/reproduce_release.py 1.0.0rc2 --source ../guardana-v1.0.0rc2
 ```
 
-Given no source checkout, the script builds the checkout it runs from, so in a checkout
-of a tag that carries the script this is enough:
+Without a source checkout, the script builds the checkout it runs from. In a tag checkout
+that contains the script, this is enough:
 
 ```bash
 uv run --no-project python scripts/reproduce_release.py VERSION
@@ -85,7 +85,7 @@ Each file gets one line, followed by a count:
 | `NOT CHECKED` | the file was not compared: PyPI could not be read or lists no files, a download did not match its digest, the build failed, a published file was not rebuilt, or a rebuilt file is not published |
 | `NOT PUBLISHED` | PyPI has no reference pack release at the tag's version because this release did not publish it; this does not change the exit status |
 
-`NOT CHECKED` is never a pass. The script could not establish whether the file reproduces
+`NOT CHECKED` is never a pass. The script cannot establish whether the file reproduces
 and states why.
 
 The exit status is `0` when every published file reproduces, `1` when any file differs, and
@@ -109,5 +109,5 @@ A match shows that the tagged source builds into the published files. It does no
 that the source is safe. Build provenance, SBOMs and review of each change serve that
 purpose; see
 [What a release publishes, and how to check it yourself](../SECURITY.md#what-a-release-publishes-and-how-to-check-it-yourself).
-The build backend's dependencies are resolved at build time. A change in one could change
+The build resolves the backend's dependencies at build time. A change in one could change
 a rebuild; the check would report the difference.

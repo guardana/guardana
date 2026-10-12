@@ -10,9 +10,9 @@ action, and whether that was a person.**
 
 ## This is an example, not an integration this project carries
 
-**Written against `hermes-agent` 0.19.0, read from the installed package on 2026-08-15.**
-Hermes is somebody else's project and moves on its own schedule; a later release may
-rename a hook or change a payload, and then this stops working.
+**Written against `hermes-agent` 0.19.0, read from the installed package.**
+Hermes is somebody else's project and moves on its own schedule; a release that
+renames a hook or changes a payload can break this example.
 
 `hermes-agent` is deliberately **not** a dependency of this package, and nothing here
 imports it: the payloads are copied from its documentation and its source. That is what

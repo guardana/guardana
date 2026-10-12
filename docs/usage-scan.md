@@ -123,20 +123,20 @@ with `.guardanaignore` or `rules.paths_exclude`.
 
 ## Chat templates and model configs
 
-`chat_template` reads a chat template wherever a loader takes one from: GGUF metadata
-(`tokenizer.chat_template` and its named variants), the `chat_template` key of
-`tokenizer_config.json`, `chat_template.json` or `processor_config.json` (a string or a list of
-named templates), a `.jinja` or `.j2` file whose name starts with `chat_template`, and every
-`.jinja` or `.j2` file in an `additional_chat_templates/` directory, which transformers 5 loads
-as named templates, the one named `default` ahead of the rest.
+`chat_template` reads chat templates from every location a loader uses: GGUF metadata
+(`tokenizer.chat_template` and its named variants); the `chat_template` key of
+`tokenizer_config.json`, `chat_template.json` or `processor_config.json` (a string or a list
+of named templates); a `.jinja` or `.j2` file whose name starts with `chat_template`; and
+every `.jinja` or `.j2` file in an `additional_chat_templates/` directory. Transformers 5
+loads these directory files as named templates and uses `default` ahead of the rest.
 
 `remote_code_config` reads every `*config.json`. A Hub kernel repository named in
-`_attn_implementation_internal` or `_attn_implementation` is `critical`: transformers sets
-either field from the config without consulting `trust_remote_code`, then downloads and imports
-the kernel. It is read in every form the loader accepts: `org/repo`, with a `@revision`, a
-`:function` or a prefix such as `paged|`; a dict keyed by sub-config name (`{"": "org/repo"}`);
-and inside a nested sub-config such as `text_config` or `decoder`. A kernel named in the
-documented `attn_implementation` field is a `medium` lead.
+`_attn_implementation_internal` or `_attn_implementation` is `critical`. Transformers sets
+either field from the config without consulting `trust_remote_code`, then downloads and
+imports the kernel. The rule reads every accepted form: `org/repo`, with a `@revision`,
+a `:function` or a prefix such as `paged|`; a dict keyed by sub-config name
+(`{"": "org/repo"}`); and a nested sub-config such as `text_config` or `decoder`.
+A kernel named in the documented `attn_implementation` field is a `medium` lead.
 
 ## Model files no rule reads
 
@@ -214,21 +214,21 @@ or cell they spell (`system`, `getoutput`, `run_line_magic`, `run_cell_magic`,
 `run_cell`, `run_cell_async`, a magic returned by `find_line_magic` and called, the same
 methods reached through `getattr`). Its namespaces, history and display data are inert.
 Any other method, an argument that is not a literal, or a method taken without being
-called is reported unscanned: inconclusive and a shortfall. So is a call handed the IPython
-object, or `get_ipython` itself, as an argument (`helper(get_ipython())`), since what the
-callee does with it is not followed; a builtin that only inspects or prints it (`print`,
-`isinstance`, `hasattr`, `type` and the like) is no such call, unless the notebook rebinds
-its name.
+called is reported unscanned: inconclusive and a shortfall. The same applies to a call
+that receives the IPython object, or `get_ipython` itself, as an argument
+(`helper(get_ipython())`), because the rule does not follow what the callee does with it.
+A builtin that only inspects or prints it (`print`, `isinstance`, `hasattr`, `type` and
+the like) is exempt unless the notebook rebinds its name.
 
-A cell that runs a local script gets one `low` finding naming each script as it is written
-in the cell: a file given to `sh`, `bash` or another shell, or to `python`, as an argument or
-as standard input (`sh < setup.sh`); a file passed to `source` or `.`; or a path run as the
-command itself (`./run`, `tools/stage2.sh`, or a bare or absolute name ending in `.sh` or
-`.py`). It counts wherever the shell command comes from: a `!` line, `%system`, a shell cell
-magic, a magic defined with `%alias_magic`, an automagic `system` line or a call on the
-IPython object. What the script runs is not read. `python -m`, `sh -c` with its command
-(which is read for scripts in turn) and a tool run by name are not scripts. A download
-piped to a shell stays the `high` finding it was.
+A cell running a local script gets one `low` finding naming each script as written:
+a file passed to `sh`, `bash` or another shell, or to `python`, as an argument or
+standard input (`sh < setup.sh`); a file passed to `source` or `.`; or a path run as
+the command (`./run`, `tools/stage2.sh`, or a bare or absolute name ending in `.sh` or
+`.py`). This applies wherever the shell command comes from: a `!` line, `%system`,
+a shell cell magic, a magic defined with `%alias_magic`, an automagic `system` line
+or a call on the IPython object. The rule does not read what the script runs.
+`python -m`, `sh -c` with its command (which the rule reads for scripts in turn) and
+a tool run by name are not scripts. A download piped to a shell remains a `high` finding.
 
 An archive is refused before it is opened when listing it would cost more than listing a
 model does. A zip, a `.keras` included, is refused when its end records declare more than
@@ -524,12 +524,12 @@ guardana scan .  --format json --output run.json
 Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
 on the other end cannot parse that.
 
-A scan never writes its report over a file it scanned. An `--output` that is, or whose
-`<stem>.exchanges.jsonl` is, a file the scan read exits `3` after the scan and writes
-nothing. Two files are exempt, each recognised by its content and never by its name: an
-earlier saved run, which `guardana scan . --format json --output run.json` replaces when
-run again, and the exchanges a saved run beside it (`<stem>.json` or `<stem>`) records by
-digest. A recording named `customer.exchanges.jsonl` that no saved run records is refused
+A scan never writes its report over a file it scanned. If `--output` or its
+`<stem>.exchanges.jsonl` is a file the scan read, the command exits `3` after scanning
+and writes nothing. Two files are exempt by content, never by name: an earlier saved
+run, which `guardana scan . --format json --output run.json` replaces when run again,
+and exchanges that an adjacent saved run (`<stem>.json` or `<stem>`) records by digest.
+A recording named `customer.exchanges.jsonl` that no saved run records is refused
 like any other scanned file.
 
 **`--format json` is not optional here.** `--output` on its own writes whatever

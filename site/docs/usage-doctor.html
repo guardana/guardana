@@ -253,12 +253,12 @@ silently is what must not happen.</li>
 <li><strong>whether the files the profile names load.</strong> Each contract, calibration and
 rule under <code>rules.paths</code> goes through the loader a run uses, the rules after the same
 plugin discovery; one a run would refuse is a failure here too.</li>
-<li><strong>whether every <code>rules.include</code> pattern matches a rule.</strong> A pattern that matches none
-of the discovered rules, the rules under <code>rules.paths</code> and the rules the profile's
-<code>contracts:</code> compile to is a failure, as it refuses every run
-(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>). <code>doctor</code> takes no
-<code>--rules</code> or <code>--contract</code>: a rule or contract a run is given only on its command
-line is not seen, so list it under <code>rules.paths</code> or <code>contracts:</code> to check it.</li>
+<li><strong>whether every <code>rules.include</code> pattern matches a rule.</strong> A pattern that matches no
+discovered rule, rule under <code>rules.paths</code> or rule compiled from the profile's
+<code>contracts:</code> fails the check because it refuses every run
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>). <code>doctor</code> accepts no
+<code>--rules</code> or <code>--contract</code>, so it cannot see rules or contracts supplied only on a
+run's command line. List them under <code>rules.paths</code> or <code>contracts:</code> to check them.</li>
 <li><strong>whether each <code>plugins.allow</code> entry loads anything.</strong> A name that is not installed,
 or installs no Guardana entry point, is a warning: its checks would simply be absent.</li>
 </ul>

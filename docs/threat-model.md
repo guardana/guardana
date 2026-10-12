@@ -55,12 +55,11 @@ pickle, a zip bomb, a 40 GB "model", or a file designed to exploit a parser.
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
 fails becomes an `errors` entry rather than an exception or a silent skip. Pickle
 is parsed at the opcode level, never unpickled. The repository cannot hide its own
-model files: a `.guardanaignore` it ships excludes ordinary files only, never a file a
-model loader reads (a model, an archive or compressed file, and the configuration, chat
-templates and Keras metadata beside a model or tokenizer), every pattern it applied is
-named in the output, and model files inside the directories every scan skips (`build`,
-`env`, `node_modules`, …) are named with their count. Only the profile's
-`rules.paths_exclude` excludes such a file.
+model files: its `.guardanaignore` excludes ordinary files only, never a file a model
+loader reads (a model, an archive or compressed file, and configuration, chat templates and Keras
+metadata beside a model or tokenizer). The output names every applied pattern and
+counts model files inside directories every scan skips (`build`, `env`,
+`node_modules`, …). Only the profile's `rules.paths_exclude` excludes such a file.
 
 **Residual risk:** a parser bug is still a parser bug. Since 0.22.0 every rule that
 opens a file is property-tested against generated input — arbitrary bytes behind
@@ -298,9 +297,9 @@ README says so before the quickstart.
 publishes Sigstore-signed build provenance and PyPI's PEP 740 attestation for the
 distributions, a CycloneDX SBOM per distribution, and an SBOM and provenance
 attestation beside each container image. Both images install third-party
-dependencies by version and hash from files exported from `uv.lock`, as wheels
-only, so they run the versions CI tested and no build step resolves unpinned
-build requirements. How to check them is in
+dependencies as wheels only, using versions and hashes exported from `uv.lock`.
+They run the versions CI tested, and no build step resolves unpinned build
+requirements. Check them as described in
 [`SECURITY.md`](../SECURITY.md#what-a-release-publishes-and-how-to-check-it-yourself).
 
 A tag ruleset lets only maintainers create, move or delete `v*` tags. The `pypi` environment requires one reviewer's approval for every publish. The `publish` job requires `ci-passed`, so a tag publishes only a commit CI passed. Both ghcr packages are public. `scripts/check_repo_settings.py` reports each setting as `PRESENT`, `ABSENT` or `NOT CHECKED`. `scripts/reproduce_release.py` rebuilds a release from its tag and reports whether each PyPI file matches byte for byte ([reproducible builds](reproducible-builds.md)).

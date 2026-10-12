@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reproducible builds — Guardana documentation</title>
-<meta name="description" content="rebuild a release from its tag and check, file by file, that it matches what PyPI serves byte for byte">
+<meta name="description" content="rebuild a release from its tag and compare every file with PyPI byte for byte">
 <link rel="canonical" href="https://guardana.dev/docs/reproducible-builds">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/brand/v1/tokens.css">
@@ -201,24 +201,24 @@
 </nav>
 </details>
 <main>
-<h1>Reproducible builds<span class="status beta">beta</span></h1><p class="lede">rebuild a release from its tag and check, file by file, that it matches what PyPI serves byte for byte</p><p><code>scripts/reproduce_release.py</code> rebuilds a release from its tag and compares every file
+<h1>Reproducible builds<span class="status beta">beta</span></h1><p class="lede">rebuild a release from its tag and compare every file with PyPI byte for byte</p><p><code>scripts/reproduce_release.py</code> rebuilds a release from its tag and compares every file
 with PyPI byte for byte. Each release publishes a wheel and a source distribution for
 every package under <code>packages/</code>, and for the reference pack (<code>examples/reference_pack</code>)
 when configured to publish it. A match means the published file is exactly what the
-tagged source builds into. You need not trust the machine that built it.</p>
+tagged source builds. You need not trust the machine that built it.</p>
 <h2 id="run-the-check-yourself">Run the check yourself</h2>
 <p>You need <code>git</code>, <a href="https://docs.astral.sh/uv/">uv</a> and network access to <code>pypi.org</code> and
 <code>files.pythonhosted.org</code>.</p>
 <p>Run the script from a current checkout and point it at a clean checkout of the release
-tag. A tag released before the script existed has no copy of it, so the script always
-comes from the current checkout:</p>
+tag. Some release tags contain no copy of the script, so always use the current
+checkout's copy:</p>
 <pre><code class="language-bash">git clone https://github.com/guardana/guardana
 cd guardana
 git worktree add --detach ../guardana-v1.0.0rc2 v1.0.0rc2
 uv run --no-project python scripts/reproduce_release.py 1.0.0rc2 --source ../guardana-v1.0.0rc2
 </code></pre>
-<p>Given no source checkout, the script builds the checkout it runs from, so in a checkout
-of a tag that carries the script this is enough:</p>
+<p>Without a source checkout, the script builds the checkout it runs from. In a tag checkout
+that contains the script, this is enough:</p>
 <pre><code class="language-bash">uv run --no-project python scripts/reproduce_release.py VERSION
 </code></pre>
 <p>The script rejects a checkout whose packages carry another version. Build from a clean
@@ -282,7 +282,7 @@ produces from the same data.</li>
 </tr>
 </tbody>
 </table></div>
-<p><code>NOT CHECKED</code> is never a pass. The script could not establish whether the file reproduces
+<p><code>NOT CHECKED</code> is never a pass. The script cannot establish whether the file reproduces
 and states why.</p>
 <p>The exit status is <code>0</code> when every published file reproduces, <code>1</code> when any file differs, and
 <code>2</code> when any file is not checked and none differs. It is also <code>2</code> when the check cannot
@@ -301,7 +301,7 @@ PyPI lists the version, each package is <code>NOT CHECKED</code> and the job fai
 that the source is safe. Build provenance, SBOMs and review of each change serve that
 purpose; see
 <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md">What a release publishes, and how to check it yourself</a>.
-The build backend's dependencies are resolved at build time. A change in one could change
+The build resolves the backend's dependencies at build time. A change in one could change
 a rebuild; the check would report the difference.</p>
 
 </main>

@@ -72,12 +72,12 @@ It answers the questions that are otherwise guessed at:
 - **whether the files the profile names load.** Each contract, calibration and
   rule under `rules.paths` goes through the loader a run uses, the rules after the same
   plugin discovery; one a run would refuse is a failure here too.
-- **whether every `rules.include` pattern matches a rule.** A pattern that matches none
-  of the discovered rules, the rules under `rules.paths` and the rules the profile's
-  `contracts:` compile to is a failure, as it refuses every run
-  ([profiles](profiles.md#an-include-pattern-must-match-a-rule)). `doctor` takes no
-  `--rules` or `--contract`: a rule or contract a run is given only on its command
-  line is not seen, so list it under `rules.paths` or `contracts:` to check it.
+- **whether every `rules.include` pattern matches a rule.** A pattern that matches no
+  discovered rule, rule under `rules.paths` or rule compiled from the profile's
+  `contracts:` fails the check because it refuses every run
+  ([profiles](profiles.md#an-include-pattern-must-match-a-rule)). `doctor` accepts no
+  `--rules` or `--contract`, so it cannot see rules or contracts supplied only on a
+  run's command line. List them under `rules.paths` or `contracts:` to check them.
 - **whether each `plugins.allow` entry loads anything.** A name that is not installed,
   or installs no Guardana entry point, is a warning: its checks would simply be absent.
 

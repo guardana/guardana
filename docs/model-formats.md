@@ -65,10 +65,9 @@ class GgufMetadata:
 `text()` is the safe accessor: it returns `None` when the key is absent *or* is
 not a string, so a rule never has to type-check an entry itself.
 
-Versions 2 and 3 are supported. Any other version raises `FormatError`. Version 1
-uses a different layout, and later versions may also use a different layout.
-Reading either with the version 3 layout would misread every offset after the
-header.
+Versions 2 and 3 are supported; any other version raises `FormatError`. Version 1
+uses a different layout, and later versions may too. The version 3 layout would
+misread every offset after the header in either case.
 
 ### safetensors — `read_safetensors_header(path, *, limits=DEFAULT_LIMITS) -> SafetensorsHeader`
 
@@ -85,14 +84,12 @@ separated from the tensor index rather than left mixed in with it. A non-string
 value is serialised rather than dropped — a writer smuggling a structure in
 there is exactly what a scanner needs to see.
 
-The header must describe the payload exactly. Every tensor entry must state a
-`dtype` defined by the format, a `shape` that is a list of non-negative integers,
-and `data_offsets` that lie inside the payload. The product of its `shape`
-dimensions, multiplied by the dtype's width, must equal the length of its
-`data_offsets` range. Together, the ranges must cover every payload byte exactly
-once, with no overlaps, gaps or undeclared bytes at the end. A header that breaks
-any of these raises `FormatError("malformed safetensors header: ...")`, naming the
-tensor where there is one.
+The header must describe the payload exactly. Every tensor entry must specify a
+format-defined `dtype`, a `shape` list of non-negative integers, and `data_offsets`
+inside the payload. The product of its `shape` dimensions times the dtype's width
+must equal its `data_offsets` range length. The ranges must cover every payload byte
+exactly once, with no overlaps, gaps or undeclared trailing bytes. A violation raises
+`FormatError("malformed safetensors header: ...")`, naming the tensor when there is one.
 
 ### ONNX — `read_onnx_summary(path, *, limits=DEFAULT_LIMITS) -> OnnxSummary`
 
@@ -113,9 +110,9 @@ reads kilobytes. The walk covers every graph the model carries: the main graph
 and its sparse initializers, tensors and subgraphs held in node attributes
 (Constant values, If/Loop/Scan bodies), model-local functions and training
 graphs. `node_domains` and `external_data_paths` collect from all of them.
-A file whose top-level message, walked in full, holds no graph raises
-`FormatError("ONNX model without a graph")`: an empty file parses as an empty
-protobuf message, and that is no model.
+A file whose complete top-level message holds no graph raises
+`FormatError("ONNX model without a graph")`. An empty file parses as an empty
+protobuf message, which is not a model.
 `STANDARD_ONNX_DOMAINS` is exported alongside it: anything else in
 `node_domains` means the runtime must register a native operator library before
 the model will run.

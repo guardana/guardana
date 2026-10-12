@@ -525,11 +525,12 @@ time exits <code>3</code>, since the run would stop before its last request, and
 <code>budgets.minimum_wall_time_seconds</code>, null when no rate is set.</p>
 <h2 id="a-run-that-could-not-pass">A run that could not pass</h2>
 <p>A <code>rules.include</code> pattern that matches no registered rule refuses the plan with exit <code>3</code>
-before it selects anything, as it refuses the run, even when another pattern matches and
-whatever <code>fail_on</code> says (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).
-The pattern is checked against every rule the run would register, including the rules
-<code>--rules</code> and <code>rules.paths</code> load and the assertions of the profile's <code>contracts:</code>, and against every pass a probe splits into, so a
-canary rule priced in a pass of its own still matches its pattern.</p>
+before selection, just as it refuses the run. This applies even when another pattern
+matches, whatever <code>fail_on</code> says (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).
+The check covers every rule the run would register, including rules loaded by
+<code>--rules</code> and <code>rules.paths</code> and assertions of the profile's <code>contracts:</code>. It also covers
+every pass a probe splits into, so a canary rule priced in its own pass still matches
+its pattern.</p>
 <p>The plan exits <code>3</code> as well when the run it describes could not pass, and says why
 on stderr, one line per cause:</p>
 <ul>

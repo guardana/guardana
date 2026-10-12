@@ -186,7 +186,7 @@ class Verification:
 
     @property
     def exit_code(self) -> int:
-        """The exit code `guardana` gives this result: 0, 1, 2, 4 (its target stopped it) or 6."""
+        """The exit code `guardana` gives this result: 0, 1, 2, 4 (target stopped it), 6 or 7."""
         return exit_code_for(self.gate, self.result.stopped_by)
 
     @property
