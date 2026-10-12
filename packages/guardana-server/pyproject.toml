@@ -55,7 +55,9 @@ Issues = "https://github.com/guardana/guardana/issues"
 Changelog = "https://github.com/guardana/guardana/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["hatchling"]
+# Exact, so a rebuild from the tag uses the backend the release used
+# (`scripts/reproduce_release.py` compares the two byte for byte).
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

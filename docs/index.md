@@ -106,6 +106,7 @@ More in [exit codes](exit-codes.md) and [the gate](profiles.md#the-gate).
 
 - [`architecture.md`](architecture.md) — understand package and trust boundaries
 - [`threat-model.md`](threat-model.md) — see what Guardana does and does not defend
+- [`reproducible-builds.md`](reproducible-builds.md) — rebuild a release from its tag and compare it with PyPI byte for byte
 - [`product-status.md`](product-status.md) — check maturity and known limitations
 
 ## Reference

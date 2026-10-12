@@ -80,6 +80,7 @@ This file is generated from the documentation map; do not edit it by hand.
 
 - [architecture.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/architecture.md): understand package and trust boundaries
 - [threat-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/threat-model.md): see what Guardana does and does not defend
+- [reproducible-builds.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/reproducible-builds.md): rebuild a release from its tag and compare it with PyPI byte for byte
 - [product-status.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/product-status.md): check maturity and known limitations
 
 ## Reference

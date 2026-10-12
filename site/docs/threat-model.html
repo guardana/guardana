@@ -86,6 +86,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html" aria-current="page">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -174,6 +175,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html" aria-current="page">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -433,7 +435,7 @@ dependencies by version and hash from files exported from <code>uv.lock</code>, 
 only, so they run the versions CI tested and no build step resolves unpinned
 build requirements. How to check them is in
 <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a>.</p>
-<p>A tag ruleset lets only maintainers create, move or delete <code>v*</code> tags. The <code>pypi</code> environment requires one reviewer's approval for every publish. The <code>publish</code> job requires <code>ci-passed</code>, so a tag publishes only a commit CI passed. Both ghcr packages are public. <code>scripts/check_repo_settings.py</code> reports each setting as <code>PRESENT</code>, <code>ABSENT</code> or <code>NOT CHECKED</code>.</p>
+<p>A tag ruleset lets only maintainers create, move or delete <code>v*</code> tags. The <code>pypi</code> environment requires one reviewer's approval for every publish. The <code>publish</code> job requires <code>ci-passed</code>, so a tag publishes only a commit CI passed. Both ghcr packages are public. <code>scripts/check_repo_settings.py</code> reports each setting as <code>PRESENT</code>, <code>ABSENT</code> or <code>NOT CHECKED</code>. <code>scripts/reproduce_release.py</code> rebuilds a release from its tag and reports whether each PyPI file matches byte for byte (<a href="reproducible-builds.html">reproducible builds</a>).</p>
 <p><strong>Residual risk:</strong> Git tags are not signed. Images before 0.33.0 carry unsigned
 attestations only, so <code>gh attestation verify</code> cannot check them; from 0.33.0 each
 image digest has a signed provenance statement. The documented pins are moving <code>X.Y</code>

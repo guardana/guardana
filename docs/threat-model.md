@@ -299,7 +299,7 @@ only, so they run the versions CI tested and no build step resolves unpinned
 build requirements. How to check them is in
 [`SECURITY.md`](../SECURITY.md#what-a-release-publishes-and-how-to-check-it-yourself).
 
-A tag ruleset lets only maintainers create, move or delete `v*` tags. The `pypi` environment requires one reviewer's approval for every publish. The `publish` job requires `ci-passed`, so a tag publishes only a commit CI passed. Both ghcr packages are public. `scripts/check_repo_settings.py` reports each setting as `PRESENT`, `ABSENT` or `NOT CHECKED`.
+A tag ruleset lets only maintainers create, move or delete `v*` tags. The `pypi` environment requires one reviewer's approval for every publish. The `publish` job requires `ci-passed`, so a tag publishes only a commit CI passed. Both ghcr packages are public. `scripts/check_repo_settings.py` reports each setting as `PRESENT`, `ABSENT` or `NOT CHECKED`. `scripts/reproduce_release.py` rebuilds a release from its tag and reports whether each PyPI file matches byte for byte ([reproducible builds](reproducible-builds.md)).
 
 **Residual risk:** Git tags are not signed. Images before 0.33.0 carry unsigned
 attestations only, so `gh attestation verify` cannot check them; from 0.33.0 each

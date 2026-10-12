@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reproducible builds — Guardana documentation</title>
+<meta name="description" content="rebuild a release from its tag and check, file by file, that it matches what PyPI serves byte for byte">
+<link rel="canonical" href="https://guardana.dev/docs/reproducible-builds">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API<span class="tag">beta</span></a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility<span class="tag">beta</span></a></li>
+<li><a href="conformance-kit.html">Conformance kit<span class="tag">beta</span></a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs<span class="tag">beta</span></a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html" aria-current="page">Reproducible builds<span class="tag">beta</span></a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Reproducible builds</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API<span class="tag">beta</span></a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility<span class="tag">beta</span></a></li>
+<li><a href="conformance-kit.html">Conformance kit<span class="tag">beta</span></a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs<span class="tag">beta</span></a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html" aria-current="page">Reproducible builds<span class="tag">beta</span></a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main>
+<h1>Reproducible builds<span class="status beta">beta</span></h1><p class="lede">rebuild a release from its tag and check, file by file, that it matches what PyPI serves byte for byte</p><p><code>scripts/reproduce_release.py</code> rebuilds a release from its tag and compares every file
+with PyPI byte for byte. Each release publishes a wheel and a source distribution for
+every package under <code>packages/</code>, and for the reference pack (<code>examples/reference_pack</code>)
+when configured to publish it. A match means the published file is exactly what the
+tagged source builds into. You need not trust the machine that built it.</p>
+<h2 id="run-the-check-yourself">Run the check yourself</h2>
+<p>You need <code>git</code>, <a href="https://docs.astral.sh/uv/">uv</a> and network access to <code>pypi.org</code> and
+<code>files.pythonhosted.org</code>.</p>
+<p>Run the script from a current checkout and point it at a clean checkout of the release
+tag. A tag released before the script existed has no copy of it, so the script always
+comes from the current checkout:</p>
+<pre><code class="language-bash">git clone https://github.com/guardana/guardana
+cd guardana
+git worktree add --detach ../guardana-v1.0.0rc2 v1.0.0rc2
+uv run --no-project python scripts/reproduce_release.py 1.0.0rc2 --source ../guardana-v1.0.0rc2
+</code></pre>
+<p>Given no source checkout, the script builds the checkout it runs from, so in a checkout
+of a tag that carries the script this is enough:</p>
+<pre><code class="language-bash">uv run --no-project python scripts/reproduce_release.py VERSION
+</code></pre>
+<p>The script rejects a checkout whose packages carry another version. Build from a clean
+checkout: a source distribution includes every file in the package directory that git
+does not ignore. A stray local file makes it differ.</p>
+<h2 id="how-the-rebuild-matches-the-release">How the rebuild matches the release</h2>
+<p>The release workflow runs <code>uv build packages/&lt;name&gt;/ --out-dir dist/</code> for every directory
+under <code>packages/</code>, and <code>uv build examples/reference_pack</code>, from the checkout root under
+Python 3.12. The script finds the packages the same way and uses the same commands and
+interpreter. Before building, it removes <code>SOURCE_DATE_EPOCH</code> and any <code>UV_*</code> setting from
+your shell because the release sets neither. Without <code>SOURCE_DATE_EPOCH</code>, hatchling gives
+every archive member one fixed date. Each package pins its build backend exactly
+(<code>hatchling==&lt;version&gt;</code> in <code>[build-system]</code>), so rebuilds use the release's backend.
+A tag whose packages name hatchling without a version uses the newest hatchling uv
+resolves. It reproduces only while that version matches the one its wheels name in their
+<code>WHEEL</code> file.</p>
+<h2 id="what-it-compares">What it compares</h2>
+<p>For each package, the script reads the release's file list from PyPI's JSON API
+(<code>https://pypi.org/pypi/&lt;name&gt;/&lt;version&gt;/json</code>). It uses the name and version in the
+package's <code>pyproject.toml</code>. It downloads each file and checks its sha256 against the API's
+digest before comparing anything.</p>
+<p>Equal bytes mean the file reproduces. Otherwise, the script opens both archives: wheels
+as zip files and source distributions as gzip-compressed tar files. It names the first
+difference:</p>
+<ul>
+<li>differing member lists: members published but not rebuilt, members rebuilt but not
+published, or the same members in another order;</li>
+<li>the first member with differing bytes, with both sizes; for a wheel's <code>RECORD</code>, entries
+with differing hashes or sizes; for its <code>WHEEL</code>, the two build backends;</li>
+<li>differing member metadata: timestamp, permissions, owner, compression method or another
+header field;</li>
+<li>for a source distribution, a differing gzip header timestamp;</li>
+<li>identical members and metadata with differing compressed bytes, as another zlib build
+produces from the same data.</li>
+</ul>
+<h2 id="reading-the-result">Reading the result</h2>
+<p>Each file gets one line, followed by a count:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Result</th>
+<th>It means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>REPRODUCES</code></td>
+<td>the rebuilt and published files have identical bytes</td>
+</tr>
+<tr>
+<td><code>DIFFERS</code></td>
+<td>the bytes differ; the next line names the first difference found</td>
+</tr>
+<tr>
+<td><code>NOT CHECKED</code></td>
+<td>the file was not compared: PyPI could not be read or lists no files, a download did not match its digest, the build failed, a published file was not rebuilt, or a rebuilt file is not published</td>
+</tr>
+<tr>
+<td><code>NOT PUBLISHED</code></td>
+<td>PyPI has no reference pack release at the tag's version because this release did not publish it; this does not change the exit status</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>NOT CHECKED</code> is never a pass. The script could not establish whether the file reproduces
+and states why.</p>
+<p>The exit status is <code>0</code> when every published file reproduces, <code>1</code> when any file differs, and
+<code>2</code> when any file is not checked and none differs. It is also <code>2</code> when the check cannot
+start: the checkout carries another version, a package directory has no readable
+<code>pyproject.toml</code>, or the script stops on an unexpected error.</p>
+<h2 id="in-ci">In CI</h2>
+<p><code>.github/workflows/reproducibility.yml</code> runs the check after each successful release
+workflow run and on demand for any version from the Actions tab (<code>Run workflow</code>, with
+the version). It checks out <code>v&lt;version&gt;</code>, takes the script from the commit the workflow
+runs from, and has read-only repository access. It does not run on a push because PyPI
+has no files for a version until its release publishes them. If the check runs before
+PyPI lists the version, each package is <code>NOT CHECKED</code> and the job fails with exit status
+<code>2</code>. Run it again by hand once the files are on PyPI.</p>
+<h2 id="what-a-match-does-not-prove">What a match does not prove</h2>
+<p>A match shows that the tagged source builds into the published files. It does not show
+that the source is safe. Build provenance, SBOMs and review of each change serve that
+purpose; see
+<a href="https://github.com/guardana/guardana/blob/main/SECURITY.md">What a release publishes, and how to check it yourself</a>.
+The build backend's dependencies are resolved at build time. A change in one could change
+a rebuild; the check would report the difference.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/reproducible-builds.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>
