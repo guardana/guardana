@@ -117,6 +117,10 @@ def create_app(
         title="guardana-server",
         version=_installed_version(),
         description=_AUTHENTICATED if database_url is not None else _UNAUTHENTICATED,
+        # FastAPI's bundled viewers load their scripts, styles and fonts from third-party
+        # hosts in the reader's browser; only the document itself is served.
+        docs_url=None,
+        redoc_url=None,
     )
     _describe_authentication(app, database_url)
     _mount_limits(app)

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — breaking
+
+- **The collector's `/docs`, `/redoc` and `/docs/oauth2-redirect` routes now return `404`.** FastAPI's default viewers loaded scripts, styles, fonts and an icon from cdn.jsdelivr.net, fonts.googleapis.com and fastapi.tiangolo.com in the reader's browser. This contradicted the promise that Guardana contacts only destinations a run names. `/openapi.json` remains public. To browse it, download the document and open it in a locally installed OpenAPI viewer ([HTTP API](docs/usage-collector.md#the-http-api)). Every HTML page the collector serves is now tested for references to external hosts; none are allowed.
+
 ### Security
 
 - **Release images now install the exact hash-pinned versions CI tests from `uv.lock`.** Both Dockerfiles used `pip install ./packages/...`, resolving the pyproject floors against PyPI at build time, upgrading `pip` unpinned, and pulling an unpinned `hatchling` through build isolation. Images could therefore contain dependency versions CI had never run. They now install `deploy/docker/cli-requirements.txt` or `collector-requirements.txt` with `pip install --only-binary=:all: --require-hashes --no-deps` (wheels only, so no source build can resolve unpinned build requirements), build the Guardana packages with the locked `hatchling` from `build-requirements.txt` outside the shipped environment, keep the base image's `pip`, and run `pip check`. `scripts/export_image_requirements.py` generates the three files from `uv.lock`; its `--check` runs in CI and `scripts/ci_local.sh`. `scripts/image_smoke.py` also fails if any package in those files lacks a wheel in the lock for `linux/amd64` or for `linux/arm64`.
