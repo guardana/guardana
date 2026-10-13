@@ -7,10 +7,12 @@ eventually reads the output and decides something.
 """
 
 import hashlib
+import importlib
 import json
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import guardana.cli._endpoint as endpoint_module
@@ -20,9 +22,10 @@ from guardana.core.report import load_report
 from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from guardana.core.testing import RefusingTransport
 from guardana.core.verify import exchanges_path
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 runner = CliRunner()
+run_module = importlib.import_module("guardana.cli.run")
 
 _INVALID_USAGE = 3
 
@@ -196,18 +199,43 @@ def test_migrate_refuses_an_object_that_only_claims_the_current_schema(tmp_path:
     assert "already" not in migrated.output
 
 
-def test_migrate_to_another_output_removes_the_exchanges_an_earlier_run_kept_there(
-    tmp_path: Path,
+def _earlier_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, out: Path, *, recorded: bool
+) -> Path:
+    """Leave exchanges beside `out`: a probe's saved there, or a file no run there recorded."""
+    sidecar = exchanges_path(out)
+    if recorded:
+        run, kept = _probe_that_kept_exchanges(tmp_path, monkeypatch)
+        run.rename(out)
+        kept.rename(sidecar)
+    else:
+        sidecar.write_text("kept by no run\n", encoding="utf-8")
+    return sidecar
+
+
+def _sidecar_outcome(result: Result, sidecar: Path, out: Path, *, recorded: bool) -> None:
+    assert result.exit_code == 0, result.output
+    if recorded:
+        assert not sidecar.exists()
+        assert f"removed {sidecar}, which an earlier run at this path kept" in result.stderr
+    else:
+        assert sidecar.read_text(encoding="utf-8") == "kept by no run\n"
+        assert "removed" not in result.stderr
+        assert (
+            f"warning: kept {sidecar}: no run saved at {out} before this one recorded it"
+        ) in result.stderr
+
+
+@pytest.mark.parametrize("recorded", [True, False], ids=["an earlier run's", "no run's"])
+def test_migrate_to_another_output_removes_only_the_exchanges_the_run_there_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, recorded: bool
 ) -> None:
     out = tmp_path / "new.json"
-    earlier = tmp_path / "new.exchanges.jsonl"
-    earlier.write_text("kept by an earlier run\n", encoding="utf-8")
+    sidecar = _earlier_sidecar(tmp_path, monkeypatch, out, recorded=recorded)
 
     result = runner.invoke(app, ["run", "migrate", str(_write_v1(tmp_path)), "--output", str(out)])
 
-    assert result.exit_code == 0, result.output
-    assert not earlier.exists()
-    assert f"removed {earlier}, which an earlier run at this path kept" in result.stderr
+    _sidecar_outcome(result, sidecar, out, recorded=recorded)
 
 
 @pytest.mark.parametrize("output", [None, "old"], ids=["in place", "run.json to run"])
@@ -240,18 +268,16 @@ def test_migrate_copies_a_current_run_to_another_output(tmp_path: Path) -> None:
     assert path.read_text(encoding="utf-8") == before
 
 
-def test_migrate_copying_a_current_run_removes_the_exchanges_an_earlier_run_kept_there(
-    tmp_path: Path,
+@pytest.mark.parametrize("recorded", [True, False], ids=["an earlier run's", "no run's"])
+def test_migrate_copying_a_current_run_removes_only_the_exchanges_the_run_there_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, recorded: bool
 ) -> None:
     out = tmp_path / "again.json"
-    earlier = tmp_path / "again.exchanges.jsonl"
-    earlier.write_text("kept by an earlier run\n", encoding="utf-8")
+    sidecar = _earlier_sidecar(tmp_path, monkeypatch, out, recorded=recorded)
 
     result = runner.invoke(app, ["run", "migrate", str(_scan_run(tmp_path)), "--output", str(out)])
 
-    assert result.exit_code == 0, result.output
-    assert not earlier.exists()
-    assert f"removed {earlier}, which an earlier run at this path kept" in result.stderr
+    _sidecar_outcome(result, sidecar, out, recorded=recorded)
 
 
 def test_migrate_of_a_current_run_in_place_writes_nothing(tmp_path: Path) -> None:
@@ -507,6 +533,50 @@ def test_migrate_of_a_run_without_its_sidecar_copies_nothing_and_says_so(
     assert (
         f"warning: {sidecar} is not the exchanges {path} records, so none were copied beside {out}"
     ) in " ".join(result.stderr.split())
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_migrate_of_a_run_whose_sidecar_is_a_fifo_copies_nothing_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, sidecar = _probe_that_kept_exchanges(tmp_path, monkeypatch)
+    sidecar.unlink()
+    os.mkfifo(sidecar)
+    out = tmp_path / "copy" / "run.json"
+    out.parent.mkdir()
+    outcome: list[Result] = []
+    worker = threading.Thread(
+        target=lambda: outcome.append(
+            runner.invoke(app, ["run", "migrate", str(path), "--output", str(out)])
+        ),
+        daemon=True,
+    )
+
+    worker.start()
+    worker.join(10)
+    if worker.is_alive():
+        os.close(os.open(sidecar, os.O_WRONLY | os.O_NONBLOCK))
+        pytest.fail("run migrate blocked on the FIFO standing in for the exchanges")
+
+    assert outcome[0].exit_code == 0, outcome[0].output
+    assert not exchanges_path(out).exists()
+    assert f"warning: {sidecar} is not the exchanges {path} records" in " ".join(
+        outcome[0].stderr.split()
+    )
+
+
+def test_migrate_refuses_a_run_over_the_saved_run_ceiling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _write_v1(tmp_path)
+    monkeypatch.setattr(run_module, "MAX_REPORT_BYTES", path.stat().st_size - 1)
+    out = tmp_path / "new.json"
+
+    result = runner.invoke(app, ["run", "migrate", str(path), "--output", str(out)])
+
+    assert result.exit_code == _INVALID_USAGE, result.output
+    assert "ceiling" in result.stderr
+    assert not out.exists()
 
 
 def test_migrate_whose_run_cannot_be_written_removes_the_sidecar_it_copied(

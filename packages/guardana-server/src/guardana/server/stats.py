@@ -8,6 +8,7 @@ time-series, with no I/O and no framework.
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from guardana.server.envelope import SkippedIn, Submission
 from guardana.server.store import StoredSubmission
 
 STATS_WINDOW = 1_000
@@ -17,8 +18,12 @@ A durable store has no upper size, so aggregating everything would make every
 dashboard refresh load the project's whole history into memory.
 """
 
+GATE_NOT_RECORDED = "not_recorded"
+"""The `by_gate` key for a run that sent no gate, which is never read as a pass."""
+
 # Ordinal severity, worst last — used to pick a source's worst finding.
 _SEVERITY_ORDER = ("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL")
+_NOT_A_COVERAGE_GAP = "not_applicable"
 
 
 def _severity_rank(severity: str) -> int | None:
@@ -37,6 +42,10 @@ class SourceStat:
     findings: int
     unverified: int
     errors: int
+    skipped: int
+    """Checks the source's runs skipped for a reason other than not applying."""
+    gate: str | None
+    """The gate its newest run recorded, `None` when that run sent none."""
     worst_severity: str | None
     last_seen: float
 
@@ -68,6 +77,8 @@ class Totals:
     findings: int
     unverified: int
     errors: int
+    skipped: int
+    """Checks skipped for a reason other than not applying: coverage that did not happen."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +95,8 @@ class Stats:
     """Everything the dashboard needs, computed server-side so the client never re-aggregates."""
 
     by_severity: dict[str, int]
+    by_gate: dict[str, int]
+    """Submissions per recorded gate, with `GATE_NOT_RECORDED` for a run that sent none."""
     by_source: list[SourceStat]
     by_rule: list[RuleStat]
     series: list[TimeBucket]
@@ -112,11 +125,15 @@ def compute_stats(
     source_findings: dict[str, int] = {}
     source_unverified: dict[str, int] = {}
     source_errors: dict[str, int] = {}
+    source_skipped: dict[str, int] = {}
+    source_gate: dict[str, str | None] = {}
+    by_gate: dict[str, int] = {}
     source_worst: dict[str, int] = {}
     source_last_seen: dict[str, float] = {}
     total_findings = 0
     total_unverified = 0
     total_errors = 0
+    total_skipped = 0
 
     for record in ordered:
         submission = record.submission
@@ -132,6 +149,13 @@ def compute_stats(
         source_errors.setdefault(source, 0)
         source_errors[source] += len(submission.errors)
         total_errors += len(submission.errors)
+        gaps = _coverage_gaps(submission)
+        source_skipped[source] = source_skipped.get(source, 0) + gaps
+        total_skipped += gaps
+        gate = submission.run.gate if submission.run is not None else None
+        source_gate[source] = gate
+        recorded = gate or GATE_NOT_RECORDED
+        by_gate[recorded] = by_gate.get(recorded, 0) + 1
         for finding in submission.findings:
             total_findings += 1
             by_severity[finding.severity] = by_severity.get(finding.severity, 0) + 1
@@ -147,6 +171,8 @@ def compute_stats(
             findings=source_findings[source],
             unverified=source_unverified[source],
             errors=source_errors[source],
+            skipped=source_skipped[source],
+            gate=source_gate[source],
             worst_severity=(
                 _SEVERITY_ORDER[source_worst[source]] if source in source_worst else None
             ),
@@ -162,6 +188,7 @@ def compute_stats(
     ]
     return Stats(
         by_severity=by_severity,
+        by_gate=by_gate,
         by_source=by_source,
         by_rule=by_rule,
         series=_series(ordered, buckets),
@@ -171,8 +198,24 @@ def compute_stats(
             findings=total_findings,
             unverified=total_unverified,
             errors=total_errors,
+            skipped=total_skipped,
         ),
         window=Window(limit=window, complete=complete),
+    )
+
+
+def _coverage_gaps(submission: Submission) -> int:
+    """How many of this run's skipped rules are checks that did not happen.
+
+    A bare rule id from an agent older than skip reasons says nothing about why, so it
+    counts as a gap rather than as a rule that did not apply.
+    """
+    if submission.summary is None:
+        return 0
+    return sum(
+        1
+        for skipped in submission.summary.rules_skipped
+        if not isinstance(skipped, SkippedIn) or skipped.reason != _NOT_A_COVERAGE_GAP
     )
 
 

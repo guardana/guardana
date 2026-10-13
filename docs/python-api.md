@@ -28,7 +28,9 @@ for finding in verification.result.findings:
 verification.save(Path("run.json"))  # the document `--format json --output` writes
 ```
 
-`PluginTrust`, `PluginMode` and `load_profile` are needed to build a `Verifier` but sit outside the [supported surface](compatibility.md#the-supported-surface): a minor release may change them, so pin `guardana-core` to a minor while your code imports them.
+`PluginTrust`, `PluginMode` and `load_profile` are needed to build a `Verifier` but are outside
+the [supported surface](compatibility.md#the-supported-surface). They are subject to change in
+any release. While your code imports them, pin the exact `guardana-core` version you tested.
 
 A run that fails, stays indeterminate, or is stopped by its budget or by its target failing part-way is returned like one that passed. Read `verification.gate`, `verification.exit_code` or `verification.open_questions`; nothing is raised for an outcome.
 
@@ -91,7 +93,7 @@ agent = A2aAgentTarget("https://agent.example.com", credential=alice, other_cred
 - `A2aAgentTarget(url, *, credential=None, other_credential=None, sender=None)` takes the http(s) URL of the agent's card (ending in `.json`) or of its origin; any other path, a second credential without the first, or the same value twice, raises `ValueError`. `sender` is a `Sender`.
 - A server that stops accepting the agreed revision mid-run returns the `Verification` with `result.stopped_by` `target_changed` and exit code `4`.
 
-A target runs once. Running the same object again, starting a second run while the first is under way, or running one that already sent requests raises `TargetReusedError`: build a fresh target for each run, so its usage, its budget and whatever it cached describe that run alone. A run refused before anything was sent, over its calibrations or a budget, leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.
+A target runs once. Reusing the same object, starting a second run while the first is under way, or running a target that already sent requests raises `TargetReusedError`. Build a fresh target for each run so its usage, budget and cache describe that run alone. A run refused over its calibrations, a budget or its profile before anything was sent leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.
 
 ## Read a result
 
@@ -102,24 +104,25 @@ A target runs once. Running the same object again, starting a second run while t
 | `result` | The `ScanResult`: findings, unverified results, waived findings, errors, observations, coverage shortfalls, assessments, the file listing (`scope`), the skipped rules and why a run stopped. A rule that found the target does not offer what it examines is skipped `not_offered` (`NotOffered`, from `guardana.core.rule`), a coverage gap. Redacted under the profile's privacy policy. |
 | `manifest` | The `RunManifest` a saved run carries. |
 | `gate` | `GateOutcome.PASS`, `FAIL` or `INDETERMINATE`. |
-| `exit_code` | The code `guardana` gives this result: `0`, `1`, `2`, `4` when its target stopped it (`target_unavailable` or `target_changed`), or `6` ([exit codes](exit-codes.md)). |
+| `exit_code` | The code `guardana` gives this result: `0`, `1`, `2`, `4` when its target stopped it (`target_unavailable` or `target_changed`), `6` when its budget did, or `7` when the run was interrupted, which only a saved run read back with `load_verification` records. `3`, `5` and `8` describe a command with no result or a failed installed output, never a `Verification` ([exit codes](exit-codes.md)). |
 | `passed` | `True` only when the gate passed. |
 | `open_questions` | Each fact that leaves part of the run's question unanswered, in the order the gate reads them. |
 | `judge_usage`, `judge_stops` | What each judge configured under `evaluators:` spent, and which judge's own ceiling stopped the run. |
 | `exchanges` | The `Recording` of the chat exchanges the run kept under `privacy.keep_exchanges`, redacted, or `None`. |
 | `stop_messages` | What the target did when it stopped the run, as the CLI prints it. Taken before redaction, so it names the cause under `metadata_only`, which withholds the recorded reason; never saved. |
-| `document()`, `save(path)` | The saved-run document, in the current run schema ([saved runs](usage-run.md)); `save` also writes kept exchanges to `exchanges_path(path)` (`run.json` → `run.exchanges.jsonl`). |
+| `document()`, `save(path)` | The saved-run document in the current run schema ([saved runs](usage-run.md)); `save` also writes kept exchanges to `exchanges_path(path)` (`run.json` → `run.exchanges.jsonl`). It writes exchanges first, then the document, each whole through an adjacent file. A failed save (`OSError`) leaves no document naming absent exchanges and preserves the earlier run and its exchanges. It replaces or removes only exchanges that the run it replaces at `path` recorded by digest. It replaces a link there without writing through it. `run` and `run.json` share one sidecar, so exchanges recorded by the other are never replaced or removed. Keeping exchanges beside any other file raises `FileExistsError` before anything is written. A run that kept none leaves such a file in place and warns with a `UserWarning` (Python's `warnings` module). |
 
 SARIF, JUnit and the terminal report are rendered by `guardana-report`: `guardana.report.get_renderer("sarif", run=verification.manifest).render(verification.result)`.
 
 ## Read a saved run back
 
 `load_verification(path)` reads a run saved by `--format json --output` or `save()`, of any
-run schema, into a `Verification` with the gate the run recorded; `exchanges` is `None`. A run
+run schema, into a `Verification` with the run's recorded gate. `exchanges` is `None`. A run
 that recorded no gate raises `ReportLoadError` from `guardana.core.report.load`. An
 [installed format](outputs.md#export-a-saved-run-from-python) can then export it without
 sending anything: `render(select_renderer(name, trust), load_verification(path))` from
-`guardana.core.output`.
+`guardana.core.output`. [Reading results](reading-results.md) shows how to read a saved run
+from Python and from `jq`, reading each channel separately.
 
 ## When a run cannot be carried out
 
@@ -135,7 +138,7 @@ Every error derives from `VerificationError`.
 | `UnsupportedTargetError` | A trace target. Its unreadable records and its contracts are read by [`guardana analyze-trace`](usage-analyze-trace.md), which this module does not run. Also an endpoint target not built on the built-in `EndpointTarget` under `privacy.keep_exchanges`. | `3` for `probe --keep-exchanges` |
 | `TargetReusedError` | The target already ran, here or by sending requests elsewhere. | — |
 
-A profile that does not load raises `ProfileError` from `guardana.core.profile`. Ctrl-C propagates as `KeyboardInterrupt`.
+A profile that does not load raises `ProfileError` from `guardana.core.profile`. Every `scan`, `run` and `grade` also raises it when a `rules.include` pattern matches none of the rules the `Verifier` registered, even when another pattern matches. Registered rules include those discovered, passed as `rules`, or loaded from `rule_paths` and `rules.paths`. A `Verifier` compiles no contract, so a pattern naming only a contract assertion is unmatched here. No `Verification` is returned, no rule runs, nothing is sent and the target stays free to run ([profiles](profiles.md#an-include-pattern-must-match-a-rule)). Ctrl-C propagates as `KeyboardInterrupt`.
 
 ## Serve your application's tools in CI
 

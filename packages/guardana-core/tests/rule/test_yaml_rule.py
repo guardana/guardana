@@ -2,6 +2,7 @@ import contextlib
 from pathlib import Path
 
 import pytest
+from guardana.core.assessment import AssessmentStatus
 from guardana.core.evaluator.base import Expectation
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.rule import RuleContext, RuleMeta
@@ -356,4 +357,4 @@ def test_an_ungradable_reply_is_recorded_as_inconclusive_not_as_a_failure() -> N
     with contextlib.suppress(EndpointError):
         list(rule.run(target, ctx))
 
-    assert all(a.passed is not False for a in ctx.recorded())
+    assert [(a.status, a.passed) for a in ctx.recorded()] == [(AssessmentStatus.INCONCLUSIVE, None)]

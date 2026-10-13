@@ -28,9 +28,10 @@ waivers:
     expires: 2026-12-31
 ```
 
-**A generated baseline is deliberately not usable as-is.** Every waiver carries
-placeholder text for the reason and the approver, and `verify` fails while it is
-still there. A baseline nobody edited is a list of findings somebody silenced in a
+**A generated baseline waives its findings as soon as a scan reads it and states
+that it is unreviewed.** Every waiver has placeholder text for its reason and
+approver. `scan` warns about each such waiver; `verify` fails while the text
+remains. Gate on `guardana baseline verify` to require review. An unedited baseline lists findings somebody silenced in a
 hurry, and it should look like one.
 
 ## Flags

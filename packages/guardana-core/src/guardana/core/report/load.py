@@ -13,6 +13,7 @@ from typing import Any, cast
 
 from guardana.core.assessment import Assessment, AssessmentStatus, Direction, UnmeasuredReason
 from guardana.core.evaluator.base import Outcome, Verdict
+from guardana.core.formats._stream import read_regular
 from guardana.core.manifest.load import ManifestLoadError, manifest_from_dict
 from guardana.core.manifest.migrations import (
     migrate_v1,
@@ -31,6 +32,7 @@ from guardana.core.manifest.migrations import (
     migrate_v14,
     migrate_v15,
     migrate_v16,
+    migrate_v17,
 )
 from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.usage import RunUsage
@@ -43,9 +45,19 @@ from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
-from guardana.core.target.scope import ExcludePattern, ExcludeSource, FileScope
+from guardana.core.target.scope import (
+    ExcludePattern,
+    ExcludeSource,
+    FileScope,
+    KeptModel,
+    SkippedDirectory,
+    SkippedModels,
+)
 from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 from guardana.core.usage import TargetUsage
+
+MAX_REPORT_BYTES = 256 * 1024 * 1024
+"""Bytes read from one saved run; a larger file is refused before any of it is parsed."""
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
 _ASSESSMENT_STATUSES = frozenset(str(s) for s in AssessmentStatus)
@@ -68,6 +80,7 @@ _MIGRATIONS = {
     14: migrate_v14,
     15: migrate_v15,
     16: migrate_v16,
+    17: migrate_v17,
 }
 """One step forward per version, keyed by the version the document *is*.
 
@@ -113,11 +126,21 @@ def load_report(path: Path) -> RunReport:
     including every run a user still has on disk — rather than reading it as a run
     that found nothing. An older *declared* version is migrated forward in memory
     instead, because refusing it would strand the evidence somebody kept.
+
+    Only a regular file is read, opened without waiting on a writer, and one over
+    `MAX_REPORT_BYTES` is refused before it is parsed.
     """
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        data = read_regular(path, MAX_REPORT_BYTES)
     except OSError as exc:
         raise ReportLoadError(f"cannot read run {path}: {exc}") from exc
+    if len(data) > MAX_REPORT_BYTES:
+        raise ReportLoadError(
+            f"{path} is over the {MAX_REPORT_BYTES}-byte ceiling for a saved run; it is "
+            f"refused rather than read in part"
+        )
+    try:
+        raw = json.loads(data.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ReportLoadError(f"{path} is not a readable Guardana run: {exc}") from exc
     if not isinstance(raw, dict):
@@ -217,6 +240,11 @@ def _result(raw: dict[str, Any], manifest: RunManifest, path: Path) -> ScanResul
 _EXCLUDE_SOURCES = frozenset(str(source) for source in ExcludeSource)
 
 
+_SCOPE_KEYS = frozenset(
+    {"files", "excludes", "ignored_directories", "kept_models", "skipped_models"}
+)
+
+
 def _scope(raw: dict[str, Any], path: Path) -> FileScope | None:
     """Read what a file run listed and excluded, refusing a shape no writer produces.
 
@@ -226,10 +254,9 @@ def _scope(raw: dict[str, Any], path: Path) -> FileScope | None:
     block = raw.get("scope")
     if block is None:
         return None
-    if not isinstance(block, dict) or set(block) != {"files", "excludes", "ignored_directories"}:
+    if not isinstance(block, dict) or set(block) != _SCOPE_KEYS:
         raise ReportLoadError(
-            f"{path}: 'scope' must be null or an object with files, excludes and "
-            f"ignored_directories"
+            f"{path}: 'scope' must be null or an object with {', '.join(sorted(_SCOPE_KEYS))}"
         )
     return FileScope(
         files=_str_tuple(block["files"], "scope.files", path),
@@ -237,6 +264,10 @@ def _scope(raw: dict[str, Any], path: Path) -> FileScope | None:
         ignored_directories=_str_tuple(
             block["ignored_directories"], "scope.ignored_directories", path
         ),
+        kept_models=_kept_models(block["kept_models"], path),
+        skipped_models=None
+        if block["skipped_models"] is None
+        else _skipped_models(block["skipped_models"], path),
     )
 
 
@@ -247,16 +278,63 @@ def _excludes(raw: object, path: Path) -> tuple[ExcludePattern, ...]:
     for entry in raw:
         if (
             not isinstance(entry, dict)
-            or set(entry) != {"pattern", "source"}
+            or set(entry) != {"pattern", "source", "file"}
             or not isinstance(entry["pattern"], str)
             or entry["source"] not in _EXCLUDE_SOURCES
+            or not (entry["file"] is None or isinstance(entry["file"], str))
         ):
             raise ReportLoadError(
-                f"{path}: every entry in 'scope.excludes' needs a string pattern and a source "
-                f"of {sorted(_EXCLUDE_SOURCES)}"
+                f"{path}: every entry in 'scope.excludes' needs a string pattern, a source "
+                f"of {sorted(_EXCLUDE_SOURCES)} and a file that is a string or null"
             )
-        patterns.append(ExcludePattern(entry["pattern"], ExcludeSource(entry["source"])))
+        patterns.append(
+            ExcludePattern(entry["pattern"], ExcludeSource(entry["source"]), entry["file"])
+        )
     return tuple(patterns)
+
+
+def _kept_models(raw: object, path: Path) -> tuple[KeptModel, ...]:
+    if not isinstance(raw, list) or not all(
+        isinstance(entry, dict)
+        and set(entry) == {"path", "pattern"}
+        and isinstance(entry["path"], str)
+        and isinstance(entry["pattern"], str)
+        for entry in raw
+    ):
+        raise ReportLoadError(
+            f"{path}: 'scope.kept_models' must be a list of objects with a string path and pattern"
+        )
+    return tuple(KeptModel(entry["path"], entry["pattern"]) for entry in raw)
+
+
+def _skipped_models(raw: object, path: Path) -> SkippedModels:
+    if (
+        not isinstance(raw, dict)
+        or set(raw) != {"directories", "searched_all"}
+        or not isinstance(raw["searched_all"], bool)
+        or not isinstance(raw["directories"], list)
+        or not all(_skipped_directory(entry) for entry in raw["directories"])
+    ):
+        raise ReportLoadError(
+            f"{path}: 'scope.skipped_models' must be null or an object with a boolean "
+            f"searched_all and directories, each a string path and a positive model_files"
+        )
+    return SkippedModels(
+        directories=tuple(
+            SkippedDirectory(entry["path"], entry["model_files"]) for entry in raw["directories"]
+        ),
+        searched_all=raw["searched_all"],
+    )
+
+
+def _skipped_directory(entry: object) -> bool:
+    return (
+        isinstance(entry, dict)
+        and set(entry) == {"path", "model_files"}
+        and isinstance(entry["path"], str)
+        and type(entry["model_files"]) is int
+        and entry["model_files"] > 0
+    )
 
 
 def _assessments(raw: object, path: Path) -> tuple[Assessment, ...]:

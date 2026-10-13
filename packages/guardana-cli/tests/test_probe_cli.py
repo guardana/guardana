@@ -59,6 +59,7 @@ def test_probe_concurrency_flag_reaches_the_runner(monkeypatch: pytest.MonkeyPat
         calibrations: Mapping[str, CalibrationRecord],
         secrets: tuple[str, ...],
         remedies: FailureRemedies,
+        inventory: Registry | None = None,
     ) -> Runner:
         seen.append(concurrency)
         return Runner(
@@ -68,6 +69,7 @@ def test_probe_concurrency_flag_reaches_the_runner(monkeypatch: pytest.MonkeyPat
             calibrations=calibrations,
             secrets=secrets,
             remedies=remedies,
+            inventory=inventory,
         )
 
     monkeypatch.setattr(probe_run_module, "Runner", recording_runner)

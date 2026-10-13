@@ -11,10 +11,14 @@ only a run that could not be carried out raises, with a `VerificationError`.
 from the command line compose the same steps in the same order.
 """
 
+import errno
 import hashlib
 import json
+import os
+import secrets
 import threading
 import uuid
+import warnings
 import weakref
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -54,7 +58,7 @@ from guardana.core.manifest.records import (
 from guardana.core.manifest.usage import JudgeUsage
 from guardana.core.plugins import PluginTrust
 from guardana.core.probe import run_target_probe
-from guardana.core.profile import Policy, Profile, default_profile
+from guardana.core.profile import Policy, Profile, ProfileError, default_profile
 from guardana.core.recording import (
     Recording,
     RecordingError,
@@ -62,7 +66,7 @@ from guardana.core.recording import (
     read_recording,
     render_recording,
 )
-from guardana.core.redaction import EvidenceRedactor, MessageQuoting
+from guardana.core.redaction import EvidenceRedactor, MessageQuoting, RedactionBoundError
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
 from guardana.core.report.baseline import Baseline, apply_baseline
@@ -70,11 +74,13 @@ from guardana.core.report.load import ReportLoadError, load_report
 from guardana.core.report.location import relativize, relativize_findings
 from guardana.core.report.serialize import run_to_dict
 from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
+from guardana.core.report.stop import StopReason
 from guardana.core.rule import Rule
 from guardana.core.runner import (
     DEFAULT_ENDPOINT_CONCURRENCY,
     Runner,
     applicability_refusal,
+    refuse_unmatched_includes,
     select_rules,
     target_failures,
 )
@@ -180,7 +186,7 @@ class Verification:
 
     @property
     def exit_code(self) -> int:
-        """The exit code `guardana` gives this result: 0, 1, 2, 4 (its target stopped it) or 6."""
+        """The exit code `guardana` gives this result: 0, 1, 2, 4 (target stopped it), 6 or 7."""
         return exit_code_for(self.gate, self.result.stopped_by)
 
     @property
@@ -200,18 +206,148 @@ class Verification:
     def save(self, path: Path) -> None:
         """Write the saved-run document to `path`, as `--format json --output` does.
 
-        Kept exchanges go to `exchanges_path(path)` beside it, replacing a link there rather
-        than writing through it; a file there from an earlier run is removed when this one
-        kept none, so it never reads as this run's.
+        Kept exchanges go to `exchanges_path(path)` first and the document second, each
+        written whole through a file beside it, so a failure leaves no document naming
+        exchanges that are not there. They replace only exchanges the run saved at `path`
+        recorded, or a link, which is never written through; exchanges the other run of
+        the pair (`run` and `run.json` share one sidecar) recorded, or any other file there,
+        raise `FileExistsError` before anything is written. A run that kept none removes the
+        exchanges the run it replaces recorded and keeps any other file there, with a
+        `UserWarning`. Raises `OSError` when a file cannot be written; the earlier run and
+        its exchanges are then as they were.
         """
-        path.write_text(json.dumps(self.document(), indent=2) + "\n", encoding="utf-8")
         sidecar = exchanges_path(path)
-        if self.exchanges is not None:
-            if sidecar.is_symlink():
-                sidecar.unlink()
-            sidecar.write_bytes(render_recording(self.exchanges).encode("utf-8"))
-        elif sidecar.exists():
-            sidecar.unlink()
+        earlier = exchanges_recorded_by(path)
+        partner = recorded_by_partner(path)
+        document = (json.dumps(self.document(), indent=2) + "\n").encode("utf-8")
+        if self.exchanges is None:
+            _put(_staged(path, document), path)
+            _remove_earlier_exchanges(path, sidecar, None if partner else earlier, partner)
+            return
+        if partner is not None or (
+            sidecar.is_file() and not sidecar.is_symlink() and earlier is None
+        ):
+            whose = f"{partner} recorded" if partner else f"no run saved at {path} recorded"
+            raise FileExistsError(
+                errno.EEXIST,
+                f"it holds exchanges {whose}, and keeping this run's would replace them",
+                str(sidecar),
+            )
+        kept = _staged(sidecar, render_recording(self.exchanges).encode("utf-8"))
+        try:
+            staged = _staged(path, document)
+        except BaseException:
+            kept.unlink(missing_ok=True)
+            raise
+        aside = _set_aside(sidecar)
+        try:
+            _put(kept, sidecar)
+            _put(staged, path)
+        except BaseException:
+            kept.unlink(missing_ok=True)
+            staged.unlink(missing_ok=True)
+            if aside is not None:
+                aside.replace(sidecar)
+            else:
+                sidecar.unlink(missing_ok=True)
+            raise
+        if aside is not None:
+            aside.unlink(missing_ok=True)
+
+
+def _staged(destination: Path, data: bytes) -> Path:
+    """Write `data` to a new file beside `destination` and return it, or raise leaving none."""
+    staged = destination.with_name(f".{destination.name}.{secrets.token_hex(8)}.tmp")
+    try:
+        with staged.open("xb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
+    return staged
+
+
+def _set_aside(path: Path) -> Path | None:
+    """Rename the file or link at `path` to a name beside it and return that, or None."""
+    if not (path.is_file() or path.is_symlink()):
+        return None
+    aside = path.with_name(f".{path.name}.{secrets.token_hex(8)}.earlier")
+    path.replace(aside)
+    return aside
+
+
+def _put(staged: Path, destination: Path) -> None:
+    """Rename `staged` over `destination`, a link there included, removing it on failure."""
+    try:
+        staged.replace(destination)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
+
+
+def _remove_earlier_exchanges(
+    path: Path, sidecar: Path, earlier: str | None, partner: Path | None
+) -> None:
+    """Remove the exchanges the replaced run recorded as `earlier`, warn of any other file."""
+    if earlier is not None and _digest_of(sidecar) == earlier:
+        sidecar.unlink(missing_ok=True)
+    elif partner is not None:
+        warnings.warn(
+            f"kept {sidecar}: it holds the exchanges {partner} recorded", UserWarning, stacklevel=3
+        )
+    elif sidecar.is_file() or sidecar.is_symlink():
+        warnings.warn(
+            f"kept {sidecar}: no run saved at {path} before this one recorded it, so it is "
+            f"not an earlier run's exchanges",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
+def _digest_of(path: Path) -> str | None:
+    """Return the sha256 digest of the file at `path` as a run records it, or None if unreadable."""
+    try:
+        with path.open("rb") as handle:
+            return f"sha256:{hashlib.file_digest(handle, 'sha256').hexdigest()}"
+    except OSError:
+        return None
+
+
+def recorded_by_partner(run: Path) -> Path | None:
+    """Return the other saved run sharing `run`'s sidecar when it records exactly its bytes.
+
+    `run` and `run.json` both keep their exchanges in `run.exchanges.jsonl`, so exchanges
+    one of them recorded are never the other's to replace or remove.
+    """
+    partner = run.with_name(run.stem if run.suffix == ".json" else f"{run.name}.json")
+    if exchanges_path(partner) != exchanges_path(run) or not partner.is_file():
+        return None
+    try:
+        if run.exists() and partner.samefile(run):
+            return None
+    except OSError:
+        return None
+    return partner if exchanges_recorded_by(partner) is not None else None
+
+
+def exchanges_recorded_by(run: Path) -> str | None:
+    """Return the digest of the exchanges beside `run` when the saved run there records them.
+
+    The saved run at `run` must load and record exactly the bytes at `exchanges_path(run)`;
+    a file's name never makes it a run's exchanges. None otherwise.
+    """
+    sidecar = exchanges_path(run)
+    if not (run.is_file() and sidecar.is_file()):
+        return None
+    try:
+        record = load_report(run).manifest.exchanges
+    except ReportLoadError:
+        return None
+    if record is None or _digest_of(sidecar) != record.digest:
+        return None
+    return record.digest
 
 
 def load_verification(path: Path) -> Verification:
@@ -378,8 +514,9 @@ class Verifier:
         closes it. A target runs once: a second run, or one started while the first is
         under way, raises `TargetReusedError`, because its meter and whatever it cached
         would describe both runs. A run refused before anything was sent, over its
-        calibrations or a budget, leaves the target free; a target that cannot be weakly
-        referenced is checked by its meter alone.
+        calibrations, a budget or its profile, leaves the target free; a target that
+        cannot be weakly referenced is checked by its meter alone. A `rules.include`
+        pattern that matches no registered rule raises `ProfileError` before any rule runs.
         """
         return self._verify(
             target,
@@ -440,6 +577,7 @@ class Verifier:
         try:
             calibrations = self._calibrations()
             registry = self._registry().copied()
+            refuse_unmatched_includes(self.profile, registry)
             registry.apply_trials(self.profile.trials)
             if isinstance(target, RecordedTarget):
                 refuse_other_trials(target.recording, registry)
@@ -453,7 +591,7 @@ class Verifier:
             result, identity = self._execute(
                 target, registry, calibrations, endpoint=endpoint, withheld=withheld
             )
-        except (CalibrationError, UnenforceableBudgetError, RecordingRefusedError):
+        except (CalibrationError, UnenforceableBudgetError, RecordingRefusedError, ProfileError):
             # Each is refused before the first request, which leaves the target unused.
             if keeping is not None:
                 keeping.stop_keeping()
@@ -647,10 +785,14 @@ class Verifier:
         the gate.
         """
         stop_messages = target_failures(result)
+        stopped = result.stopped_by
         if relative_to is not None:
             result = relativize_findings(result, relative_to)
         redactor = EvidenceRedactor(self.profile.privacy, secrets=withheld)
-        result = redactor.redact_result(result)
+        try:
+            result = redactor.redact_result(result)
+        except RedactionBoundError as exc:
+            raise _after_stop(exc, stopped) from exc
         if baseline is not None:
             result = apply_baseline(result, baseline.active())
         result = replace(
@@ -663,19 +805,22 @@ class Verifier:
         )
         gate = gate_outcome(result, self.profile.policy)
         run_id = str(uuid.uuid4())
-        exchanges = (
-            None
-            if kept is None
-            else self._kept_recording(
-                kept,
-                redactor,
-                run_id=run_id,
-                subject=reference,
-                started_at=started_at,
-                gate=gate,
-                result=result,
+        try:
+            exchanges = (
+                None
+                if kept is None
+                else self._kept_recording(
+                    kept,
+                    redactor,
+                    run_id=run_id,
+                    subject=reference,
+                    started_at=started_at,
+                    gate=gate,
+                    result=result,
+                )
             )
-        )
+        except RedactionBoundError as exc:
+            raise _after_stop(exc, stopped) from exc
         manifest = build_run_manifest(
             registry,
             self.profile,
@@ -941,6 +1086,11 @@ def _release(target: Target) -> None:
     with _RAN_LOCK:
         if _RAN.get(id(target)) is target:
             del _RAN[id(target)]
+
+
+def _after_stop(error: RedactionBoundError, stopped: StopReason | None) -> RedactionBoundError:
+    """Return `error` stating the stop the run had already met, so the stop keeps its code."""
+    return RedactionBoundError(error.pattern, error.failure, stopped_by=stopped)
 
 
 __all__ = [

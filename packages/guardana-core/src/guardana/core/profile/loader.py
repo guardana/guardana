@@ -1,3 +1,4 @@
+import math
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -187,10 +188,12 @@ def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
     severity_name = raw.get("severity", "high")
     if not isinstance(severity_name, str) or severity_name.upper() not in Severity.__members__:
         raise ProfileError(f"invalid profile {path}: unknown severity {severity_name!r}")
-    try:
-        min_confidence = float(raw.get("min_confidence", 0.0))
-    except (TypeError, ValueError) as exc:
-        raise ProfileError(f"invalid profile {path}: min_confidence must be a number") from exc
+    raw_confidence = raw.get("min_confidence", 0.0)
+    min_confidence = _confidence_number(raw_confidence)
+    if min_confidence is None:
+        raise ProfileError(
+            f"invalid profile {path}: min_confidence must be a number, got {raw_confidence!r}"
+        )
     # NaN and out-of-range values silently disable the confidence gate — the
     # comparison `confidence >= min_confidence` is always False for them.
     if not 0.0 <= min_confidence <= 1.0:
@@ -214,6 +217,25 @@ def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
         fail_on_skipped=fail_on_skipped,
         min_graded_share=_graded_share(raw.get("min_graded_share"), path),
     )
+
+
+def _confidence_number(value: object) -> float | None:
+    """Read `min_confidence` as a number: an int, a float or a quoted finite number; never a bool.
+
+    YAML `true` is an int to Python, and reading it as 1.0 would hide every finding below
+    full confidence from the gate.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            number = float(value)
+        except ValueError:
+            return None
+        return number if math.isfinite(number) else None
+    return None
 
 
 def _graded_share(value: object, path: Path) -> float | None:

@@ -2,9 +2,10 @@
 
 `release.py` fetches, runs the gate and pushes; `clean_install_check.py` builds a
 virtual environment; `generate_sbom.py` writes `sbom/`; `image_smoke.py` builds and
-runs containers; `export_image_requirements.py` writes `deploy/docker/`. A request
-for usage that did any of that, or an unknown flag that was ignored and ran the
-default, is the script doing something nobody asked for.
+runs containers; `export_image_requirements.py` writes `deploy/docker/`;
+`reproduce_release.py` downloads from PyPI and builds. A request for usage that did
+any of that, or an unknown flag that was ignored and ran the default, is the script
+doing something nobody asked for.
 """
 
 import subprocess
@@ -22,6 +23,7 @@ import export_image_requirements
 import generate_sbom
 import image_smoke
 import release
+import reproduce_release
 
 
 class _SideEffectError(Exception):
@@ -57,6 +59,7 @@ def acted(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
         generate_sbom,
         image_smoke,
         export_image_requirements,
+        reproduce_release,
     ):
         monkeypatch.setattr(module, "_ROOT", tmp_path)
     return attempts
@@ -70,6 +73,7 @@ _SCRIPTS = pytest.mark.parametrize(
         (generate_sbom, ("--check",)),
         (image_smoke, ("--no-build",)),
         (export_image_requirements, ("--check",)),
+        (reproduce_release, ("--source",)),
     ],
     ids=[
         "release",
@@ -77,6 +81,7 @@ _SCRIPTS = pytest.mark.parametrize(
         "generate_sbom",
         "image_smoke",
         "export_image_requirements",
+        "reproduce_release",
     ],
 )
 
@@ -111,7 +116,8 @@ def test_an_unknown_flag_is_refused_before_anything_runs(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A misspelled flag is an error, never a default run with the typo ignored."""
-    argv = ["patch", "--no-such-flag"] if module is release else ["--no-such-flag"]
+    takes_a_positional = module in {release, reproduce_release}
+    argv = ["patch", "--no-such-flag"] if takes_a_positional else ["--no-such-flag"]
     with pytest.raises(SystemExit) as exit_info:
         _call_main(module, argv)
 

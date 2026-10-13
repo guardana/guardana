@@ -14,6 +14,9 @@ passes.
 import hashlib
 import json
 import os
+import sys
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -432,3 +435,34 @@ def test_a_missing_undecided_count_is_derived_from_the_processed_total(tmp_path:
     ]
     assert "1 of 6 scored output(s)" in (read.observations[0].detail or "")
     assert read.unreadable == ()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+@pytest.mark.parametrize(
+    "read",
+    [detect_observation_dialect, read_observations],
+    ids=["detect-dialect", "read"],
+)
+def test_observations_that_are_a_fifo_are_refused_without_blocking(
+    tmp_path: Path, read: Callable[[Path], object]
+) -> None:
+    path = tmp_path / "observations.json"
+    os.mkfifo(path)
+    outcome: list[object] = []
+
+    def attempt() -> None:
+        try:
+            outcome.append(read(path))
+        except Exception as exc:
+            outcome.append(exc)
+
+    worker = threading.Thread(target=attempt, daemon=True)
+    worker.start()
+    worker.join(10)
+    if worker.is_alive():
+        os.close(os.open(path, os.O_WRONLY | os.O_NONBLOCK))
+        pytest.fail("reading observations from a FIFO blocked")
+
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], TraceLoadError)
+    assert "not a regular file" in str(outcome[0])

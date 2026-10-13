@@ -74,7 +74,8 @@ because a scan that did not answer is not a clean result.
 
 The Action gates on what a scan finds *today*. To gate on whether today is worse
 than the last accepted run, save both runs and compare them. These steps run the
-published image, so they need no install step of their own:
+published image, so they need no separate install step. They run it as the runner's
+user: the image's default user cannot write to a checkout it does not own:
 
 ```yaml
       - uses: actions/checkout@v7
@@ -82,12 +83,12 @@ published image, so they need no install step of their own:
       - name: Scan and save this run
         # exit 1 is a finding the comparison will judge; 2 and above still stop the job
         run: >
-          docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.41
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/guardana/guardana:0.41
           scan /work --format json --output /work/current.json || test $? -eq 1
 
       - name: Compare against the last accepted run
         run: >
-          docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.41
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.41
           diff /work/accepted.json /work/current.json --preset ci
 ```
 

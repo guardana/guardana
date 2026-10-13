@@ -400,11 +400,23 @@ def test_a_profile_example_holds_only_profile_keys_and_more_than_a_name() -> Non
     assert [(e.tag, e.doc, e.block) for e in examples] == [
         ("v0.20.0", "docs/profiles.md", 1),
         ("v0.20.0", "docs/profiles.md", 3),
+        ("v0.20.0", "docs/profiles.md", 5),
     ]
     assert not capture.is_profile_example({"name": "x", "schema_version": 1})
     assert not capture.is_profile_example({"name": "x", "collector": {}})
     assert not capture.is_profile_example(["fail_on"])
     assert capture.is_profile_example({"schema_version": 1, "trace": {"require": []}})
+
+
+def test_a_broken_profile_example_is_kept_for_the_release_to_refuse() -> None:
+    """A block YAML cannot read still reaches the release, which records why it refuses it."""
+    page = "```yaml\nname: production\nrules: [\n```\n\n```yaml\nnot: [a profile\n```\n"
+
+    examples = capture.examples_in("v0.20.0", "docs/profiles.md", page)
+
+    assert [(e.block, e.text) for e in examples] == [(1, "name: production\nrules: [\n")]
+    assert capture.example_env(examples[0].text) == {}
+    assert capture.named_files(examples[0].text) == []
 
 
 def test_every_variable_an_example_names_gets_a_placeholder() -> None:

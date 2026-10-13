@@ -37,13 +37,15 @@ def _child(source: str) -> list[str]:
     return [sys.executable, "-c", source]
 
 
-def _request_in_background(transport: StdioMcpTransport) -> list[object]:
-    """Make one request on a thread, so a read that never returns fails the test instead."""
+def _request_in_background(
+    transport: StdioMcpTransport, params: dict[str, object] | None = None
+) -> list[object]:
+    """Make one request on a thread, so a read or write that never returns fails the test."""
     outcome: list[object] = []
 
     def ask() -> None:
         try:
-            outcome.append(transport.request("tools/list", {}))
+            outcome.append(transport.request("tools/list", params or {}))
         except Exception as exc:
             outcome.append(exc)
 
@@ -371,3 +373,67 @@ def test_a_server_flooding_its_own_requests_is_unreadable_not_a_hang() -> None:
     assert len(outcome) == 1
     assert isinstance(outcome[0], UnreadableReply)
     assert "requests of its own" in str(outcome[0])
+
+
+_PINGS_WITH_A_LONG_ID = """
+import json, sys, time
+sys.stdin.readline()
+sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": "x" * 200000, "method": "ping"}) + "\\n")
+sys.stdout.flush()
+time.sleep(60)
+"""
+"""Asks with an id no pipe holds the answer to, and never reads its input again."""
+
+
+def test_a_server_request_whose_id_is_too_long_to_reflect_is_unreadable() -> None:
+    transport = StdioMcpTransport(_child(_PINGS_WITH_A_LONG_ID), timeout=5.0)
+    try:
+        outcome = _request_in_background(transport)
+    finally:
+        transport.close()
+
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], UnreadableReply)
+    assert "id" in str(outcome[0])
+
+
+@pytest.mark.parametrize("asked_id", ["[1]", '{"n": 1}', "true", "1.5"])
+def test_a_server_request_whose_id_is_not_a_string_or_integer_is_unreadable(
+    asked_id: str,
+) -> None:
+    asked = f'{{"jsonrpc": "2.0", "id": {asked_id}, "method": "ping"}}\\n'
+    transport = StdioMcpTransport(
+        _child(
+            "import sys, time\n"
+            "sys.stdin.readline()\n"
+            f"sys.stdout.write('{asked}')\n"
+            "sys.stdout.flush()\n"
+            "time.sleep(30)\n"
+        ),
+        timeout=5.0,
+    )
+    try:
+        outcome = _request_in_background(transport)
+    finally:
+        transport.close()
+
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], UnreadableReply)
+
+
+_NEVER_READS = "import time\ntime.sleep(60)\n"
+"""Leaves its input unread, so a request larger than the pipe never finishes writing."""
+
+
+def test_a_server_that_does_not_read_its_input_is_unreachable_within_the_deadline() -> None:
+    transport = StdioMcpTransport(_child(_NEVER_READS), timeout=0.5)
+    try:
+        outcome = _request_in_background(transport, {"cursor": "x" * 1_000_000})
+        with pytest.raises(UnreadableReply):
+            transport.request("tools/list", {})
+    finally:
+        transport.close()
+
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], EndpointUnreachable)
+    assert "0.5 seconds" in str(outcome[0])

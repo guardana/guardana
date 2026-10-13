@@ -1,9 +1,10 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from guardana.cli._atomic import write_whole
-from guardana.cli._exit import refuse_unenforceable_budget
+from guardana.cli._exit import refuse_invalid_profile, refuse_unenforceable_budget
 from guardana.cli._formats import FORMAT_HELP
 from guardana.cli._outputs import (
     refuse_collector_beside,
@@ -37,6 +38,7 @@ from guardana.cli.baseline import (
     refuse_an_incomplete_baseline,
 )
 from guardana.cli.exit_codes import ExitCode
+from guardana.core.profile import ProfileError
 from guardana.core.registry import Registry
 from guardana.core.report import (
     Baseline,
@@ -45,7 +47,7 @@ from guardana.core.report import (
     serialize_baseline,
 )
 from guardana.core.target import Target, TargetKind
-from guardana.core.verify import UnenforceableBudgetError, Verifier
+from guardana.core.verify import UnenforceableBudgetError, Verification, Verifier
 
 _BASELINE_ERROR_EXIT_CODE = ExitCode.INVALID_USAGE
 """A baseline file that cannot be read is bad input, not an indeterminate result."""
@@ -262,25 +264,26 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
         # is rendered, baselined or emitted as SARIF, so alerts attach to real repo paths
         # and a baseline fingerprint is portable between a dev machine and CI. A plugin
         # owns its locator's identity, so only a path-built target's own ref is rewritten.
-        try:
-            if isinstance(selected, Path):
-                verification = verifier.scan(
+        waived = None if write_baseline is not None else accepted
+        verification = _carried_out(
+            lambda: (
+                verifier.scan(
                     selected,
                     relative_to=Path.cwd(),
-                    baseline=None if write_baseline is not None else accepted,
+                    baseline=waived,
                     source=detect_source(),
                     deployment=deployment,
                 )
-            else:
-                verification = verifier.run(
+                if isinstance(selected, Path)
+                else verifier.run(
                     selected,
                     relative_to=Path.cwd(),
-                    baseline=None if write_baseline is not None else accepted,
+                    baseline=waived,
                     source=detect_source(),
                     deployment=deployment,
                 )
-        except UnenforceableBudgetError as exc:
-            raise refuse_unenforceable_budget(exc) from exc
+            )
+        )
         result = verification.result
 
         if write_baseline is not None:
@@ -321,6 +324,16 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
             delivery_required=prof.delivery_required,
             collector_acknowledged=acknowledged,
         )
+
+
+def _carried_out(run: Callable[[], Verification]) -> Verification:
+    """Run, ending a run the verifier refuses before it starts with exit `3`."""
+    try:
+        return run()
+    except UnenforceableBudgetError as exc:
+        raise refuse_unenforceable_budget(exc) from exc
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
 
 
 def _read_baseline(path: Path | None) -> Baseline | None:

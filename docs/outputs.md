@@ -64,11 +64,11 @@ delivery: <status> — <name> to <destination>[ (HTTP <code>, <n> attempt|attemp
 
 | Status | Meaning | Exit code |
 |---|---|---|
-| `delivered` | the receiver acknowledged it: a 2xx answer to at least one attempt | the verdict's |
+| `delivered` | the receiver acknowledged it, after at least one attempt; a reporter that names an HTTP status names a 2xx one, and one that writes locally, such as to a file, names none | the verdict's |
 | `rejected` | the receiver answered and did not accept it | the verdict's; `8` under `delivery.required` |
 | `unreachable` | the receiver did not answer | the verdict's; `8` under `delivery.required` |
 | `not_sent` | nothing left the machine: the run ended before its report existed, or the reporter declined to send | the verdict's, or the code the command ended with before delivery; `8` under `delivery.required` once the run produced its report |
-| `unknown` | the reporter failed, ran past 30 seconds, or said `delivered` with no attempt or with a status outside 2xx; whether anything left is unknown | `8` |
+| `unknown` | the reporter failed, ran past 30 seconds including its post-delivery `sent_secrets()` read, or said `delivered` with no attempt or a status outside 2xx; whether anything left is unknown | `8` |
 
 The destination is shown without a path, query or credential: Guardana reduces a URL to
 `scheme://host[:port]` before printing it, whatever the reporter gave, and withholds the
@@ -110,7 +110,10 @@ table = render(select_renderer("acme-table", trust), load_verification(Path("run
 Path("run.csv").write_text(table, encoding="utf-8", newline="")
 ```
 
-`PluginTrust` and `PluginMode` sit outside the [supported surface](compatibility.md#the-supported-surface): a minor release may change them, so pin `guardana-core` to a minor while your code imports them.
+`render`, `select_renderer` and `load_verification` are in the
+[supported surface](compatibility.md#the-supported-surface). `PluginTrust` and `PluginMode` are
+outside it and subject to change in any release. While your code imports them, pin the exact
+`guardana-core` version you tested.
 
 `guardana recipe run` saves `run.json` in its artifact directory; export it the same way.
 
@@ -147,10 +150,11 @@ acme-table = "acme_outputs:provide_table"
 acme-webhook = "acme_outputs:provide_webhook"
 ```
 
-Name the package module, not a submodule, so `guardana pack validate` finds your manifest, and
-import heavy code inside the provider so selecting one output never imports another. A name is
-lowercase letters, digits and `-`, at most 40 characters; `human`, `json`, `sarif`, `junit`,
-`server`, `http`, `https` and any name starting with `guardana` are reserved.
+Name the package module, not a submodule, so `guardana pack validate` finds your manifest.
+Import heavy code inside the provider so selecting one output never imports another. A name
+matches `[a-z][a-z0-9-]*`: a lowercase letter followed by lowercase letters, digits and `-`,
+with at most 40 characters in total. A format cannot use `human`, `json`, `sarif` or `junit`;
+a reporter cannot use `server`, `http` or `https`. No output name may start with `guardana`.
 
 ```python
 from guardana.core.output import Delivery, DeliveryStatus, RendererSpec, ReporterSpec
@@ -167,7 +171,8 @@ def provide_webhook() -> ReporterSpec:
 - `prepare(ReporterRequest(locator))` checks the destination and credentials and sends
   nothing; raise `ValueError` with the reason to refuse. It returns an object with
   `destination` (shown in the delivery line), `sent_secrets()` (withheld from every line) and
-  `deliver(verification) -> Delivery`.
+  `deliver(verification) -> Delivery`. `sent_secrets()` is read again after `deliver`, within
+  the same deadline.
 - `deliver` should connect straight to the destination the operator named and ignore
   `HTTP_PROXY`, `HTTPS_PROXY` and their lowercase forms, as the reference webhook does with
   `ProxyHandler({})`. A proxy the environment names sees everything sent and can answer in the

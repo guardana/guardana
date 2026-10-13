@@ -1,6 +1,8 @@
 import os
+from collections import deque
 from collections.abc import Iterator
 from fnmatch import fnmatch
+from itertools import islice
 from pathlib import Path
 
 from guardana.core.budget import BudgetExhausted, Budgets
@@ -12,6 +14,9 @@ from guardana.core.target.scope import (
     ExcludePattern,
     ExcludeSource,
     FileScope,
+    KeptModel,
+    SkippedDirectory,
+    SkippedModels,
 )
 from guardana.core.usage import TargetUsage
 
@@ -21,6 +26,11 @@ from guardana.core.usage import TargetUsage
 # fall back to recomputing — slower, never wrong. Sized so an 8 MB Python
 # codebase (an order of magnitude larger than this repo) caches whole.
 _SOURCE_CACHE_BYTES = 8 * 1024 * 1024
+
+SKIPPED_SEARCH_ENTRIES = 10_000
+"""How many entries of the skipped directories a scan reads by name, shallowest first,
+looking for model files. A virtualenv runs to hundreds of thousands of entries, and a
+model somebody put in `build/` sits near the top."""
 
 
 def _is_ignored(dirname: str) -> bool:
@@ -78,24 +88,39 @@ class ArtifactTarget(Target):
         excludes: tuple[str, ...] = (),
         source_cache_bytes: int = _SOURCE_CACHE_BYTES,
         source_read_limit: int = MAX_SOURCE_BYTES,
+        skipped_search_entries: int = SKIPPED_SEARCH_ENTRIES,
     ) -> None:
         self._root = root
         # Profile `rules.paths_exclude` plus any `.guardanaignore` at the root, both
         # matched (via fnmatch) against each entry's path relative to the root. A
         # single-file root is scanned whatever they say, so none is recorded for it.
+        ignore_file = str(root / IGNORE_FILE)
         self._excludes: tuple[ExcludePattern, ...] = (
             ()
             if root.is_file()
             else (
                 *(ExcludePattern(p, ExcludeSource.PROFILE) for p in excludes),
-                *(ExcludePattern(p, ExcludeSource.IGNORE_FILE) for p in _read_ignore_file(root)),
+                *(
+                    ExcludePattern(p, ExcludeSource.IGNORE_FILE, ignore_file)
+                    for p in _read_ignore_file(root)
+                ),
             )
         )
+        self._patterns = {
+            source: tuple(e.pattern for e in self._excludes if e.source is source)
+            for source in ExcludeSource
+        }
         self._sources: dict[Path, PythonSource | None] = {}
         self._unread: dict[Path, UnreadSource] = {}
         self._source_budget = source_cache_bytes
         self._source_read_limit = source_read_limit
+        self._skipped_search_entries = skipped_search_entries
         self._files: tuple[Path, ...] | None = None
+        self._kept: list[KeptModel] = []
+        self._names: dict[Path, list[str]] = {}
+        self._model_directories: dict[Path, bool] = {}
+        self._skipped: list[Path] = []
+        self._skipped_models: SkippedModels | None = None
 
     def capabilities(self) -> set[Capability]:
         """Files can be read; nothing can be asked."""
@@ -170,18 +195,29 @@ class ArtifactTarget(Target):
         return tuple(self._unread[path] for path in sorted(self._unread))
 
     def file_scope(self) -> FileScope:
-        """Return every file this scan listed and the excludes it applied while listing."""
+        """Return every file this scan listed and the excludes it applied while listing.
+
+        Also the model files the target's own ignore file matched and the scan read
+        anyway, and what a bounded, name-only search of the skipped directories found.
+        """
+        files = tuple(str(path) for path in self._listing())
+        if self._root.is_file():
+            return FileScope(files=files, excludes=self._excludes, skipped_models=SkippedModels())
         return FileScope(
-            files=tuple(str(path) for path in self._listing()),
+            files=files,
             excludes=self._excludes,
-            ignored_directories=() if self._root.is_file() else IGNORED_DIRECTORIES,
+            ignored_directories=IGNORED_DIRECTORIES,
+            kept_models=tuple(self._kept),
+            skipped_models=self._search_skipped(),
         )
 
-    def _excluded(self, path: Path) -> bool:
-        if not self._excludes:
-            return False
+    def _matched(self, path: Path, source: ExcludeSource) -> str | None:
+        """Return the first pattern from `source` that matches `path`, or None."""
+        patterns = self._patterns[source]
+        if not patterns:
+            return None
         rel = os.path.relpath(path, self._root)
-        return any(fnmatch(rel, exclude.pattern) for exclude in self._excludes)
+        return next((pattern for pattern in patterns if fnmatch(rel, pattern)), None)
 
     def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
         """Walk the tree in a stable order, skipping caches, virtualenvs, and excludes.
@@ -217,33 +253,145 @@ class ArtifactTarget(Target):
             return
         matches: list[Path] = []
         real_root = os.path.realpath(self._root)
+        # A directory the target's own ignore file excludes is still walked, keyed to
+        # the pattern, because a model file beneath it is scanned whatever it says.
+        hidden: dict[Path, str] = {}
         for dirpath, dirnames, filenames in os.walk(self._root, onerror=self._unlisted):
-            kept = [
-                d
-                for d in sorted(dirnames)
-                if not _is_ignored(d) and not self._excluded(Path(dirpath) / d)
-            ]
+            directory = Path(dirpath)
+            inherited = hidden.get(directory)
+            kept = self._descended(directory, dirnames, inherited, hidden)
             # `os.walk` does not descend a symlinked directory, so everything behind
             # one would leave the scan without a trace.
-            linked = {d for d in kept if _is_link(Path(dirpath) / d)}
+            linked = {d for d in kept if _is_link(directory / d)}
             for name in sorted(linked):
-                path = Path(dirpath) / name
+                path = directory / name
                 self._unread[path] = UnreadSource(
                     path,
                     f"{path}: a symlinked directory is not walked; scan its target "
                     f"directly or exclude it",
                 )
             dirnames[:] = [d for d in kept if d not in linked]
+            siblings = frozenset(name.lower() for name in filenames)
+            self._names[directory] = filenames
             for filename in filenames:
-                path = Path(dirpath) / filename
-                if self._excluded(path):
+                path = directory / filename
+                if not self._listed(path, inherited, siblings):
                     continue
                 refused = _refused_link(path, real_root) if _is_link(path) else None
                 if refused is not None:
                     self._unread[path] = UnreadSource(path, f"{path}: {refused}")
                     continue
                 matches.append(path)
+        self._kept.sort(key=lambda kept: kept.path)
         yield from sorted(matches)
+
+    def _descended(
+        self, directory: Path, names: list[str], inherited: str | None, hidden: dict[Path, str]
+    ) -> list[str]:
+        """Return the subdirectories to walk, noting the skipped and the ignore-file ones."""
+        kept = []
+        for name in sorted(names):
+            path = directory / name
+            if _is_ignored(name):
+                # A link is not searched: it may lead anywhere on the scanning machine.
+                if not _is_link(path):
+                    self._skipped.append(path)
+                continue
+            if self._matched(path, ExcludeSource.PROFILE) is not None:
+                continue
+            pattern = inherited or self._matched(path, ExcludeSource.IGNORE_FILE)
+            if pattern is not None:
+                if _is_link(path):
+                    continue
+                hidden[path] = pattern
+            kept.append(name)
+        return kept
+
+    def _listed(self, path: Path, inherited: str | None, siblings: frozenset[str]) -> bool:
+        """Whether `path` stays in the listing; a file model loaders read stays even ignored.
+
+        `inherited` is the ignore-file pattern that excluded a directory above `path`. A
+        link is judged by its name, so nothing is opened before the link itself is checked.
+        """
+        # Imported here because the inventory imports this package.
+        from guardana.core.inventory import read_by_model_loaders  # noqa: PLC0415
+
+        if self._matched(path, ExcludeSource.PROFILE) is not None:
+            return False
+        pattern = inherited or self._matched(path, ExcludeSource.IGNORE_FILE)
+        if pattern is None:
+            return True
+        if not read_by_model_loaders(path, siblings, self._holds_model, by_name=_is_link(path)):
+            return False
+        self._kept.append(KeptModel(str(path), pattern))
+        return True
+
+    def _holds_model(self, directory: Path) -> bool:
+        """Whether a walked directory holds a model or a tokenizer, decided once each."""
+        from guardana.core.inventory import holds_model  # noqa: PLC0415
+
+        held = self._model_directories.get(directory)
+        if held is None:
+            held = holds_model(directory, self._names.get(directory, []))
+            self._model_directories[directory] = held
+        return held
+
+    def _search_skipped(self) -> SkippedModels:
+        """Count files named like models inside the skipped directories, within a bound.
+
+        By name only, breadth-first and in turns across the skipped directories, each
+        listing taking at most its share of what is left, so one large virtualenv
+        cannot spend the bound before a model in `build/` is reached. No file is opened.
+        """
+        if self._skipped_models is not None:
+            return self._skipped_models
+        self._listing()
+        from guardana.core.inventory import named_like_model  # noqa: PLC0415
+
+        counts = dict.fromkeys(self._skipped, 0)
+        queues = {top: deque([top]) for top in self._skipped}
+        remaining = self._skipped_search_entries
+        cut = False
+        while queues and remaining > 0:
+            for top in list(queues):
+                share = max(1, remaining // len(queues))
+                listed, more = self._names_in(queues[top].popleft(), share)
+                cut = cut or more
+                remaining -= len(listed)
+                for path, is_directory in listed:
+                    if is_directory:
+                        queues[top].append(path)
+                    elif named_like_model(path.name):
+                        counts[top] += 1
+                if not queues[top]:
+                    del queues[top]
+                if remaining <= 0:
+                    break
+        self._skipped_models = SkippedModels(
+            directories=tuple(
+                SkippedDirectory(str(path), count) for path, count in counts.items() if count
+            ),
+            searched_all=not (cut or queues),
+        )
+        return self._skipped_models
+
+    @staticmethod
+    def _names_in(directory: Path, limit: int) -> tuple[list[tuple[Path, bool]], bool]:
+        """Return up to `limit` entries of `directory`, each marked when it is a directory.
+
+        The flag is True when entries were left out, including when the directory could
+        not be listed at all.
+        """
+        try:
+            with os.scandir(directory) as listing:
+                entries = sorted(islice(listing, limit + 1), key=lambda entry: entry.name)
+                named = [
+                    (Path(entry.path), entry.is_dir(follow_symlinks=False))
+                    for entry in entries[:limit]
+                ]
+        except OSError:
+            return [], True
+        return named, len(entries) > limit
 
     def _unlisted(self, error: OSError) -> None:
         """Record a directory the walk could not list, which `os.walk` would skip in silence."""

@@ -7,7 +7,7 @@ written by processes that never see each other, which is the whole reason
 
 The wire protocol is the shell-hook envelope Hermes documents in
 `agent/shell_hooks.py` — `hook_event_name`, `tool_name`, `tool_input`, `session_id`,
-`cwd`, `extra` — read from `hermes-agent` 0.19.0 on 2026-08-15. Nothing here imports
+`cwd`, `extra` — read from `hermes-agent` 0.19.0. Nothing here imports
 that package, and the same envelope is what other agents with Claude-Code-style hooks
 emit; see `README.md`.
 

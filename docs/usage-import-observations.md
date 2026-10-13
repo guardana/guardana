@@ -13,6 +13,9 @@ status: stable
 guardana import-observations garak.report.jsonl --target https://llm.internal/v1
 ```
 
+The file is read only when it is a regular file of at most 64 MiB; a FIFO, a device or a larger
+file is refused with exit `3` before anything is imported.
+
 ## This command never exits 0, and that is the design
 
 Guardana did not send those prompts, did not see the replies, and cannot grade what it did
@@ -123,7 +126,7 @@ unreadable — not assumed to be a pass.
 | `--format`, `--output` | As for every command; `json` is what `diff` reads |
 | `--reporter server://URL` | Forward the claims to a collector; the command loads no plugins, so an [installed reporter](outputs.md) is refused with exit `3` |
 | `--ai-system`, `--environment` | What these results are about. Never guessed |
-| `--profile`, `--preset` | Policy — `fail_on_inconclusive` is the switch that makes imported claims block |
+| `--profile`, `--preset` | Policy, evidence and delivery settings for the saved run. No `fail_on_*` switch changes the exit code: `2`, or `8` when `delivery.required` is on and delivery lacks acknowledgement. |
 
 ## Turning a claim into a finding
 

@@ -29,7 +29,7 @@ from guardana.server.envelope import (
 from guardana.server.lifecycle import record_sighting
 from guardana.server.store import StoredSubmission
 from guardana.server.tenancy import TenantScope
-from psycopg import Connection, Cursor
+from psycopg import Connection, Cursor, IsolationLevel
 
 _FINDINGS = "findings"
 _UNVERIFIED = "unverified"
@@ -338,6 +338,9 @@ class PostgresStore:
         """
         project = scope.require_project()
         with self._connection() as connection, connection.cursor() as cursor:
+            # One snapshot for both queries: under READ COMMITTED a retention pass
+            # committing between them would return a submission without its findings.
+            connection.isolation_level = IsolationLevel.REPEATABLE_READ
             cursor.execute(
                 """
                 select id, extract(epoch from received_at), source, schema_version, rules_run,

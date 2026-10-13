@@ -160,6 +160,7 @@ def run_target_probe(  # noqa: PLR0913 — the probe's inputs, keyword-only afte
         result = Runner(
             registry=part,
             profile=profile,
+            inventory=registry,
             concurrency=concurrency,
             calibrations=measured,
             secrets=secrets,

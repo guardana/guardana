@@ -10,7 +10,7 @@ from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
-from guardana.core.target.scope import FileScope
+from guardana.core.target.scope import FileScope, SkippedModels
 from guardana.core.usage import TargetUsage, total
 
 if TYPE_CHECKING:  # the manifest records a result's summaries; the result only carries them
@@ -257,4 +257,17 @@ def _merged_scope(scopes: Sequence[FileScope | None]) -> FileScope | None:
         ignored_directories=tuple(
             dict.fromkeys(name for scope in known for name in scope.ignored_directories)
         ),
+        kept_models=tuple(dict.fromkeys(kept for scope in known for kept in scope.kept_models)),
+        skipped_models=_merged_skipped([scope.skipped_models for scope in known]),
+    )
+
+
+def _merged_skipped(searches: Sequence[SkippedModels | None]) -> SkippedModels | None:
+    """Combine the skipped-directory searches of several passes; one unsearched pass is unknown."""
+    if any(search is None for search in searches):
+        return None
+    known = [search for search in searches if search is not None]
+    return SkippedModels(
+        directories=tuple(dict.fromkeys(d for search in known for d in search.directories)),
+        searched_all=all(search.searched_all for search in known),
     )

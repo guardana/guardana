@@ -620,6 +620,9 @@ def test_every_model_name_the_inventory_knows_is_read_or_named_inside_an_archive
             f"model{suffix}"
             for key in _INVENTORY_SUFFIX_SETS
             for suffix in getattr(inventory, key, ())
+            # A member with no suffix is what `torch.save` writes beside its pickle
+            # (`archive/version`, a legacy tar's `storages`), judged by the archive it is in.
+            if suffix
         ),
         *(name for key in _INVENTORY_FILE_SETS for name in getattr(inventory, key, ())),
         "model.hdf",
@@ -636,7 +639,9 @@ def test_every_model_name_the_inventory_knows_is_read_or_named_inside_an_archive
     ] == []
 
 
-@pytest.mark.parametrize("member", ["model.hdf", "model.weights", "model.tf", "config.json"])
+@pytest.mark.parametrize(
+    "member", ["model.hdf", "model.weights", "model.tf", "config.json", "model.weights.npz"]
+)
 def test_keras_files_in_a_model_archive_are_named_and_in_a_plain_one_are_not(
     tmp_path: Path, member: str
 ) -> None:
@@ -770,7 +775,8 @@ def test_zip64_records_that_declare_different_directories_have_no_declared_start
     path = tmp_path / "model.pt"
     path.write_bytes(data)
 
-    assert declared_directory_start(path) is None
+    with path.open("rb") as handle:
+        assert declared_directory_start(handle) is None
 
 
 @pytest.mark.parametrize(("archive", "build"), [("data.zip", _zip), ("data.tar", _tar)])
@@ -1101,6 +1107,46 @@ def test_a_torch_pickle_that_ends_before_its_stop_is_unscanned(tmp_path: Path) -
 
     assert any("ends before its STOP" in s for s in _unscanned(findings)), findings
     assert list(ctx.shortfalls())
+
+
+_SHORT_PICKLES = {
+    "empty": b"",
+    "protocol-2-header-only": b"\x80\x02",
+    "protocol-1-header": b"\x80\x01}",
+    "protocol-0-dict": b"(dp0\n",
+    "headerless-list": b"]",
+}
+
+
+_SHORT_MEMBER_HOLDERS: dict[str, tuple[str, str, str, Callable[[bytes], bytes]]] = {
+    "checkpoint": ("model.pt", "zip", "archive/data.pkl", _torch_zip),
+    "plain-zip": ("bundle.zip", "zip", "model.pkl", lambda stream: _zip(("model.pkl", stream))),
+    "legacy-tar": ("checkpoint.tar", "tar", "pickle", lambda stream: _tar(("pickle", stream))),
+}
+
+
+@pytest.mark.parametrize("stream", _SHORT_PICKLES.values(), ids=_SHORT_PICKLES.keys())
+@pytest.mark.parametrize("holder", _SHORT_MEMBER_HOLDERS.values(), ids=_SHORT_MEMBER_HOLDERS.keys())
+def test_a_member_named_as_a_pickle_that_ends_before_its_stop_is_unscanned(
+    tmp_path: Path, holder: tuple[str, str, str, Callable[[bytes], bytes]], stream: bytes
+) -> None:
+    name, kind, member, wrap = holder
+
+    findings, ctx = _run(tmp_path, name, wrap(stream))
+
+    assert _unscanned(findings) == [
+        f"{kind} member is a pickle that ends before its STOP ({member}); not scanned past its end"
+    ]
+    assert list(ctx.shortfalls())
+
+
+def test_a_short_member_no_loader_unpickles_stays_quiet(tmp_path: Path) -> None:
+    findings, ctx = _run(
+        tmp_path, "model.pt", _zip(("archive/data.pkl", _PLAIN), ("archive/byteorder", b"("))
+    )
+
+    assert findings == []
+    assert list(ctx.shortfalls()) == []
 
 
 def _empty_end_record(at: int) -> bytes:

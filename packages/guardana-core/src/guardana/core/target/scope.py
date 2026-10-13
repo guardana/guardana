@@ -48,10 +48,47 @@ class ExcludeSource(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ExcludePattern:
-    """One glob a scan matched against each path relative to its root."""
+    """One glob a scan matched against each path relative to its root.
+
+    `file` is the file the pattern was read from, spelled as the listing spells
+    paths; None for a profile pattern, and for a run that did not record it.
+    """
 
     pattern: str
     source: ExcludeSource
+    file: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class KeptModel:
+    """A model file a pattern from the scanned target matched and the scan read anyway.
+
+    Only the profile's `rules.paths_exclude` may exclude a model: a target that could
+    hide its own model files from the scan would decide its own verdict.
+    """
+
+    path: str
+    pattern: str
+
+
+@dataclass(frozen=True, slots=True)
+class SkippedDirectory:
+    """A directory every scan skips that holds files named like models."""
+
+    path: str
+    model_files: int
+
+
+@dataclass(frozen=True, slots=True)
+class SkippedModels:
+    """What a name-only, bounded search of the skipped directories found.
+
+    `searched_all` is False when the search stopped at its bound or could not list a
+    directory, so a directory with no entry here may still hold model files.
+    """
+
+    directories: tuple[SkippedDirectory, ...] = ()
+    searched_all: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,12 +98,15 @@ class FileScope:
     `files` holds the paths as the run's findings name them, so a finding's location
     and a listed file compare directly. `excludes` is None when the target applied
     excludes it does not report — a third-party file target — which is unknown, never
-    "none applied".
+    "none applied". `skipped_models` is None when nobody searched the skipped
+    directories, which is likewise unknown.
     """
 
     files: tuple[str, ...] = ()
     excludes: tuple[ExcludePattern, ...] | None = ()
     ignored_directories: tuple[str, ...] = ()
+    kept_models: tuple[KeptModel, ...] = ()
+    skipped_models: SkippedModels | None = None
 
     def exclusion_of(self, relative: str) -> str | None:
         """Describe what kept `relative` (a path under the scanned root) out of the scan.

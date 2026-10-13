@@ -7,7 +7,9 @@ end of one, up to a bound on the output and on the input read.
 """
 
 import bz2
+import io
 import lzma
+import os
 import re
 import zlib
 from collections.abc import Callable, Iterator
@@ -264,3 +266,117 @@ def inflate(source: IO[bytes], head: bytes, *, limit: int, input_limit: int) -> 
     cut = shortfall is not None and not drained.raised
     filled = len(drained.out) > limit
     return Inflated(codec.name, data, cut=cut, shortfall=shortfall, filled=filled)
+
+
+_TAR_CODECS = frozenset({"gzip", "bz2", "xz"})
+"""The codecs `tar` decompresses an archive with by its first bytes (`-z`, `-j`, `-J`)."""
+_DECODED_BYTES = 64 * 1024
+"""Output taken from a decoder per call while a stream is read forward."""
+
+
+class InflateError(Exception):
+    """A compressed stream could not be decoded to the point asked for: damage or a bound."""
+
+
+def _decoded(start: Callable[[], _Stream], source: IO[bytes]) -> Iterator[bytes]:
+    """Decode `source` streams back to back, as `gzip -d` does, a bounded piece at a time.
+
+    Bytes after the last stream that do not start another are ignored, as `gzip -d`
+    ignores them; damage inside a stream, a cut one or more than `MAX_STREAMS` raises.
+    """
+    stream = start()
+    streams = 1
+    produced = False
+    data = b""
+    while True:
+        if stream.eof:
+            data = stream.unused_data or source.read(_BLOCK_BYTES)
+            if not data:
+                return
+            if streams >= MAX_STREAMS:
+                raise InflateError(f"made of more than {MAX_STREAMS} compressed streams")
+            streams += 1
+            stream = start()
+            produced = False
+        elif stream.needs_input and not data:
+            data = source.read(_BLOCK_BYTES)
+            if not data:
+                raise InflateError("cut off before its compressed stream ends")
+        try:
+            out = stream.feed(data, _DECODED_BYTES)
+        except _CODEC_ERRORS as error:
+            if streams > 1 and not produced:
+                return
+            raise InflateError("damaged") from error
+        data = b""
+        if out:
+            produced = True
+            yield out
+
+
+class InflatingReader(io.RawIOBase):
+    """A gzip, bz2 or xz file read forward as its decompressed bytes, as `tar` reads it.
+
+    Reading past `limit` decompressed bytes, damage, a cut stream or a seek backwards
+    raises `InflateError`; only the bytes asked for are held in memory, so a seek forward
+    decodes and drops what it passes.
+    """
+
+    def __init__(self, source: IO[bytes], codec: str, *, limit: int) -> None:
+        super().__init__()
+        found = next(c for c in _CODECS if c.name == codec)
+        if found.start is None:
+            raise InflateError(f"{codec} cannot be decompressed")
+        self.codec = codec
+        self.limit = limit
+        self._position = 0
+        self._pending = bytearray()
+        source.seek(0)
+        self._decoded = _decoded(found.start, source)
+
+    def readable(self) -> bool:
+        """Whether the stream can be read: always."""
+        return True
+
+    def read(self, size: int = -1, /) -> bytes:
+        """Return up to `size` decompressed bytes, all that is left when `size` is negative."""
+        while size < 0 or len(self._pending) < size:
+            piece = next(self._decoded, None)
+            if piece is None:
+                break
+            self._pending += piece
+            if self._position + len(self._pending) > self.limit:
+                raise InflateError(f"larger than {self.limit} bytes once decompressed")
+        taken = len(self._pending) if size < 0 else min(size, len(self._pending))
+        out = bytes(self._pending[:taken])
+        del self._pending[:taken]
+        self._position += taken
+        return out
+
+    def readinto(self, buffer: object, /) -> int:
+        """Read into `buffer`, as a buffered reader wrapping this stream asks."""
+        if not isinstance(buffer, memoryview | bytearray):
+            raise TypeError(f"decompressed bytes are read into a byte buffer, not {type(buffer)}")
+        with memoryview(buffer) as view, view.cast("B") as target:
+            data = self.read(len(target))
+            target[: len(data)] = data
+        return len(data)
+
+    def seek(self, offset: int, whence: int = os.SEEK_SET, /) -> int:
+        """Move forward to `offset`, decoding what lies between; never backwards."""
+        target = offset + (self._position if whence == os.SEEK_CUR else 0)
+        if whence not in (os.SEEK_SET, os.SEEK_CUR) or target < self._position:
+            raise InflateError("a compressed stream is read forward only")
+        while self._position < target and self.read(min(target - self._position, _BLOCK_BYTES)):
+            pass
+        return self._position
+
+    def tell(self) -> int:
+        """Return how many decompressed bytes were read or passed."""
+        return self._position
+
+
+def tar_codec(head: bytes) -> str | None:
+    """Name the codec `tar` would decompress a file starting with `head` with, or None."""
+    codec = next((c for c in _CODECS if c.name in _TAR_CODECS and head.startswith(c.magic)), None)
+    return codec.name if codec is not None and codec.strong(head) else None

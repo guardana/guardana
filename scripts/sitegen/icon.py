@@ -305,25 +305,41 @@ def png(rgba: bytes, size: int) -> bytes:
     )
 
 
+def _png_chunks(data: bytes) -> tuple[bytes, bytes] | None:
+    """Return a PNG's IHDR body and joined IDAT data, or None unless every chunk is whole.
+
+    A decoder such as libpng refuses a chunk whose CRC does not match or a file that
+    ends before IEND, so the pixels such a file carries are not what a browser shows.
+    """
+    position, header, compressed = len(_PNG_SIGNATURE), b"", b""
+    while position + 8 <= len(data):
+        length, kind = struct.unpack(">I4s", data[position : position + 8])
+        end = position + 8 + length
+        if end + 4 > len(data):
+            return None
+        body = data[position + 8 : end]
+        if zlib.crc32(kind + body) != struct.unpack(">I", data[end : end + 4])[0]:
+            return None
+        position = end + 4
+        if kind == b"IEND":
+            return header, compressed
+        if kind == b"IHDR":
+            header = body
+        elif kind == b"IDAT":
+            compressed += body
+    return None
+
+
 def png_pixels(data: bytes) -> tuple[int, bytes] | None:
     """Decode a PNG `png` wrote into its size and RGBA pixels, or None for anything else.
 
     Pixels rather than bytes, because two zlib builds may compress the same
     scanlines differently and a check must not depend on which one ran.
     """
-    if not data.startswith(_PNG_SIGNATURE):
+    chunks = _png_chunks(data) if data.startswith(_PNG_SIGNATURE) else None
+    if chunks is None or len(chunks[0]) != _IHDR_LENGTH:
         return None
-    position, header, compressed = len(_PNG_SIGNATURE), b"", b""
-    while position + 8 <= len(data):
-        length, kind = struct.unpack(">I4s", data[position : position + 8])
-        body = data[position + 8 : position + 8 + length]
-        position += 12 + length
-        if kind == b"IHDR":
-            header = body
-        elif kind == b"IDAT":
-            compressed += body
-    if len(header) != _IHDR_LENGTH:
-        return None
+    header, compressed = chunks
     width, height, depth, color_type, _, _, interlace = struct.unpack(">IIBBBBB", header)
     if width != height or depth != _BIT_DEPTH or color_type != _RGBA_COLOR_TYPE or interlace:
         return None

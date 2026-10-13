@@ -65,5 +65,10 @@ def test_the_scan_records_its_listing_and_the_ignore_file(tmp_path: Path) -> Non
 
     scope = _saved_scan(tmp_path)["scope"]
 
-    assert scope["excludes"] == [{"pattern": "notes/*", "source": "ignore_file"}]  # type: ignore[index]
+    (exclude,) = scope["excludes"]  # type: ignore[index]
+    assert {k: v for k, v in exclude.items() if k != "file"} == {
+        "pattern": "notes/*",
+        "source": "ignore_file",
+    }
+    assert exclude["file"].endswith("tree/.guardanaignore")
     assert any(path.endswith("tree/app.py") for path in scope["files"])  # type: ignore[index]

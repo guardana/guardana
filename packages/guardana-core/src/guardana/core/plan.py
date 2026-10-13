@@ -238,7 +238,7 @@ def build_plan(  # noqa: PLR0913 — what is run, against what, and how the run 
     floor = 0
     foreseen_errors: list[CheckError] = []
     for index, (part, view) in enumerate(((registry, target),) if passes is None else passes):
-        chosen, refused = select_rules(part, profile, view)
+        chosen, refused = select_rules(part, profile, view, inventory=registry)
         skipped.extend(refused)
         if index == 0:
             skipped.extend(skips)

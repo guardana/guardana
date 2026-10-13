@@ -38,13 +38,37 @@ _CONFIG_NAME_SUFFIX = "config.json"
 # Detection is by *key name*, never by value shape: `_name_or_path` carries an
 # `owner/repo` string in a large share of real configs, so a shape-only rule would
 # flag almost every model on the Hub.
-_INTERNAL_KERNEL_KEY = "_attn_implementation_internal"
-_PUBLIC_KERNEL_KEYS = ("attn_implementation", "_attn_implementation")
-_KERNEL_REFERENCE = re.compile(r"^[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*$")
+_INTERNAL_KERNEL_KEYS = ("_attn_implementation_internal", "_attn_implementation")
+_PUBLIC_KERNEL_KEY = "attn_implementation"
+_KERNEL_KEYS = (*_INTERNAL_KERNEL_KEYS, _PUBLIC_KERNEL_KEY)
+# The pattern transformers' `is_kernel` matches: `org/repo`, optionally `@revision`
+# and `:function`, with any prefix such as `paged|` before the owner.
+_KERNEL_REFERENCE = re.compile(r"^[^/:]+/[^/:]+(?:@[^/:]+)?(?::[^/:]+)?$")
 
 
 def _is_config(path: Path) -> bool:
     return path.name.lower().endswith(_CONFIG_NAME_SUFFIX)
+
+
+def _kernel_references(doc: dict[str, object]) -> Iterator[tuple[str, str, str]]:
+    """Yield `(key, label, reference)` for each kernel reference the config sets.
+
+    The attribute setter takes a dict keyed by sub-config name (`""` for the config
+    itself), and a composite config that builds its sub-configs after its own init
+    keeps the field each sub-config carries, so nested configs are read as well.
+    """
+    pending: list[tuple[str, dict[str, object]]] = [("", doc)]
+    while pending:
+        prefix, config = pending.pop()
+        for key, value in config.items():
+            label = f"{prefix}{key}"
+            if key in _KERNEL_KEYS:
+                entries = value.items() if isinstance(value, dict) else [(None, value)]
+                for sub, reference in entries:
+                    if isinstance(reference, str) and _KERNEL_REFERENCE.match(reference):
+                        yield key, label if sub is None else f'{label}["{sub}"]', reference
+            elif isinstance(value, dict):
+                pending.append((f"{label}.", value))
 
 
 def _module_targets(pointer: object) -> Iterator[str]:
@@ -124,7 +148,7 @@ class RemoteCodeConfigRule(ArtifactRule):
         )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Scan every `*config.json` for an `auto_map`/`custom_pipelines` code pointer."""
+        """Scan every `*config.json` for a code pointer or a Hub kernel reference."""
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".json",)):
@@ -145,7 +169,7 @@ class RemoteCodeConfigRule(ArtifactRule):
             return
         try:
             doc = json.loads(raw)
-        except ValueError:
+        except (ValueError, RecursionError):
             # A loader cannot parse it either, so it configures nothing; `tsconfig.json`
             # with comments is the common case.
             return
@@ -154,21 +178,19 @@ class RemoteCodeConfigRule(ArtifactRule):
         for key in _CODE_POINTER_KEYS:
             if key in doc:
                 yield self._finding(path, key, doc[key])
-        for key in (_INTERNAL_KERNEL_KEY, *_PUBLIC_KERNEL_KEYS):
-            reference = doc.get(key)
-            if isinstance(reference, str) and _KERNEL_REFERENCE.match(reference):
-                yield self._kernel_finding(path, key, reference)
+        for key, label, reference in _kernel_references(doc):
+            yield self._kernel_finding(path, key, label, reference)
 
-    def _kernel_finding(self, path: Path, key: str, reference: str) -> Finding:
+    def _kernel_finding(self, path: Path, key: str, label: str, reference: str) -> Finding:
         """Build the finding for a config entry naming a Hub kernel repository.
 
-        Through the private field this is the CVE — code runs on a load the user
+        Through a private field this is the CVE — code runs on a load the user
         believes is sandboxed. Through the documented field it is an opt-in, so it
         is reported the way `trust_remote_code=True` is: a lead, not a compromise.
         """
-        internal = key == _INTERNAL_KERNEL_KEY
+        internal = key in _INTERNAL_KERNEL_KEYS
         summary = (
-            f"'{key}' names the Hub kernel repository '{reference}', "
+            f"'{label}' names the Hub kernel repository '{reference}', "
             "which transformers downloads and imports on load"
         )
         if internal:

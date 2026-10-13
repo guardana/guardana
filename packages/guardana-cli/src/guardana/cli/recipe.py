@@ -533,7 +533,10 @@ def _prepare(read: _Read) -> _Prepared:
     else:
         installed = _installed_target(recipe, recipe.target, registry, profile)
         target, files = installed, {}
-    plan = build_plan(priced, profile, target)
+    try:
+        plan = build_plan(priced, profile, target)
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     written = (recipe.lock_path, recipe.output)
     current = lock_of(
         recipe,

@@ -6,6 +6,7 @@ from typing import Annotated, TypeVar
 
 import typer
 from guardana.cli._a2a_run import connection_from, run_a2a_probe
+from guardana.cli._atomic import replace_whole
 from guardana.cli._budget_flags import override
 from guardana.cli._connection import (
     AdapterOption,
@@ -42,7 +43,7 @@ from guardana.cli._mcp_run import (
 from guardana.cli._output import refuse_incomparable_output
 from guardana.cli._outputs import (
     RunOutputs,
-    recorded_by_partner,
+    earlier_run_kept,
     refuse_collector_beside,
     refuse_installed_output_beside,
     refuse_output_beside,
@@ -61,7 +62,7 @@ from guardana.cli._reporting import installed_reporter_or_check, submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import calibrations_or_exit, detect_deployment, detect_source
 from guardana.cli._safety_flags import parse_impact
-from guardana.cli._sidecar import refuse_writing_over_named_inputs
+from guardana.cli._sidecar import digest_of, refuse_writing_over_named_inputs
 from guardana.cli._target_locator import resolve_target
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
@@ -71,6 +72,7 @@ from guardana.core.profile import Profile, ProfileError
 from guardana.core.recording import render_recording
 from guardana.core.redaction import EvidenceMode
 from guardana.core.registry import Registry
+from guardana.core.runner import refuse_unmatched_includes
 from guardana.core.target import EndpointTarget, SeededTarget, Target, TargetKind, display_url
 from guardana.core.target.connection import Connection
 from guardana.core.usage import UsageMeter
@@ -82,6 +84,7 @@ from guardana.core.verify import (
     Verification,
     Verifier,
     exchanges_path,
+    recorded_by_partner,
 )
 
 _Run = TypeVar("_Run", Verification, Verification | None)
@@ -323,7 +326,9 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
         ),
         trials=prof.trials if trials is None else trials,
     )
-    prof = _keeping(prof, keep_exchanges, protocol=mcp or a2a, output=output, format=format)
+    prof, replaces = _keeping(
+        prof, keep_exchanges, protocol=mcp or a2a, output=output, format=format
+    )
     resolved = resolve_trust(plugins, allow_plugin, prof)
     outputs = select_outputs(format, installed_reporter, resolved.trust, collector=bool(collector))
     with outputs:
@@ -338,6 +343,11 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
         except ProfileError as exc:
             raise refuse_invalid_profile(exc) from exc
         load_custom_rules(registry, prof, rules)
+        # Before any target is built: a stdio server starts as its target is constructed.
+        try:
+            refuse_unmatched_includes(prof, registry)
+        except ProfileError as exc:
+            raise refuse_invalid_profile(exc) from exc
         registry.apply_trials(prof.trials)
         # Read before anything is sent, and once: the rules correct with these while they
         # run, and the manifest records the very same ones.
@@ -393,6 +403,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
                 collector=collector,
                 delivery_required=prof.delivery_required,
                 keep=prof.privacy.keep_exchanges,
+                replaces=replaces,
             )
             return
 
@@ -509,6 +520,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
             collector=collector,
             delivery_required=prof.delivery_required,
             keep=prof.privacy.keep_exchanges,
+            replaces=replaces,
         )
 
 
@@ -618,6 +630,8 @@ def _carried_out(run: Callable[[], _Run]) -> _Run:
         return run()
     except UnenforceableBudgetError as exc:
         raise refuse_unenforceable_budget(exc) from exc
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     except UnsupportedTargetError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
@@ -634,13 +648,17 @@ def _keeping(
     protocol: str | None,
     output: Path | None,
     format: str,
-) -> Profile:
+) -> tuple[Profile, str | None]:
     """Turn `--keep-exchanges` into the profile switch and refuse what it cannot honour.
 
     Kept exchanges are written beside the saved run, so a run that writes none would keep
-    them nowhere, and never over exchanges the run sharing that sidecar recorded; an MCP
-    server or an A2A agent (`protocol`) has no chat exchanges to keep. A `--target` is
+    them nowhere. They replace only exchanges the run saved at `output` recorded, refused
+    before anything is sent otherwise; a link there is replaced, never written through. An
+    MCP server or an A2A agent (`protocol`) has no chat exchanges to keep. A `--target` is
     checked once it is built, since only a target built on the endpoint keeps them.
+
+    Returns the profile and the digest of the exchanges the kept ones may replace: those the
+    run saved at `output` records, or None when there are none to replace.
     """
     if flag:
         if prof.privacy.mode is EvidenceMode.METADATA_ONLY:
@@ -650,7 +668,7 @@ def _keeping(
             )
         prof = replace(prof, privacy=replace(prof.privacy, keep_exchanges=True))
     if not prof.privacy.keep_exchanges:
-        return prof
+        return prof, None
     if protocol is not None:
         raise typer.BadParameter(
             "keeping exchanges keeps the chat exchanges of --url (with or without --adapter) "
@@ -662,7 +680,7 @@ def _keeping(
             "kept exchanges are written beside the saved run: pass --format json --output run.json"
         )
     sidecar = exchanges_path(output)
-    partner = recorded_by_partner(output, sidecar)
+    partner = recorded_by_partner(output)
     if partner is not None:
         typer.echo(
             f"error: {sidecar} holds the exchanges {partner} recorded, and keeping this run's "
@@ -670,7 +688,15 @@ def _keeping(
             err=True,
         )
         raise typer.Exit(code=ExitCode.INVALID_USAGE)
-    return prof
+    replaces = earlier_run_kept(output)
+    if sidecar.is_file() and not sidecar.is_symlink() and replaces is None:
+        typer.echo(
+            f"error: {sidecar} holds exchanges no run saved at {output} recorded, and keeping "
+            f"this run's beside it would replace them — choose another --output",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
+    return prof, replaces
 
 
 def _missing_target() -> Target:
@@ -687,9 +713,13 @@ def _finish_probe(  # noqa: PLR0913 — what the command does with a finished ru
     output: Path | None,
     collector: str | None,
     keep: bool = False,
+    replaces: str | None = None,
     delivery_required: bool = False,
 ) -> None:
     """Emit, forward and gate one probe the verifier finished.
+
+    `replaces` is the digest of the exchanges beside `output` this run's kept ones may
+    replace, as `_keeping` established it before anything was sent.
 
     A judge whose own ceiling stopped the run is named here, which the exit code alone
     cannot: a judge meters its calls apart from the target's, so a run cut short by
@@ -701,7 +731,7 @@ def _finish_probe(  # noqa: PLR0913 — what the command does with a finished ru
         typer.echo(f"warning: {stop}", err=True)
     try:
         outputs.write(verification, output, keeps_exchanges=_keeps(verification, output))
-        _write_exchanges(verification, output, keep=keep, outputs=outputs)
+        _write_exchanges(verification, output, keep=keep, replaces=replaces, outputs=outputs)
         acknowledged = None
         if collector:
             acknowledged = submit_safely(
@@ -734,14 +764,21 @@ def _keeps(verification: Verification, output: Path | None) -> bool:
 
 
 def _write_exchanges(
-    verification: Verification, output: Path | None, *, keep: bool, outputs: RunOutputs
+    verification: Verification,
+    output: Path | None,
+    *,
+    keep: bool,
+    replaces: str | None,
+    outputs: RunOutputs,
 ) -> None:
     """Write the exchanges the run kept beside its saved run, and say where and how many.
 
     A run that keeps none leaves nothing there: `RunOutputs.write` removed what an earlier
-    run kept. Exchanges that cannot be written end the command with exit `3`, unless the
-    run stopped, and the saved run is written again recording none, so it never claims a
-    sidecar that is not there. A link at their path is replaced, never written through.
+    run kept. The exchanges replace only a file holding the `replaces` digest, checked again
+    here because the probe ran since; anything else there is kept. Exchanges that cannot
+    be written end the command with exit `3`, unless the run stopped, and the saved run is
+    written again recording none, so it never claims a sidecar that is not there. They are
+    written whole, and a link at their path is replaced, never written through.
     """
     kept = verification.exchanges
     record = verification.manifest.exchanges
@@ -753,14 +790,20 @@ def _write_exchanges(
             )
         return
     path = exchanges_path(output)
+    if path.is_file() and not path.is_symlink() and digest_of(path) != replaces:
+        typer.echo(
+            f"error: {path} changed while the probe ran and no run saved at {output} records "
+            f"it, so it was kept and this run's exchanges were not written",
+            err=True,
+        )
+        _save_without_exchanges(verification, output, outputs)
+        outputs.end_unwritten(verification, "the run's kept exchanges could not be written")
     try:
-        if path.is_symlink():
-            path.unlink()
         # Bytes, so no platform translates line endings away from what the digest covers.
-        path.write_bytes(render_recording(kept).encode("utf-8"))
+        replace_whole(path, render_recording(kept).encode("utf-8"))
     except OSError as exc:
         typer.echo(f"error: could not write the kept exchanges to {path}: {exc}", err=True)
-        if path.is_file() or path.is_symlink():
+        if replaces is not None and digest_of(path) == replaces:
             with suppress(OSError):
                 path.unlink()
         _save_without_exchanges(verification, output, outputs)

@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 from guardana.cli._atomic import write_whole
+from guardana.cli._exit import refuse_invalid_profile
 from guardana.cli._plugins import (
     AllowPluginOption,
     PluginsOption,
@@ -18,11 +19,11 @@ from guardana.cli._plugins import (
 from guardana.cli._profile import PRESET_HELP, resolve_profile
 from guardana.cli._profile_files import profile_file_inputs
 from guardana.cli._rules_loading import load_custom_rules
-from guardana.cli._sidecar import same_file
+from guardana.cli._sidecar import kept_by_a_run, same_file
 from guardana.cli._target_locator import resolve_target
 from guardana.cli.exit_codes import ExitCode, code_for
 from guardana.core.gate import GateOutcome, open_questions, refused_by
-from guardana.core.profile import Policy, Profile
+from guardana.core.profile import Policy, Profile, ProfileError
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import (
@@ -69,7 +70,10 @@ def _scan(
         kind=TargetKind.ARTIFACT,
         fallback=lambda: _path_target(path, prof.path_excludes),
     )
-    result = Runner(registry=registry, profile=prof).run(target)
+    try:
+        result = Runner(registry=registry, profile=prof).run(target)
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     result = relativize_findings(result, Path.cwd())
     return EvidenceRedactor(prof.privacy).redact_result(result)
 
@@ -149,15 +153,19 @@ def refuse_a_report_over_a_scanned_file(
     """Exit `3` when the report or its sidecar would replace a file the scan read.
 
     An earlier saved run is the exception: `guardana scan . --output run.json` run again
-    replaces the run it wrote before, which the scan also lists.
+    replaces the run it wrote before, and the exchanges a run beside it records, which the
+    scan also lists. Whether a file is such a run is read from its content, never its name.
     """
     if written is None or scope is None:
         return
-    for target in (written, exchanges_path(written)):
+    for target, earlier in (
+        (written, _reads_as_a_saved_run),
+        (exchanges_path(written), kept_by_a_run),
+    ):
         if not target.is_file():
             continue
         listed = next((Path(file) for file in scope.files if same_file(target, Path(file))), None)
-        if listed is None or _reads_as_a_saved_run(target):
+        if listed is None or earlier(target):
             continue
         typer.echo(
             f"error: {flag} {written} would replace {listed}, which this scan read — choose "
@@ -168,9 +176,7 @@ def refuse_a_report_over_a_scanned_file(
 
 
 def _reads_as_a_saved_run(path: Path) -> bool:
-    """Whether `path` holds a run Guardana saved, or the exchanges sidecar beside one."""
-    if path.name.endswith(".exchanges.jsonl"):
-        return True
+    """Whether `path` holds a run Guardana saved."""
     try:
         load_report(path)
     except (OSError, ReportLoadError):

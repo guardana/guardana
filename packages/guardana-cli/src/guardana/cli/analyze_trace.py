@@ -6,9 +6,10 @@ dialect the file was read as, which dimensions nobody instrumented, and how many
 records could not be read at all.
 """
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import typer
 from guardana.cli._atomic import write_whole
@@ -18,7 +19,7 @@ from guardana.cli._contracts import (
     describe_contracts,
     wire_contracts,
 )
-from guardana.cli._exit import refuse_unenforceable_budget
+from guardana.cli._exit import refuse_invalid_profile, refuse_unenforceable_budget
 from guardana.cli._formats import FORMAT_HELP
 from guardana.cli._outputs import select_outputs, warn_without_a_reporter
 from guardana.cli._plugins import (
@@ -48,6 +49,7 @@ from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import gate_outcome
 from guardana.core.manifest import SourceKind
+from guardana.core.profile import ProfileError
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import ScanResult
@@ -125,15 +127,19 @@ def analyze_trace(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface pl
 ) -> None:
     """Grade a recorded agent execution (JSONL, OpenTelemetry GenAI or Guardana native)."""
     inputs = [trace, profile, *rules, *contract]
+    named = [
+        *rule_flag_inputs(rules),
+        *(("--contract", file) for entry in contract for file in contract_files(entry)),
+    ]
     refuse_writing_over_an_input(output, inputs)
-    refuse_writing_over_named_inputs(output, rule_flag_inputs(rules))
-    refuse_writing_over_named_inputs(
-        output, [("--contract", file) for entry in contract for file in contract_files(entry)]
-    )
-    _refuse_writing_the_trace_over(write_trace, output, inputs)
+    refuse_writing_over_named_inputs(output, named)
+    _refuse_writing_the_trace_beside(write_trace, output)
+    _refuse_writing_the_trace_over(write_trace, [*((None, path) for path in inputs), *named])
     installed_reporter = installed_reporter_or_check(reporter)
     prof = resolve_profile(profile, preset)
-    refuse_writing_over_named_inputs(output, profile_file_inputs(prof))
+    named_by_profile = profile_file_inputs(prof)
+    refuse_writing_over_named_inputs(output, named_by_profile)
+    _refuse_writing_the_trace_over(write_trace, named_by_profile)
     warn_without_a_reporter(prof.delivery_required, reporter)
     resolved = resolve_trust(plugins, allow_plugin, prof)
     outputs = select_outputs(
@@ -184,6 +190,8 @@ def analyze_trace(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface pl
             result = Runner(registry=registry, profile=prof).run(selected)
         except BudgetExhausted as exc:
             raise refuse_unenforceable_budget(exc) from exc
+        except ProfileError as exc:
+            raise refuse_invalid_profile(exc) from exc
         # The observations the trace itself supplies — which models actually answered —
         # are merged in here rather than produced by a rule: they are a fact about the
         # file, not a judgement about it.
@@ -247,32 +255,42 @@ def analyze_trace(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface pl
         )
 
 
+def _refuse_writing_the_trace_beside(write_trace: Path | None, output: Path | None) -> None:
+    """Exit `3` when `--write-trace` names the report or the exchanges beside it."""
+    if write_trace is None or output is None:
+        return
+    if same_file(write_trace, output):
+        _refuse_the_trace(write_trace, f"is --output {output}, and one would replace the other")
+    if same_file(write_trace, exchanges_path(output)):
+        _refuse_the_trace(
+            write_trace,
+            f"is where a run saved at {output} keeps its exchanges, and writing the report "
+            f"would remove it",
+        )
+
+
 def _refuse_writing_the_trace_over(
-    write_trace: Path | None, output: Path | None, inputs: list[Path | None]
+    write_trace: Path | None, inputs: Iterable[tuple[str | None, Path | None]]
 ) -> None:
-    """Exit `3` when `--write-trace` names the report, the exchanges beside it, or an input."""
+    """Exit `3` when `--write-trace` names a file this command reads.
+
+    Each input carries the flag or profile key that names it, or None for a file named on
+    the command line itself; a directory stands for the files read from it, listed apart.
+    """
     if write_trace is None:
         return
-    problem = None
-    if output is not None and same_file(write_trace, output):
-        problem = f"is --output {output}, and one would replace the other"
-    elif output is not None and same_file(write_trace, exchanges_path(output)):
-        problem = (
-            f"is where a run saved at {output} keeps its exchanges, and writing the report "
-            f"would remove it"
-        )
-    else:
-        given = next(
-            (path for path in inputs if path is not None and same_file(write_trace, path)), None
-        )
-        if given is not None:
-            problem = f"is {given}, which this command reads, and writing it would replace it"
-    if problem is not None:
-        typer.echo(
-            f"error: --write-trace {write_trace} {problem} — choose another --write-trace",
-            err=True,
-        )
-        raise typer.Exit(code=ExitCode.INVALID_USAGE)
+    for name, given in inputs:
+        if given is None or given.is_dir() or not same_file(write_trace, given):
+            continue
+        described = "which this command reads" if name is None else f"which {name} names"
+        _refuse_the_trace(write_trace, f"is {given}, {described}, and writing it would replace it")
+
+
+def _refuse_the_trace(write_trace: Path, problem: str) -> NoReturn:
+    typer.echo(
+        f"error: --write-trace {write_trace} {problem} — choose another --write-trace", err=True
+    )
+    raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
 
 def _write_native(read: TraceRead, destination: Path) -> None:

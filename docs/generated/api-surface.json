@@ -3806,7 +3806,7 @@
     "guardana.core.entrypoints.TARGET_GROUP": "guardana.targets",
     "guardana.core.entrypoints.TAXONOMY_GROUP": "guardana.taxonomies",
     "guardana.core.fixtures.FIXTURES_SCHEMA_VERSION": 1,
-    "guardana.core.manifest.model.MANIFEST_SCHEMA_VERSION": 17,
+    "guardana.core.manifest.model.MANIFEST_SCHEMA_VERSION": 18,
     "guardana.core.output.OUTPUT_API_VERSION": 1,
     "guardana.core.output.SUPPORTED_OUTPUT_API_VERSIONS": [
       1
@@ -3844,7 +3844,8 @@
       13,
       14,
       15,
-      16
+      16,
+      17
     ],
     "guardana.core.reporter.ENVELOPE_SCHEMA_VERSION": 8,
     "guardana.core.trace.observations.OBSERVATIONS_SCHEMA_VERSION": 1,

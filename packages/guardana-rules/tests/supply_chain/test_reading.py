@@ -2,10 +2,16 @@
 never allowed to hang or OOM the scanner."""
 
 import os
+import threading
 from pathlib import Path
 
 import pytest
-from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_bounded, read_text_prefix
+from guardana.rules.supply_chain._reading import (
+    MAX_SCAN_BYTES,
+    open_regular,
+    read_text_bounded,
+    read_text_prefix,
+)
 
 
 def test_reads_a_normal_file() -> None:
@@ -67,3 +73,40 @@ def test_the_text_prefix_says_when_the_file_ran_past_the_bound(tmp_path: Path) -
 
     assert read_text_prefix(tmp_path / "small.txt", limit=3) == ("abc", False)
     assert read_text_prefix(tmp_path / "big.txt", limit=3) == ("abc", True)
+
+
+def test_a_regular_file_opens_for_raw_reading(tmp_path: Path) -> None:
+    (tmp_path / "model.pt").write_bytes(b"PK\x03\x04")
+
+    with open_regular(tmp_path / "model.pt") as handle:
+        assert handle.read() == b"PK\x03\x04"
+
+
+def test_a_missing_file_does_not_open(tmp_path: Path) -> None:
+    with pytest.raises(OSError, match="nope"):
+        open_regular(tmp_path / "nope.pt")
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="mkfifo is POSIX-only")
+def test_a_fifo_with_no_writer_is_refused_without_blocking(tmp_path: Path) -> None:
+    """A FIFO is judged on the descriptor opened without blocking, never by a check by name."""
+    fifo = tmp_path / "model.pt"
+    os.mkfifo(fifo)
+    errors: list[OSError] = []
+
+    def opening() -> None:
+        try:
+            open_regular(fifo).close()
+        except OSError as error:
+            errors.append(error)
+
+    worker = threading.Thread(target=opening, daemon=True)
+    worker.start()
+    worker.join(timeout=10)
+    blocked = worker.is_alive()
+    if blocked:
+        os.close(os.open(fifo, os.O_WRONLY | os.O_NONBLOCK))
+        worker.join(timeout=10)
+
+    assert not blocked
+    assert [str(error) for error in errors] == ["model.pt is not a regular file"]
