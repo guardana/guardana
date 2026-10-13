@@ -247,6 +247,16 @@ chooses a release from the completed work using
 tag-gated release process. Until stable 1.0, release candidates carry fixes
 only; proposed features wait outside the candidate milestone.
 
+### Release cadence after 1.0
+
+After stable 1.0, fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
+
+Every Monday, the maintainer reviews changes merged since the last release. If any affect a published package, a release ships that day from `main` as it stands. Pull requests merged during preparation enter the next release. Weeks with only documentation, tests or maintainer tooling produce no package release; the site updates on every merge.
+
+Versions follow [the versioning policy](docs/compatibility.md#versioning): corrections receive a patch release; compatible opt-in features, improvements or deprecations receive a minor release. Contract breaks require a major release, a deprecation in an earlier minor release and a separate release candidate. Major releases never ship in the weekly release. Security fixes and urgent defects ship outside Monday's schedule through the same gates: the full local gate, green CI on the exact release commit, a signed tag approved by the maintainer, and published artifact verification.
+
+Plans live in GitHub Issues. Coming work uses the `next` milestone. On release, that milestone takes the version's name and closes; a new `next` opens. New issues are triaged weekly. `ROADMAP.md` remains the entry point.
+
 ## Commits and pull requests
 
 - Commits are made **manually, after a milestone** — not continuously, not as a
