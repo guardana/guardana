@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -404,8 +408,14 @@ says the watch did not finish. See <a href="exit-codes.html"><code>exit-codes.md
 ✖ [HIGH] guardana.prompt.jailbreak.dan_style — Jailbreak via persona override and encoding smuggling
     No refusal marker found; response likely complied.  (http://localhost:11434#llama3)
 
-1 finding(s); 8 rule(s) run, 0 skipped.
+1 finding(s); 14 rule(s) run, 16 skipped.
 </code></pre>
+<p>Against a plain chat endpoint 16 rules are counted as skipped: the 11 MCP
+rules and the 3 A2A rules (the target offers neither surface), and the two
+rules that need seeded data — <code>guardana.tenancy.cross_tenant_answer</code> and
+<code>guardana.retrieval.poisoned_document</code>, which <code>--fixtures</code> enables. A rule
+that needs <code>plant_system_prompt</code> is not among them:
+<code>guardana.prompt.system_prompt_leak.canary</code> plants its own canary and runs.</p>
 <h2 id="forwarding-alerts-to-a-collector">Forwarding alerts to a collector</h2>
 <pre><code class="language-bash">guardana monitor --url http://localhost:11434 --model llama3 --reporter server://https://collector.example.com
 </code></pre>
@@ -425,7 +435,7 @@ with <code>&lt;url&gt;#&lt;model&gt;</code> as the source.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-monitor.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

@@ -4,7 +4,7 @@ from urllib.error import HTTPError, URLError
 
 import typer
 from guardana.core.manifest import DeploymentRef, RunManifest
-from guardana.core.output import RESERVED_REPORTER_NAMES, is_output_name
+from guardana.core.output import RESERVED_REPORTER_NAMES, is_output_name, sanitise_reason
 from guardana.core.report import ScanResult
 from guardana.core.reporter import (
     HttpReporter,
@@ -123,7 +123,9 @@ def submit_safely(  # noqa: PLR0913 — a destination, a run, and whether it mus
     """Forward findings to a collector and return whether it acknowledged them.
 
     A collector that rejects, cannot be reached, or answers without acknowledging is said
-    as a warning, or as an error when the profile sets `delivery.required` (`required`);
+    as a warning, or as an error when the profile sets `delivery.required` (`required`),
+    with what it said sanitised: the collector token withheld, secrets redacted, control
+    characters dropped;
     the caller decides the exit, since the scan already ran and its verdict stands on its
     own. A bad `--reporter` URL or a bug in serialization is not an outage; those
     propagate so the user actually learns their findings are not being collected.
@@ -131,6 +133,10 @@ def submit_safely(  # noqa: PLR0913 — a destination, a run, and whether it mus
     level, suffix = (
         ("error", " — the profile sets delivery.required") if required else ("warning", "")
     )
+    # What comes back is written by the other side, which can echo the credential it was
+    # sent or carry escape sequences, so it is printed only once sanitised.
+    token = os.environ.get(TOKEN_VARIABLE)
+    secrets = (token,) if token else ()
     try:
         reporter_from_url(url, deployment, run).submit(result, source=source)
     except HTTPError as exc:
@@ -143,11 +149,14 @@ def submit_safely(  # noqa: PLR0913 — a destination, a run, and whether it mus
         # database outage as a rejected credential.
         typer.echo(
             f"{level}: the collector rejected this submission (HTTP {exc.code}): "
-            f"{_why(exc)}{suffix}",
+            f"{sanitise_reason(_why(exc), secrets)}{suffix}",
             err=True,
         )
         return False
     except _NOT_DELIVERED as exc:
-        typer.echo(f"{level}: could not submit to reporter: {exc}{suffix}", err=True)
+        typer.echo(
+            f"{level}: could not submit to reporter: {sanitise_reason(str(exc), secrets)}{suffix}",
+            err=True,
+        )
         return False
     return True

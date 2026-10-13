@@ -17,6 +17,7 @@ class Truncation(StrEnum):
     TOOL_RESULT_BYTES = "tool_result_bytes"
     HISTORY_BYTES = "history_bytes"
     DEADLINE = "deadline"
+    UNREADABLE_CALL = "unreadable_call"
 
 
 @dataclass(frozen=True, slots=True)

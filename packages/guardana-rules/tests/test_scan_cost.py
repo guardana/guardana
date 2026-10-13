@@ -13,16 +13,23 @@ rule can defend.
 """
 
 import ast
+import collections
+import gzip
 import os
+import sys
 from collections.abc import Iterator
 from pathlib import Path
+from types import FrameType
+from typing import Any
 
 import pytest
+from guardana.core import inventory
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain import _ast_names, keras_lambda, pickle_opcode, saved_model_ops
 
 _SOURCE_FILES = 6
 # The one walk belongs to the target; every rule filters its listing.
@@ -142,3 +149,210 @@ def test_findings_survive_the_shared_read(repo: Path) -> None:
     assert "guardana.supply_chain.code_execution" in rules_fired
     assert "guardana.supply_chain.insecure_transport" in rules_fired
     assert not result.errors
+
+
+def _name_resolution_calls(root: Path, links: int) -> int:
+    """Count the calls into the shared name resolver while a scan reads one method chain."""
+    (root / "fluent.py").write_text(
+        "q = db" + "".join(f".step{i}(x)" for i in range(links)) + "\n", encoding="utf-8"
+    )
+    resolver_file = _ast_names.__file__
+    calls = 0
+
+    def count(frame: FrameType, event: str, _arg: object) -> None:
+        nonlocal calls
+        if event == "call" and frame.f_code.co_filename == resolver_file:
+            calls += 1
+
+    sys.setprofile(count)
+    try:
+        _run(root)
+    finally:
+        sys.setprofile(None)
+    return calls
+
+
+def test_name_resolution_grows_linearly_with_a_method_chain(tmp_path: Path) -> None:
+    # Fluent chains (`df.where(...).groupby(...)...`) are ordinary code; a resolver that
+    # revisits a receiver once per call above it, or twice per link, turns one long
+    # line into a scan that never finishes.
+    short_root, long_root = tmp_path / "short", tmp_path / "long"
+    short_root.mkdir()
+    long_root.mkdir()
+    short = _name_resolution_calls(short_root, 8)
+    long = _name_resolution_calls(long_root, 16)
+    assert short > 0, "the resolver was never called, so this measures nothing"
+    assert long <= 3 * short, (
+        f"{short} resolver calls for 8 links but {long} for 16 — name resolution is not "
+        f"linear in the chain"
+    )
+
+
+def _opens_by_reader(
+    monkeypatch: pytest.MonkeyPatch, watched: set[str]
+) -> collections.Counter[tuple[str, str]]:
+    """Count each open of a watched file name by the module that asked for it."""
+    readers = {
+        Path(module.__file__).name: name
+        for name, module in (
+            ("pickle_opcode", pickle_opcode),
+            ("keras_lambda", keras_lambda),
+            ("saved_model_ops", saved_model_ops),
+            ("inventory", inventory),
+        )
+        if module.__file__ is not None
+    }
+    opens: collections.Counter[tuple[str, str]] = collections.Counter()
+    real_path_open = Path.open
+    real_os_open = os.open
+
+    def note(name: str) -> None:
+        if name not in watched:
+            return
+        frame = sys._getframe(2)
+        while frame is not None and Path(frame.f_code.co_filename).name not in readers:
+            frame = frame.f_back  # type: ignore[assignment]
+        reader = "other" if frame is None else readers[Path(frame.f_code.co_filename).name]
+        opens[name, reader] += 1
+
+    def path_open(self: Path, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        note(self.name)
+        return real_path_open(self, *args, **kwargs)
+
+    def os_open(path: Any, *args: Any, **kwargs: Any) -> int:  # noqa: ANN401
+        note(Path(path).name)
+        return real_os_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", path_open)
+    monkeypatch.setattr(os, "open", os_open)
+    return opens
+
+
+def test_a_file_whose_name_says_nothing_costs_each_reader_one_read(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A file with no suffix, or a `.dat`, may be a pickle or an HDF5 model a loader opens
+    # by its content, and one named only by a codec may be a tar `tar` extracts; finding
+    # out that it is none of those must cost one bounded read, or every LICENSE and data
+    # file in a repository is read in full by each rule that asks.
+    honest = {
+        "LICENSE": b"x" * 200_000,
+        "table.dat": bytes(range(256)) * 800,
+        "values.dat.gz": gzip.compress(b"1.0 2.0\n" * 50_000),
+        "rows.csv.gz": gzip.compress(b"a,b\n1,2\n" * 50_000),
+    }
+    for name, content in honest.items():
+        (repo / name).write_bytes(content)
+    (repo / "model").write_bytes(b"\x80\x02cos\nsystem\nX\x02\x00\x00\x00id\x85R.")
+    opens = _opens_by_reader(monkeypatch, set(honest))
+    result = _runner().run(ArtifactTarget(repo))
+    assert "guardana.supply_chain.pickle_opcode" in {f.rule_id for f in result.findings}, (
+        "the pickle under no suffix was not read, so the counts measure nothing"
+    )
+    readers = {reader for _name, reader in opens}
+    assert {"pickle_opcode", "inventory"} <= readers
+    assert ("rows.csv.gz", "pickle_opcode") in opens
+    assert all(count <= 1 for count in opens.values()), (
+        f"opens per file and reader: {dict(opens)} — a reader opens a file whose name says "
+        f"nothing more than once to find out it is no model"
+    )
+
+
+def _varint(value: int) -> bytes:
+    out = bytearray()
+    while True:
+        low, value = value & 0x7F, value >> 7
+        out.append(low | (0x80 if value else 0))
+        if not value:
+            return bytes(out)
+
+
+def _field(number: int, payload: bytes) -> bytes:
+    return _varint(number << 3 | 2) + _varint(len(payload)) + payload
+
+
+def test_an_honest_keras_directory_and_savedmodel_cost_each_reader_one_read(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A Keras directory with `.npz` weights and a tf_keras SavedModel are read for what
+    # they run on load; an honest one must stay clean for one read of each file.
+    keras_dir = repo / "keras_model"
+    keras_dir.mkdir()
+    (keras_dir / "config.json").write_text(
+        '{"class_name": "Sequential", "config": {"layers": [{"class_name": "Dense"}]}}',
+        encoding="utf-8",
+    )
+    (keras_dir / "model.weights.npz").write_bytes(b"PK\x05\x06" + bytes(18))
+    saved = repo / "saved"
+    (saved / "variables").mkdir(parents=True)
+    saver = _field(1, b"save/SaveV2") + _field(2, b"SaveV2") + _field(3, b"save/Const")
+    vocab = _field(1, b"vocab") + _field(2, b"Const") + _field(8, b"assets/vocab.txt")
+    table = _field(1, b"init") + _field(2, b"InitializeTableFromTextFileV2") + _field(3, b"vocab")
+    graph = b"".join(_field(1, node) for node in (saver, vocab, table))
+    (saved / "saved_model.pb").write_bytes(b"\x08\x01" + _field(2, _field(2, graph)))
+    (saved / "keras_metadata.pb").write_bytes(
+        _field(1, _field(5, b'{"class_name": "Dense", "config": {"units": 1}}'))
+    )
+    watched = {"config.json", "saved_model.pb", "keras_metadata.pb"}
+    opens = _opens_by_reader(monkeypatch, watched)
+    result = _runner().run(ArtifactTarget(repo))
+    model_rules = {
+        "guardana.supply_chain.keras_lambda",
+        "guardana.supply_chain.saved_model_ops",
+    }
+    assert not [f for f in result.findings if f.rule_id in model_rules]
+    assert {("config.json", "keras_lambda"), ("keras_metadata.pb", "keras_lambda")} <= set(opens)
+    assert ("saved_model.pb", "saved_model_ops") in opens
+    assert all(count <= 1 for (_name, reader), count in opens.items() if reader != "other"), (
+        f"opens per file and reader: {dict(opens)}"
+    )
+
+
+def test_a_skipped_directory_is_searched_by_name_within_a_bound(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The search for model files in `.venv`, `build` and the rest lists names and opens
+    # nothing, and stops at its bound however large the directory is.
+    venv = repo / ".venv"
+    for package in range(40):
+        (venv / f"pkg{package:02}" / "data").mkdir(parents=True)
+        (venv / f"pkg{package:02}" / "data" / "fixture.pkl").write_bytes(b"x")
+    (repo / "build").mkdir()
+    (repo / "build" / "model.pkl").write_bytes(b"x")
+    bound = 30
+    listings = 0
+    opened: list[str] = []
+    real_scandir = os.scandir
+    real_path_open = Path.open
+    real_os_open = os.open
+
+    def counting_scandir(path: str | Path = ".") -> object:
+        nonlocal listings
+        if venv in Path(path).parents or Path(path) == venv:
+            listings += 1
+        return real_scandir(path)
+
+    def path_open(self: Path, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        if venv in self.parents:
+            opened.append(str(self))
+        return real_path_open(self, *args, **kwargs)
+
+    def os_open(path: Any, *args: Any, **kwargs: Any) -> int:  # noqa: ANN401
+        if venv in Path(path).parents:
+            opened.append(str(path))
+        return real_os_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "scandir", counting_scandir)
+    monkeypatch.setattr(Path, "open", path_open)
+    monkeypatch.setattr(os, "open", os_open)
+    result = _runner().run(ArtifactTarget(repo, skipped_search_entries=bound))
+
+    assert result.scope is not None
+    skipped = result.scope.skipped_models
+    assert skipped is not None
+    assert [Path(d.path).name for d in skipped.directories] == ["build"], (
+        "the shallow model in build/ was not found first, so the bound measures nothing"
+    )
+    assert not skipped.searched_all
+    assert opened == []
+    assert listings <= bound, f"{listings} listings inside .venv for a bound of {bound} entries"

@@ -67,6 +67,7 @@ from guardana.core.target.endpoint import (
     UnreadableReply,
 )
 from guardana.core.target.mcp import (
+    MAX_LISTING_PAGES,
     CacheHints,
     Era,
     McpConversation,
@@ -93,6 +94,7 @@ from guardana.core.target.seeded import SeededTarget
 from guardana.core.target.trace import TraceTarget, capability_for, dimensions_of
 
 __all__ = [
+    "MAX_LISTING_PAGES",
     "REQUEST_TIMEOUT_SECONDS",
     "WIRE_PROTOCOL_OF",
     "A2aAgentTarget",

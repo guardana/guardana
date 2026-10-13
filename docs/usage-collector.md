@@ -33,6 +33,10 @@ because a security boundary that adds four commands to the first run is a bounda
 that makes a tool nobody starts. The granular commands below exist for the second
 team, not for the first one.
 
+`bootstrap` takes `--key-name TEXT` (default `first-key`): what to call the first
+key. It also takes `--scope [ingest|read]` (default `ingest` only): repeatable,
+exactly like `key create`.
+
 `serve` binds **loopback** unless told otherwise: `--host 0.0.0.0` is a decision,
 so it is one you type. It needs an ASGI server, which is an extra
 (`pip install "guardana-server[serve]"`) rather than a dependency — a deployment
@@ -213,11 +217,10 @@ legitimate thing to do and a surprise is not.
 | Lives | next to the code, in git | in the collector, shared by the team |
 | Answers | "should this pipeline fail today" | "did anybody decide anything about this" |
 
-The collector never tells an agent what to do. A gate that asked a server whether
-to fail would be a gate that fails open when the network does — so if you want a
-build to stop failing, that is still `guardana baseline`
-([usage-baseline.md](usage-baseline.md)). Exporting a project's collector waivers
-*as* a baseline file is a natural next step and is deliberately not here yet.
+The collector never tells an agent what to do. A gate that relies on a server to decide
+whether to fail fails open when the network fails. To stop a build from failing, use
+`guardana baseline` ([usage-baseline.md](usage-baseline.md)). The collector does not export
+its waivers as a baseline file.
 
 ## The audit log
 
@@ -236,13 +239,13 @@ recorded — a log that grows with every dashboard refresh is a log nobody reads
 | `key` | `key:prod-ci (id 4)` | **verified** — the credential was presented and matched |
 | `cli` | `cli:alice@ops-1` | **asserted** — an operator with database access said so |
 
-A CLI actor is the operating-system user, taken from the environment rather than
-typed, and `--actor` overrides it for a shared operations account. It is not
-authentication: anybody who can reach the database can write any name. It is
-recorded anyway, because "what happened, roughly when, by which route" is the
-question a log usually answers — and labelling an assertion as proof would be the
-same false green this tool refuses in a verdict. Real identities arrive with users
-and RBAC.
+A CLI actor is the operating-system user, taken from the environment rather than typed.
+`--actor` overrides it for a shared operations account. This is not authentication: anybody
+who can reach the database can write any name. The log still records the actor because a log
+usually answers what happened, roughly when, and by which route. Labelling this assertion as
+proof would be the same false green the tool refuses in a verdict. The
+collector has no user accounts or role-based access control, so the log records no verified
+person.
 
 - **The audit log is not tamper-evident.** It has no per-row signature or hash chain. Anyone with database write access can edit or delete rows. It records actions; it does not prove them.
 
@@ -270,6 +273,11 @@ a collector that removes evidence because nobody said not to.
 **Applying is a command, never a background job.** There is no scheduler in the
 collector, so "what deleted my evidence" is answerable from the audit log rather
 than from source. Run it yourself, or from a cron you wrote.
+
+`apply` reports and audits the submissions it actually deletes, so concurrent
+passes never claim the same rows. `--dry-run` reports how many would go at that moment.
+A read overlapping a retention pass returns each submission with its findings
+as they stood when the read began, never emptied halfway through.
 
 Two things retention deliberately does not touch:
 
@@ -354,6 +362,16 @@ tenant column on a database serving two teams folds their evidence into one
 undifferentiated pile, so the down migration counts the tenants across the
 submissions *and* the keys first and raises rather than doing it.
 
+## What the collector refuses and redacts on ingest
+
+`POST /findings` redacts recognisable secrets with engine patterns and `[redacted:<label>:<12 hex digits>]`; a value reaching past a recognised key becomes one placeholder with it; placeholders the engine writes remain unchanged. Redacted fields: `source`; every finding and unverified result's title, target reference, evidence summary/detail and verdict rationale; every error's source, stage and reason; the missing items of every skipped rule. Ids, identity, rule ids, taxonomy, evaluator ids, run summary and declared deployment fields remain as sent (deployment fields are operator declarations; see the privacy guide).
+
+Post-redaction overflow (4,096 characters: `source`/error sources; 65,536: other text fields) returns `422`; nothing is stored.
+
+Across accepted envelope versions, published-schema violations return `422`, one error entry (`loc`, `msg`, `input`) per value: severity outside exact-case `INFO`/`LOW`/`MEDIUM`/`HIGH`/`CRITICAL`; verdict outcome outside `pass`/`fail`/`inconclusive`; confidence outside [0,1] or nonfinite; negative counts; negative/infinite wall time; gate outside `pass`/`fail`/`indeterminate`; evidence mode outside `metadata_only`/`redacted`/`full`; a skip reason outside `missing_capability`/`unsafe_mode`/`not_applicable`/`not_recorded`/`not_offered`; an identity that is present but not `sha256:` followed by 64 lower-case hex digits. Permitted `null` remains accepted.
+
+Data stored earlier reads back unchanged, including any secret it holds; redaction applies to new submissions. The dashboard never ranks an unknown severity as the worst.
+
 ## Limits: how much one caller may send, and how often
 
 | Variable | Default | What it bounds |
@@ -379,8 +397,11 @@ at the proxy that already terminates your TLS.
 A credential is charged on its own only after the collector has accepted it; every
 other request — no key, a rejected key, a key no route checked — is charged to the
 peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
-inventing a new token per request cannot buy a fresh one. The limiter tracks at
-most 10,000 callers per process.
+inventing a new token per request cannot buy a fresh one. Key acceptance and
+usage are separate: a route that checks no key, such as `/healthz` or `/readyz`,
+leaves its count unchanged. A key refused by one route and accepted again resumes
+its existing minute. The limiter tracks at
+most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its `Bearer` scheme; an Authorization header with a scheme other than `Bearer` is charged to the peer address.
 
 ## Choosing where submissions go
 
@@ -434,7 +455,11 @@ credential on a command line lands in shell history, in `ps`, and in the echoed
 command of most CI logs — the same reason `probe` takes `--api-key-env` rather
 than `--api-key`. A collector that rejects a submission says so as a warning
 naming the status, because a whole fleet quietly failing to report while a
-dashboard shows stale data as current is the failure that matters.
+dashboard shows stale data as current is the failure that matters. What the
+collector says back, and why it could not be reached, is printed with that key
+withheld, recognisable secrets redacted and control characters dropped, so a
+collector that echoes the `Authorization` header cannot put the key in a CI log or
+rewrite the terminal.
 
 **`--reporter` takes the collector's URL, not a route.** The reporter appends the
 ingest path itself, so `server://https://collector.example.com` is the whole thing
@@ -476,9 +501,9 @@ guardana-collector key create --project acme/web --name panel --scope read
 # then open the collector and paste the key once
 ```
 
-The key goes into an `HttpOnly`, `SameSite=Strict` cookie the page itself cannot
-read; `key revoke` ends the session, and an expiring key ends it on its own. There
-are no user accounts — those arrive with RBAC and replace this.
+The key is stored in an `HttpOnly`, `SameSite=Strict` cookie that the page itself cannot read.
+`key revoke` ends the session, and the session also ends when the key expires. There are no
+user accounts: the key is the page's only identity.
 
 **The cookie holds the read-scoped API key itself.** Stealing it gives read access until the key is revoked or expires. It is marked `Secure` only when the request reaches the collector as `https`, directly or through a trusted `X-Forwarded-Proto`; over plain http the key travels in clear. It is a browser-session cookie with no remember-me, refresh or idle timeout. Bound its lifetime with `--expires-in-days` on the panel key.
 
@@ -497,6 +522,35 @@ its whole history, so a refresh costs the same on a collector that has held a
 project for years. The response says which: `window.limit` is the bound, and
 `window.complete` is `false` when older submissions exist that the totals leave
 out. `guardana-collector run list --limit N` still lists the older runs.
+
+`/stats` also counts what runs did not check. `totals.skipped` counts rules skipped
+for any reason except `not_applicable`. A bare rule id from an agent older than skip
+reasons also counts because it gives no reason. `by_gate` counts submissions per
+recorded gate, using `not_recorded` when a run sent none. Each `by_source` row carries
+its `skipped` count and its newest run's `gate` (`null` when that run sent none).
+The page gives skipped checks and indeterminate gates their own tiles and lists
+each beside the findings. A run with a skipped check or an undecided gate therefore
+never reads as "No findings".
+
+`GET /stats` responds only while the dashboard is mounted, to a read key or a signed-in
+browser:
+
+```bash
+curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/stats
+```
+
+| Key | What it holds |
+|---|---|
+| `window` | `{limit, complete}`: the bound, `1000`, and whether every submission fitted inside it |
+| `totals` | `{submissions, sources, findings, unverified, errors, skipped}` over the window. `submissions` counts submissions and `sources` distinct sources; `findings`, `unverified` and `errors` count entries; `skipped` counts skipped rules whose reason is not `not_applicable` |
+| `by_severity` | findings per severity name |
+| `by_gate` | submissions per recorded gate, with `not_recorded` for a run that sent none |
+| `by_source` | one row per source, most findings first: `{source, findings, unverified, errors, skipped, gate, worst_severity, last_seen}`; `gate` is the newest run's |
+| `by_rule` | the 10 rules with the most findings, as `{rule_id, count}` |
+| `series` | up to 24 equal time buckets across the window, each `{t, findings, unverified, errors}`; empty when nothing is stored |
+
+`last_seen` and `t` are Unix times in seconds, taken when the collector received a submission;
+a bucket's `t` is its start time.
 
 ### A database outage is not a rejected key
 
@@ -520,6 +574,8 @@ The optional collector stores and serves results submitted by Guardana runs. It 
 
 `/openapi.json` lists routes, key permissions and refusals: `401` for a missing or unaccepted key, `403` for insufficient permission, and `503` when the database cannot be reached to check the key.
 
+The collector serves no interactive API viewer because FastAPI's default viewers load scripts, styles and fonts from third-party hosts. `/docs`, `/redoc` and `/docs/oauth2-redirect` return `404`. To browse the API, download the document (`curl --fail --show-error "$COLLECTOR_URL/openapi.json" -o openapi.json`) and open it in an OpenAPI viewer installed on your machine.
+
 | Route | Permission | Session cookie accepted |
 | --- | --- | --- |
 | `POST /findings` | `ingest` | No |
@@ -529,7 +585,7 @@ The optional collector stores and serves results submitted by Guardana runs. It 
 | `/healthz`, `/readyz` | None (public) | — |
 | `/catalog`, `/` (dashboard only) | None (public) | — |
 | `POST /session`, `DELETE /session` (dashboard only) | None; `POST` takes a `read` key in its body | — |
-| `/openapi.json`, and FastAPI's `/docs` and `/redoc` viewers | None (public) | — |
+| `/openapi.json` | None (public) | — |
 
 Send keys as `Authorization: Bearer <key>`. Read routes also accept the `guardana_session` cookie set by the dashboard after `POST /session`; a `Bearer` header takes precedence. Permissions belong to keys, not OAuth2 scopes.
 
@@ -551,6 +607,34 @@ curl -s -X POST https://collector.example.com/findings \
 curl -s -H "Authorization: Bearer $READ_KEY" "https://collector.example.com/findings?limit=1"
 curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/trend   # {"HIGH": 1} on a fresh project
 ```
+
+### Reading results back
+
+`GET /findings` returns the newest submissions the key may read, newest first, as a JSON list
+of envelopes in their stored form. It takes two query parameters:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `limit` | `100` | how many submissions, from `1` to `1000`; anything else is refused with `422` |
+| `source` | none | only submissions whose `source` is exactly this value |
+
+There is no cursor or offset. A reader gets at most the newest 1,000 matching submissions;
+older submissions are not accessible through this route.
+`guardana-collector run list --limit N` lists older runs for an operator with database access.
+`GET /trend` returns finding counts by severity across everything the key's project stores.
+
+### What the envelope leaves out
+
+The envelope is smaller than the saved run and has its own version (8). The collector keeps
+only what the envelope contains: `source`, `findings`, `unverified`, `errors`, a `summary`
+(`rules_run`, `rules_executed`, `rules_skipped` as `{rule_id, reason, missing}`,
+`max_severity`, and the `unverified` and `errors` counts), the declared `deployment`, and a
+`run` block (`run_id`, `started_at`, `completed_at`, `tool_version`, `gate`,
+`evidence_mode`, `requests`, `input_tokens`, `output_tokens`, `wall_time_seconds`). It does
+not contain waived findings, observations, assessments, the file listing, coverage shortfalls,
+why a run stopped, a skip's `detail`, or the manifest's rule, suite and trial records. A
+`gate` of `indeterminate` means the run did not pass; the saved run explains why. A tool that
+needs the whole result reads the saved run ([reading results](reading-results.md)).
 
 ## Migrations
 

@@ -12,9 +12,11 @@ applied in thirty places has thirty exceptions, and the one that matters is the
 one somebody forgot.
 """
 
+import atexit
 import re
+import threading
 from bisect import bisect_right
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, fields, is_dataclass, replace
 from datetime import date
 from enum import Enum, StrEnum
@@ -23,8 +25,10 @@ from types import NoneType
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
 from guardana.core.fingerprint import digest_of
+from guardana.core.gate import StopReason
 
 if TYPE_CHECKING:  # everything downstream builds on this module; the arrow runs one way
+    from guardana.core.evaluator.regex import _SearchWorker
     from guardana.core.report.check_error import CheckError
     from guardana.core.report.finding import Finding
     from guardana.core.report.result import ScanResult
@@ -49,6 +53,35 @@ DEFAULT_MAX_EVIDENCE_BYTES = 16 * 1024
 """Unbounded evidence is a denial-of-service against a collector and a memory risk
 locally, and a 64 MiB model reply in a report helps nobody."""
 
+CUSTOM_PATTERN_TIMEOUT_SECONDS = 2.0
+"""How long one profile pattern may search one text before the redaction fails.
+
+A profile's `custom_patterns` are the operator's own regexes, applied to text the target
+chose, so they run in a worker process that is killed at this bound rather than on the
+thread that holds the run.
+"""
+
+MAX_CUSTOM_PATTERN_CHARS = 16 * 1024 * 1024
+"""The longest text a profile pattern is searched in; a longer one fails the redaction."""
+
+
+class RedactionBoundError(Exception):
+    """A profile pattern could not be searched within its bounds, so the text is not released.
+
+    Raised rather than returned: the text it was meant to clean may hold exactly what the
+    pattern exists to remove, and no caller may treat it as redacted. `pattern` names the
+    entry by its position in `custom_patterns`, never by its source, which may itself be a
+    value the operator wants withheld; `failure` says which bound it missed; `stopped_by`
+    is why the run had already stopped, when it had, so the stop keeps its exit code.
+    """
+
+    def __init__(self, pattern: str, failure: str, *, stopped_by: StopReason | None = None) -> None:
+        super().__init__(f"{pattern} {failure}")
+        self.pattern = pattern
+        self.failure = failure
+        self.stopped_by = stopped_by
+
+
 OMITTED_WHEN_DEFAULT = "guardana.omitted_when_default"
 """Field metadata: a setting left out of a profile's digest while it holds its default.
 
@@ -70,20 +103,18 @@ straight after Chinese or accented text would have no boundary before it and sta
 """
 
 # Ordered most specific first: a key that also matches a generic high-entropy
-# pattern should be labelled as the key it is. A private key leads because its span
-# holds the whole block, and a shorter match claimed inside the body first would
-# leave the rest of the key material in place. Its body stops at the next BEGIN, so a
-# reply of headers with no END costs one pass rather than one pass per header; a block
-# cut before its END still takes its armor headers (`Proc-Type:`, `Version:`) and the
-# base64 lines after them.
+# pattern should be labelled as the key it is, as a span keeps the label of the
+# earliest pattern that claimed it (`_claim`). A private key leads because its span
+# holds the whole block. A block with no END runs to the end of the text, since any
+# line that stopped it sooner would leave the key material after that line in the
+# clear; the END branch gives up at the next BEGIN, so the scan stays one pass.
 _PRIVATE_KEY_LABEL = r"[A-Z ]*PRIVATE KEY(?: BLOCK)?"
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "private-key",
         re.compile(
             rf"-----BEGIN {_PRIVATE_KEY_LABEL}-----"
-            rf"(?:(?:(?!-----BEGIN )[\s\S])*?-----END {_PRIVATE_KEY_LABEL}-----"
-            rf"|(?:\s+(?:[A-Za-z-]+:[^\n]*|[A-Za-z0-9+/=]{{16,}}))*)"
+            rf"(?:(?:(?!-----BEGIN )[\s\S])*?-----END {_PRIVATE_KEY_LABEL}-----|[\s\S]*)"
         ),
     ),
     ("aws-key", re.compile(rf"{_WORD_START}(?:AKIA|ASIA)[0-9A-Z]{{16}}")),
@@ -99,12 +130,12 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             rf"{_WORD_START}eyJ[A-Za-z0-9_-]{{8,}}\.[A-Za-z0-9_-]{{8,}}\.[A-Za-z0-9_-]{{8,}}"
         ),
     ),
-    ("bearer-token", re.compile(rf"(?i){_WORD_START}bearer\s+[A-Za-z0-9._-]{{16,}}")),
+    ("bearer-token", re.compile(rf"(?i){_WORD_START}bearer\s+(?P<value>[A-Za-z0-9._-]{{16,}})")),
     (
         "credential-assignment",
         re.compile(
             rf"(?i){_WORD_START}(?:api[_-]?key|secret|password|passwd|token)(?![A-Za-z0-9_])\s*[:=]\s*"
-            r"[\"']?([A-Za-z0-9/_+.-]{12,})[\"']?"
+            r"[\"']?(?P<value>[A-Za-z0-9/_+.-]{12,})[\"']?"
         ),
     ),
 )
@@ -131,7 +162,14 @@ _SCALARS = (int, float, NoneType, date)
 _COLLECTIONS = (tuple, list, set, frozenset)
 """What the span walk rebuilds item by item; only a tuple is walked by `redact`."""
 
-_ALREADY_REDACTED = re.compile(r"\[redacted:[a-z0-9-]+(?::[0-9a-f]{12})?\]")
+_WRITTEN_LABELS = (*(label for label, _ in _SECRET_PATTERNS), "email", "ip", "query", "url")
+"""Every label the engine writes with an optional digest; `custom-<n>` and `credential` aside."""
+
+_ALREADY_REDACTED = re.compile(
+    r"\[redacted:(?:(?:"
+    + "|".join(re.escape(label) for label in _WRITTEN_LABELS)
+    + r"|custom-(?:0|[1-9][0-9]*))(?::[0-9a-f]{12})?|credential)\]"
+)
 """A placeholder this redactor itself wrote, so a second pass leaves it alone.
 
 Redaction runs twice by design — once in the command, so a baseline is written
@@ -145,10 +183,14 @@ looks for.
 model's reply. A permissive `\\[redacted:[^\\]]*\\]` would let anything that can
 make a model emit `[redacted:` around a credential carry that credential through
 the redactor untouched — the redactor's own output format turned into a smuggling
-envelope. This matches only what `_placeholder` can produce: a lower-case label
-and an optional twelve-hex digest. Nothing that fits inside it is a secret, an
-address or an IP, because none of those are twelve lower-case hex characters.
+envelope. This matches only what the engine writes: one of its own labels with an
+optional twelve-hex digest, or `[redacted:credential]`. Any other bracketed text is
+ordinary text the patterns read. A secret that is itself twelve lower-case hex
+characters still fits the digest slot of a real label.
 """
+
+_PLACEHOLDER_SHAPE = re.compile(r"\[redacted:[a-z0-9-]+(?::[0-9a-f]{12})?\]")
+"""Anything shaped like a placeholder, whatever wrote it; detection errs toward finding one."""
 
 _SENT_VALUE_PLACEHOLDER = "[redacted:credential]"
 _SHORTEST_SECRET = 4
@@ -162,12 +204,12 @@ def holds_redaction_marker(text: str) -> bool:
     """Tell whether `text` carries a placeholder this redactor writes in place of what it removed.
 
     Text holding one is no longer what the target said, so whoever grades it is grading
-    the redactor's output. Only the exact shapes this module produces count.
+    the redactor's output. A placeholder counts whatever label it has.
     """
     return any(
         pattern.search(text) is not None
         for pattern in (
-            _ALREADY_REDACTED,
+            _PLACEHOLDER_SHAPE,
             _WITHHELD_SUMMARY,
             _WITHHELD_REASON_MARKER,
             _TRUNCATED_MARKER,
@@ -258,6 +300,7 @@ class EvidenceRedactor:
             (f"custom-{index}", re.compile(pattern))
             for index, pattern in enumerate(self._policy.custom_patterns)
         )
+        self._isolated = frozenset(pattern for _, pattern in self._custom)
 
     @property
     def policy(self) -> RedactionPolicy:
@@ -454,35 +497,31 @@ class EvidenceRedactor:
         on, so losing it costs the redaction most of its usefulness.
 
         Matches are therefore collected against the original text and spliced in
-        once. An earlier pattern owns the span it claimed, which is what "ordered
-        most specific first" was always supposed to mean — and the placeholders
-        of a previous pass claim their spans first, which is what makes redacting
+        once, most specific pattern first; see `_claim` for how a later match that
+        collides with an earlier one is taken. A previous pass's placeholders are kept
+        as written and a match inside one is ignored, which is what makes redacting
         twice produce the same text as redacting once.
         """
         text = without_lone_surrogates(text)
         for value in self._secrets:
             text = text.replace(value, _SENT_VALUE_PLACEHOLDER)
-        claimed = [(m.start(), m.end(), m.group(0)) for m in _ALREADY_REDACTED.finditer(text)]
-        starts = [start for start, _, _ in claimed]
-        for label, pattern in patterns:
-            # One pattern's matches never overlap each other, so each is checked only
-            # against the spans earlier patterns claimed: its two sorted neighbours.
-            fresh = [
-                (start, end, self._placeholder(label, match.group(0)))
-                for match in pattern.finditer(text)
-                for start, end in (match.span(),)
-                if not _collides(claimed, starts, start, end)
-            ]
-            if fresh:
-                claimed = sorted([*claimed, *fresh])
-                starts = [start for start, _, _ in claimed]
-        if not claimed:
+        kept = [m.span() for m in _ALREADY_REDACTED.finditer(text)]
+        claimed = [(start, end, len(patterns)) for start, end in kept]
+        for rank, (label, pattern) in enumerate(patterns):
+            found = (
+                _isolated_spans(label, pattern, text)
+                if pattern in self._isolated
+                else _spans(pattern.finditer(text))
+            )
+            claimed = _claim(claimed, rank, found)
+        spans = _outside(kept, claimed)
+        if not spans:
             return text
         pieces: list[str] = []
         cursor = 0
-        for start, end, replacement in claimed:
+        for start, end, rank in spans:
             pieces.append(text[cursor:start])
-            pieces.append(replacement)
+            pieces.append(self._placeholder(patterns[rank][0], text[start:end]))
             cursor = end
         pieces.append(text[cursor:])
         return "".join(pieces)
@@ -589,7 +628,96 @@ def without_lone_surrogates(text: str) -> str:
     return text.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
 
 
-def _collides(claimed: list[tuple[int, int, str]], starts: list[int], start: int, end: int) -> bool:
+_Claimed = list[tuple[int, int, int]]
+_Span = tuple[int, int, int, int]
+"""One match as `(start, end, value_start, value_end)`; without a matched `value`, the match."""
+
+
+def _spans(matches: Iterator[re.Match[str]]) -> Iterator[_Span]:
+    """Read in-process matches as spans, the shape the worker answers in.
+
+    A `value` group that took no part in the match stands for the whole match, so a
+    collision never claims less than the match.
+    """
+    for match in matches:
+        start, end = match.span()
+        value = match.span("value") if "value" in match.re.groupindex else (-1, -1)
+        yield start, end, *((start, end) if value == (-1, -1) else value)
+
+
+_workers: dict[float, "_SearchWorker"] = {}
+_workers_lock = threading.Lock()
+
+
+def _isolated_spans(label: str, pattern: re.Pattern[str], text: str) -> tuple[_Span, ...]:
+    """Match a profile pattern in the worker process, raising `RedactionBoundError` past a bound."""
+    from guardana.core.evaluator.regex import (  # noqa: PLC0415
+        _NotSearchedError,
+        _SearchTimeoutError,
+    )
+
+    named = f"custom_patterns[{label.removeprefix('custom-')}]"
+    if len(text) > MAX_CUSTOM_PATTERN_CHARS:
+        raise RedactionBoundError(
+            named,
+            f"was not searched in a {len(text)}-character text, over the "
+            f"{MAX_CUSTOM_PATTERN_CHARS}-character bound",
+        )
+    try:
+        return _custom_worker().spans(pattern.pattern, text)
+    except _SearchTimeoutError as exc:
+        raise RedactionBoundError(
+            named, f"did not finish within {CUSTOM_PATTERN_TIMEOUT_SECONDS:g} s on one text"
+        ) from exc
+    except _NotSearchedError as exc:
+        raise RedactionBoundError(named, f"could not be searched ({exc})") from exc
+
+
+def _custom_worker() -> "_SearchWorker":
+    """Return the worker for the current bound, started on first use and stopped at exit."""
+    from guardana.core.evaluator.regex import _SearchWorker  # noqa: PLC0415 — one-way dependency
+
+    timeout = CUSTOM_PATTERN_TIMEOUT_SECONDS
+    with _workers_lock:
+        worker = _workers.get(timeout)
+        if worker is None:
+            worker = _workers[timeout] = _SearchWorker(timeout)
+            atexit.register(worker.stop)
+    return worker
+
+
+def _claim(claimed: _Claimed, rank: int, matches: Iterable[_Span]) -> _Claimed:
+    """Add one pattern's matches to `claimed`, sorted and disjoint `(start, end, rank)` spans.
+
+    A match clear of every claimed span is claimed whole. One that collides is claimed
+    by its `value` group, or whole when it has none, unless claimed spans already cover
+    that value, so a generic pattern around a specific key changes nothing. A value
+    reaching past them merges with the spans it overlaps under the lowest rank, so no
+    character of a longer credential survives.
+    """
+    starts = [start for start, _, _ in claimed]
+    fresh: _Claimed = []
+    for start, end, value_start, value_end in matches:
+        if start == end:
+            continue
+        if not _collides(claimed, starts, start, end):
+            fresh.append((start, end, rank))
+            continue
+        if not _covered(claimed, starts, value_start, value_end):
+            fresh.append((value_start, value_end, rank))
+    if not fresh:
+        return claimed
+    merged: _Claimed = []
+    for start, end, span_rank in sorted([*claimed, *fresh]):
+        if merged and start < merged[-1][1]:
+            last_start, last_end, last_rank = merged[-1]
+            merged[-1] = (last_start, max(last_end, end), min(last_rank, span_rank))
+        else:
+            merged.append((start, end, span_rank))
+    return merged
+
+
+def _collides(claimed: _Claimed, starts: list[int], start: int, end: int) -> bool:
     """Whether `start`..`end` overlaps a claimed span, given spans sorted and disjoint."""
     index = bisect_right(starts, start)
     before = claimed[index - 1] if index else None
@@ -597,6 +725,40 @@ def _collides(claimed: list[tuple[int, int, str]], starts: list[int], start: int
     return any(
         _overlaps(start, end, span[0], span[1]) for span in (before, after) if span is not None
     )
+
+
+def _covered(claimed: _Claimed, starts: list[int], start: int, end: int) -> bool:
+    """Whether claimed spans, touching end to end, cover every character of `start`..`end`."""
+    index = bisect_right(starts, start) - 1
+    if index < 0 or claimed[index][1] <= start:
+        return False
+    reach = claimed[index][1]
+    while reach < end:
+        index += 1
+        if index == len(claimed) or claimed[index][0] != reach:
+            return False
+        reach = claimed[index][1]
+    return True
+
+
+def _outside(kept: list[tuple[int, int]], claimed: _Claimed) -> _Claimed:
+    """Return the parts of `claimed` that lie outside `kept`, both sorted and disjoint."""
+    spans: _Claimed = []
+    first = 0
+    for start, end, rank in claimed:
+        while first < len(kept) and kept[first][1] <= start:
+            first += 1
+        cursor = start
+        index = first
+        while index < len(kept) and kept[index][0] < end:
+            kept_start, kept_end = kept[index]
+            if cursor < kept_start:
+                spans.append((cursor, kept_start, rank))
+            cursor = max(cursor, kept_end)
+            index += 1
+        if cursor < end:
+            spans.append((cursor, end, rank))
+    return spans
 
 
 def _overlaps(start: int, end: int, taken_start: int, taken_end: int) -> bool:

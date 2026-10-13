@@ -8,10 +8,13 @@ from guardana.core.target.endpoint import (
     ChatMessage,
     EndpointError,
     EndpointTarget,
+    ToolSpec,
+    UnreadableReply,
     UrllibTransport,
     _extract_content,
     _extract_tool_reply,
 )
+from guardana.core.testing._fake_provider import FakeProvider, openai_reply
 
 
 class _FakeTransport:
@@ -193,10 +196,97 @@ def test_extract_tool_reply_parses_tool_calls_with_null_content() -> None:
     assert [c.name for c in reply.tool_calls] == ["run_shell_command", "calculator"]
 
 
-def test_extract_tool_reply_skips_a_malformed_tool_call() -> None:
-    payload = {"choices": [{"message": {"tool_calls": [{"function": {"arguments": "x"}}, "junk"]}}]}
+def _calling(*calls: object) -> dict[str, object]:
+    return {"choices": [{"message": {"content": None, "tool_calls": list(calls)}}]}
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "junk",
+        {"function": {"arguments": "x"}},
+        {"function": "post_status"},
+        {"function": {"name": 7, "arguments": "{}"}},
+    ],
+    ids=["not-an-object", "no-name", "function-not-an-object", "name-not-text"],
+)
+def test_a_malformed_tool_call_is_named_as_unreadable_and_the_readable_ones_are_kept(
+    call: object,
+) -> None:
+    payload = _calling({"function": {"name": "read_file", "arguments": "{}"}}, call)
+
     reply = _extract_tool_reply(payload, ref="x#m")
+
+    assert [c.name for c in reply.tool_calls] == ["read_file"]
+    assert reply.unreadable is not None
+    assert "tool call 2 with no readable function name" in reply.unreadable
+
+
+def test_tool_calls_that_are_not_a_list_make_the_reply_unreadable() -> None:
+    payload = {"choices": [{"message": {"tool_calls": {"function": {"name": "read_file"}}}}]}
+
+    with pytest.raises(UnreadableReply, match="tool_calls"):
+        _extract_tool_reply(payload, ref="x#m")
+
+
+def test_arguments_sent_as_an_object_are_kept_as_their_canonical_json_text() -> None:
+    arguments = {"message": "handover token GUARDANA_CANARY_X", "a": [1, "ü"]}
+    payload = _calling({"id": "c2", "function": {"name": "post_status", "arguments": arguments}})
+
+    (call,) = _extract_tool_reply(payload, ref="x#m").tool_calls
+
+    assert call.arguments == '{"a": [1, "ü"], "message": "handover token GUARDANA_CANARY_X"}'
+    assert json.loads(call.arguments) == arguments
+
+
+@pytest.mark.parametrize("arguments", [["x"], 7, 1.5, True], ids=["list", "int", "float", "bool"])
+def test_arguments_neither_text_nor_an_object_leave_the_call_unreadable(arguments: object) -> None:
+    payload = _calling({"function": {"name": "post_status", "arguments": arguments}})
+
+    reply = _extract_tool_reply(payload, ref="x#m")
+
     assert reply.tool_calls == ()
+    assert reply.unreadable is not None
+    assert "tool call 1 whose arguments are a" in reply.unreadable
+
+
+def test_a_reply_whose_calls_all_parse_names_nothing_unreadable() -> None:
+    payload = _calling({"function": {"name": "post_status", "arguments": {"a": 1}}})
+
+    assert _extract_tool_reply(payload, ref="x#m").unreadable is None
+
+
+@pytest.mark.parametrize("function", [{"name": "ping"}, {"name": "ping", "arguments": None}])
+def test_a_call_carrying_no_arguments_has_empty_arguments(function: dict[str, object]) -> None:
+    (call,) = _extract_tool_reply(_calling({"function": function}), ref="x#m").tool_calls
+
+    assert call.arguments == ""
+
+
+def test_object_arguments_are_echoed_back_to_the_endpoint_as_sent() -> None:
+    arguments = {"message": "handover token GUARDANA_CANARY_X"}
+    first = openai_reply(
+        None, tool_calls=[{"id": "c1", "function": {"name": "post_status", "arguments": arguments}}]
+    )
+    with FakeProvider(first, openai_reply("Done.")) as provider:
+        transport = UrllibTransport()
+        reply = transport.send_tools(
+            provider.url, "m", [ChatMessage("user", "go")], None, [ToolSpec("post_status", "")]
+        )
+        transport.send_tools(
+            provider.url,
+            "m",
+            [
+                ChatMessage("user", "go"),
+                ChatMessage("assistant", "", tool_calls=reply.tool_calls),
+                ChatMessage("tool", "Status posted.", tool_call_id="c1"),
+            ],
+            None,
+            [ToolSpec("post_status", "")],
+        )
+
+    echoed = provider.requests[1].body["messages"][1]["tool_calls"][0]  # type: ignore[index]
+    assert json.loads(echoed["function"]["arguments"]) == arguments
 
 
 def test_extract_tool_reply_rejects_a_broken_envelope() -> None:

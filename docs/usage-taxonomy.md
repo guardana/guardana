@@ -120,10 +120,14 @@ ACME-CONTROLS — registered by an installed package
     ACME-14          Internal data does not leave the support boundary
 ```
 
-**Your entries carry no digest, and that is deliberate.** A package registers
-references; a catalogue file is what gets hashed and pinned into a run manifest, so
-there is nothing here to pin and inventing a value would claim a provenance nobody
-has. In `--format json` the entry appears in the same list as the built-in
-catalogues with `"digest": null`, which is how a script tells the two apart.
+**The listing shows no catalogue digest for your entries, and that is deliberate.** A
+package registers references rather than a catalogue file, so there is no file to hash.
+Inventing a file digest would claim a provenance nobody has. In `--format json`, the entry
+appears in the same list as the built-in catalogues with `"digest": null`, which lets a script
+tell the two apart.
+
+The content a package registers is still pinned. For each framework, a run manifest records
+a digest of the references registered by installed packages (`run.coverage.taxonomies`).
+`guardana pack lock` pins the same digest ([catalogues in a lock](usage-pack.md)).
 
 See [`extending.md`](extending.md).

@@ -108,8 +108,8 @@ def test_a_directory_whose_every_file_is_excluded_is_empty(tmp_path: Path) -> No
 
 
 def test_a_directory_emptied_by_its_ignore_file_is_empty(tmp_path: Path) -> None:
-    (tmp_path / "model.pkl").write_text("x")
-    (tmp_path / ".guardanaignore").write_text("*.pkl\n")
+    (tmp_path / "notes.txt").write_text("x")
+    (tmp_path / ".guardanaignore").write_text("*.txt\n")
 
     assert _shortfall(ArtifactTarget(tmp_path))
 

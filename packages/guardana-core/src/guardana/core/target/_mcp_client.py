@@ -79,13 +79,27 @@ notification is skipped, uncounted, and the request's deadline bounds how long t
 _SERVER_REQUESTS = 16
 """How many of its own requests an stdio server may make per request; more is unreadable.
 
-Each is answered with a blocking write, and a server that never reads its input would fill
-the pipe and stall the run past any deadline; this many answers fit in any pipe buffer.
+Each answer is written within the request's deadline; this many short answers fit in any
+pipe buffer, so a server that asks and never reads stalls nothing.
+"""
+_MAX_REFLECTED_ID_CHARS = 256
+"""The longest id of a server's own request that is echoed back; a longer one is unreadable.
+
+The answer repeats the id, so an unbounded one would make every answer as large as the
+server chose.
 """
 _METHOD_NOT_FOUND = -32601
 
+MAX_LISTING_PAGES = 16
+"""How many pages of one listing are read; a server that names more is refused, never cut short."""
+
+MAX_LISTING_BYTES = MAX_RESPONSE_BYTES
+"""How much one listing may hold across all its pages: paging never raises the one-reply ceiling."""
+
 REFUSAL_STATUSES = frozenset({401, 403})
 """The statuses that mean a server decided this caller may not ask; no other status does."""
+
+_SHAREABLE_SCOPE = "public"
 
 _CREDENTIAL_STATUSES = frozenset({401, 403, 407})
 _TARGET_STATUSES = frozenset({404, 408, 425, 429})
@@ -124,6 +138,14 @@ class ConversationRefused(HTTPError):  # noqa: N818 — named for what the run m
     def __init__(self, reply: RawReply, ref: str) -> None:
         super().__init__(ref, reply.status, _reason(reply.status), _message(reply), _quoted(reply))
         self.reply = reply
+
+
+class IncompleteListing(McpError):  # noqa: N818 — named for what the run meets
+    """A listing that could not be read to its last page, or holds an entry that is no tool.
+
+    Never read as a shorter manifest: a later page or a malformed entry is exactly the
+    part of the server nobody examined.
+    """
 
 
 class SessionExpired(HTTPError):  # noqa: N818 — named for what the run meets
@@ -428,6 +450,8 @@ class StdioMcpTransport:
             )
         except OSError as exc:
             raise EndpointUnreachable(f"could not start MCP server {command[0]!r}: {exc}") from exc
+        if self._process.stdin is not None:
+            os.set_blocking(self._process.stdin.fileno(), False)
 
     def speak(self, wire: Wire) -> None:
         """Adopt the negotiated revision for every later request."""
@@ -437,8 +461,8 @@ class StdioMcpTransport:
         """Write one JSON-RPC line and read lines until the one answering it, in one deadline."""
         self._last_id += 1
         asked = self._last_id
-        self._write(self._wire.body(method, params, request_id=asked))
         deadline = time.monotonic() + self._timeout
+        self._write(self._wire.body(method, params, request_id=asked), deadline)
         stale = 0
         answered = 0
         while stale <= _STALE_LINES:
@@ -454,7 +478,7 @@ class StdioMcpTransport:
                                 f"for its reply"
                             )
                         )
-                    self._answer(payload)
+                    self._answer(payload, deadline)
                 continue
             if payload.get("id") != asked:
                 stale += 1
@@ -480,25 +504,57 @@ class StdioMcpTransport:
 
     def notify(self, method: str) -> None:
         """Write one notification line; nothing is read for it."""
-        self._write(self._wire.notification(method))
+        self._write(self._wire.notification(method), time.monotonic() + self._timeout)
 
-    def _answer(self, asked: Mapping[str, object]) -> None:
+    def _answer(self, asked: Mapping[str, object], deadline: float) -> None:
         """Answer one of the server's own requests: `ping` with `{}`, anything else as unknown."""
-        answer: dict[str, object] = {"jsonrpc": "2.0", "id": asked.get("id")}
+        asked_id = asked.get("id")
+        reflectable = isinstance(asked_id, int) and not isinstance(asked_id, bool)
+        if isinstance(asked_id, str):
+            reflectable = len(asked_id) <= _MAX_REFLECTED_ID_CHARS
+        if not reflectable:
+            raise self._fail(
+                UnreadableReply(
+                    f"the MCP server at {self._ref} made a request whose id is neither an "
+                    f"integer nor a string of at most {_MAX_REFLECTED_ID_CHARS} characters"
+                )
+            )
+        answer: dict[str, object] = {"jsonrpc": "2.0", "id": asked_id}
         if asked.get("method") == "ping":
             answer["result"] = {}
         else:
             answer["error"] = {"code": _METHOD_NOT_FOUND, "message": "Method not found"}
-        self._write(json.dumps(answer).encode("utf-8"))
+        self._write(json.dumps(answer).encode("utf-8"), deadline)
 
-    def _write(self, line: bytes) -> None:
-        if self._process.stdin is None or self._process.stdout is None:
+    def _write(self, line: bytes, deadline: float) -> None:
+        """Write one line by `deadline` on the non-blocking pipe, or give up on the stream.
+
+        A server that stops reading its input fills the pipe, and a blocking write would
+        then wait for it past any deadline. A line cut short leaves the stream with no
+        known boundary, so a missed deadline ends the conversation.
+        """
+        stdin = self._process.stdin
+        if stdin is None or self._process.stdout is None:
             raise EndpointUnreachable(f"the MCP server at {self._ref} has no usable pipes")
         if self._broken is not None:
             raise UnreadableReply(self._broken)
+        pending = memoryview(line + b"\n")
         try:
-            self._process.stdin.write(line + b"\n")
-            self._process.stdin.flush()
+            with selectors.DefaultSelector() as selector:
+                selector.register(stdin.fileno(), selectors.EVENT_WRITE)
+                while pending:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0 or not selector.select(remaining):
+                        message = (
+                            f"the MCP server at {self._ref} did not read its input within "
+                            f"{self._timeout} seconds"
+                        )
+                        self._broken = message
+                        raise EndpointUnreachable(message)
+                    try:
+                        pending = pending[os.write(stdin.fileno(), pending) :]
+                    except BlockingIOError:
+                        continue
         except OSError as exc:
             raise EndpointUnreachable(
                 f"the MCP server at {self._ref} did not answer: {exc}"
@@ -832,8 +888,15 @@ def list_manifest(
     """
     if negotiation.unsupported is not None:
         raise McpError(negotiation.unsupported)
-    result = settled_request(transport, negotiation, ref, "tools/list", {}, announce=announce)
-    return McpConversation(negotiation=negotiation, tools=tools_in(result), cache=cache_in(result))
+    first = settled_request(transport, negotiation, ref, "tools/list", {}, announce=announce)
+    tools, cache = read_listing(
+        first,
+        lambda cursor: settled_request(
+            transport, negotiation, ref, "tools/list", {"cursor": cursor}
+        ),
+        ref,
+    )
+    return McpConversation(negotiation=negotiation, tools=tools, cache=cache)
 
 
 def changed(ref: str, agreed: str, offered: Sequence[str]) -> TargetChanged:
@@ -890,26 +953,84 @@ def read_manifest(
     return list_manifest(transport, settled, ref, announce=announce)
 
 
-def list_tools(transport: McpTransport) -> tuple[McpTool, ...]:
-    """Read every tool the server advertises, in the order it advertises them."""
-    return tools_in(transport.request("tools/list", {}))
+def list_tools(transport: McpTransport, ref: str = "mcp") -> tuple[McpTool, ...]:
+    """Read every tool the server advertises, on every page, in the order it advertises them."""
+    first = transport.request("tools/list", {})
+    tools, _ = read_listing(
+        first, lambda cursor: transport.request("tools/list", {"cursor": cursor}), ref
+    )
+    return tools
 
 
-def tools_in(result: Mapping[str, object]) -> tuple[McpTool, ...]:
-    """Read a `tools/list` result, skipping entries too malformed to name."""
+def read_listing(
+    first: Mapping[str, object], more: Callable[[str], Mapping[str, object]], ref: str
+) -> tuple[tuple[McpTool, ...], CacheHints]:
+    """Read a `tools/list` result and every page its `nextCursor` names, and the caching claims.
+
+    `more` asks for the page a cursor names. Bounded in pages and in bytes; a cursor that
+    repeats, a cursor that is not a string, a page that is no tool list and an entry that
+    is no tool declaration each raise `IncompleteListing` (or `McpError`), never a listing
+    cut short. A page any shared cache may serve makes the listing shareable.
+    """
+    tools: list[McpTool] = []
+    named: set[str] = set()
+    cache = cache_in(first)
+    page, number, size = first, 1, 0
+    asked: set[str] = set()
+    while True:
+        size += _size_of(page)
+        if size > MAX_LISTING_BYTES:
+            raise IncompleteListing(
+                f"the MCP server at {ref} listed more than {MAX_LISTING_BYTES} bytes of tools "
+                f"by page {number}; the listing was not examined"
+            )
+        for tool in tools_in(page, ref, page_number=number):
+            if tool.name in named:
+                raise IncompleteListing(
+                    f"the MCP server at {ref} listed the tool {tool.name!r} more than once; "
+                    f"which declaration a client adopts is unknown, so none was examined"
+                )
+            named.add(tool.name)
+            tools.append(tool)
+        if number > 1:
+            cache = _widest(cache, cache_in(page))
+        cursor = _next_cursor(page, ref, number)
+        if cursor is None:
+            return tuple(tools), cache
+        if number >= MAX_LISTING_PAGES:
+            raise IncompleteListing(
+                f"the MCP server at {ref} listed more than {MAX_LISTING_PAGES} pages of tools; "
+                f"the listing was not examined"
+            )
+        if cursor in asked:
+            raise IncompleteListing(
+                f"the MCP server at {ref} repeated a cursor on page {number} of its tool "
+                f"listing; the listing was not examined"
+            )
+        asked.add(cursor)
+        page = more(cursor)
+        number += 1
+
+
+def tools_in(
+    result: Mapping[str, object], ref: str = "mcp", *, page_number: int = 1
+) -> tuple[McpTool, ...]:
+    """Read one page of a `tools/list` result; an entry that is no tool declaration raises."""
     raw = result.get("tools")
     if not isinstance(raw, list):
-        raise McpError("MCP server did not return a tool list")
+        said = f"MCP server at {ref} did not return a tool list on page {page_number}"
+        raise IncompleteListing(said) if page_number > 1 else McpError(said)
     tools = []
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        name = entry.get("name")
-        if not isinstance(name, str):
-            continue
+    for index, entry in enumerate(raw, start=1):
+        problem = _declaration_problem(entry)
+        if problem is not None or not isinstance(entry, dict):
+            raise IncompleteListing(
+                f"the MCP server at {ref} listed entry {index} on page {page_number} that is "
+                f"not a tool declaration ({problem}); the listing was not examined"
+            )
         tools.append(
             McpTool(
-                name=name,
+                name=entry["name"],
                 description=_text(entry, "description"),
                 title=_text(entry, "title"),
                 input_schema=_mapping(entry, "inputSchema"),
@@ -918,6 +1039,48 @@ def tools_in(result: Mapping[str, object]) -> tuple[McpTool, ...]:
             )
         )
     return tuple(tools)
+
+
+def _declaration_problem(entry: object) -> str | None:
+    """Say why `entry` is not a tool declaration, or None when it is one.
+
+    An optional field that is present must have its declared type: a description sent as
+    a list would otherwise be dropped from what is graded and from what a pin digests.
+    """
+    if not isinstance(entry, dict):
+        return "it is not an object"
+    if not isinstance(entry.get("name"), str):
+        return "its name is not text"
+    for key in ("description", "title"):
+        if entry.get(key) is not None and not isinstance(entry[key], str):
+            return f"its {key} is not text"
+    for key in ("inputSchema", "outputSchema", "annotations"):
+        if entry.get(key) is not None and not isinstance(entry[key], dict):
+            return f"its {key} is not an object"
+    return None
+
+
+def _next_cursor(page: Mapping[str, object], ref: str, number: int) -> str | None:
+    """Return the cursor naming the page after this one, or None when this is the last."""
+    cursor = page.get("nextCursor")
+    if cursor is None or isinstance(cursor, str):
+        return cursor
+    raise IncompleteListing(
+        f"the MCP server at {ref} sent a nextCursor on page {number} of its tool listing "
+        f"that is not a string; the listing was not examined"
+    )
+
+
+def _size_of(page: Mapping[str, object]) -> int:
+    """Count a page as the UTF-8 bytes of its JSON, the measure the one-reply ceiling uses."""
+    return len(json.dumps(page, ensure_ascii=False, default=str).encode("utf-8"))
+
+
+def _widest(kept: CacheHints, later: CacheHints) -> CacheHints:
+    """Keep the claims of the first page, unless a later one lets any shared cache serve it."""
+    if later.scope == _SHAREABLE_SCOPE:
+        return replace(kept, scope=later.scope)
+    return kept
 
 
 def cache_in(result: Mapping[str, object]) -> CacheHints:

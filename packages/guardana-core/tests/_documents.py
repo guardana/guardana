@@ -62,7 +62,14 @@ from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.severity import Severity
 from guardana.core.subject import SubjectKind
 from guardana.core.target import TargetKind
-from guardana.core.target.scope import ExcludePattern, ExcludeSource, FileScope
+from guardana.core.target.scope import (
+    ExcludePattern,
+    ExcludeSource,
+    FileScope,
+    KeptModel,
+    SkippedDirectory,
+    SkippedModels,
+)
 from guardana.core.taxonomy import TaxonomyRef
 from guardana.core.usage import TargetUsage
 
@@ -451,18 +458,46 @@ def scan_result() -> ScanResult:
         trials_per_case={"guardana.prompt.jailbreak": 3},
         suites={"acme.suite.support_answers": _SUITE},
         scope=FileScope(
-            files=("model/weights.safetensors", "model/config.json"),
+            files=("model/weights.safetensors", "model/config.json", "model/old.pkl"),
             excludes=(
                 ExcludePattern("model/build/*", ExcludeSource.PROFILE),
-                ExcludePattern("*.bak", ExcludeSource.IGNORE_FILE),
+                ExcludePattern("*.bak", ExcludeSource.IGNORE_FILE, ".guardanaignore"),
+                ExcludePattern("*.pkl", ExcludeSource.IGNORE_FILE, ".guardanaignore"),
             ),
             ignored_directories=(".git", "*.egg-info"),
+            kept_models=(KeptModel("model/old.pkl", "*.pkl"),),
+            skipped_models=SkippedModels(
+                directories=(SkippedDirectory("env", 2),), searched_all=False
+            ),
         ),
     )
 
 
+def saved_run_at_v17(document: dict[str, Any]) -> dict[str, Any]:
+    """Rewrite a document this build wrote into the shape a version-17 build wrote."""
+    scope = document.get("scope")
+    if not isinstance(scope, dict):
+        return {
+            **document,
+            "schema_version": 17,
+            "$schema": "https://guardana.dev/schemas/run/v17.schema.json",
+        }
+    return {
+        **document,
+        "schema_version": 17,
+        "$schema": "https://guardana.dev/schemas/run/v17.schema.json",
+        "scope": {
+            **{k: v for k, v in scope.items() if k not in {"kept_models", "skipped_models"}},
+            "excludes": None
+            if scope["excludes"] is None
+            else [{k: v for k, v in e.items() if k != "file"} for e in scope["excludes"]],
+        },
+    }
+
+
 def saved_run_at_v16(document: dict[str, Any]) -> dict[str, Any]:
     """Rewrite a document this build wrote into the shape a version-16 build wrote."""
+    document = saved_run_at_v17(document)
     run = document["run"]
     summary = run["result_summary"]
     return {

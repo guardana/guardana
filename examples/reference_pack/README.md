@@ -1,13 +1,14 @@
 # `guardana-reference-pack`
 
 A Guardana extension pack that uses all six extension points and imports nothing outside
-the [supported surface](../../docs/compatibility.md). It is versioned on its own (`0.1.0`),
-depends on `guardana-core>=0.41` with no upper bound, and declares in its manifest the
-`extension_api` and `output_api` ranges it runs on. `guardana pack validate` checks those
-ranges; installing the pack or running a scan does not, so a CI job that depends on it
-runs `guardana pack validate` and `guardana pack lock --check`. Every release
-attaches its wheel and sdist to the GitHub Release; it is published to PyPI once the
-project's trusted publisher is registered.
+the [supported surface](../../docs/compatibility.md). It has its own version (`0.1.2`),
+depends on `guardana-core>=0.41` with no upper bound, and declares the `extension_api` and
+`output_api` ranges it runs on in its manifest. `guardana pack validate` checks those ranges;
+installing the pack or running a scan does not. A CI job that depends on the pack therefore
+runs `guardana pack validate` and `guardana pack lock --check`. Install it from this directory
+or from the wheel and sdist attached to each GitHub Release. The release workflow's PyPI step
+for the pack is off unless a maintainer has registered the pack's trusted publisher on PyPI
+and switched the step on in the repository settings.
 
 `custom_rule` and `output_pack` teach one idea each. This pack is an example a third party
 can copy: everything in it is checked by the commands and the conformance kit Guardana

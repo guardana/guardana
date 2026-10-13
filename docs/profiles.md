@@ -51,7 +51,12 @@ rules:
   paths_exclude: ["data/*", "archive"]  # optional; globs (matched relative to the
                                          # scan root) of files/dirs to skip. A
                                          # `.guardanaignore` file at the root adds
-                                         # more, one glob per line.
+                                         # more, one glob per line, but cannot
+                                         # exclude a file a model loader reads
+                                         # (usage-scan.md); only this key can.
+                                         # Exclude here a `.py` file the scanning
+                                         # interpreter cannot decode or parse;
+                                         # otherwise it leaves the run indeterminate.
 
 plugins:                        # optional; which installed plugins a run imports
   mode: allowlist               # all | builtins | allowlist | disabled
@@ -106,7 +111,7 @@ delivery:                       # optional; see "delivery:" below
 |---|---|---|---|
 | `schema_version` | integer | `1` | The profile schema the file was written for. See [Schema version](#schema-version). |
 | `name` | string | `"custom"` | A label for the profile (informational only) |
-| `rules.include` | list of glob patterns | `["*"]` | A rule's `id` must match at least one pattern here to run |
+| `rules.include` | list of glob patterns | `["*"]` | A rule's `id` must match at least one pattern here to run. Every pattern must match at least one registered rule, or the command is refused with exit `3` before any rule runs; see [below](#an-include-pattern-must-match-a-rule). |
 | `rules.exclude` | list of glob patterns | `[]` | A rule's `id` matching any of these is dropped, even if included |
 | `rules.paths` | list of paths | `[]` | Directories (or single files) of custom declarative YAML rules to load, in addition to anything passed via the repeatable `--rules PATH` flag on `scan`/`probe`/`monitor`. A relative path is read beside the profile file, not from the current working directory, like `contracts` and `calibrations`; when it only exists in the working directory, the warning names both paths. A rule file that does not load never aborts the run: it is recorded in `errors`, which leaves the run indeterminate unless `fail_on.fail_on_error` is `false`. So is a directory that holds no `.yaml` or `.yml` file at its top level; rule files in its subdirectories are not read. See [`writing-rules.md`](writing-rules.md). |
 | `plugins.mode` | `all\|builtins\|allowlist\|disabled` | not stated: `builtins` | Which installed plugins every command given this profile imports. See [Plugin trust](#plugin-trust-plugins). |
@@ -121,7 +126,7 @@ delivery:                       # optional; see "delivery:" below
 | `contracts` | list of paths | `[]` | Security contracts to load — files, or directories of `.yaml`/`.yml`. Added to anything passed via the repeatable `--contract PATH` flag. Unlike a malformed *rule* file, a contract that will not load is a hard error: it is your own threat model, and a silently absent one is a gate you think you have. See [`usage-contracts.md`](usage-contracts.md). |
 | `trials` | integer ≥ 1 | `1` | How many independent attempts `probe`, `monitor` and `plan probe` make at each case of a rule that grades a sampled model reply. `--trials N` wins over it. A rule that does not repeat (a protocol check, a `stateful` scenario) makes one attempt whatever this says, and the run records that. Anything other than a whole number of at least 1 is refused at load. See [`usage-probe.md`](usage-probe.md#repeated-trials). |
 | `calibrations` | list of paths | `[]` | Calibration files written by `guardana calibrate --record`. A relative path is read beside the profile file, not from the current working directory; globs are not expanded. A missing listed path stops the run with exit code `3` (`INVALID_USAGE`), and so do two files that both record the same evaluator. A bare string is refused. |
-| `evaluators` | mapping | `{}` | Config blocks for evaluators that need a model of their own, keyed by evaluator id — `llm_judge` and `guard`; any other block name is refused. `probe`, `grade`, `monitor`, `calibrate` and `rule test` build and register them from this block at startup, and `plan` builds them to price their calls without sending any; see the next section. With no block, a rule naming that evaluator is skipped **visibly**, never silently passed. |
+| `evaluators` | mapping | `{}` | Config blocks for evaluators with their own model, keyed by evaluator id: `llm_judge` and `guard`. Other block names are refused. `probe`, `grade`, `monitor`, `calibrate` and `rule test` build and register them from this block at startup. `plan` builds them to price calls without sending any; see the next section. Without a block, a rule naming that evaluator is recorded as a rule error, never silently passed. The default `fail_on_error: true` makes that error fail the gate. |
 | `budgets` | mapping | no ceiling | What a run may spend. See [`budgets:`](#budgets--a-ceiling-on-what-a-run-may-spend). |
 | `privacy` | mapping | `evidence_mode: redacted` | What evidence a run keeps and how it is redacted. See [`privacy.md`](privacy.md). |
 | `delivery.required` | bool | `false` | When `true`, a delivery to the collector or an installed reporter that was not acknowledged ends the command with exit `8`. See [`delivery:`](#delivery). |
@@ -130,7 +135,41 @@ delivery:                       # optional; see "delivery:" below
 the rule's `id`, so namespacing rules (`guardana.*` for built-ins, `acme.*`
 for a company's own) lets one profile mix and match cleanly — see
 [`examples/guardana.yaml`](../examples/guardana.yaml) for a profile that
-includes both.
+includes both. A pattern is a whole id or a glob: `guardana.supply_chain` is not a
+prefix and matches no rule, while `guardana.supply_chain.*` matches the namespace.
+
+### An include pattern must match a rule
+
+Every `rules.include` pattern must match at least one registered rule after all rules
+load: built-in and installed rules, and YAML rules under `rules.paths` and
+`--rules`. Assertions of every contract under `contracts:`, and every contract
+`analyze-trace` receives through `--contract`, also count, regardless of their AI
+system. Only an `analyze-trace` run for that system executes them, but a pattern
+naming one matches on every command. One profile can therefore serve `scan`, `probe`
+and trace runs of each system. A pattern that matches none refuses `scan`, `probe`,
+`grade`, `monitor`, `analyze-trace`, `baseline`, `recipe` and `plan` with exit `3`,
+even when another pattern matches. Refusal precedes any rule execution, anything
+sent and `probe` starting an MCP server:
+
+```text
+error: rules.include contains unmatched patterns: "guardana.supply_chain.code_executon" — check the spelling and registered rules.
+```
+
+Every unmatched pattern is named once, quoted, in profile order. No `fail_on_*`
+setting relaxes this check: a misspelled id would otherwise select only the correctly
+spelled rules and let the run pass. Patterns are checked before
+`rules.exclude`, target kind, safety limits or capabilities narrow the selection.
+A pattern whose rules are all excluded, or all for another target kind, is therefore
+not unmatched. A run left with no rule exits `2` and its plan `3`, as for any selection
+that verifies nothing. The bare `*` default is never unmatched. A plugin pack's rules
+are not registered unless [`plugins:`](#plugin-trust-plugins) admits the pack.
+A pattern naming only those rules is unmatched: admit the pack or remove the pattern.
+`guardana config validate` checks patterns the same way before a run, against rules
+the profile names: built-in and installed rules its `plugins:` trust admits, rules
+under `rules.paths` and assertions of every contract under `contracts:`.
+It cannot see rules loaded only with `--rules` or contracts named only by
+`--contract`; list them under `rules.paths` and `contracts:` to validate them
+([`config validate`](usage-doctor.md)).
 
 ## Plugin trust: `plugins:`
 
@@ -267,8 +306,8 @@ that.
 An unknown block name under `evaluators:`, a key a block does not take, and a block
 that is not a mapping are a `ProfileError` when the profile loads (exit `3`), and a
 profile built in Python is held to the same keys when its judges are wired. A rule
-that names an unconfigured evaluator is skipped visibly in the run summary — the gate
-never quietly weakens.
+that names an unconfigured evaluator records a `RuleLoadError` (`unknown evaluator`)
+error in the run instead of grading — the gate never quietly weakens.
 
 ## Rule-specific configuration
 
@@ -385,9 +424,11 @@ recording) accepts a rate, as it accepts `max_requests`. [`guardana plan
 probe`](usage-plan.md#checking-against-a-budget) states the wall time a rate needs and
 refuses a `max_duration` below it.
 
-A token ceiling is held only while replies report their token counts. The first
-reply that leaves out a count a ceiling depends on stops the run as an exhausted
-budget, exit `6`, because no later request could be measured against it.
+A token ceiling is held only while replies report their token counts. A token count
+below zero is read as not reported, because adding a negative count to the sum would
+let every later request pass the ceiling. The first reply that leaves out a count a
+ceiling depends on stops the run as an exhausted budget, exit `6`, because no later
+request could be measured against it.
 
 **The ceiling belongs to the run, not to a pass of it.** `probe` runs each
 canary-planting rule against a target of its own — the marker has to be in that

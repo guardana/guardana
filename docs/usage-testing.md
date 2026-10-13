@@ -183,8 +183,9 @@ Three things to know:
   the two you have.
 - **Token budgets need a model that reports usage.** When the reply carries
   `usage_metadata` the tokens are counted; when it does not, the count is recorded
-  as unknown rather than zero — so a *token* ceiling over such a model can never
-  fire, while a *request* ceiling always can.
+  as unknown rather than zero. A *token* ceiling over such a model cannot be
+  enforced. The first reply missing the required count stops the run as budget
+  exhausted (exit `6`). A *request* ceiling works as usual.
 
 ## A run your framework already performed
 

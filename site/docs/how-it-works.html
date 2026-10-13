@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -360,7 +364,7 @@ mypack = &quot;mypack:provide_evaluators&quot;
 <p><code>examples/custom_rule/</code> is a third-party package with two plugin rules, three YAML rules, a custom classifier, a custom target, and a custom taxonomy. It registers all four run groups and needs no Guardana changes; <code>examples/output_pack/</code> does the same for an export and a webhook. One plugin rule inspects a GGUF model file using engine parsing, leaving only policy in the rule.</p>
 <hr />
 <h2 id="7-central-monitoring-and-why-the-collector-is-separate">7. Central monitoring, and why the collector is separate</h2>
-<p>A scan, a trace analysis and every report format work offline. A probe or <code>monitor</code> talks to its target, a judge configured under <code>evaluators:</code> to its own endpoint, and <code>--reporter</code> to the collector or to the destination an installed reporter is given; nothing else leaves the machine. For fleet-wide visibility, <code>--reporter server://…</code> forwards normalized findings in a versioned JSON envelope at schema version 8. The envelope includes <code>unverified</code>, so the collector cannot show a false all-clear. Self-hosted <code>guardana-server</code> provides ingest, list, trend, and an opt-in monitoring dashboard, with scoped API-key authentication and PostgreSQL persistence.</p>
+<p>A scan, a trace analysis and every report format work offline. A probe or <code>monitor</code> contacts its target and the authorization metadata advertised by an MCP target requiring authorization (possibly on other hosts). A judge configured under <code>evaluators:</code> contacts its own endpoint. <code>--reporter</code> contacts the collector or the destination given to an installed reporter. Nothing else leaves the machine. For fleet-wide visibility, <code>--reporter server://…</code> forwards normalized findings in a versioned JSON envelope at schema version 8. The envelope includes <code>unverified</code>, so the collector cannot show a false all-clear. Self-hosted <code>guardana-server</code> provides ingest, list, trend, and an opt-in monitoring dashboard, with scoped API-key authentication and PostgreSQL persistence.</p>
 <p><code>guardana-core</code> never imports <code>guardana-server</code>, directly or transitively. An import-linter contract and a test enforce that boundary. The open-source engine runs on its own; the collector is a separate layer.</p>
 <hr />
 <h2 id="8-the-one-invariant-that-matters-most">8. The one invariant that matters most</h2>
@@ -385,7 +389,7 @@ mypack = &quot;mypack:provide_evaluators&quot;
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/how-it-works.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

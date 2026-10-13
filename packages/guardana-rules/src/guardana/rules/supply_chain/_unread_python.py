@@ -17,7 +17,7 @@ def unread_python(
 
     The run also records the file as an error, but `fail_on_error: false` switches that
     off; the shortfall has no switch, so the run stays `indeterminate` either way. A file
-    that is simply not Python is not in `unread_sources` and yields nothing.
+    the target read and parsed is not in `unread_sources` and yields nothing.
     """
     unread = next((u for u in target.unread_sources() if u.path == path), None)
     if unread is None:

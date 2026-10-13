@@ -272,11 +272,15 @@ class ToolCallReply:
     normal here (unlike the text-only path, where no content is a fail-closed
     error), because the tool calls are the signal an agency check grades.
     `usage` is what the provider said the turn cost, or None when it said nothing.
+    `unreadable` says why a call in the reply could not be read, or is None when every
+    one was: `tool_calls` then holds only the readable ones, and what the model asked
+    for in full is unknown, so a reply carrying it is never graded as a pass.
     """
 
     text: str | None
     tool_calls: tuple[ToolCall, ...]
     usage: TokenUsage | None = None
+    unreadable: str | None = None
 
     @property
     def is_silent(self) -> bool:
@@ -617,28 +621,50 @@ def _extract_tool_reply(payload: object, *, ref: str) -> ToolCallReply:
         raise EndpointError(f"unexpected response from {ref}: {payload!r}")
     content = message.get("content")
     raw_calls = message.get("tool_calls")
-    calls = tuple(_parse_tool_call(c) for c in raw_calls) if isinstance(raw_calls, list) else ()
+    if raw_calls is None:
+        raw_calls = []
+    if not isinstance(raw_calls, list):
+        raise UnreadableReply(f"the reply from {ref} carries tool_calls that are not a list")
+    calls: list[ToolCall] = []
+    problems: list[str] = []
+    for position, raw in enumerate(raw_calls, start=1):
+        parsed = _parse_tool_call(raw)
+        if isinstance(parsed, ToolCall):
+            calls.append(parsed)
+        else:
+            problems.append(f"tool call {position} {parsed}")
     return ToolCallReply(
         text=content if isinstance(content, str) else None,
-        tool_calls=tuple(c for c in calls if c is not None),
+        tool_calls=tuple(calls),
+        unreadable=f"the reply from {ref} carries {problems[0]}" if problems else None,
     )
 
 
-def _parse_tool_call(raw: object) -> ToolCall | None:
-    """Parse one OpenAI tool-call object, or None if its shape is unusable."""
-    if not isinstance(raw, dict):
-        return None
-    function = raw.get("function")
-    if not isinstance(function, dict):
-        return None
-    name = function.get("name")
-    if not isinstance(name, str):
-        return None
+def _parse_tool_call(raw: object) -> ToolCall | str:
+    """Parse one OpenAI tool-call object, or say why it cannot be read whole.
+
+    Arguments sent as a JSON object instead of the string the format defines are kept as
+    their canonical JSON text, which is what is graded and what is sent back: a call
+    dropped or emptied here would be graded as a call that carried nothing.
+    """
+    function = raw.get("function") if isinstance(raw, dict) else None
+    name = function.get("name") if isinstance(function, dict) else None
+    if not isinstance(raw, dict) or not isinstance(function, dict) or not isinstance(name, str):
+        return "with no readable function name"
     arguments = function.get("arguments")
+    if isinstance(arguments, dict):
+        arguments = json.dumps(arguments, sort_keys=True, ensure_ascii=False)
+    elif arguments is None:
+        arguments = ""
+    elif not isinstance(arguments, str):
+        return (
+            f"whose arguments are a {type(arguments).__name__}, neither the JSON text nor "
+            f"the object a call carries"
+        )
     call_id = raw.get("id")
     return ToolCall(
         name=name,
-        arguments=arguments if isinstance(arguments, str) else "",
+        arguments=arguments,
         id=call_id if isinstance(call_id, str) else "",
     )
 

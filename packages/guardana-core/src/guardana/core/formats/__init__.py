@@ -27,12 +27,20 @@ Every reader in this package honours the same four promises:
 
 from guardana.core.formats.errors import FormatError
 from guardana.core.formats.gguf import GgufMetadata, GgufValue, read_gguf_metadata
+from guardana.core.formats.hdf5 import (
+    HDF5_HEAD_BYTES,
+    HDF5_SIGNATURE,
+    find_hdf5_signature,
+    find_hdf5_signature_in_head,
+)
 from guardana.core.formats.limits import DEFAULT_LIMITS, Limits
 from guardana.core.formats.onnx import STANDARD_ONNX_DOMAINS, OnnxSummary, read_onnx_summary
 from guardana.core.formats.safetensors import SafetensorsHeader, read_safetensors_header
 
 __all__ = [
     "DEFAULT_LIMITS",
+    "HDF5_HEAD_BYTES",
+    "HDF5_SIGNATURE",
     "STANDARD_ONNX_DOMAINS",
     "FormatError",
     "GgufMetadata",
@@ -40,6 +48,8 @@ __all__ = [
     "Limits",
     "OnnxSummary",
     "SafetensorsHeader",
+    "find_hdf5_signature",
+    "find_hdf5_signature_in_head",
     "read_gguf_metadata",
     "read_onnx_summary",
     "read_safetensors_header",

@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html" aria-current="page">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html" aria-current="page">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -212,9 +216,10 @@ waivers:
     approved_by: security@example.com
     expires: 2026-12-31
 </code></pre>
-<p><strong>A generated baseline is deliberately not usable as-is.</strong> Every waiver carries
-placeholder text for the reason and the approver, and <code>verify</code> fails while it is
-still there. A baseline nobody edited is a list of findings somebody silenced in a
+<p><strong>A generated baseline waives its findings as soon as a scan reads it and states
+that it is unreviewed.</strong> Every waiver has placeholder text for its reason and
+approver. <code>scan</code> warns about each such waiver; <code>verify</code> fails while the text
+remains. Gate on <code>guardana baseline verify</code> to require review. An unedited baseline lists findings somebody silenced in a
 hurry, and it should look like one.</p>
 <h2 id="flags">Flags</h2>
 <p><code>create</code> and <code>update</code> both run a scan, so both take the same plugin-trust flags
@@ -232,6 +237,21 @@ hurry, and it should look like one.</p>
 <td><code>PATH</code> (positional)</td>
 <td>—</td>
 <td>Directory to scan; required unless <code>--target</code> is used</td>
+</tr>
+<tr>
+<td><code>--file PATH</code></td>
+<td><code>guardana-baseline.yaml</code></td>
+<td>The baseline to refresh (<code>update</code> only; <code>create</code> writes with <code>--output</code>)</td>
+</tr>
+<tr>
+<td><code>--profile PATH</code></td>
+<td>none (built-in default profile)</td>
+<td>Path to a <code>guardana.yaml</code> policy file</td>
+</tr>
+<tr>
+<td><code>--preset [ci|pre-training|monitor|release]</code></td>
+<td>none</td>
+<td>Named policy preset (mutually exclusive with <code>--profile</code>) — see <a href="profiles.html#named-presets---preset"><code>profiles.md</code></a></td>
 </tr>
 <tr>
 <td><code>--target SCHEME://LOCATOR</code></td>
@@ -321,7 +341,7 @@ unreadable baseline.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-baseline.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

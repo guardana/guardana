@@ -85,6 +85,6 @@ def test_verify_true_is_not_flagged(tmp_path: Path) -> None:
     assert _findings(tmp_path) == []
 
 
-def test_does_not_crash_on_a_syntax_error(tmp_path: Path) -> None:
+def test_a_syntax_error_is_declined_as_not_scanned(tmp_path: Path) -> None:
     (tmp_path / "broken.py").write_text("def (:\n", encoding="utf-8")
-    assert _findings(tmp_path) == []
+    assert [s.split(":")[0] for _, s in _findings(tmp_path)] == ["Python file not scanned"]

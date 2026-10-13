@@ -139,9 +139,17 @@ def test_a_keyboard_interrupt_is_not_swallowed() -> None:
         _run(_rule("guardana.interrupted", raises=KeyboardInterrupt()))
 
 
-def test_a_system_exit_is_not_swallowed() -> None:
-    with pytest.raises(SystemExit):
-        _run(_rule("guardana.exiting", raises=SystemExit(2)))
+@pytest.mark.parametrize("code", [0, 2])
+def test_a_rule_calling_sys_exit_is_a_rule_error_not_the_end_of_the_run(code: int) -> None:
+    # `sys.exit()` inside a rule (argparse `--help`, a stray script entry point) must
+    # not end the command with exit 0 and no report.
+    result, failed = _run(
+        _rule("guardana.exiting", raises=SystemExit(code)), _rule("guardana.after")
+    )
+    assert [e.source for e in result.errors] == ["guardana.exiting"]
+    assert "SystemExit" in result.errors[0].reason
+    assert "guardana.after" in result.rules_run
+    assert failed
 
 
 def test_fail_on_error_false_restores_a_green_build() -> None:

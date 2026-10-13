@@ -48,10 +48,10 @@ def test_src_layout_package_treated_as_local(tmp_path: Path) -> None:
     assert any("totally_fake_zzz" in s for s in flagged)
 
 
-def test_non_utf8_file_skipped_without_raising(tmp_path: Path) -> None:
+def test_an_undecodable_file_is_declined_as_not_scanned(tmp_path: Path) -> None:
     (tmp_path / "bad.py").write_bytes(b"\xff\xfe\x00invalid utf-8\x80\x81")
     findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
-    assert findings == []
+    assert [f.title for f in findings] == ["Python file not scanned"]
 
 
 def test_curated_real_distribution_not_flagged(tmp_path: Path) -> None:

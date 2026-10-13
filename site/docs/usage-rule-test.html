@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -198,10 +202,13 @@
 </details>
 <main>
 <h1><code>guardana rule test</code> — a rule's own samples, run as a command</h1><p class="lede"><code>guardana rule test</code>: a rule's positive, negative and <strong>inconclusive</strong> fixtures, run as a command</p><p><code>guardana rule test</code> checks positive, negative, and inconclusive samples when you need to verify a rule's classifications.</p>
-<pre><code class="language-bash">guardana rule test 'acme.*'
+<pre><code class="language-bash">guardana rule test 'acme.*' --plugins allowlist --allow-plugin acme-guardana-rules
 </code></pre>
 <pre><code>5 rule(s); 15 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
 </code></pre>
+<p>That is the output for <a href="https://github.com/guardana/guardana/blob/main/examples/custom_rule/README.md"><code>examples/custom_rule</code></a>, installed as
+the distribution <code>acme-guardana-rules</code>. Every command starts with only Guardana's own
+distributions, so an installed pack is admitted by name.</p>
 <p>Scripted fixtures send nothing over the network. They test classification, but cannot show whether prompts or tool results carry an attack.</p>
 <h2 id="declaring-fixtures-in-a-yaml-rule">Declaring fixtures in a YAML rule</h2>
 <pre><code class="language-yaml">id: acme.demo.canary
@@ -477,9 +484,13 @@ through: an escape hatch that hid its own effect would be worse than none.</p>
 <h2 id="turning-fixtures-into-a-labelled-corpus">Turning fixtures into a labelled corpus</h2>
 <p>A fixture set, once run, <em>is</em> a labelled corpus — so an evaluator author gets one
 without hand-writing it:</p>
-<pre><code class="language-bash">guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl
-guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl
+<pre><code class="language-bash">guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
+guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
 </code></pre>
+<p><code>examples/custom_rule</code> installs the evaluator <code>acme.strict_refusal</code>. A rule under
+<code>./my-rules/</code> that uses it for grading needs the same distribution admitted.</p>
 <p><code>finding</code> becomes <code>attack_succeeded: true</code>, <code>clean</code> becomes <code>false</code>, and
 <strong><code>inconclusive</code> is left out and counted</strong>: calibration measures a judge's
 confidence against a known outcome, and a sample whose outcome is undecidable has
@@ -538,7 +549,7 @@ gate lists it as exempt with the reason it can never decline.</p>
 </tr>
 <tr>
 <td><code>--plugins</code>, <code>--allow-plugin</code></td>
-<td>the usual plugin-trust controls; <code>builtins</code> unless the flag or the profile's <code>plugins:</code> says otherwise. While an installed pack is refused, every selector exits <code>2</code>, so a pack author admits their own distribution: <code>--plugins allowlist --allow-plugin &lt;distribution&gt;</code></td>
+<td>the usual plugin-trust controls; <code>builtins</code> unless the flag or the profile's <code>plugins:</code> says otherwise. While an installed pack is refused, a selector that matches only its rules, such as <code>'acme.*'</code>, matches nothing and exits <code>3</code>; a selector that matches admitted rules exits <code>2</code> when a refused pack or a rule that failed to load leaves a gap. A pack author admits their own distribution: <code>--plugins allowlist --allow-plugin &lt;distribution&gt;</code></td>
 </tr>
 </tbody>
 </table></div>
@@ -546,7 +557,7 @@ gate lists it as exempt with the reason it can never decline.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-rule-test.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

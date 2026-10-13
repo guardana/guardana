@@ -82,3 +82,10 @@ def test_an_unreadable_model_card_is_unverified_not_clean(tmp_path: Path) -> Non
     findings = list(ProvenanceRule().run(ArtifactTarget(tmp_path), RuleContext()))
 
     assert [f.title for f in findings] == ["Model card not scanned"]
+
+
+def test_an_unparseable_loader_is_declined_as_not_scanned(tmp_path: Path) -> None:
+    (tmp_path / "load.py").write_text("def (:\n", encoding="utf-8")
+    findings = list(ProvenanceRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.title for f in findings] == ["Python file not scanned"]
+    assert [f.verdict.outcome if f.verdict else None for f in findings] == ["inconclusive"]

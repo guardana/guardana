@@ -26,7 +26,13 @@ from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import NotOffered, Rule, RuleContext, RuleError
 from guardana.core.rule.trajectory_rule import TrajectoryRule
-from guardana.core.target import Capability, EndpointTarget, SeededTarget, TargetKind
+from guardana.core.target import (
+    MAX_LISTING_PAGES,
+    Capability,
+    EndpointTarget,
+    SeededTarget,
+    TargetKind,
+)
 from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply, ToolSpec
 from guardana.core.testing.seeded import SeededApplication, seeded_target
 from guardana.core.trajectory import MAX_STEPS_CEILING
@@ -350,9 +356,10 @@ def test_an_mcp_probe_has_a_knowable_ceiling_and_actually_spends_far_less() -> N
     # run spends a fraction of it. The ceiling stays honest — it is an upper bound —
     # and this pins how loose it is allowed to get. Every accepted handshake is
     # followed by a metered `notifications/initialized`, which every rule that may
-    # open a session counts once more.
+    # open a session counts once more, and every rule reading the tool listing counts
+    # each page a server may name.
     ceiling = sum(r.estimated_requests or 0 for r in _mcp_rules())
-    assert ceiling <= 82, (
+    assert ceiling <= 118, (
         f"a full MCP probe can cost {ceiling} requests, which is too many to default to"
     )
 
@@ -369,6 +376,10 @@ def test_an_mcp_probe_has_a_knowable_ceiling_and_actually_spends_far_less() -> N
 _MCP_URL = "https://93.184.215.14/mcp"
 _MODERN = "2026-07-28"
 _LEGACY = "2025-11-25"
+_LONGEST_LISTING = [
+    [{"name": f"t{page}", "description": "reads"}] for page in range(MAX_LISTING_PAGES)
+]
+"""A listing with exactly as many pages as a run reads, the longest a rule pays for."""
 
 
 def _mcp_server(**era: object) -> "ScriptedMcpServer":
@@ -411,8 +422,19 @@ def _mcp_target(server: "ScriptedMcpServer") -> "McpServerTarget":
         {"protocol_versions": [_MODERN]},
         {"protocol_versions": [_MODERN, _LEGACY]},
         {"protocol_versions": [_MODERN, _LEGACY], "discovers": [_MODERN]},
+        {"tool_pages": _LONGEST_LISTING},
+        {"tool_pages": _LONGEST_LISTING, "protocol_versions": [_MODERN, _LEGACY]},
+        {"tool_pages": _LONGEST_LISTING, "expire_session_on_page": MAX_LISTING_PAGES - 1},
     ],
-    ids=["legacy", "modern-only", "dual-era", "dual-era-listing-only-modern"],
+    ids=[
+        "legacy",
+        "modern-only",
+        "dual-era",
+        "dual-era-listing-only-modern",
+        "legacy-longest-listing",
+        "dual-era-longest-listing",
+        "legacy-longest-listing-with-a-session-reopened",
+    ],
 )
 def test_no_mcp_rule_spends_more_than_it_declared(era: dict[str, object]) -> None:
     for rule in _mcp_rules():
@@ -482,20 +504,31 @@ def test_no_a2a_rule_grades_with_an_evaluator() -> None:
         assert not tally, rule.meta.id
 
 
-def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
+def test_the_mcp_rule_declares_the_longest_listing_it_reads() -> None:
     """Measured against the target it is written for, not against a chat endpoint."""
     from collections.abc import Mapping  # noqa: PLC0415
+    from http.client import HTTPMessage  # noqa: PLC0415
 
+    from guardana.core.target._mcp_client import SessionExpired  # noqa: PLC0415
     from guardana.core.target.mcp import McpServerTarget  # noqa: PLC0415
 
     class _Manifest:
+        expired = False
+
         def speak(self, wire: object) -> None:
             pass
 
         def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
             if method == "initialize":
                 return {"protocolVersion": "2025-11-25"}
-            return {"tools": [{"name": "read", "description": "reads a file"}]}
+            page = int(str(params.get("cursor", "1")))
+            if page == MAX_LISTING_PAGES and not self.expired:
+                self.expired = True
+                raise SessionExpired("http://mcp", 404, "Not Found", HTTPMessage(), None)
+            listed: dict[str, object] = {"tools": [{"name": f"read{page}", "description": "r"}]}
+            if page < MAX_LISTING_PAGES:
+                listed["nextCursor"] = str(page + 1)
+            return listed
 
         def notify(self, method: str) -> None:
             pass

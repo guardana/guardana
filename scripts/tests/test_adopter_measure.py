@@ -14,6 +14,7 @@ from guardana.core.manifest.records import RecipeRecord, SubjectSource
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.result import ScanResult
+from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from guardana.core.report.serialize import run_to_dict
 from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.severity import Severity
@@ -129,7 +130,9 @@ def test_a_locked_application_run_becomes_one_row_of_counts(
     code = measure.main(["row", str(run), "--team", "T1", "--consent", "yes"])
 
     assert code == 0
-    assert capsys.readouterr().out == f"T1,{_RUN_ID},0.0.0-test,17,7,1,5,2,yes\n"
+    assert capsys.readouterr().out == (
+        f"T1,{_RUN_ID},0.0.0-test,{REPORT_SCHEMA_VERSION},7,1,5,2,yes\n"
+    )
 
 
 def test_the_row_carries_counts_never_content(tmp_path: Path) -> None:

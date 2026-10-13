@@ -42,8 +42,9 @@ class McpTaskIdentityRule(McpAuthorizationRule):
     a credential (`--mcp-token-env`). On an open server an empty listing leaves the ids
     ungraded and says so. A
     server that declares no tasks and answers `tasks/list` as an unknown method has none
-    to grade, which the run records as not offered. The listing is one page; ids are
-    read in memory and never written, and evidence holds only counts.
+    to grade, which the run records as not offered. The listing is one page, and an
+    empty one naming a further page is inconclusive; ids are read in memory and never
+    written, and evidence holds only counts.
     """
 
     meta = RuleMeta(
@@ -156,6 +157,14 @@ class McpTaskIdentityRule(McpAuthorizationRule):
     def _answered(self, view: McpAuthorizationView, tasks: Tasks) -> Iterator[Finding]:
         open_server = view.anonymous.open_to_anyone
         if tasks.count == 0:
+            if tasks.more:
+                yield self.unverified(
+                    view,
+                    "the first page of the listing shows no task to a caller without a "
+                    "credential and names a further page, which guardana does not read, so "
+                    "what that caller is shown is unknown",
+                )
+                return
             if open_server:
                 yield self.unverified(
                     view,

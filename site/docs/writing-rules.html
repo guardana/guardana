@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -286,8 +290,8 @@ expect:
 <tr>
 <td><code>target_kind</code></td>
 <td>yes</td>
-<td><code>artifact|endpoint</code></td>
-<td>Which <code>Target</code> kind this rule runs against. YAML rules only ever run against <code>endpoint</code> today (<code>YamlRule.run</code> returns immediately if the target isn't an <code>EndpointTarget</code>) — static artifact checks are currently authored as Python plugins (see Path 2).</td>
+<td><code>endpoint</code></td>
+<td>The only value a YAML rule accepts; any other is refused at load. The rule sends its prompts through the target's <code>ChatEndpoint</code> surface, and a target without it is an error of the rule, never a silent pass. Artifact checks are Python plugins (see Path 2).</td>
 </tr>
 <tr>
 <td><code>taxonomy</code></td>
@@ -299,7 +303,7 @@ expect:
 <td><code>evaluator</code></td>
 <td>yes</td>
 <td>string</td>
-<td>The evaluator id this rule's prompts are graded with, e.g. <code>keyword</code>, <code>canary</code>, or an evaluator your own package registers, e.g. <code>acme.severity_classifier</code>. A rule using <code>canary</code> must set <code>expect.canary</code>, and one using <code>llm_judge</code> must set <code>expect.goal</code> — the loader rejects it otherwise. <code>llm_judge</code> and <code>guard</code> also need an <code>evaluators:</code> block in <code>guardana.yaml</code> telling Guardana where their model lives (see <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>); without it, the rule is skipped visibly.</td>
+<td>The evaluator id this rule's prompts are graded with, e.g. <code>keyword</code>, <code>canary</code>, or an evaluator your own package registers, e.g. <code>acme.severity_classifier</code>. A rule using <code>canary</code> must set <code>expect.canary</code>, and one using <code>llm_judge</code> must set <code>expect.goal</code> — the loader rejects it otherwise. <code>llm_judge</code> and <code>guard</code> also need an <code>evaluators:</code> block in <code>guardana.yaml</code> telling Guardana where their model lives (see <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>); without it, the rule's run records a <code>RuleLoadError</code> (<code>unknown evaluator</code>) error instead of grading. <code>fail_on_error</code> (on by default) counts that error against the gate.</td>
 </tr>
 <tr>
 <td><code>requires</code></td>
@@ -363,8 +367,8 @@ a <code>Verdict</code> against the rule's <code>Expectation</code>. A <code>&quo
 <code>Finding</code>; an <code>&quot;inconclusive&quot;</code> verdict (the evaluator could not actually
 grade — say, an empty reply) is routed to the result's <code>unverified</code> channel
 instead of being dropped; only a real <code>&quot;pass&quot;</code> yields nothing. An evaluator
-id that resolves to nothing is a loud error (a visible skip), never a rule
-that silently passes everything.</p>
+id that resolves to nothing is a loud error recorded in the run's <code>errors</code>, never a
+rule that silently passes everything.</p>
 <p>When the target reports reply metadata (an adapter's <code>metadata_paths:</code>), the rule asks
 through <code>chat_reply</code> and the <code>Exchange</code> carries it in <code>meta</code>. A request the application
 declines (an adapter's <code>declines:</code>) is graded rather than raised: the exchange ends on the
@@ -608,14 +612,16 @@ nothing reads as a clean server.</p>
 <h3 id="shipping-a-yaml-rule">Shipping a YAML rule</h3>
 <p>Three ways, all real:</p>
 <ol>
-<li><strong>Point the CLI at a rules directory you maintain</strong> (e.g. a private repo
-checked out in CI) — no packaging at all. Pass the repeatable
-<code>--rules PATH</code> flag on <code>scan</code>, <code>probe</code>, or <code>monitor</code>, or set
-<code>rules.paths: [&quot;./team-rules&quot;]</code> in your <code>guardana.yaml</code> (see
-<a href="profiles.html"><code>profiles.md</code></a>); the two are combined. A path may be a
-directory (every <code>*.yaml</code>/<code>*.yml</code> in it loads) or a single file. A
-malformed rule file is reported as a warning and skipped — it never
-aborts the run.</li>
+<li><strong>Point the CLI at a rules directory you maintain</strong> (e.g. a private repo checked out in CI).
+This needs no packaging. Pass the repeatable <code>--rules PATH</code> flag on <code>scan</code>, <code>probe</code>, or
+<code>monitor</code>, or set <code>rules.paths: [&quot;./team-rules&quot;]</code> in your <code>guardana.yaml</code> (see
+<a href="profiles.html"><code>profiles.md</code></a>); the two are combined. A path may be a directory (every
+<code>*.yaml</code>/<code>*.yml</code> in it loads) or a single file. A malformed rule file produces a warning,
+and the other rules still run. It is not a skip: the run records it among its <code>errors</code> at
+stage <code>load</code>. Under the default <code>fail_on_error</code>, the run is <code>indeterminate</code> unless a finding
+fails it. If a <code>rules.include</code> pattern then matches no rule because the rule it named did
+not load, the command is refused before anything runs
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).</li>
 <li><strong>Bundle it in your package and expose it via <code>provide_rules()</code></strong> — this
 is how <code>guardana-rules</code> itself ships its catalog:
 <a href="https://github.com/guardana/guardana/blob/main/packages/guardana-rules/src/guardana/rules/__init__.py"><code>packages/guardana-rules/src/guardana/rules/__init__.py</code></a>
@@ -629,34 +635,32 @@ the identical pattern for its own YAML rule.</li>
 then hand the resulting rules to a <code>Registry</code>.</li>
 </ol>
 <h2 id="path-2-python-plugin-when-yaml-cant-express-the-logic">Path 2: Python plugin (when YAML can't express the logic)</h2>
-<p>Use this for custom parsers, stateful probes, or any check against an
-<strong>artifact</strong> target. Of the 58 built-in rules, 19 are build-time (artifact-kind)
-Python plugins — pickle opcodes (incl. ZIP-archive recursion), model format,
-chat-template code-execution gadgets, risky ONNX graph constructs, Keras
-Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk, remote-code
-(<code>trust_remote_code</code>/<code>torch.hub.load</code>) and its config form (<code>auto_map</code>), code
-execution (<code>eval</code>/<code>exec</code>/<code>os.system</code>/<code>shell=True</code>), notebook payloads, insecure
-transport (<code>verify=False</code>/plaintext HTTP), known-malicious dependencies, MCP
-tool-poisoning, hidden-instruction rules-file backdoors, training-data
-integrity, hallucinated packages, provenance, hardcoded secrets — since they
-need real parsing logic, not a prompt corpus. (The hallucinated-package rule
-reads <code>import</code>/<code>from</code> statements in <code>.py</code> files and checks each name against the
-dependencies the repository declares in <code>requirements*.txt</code> and <code>pyproject.toml</code>,
-so a declared package is not reported.) The rest are dynamic endpoint rules. The
-YAML ones are single-turn (injection, jailbreak, system-prompt-leak,
-unbounded-consumption, cost-asymmetry, and agent-scoped checks for credential
-exfiltration, memory poisoning, tool-argument scope, tool-result injection, and
-hidden context in a tool schema) or scenarios (gradual jailbreak and
-indirect/RAG injection). The others need real logic and are Python plugins like
-this one but endpoint-kind: <code>output.secrets</code>, the tool-calling
-<code>agent.excessive_tool_use</code> (see the note below), <code>agent.mcp_server_manifest</code>,
-the <code>mcp.*</code> checks (the MCP authorization surface — session binding, token
-audience, scope breadth, and others), and the <code>trace.*</code> checks (graded from a
-recorded <code>Trace</code> rather than a live chat — credential passthrough, identity
-disagreement, cross-tenant retrieval, and others), and the two checks a
-<a href="usage-fixtures.html">fixtures file</a> brings, <code>tenancy.cross_tenant_answer</code> and
-<code>retrieval.poisoned_document</code>. The <a href="generated/rule-summary.html">rule summary</a> counts them by
-surface and kind.</p>
+<p>Use this for custom parsers, stateful probes, or any check against an <strong>artifact</strong> target.
+Of the 58 built-in rules, 19 are build-time (artifact-kind) Python plugins: pickle opcodes
+(including ZIP-archive recursion), model format, chat-template code-execution gadgets, risky
+ONNX graph constructs, Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency
+risk, remote-code (<code>trust_remote_code</code>/<code>torch.hub.load</code>) and its config form (<code>auto_map</code>), code
+execution (<code>eval</code>/<code>exec</code>/<code>os.system</code>/<code>shell=True</code>), notebook payloads, insecure transport
+(<code>verify=False</code>/plaintext HTTP), known-malicious dependencies, MCP tool-poisoning,
+hidden-instruction rules-file backdoors, training-data integrity, hallucinated packages,
+provenance, and hardcoded secrets. These need real parsing logic rather than a prompt corpus.
+The hallucinated-package rule reads <code>import</code>/<code>from</code> statements in <code>.py</code> files and checks each
+name against the dependencies the repository declares in <code>requirements*.txt</code> and
+<code>pyproject.toml</code>, so a declared package is not reported. The rest are runtime rules: dynamic
+endpoint rules and trace rules graded from a recorded execution. The YAML rules are
+single-turn (injection, jailbreak, system-prompt-leak, unbounded-consumption, cost-asymmetry,
+and agent-scoped checks for credential exfiltration, memory poisoning, tool-argument scope,
+tool-result injection, and hidden context in a tool schema) or scenarios (gradual jailbreak
+and indirect/RAG injection). The other endpoint rules need real logic and are Python plugins
+like this one: <code>output.secrets</code>, the tool-calling <code>agent.excessive_tool_use</code> (see the note
+below), <code>agent.mcp_server_manifest</code>, the <code>mcp.*</code> checks (the MCP authorization surface — session
+binding, token audience, scope breadth, and others), and the two checks supplied by a
+<a href="usage-fixtures.html">fixtures file</a>, <code>tenancy.cross_tenant_answer</code> and
+<code>retrieval.poisoned_document</code>. The <code>trace.*</code> checks are Python plugins of the trace kind. They
+are graded from a recorded <code>Trace</code> rather than a live chat (credential passthrough, identity
+disagreement, cross-tenant retrieval, and others) and run under
+<a href="usage-analyze-trace.html"><code>guardana analyze-trace</code></a>. The
+<a href="generated/rule-summary.html">rule summary</a> counts them by surface and kind.</p>
 <p>Subclass <code>Rule</code>, set <code>meta</code> to a <code>RuleMeta</code>, implement <code>run</code>:</p>
 <pre><code class="language-python">from collections.abc import Iterable
 
@@ -741,7 +745,7 @@ whatever the profile selects, unless <code>not_applicable_to</code> says it has 
 every rule over the same tree, so a rule that reads and parses a file for itself
 multiplies the cost of the whole scan by the number of rules:</p>
 <pre><code class="language-python">for path in target.iter_files((&quot;.py&quot;,)):
-    source = target.python_source(path)   # read, parsed and indexed once per scan
+    source = target.python_source(path)   # parsed once per scan while it fits the cache
     if source is None:
         continue                          # unreadable or unparseable — not &quot;clean&quot;
     for node in source.nodes(ast.Call):   # no ast.walk: the index is already built
@@ -749,14 +753,13 @@ multiplies the cost of the whole scan by the number of rules:</p>
 </code></pre>
 <p><code>PythonSource</code> gives you <code>text</code>, <code>tree</code>, and <code>nodes(&lt;node type&gt;)</code> in document
 order (<a href="https://github.com/guardana/guardana/blob/main/packages/guardana-core/src/guardana/core/source.py"><code>guardana.core.source</code></a>).</p>
-<p><code>None</code> means there is no tree, and the engine has already dealt with the half of
-that which matters: a file the scan was <em>prevented</em> from reading — too large, not
-a regular file, unopenable — is recorded by the target and surfaces in the run's
-<code>errors</code>, so it fails the gate rather than disappearing. A file that is simply
-not runnable Python (invalid syntax, undecodable bytes) stays quiet, because a
-rule looking for Python constructs has nothing to find there. Call
-<code>read_source()</code> instead of <code>python_source()</code> if your rule wants that distinction
-in its own hands — it returns <code>PythonSource | UnreadSource | None</code>.</p>
+<p><code>None</code> means there is no tree, and the engine has already recorded why: a file
+that is too large, not a regular file, unopenable, undecodable or not parseable
+by the scanning interpreter surfaces in the run's <code>errors</code>, so it fails the gate
+rather than disappearing. Bytes are decoded the way the interpreter runs them, so
+a UTF-8 byte order mark or a PEP 263 coding line is honoured. Call <code>read_source()</code>
+instead of <code>python_source()</code> if your rule wants the reason in its own hands — it
+returns <code>PythonSource | UnreadSource</code>.</p>
 <p><strong>Worth copying as a pattern:</strong> the AST-based supply-chain rules are written to
 be read. Each is one short file that pulls its nodes off the shared index,
 yields <code>(line, why)</code> tuples from a small module-level <code>_sinks</code> helper, and
@@ -807,6 +810,9 @@ the point: without them there is no denominator, and three findings out of four
 prompts reads exactly like three out of four hundred. <code>guardana diff</code> pairs the
 two runs case by case and refuses to compare a case whose assessor or dataset
 changed.</p>
+<p><code>case_id_for</code>, <code>from_verdict</code> and <code>grade</code> are outside the
+<a href="compatibility.html#the-supported-surface">supported surface</a>. A pack that imports them pins the
+exact <code>guardana-core</code> version it was tested with.</p>
 <p>Recording is optional, and staying silent is not a failure. A rule that reads a
 file and finds nothing has not <em>measured</em> anything; inventing an assessment for it
 would put hundreds of empty passes into the denominator of every rate.</p>
@@ -840,8 +846,10 @@ rule throws, records it in the result's <code>errors</code> channel with your ru
 exception, and carries on with the other rules — but the gate <strong>fails</strong> on it by
 default, because a check that did not run must never read as a check that passed.
 Findings you already yielded before raising are kept.</p>
-<p>Two exceptions to that. <code>KeyboardInterrupt</code> and <code>SystemExit</code> are deliberately not
-caught, so Ctrl-C still works. And raising <code>RuleLoadError</code> means &quot;I could not be
+<p>Two exceptions to that. <code>KeyboardInterrupt</code> is deliberately not caught, so Ctrl-C
+still works; <code>SystemExit</code> (a <code>sys.exit()</code> or an argparse <code>--help</code> inside your rule) is
+recorded as your rule's error like any other exception, never as the end of the run, at
+any <code>--concurrency</code>. And raising <code>RuleLoadError</code> means &quot;I could not be
 resolved for this run&quot; — a missing evaluator, say. That is a configuration state
 rather than a defect in your code, and it is still recorded in <code>errors</code>: a check
 that could not be resolved did not run.</p>
@@ -944,11 +952,13 @@ payload = &quot;{{ lipsum.__globals__['os'].popen('id').read() }}&quot;
 it. A rule that silently skips a file it failed to read is reporting &quot;clean&quot; about
 something it never looked at, which is the one failure mode this project treats as
 unacceptable.</p>
-<p>The parsing itself is not your job: <code>guardana.core.formats</code> ships bounded,
-fail-closed readers for GGUF, safetensors and ONNX, and its contract is in
-<a href="model-formats.html"><code>model-formats.md</code></a>.
+<p>You do not need to write the parsing code: <code>guardana.core.formats</code> provides bounded,
+fail-closed readers for GGUF, safetensors and ONNX. Its contract is in
+<a href="model-formats.html"><code>model-formats.md</code></a>. The readers are outside the
+<a href="compatibility.html#the-supported-surface">supported surface</a>. A pack that imports them pins the
+exact <code>guardana-core</code> version it was tested with.
 <a href="https://github.com/guardana/guardana/blob/main/examples/custom_rule/src/acme_rules/approved_model.py"><code>examples/custom_rule/src/acme_rules/approved_model.py</code></a>
-is a complete rule built that way — every line of it is policy.</p>
+is a complete rule built this way; every line of it is policy.</p>
 <h2 id="reporting-what-a-request-cost-optional">Reporting what a request cost (optional)</h2>
 <p>A transport can tell Guardana how many tokens a request used, which is what fills
 in <code>usage</code> in the run manifest and what a token budget is enforced against. It is
@@ -981,7 +991,7 @@ would then be enforced against the guess.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/writing-rules.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

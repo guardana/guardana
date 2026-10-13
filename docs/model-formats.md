@@ -33,9 +33,9 @@ Every reader in the package makes the same four promises.
 | Promise | What it means for you |
 |---|---|
 | **Offline** | It reads the one file it was given. No network, ever. |
-| **Bounded** | Sizes claimed *inside* a file are checked against `Limits` before anything is allocated. A header claiming 2⁶⁴ entries costs a `FormatError`, not the scan. |
+| **Bounded** | Every reader enforces the `Limits` you pass. [The table under Limits](#limits) lists what each bound covers in each reader. Sizes claimed *inside* a file are checked before anything is allocated. A header claiming 2⁶⁴ entries raises `FormatError` instead of exhausting the scan. |
 | **Deterministic** | Same bytes, same result, on every platform and locale. |
-| **Fail-closed** | Anything it cannot parse raises `FormatError`. A reader never returns "empty" to mean "clean". |
+| **Fail-closed** | Anything it cannot parse raises `FormatError`. The ONNX reader can also return a partial summary with `truncated` set at its budget or nesting-depth limit (see the ONNX section below). Treat that as incomplete coverage. A reader never returns "empty" to mean "clean". |
 
 And one non-promise, which is the point: **a reader returns data, never a
 verdict.** It has no opinion about whether what it found is dangerous. That is
@@ -65,6 +65,10 @@ class GgufMetadata:
 `text()` is the safe accessor: it returns `None` when the key is absent *or* is
 not a string, so a rule never has to type-check an entry itself.
 
+Versions 2 and 3 are supported; any other version raises `FormatError`. Version 1
+uses a different layout, and later versions may too. The version 3 layout would
+misread every offset after the header in either case.
+
 ### safetensors — `read_safetensors_header(path, *, limits=DEFAULT_LIMITS) -> SafetensorsHeader`
 
 ```python
@@ -79,6 +83,13 @@ class SafetensorsHeader:
 separated from the tensor index rather than left mixed in with it. A non-string
 value is serialised rather than dropped — a writer smuggling a structure in
 there is exactly what a scanner needs to see.
+
+The header must describe the payload exactly. Every tensor entry must specify a
+format-defined `dtype`, a `shape` list of non-negative integers, and `data_offsets`
+inside the payload. The product of its `shape` dimensions times the dtype's width
+must equal its `data_offsets` range length. The ranges must cover every payload byte
+exactly once, with no overlaps, gaps or undeclared trailing bytes. A violation raises
+`FormatError("malformed safetensors header: ...")`, naming the tensor when there is one.
 
 ### ONNX — `read_onnx_summary(path, *, limits=DEFAULT_LIMITS) -> OnnxSummary`
 
@@ -95,19 +106,35 @@ class OnnxSummary:
 
 The graph is walked straight off disk by a dependency-free streaming protobuf
 reader that seeks past tensor payloads, so summarising a multi-gigabyte model
-reads kilobytes. `STANDARD_ONNX_DOMAINS` is exported alongside it: anything else
-in `node_domains` means the runtime must register a native operator library
-before the model will run.
+reads kilobytes. The walk covers every graph the model carries: the main graph
+and its sparse initializers, tensors and subgraphs held in node attributes
+(Constant values, If/Loop/Scan bodies), model-local functions and training
+graphs. `node_domains` and `external_data_paths` collect from all of them.
+A file whose complete top-level message holds no graph raises
+`FormatError("ONNX model without a graph")`. An empty file parses as an empty
+protobuf message, which is not a model.
+`STANDARD_ONNX_DOMAINS` is exported alongside it: anything else in
+`node_domains` means the runtime must register a native operator library before
+the model will run.
 
-`truncated` is the honest half of the bound — it says the field budget ran out
-before the walk finished. **A partial walk has not cleared the model, whatever
-it found**: a lead in the fields it reached says nothing about a worse one past
-the budget. A rule reports the findings it has and says the walk was partial:
+`truncated` is the honest half of the bound — it says the walk did not finish:
+the field budget ran out, subgraphs were nested deeper than 32 levels, or the
+strings kept in the summary exceeded `Limits.max_header_bytes`. Metadata entries
+have one allowance of that size. The producer, domains and external-data paths
+share a separate allowance of the same size. This keeps a flood of metadata from
+excluding a graph's domains from the summary.
+The
+`guardana.supply_chain.onnx_graph` rule gives a file one field per two bytes of
+its size, never fewer than 1,000,000 and never more than 8,000,000, so a graph
+below the cap is walked in full. **A partial walk has not cleared the model,
+whatever it found**: a lead in the fields it reached says nothing about a worse
+one past the budget. A rule reports the findings it has and says the walk was
+partial:
 
 ```python
 yield from self._graded(path, summary)
 if summary.truncated:
-    yield self._unscanned(path, "the graph was too large to walk within the budget", ctx)
+    yield self._unscanned(path, "the model was too large or nested too deeply to walk in full", ctx)
 ```
 
 `_unscanned` there yields the inconclusive finding and reports the file as an
@@ -127,6 +154,16 @@ class Limits:
 Defaults are sized off real models — a 20k-tensor safetensors index is ~1.5 MiB
 of JSON, a 256k-token GGUF vocabulary a few MiB — so honest files stay far
 inside them. Pass your own `Limits` to tighten them for a constrained runner.
+
+The table lists what each bound covers in each reader. Exceeding a bound raises
+`FormatError`, except where the table says the ONNX summary is `truncated`.
+
+| Limit | GGUF | safetensors | ONNX |
+|---|---|---|---|
+| `max_header_bytes` | bytes from the start of the file to the end of the metadata block | declared header length, checked before reading the header | separate allowances for metadata entries and other strings kept; exceeding either makes the summary `truncated` |
+| `max_entries` | metadata entries | keys in each JSON object in the header, including the tensor index and `__metadata__` | protobuf fields walked; exceeding the bound makes the summary `truncated` |
+| `max_string_bytes` | each key and string value | each string in the header and each non-string `__metadata__` value after serialisation | each string read |
+| `max_array_items` | each array | each array in the header, including `shape` and `data_offsets` | not used: the summary keeps no arrays |
 
 ## Writing a rule on top
 

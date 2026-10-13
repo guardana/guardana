@@ -149,6 +149,22 @@ def test_a_token_budget_stops_the_run_once_the_tokens_are_spent() -> None:
         meter.reserve()
 
 
+@pytest.mark.parametrize(
+    "reported", [TokenUsage(-1000, 5), TokenUsage(5, -1000)], ids=["input", "output"]
+)
+def test_a_negative_token_count_is_no_count_and_cannot_switch_a_ceiling_off(
+    reported: TokenUsage,
+) -> None:
+    meter = UsageMeter(Budgets(max_input_tokens=10, max_output_tokens=10))
+
+    with pytest.raises(BudgetExhausted, match="cannot be enforced"):
+        meter.record_reply(reported)
+
+    usage = meter.snapshot()
+    assert (usage.input_tokens or 0) >= 0
+    assert (usage.output_tokens or 0) >= 0
+
+
 def test_a_duration_budget_stops_the_run() -> None:
     clock = iter([0.0, 0.0, 100.0])
     meter = UsageMeter(Budgets(max_duration_seconds=30.0), clock=lambda: next(clock))

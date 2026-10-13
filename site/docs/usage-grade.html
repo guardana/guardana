@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -313,7 +317,8 @@ reply's metadata:</p>
 sends: same roles, same text. Several lines for one question are trials, read in file order.
 Two rules asking the same question each need their own lines. Unknown or repeated keys, a line
 over 1 MiB, a file over 64 MiB, a header with no lines, and text that is not UTF-8 are refused
-with the line at fault (exit <code>3</code>).</p>
+with the line at fault (exit <code>3</code>). A path that is not a regular file, such as a FIFO, is refused
+the same way, without waiting for anything to be written to it.</p>
 <h2 id="what-is-graded-and-what-is-not">What is graded, and what is not</h2>
 <p><code>grade</code> runs against a target that answers chat from the recording and supports nothing else.</p>
 <div class="table-wrap"><table>
@@ -381,6 +386,35 @@ Measured
 
 1 finding(s); 1 rule(s) run, 0 skipped. 3/3 case(s) measured. 1 component(s) observed.
 </code></pre>
+<h2 id="flags">Flags</h2>
+<p><code>--profile</code>/<code>--preset</code>/<code>--rules</code>/<code>--trials</code> and the budget flags are covered in
+the sections above and below; the remaining flags are:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--concurrency INTEGER</code></td>
+<td><code>4</code></td>
+<td>How many rules may grade at once</td>
+</tr>
+<tr>
+<td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
+<td><code>builtins</code>, or the profile's <code>plugins:</code></td>
+<td>Which installed plugins to load — same meaning as on <code>probe</code></td>
+</tr>
+<tr>
+<td><code>--allow-plugin TEXT</code></td>
+<td>none</td>
+<td>Distribution to trust; repeatable, needs <code>--plugins allowlist</code></td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="traffic-and-budgets">Traffic and budgets</h2>
 <p>No request reaches the target: the saved run records <code>usage.requests: 0</code>. A judge configured
 under <code>evaluators:</code> is called as in a probe, metered on its own and held to the budget flags
@@ -479,7 +513,7 @@ graded runs. <code>--format</code> takes the built-in formats or an <a href="out
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-grade.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

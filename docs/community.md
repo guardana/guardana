@@ -26,7 +26,7 @@ README command with the same launcher, as the [first-run guide](usage-init.md)
 explains. See [installing](install.md) for pip, source and container options.
 For reproducible team runs, pin the exact reviewed version in your environment.
 
-## Help validate 1.0
+## Join a first run or pilot
 
 - Join a consented [first-run session](studies/first-run-study.md). Record where
   the instructions stop being clear; a failed session is useful evidence too.
@@ -66,6 +66,33 @@ listing is distinct from a hands-on review; a fork or star is distinct from a
 deployment. A quotation or named application story needs the author's consent
 and a reproducible, redacted result. Suggested links are reviewed for identity,
 accuracy and source context before publication.
+
+## Build on Guardana's output
+
+Tools can read Guardana's output in four forms:
+
+- the saved run, written with `--format json --output run.json`: a JSON document that identifies
+  its schema in `schema_version` and `$schema`, with the matching JSON Schema in
+  [`schemas/`](../schemas/);
+- SARIF 2.1.0 and JUnit XML, written with `--format sarif` and `--format junit`;
+- `load_verification` in Python, which reads a saved run with its recorded verdict;
+- the optional collector's [HTTP API](usage-collector.md#the-http-api), which serves stored runs.
+
+[Reading results](reading-results.md) shows all four forms and what SARIF, JUnit and the
+collector leave out. The [saved-run reference](usage-run.md#the-document) lists every field. A
+package can also add its own format or reporter ([installed outputs](outputs.md)).
+
+The [compatibility page](compatibility.md) states what stays stable. Every persisted document
+carries its version. The saved run's version changes whenever a change to it is not
+backwards-compatible; earlier run schemas stay published in `schemas/`. Two guarantees apply
+only from the final 1.0 release: incompatible changes to the supported surface occur only in a
+major release, and every 1.x release reads documents written by earlier releases. Before the
+final 1.0 release, the `1.0.0rcN` candidates carry fixes only.
+
+If you have built something on Guardana's output, tell the project in
+[GitHub Discussions](https://github.com/guardana/guardana/discussions). Open an
+[issue](https://github.com/guardana/guardana/issues) when the output does not let you do
+something you need.
 
 ## Follow changes
 

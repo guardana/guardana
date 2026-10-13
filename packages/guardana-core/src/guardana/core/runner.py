@@ -1,7 +1,9 @@
+import json
 import reprlib
 import threading
 from collections.abc import Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from fnmatch import fnmatch
 from pathlib import Path, PurePath
 from urllib.error import URLError
 
@@ -12,9 +14,10 @@ from guardana.core.gate import GateOutcome, gate, gate_outcome
 from guardana.core.inventory import observe
 from guardana.core.manifest.records import CalibrationRecord, SuiteSummary
 from guardana.core.observation import Observation, ObservationKind
-from guardana.core.profile.model import Profile
+from guardana.core.profile.errors import ProfileError
+from guardana.core.profile.model import Policy, Profile
 from guardana.core.redaction import EvidenceMode, MessageQuoting
-from guardana.core.registry import Registry
+from guardana.core.registry import Registry, known_rule_ids
 from guardana.core.regression import broken_pairs
 from guardana.core.report import CheckError, Finding, ScanResult, StopReason, split_ref
 from guardana.core.report.check_error import bounded_reason
@@ -161,7 +164,7 @@ class _RuleOutcome:
     suite: SuiteSummary | None = None
     """What a suite concluded, carried from its context; None for every other rule."""
 
-    raised: type[Exception] | None = None
+    raised: type[BaseException] | None = None
     """The class of the exception `error` was built from, None when no exception was."""
 
     examined: frozenset[str] = frozenset()
@@ -219,7 +222,7 @@ def pre_run_errors(
         *registry.load_errors,
         *registry.expectation_errors(),
         *_unknown_recorded_rules(registry, target),
-        *_unreadable_applicability(registry, target),
+        *_unreadable_applicability(selected, target),
         *_broken_regressions(selected, registry),
     )
 
@@ -298,6 +301,13 @@ class Runner:
     remedies: FailureRemedies = field(default_factory=FailureRemedies)
     """What a recorded failure advises for a refused credential and for a rate limit."""
 
+    inventory: Registry | None = None
+    """Every rule the whole run registered, when `registry` is one pass of a split run.
+
+    Include patterns are checked against it, so a pattern another pass matches is not
+    refused here; None checks them against `registry`.
+    """
+
     def concurrency_for(self, kind: TargetKind) -> int:
         """How many rules may run at once against this kind of target.
 
@@ -327,7 +337,9 @@ class Runner:
         # the target that has to hold it. A target that cannot enforce it refuses
         # here rather than letting the run proceed under a ceiling nothing watches.
         target.apply_budgets(self.profile.budgets)
-        plan, selection_skips = select_rules(self.registry, self.profile, target)
+        plan, selection_skips = select_rules(
+            self.registry, self.profile, target, inventory=self.inventory
+        )
         skipped = list(selection_skips)
 
         findings: list[Finding] = []
@@ -463,20 +475,22 @@ class Runner:
         # produce the same report. A propagating failure surfaces at the first
         # rule that hit it, deterministically, rather than whichever thread lost.
         for outcome in outcomes:
-            if isinstance(outcome, Exception):
+            if isinstance(outcome, BaseException):
                 raise outcome
             if outcome is not None:  # None: never started, because an abort won
                 yield outcome
 
     def _run_pool(
         self, plan: Sequence[Rule], target: Target, limit: int
-    ) -> list["_RuleOutcome | Exception | None"]:
+    ) -> list["_RuleOutcome | BaseException | None"]:
         """Run the plan across `limit` daemon threads; return outcomes in plan order.
 
         A `None` in the result never started, because something aborted the pool:
-        a propagating endpoint failure, or a budget that ran out.
+        a propagating failure, or a budget that ran out. A propagating failure is
+        returned rather than left in its thread, where `KeyboardInterrupt` would
+        vanish instead of ending the run as it does with one rule at a time.
         """
-        outcomes: list[_RuleOutcome | Exception | None] = [None] * len(plan)
+        outcomes: list[_RuleOutcome | BaseException | None] = [None] * len(plan)
         aborted = threading.Event()
         cursor = iter(range(len(plan)))
         lock = threading.Lock()
@@ -488,7 +502,7 @@ class Runner:
         def run_at(index: int) -> None:
             try:
                 outcome = self._execute_one(plan[index], target)
-            except Exception as exc:  # a propagating endpoint failure
+            except BaseException as exc:  # what `_execute_one` lets propagate
                 outcomes[index] = exc
                 aborted.set()
                 return
@@ -515,9 +529,8 @@ class Runner:
     def _execute_one(self, rule: Rule, target: Target) -> _RuleOutcome:
         """Run one rule, converting anything it throws into a recorded error.
 
-        Any `Exception` is caught, not just `RuleError`: a third-party rule with an
-        ordinary bug in it used to abort the entire scan. `BaseException` is
-        deliberately not caught, so Ctrl-C and `SystemExit` still stop the run.
+        Any `Exception` is caught, not just `RuleError`, and `SystemExit` with it: a
+        third-party rule must not abort the scan. `KeyboardInterrupt` still stops the run.
 
         A target that attributes exchanges is asked for this rule's own view here, in
         the thread that runs the rule, so nothing about which rule is asking is shared.
@@ -576,7 +589,9 @@ class Runner:
                 raised=type(exc),
                 shortfalls=ctx.shortfalls(),
             )
-        except Exception as exc:
+        except (Exception, SystemExit) as exc:
+            # `sys.exit()` in a rule is that rule's failure, never the end of the run:
+            # exit 0 with no report would read as a clean command.
             return _RuleOutcome(
                 rule.meta.id,
                 tuple(findings),
@@ -689,14 +704,19 @@ def _target_stop(exc: URLError | EndpointError) -> StopReason:
 
 
 def select_rules(
-    registry: Registry, profile: Profile, target: Target
+    registry: Registry, profile: Profile, target: Target, *, inventory: Registry | None = None
 ) -> tuple[tuple[Rule, ...], tuple[SkippedRule, ...]]:
     """Choose the rules a run of `profile` against `target` executes, and the ones it skips.
 
     The one selection `Runner.run` and `guardana plan` both make: a filter added here
     reaches the plan too, so the plan never describes a run that selects differently.
     A rule of another target kind, or one the policy does not match, is neither.
+
+    Raises `ProfileError` before selecting anything when an include pattern matches no
+    rule of `inventory`: every rule the run registered, `registry` itself unless it is
+    one pass of a split run.
     """
+    refuse_unmatched_includes(profile, registry if inventory is None else inventory)
     capabilities = target.capabilities()
     selected: list[Rule] = []
     skipped: list[SkippedRule] = []
@@ -717,6 +737,36 @@ def select_rules(
             continue
         selected.append(rule)
     return tuple(selected), tuple(skipped)
+
+
+def refuse_unmatched_includes(profile: Profile, registry: Registry) -> None:
+    """Raise `ProfileError` naming every include pattern no rule of `registry` matches.
+
+    Checked against every registered rule and every id named on `registry` without a
+    rule, before exclusions, target kind or any skip: a misspelled pattern beside a
+    correct one would otherwise narrow the run to what the correct one selects and let
+    it pass. No `fail_on` setting relaxes it.
+    """
+    unmatched = _unmatched_includes(profile.policy, sorted(known_rule_ids(registry)))
+    if unmatched:
+        named = ", ".join(json.dumps(pattern, ensure_ascii=False) for pattern in unmatched)
+        raise ProfileError(
+            f"rules.include contains unmatched patterns: {named} — check the spelling and "
+            f"registered rules."
+        )
+
+
+def _unmatched_includes(policy: Policy, rule_ids: Sequence[str]) -> tuple[str, ...]:
+    """Return each include glob no id in `rule_ids` matches, once, in profile order.
+
+    A bare `*` is never unmatched: it cannot be misspelled, and with nothing registered
+    the run itself reports that no rule ran.
+    """
+    return tuple(
+        pattern
+        for pattern in dict.fromkeys(policy.include)
+        if pattern != "*" and not any(fnmatch(rule_id, pattern) for rule_id in rule_ids)
+    )
 
 
 def _unrecorded(rule: Rule, target: RecordedTarget) -> SkippedRule | None:
@@ -826,7 +876,7 @@ def applicability_refusal(rule: Rule, target: Target) -> SkippedRule | None:
 
     Not a coverage gap: nothing the rule needs is missing. Only a non-empty string is a
     reason. A rule whose `not_applicable_to` raises, or returns anything else, is run
-    instead of read as having nothing to check; `pre_run_errors` records the second.
+    instead of read as having nothing to check; `pre_run_errors` records either as an error.
     """
     try:
         reason = rule.not_applicable_to(target)
@@ -847,21 +897,21 @@ def _is_reason(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def _unreadable_applicability(registry: Registry, target: Target) -> tuple[CheckError, ...]:
-    """Return an error for every rule whose `not_applicable_to` answered neither None nor a reason.
+def _unreadable_applicability(selected: Sequence[Rule], target: Target) -> tuple[CheckError, ...]:
+    """Return an error for every selected rule whose applicability hook raised or gave no answer.
 
-    Asked of the rules the hook is consulted for: those of `target`'s kind whose
-    capabilities it declares. Such a rule is run rather than skipped, and the error keeps
-    a run under `fail_on_error` from passing on a hook that cannot say what it meant.
+    An answer is None or a non-empty reason.
+
+    Such a rule is run rather than skipped, and the error keeps a run under
+    `fail_on_error` from passing on a hook that cannot say what it meant. A rule the
+    profile left out is never asked.
     """
-    capabilities = set(target.capabilities())
     errors: list[CheckError] = []
-    for rule in registry.rules():
-        if rule.meta.target_kind != target.kind or rule.meta.required_capabilities - capabilities:
-            continue
+    for rule in selected:
         try:
             answer: object = rule.not_applicable_to(target)
-        except Exception:  # noqa: S112 — the rule runs, and records its own failure
+        except Exception as exc:
+            errors.append(CheckError.from_exception(rule.meta.id, "applicability", exc))
             continue
         if answer is None or _is_reason(answer):
             continue
@@ -1098,6 +1148,7 @@ __all__ = [
     "gate_outcome",
     "incomplete_recording",
     "protocol_refusal",
+    "refuse_unmatched_includes",
     "refused_by_this_run",
     "safety_refusal",
     "target_failures",

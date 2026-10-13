@@ -63,6 +63,18 @@ session, and an expired key ends it on its own.
 """
 
 
+def bearer_token(request: Request) -> str | None:
+    """Return the token of a `Bearer` authorization header, whatever the scheme's case, or `None`.
+
+    The one parser for the header, shared by authentication and the rate limiter, so
+    two spellings of one credential are always one caller.
+    """
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith(_BEARER):
+        return header[len(_BEARER) :].strip()
+    return None
+
+
 def _presented_token(request: Request, *, accept_cookie: bool = False) -> str:
     """Return the credential this request presented: the header, or — for reads — a cookie.
 
@@ -72,9 +84,9 @@ def _presented_token(request: Request, *, accept_cookie: bool = False) -> str:
     Leaving that to `SameSite=Strict` alone would be one browser flag away from a
     cross-site submission.
     """
-    header = request.headers.get("authorization", "")
-    if header.lower().startswith(_BEARER):
-        return header[len(_BEARER) :].strip()
+    token = bearer_token(request)
+    if token is not None:
+        return token
     if accept_cookie:
         cookie = request.cookies.get(SESSION_COOKIE, "").strip()
         if cookie:

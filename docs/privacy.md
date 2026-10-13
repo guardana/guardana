@@ -14,13 +14,14 @@ way a finding leaves the process goes through it.
 
 ## Defaults
 
-Every command defaults to `redacted`; artifact scans send nothing, and Guardana sends no
+Every command defaults to `redacted`; artifact scans send nothing unless `--reporter` names a
+destination, and Guardana sends no
 telemetry and needs no account. Probes contact the named target and send graded exchanges
 to judges or guards under `evaluators:`; when an MCP target requires authorization, they
 also read its advertised protected-resource metadata and the metadata of the authorization
 server it names, possibly on other hosts. Guardana itself contacts nothing else; a package admitted with `--plugins` runs with your privileges and can open its own connections ([threat model, T3](threat-model.md#t3--a-malicious-plugin-or-rule-pack)). The collector, or a reporter
 an installed package adds, receives results only when `--reporter` names it, and a reporter never
-receives kept exchanges ([installed outputs](outputs.md#what-an-output-receives)).
+receives kept exchanges ([installed outputs](outputs.md#what-an-output-receives)). Before storing a submission, the collector also [redacts](usage-collector.md#what-the-collector-refuses-and-redacts-on-ingest) recognisable secrets in its evidence text using the engine's patterns. Those secrets stay out of the database even when a third-party sender or an older agent does not redact them. The collector's pages load no third-party browser assets. It serves its OpenAPI document at `/openapi.json` and bundles no interactive API viewer.
 
 ```yaml
 privacy:
@@ -43,6 +44,14 @@ privacy:
 **`full` does not mean "store a live key".** Secrets are removed at every mode,
 including this one. There is no useful reading of "keep the credential": the
 finding is that a secret appeared, not what it was.
+
+**`custom_patterns` run in a separate process, within bounds.** Each pattern gets at most
+2 seconds per text; texts over 16 Mi characters are not searched. A pattern that misses either bound
+fails the redaction without releasing the text. When the run's results are redacted, nothing
+is written or sent and the command exits `5`, or the stop's code when the run had already
+stopped ([exit codes](exit-codes.md)). The error names the entry by position, such as
+`custom_patterns[0]`, never by its text, and states which bound it missed. A pattern that
+backtracks without end, such as `(a+)+$`, triggers this failure on a long enough run of `a`.
 
 `redact_secrets: false` is **refused at load time**, with a message saying why.
 Until 0.7.1 the switch existed and took effect only at `full` — so its single
@@ -138,7 +147,13 @@ one. Until 0.7.1 they were applied one at a time, each reading the previous one'
 output, so the generic "token = value" pattern matched the *label* of the
 placeholder that had just replaced the secret and produced
 `[redacted:github-[redacted:credential-assignment:…]]`. Matches are now collected
-against the original text and spliced in once.
+against the original text and spliced in once. A generic match around a specific
+key leaves the key's placeholder as it is: `password=` followed by a GitHub token
+becomes `password=` and the token's placeholder. When the value reaches past the key,
+as in a GitHub token with more characters after it, the key and the rest of the value
+become one placeholder under the more specific label, so no part of a longer
+credential is left in the clear. A private-key header with no matching END line
+redacts the rest of that field.
 
 **A placeholder is recognised narrowly, and that narrowness is load-bearing.** A
 second pass skips spans this redactor already wrote — that is what makes redacting
@@ -146,8 +161,10 @@ twice idempotent — and the redactor's input is the model's reply, which is
 attacker-influenced by definition. Recognising `[redacted:` *anything* `]` would
 mean that anything able to make a model emit `[redacted:` around a credential
 carried it through untouched: the output format turned into a smuggling envelope.
-Only a lower-case label with an optional twelve-hex digest is skipped, and nothing
-that fits that shape is a secret, an address or an IP.
+Only a label Guardana itself writes, with an optional twelve-hex digest, is skipped;
+any other bracketed text is read by the patterns like the rest of the reply. A value
+that is itself twelve lower-case hex characters still fits the digest slot of a real
+label, so a custom pattern for such values cannot rely on catching it there.
 
 ## One seam, and why that is the whole design
 
@@ -162,8 +179,8 @@ places has thirty exceptions, and the one that matters is the one somebody forgo
 
 `scan`, `probe` and `monitor` also redact once, early — before a baseline is
 written or matched — because a fingerprint is computed from the evidence summary.
-Redaction is idempotent: a placeholder claims its own span before any pattern is
-offered the text, so a second pass cannot read the first pass's label as content.
+Redaction is idempotent: a pattern match that lies inside an existing placeholder is
+ignored, so a second pass cannot read the first pass's label as content.
 
 **`monitor` was the exception until 0.7.1**, and it was the worst one to have: it
 printed through a renderer built with no policy — so the library default, `full` —

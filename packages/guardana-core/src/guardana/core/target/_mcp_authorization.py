@@ -141,12 +141,16 @@ class Tasks:
     shown. It is asked only when a server that refused its tools to a caller presenting
     nothing listed that caller no task and a credential is configured, because an empty
     listing alone cannot tell tasks bound to their owner from no task at all.
+
+    `more` says the answered listing named a further page, which is never read: `count`
+    and `ids` are then the first page's, and an empty first page shows nothing.
     """
 
     answer: TaskAnswer | None = None
     status: int | None = None
     count: int = 0
     ids: tuple[str, ...] = field(default=(), repr=False)
+    more: bool = False
     offer: TaskOffer | None = None
     detail: str | None = None
     error: str | None = None
@@ -630,7 +634,8 @@ class _Probe:
         `tasks/list` is a `2025-11-25` method, so it goes over the handshake era whenever
         the server still serves it: in the anonymous probe's session, or, when the run
         settled on the modern era of a dual-era server, in a session opened here without
-        a credential. Over the modern wire otherwise. One page; a cursor is never followed.
+        a credential. Over the modern wire otherwise. One page; a cursor is never followed,
+        and a listing that names one says so (`Tasks.more`).
         Every task id seen is handed to the target, which withholds it from the record.
         An empty listing on a server that refused its tools anonymously is followed by the
         operator's own listing, when a credential is configured (`Tasks.operator`).
@@ -1112,7 +1117,13 @@ def _task_listing(reply: RawReply) -> Tasks:
             and isinstance(task_id := entry.get("taskId"), str)
             and task_id
         )
-        return Tasks(answer=TaskAnswer.ANSWERED, status=reply.status, count=len(listed), ids=ids)
+        return Tasks(
+            answer=TaskAnswer.ANSWERED,
+            status=reply.status,
+            count=len(listed),
+            ids=ids,
+            more=result.get("nextCursor") is not None,
+        )
     detail = f"HTTP {reply.status}"
     if error is not None:
         detail = f"{detail} carrying JSON-RPC error {error.get('code')}"

@@ -53,6 +53,10 @@ _ACCEPTED: dict[str, frozenset[int]] = {
 """Every version each persisted kind's reader accepts."""
 
 NOT_EXERCISED: dict[tuple[str, int], str] = {
+    ("run", 18): (
+        "no published release writes it yet; test_run_schema_v18.py round-trips what this "
+        "tree writes"
+    ),
     ("envelope", 6): "no release on PyPI wrote it: 0.8.0 writes 5 and 0.9.1 writes 7",
     ("pack-manifest", 1): (
         "no release with schema 1 has `pack lock` to accept a pack; the hand-written 0.19.1 "

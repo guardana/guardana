@@ -10,6 +10,7 @@ field redacted again and its target ref at `redacted` mode, and no kept exchange
 
 import re
 import threading
+import unicodedata
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -296,13 +297,24 @@ _REPORTER = _Kind(
 
 
 def sanitise_reason(text: str, secrets: Iterable[str] = ()) -> str:
-    """Make text from plugin code safe to print: secrets withheld, redacted, one line, bounded.
+    """Make text from plugin or collector code safe to print: one line, secrets gone, bounded.
 
-    Each of `secrets` is withheld as written, then the default redactor runs, then every
-    C0, DEL and C1 control character is dropped, then the length is bounded.
+    Every C0, DEL and C1 control character and every Unicode format character (bidi
+    controls, zero-width marks) is dropped first, so none can split a secret out of the
+    patterns' sight; then each of `secrets` is withheld, the default redactor runs, and
+    the length is bounded.
     """
-    redacted = EvidenceRedactor(secrets=secrets).redact_text(text)
-    return bounded_reason(_C0_DEL_C1.sub("", redacted))
+    known = tuple(secrets)
+    withheld = (*known, *(_printable(value) for value in known))
+    return bounded_reason(EvidenceRedactor(secrets=withheld).redact_text(_printable(text)))
+
+
+def _printable(text: str) -> str:
+    """Drop every C0, DEL and C1 control character and every Unicode format character."""
+    text = _C0_DEL_C1.sub("", text)
+    if text.isascii():
+        return text
+    return "".join(char for char in text if unicodedata.category(char) != "Cf")
 
 
 def _describe(entry_point: InstalledEntryPoint) -> str:
@@ -688,7 +700,8 @@ def deliver(
     Raises `BoundaryError` when the boundary fails, before the reporter is called. Never
     raises for the reporter's sake: a reporter that raises, overruns the deadline,
     returns an invalid delivery, or returns `delivered` with no attempt or with an HTTP
-    status outside 2xx is `unknown`. A `KeyboardInterrupt` propagates. The detail
+    status outside 2xx is `unknown`. The deadline covers the delivery and the
+    `sent_secrets` hook read after it. A `KeyboardInterrupt` propagates. The detail
     is sanitised.
     """
     try:
@@ -700,8 +713,7 @@ def deliver(
     ran = _run_deliverer(prepared, sent, deadline)
     if ran is None:
         return Delivery(DeliveryStatus.UNKNOWN, detail=f"did not finish within {deadline:g} s")
-    outcome, raised = ran
-    secrets = _current_secrets(prepared)
+    outcome, raised, secrets = ran
     if raised:
         known = prepared.secrets if secrets is None else secrets
         return Delivery(DeliveryStatus.UNKNOWN, detail=sanitise_reason(_failure(raised[0]), known))
@@ -716,19 +728,26 @@ def deliver(
 
 def _run_deliverer(
     prepared: PreparedReporter, sent: Verification, deadline: float
-) -> tuple[list[object], list[Exception | SystemExit]] | None:
-    """Run the deliverer on a daemon thread; None when it is still running at `deadline`."""
+) -> tuple[list[object], list[Exception | SystemExit], tuple[str, ...] | None] | None:
+    """Run the delivery and then its `sent_secrets` hook on one daemon thread, in one deadline.
+
+    Returns what `deliver` returned or raised and the secrets known afterwards, or None
+    when the thread is still running at `deadline`.
+    """
     outcome: list[object] = []
     raised: list[Exception | SystemExit] = []
+    secrets: list[tuple[str, ...] | None] = []
     interrupted: list[KeyboardInterrupt] = []
 
     def attempt() -> None:
         try:
-            outcome.append(prepared.deliverer.deliver(sent))
+            try:
+                outcome.append(prepared.deliverer.deliver(sent))
+            except (Exception, SystemExit) as exc:
+                raised.append(exc)
+            secrets.append(_current_secrets(prepared))
         except KeyboardInterrupt as exc:
             interrupted.append(exc)
-        except (Exception, SystemExit) as exc:
-            raised.append(exc)
 
     worker = threading.Thread(target=attempt, name=f"guardana-deliver-{prepared.name}", daemon=True)
     worker.start()
@@ -738,7 +757,7 @@ def _run_deliverer(
         return None
     if interrupted:
         raise interrupted[0]
-    return outcome, raised
+    return outcome, raised, secrets[0] if secrets else None
 
 
 def _current_secrets(prepared: PreparedReporter) -> tuple[str, ...] | None:

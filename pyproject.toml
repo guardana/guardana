@@ -206,6 +206,11 @@ filterwarnings = [
 default-groups = ["dev", "docs", "conformance"]
 
 [dependency-groups]
+# The build backend of every package, locked so the container images build the local
+# packages without build isolation and with hashes, like their dependencies. Not a
+# default group: nothing in the development environment imports it.
+# `scripts/export_image_requirements.py` exports it to deploy/docker/.
+image-build = ["hatchling==1.32.4"]
 docs = [
     # Renders docs/**.md into site/docs/**.html. Its own dependency is `mdurl` and
     # nothing else, it is CommonMark-compliant, and it exposes the token stream —
@@ -225,7 +230,7 @@ conformance = [
     # `packages/*/src` may import `mcp` or `a2a` (the import-linter contract below),
     # and the clean-install check and the isolated example suites never install it.
     "mcp==2.3.0",
-    "a2a-sdk[http-server]==1.2.1",
+    "a2a-sdk[http-server]==1.2.2",
     "uvicorn",
 ]
 dev = [
@@ -234,7 +239,7 @@ dev = [
     # model named "no fuzzing of the binary parsers" as an open gap for four
     # releases, and an example-based test proves the case its author thought of —
     # which is never the length field that is one byte short of the file.
-    "hypothesis>=6.168.3",
+    "hypothesis>=6.168.5",
     "import-linter>=2.14",
     # Test-only, and deliberately not a runtime dependency of any distribution:
     # `schemas/run-v2.schema.json` is a published contract, and a schema
@@ -242,12 +247,12 @@ dev = [
     # never validates at run time — it constructs manifests from typed
     # dataclasses, so the shape is enforced by mypy on the way out.
     "jsonschema>=4.23",
-    "types-jsonschema>=4.23",
-    "mypy>=2.3.1",
+    "types-jsonschema>=4.26.0.20261006",
+    "mypy>=2.4.0",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
-    "ruff>=0.16.9",
+    "ruff>=0.16.10",
 ]
 
 [tool.coverage.run]

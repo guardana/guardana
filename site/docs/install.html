@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -228,6 +232,7 @@ docker run --rm ghcr.io/guardana/guardana-collector:0.41 --help
 <h2 id="the-optional-collector">The optional collector</h2>
 <p><code>guardana-server</code> is a separate service. <code>scan</code>, <code>probe</code>, and <code>monitor</code> do not require it. Install it to collect findings centrally; see <a href="architecture.html#the-coreserver-boundary"><code>architecture.md</code></a>.</p>
 <pre><code class="language-bash">pip install &quot;guardana-server[serve]&quot;   # `[serve]` adds the ASGI server
+export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana   # an existing PostgreSQL database
 guardana-collector migrate             # then: guardana-collector serve
 </code></pre>
 <p>The <code>[serve]</code> extra adds an ASGI server. Deployments using gunicorn or hypercorn can omit it. See <a href="usage-collector.html"><code>usage-collector.md</code></a> for collector use and <a href="deployment.html"><code>deployment.md</code></a> for production deployment.</p>
@@ -240,7 +245,7 @@ guardana-collector migrate             # then: guardana-collector serve
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/install.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

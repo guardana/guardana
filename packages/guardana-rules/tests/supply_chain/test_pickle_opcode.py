@@ -753,7 +753,7 @@ def test_callables_found_before_a_later_member_raises_are_still_reported(
     ) -> object:
         member = name.filename if isinstance(name, zipfile.ZipInfo) else name
         if member == "archive/later.pkl":
-            raise ValueError("a decoder this rule does not expect")
+            raise LookupError("a decoder this rule does not expect")
         return real_open(self, name, *args, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(zipfile.ZipFile, "open", failing)

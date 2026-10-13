@@ -22,6 +22,10 @@ on:
     # Marketplace Action (v0.1, v1) don't re-trigger a publish when they move.
     tags: ["v*.*.*"]
 
+# Every job states the scopes it needs; nothing else in this file may write.
+permissions:
+  contents: read
+
 jobs:
   # A tag publishes only a commit CI has passed. `release.py` waits for that before
   # it creates the tag; this job holds the same line for a tag pushed any other way.

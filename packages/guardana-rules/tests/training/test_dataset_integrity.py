@@ -67,9 +67,9 @@ def test_ordinary_class_is_not_a_loader_script(tmp_path: Path) -> None:
     assert _summaries(tmp_path) == []
 
 
-def test_does_not_crash_on_a_syntax_error(tmp_path: Path) -> None:
+def test_a_syntax_error_is_declined_as_not_scanned(tmp_path: Path) -> None:
     (tmp_path / "broken.py").write_text("class (:\n", encoding="utf-8")
-    assert _summaries(tmp_path) == []
+    assert [s.split(":")[0] for s in _summaries(tmp_path)] == ["Python file not scanned"]
 
 
 _PIN = ", revision='e6281661ce1c48d982bc483cf8a173c1bbeb5d31'"
@@ -234,3 +234,13 @@ def test_the_rule_proves_all_three_outcomes_on_its_own_samples() -> None:
 
     assert verified.is_proven, verified
     assert {r.observed for r in verified.results} >= set(DEMANDED_OUTCOMES)
+
+
+def test_an_assignment_in_a_function_does_not_hide_an_imported_module(tmp_path: Path) -> None:
+    (tmp_path / "train.py").write_text(
+        "import datasets\n\n\ndef helper():\n"
+        "    datasets = __import__('json')\n    return datasets\n\n\n"
+        "ds = datasets.load_dataset('imdb')\n",
+        encoding="utf-8",
+    )
+    assert len(_unpinned(tmp_path)) == 1

@@ -11,7 +11,7 @@ from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
-from guardana.rules.supply_chain._ast_names import import_aliases, resolved_call_name
+from guardana.rules.supply_chain._ast_names import NameResolver, import_aliases
 from guardana.rules.supply_chain._unread_python import unread_python
 
 _SAFE_YAML_LOADERS = frozenset({"SafeLoader", "CSafeLoader"})
@@ -87,9 +87,9 @@ def _yaml_load_finding(node: ast.Call) -> tuple[str, Severity] | None:
 
 
 def _sinks(source: PythonSource) -> Iterator[tuple[int, str, Severity]]:
-    aliases = import_aliases(source)
+    resolver = NameResolver(import_aliases(source))
     for node in source.nodes(ast.Call):
-        name = resolved_call_name(node, aliases)
+        name = resolver.call_name(node)
         if name in _PICKLE_FAMILY_LOADERS:
             yield node.lineno, f"{name} on possibly-untrusted data", Severity.HIGH
         elif name == "torch.load":

@@ -14,6 +14,7 @@ from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import lead_verdict, unscanned_verdict
 from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefix
+from guardana.rules.supply_chain._unread_python import unread_python
 
 _RULE_ID = "guardana.supply_chain.provenance"
 _DOWNLOAD_CALLS = frozenset({"from_pretrained", "hf_hub_download"})
@@ -100,7 +101,9 @@ class ProvenanceRule(ArtifactRule):
             return
         for path in target.iter_files((".py",)):
             source = target.python_source(path)
-            if source is not None:
+            if source is None:
+                yield from unread_python(self.meta, target, path, ctx)
+            else:
                 yield from self._scan_downloads(source)
         for path in target.iter_files((".md",)):
             if path.name.lower() in _CARD_NAMES:

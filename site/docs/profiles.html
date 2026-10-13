@@ -48,6 +48,7 @@
 <li><a href="profiles.html" aria-current="page">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html" aria-current="page">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -231,7 +235,12 @@ rules:
   paths_exclude: [&quot;data/*&quot;, &quot;archive&quot;]  # optional; globs (matched relative to the
                                          # scan root) of files/dirs to skip. A
                                          # `.guardanaignore` file at the root adds
-                                         # more, one glob per line.
+                                         # more, one glob per line, but cannot
+                                         # exclude a file a model loader reads
+                                         # (usage-scan.md); only this key can.
+                                         # Exclude here a `.py` file the scanning
+                                         # interpreter cannot decode or parse;
+                                         # otherwise it leaves the run indeterminate.
 
 plugins:                        # optional; which installed plugins a run imports
   mode: allowlist               # all | builtins | allowlist | disabled
@@ -307,7 +316,7 @@ delivery:                       # optional; see &quot;delivery:&quot; below
 <td><code>rules.include</code></td>
 <td>list of glob patterns</td>
 <td><code>[&quot;*&quot;]</code></td>
-<td>A rule's <code>id</code> must match at least one pattern here to run</td>
+<td>A rule's <code>id</code> must match at least one pattern here to run. Every pattern must match at least one registered rule, or the command is refused with exit <code>3</code> before any rule runs; see <a href="#an-include-pattern-must-match-a-rule">below</a>.</td>
 </tr>
 <tr>
 <td><code>rules.exclude</code></td>
@@ -397,7 +406,7 @@ delivery:                       # optional; see &quot;delivery:&quot; below
 <td><code>evaluators</code></td>
 <td>mapping</td>
 <td><code>{}</code></td>
-<td>Config blocks for evaluators that need a model of their own, keyed by evaluator id — <code>llm_judge</code> and <code>guard</code>; any other block name is refused. <code>probe</code>, <code>grade</code>, <code>monitor</code>, <code>calibrate</code> and <code>rule test</code> build and register them from this block at startup, and <code>plan</code> builds them to price their calls without sending any; see the next section. With no block, a rule naming that evaluator is skipped <strong>visibly</strong>, never silently passed.</td>
+<td>Config blocks for evaluators with their own model, keyed by evaluator id: <code>llm_judge</code> and <code>guard</code>. Other block names are refused. <code>probe</code>, <code>grade</code>, <code>monitor</code>, <code>calibrate</code> and <code>rule test</code> build and register them from this block at startup. <code>plan</code> builds them to price calls without sending any; see the next section. Without a block, a rule naming that evaluator is recorded as a rule error, never silently passed. The default <code>fail_on_error: true</code> makes that error fail the gate.</td>
 </tr>
 <tr>
 <td><code>budgets</code></td>
@@ -423,7 +432,36 @@ delivery:                       # optional; see &quot;delivery:&quot; below
 the rule's <code>id</code>, so namespacing rules (<code>guardana.*</code> for built-ins, <code>acme.*</code>
 for a company's own) lets one profile mix and match cleanly — see
 <a href="https://github.com/guardana/guardana/blob/main/examples/guardana.yaml"><code>examples/guardana.yaml</code></a> for a profile that
-includes both.</p>
+includes both. A pattern is a whole id or a glob: <code>guardana.supply_chain</code> is not a
+prefix and matches no rule, while <code>guardana.supply_chain.*</code> matches the namespace.</p>
+<h3 id="an-include-pattern-must-match-a-rule">An include pattern must match a rule</h3>
+<p>Every <code>rules.include</code> pattern must match at least one registered rule after all rules
+load: built-in and installed rules, and YAML rules under <code>rules.paths</code> and
+<code>--rules</code>. Assertions of every contract under <code>contracts:</code>, and every contract
+<code>analyze-trace</code> receives through <code>--contract</code>, also count, regardless of their AI
+system. Only an <code>analyze-trace</code> run for that system executes them, but a pattern
+naming one matches on every command. One profile can therefore serve <code>scan</code>, <code>probe</code>
+and trace runs of each system. A pattern that matches none refuses <code>scan</code>, <code>probe</code>,
+<code>grade</code>, <code>monitor</code>, <code>analyze-trace</code>, <code>baseline</code>, <code>recipe</code> and <code>plan</code> with exit <code>3</code>,
+even when another pattern matches. Refusal precedes any rule execution, anything
+sent and <code>probe</code> starting an MCP server:</p>
+<pre><code class="language-text">error: rules.include contains unmatched patterns: &quot;guardana.supply_chain.code_executon&quot; — check the spelling and registered rules.
+</code></pre>
+<p>Every unmatched pattern is named once, quoted, in profile order. No <code>fail_on_*</code>
+setting relaxes this check: a misspelled id would otherwise select only the correctly
+spelled rules and let the run pass. Patterns are checked before
+<code>rules.exclude</code>, target kind, safety limits or capabilities narrow the selection.
+A pattern whose rules are all excluded, or all for another target kind, is therefore
+not unmatched. A run left with no rule exits <code>2</code> and its plan <code>3</code>, as for any selection
+that verifies nothing. The bare <code>*</code> default is never unmatched. A plugin pack's rules
+are not registered unless <a href="#plugin-trust-plugins"><code>plugins:</code></a> admits the pack.
+A pattern naming only those rules is unmatched: admit the pack or remove the pattern.
+<code>guardana config validate</code> checks patterns the same way before a run, against rules
+the profile names: built-in and installed rules its <code>plugins:</code> trust admits, rules
+under <code>rules.paths</code> and assertions of every contract under <code>contracts:</code>.
+It cannot see rules loaded only with <code>--rules</code> or contracts named only by
+<code>--contract</code>; list them under <code>rules.paths</code> and <code>contracts:</code> to validate them
+(<a href="usage-doctor.html"><code>config validate</code></a>).</p>
 <h2 id="plugin-trust-plugins">Plugin trust: <code>plugins:</code></h2>
 <p>Every command starts by trusting only Guardana's own distributions (<code>builtins</code>). <code>guardana doctor</code> lists installed packs. Guardana refuses a pack until you admit it and records its entry points as errors, so while a pack stays refused every run is <code>indeterminate</code> under the default <code>fail_on_error</code>, whether or not it would have used the pack. Use <code>plugins:</code> to set trust for every command given this profile:</p>
 <pre><code class="language-yaml">plugins:
@@ -577,8 +615,8 @@ that.</p>
 <p>An unknown block name under <code>evaluators:</code>, a key a block does not take, and a block
 that is not a mapping are a <code>ProfileError</code> when the profile loads (exit <code>3</code>), and a
 profile built in Python is held to the same keys when its judges are wired. A rule
-that names an unconfigured evaluator is skipped visibly in the run summary — the gate
-never quietly weakens.</p>
+that names an unconfigured evaluator records a <code>RuleLoadError</code> (<code>unknown evaluator</code>)
+error in the run instead of grading — the gate never quietly weakens.</p>
 <h2 id="rule-specific-configuration">Rule-specific configuration</h2>
 <p><code>rule_config</code> (a top-level key, keyed by rule id) is threaded into a rule's
 <code>RuleContext</code> at run time, letting a rule read profile-supplied configuration
@@ -696,9 +734,11 @@ each judge's own. A slot that lies past <code>max_duration</code> is not waited 
 an exhausted budget, exit <code>6</code>. A target that sends nothing (a file scan, a trace, a
 recording) accepts a rate, as it accepts <code>max_requests</code>. <a href="usage-plan.html#checking-against-a-budget"><code>guardana plan probe</code></a> states the wall time a rate needs and
 refuses a <code>max_duration</code> below it.</p>
-<p>A token ceiling is held only while replies report their token counts. The first
-reply that leaves out a count a ceiling depends on stops the run as an exhausted
-budget, exit <code>6</code>, because no later request could be measured against it.</p>
+<p>A token ceiling is held only while replies report their token counts. A token count
+below zero is read as not reported, because adding a negative count to the sum would
+let every later request pass the ceiling. The first reply that leaves out a count a
+ceiling depends on stops the run as an exhausted budget, exit <code>6</code>, because no later
+request could be measured against it.</p>
 <p><strong>The ceiling belongs to the run, not to a pass of it.</strong> <code>probe</code> runs each
 canary-planting rule against a target of its own — the marker has to be in that
 rule's system prompt and in no other — and every one of those passes shares one
@@ -720,7 +760,7 @@ paying for the answer.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/profiles.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

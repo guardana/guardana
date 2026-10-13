@@ -74,7 +74,7 @@ def test_the_finding_text_path_removes_the_secret(
     redacted = _redactor().redact_text(text)
     assert _secret_of(label, sample) not in redacted
     assert "[redacted:" in redacted
-    assert redacted.endswith(after)
+    assert redacted.endswith(_kept_after(sample, after))
 
 
 @pytest.mark.parametrize(("label", "sample"), _CASES, ids=_IDS)
@@ -84,7 +84,13 @@ def test_the_span_path_removes_the_secret(label: str, sample: str, before: str, 
     redacted = _redactor().redact_spans(text)
     assert _secret_of(label, sample) not in redacted
     assert "[redacted:" in redacted
-    assert redacted.endswith(after)
+    assert redacted.endswith(_kept_after(sample, after))
+
+
+def _kept_after(sample: str, after: str) -> str:
+    """What survives after `sample`: nothing when it opens a private key it never closes."""
+    opens_a_key = sample.startswith("-----BEGIN ") and "-----END " not in sample
+    return "]" if opens_a_key else after
 
 
 def _secret_of(label: str, sample: str) -> str:

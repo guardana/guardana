@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -215,7 +219,9 @@ for finding in verification.result.findings:
     print(finding.severity.name, finding.rule_id, finding.target_ref)
 verification.save(Path(&quot;run.json&quot;))  # the document `--format json --output` writes
 </code></pre>
-<p><code>PluginTrust</code>, <code>PluginMode</code> and <code>load_profile</code> are needed to build a <code>Verifier</code> but sit outside the <a href="compatibility.html#the-supported-surface">supported surface</a>: a minor release may change them, so pin <code>guardana-core</code> to a minor while your code imports them.</p>
+<p><code>PluginTrust</code>, <code>PluginMode</code> and <code>load_profile</code> are needed to build a <code>Verifier</code> but are outside
+the <a href="compatibility.html#the-supported-surface">supported surface</a>. They are subject to change in
+any release. While your code imports them, pin the exact <code>guardana-core</code> version you tested.</p>
 <p>A run that fails, stays indeterminate, or is stopped by its budget or by its target failing part-way is returned like one that passed. Read <code>verification.gate</code>, <code>verification.exit_code</code> or <code>verification.open_questions</code>; nothing is raised for an outcome.</p>
 <p>To keep runs in the optional collector, the CLI sends them with <code>--reporter server://&lt;collector URL&gt;</code>; the collector's <a href="usage-collector.html#the-http-api">HTTP API</a> stores and serves results without starting runs. <code>verification.save(path)</code> writes the same run document as <code>--format json --output</code>.</p>
 <h2 id="configure-a-run">Configure a run</h2>
@@ -310,7 +316,7 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 <li><code>A2aAgentTarget(url, *, credential=None, other_credential=None, sender=None)</code> takes the http(s) URL of the agent's card (ending in <code>.json</code>) or of its origin; any other path, a second credential without the first, or the same value twice, raises <code>ValueError</code>. <code>sender</code> is a <code>Sender</code>.</li>
 <li>A server that stops accepting the agreed revision mid-run returns the <code>Verification</code> with <code>result.stopped_by</code> <code>target_changed</code> and exit code <code>4</code>.</li>
 </ul>
-<p>A target runs once. Running the same object again, starting a second run while the first is under way, or running one that already sent requests raises <code>TargetReusedError</code>: build a fresh target for each run, so its usage, its budget and whatever it cached describe that run alone. A run refused before anything was sent, over its calibrations or a budget, leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.</p>
+<p>A target runs once. Reusing the same object, starting a second run while the first is under way, or running a target that already sent requests raises <code>TargetReusedError</code>. Build a fresh target for each run so its usage, budget and cache describe that run alone. A run refused over its calibrations, a budget or its profile before anything was sent leaves the target free to run. A target that cannot be weakly referenced is checked by its meter alone.</p>
 <h2 id="read-a-result">Read a result</h2>
 <p><code>Verification</code> is frozen.</p>
 <div class="table-wrap"><table>
@@ -335,7 +341,7 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 </tr>
 <tr>
 <td><code>exit_code</code></td>
-<td>The code <code>guardana</code> gives this result: <code>0</code>, <code>1</code>, <code>2</code>, <code>4</code> when its target stopped it (<code>target_unavailable</code> or <code>target_changed</code>), or <code>6</code> (<a href="exit-codes.html">exit codes</a>).</td>
+<td>The code <code>guardana</code> gives this result: <code>0</code>, <code>1</code>, <code>2</code>, <code>4</code> when its target stopped it (<code>target_unavailable</code> or <code>target_changed</code>), <code>6</code> when its budget did, or <code>7</code> when the run was interrupted, which only a saved run read back with <code>load_verification</code> records. <code>3</code>, <code>5</code> and <code>8</code> describe a command with no result or a failed installed output, never a <code>Verification</code> (<a href="exit-codes.html">exit codes</a>).</td>
 </tr>
 <tr>
 <td><code>passed</code></td>
@@ -359,18 +365,19 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 </tr>
 <tr>
 <td><code>document()</code>, <code>save(path)</code></td>
-<td>The saved-run document, in the current run schema (<a href="usage-run.html">saved runs</a>); <code>save</code> also writes kept exchanges to <code>exchanges_path(path)</code> (<code>run.json</code> → <code>run.exchanges.jsonl</code>).</td>
+<td>The saved-run document in the current run schema (<a href="usage-run.html">saved runs</a>); <code>save</code> also writes kept exchanges to <code>exchanges_path(path)</code> (<code>run.json</code> → <code>run.exchanges.jsonl</code>). It writes exchanges first, then the document, each whole through an adjacent file. A failed save (<code>OSError</code>) leaves no document naming absent exchanges and preserves the earlier run and its exchanges. It replaces or removes only exchanges that the run it replaces at <code>path</code> recorded by digest. It replaces a link there without writing through it. <code>run</code> and <code>run.json</code> share one sidecar, so exchanges recorded by the other are never replaced or removed. Keeping exchanges beside any other file raises <code>FileExistsError</code> before anything is written. A run that kept none leaves such a file in place and warns with a <code>UserWarning</code> (Python's <code>warnings</code> module).</td>
 </tr>
 </tbody>
 </table></div>
 <p>SARIF, JUnit and the terminal report are rendered by <code>guardana-report</code>: <code>guardana.report.get_renderer(&quot;sarif&quot;, run=verification.manifest).render(verification.result)</code>.</p>
 <h2 id="read-a-saved-run-back">Read a saved run back</h2>
 <p><code>load_verification(path)</code> reads a run saved by <code>--format json --output</code> or <code>save()</code>, of any
-run schema, into a <code>Verification</code> with the gate the run recorded; <code>exchanges</code> is <code>None</code>. A run
+run schema, into a <code>Verification</code> with the run's recorded gate. <code>exchanges</code> is <code>None</code>. A run
 that recorded no gate raises <code>ReportLoadError</code> from <code>guardana.core.report.load</code>. An
 <a href="outputs.html#export-a-saved-run-from-python">installed format</a> can then export it without
 sending anything: <code>render(select_renderer(name, trust), load_verification(path))</code> from
-<code>guardana.core.output</code>.</p>
+<code>guardana.core.output</code>. <a href="reading-results.html">Reading results</a> shows how to read a saved run
+from Python and from <code>jq</code>, reading each channel separately.</p>
 <h2 id="when-a-run-cannot-be-carried-out">When a run cannot be carried out</h2>
 <p>Every error derives from <code>VerificationError</code>.</p>
 <div class="table-wrap"><table>
@@ -419,7 +426,7 @@ sending anything: <code>render(select_renderer(name, trust), load_verification(p
 </tr>
 </tbody>
 </table></div>
-<p>A profile that does not load raises <code>ProfileError</code> from <code>guardana.core.profile</code>. Ctrl-C propagates as <code>KeyboardInterrupt</code>.</p>
+<p>A profile that does not load raises <code>ProfileError</code> from <code>guardana.core.profile</code>. Every <code>scan</code>, <code>run</code> and <code>grade</code> also raises it when a <code>rules.include</code> pattern matches none of the rules the <code>Verifier</code> registered, even when another pattern matches. Registered rules include those discovered, passed as <code>rules</code>, or loaded from <code>rule_paths</code> and <code>rules.paths</code>. A <code>Verifier</code> compiles no contract, so a pattern naming only a contract assertion is unmatched here. No <code>Verification</code> is returned, no rule runs, nothing is sent and the target stays free to run (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>). Ctrl-C propagates as <code>KeyboardInterrupt</code>.</p>
 <h2 id="serve-your-applications-tools-in-ci">Serve your application's tools in CI</h2>
 <p><code>guardana.core.doubles</code> is public too: <code>open_doubles(FILE, trace=PATH)</code> returns <code>Doubles</code> over the tools and records a fixtures file declares, with <code>acting_as(tenant)</code>, <code>call(name, **arguments)</code>, <code>tool(name)</code> and <code>close()</code>, and raises <code>DoublesError</code> for a call or a setup it refuses. Its behaviour and its trace are described in <a href="usage-doubles.html"><code>usage-doubles.md</code></a>.</p>
 <h2 id="what-is-supported">What is supported</h2>
@@ -429,7 +436,7 @@ sending anything: <code>render(select_renderer(name, trust), load_verification(p
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/python-api.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

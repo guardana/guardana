@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -204,7 +208,7 @@ guardana probe --url https://staging.example.com --model my-app --max-requests 5
 </code></pre>
 <ol>
 <li><code>plan probe</code> estimates the cost and lists what would run without sending a request.</li>
-<li><code>target inspect</code> sends three requests to find out what the endpoint can do, and lists what it declares but could not confirm. It informs you; it does not configure the probe. A rule whose capability the target does not declare is skipped and recorded as skipped; a capability the target declares but inspection could not confirm still lets its rules run, so settle those before trusting the probe. <code>--require</code> exits <code>2</code> when a named capability is not confirmed (<a href="usage-target.html#declared-versus-verified">target inspection</a>).</li>
+<li><code>target inspect</code> sends up to three requests to check endpoint capabilities. It lists declared capabilities it cannot confirm. It informs you; it does not configure the probe. A rule whose capability the target does not declare is skipped and recorded as skipped. Rules for declared but unconfirmed capabilities still run. Resolve those uncertainties before trusting the probe. <code>--require</code> exits <code>2</code> when a named capability is not confirmed (<a href="usage-target.html#declared-versus-verified">target inspection</a>).</li>
 <li><code>probe</code> sends at most <code>--max-requests</code> requests and saves the run. The saved run records the plugin trust in force (<code>run.configuration.plugins</code>).</li>
 </ol>
 <p>Probe staging, not production. Your application can act on the model's output, and real probe requests can cost money. Read <a href="safe-testing.html">safe testing</a> first. Run your own checks, such as the starter's <code>checks/</code>, with <code>--rules checks</code>.</p>
@@ -213,7 +217,7 @@ guardana probe --url https://staging.example.com --model my-app --max-requests 5
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/recipe-real-application.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

@@ -12,6 +12,7 @@ from guardana.core.rule.fixture import DeclaredFixture, FixtureOutcome, RuleFixt
 from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
 from guardana.core.target import (
+    MAX_LISTING_PAGES,
     Capability,
     McpServerTarget,
     McpTool,
@@ -169,12 +170,15 @@ class McpServerManifestRule(Rule):
 
     @property
     def estimated_requests(self) -> int:
-        """Four: the discovery probe, the fallback handshake, its notification, and the listing.
+        """The discovery probe, the fallback handshake, its notification, and every listed page.
 
         The first is which era the server speaks, asked once and shared with every
-        other rule. A modern server needs no handshake and costs two.
+        other rule. A modern server needs no handshake. The listing is read to its last
+        page, up to `MAX_LISTING_PAGES`; a server naming more is refused rather than read,
+        so a one-page server costs four. A session that expires is opened again once per
+        run: a handshake, its notification and the request again.
         """
-        return 4
+        return 3 + MAX_LISTING_PAGES + 3
 
     @property
     def graded_verdicts(self) -> Mapping[str, int]:

@@ -76,12 +76,24 @@ def scope_to_dict(scope: FileScope | None) -> dict[str, object] | None:
     """Serialize what a file run listed and excluded; None for any other run."""
     if scope is None:
         return None
+    skipped = scope.skipped_models
     return {
         "files": list(scope.files),
         "excludes": None
         if scope.excludes is None
-        else [{"pattern": e.pattern, "source": str(e.source)} for e in scope.excludes],
+        else [
+            {"pattern": e.pattern, "source": str(e.source), "file": e.file} for e in scope.excludes
+        ],
         "ignored_directories": list(scope.ignored_directories),
+        "kept_models": [{"path": k.path, "pattern": k.pattern} for k in scope.kept_models],
+        "skipped_models": None
+        if skipped is None
+        else {
+            "directories": [
+                {"path": d.path, "model_files": d.model_files} for d in skipped.directories
+            ],
+            "searched_all": skipped.searched_all,
+        },
     }
 
 

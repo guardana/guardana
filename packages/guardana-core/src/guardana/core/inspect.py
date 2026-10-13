@@ -177,6 +177,10 @@ def _probe_tools(target: Target) -> CapabilityFinding:
         raise
     except EndpointError as exc:
         return CapabilityFinding(name, Support.UNSUPPORTED, f"tool request rejected: {exc}", 1)
+    if reply.unreadable is not None:
+        return CapabilityFinding(
+            name, Support.UNKNOWN, f"{reply.unreadable}; the capability is not established", 1
+        )
     if reply.tool_calls:
         return CapabilityFinding(name, Support.SUPPORTED, "the model returned a tool call", 1)
     return CapabilityFinding(

@@ -1,9 +1,10 @@
 """`guardana diff` calls a finding resolved only where the later scan still listed its file.
 
 Each case scans a real tree twice through the CLI and compares the two saved runs, the
-way a pipeline does: a pickle that was deleted, moved into a directory every scan skips,
-renamed to `.bin` or listed in `.guardanaignore` left the scan, and only a file the
-second scan read and found clean is resolved.
+way a pipeline does: a pickle that was deleted, moved into a directory every scan skips or
+renamed to `.bin`, or a source file listed in `.guardanaignore`, left the scan, and only a
+file the second scan read and found clean is resolved. A pickle listed in `.guardanaignore`
+stays in the scan.
 """
 
 import json
@@ -78,20 +79,40 @@ def test_a_pickle_deleted_from_the_tree_left_the_scan(
     assert "deleted, moved, renamed" in payload["changes"][0]["detail"]  # type: ignore[index]
 
 
-def test_a_pickle_listed_in_guardanaignore_left_an_empty_scan_and_the_pattern_is_named(
+def test_a_pickle_listed_in_guardanaignore_stays_in_the_scan_and_is_not_resolved(
     scanned: tuple[Path, Path], tmp_path: Path
 ) -> None:
     model, before = scanned
     (model / ".guardanaignore").write_text("weights.pkl\n", encoding="utf-8")
     after = tmp_path / "after.json"
-    _scan_of_nothing(model, after)
+    _scan(model, after)
+
+    code, payload = _diff(before, after)
+
+    assert code == _NO_REGRESSION
+    assert _kinds(payload) == []
+    kept = json.loads(after.read_text(encoding="utf-8"))["scope"]["kept_models"]
+    assert [entry["pattern"] for entry in kept] == ["weights.pkl"]
+
+
+def test_source_listed_in_guardanaignore_left_an_empty_scan_and_the_pattern_is_named(
+    tmp_path: Path,
+) -> None:
+    code_dir = tmp_path / "code"
+    code_dir.mkdir()
+    (code_dir / "run.py").write_text("import os\nos.system('echo hi')\n", encoding="utf-8")
+    before = tmp_path / "before.json"
+    _scan(code_dir, before)
+    (code_dir / ".guardanaignore").write_text("run.py\n", encoding="utf-8")
+    after = tmp_path / "after.json"
+    _scan_of_nothing(code_dir, after)
 
     code, payload = _diff(before, after)
 
     assert code == _INCOMPLETE
-    assert _kinds(payload) == [("left_scan", "weights.pkl")]
+    assert [kind for kind, _location in _kinds(payload)] == ["left_scan"]
     detail = payload["changes"][0]["detail"]  # type: ignore[index]
-    assert "excluded by 'weights.pkl' from .guardanaignore" in detail
+    assert "excluded by 'run.py' from .guardanaignore" in detail
 
 
 def test_a_pickle_moved_into_a_directory_every_scan_skips_left_an_empty_scan(

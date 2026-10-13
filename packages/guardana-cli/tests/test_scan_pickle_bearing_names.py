@@ -76,8 +76,8 @@ _CASES: dict[str, tuple[str, Callable[[], bytes], ExitCode]] = {
         lambda: _zip({"model/data.pkl": _SYSTEM, "model/version": b"3"}),
         ExitCode.POLICY_FAILED,
     ),
-    "pkl-gz": ("model.pkl.gz", lambda: gzip.compress(_SYSTEM), ExitCode.INDETERMINATE),
-    "joblib-gz": ("model.joblib.gz", lambda: gzip.compress(_SYSTEM), ExitCode.INDETERMINATE),
+    "pkl-gz": ("model.pkl.gz", lambda: gzip.compress(_SYSTEM), ExitCode.POLICY_FAILED),
+    "joblib-gz": ("model.joblib.gz", lambda: gzip.compress(_SYSTEM), ExitCode.POLICY_FAILED),
     "torchserve-mar": (
         "model.mar",
         lambda: _zip({"model.pkl": _SYSTEM, "handler.py": b"import os\n"}),
@@ -89,12 +89,12 @@ _CASES: dict[str, tuple[str, Callable[[], bytes], ExitCode]] = {
         ExitCode.INDETERMINATE,
     ),
     "llamafile": ("model.llamafile", lambda: _SYSTEM, ExitCode.INDETERMINATE),
-    "pt-gz": ("model.pt.gz", lambda: gzip.compress(_SYSTEM), ExitCode.INDETERMINATE),
-    "joblib-lz4": ("model.joblib.lz4", lambda: _SYSTEM, ExitCode.INDETERMINATE),
+    "pt-gz": ("model.pt.gz", lambda: gzip.compress(_SYSTEM), ExitCode.POLICY_FAILED),
+    "joblib-lz4": ("model.joblib.lz4", lambda: _SYSTEM, ExitCode.POLICY_FAILED),
     "sagemaker": (
         "model.tar.gz",
         lambda: _tar({"model.pkl": _SYSTEM}, mode="w:gz"),
-        ExitCode.INDETERMINATE,
+        ExitCode.POLICY_FAILED,
     ),
     "torch-tar-in-zip": (
         "release.zip",

@@ -1,6 +1,6 @@
 """One archive costs a bounded number of operations, and reaching a bound is never clean.
 
-Counted, never timed: the opcodes `pickletools` yields and the members opened are
+Counted, never timed: the opcodes the rule reads and the members opened are
 the work, so the tests count them.
 """
 
@@ -15,6 +15,7 @@ import types
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
+from typing import IO
 
 import pytest
 from guardana.core.profile import Policy, Profile
@@ -24,6 +25,7 @@ from guardana.core.rule import RuleContext
 from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain import pickle_opcode
+from guardana.rules.supply_chain._opcodes import read_opcodes
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule
 
 _RULE_ID = "guardana.supply_chain.pickle_opcode"
@@ -43,16 +45,16 @@ def _zip(members: dict[str, bytes], compression: int = zipfile.ZIP_DEFLATED) -> 
 
 
 def _count_opcodes(monkeypatch: pytest.MonkeyPatch) -> list[int]:
-    """Patch `pickletools.genops` to count every opcode it yields; read `[0]` after."""
+    """Patch the rule's opcode reader to count every opcode it yields; read `[0]` after."""
     walked = [0]
-    real_genops = pickletools.genops
+    real_reader = read_opcodes
 
-    def counting(stream: io.BytesIO) -> Iterator[tuple[pickletools.OpcodeInfo, object, int | None]]:
-        for item in real_genops(stream):
+    def counting(stream: IO[bytes]) -> Iterator[tuple[pickletools.OpcodeInfo, object]]:
+        for item in real_reader(stream):
             walked[0] += 1
             yield item
 
-    monkeypatch.setattr(pickletools, "genops", counting)
+    monkeypatch.setattr(pickle_opcode, "read_opcodes", counting)
     return walked
 
 

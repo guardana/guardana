@@ -48,6 +48,7 @@
 <li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="../usage-baseline.html">guardana baseline</a></li>
 <li><a href="../usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="../product-status.html">Product status</a></li>
 <li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="../architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="../usage-baseline.html">guardana baseline</a></li>
 <li><a href="../usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="../product-status.html">Product status</a></li>
 <li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="../architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -197,11 +201,11 @@
 </nav>
 </details>
 <main>
-<p class="crumb"><a href="../rules/index.html">Rule explorer</a></p><h1>Live MCP tool manifest carries a hidden instruction or has drifted</h1><p class="lede"><span class="rid">guardana.agent.mcp_server_manifest</span></p><ul class="props"><li><b>Severity</b><a class="sev HIGH" href="../rules/by/severity-HIGH.html">HIGH</a></li><li><b>Surface</b><a href="../rules/by/surface-runtime.html">runtime</a></li><li><b>Family</b><a href="../rules/by/family-agent.html">agent</a></li><li><b>Impact</b><a href="../rules/by/impact-active.html">active</a></li><li><b>Target</b>endpoint</li><li><b>Requests</b>at most 4</li><li><b>Evaluator</b>graded in code</li><li><b>Maturity</b>stable</li><li><b>Detection</b>heuristic</li><li><b>Destructive</b>no</li><li><b>Needs</b>list_tools</li></ul><h2>What a secure system does</h2><p>This rule grades in code rather than against a declared expectation, so it states no goal here. Its behaviour is its fixtures, which <code>guardana rule test</code> runs.</p><h2>Maps to</h2><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Control</th><th>Catalogue</th></tr></thead><tbody><tr><td><a class="rid" href="../rules/by/reference-LLM01-2025.html">LLM01:2025</a></td><td>Prompt Injection</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM01-2026.html">LLM01:2026</a></td><td>Prompt Injection</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM03-2025.html">LLM03:2025</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM04-2026.html">LLM04:2026</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-ASI04-2026.html">ASI04:2026</a></td><td>Agentic Supply Chain Vulnerabilities</td><td><a href="../rules/by/framework-OWASP-ASI-2026.html">OWASP-ASI-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-MCP03-2025.html">MCP03:2025</a></td><td>Tool Poisoning</td><td><a href="../rules/by/framework-OWASP-MCP-2025.html">OWASP-MCP-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-MCP04-2025.html">MCP04:2025</a></td><td>Software Supply Chain Attacks &amp; Dependency Tampering</td><td><a href="../rules/by/framework-OWASP-MCP-2025.html">OWASP-MCP-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-MCP10-2025.html">MCP10:2025</a></td><td>Context Injection &amp; Over-Sharing</td><td><a href="../rules/by/framework-OWASP-MCP-2025.html">OWASP-MCP-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0110.html">AML.T0110</a></td><td>AI Agent Tool Poisoning</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0109.html">AML.T0109</a></td><td>AI Supply Chain Rug Pull</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0084.001.html">AML.T0084.001</a></td><td>Discover AI Agent Configuration: Tool Definitions</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr></tbody></table></div><p><a href="../writing-rules.html">How a rule is written</a> · <a href="../profiles.html">Selecting it in a profile</a></p>
+<p class="crumb"><a href="../rules/index.html">Rule explorer</a></p><h1>Live MCP tool manifest carries a hidden instruction or has drifted</h1><p class="lede"><span class="rid">guardana.agent.mcp_server_manifest</span></p><ul class="props"><li><b>Severity</b><a class="sev HIGH" href="../rules/by/severity-HIGH.html">HIGH</a></li><li><b>Surface</b><a href="../rules/by/surface-runtime.html">runtime</a></li><li><b>Family</b><a href="../rules/by/family-agent.html">agent</a></li><li><b>Impact</b><a href="../rules/by/impact-active.html">active</a></li><li><b>Target</b>endpoint</li><li><b>Requests</b>at most 22</li><li><b>Evaluator</b>graded in code</li><li><b>Maturity</b>stable</li><li><b>Detection</b>heuristic</li><li><b>Destructive</b>no</li><li><b>Needs</b>list_tools</li></ul><h2>What a secure system does</h2><p>This rule grades in code rather than against a declared expectation, so it states no goal here. Its behaviour is its fixtures, which <code>guardana rule test</code> runs.</p><h2>Maps to</h2><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Control</th><th>Catalogue</th></tr></thead><tbody><tr><td><a class="rid" href="../rules/by/reference-LLM01-2025.html">LLM01:2025</a></td><td>Prompt Injection</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM01-2026.html">LLM01:2026</a></td><td>Prompt Injection</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM03-2025.html">LLM03:2025</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2025.html">OWASP-LLM-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-LLM04-2026.html">LLM04:2026</a></td><td>Supply Chain</td><td><a href="../rules/by/framework-OWASP-LLM-2026.html">OWASP-LLM-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-ASI04-2026.html">ASI04:2026</a></td><td>Agentic Supply Chain Vulnerabilities</td><td><a href="../rules/by/framework-OWASP-ASI-2026.html">OWASP-ASI-2026</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-MCP03-2025.html">MCP03:2025</a></td><td>Tool Poisoning</td><td><a href="../rules/by/framework-OWASP-MCP-2025.html">OWASP-MCP-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-MCP04-2025.html">MCP04:2025</a></td><td>Software Supply Chain Attacks &amp; Dependency Tampering</td><td><a href="../rules/by/framework-OWASP-MCP-2025.html">OWASP-MCP-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-MCP10-2025.html">MCP10:2025</a></td><td>Context Injection &amp; Over-Sharing</td><td><a href="../rules/by/framework-OWASP-MCP-2025.html">OWASP-MCP-2025</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0110.html">AML.T0110</a></td><td>AI Agent Tool Poisoning</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0109.html">AML.T0109</a></td><td>AI Supply Chain Rug Pull</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr><tr><td><a class="rid" href="../rules/by/reference-AML.T0084.001.html">AML.T0084.001</a></td><td>Discover AI Agent Configuration: Tool Definitions</td><td><a href="../rules/by/framework-MITRE-ATLAS.html">MITRE-ATLAS</a></td></tr></tbody></table></div><p><a href="../writing-rules.html">How a rule is written</a> · <a href="../profiles.html">Selecting it in a profile</a></p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana">Source on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

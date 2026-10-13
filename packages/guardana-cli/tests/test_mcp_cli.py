@@ -93,11 +93,12 @@ def test_a_missing_tool_list_is_refused_rather_than_read_as_no_tools() -> None:
         open_conversation(_Fake("not a list"))
 
 
-def test_malformed_tool_entries_are_dropped_and_the_rest_survive() -> None:
-    entries = ["junk", {"no_name": 1}, {"name": "ok", "description": "d"}]
-    conversation = open_conversation(_Fake(entries))
-
-    assert [t.name for t in conversation.tools] == ["ok"]
+@pytest.mark.parametrize("junk", ["junk", {"no_name": 1}])
+def test_a_malformed_tool_entry_makes_the_listing_unreadable_rather_than_shorter(
+    junk: object,
+) -> None:
+    with pytest.raises(McpError, match="not a tool declaration"):
+        open_conversation(_Fake([{"name": "ok", "description": "d"}, junk]))
 
 
 def test_a_tool_without_a_description_reads_as_empty_not_missing() -> None:

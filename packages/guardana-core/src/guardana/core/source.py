@@ -13,6 +13,8 @@ fail-open one level up from any rule.
 """
 
 import ast
+import io
+import tokenize
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -100,22 +102,18 @@ class UnreadSource:
     reason: str
 
 
-def read_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSource | UnreadSource | None:
-    """Read and index one Python file, distinguishing "could not" from "nothing to find".
+def read_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSource | UnreadSource:
+    """Read and index one Python file, or say why the scan could not look at it.
 
-    Three outcomes, and the difference between the last two is the whole point:
+    * a `PythonSource` — the file was read, decoded and parsed;
+    * an `UnreadSource` — nobody examined it: the file is larger than `limit`, is
+      not a regular file, could not be opened, cannot be decoded, or does not
+      parse under this interpreter. The run must say so rather than let it
+      disappear.
 
-    * a `PythonSource` — the file was read and parsed;
-    * an `UnreadSource` — the scan was *prevented* from looking: the file is
-      larger than `limit`, is not a regular file, or could not be opened. Nobody
-      examined it, so the run must say so rather than let it disappear;
-    * `None` — the file is not runnable Python (invalid syntax, undecodable
-      bytes). A rule looking for Python constructs has genuinely nothing to find,
-      and reporting it would put noise on every repo with a Python 2 relic.
-
-    Collapsing the middle case into `None` is how an oversized file became a
-    scanner bypass: padding a malicious loader past the read limit removed it from
-    the scan and nothing in the report said so.
+    Bytes are decoded the way the interpreter decodes a module it runs: a UTF-8
+    byte order mark or a PEP 263 coding line decides the encoding, so a loader
+    saved as latin-1 is scanned like its UTF-8 twin.
     """
     try:
         with open_regular(path) as handle:
@@ -126,15 +124,35 @@ def read_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSource | 
         return UnreadSource(path, f"cannot read {path.name}: {exc}")
     if len(raw) > limit:
         return UnreadSource(path, f"{path.name} is too large to analyse (over {limit} bytes)")
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
+    text = _decoded(path, raw)
+    if isinstance(text, UnreadSource):
+        return text
     try:
         tree = ast.parse(text)
-    except (SyntaxError, ValueError):  # ValueError: source containing a null byte
-        return None
+    # MemoryError and RecursionError: a source too deeply nested for the parser.
+    # ValueError: a null byte, on interpreters that do not raise SyntaxError for it.
+    except (SyntaxError, ValueError, MemoryError, RecursionError) as exc:
+        return UnreadSource(path, f"{path.name} cannot be parsed as Python: {_why(exc)}")
     return PythonSource(path, text, tree)
+
+
+def _why(exc: Exception) -> str:
+    """Say why the parser refused a source, naming the line only when it has one."""
+    if isinstance(exc, SyntaxError):
+        return exc.msg if exc.lineno is None else f"{exc.msg} (line {exc.lineno})"
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _decoded(path: Path, raw: bytes) -> str | UnreadSource:
+    """Decode `raw` in the encoding its byte order mark or coding line declares."""
+    try:
+        encoding, _ = tokenize.detect_encoding(io.BytesIO(raw).readline)
+    except SyntaxError as exc:
+        return UnreadSource(path, f"{path.name} declares an encoding that cannot be used: {exc}")
+    try:
+        return raw.decode(encoding)
+    except (UnicodeDecodeError, LookupError) as exc:
+        return UnreadSource(path, f"{path.name} cannot be decoded as {encoding}: {exc}")
 
 
 def read_python_source(path: Path, *, limit: int = MAX_SOURCE_BYTES) -> PythonSource | None:

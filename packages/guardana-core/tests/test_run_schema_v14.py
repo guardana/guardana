@@ -36,7 +36,7 @@ _LOCK = "sha256:" + "cd" * 32
 
 def _errors(document: dict[str, Any], version: int = 14) -> list[str]:
     """Validate `document` against a run schema, a current one in the shape version 14 wrote."""
-    if document["schema_version"] == 17:
+    if document["schema_version"] == 18:
         document = saved_run_at_v14(document)
     schema = json.loads((_SCHEMAS / f"run-v{version}.schema.json").read_text(encoding="utf-8"))
     return [error.message for error in Draft202012Validator(schema).iter_errors(document)]

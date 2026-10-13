@@ -22,16 +22,20 @@ robust behind a caller that is not has been tested in the wrong place.
 """
 
 import contextlib
+import struct
 import time
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from guardana.core.formats import FormatError, read_gguf_metadata
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.rule.errors import RuleError
 from guardana.core.target import ArtifactTarget, TargetKind
+from guardana.rules.supply_chain import chat_template as chat_template_module
+from guardana.rules.supply_chain._reading import read_bytes_bounded, read_text_prefix
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -55,9 +59,13 @@ _HOSTILE_SUFFIXES = (
     ".onnx",
     ".safetensors",
     ".h5",
+    ".hdf",
+    ".weights",
+    ".tf",
     ".keras",
     ".pmml",
     ".pb",
+    ".pbtxt",
     ".npy",
     ".npz",
     ".sav",
@@ -73,6 +81,27 @@ _HOSTILE_SUFFIXES = (
     ".jinja",
     ".txt",
     ".py",
+    ".pkl.gz",
+    ".pkl.z",
+    ".joblib.xz",
+    ".pickle.bz2",
+    ".pkl.lzma",
+    ".joblib.lz4",
+    ".th",
+    ".pkl3",
+    ".mdl",
+    ".dat",
+    "",
+    ".pkl.gzip",
+    ".npy.gz",
+    ".dat.gz",
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tbz",
+    ".tar.xz",
+    ".txz",
 )
 """Every extension a built-in artifact rule opens and reads the contents of.
 
@@ -96,7 +125,26 @@ _MAGICS = (
     b"\x93NUMPY\x01\x00\x40\x00{'descr': '|O', 'fortran_order': False, 'shape': (1,)}",
     b'{"__metadata__":',
     b"<PMML>",
+    b'node { op: "Write\\',  # a SavedModel text graph, cut inside an escaped op name
+    b"\x12\x0bMatchingFilesB",  # a SavedModel op that reads a string constant, then its key
+    b"\x1f\x8b\x08\x00",  # gzip
+    b"\x78\x9c",  # zlib
+    b"BZh9",
+    b"\xfd7zXZ\x00",
+    b"\x5d\x00\x00\x80\x00",  # lzma
+    b"ZF0x40               ",  # joblib's legacy zlib header
 )
+
+_NAMES_BY_SUFFIX = {
+    ".json": "tokenizer_config.json",
+    ".jinja": "chat_template.jinja",
+    ".j2": "chat_template.j2",
+}
+"""Names the chat-template rule actually opens.
+
+It reads `.json` only under a config name and `.jinja`/`.j2` only under a
+`chat_template` stem, so `model.json` and `model.jinja` never reach its reader.
+"""
 
 
 def _artifact_rules() -> tuple[Rule, ...]:
@@ -119,7 +167,11 @@ _RULES = _artifact_rules()
     suffix=st.sampled_from(_HOSTILE_SUFFIXES),
 )
 def test_no_artifact_rule_raises_on_bytes_nobody_wrote(
-    tmp_path: Path, magic: bytes, body: bytes, suffix: str
+    tmp_path: Path,
+    magic: bytes,
+    body: bytes,
+    suffix: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A rule that raises is coverage the scan reported and did not have.
 
@@ -127,7 +179,34 @@ def test_no_artifact_rule_raises_on_bytes_nobody_wrote(
     failure this catches is the scan going `indeterminate` because a struct
     unpacked short, and the file that did it being one an attacker uploaded.
     """
-    (tmp_path / f"model{suffix}").write_bytes(magic + body)
+    # The chat-template rule never opens `model.json` or `model.jinja`: it reads
+    # `.json` only under a config name and `.jinja`/`.j2` only under a
+    # `chat_template` stem. Without the real names the reader below is never
+    # reached and this test proves nothing about it.
+    # A SavedModel graph is read only under its own name in its text form; tf_keras
+    # metadata is read under its own name.
+    stem = "saved_model" if suffix == ".pbtxt" else "model"
+    name = _NAMES_BY_SUFFIX.get(suffix, f"{stem}{suffix}")
+    (tmp_path / name).write_bytes(magic + body)
+    if suffix == ".pb":
+        (tmp_path / "saved_model.pb").write_bytes(magic + body)
+        (tmp_path / "keras_metadata.pb").write_bytes(magic + body)
+    # Counters close over the module-level originals, not over the attribute on
+    # `chat_template_module`: `monkeypatch` is function-scoped, so reading the
+    # attribute here would pick up the previous example's wrapper and nest one
+    # frame per example.
+    reached: list[str] = []
+
+    def counting_text_prefix(path: Path, **kwargs: object) -> object:
+        reached.append(path.name)
+        return read_text_prefix(path, **kwargs)  # type: ignore[arg-type]
+
+    def counting_bytes(path: Path, *args: object, **kwargs: object) -> object:
+        reached.append(path.name)
+        return read_bytes_bounded(path, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(chat_template_module, "read_text_prefix", counting_text_prefix)
+    monkeypatch.setattr(chat_template_module, "read_bytes_bounded", counting_bytes)
     target = ArtifactTarget(tmp_path)
     ctx = RuleContext()
 
@@ -140,6 +219,8 @@ def test_no_artifact_rule_raises_on_bytes_nobody_wrote(
             continue
         except Exception as exc:
             pytest.fail(f"{rule.meta.id} raised {type(exc).__name__} on {suffix}: {exc}")
+    if suffix in _NAMES_BY_SUFFIX:
+        assert name in reached, f"no example with suffix {suffix} reached the chat-template reader"
 
 
 @settings(
@@ -150,7 +231,7 @@ def test_no_artifact_rule_raises_on_bytes_nobody_wrote(
     actual=st.binary(min_size=0, max_size=256),
 )
 def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
-    tmp_path: Path, declared: int, actual: bytes
+    tmp_path: Path, declared: int, actual: bytes, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The header field an attacker controls, pointed past the end of the file.
 
@@ -160,8 +241,29 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
     and a loop that iterates it.
     """
     header = declared.to_bytes(8, "little")
-    for name in ("model.safetensors", "model.gguf"):
-        (tmp_path / name).write_bytes(header + actual)
+    (tmp_path / "model.safetensors").write_bytes(header + actual)
+    # A real GGUF header: magic bytes, version 3, then the declared tensor and
+    # metadata counts. Without the magic first, every example stops at the magic
+    # check and the length handling below is never exercised.
+    gguf_header = (
+        b"GGUF" + struct.pack("<I", 3) + struct.pack("<Q", declared) + struct.pack("<Q", declared)
+    )
+    (tmp_path / "model.gguf").write_bytes(gguf_header + actual)
+    reached: list[Path] = []
+    reader_errors: list[str] = []
+
+    def counting_reader(path: Path, **kwargs: object) -> object:
+        # Closes over the module-level original: `monkeypatch` is
+        # function-scoped, so reading the attribute here would pick up the
+        # previous example's wrapper and nest one frame per example.
+        reached.append(path)
+        try:
+            return read_gguf_metadata(path, **kwargs)  # type: ignore[arg-type]
+        except FormatError as exc:
+            reader_errors.append(str(exc))
+            raise
+
+    monkeypatch.setattr(chat_template_module, "read_gguf_metadata", counting_reader)
     target = ArtifactTarget(tmp_path)
     ctx = RuleContext()
 
@@ -175,6 +277,10 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
             pytest.fail(f"{rule.meta.id} raised {type(exc).__name__}: {exc}")
     elapsed = time.monotonic() - started
 
+    assert reached, "no example reached the GGUF reader"
+    assert not any(
+        "bad magic" in message or "unsupported GGUF version" in message for message in reader_errors
+    ), "input carries a full valid header: a magic or version rejection means it regressed"
     assert elapsed < _DEADLINE_SECONDS, (
         f"scanning a file that declares {declared} bytes took {elapsed:.1f}s — "
         f"a crafted length must not become a hang"
@@ -185,14 +291,38 @@ def test_a_declared_length_larger_than_the_file_does_not_hang_or_allocate(
     max_examples=40, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )
 @given(text=st.text(max_size=2048))
-def test_the_text_parsers_survive_arbitrary_unicode(tmp_path: Path, text: str) -> None:
+def test_the_text_parsers_survive_arbitrary_unicode(
+    tmp_path: Path, text: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Bidi controls, lone surrogates, unassigned planes — the hidden-instruction surface.
 
     These rules exist *because* text can carry what a reader cannot see, so the
     input they are pointed at is exactly the input most likely to be malformed.
     """
-    for name in ("config.json", "chat_template.jinja", "README.txt", "loader.py"):
+    for name in (
+        "tokenizer_config.json",
+        "chat_template.jinja",
+        "README.txt",
+        "loader.py",
+        "saved_model.pbtxt",
+    ):
         (tmp_path / name).write_text(text, encoding="utf-8", errors="surrogatepass")
+    # Counters on the reader seams in the private `_reading` module: the config
+    # reader must open tokenizer_config.json and the template reader
+    # chat_template.jinja, or the test below proves nothing about either.
+    # They close over the module-level originals (see the GGUF test above).
+    reached: list[str] = []
+
+    def counting_text_prefix(path: Path, **kwargs: object) -> object:
+        reached.append(path.name)
+        return read_text_prefix(path, **kwargs)  # type: ignore[arg-type]
+
+    def counting_bytes(path: Path, *args: object, **kwargs: object) -> object:
+        reached.append(path.name)
+        return read_bytes_bounded(path, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(chat_template_module, "read_text_prefix", counting_text_prefix)
+    monkeypatch.setattr(chat_template_module, "read_bytes_bounded", counting_bytes)
     target = ArtifactTarget(tmp_path)
     ctx = RuleContext()
 
@@ -203,6 +333,8 @@ def test_the_text_parsers_survive_arbitrary_unicode(tmp_path: Path, text: str) -
             continue
         except Exception as exc:
             pytest.fail(f"{rule.meta.id} raised {type(exc).__name__}: {exc}")
+    assert "tokenizer_config.json" in reached
+    assert "chat_template.jinja" in reached
 
 
 def test_the_corpus_covers_every_extension_a_built_in_rule_opens(tmp_path: Path) -> None:
@@ -228,5 +360,6 @@ def test_the_corpus_covers_every_extension_a_built_in_rule_opens(tmp_path: Path)
             list(rule.run(target, RuleContext()))
 
     assert asked, "no rule asked for a suffix, so this test is measuring nothing"
-    missing = sorted(asked - set(_HOSTILE_SUFFIXES))
+    fed = {Path(f"model{suffix}").suffix for suffix in _HOSTILE_SUFFIXES}
+    missing = sorted(asked - fed)
     assert not missing, f"extensions a rule reads and the corpus never feeds it: {missing}"

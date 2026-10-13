@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -314,7 +318,15 @@ because a larger budget would not have let the run finish. A target that fails b
 the run has a result — an stdio MCP command that cannot be started, say — and a judge
 that fails at any point, still exit <code>4</code> with nothing saved.</p>
 <p><strong><code>3</code> is usage, not policy.</strong> A malformed <code>guardana.yaml</code> must not look like a
-policy failure, or a typo in a config file reads as a security finding.</p>
+policy failure, or a typo in a config file reads as a security finding. A
+<code>rules.include</code> pattern that matches no registered rule is such a typo, even beside a
+pattern that matches: the command refuses before any rule runs, whatever <code>fail_on</code>
+says, and names every such pattern
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>):</p>
+<pre><code class="language-text">error: rules.include contains unmatched patterns: &quot;guardana.supply_chain.code_executon&quot; — check the spelling and registered rules.
+</code></pre>
+<p>A selection the policy narrows to nothing with every pattern matched — each rule
+excluded, or for another kind of target — still runs no rule and exits <code>2</code>.</p>
 <p><strong><code>7</code> is honest partiality.</strong> Ctrl-C is neither a pass nor a completed failure.
 Nothing the command had not yet written is written afterwards, and the code says
 the run did not finish. Stopping <code>guardana monitor</code> with Ctrl-C exits <code>7</code> too, even
@@ -327,7 +339,10 @@ ran past its deadline. The bug report belongs to that distribution, so the code 
 and a run that stopped keeps <code>4</code>, <code>6</code> or <code>7</code>. A receiver that refused or did not answer is not
 <code>8</code> by default: the delivery line says so and the verdict keeps its code, as for the collector.
 When Guardana's own redaction fails before an output is called, nothing is written or sent and the
-code is <code>5</code>, under the same precedence; <code>GUARDANA_DEBUG=1</code> prints the traceback.</p>
+code is <code>5</code>, under the same precedence; <code>GUARDANA_DEBUG=1</code> prints the traceback. A profile's
+<code>custom_patterns</code> entry that misses its time or size bound while the run's results are
+redacted (<a href="privacy.html">privacy</a>) is the same failure: nothing is written or sent, and the code
+is <code>5</code> under the same precedence.</p>
 <p><strong><code>8</code> is also a delivery a profile required.</strong> A profile that sets <code>delivery.required: true</code>
 (<a href="profiles.html#delivery">profiles</a>) asks that every delivery the run makes be acknowledged: the
 collector's, which answers with its own acknowledgement and not merely a <code>2xx</code>, and an installed
@@ -366,7 +381,10 @@ file, recording, trace or results file, <code>--profile</code>, a <code>--rules<
 or one the profile names under <code>rules.paths</code>, <code>contracts:</code>, <code>calibrations:</code> or a judge's or
 guard's <code>adapter</code>; <code>recipe run</code> refuses the same profile files inside its
 <code>output.directory</code>; <code>analyze-trace</code> also exits <code>3</code> when <code>--write-trace</code> is <code>--output</code>, its
-sidecar path or such a file. <code>run migrate</code> exits <code>3</code> when the sidecar path of <code>--output</code>
+sidecar path or such a file, a file in a <code>--rules</code> or <code>--contract</code> directory included.
+After scanning and before writing, <code>scan</code> exits <code>3</code> when <code>--output</code> or its sidecar path is
+a file it scanned, other than an earlier saved run and the exchanges a saved run beside it
+records by digest. <code>run migrate</code> exits <code>3</code> when the sidecar path of <code>--output</code>
 is its input; writing over the input itself is migrating in place. It also exits <code>3</code>
 when <code>--output</code> is the input's own sidecar or the destination cannot be written; the
 destination is then left as it was. <code>scan --write-baseline</code> and
@@ -374,7 +392,8 @@ destination is then left as it was. <code>scan --write-baseline</code> and
 written; <code>probe</code> exits <code>3</code> for an MCP-only flag without <code>--mcp</code>; <code>recipe run</code> exits <code>3</code>
 for a recipe that names a file inside its own <code>output.directory</code>.
 <code>probe --keep-exchanges</code> exits <code>3</code> before sending anything when its sidecar path holds
-exchanges the other saved run of the pair (<code>&lt;stem&gt;</code> or <code>&lt;stem&gt;.json</code>) records.
+exchanges the other saved run of the pair (<code>&lt;stem&gt;</code> or <code>&lt;stem&gt;.json</code>) records, or a file
+the run saved at <code>--output</code> does not record by digest.
 <code>analyze-trace</code> adds one route to <code>2</code> the others do not have: demanded coverage that
 was not available, and a security contract that turned out to be about a different
 AI system than the one under test. <code>baseline create</code>, <code>baseline update</code> and
@@ -456,7 +475,7 @@ between non-zero codes, so no pipeline turns green by accident.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/exit-codes.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

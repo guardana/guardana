@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -312,18 +316,19 @@ because a scan that did not answer is not a clean result.</p>
 <h2 id="failing-a-build-on-deterioration-not-just-on-findings">Failing a build on deterioration, not just on findings</h2>
 <p>The Action gates on what a scan finds <em>today</em>. To gate on whether today is worse
 than the last accepted run, save both runs and compare them. These steps run the
-published image, so they need no install step of their own:</p>
+published image, so they need no separate install step. They run it as the runner's
+user: the image's default user cannot write to a checkout it does not own:</p>
 <pre><code class="language-yaml">      - uses: actions/checkout@v7
 
       - name: Scan and save this run
         # exit 1 is a finding the comparison will judge; 2 and above still stop the job
         run: &gt;
-          docker run --rm -v &quot;$PWD:/work&quot; ghcr.io/guardana/guardana:0.41
+          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work&quot; ghcr.io/guardana/guardana:0.41
           scan /work --format json --output /work/current.json || test $? -eq 1
 
       - name: Compare against the last accepted run
         run: &gt;
-          docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.41
+          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.41
           diff /work/accepted.json /work/current.json --preset ci
 </code></pre>
 <p>Keep <code>accepted.json</code> in the repository (or in your CI's artifact store) and
@@ -375,7 +380,7 @@ to turn the gate on for an existing repo without fixing the whole backlog first.
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/integrations.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

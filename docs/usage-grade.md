@@ -78,7 +78,8 @@ A line answers the question its rule asks when the `input` is exactly the messag
 sends: same roles, same text. Several lines for one question are trials, read in file order.
 Two rules asking the same question each need their own lines. Unknown or repeated keys, a line
 over 1 MiB, a file over 64 MiB, a header with no lines, and text that is not UTF-8 are refused
-with the line at fault (exit `3`).
+with the line at fault (exit `3`). A path that is not a regular file, such as a FIFO, is refused
+the same way, without waiting for anything to be written to it.
 
 ## What is graded, and what is not
 
@@ -132,6 +133,17 @@ Measured
 
 1 finding(s); 1 rule(s) run, 0 skipped. 3/3 case(s) measured. 1 component(s) observed.
 ```
+
+## Flags
+
+`--profile`/`--preset`/`--rules`/`--trials` and the budget flags are covered in
+the sections above and below; the remaining flags are:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--concurrency INTEGER` | `4` | How many rules may grade at once |
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe` |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
 
 ## Traffic and budgets
 

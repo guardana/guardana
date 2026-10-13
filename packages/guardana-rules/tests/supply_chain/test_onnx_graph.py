@@ -1,10 +1,21 @@
 from pathlib import Path
 
+import pytest
+from _onnx_carriers import (
+    CARRIERS,
+    CUSTOM_DOMAIN,
+    Carrier,
+    large_honest_model,
+    nested_subgraphs,
+    node,
+)
+from guardana.core.formats import Limits, OnnxSummary
 from guardana.core.report import ShortfallKind
 from guardana.core.rule import RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget
 from guardana.core.testing import build_onnx
+from guardana.rules.supply_chain import onnx_graph
 from guardana.rules.supply_chain.onnx_graph import OnnxGraphRule
 
 _TAG = "\U000e0074\U000e0065\U000e0073\U000e0074"  # "test" in the invisible Tags block
@@ -132,3 +143,89 @@ def test_a_lead_found_before_the_budget_ran_out_does_not_hide_the_unread_rest(
 
     assert [f.severity for f in findings] == [Severity.MEDIUM, Severity.LOW]
     assert findings[1].title == "ONNX model not scanned"
+
+
+@pytest.mark.parametrize("carrier", CARRIERS, ids=lambda carrier: carrier.name)
+def test_flags_what_a_model_carries_outside_its_top_level_graph(
+    tmp_path: Path, carrier: Carrier
+) -> None:
+    _write(tmp_path, carrier.model)
+
+    findings = _findings(tmp_path)
+
+    if carrier.external_path is not None:
+        assert findings == [
+            ("HIGH", f"external_data points outside the model directory: '{carrier.external_path}'")
+        ]
+    if carrier.custom_domain is not None:
+        assert [severity for severity, _ in findings] == ["MEDIUM"]
+        assert carrier.custom_domain in findings[0][1]
+
+
+def test_subgraphs_nested_past_the_depth_bound_are_not_cleared(tmp_path: Path) -> None:
+    _write(tmp_path, nested_subgraphs(200, node(CUSTOM_DOMAIN)))
+
+    findings = _findings(tmp_path)
+
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert "not scanned" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.onnx")]
+
+
+def test_a_large_honest_model_is_walked_in_full_and_clean(tmp_path: Path) -> None:
+    """60,000 nodes with 3-5 attributes each spend more fields than any fixed floor."""
+    _write(tmp_path, large_honest_model(60_000, 300))
+    ctx = RuleContext()
+
+    findings = list(OnnxGraphRule().run(ArtifactTarget(tmp_path), ctx))
+
+    assert findings == []
+    assert ctx.shortfalls() == ()
+
+
+def _budgets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rule: OnnxGraphRule) -> list[int]:
+    """The field budget the rule hands the reader for `model.onnx`."""
+    seen: list[int] = []
+
+    def read(path: Path, *, limits: Limits) -> OnnxSummary:
+        seen.append(limits.max_entries)
+        return OnnxSummary("", (), (), {}, (), truncated=False)
+
+    monkeypatch.setattr(onnx_graph, "read_onnx_summary", read)
+    list(rule.run(ArtifactTarget(tmp_path), RuleContext()))
+    return seen
+
+
+def test_the_default_field_budget_grows_with_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with (tmp_path / "model.onnx").open("wb") as handle:
+        handle.truncate(6_000_000)
+
+    assert _budgets(tmp_path, monkeypatch, OnnxGraphRule()) == [3_000_000]
+
+
+def test_the_default_field_budget_stops_growing_at_the_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with (tmp_path / "model.onnx").open("wb") as handle:
+        handle.truncate(20_000_000)
+
+    assert _budgets(tmp_path, monkeypatch, OnnxGraphRule()) == [8_000_000]
+
+
+def test_a_small_file_gets_only_the_floor_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(tmp_path, build_onnx(nodes=(("Conv", ""),)))
+
+    assert _budgets(tmp_path, monkeypatch, OnnxGraphRule()) == [1_000_000]
+
+
+def test_an_explicit_field_budget_is_used_whatever_the_file_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with (tmp_path / "model.onnx").open("wb") as handle:
+        handle.truncate(6_000_000)
+
+    assert _budgets(tmp_path, monkeypatch, OnnxGraphRule(max_entries=20)) == [20]

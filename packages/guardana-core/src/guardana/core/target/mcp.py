@@ -5,9 +5,11 @@ from guardana.core.budget import Budgets
 from guardana.core.target._mcp_authorization import McpAuthorizationView
 from guardana.core.target._mcp_authorization import observe as observe_authorization
 from guardana.core.target._mcp_client import (
+    MAX_LISTING_PAGES,
     CacheHints,
     ConversationRefused,
     HttpMcpTransport,
+    IncompleteListing,
     McpConversation,
     McpTool,
     McpTransport,
@@ -29,6 +31,7 @@ from guardana.core.target.base import Capability, Target, TargetKind, WireProtoc
 from guardana.core.usage import TargetUsage, UsageMeter
 
 __all__ = [
+    "MAX_LISTING_PAGES",
     "CacheHints",
     "Era",
     "McpAuthorizationView",
@@ -124,6 +127,7 @@ class McpServerTarget(Target):
         self._opened = False
         self._announce = False
         self._refused: RawReply | None = None
+        self._incomplete: str | None = None
         self._conversation: McpConversation | None = None
         self._authorization: McpAuthorizationView | None = None
 
@@ -279,9 +283,12 @@ class McpServerTarget(Target):
         the target rather than with how many rules look at it, and an unlocked check
         would buy the same negotiation once per concurrent reader. A status the
         server gave the one request it was sent is remembered and handed to every
-        later reader without sending it again.
+        later reader without sending it again, and so is a listing that could not be
+        read to its end, which every page bought again would not change.
         """
         with self._lock:
+            if self._incomplete is not None:
+                raise IncompleteListing(self._incomplete)
             if self._conversation is None:
                 negotiation = self._open()
                 try:
@@ -291,12 +298,15 @@ class McpServerTarget(Target):
                 except ConversationRefused as refused:
                     self._refused = refused.reply
                     raise
+                except IncompleteListing as incomplete:
+                    self._incomplete = str(incomplete)
+                    raise
                 finally:
                     self._announce = False
             return self._conversation
 
     def list_tools(self) -> tuple[McpTool, ...]:
-        """Every tool the server advertises, fetched once per run and cached."""
+        """Every tool the server advertises, on every page, fetched once per run and cached."""
         return self.conversation().tools
 
     def _settle(self) -> Negotiation:

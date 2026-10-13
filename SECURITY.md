@@ -153,6 +153,8 @@ what was built — and `scripts/generate_sbom.py` reads each file back and check
 against that package's own metadata before the release keeps it. CI generates and
 verifies them on every push, so a tag is never the first time they are produced.
 
+To check that PyPI's files match the release tag's build, rebuild them
+and compare byte for byte as described in [Reproducible builds](docs/reproducible-builds.md).
 The release controls are described in [the threat model](docs/threat-model.md#t10--a-compromised-guardana-release).
 
 ## If a release is withdrawn

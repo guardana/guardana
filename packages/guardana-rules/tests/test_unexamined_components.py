@@ -140,10 +140,18 @@ def test_every_model_suffix_a_built_in_rule_reads_leaves_no_shortfall(tmp_path: 
     (tmp_path / "model.dill").write_bytes(pickle.dumps({"w": 1}))
     (tmp_path / "model.keras").write_bytes(_keras({"class_name": "Sequential", "config": {}}))
     (tmp_path / "model.onnx").write_bytes(build_onnx(nodes=(("Conv", ""),)))
+    (tmp_path / "weights.bin").write_bytes(b"\x89HDF\r\n\x1a\n" + bytes(64))
+    model = tmp_path / "my_model"
+    model.mkdir()
+    (model / "config.json").write_text('{"class_name": "Sequential"}', encoding="utf-8")
+    (model / "metadata.json").write_text("{}", encoding="utf-8")
 
     result = _scan(tmp_path)
 
     assert _unexamined(result) == {}
+    assert {"keras-hdf5", "keras-directory"} <= {
+        o.attributes["format"] for o in result.observations
+    }
 
 
 def test_a_model_a_rule_could_not_read_is_named_by_its_file(tmp_path: Path) -> None:

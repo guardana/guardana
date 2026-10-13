@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -363,14 +367,42 @@ any depth; <code>venv/</code>, <code>build/</code>, <code>dist/</code>, <code>ht
 the top of the directory only (a package of the project may carry those names); and the
 recipe's own lock file and output directory when the recipe sits inside the directory, since
 <code>recipe lock</code> and <code>recipe run</code> write them. Symlinks are followed, so a linked file is pinned
-by what it holds. The <code>.pth</code> files and setuptools <code>__editable__…finder.py</code> modules the
-install's <code>RECORD</code> lists are read first: a path they add or map outside the directory is code
-the pin would not cover, so the distribution stays unpinned. Bytecode under <code>__pycache__/</code>
-is not pinned, but bytecode this interpreter would load in place of a pinned source
-(hash-based bytecode, whatever hash it records, or bytecode recording the source's
-modification time and size) leaves the distribution unpinned unless it is what that source
-compiles to; bytecode only another interpreter would load is checked when that interpreter
-pins, and this check does not change pin digests.</li>
+by what it holds, and a linked directory is also pinned by where it points, so retargeting it
+changes the pin. The <code>.pth</code> files and setuptools <code>__editable__…finder.py</code> modules the
+install's <code>RECORD</code> lists are read first: a path they add or map outside the directory, or
+into a directory the tree pin leaves out (such as <code>build/</code>, where a setuptools strict
+editable install maps its packages, <code>.venv/</code> or <code>*.egg-info/</code>), is code the pin would not
+cover, so the distribution stays unpinned. A finder is read only when it is the template a
+setuptools release 64.0.0 through 84.0.0 writes, with nothing but its mapping, namespaces
+and own name filled in, and the mapping and namespaces as absolute paths; a <code>.pth</code> file
+imports the finder, which runs all of it, so a finder with any other code leaves the
+distribution unpinned, and one from a later setuptools whose template differs does too,
+with that reason. A <code>.pth</code> file is read as UTF-8 as <code>site</code> reads it, past a byte order
+mark; setuptools writes it in the locale's encoding, so under a locale that is not UTF-8
+a <code>.pth</code> file naming a path outside ASCII cannot be read and leaves the distribution
+unpinned. Otherwise each is also pinned by its content and each package
+and path it maps, relative to the directory. Where they name the directory's absolute path,
+followed by a path separator, a quote or a line end, that path is pinned as a placeholder,
+so moving the project and installing it editable again keeps the pin; a <code>.pth</code> line written
+relative to the environment is pinned as written, so it moves with the environment. An
+editable digest is never that of a plain directory, even when <code>RECORD</code> lists no <code>.pth</code>
+file or finder. Editing a finder or <code>.pth</code> file, or mapping a package elsewhere, changes
+it; the bytecode check below applies to each finder too. A <code>.pth</code> file imports its finder
+by name, so anything else importable under that name beside the finder (a package, a
+directory, an extension module, legacy bytecode) or in a <code>sys.path</code> entry listed before it
+leaves the distribution unpinned, as does an entry listed before it that is, or lies inside,
+an archive or other file, which Guardana does not look into; the pin sees only the <code>sys.path</code> of the process that
+pins, not entries the environment adds when the recipe runs (<code>PYTHONPATH</code>, another <code>.pth</code>
+file, <code>sitecustomize</code>). A directory the pin leaves out
+whose name is a Python identifier — <code>node_modules</code> and <code>__pycache__</code> at any depth, and
+<code>venv</code>, <code>build</code>, <code>dist</code> and <code>htmlcov</code> at the top when a <code>.pth</code> file adds the directory
+itself to <code>sys.path</code> — stays importable by name, and what is imported from it is not
+pinned. Bytecode under <code>__pycache__/</code> is not pinned, but
+bytecode this interpreter would load in place of a pinned source (hash-based bytecode,
+whatever hash it records, or bytecode recording the source's modification time and size)
+leaves the distribution unpinned unless it is what that source compiles to; bytecode only
+another interpreter would load is checked when that interpreter pins, and this check does
+not change pin digests.</li>
 <li><strong>Any other direct URL</strong> — a directory installed without <code>-e</code>, a VCS checkout, an archive —
 is pinned by its installed <code>RECORD</code>: each entry's path and recorded hash, except bytecode
 under <code>__pycache__/</code> and every file of its own <code>.dist-info</code> but <code>METADATA</code> (its version and
@@ -403,10 +435,14 @@ the environment changes. Installing the same code again into an environment this
 path) has its generated scripts hashed too, so its pin can differ by installer.</li>
 </ul>
 <p>A distribution stays under <code>unpinned</code>, with the reason, when it holds more than 20,000 files or
-256 MiB, when a symlink leads outside its directory, when its editable install loads code from
-outside its directory or maps its packages in a way Guardana cannot read, when it has no
+256 MiB (an editable install's <code>.pth</code> files and finders count toward both), when one of those
+<code>.pth</code> files or finders is larger than 64 KiB, when a symlink leads outside its directory, when
+a file in its editable directory is not a regular file (a FIFO, a device, a socket) or changes
+between the listing of the directory and its hashing, when its editable install loads code
+from outside its directory or maps its packages in a way Guardana cannot read, when it has no
 <code>RECORD</code> to read, when its <code>RECORD</code> lists an entry inside the install root without a hash, or
-when a file it installed outside the install root cannot be read or is not a regular file (a FIFO, a device, a socket). <code>unpinned</code> maps each
+when a file it installed outside the install root cannot be read or is not a regular file (a
+FIFO, a device, a socket). <code>unpinned</code> maps each
 <code>rule:&lt;id&gt;</code>, <code>evaluator:&lt;id&gt;</code> and <code>target:&lt;scheme&gt;</code> it registers — or <code>distribution:&lt;name&gt;</code>
 when it registers none of them — to that reason. <code>recipe run</code> computes the lock again on every
 run, so it hashes each editable tree again, within the same bounds.</p>
@@ -499,7 +535,8 @@ pair's <code>observed</code> must still grade <code>fail</code> and its <code>ac
 now. A pair that no longer holds, or a suite whose evaluator cannot regrade without sending,
 is a refusal rather than a drifted pin, because it is broken in the lock and in the
 configuration alike; the refusal names each case by its rule and dataset line.</p>
-<p><code>recipe run</code> takes no selection, trust, trials or profile flags: those are what the lock pins.</p>
+<p><code>recipe run</code> takes no selection, trust, trials or profile flags: those are what the lock pins.
+Its one flag is <code>--concurrency INTEGER</code> (default <code>4</code>): how many rules may run at once.</p>
 <p>Every rule the lock pins must run to completion. One that the run skips — a recording that
 holds no answer for it is the usual cause — that errors or that is never reached is a
 <code>demanded_check</code> coverage shortfall: the run is <code>indeterminate</code> (exit <code>2</code>) unless a finding
@@ -517,8 +554,9 @@ at the end of <code>report.txt</code> and in <code>guardana run inspect</code>.<
 error (&quot;the run did not finish&quot;) and a <code>report.txt</code> saying so. When the run ends it replaces
 the directory whole. An interrupted run leaves the placeholder; a refused run writes the
 refusal into the same two files; a run its target stopped part-way replaces it with the
-partial run and exits <code>4</code>. A CI step that uploads the directory therefore never shows an
-earlier run's green.</p>
+partial run and exits <code>4</code>. A CI step that uploads the directory after such a run
+does not show an earlier run's green. Exceptions are the refusals below that must not
+rewrite an input.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -560,7 +598,7 @@ copy of your application's replies that nobody controls.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-recipe.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

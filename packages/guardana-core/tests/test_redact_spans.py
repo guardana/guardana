@@ -31,11 +31,9 @@ def test_span_redaction_is_never_truncated() -> None:
     "secret",
     [
         fake_github_pat(),
-        "-----BEGIN " + "PGP PRIVATE KEY BLOCK-----",
         "-----BEGIN " + _RSA + "\n" + _PEM_BODY + "\n-----END " + _RSA,
-        "-----BEGIN " + "PRIVATE KEY-----\n" + _PEM_BODY,
     ],
-    ids=["github-pat", "pgp-header", "pem-block", "pem-cut-short"],
+    ids=["github-pat", "pem-block"],
 )
 def test_a_second_pass_leaves_the_first_pass_placeholder_alone(secret: str) -> None:
     redactor = EvidenceRedactor(RedactionPolicy(mode=EvidenceMode.REDACTED))
@@ -61,20 +59,39 @@ def test_a_key_body_holding_a_shorter_secret_shape_is_still_removed_whole() -> N
     assert "MIIE" not in redacted
 
 
-def test_a_key_body_never_reaches_past_the_next_header() -> None:
-    """Each header's body stops at the next BEGIN, which bounds the scan to one pass.
-
-    A body free to run to any later END scans to the end of the reply once per header, and a
-    reply of headers with no END then costs time quadratic in its length.
-    """
+def test_a_header_left_open_takes_every_later_header_with_it_in_one_match() -> None:
+    """A key with no END runs to the end of the text, so the headers after it add no scan."""
     first = "-----BEGIN PRIVATE KEY----- left open\n"
     second = "-----BEGIN PRIVATE KEY-----\nMIIBVQIBADANBg\n-----END PRIVATE KEY-----"
     redacted = EvidenceRedactor(RedactionPolicy(mode=EvidenceMode.REDACTED)).redact_spans(
         first + second
     )
 
-    assert redacted.count("[redacted:private-key") == 2
-    assert "left open" in redacted
+    assert redacted.count("[redacted:") == 1
+    assert redacted.startswith("[redacted:private-key:")
+    assert redacted.endswith("]")
+
+
+@pytest.mark.parametrize(
+    "opened",
+    [
+        "-----BEGIN " + "PRIVATE KEY-----\n" + _PEM_BODY + "\n!\n" + _PEM_BODY,
+        "-----BEGIN " + "PRIVATE KEY-----\n" + _PEM_BODY + "\nnot base64 at all\n" + _PEM_BODY,
+        "-----BEGIN " + _RSA + "\n" + _PEM_BODY + "\n-----BEGIN CERTIFICATE-----\n" + _PEM_BODY,
+        "-----BEGIN " + "PRIVATE KEY-----\n" + _PEM_BODY,
+        "-----BEGIN " + "PGP PRIVATE KEY BLOCK-----",
+    ],
+    ids=["bang-line", "prose-line", "other-header", "cut-short", "pgp-header"],
+)
+def test_a_key_with_no_end_is_redacted_to_the_end_of_the_text(opened: str) -> None:
+    redactor = EvidenceRedactor(RedactionPolicy(mode=EvidenceMode.REDACTED))
+
+    once = redactor.redact_spans(f"here: {opened}\nthat was all")
+
+    assert once.startswith("here: [redacted:private-key:")
+    assert once.endswith("]")
+    assert once.count("[redacted:") == 1
+    assert redactor.redact_spans(once) == once == redactor.redact_text(once)
 
 
 @pytest.mark.parametrize(

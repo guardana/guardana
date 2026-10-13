@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -234,7 +238,7 @@
 </tbody>
 </table></div>
 <p><code>observed</code> and <code>accepted</code> come together or not at all, and only in the suite's own dataset,
-never in a fixture dataset. A run never sends or reads them, and they are not part of a
+never in a fixture dataset. A run never sends them or grades them as the target's reply. They are not part of a
 case's identity: <a href="usage-case.html"><code>guardana case add</code></a> writes them, and <code>guardana rule test</code>,
 every <code>guardana recipe</code> command and every run that selects the suite regrade them. A format-1 dataset
 (<code>&quot;guardana_dataset&quot;: 1</code>) is still read, without <code>observed</code> and <code>accepted</code>. The formats are
@@ -327,13 +331,13 @@ fixtures:
 <li>The collector receives the target's request count, not <code>usage.judge</code>.</li>
 <li><code>diff</code> pairs cases across runs but does not test a suite's rate statistically.</li>
 <li>A file holds one calibration per evaluator id.</li>
-<li><code>regex</code> grades a reply of up to 65,536 characters; a longer reply is <code>inconclusive</code>. There is no time bound: a pattern that backtracks can hang on a crafted reply, so avoid nested quantifiers and several <code>.*</code> in a row, or use possessive quantifiers and atomic groups.</li>
+<li><code>regex</code> grades replies up to 65,536 characters; longer replies are <code>inconclusive</code>. Each search runs in a separate worker process for at most 2 seconds. A longer search stops with <code>inconclusive</code> (&quot;regex search exceeded 2 s; not evaluated&quot;), never a pass. Like any <code>inconclusive</code> result, it makes the run <code>indeterminate</code> (exit <code>2</code>) when <code>fail_on_inconclusive</code> is on. Backtracking patterns, such as nested quantifiers or several <code>.*</code> in a row, can still exhaust this time on a crafted reply. Use possessive quantifiers or atomic groups instead.</li>
 </ul>
 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-suites.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

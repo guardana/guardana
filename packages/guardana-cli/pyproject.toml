@@ -1,6 +1,6 @@
 [project]
 name = "guardana-cli"
-version = "1.0.0rc1"
+version = "1.0.0rc2"
 description = "Guardana command-line interface: scan, probe, monitor, init, rules, new-rule."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -42,10 +42,10 @@ classifiers = [
 # only there transitively is one a dependant can remove without anybody noticing
 # until a clean install fails.
 dependencies = [
-    "guardana-core==1.0.0rc1",
-    "guardana-rules==1.0.0rc1",
-    "guardana-report==1.0.0rc1",
-    "typer>=0.27.2",
+    "guardana-core==1.0.0rc2",
+    "guardana-rules==1.0.0rc2",
+    "guardana-report==1.0.0rc2",
+    "typer>=0.27.3",
     "pyyaml>=6.0",
 ]
 
@@ -60,7 +60,9 @@ Changelog = "https://github.com/guardana/guardana/blob/main/CHANGELOG.md"
 guardana = "guardana.cli.main:main"
 
 [build-system]
-requires = ["hatchling"]
+# Exact, so a rebuild from the tag uses the backend the release used
+# (`scripts/reproduce_release.py` compares the two byte for byte).
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

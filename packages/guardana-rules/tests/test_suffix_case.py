@@ -76,6 +76,7 @@ _PICKLE = pickle.dumps(_Evil())
 _NPY_HEADER = b"{'descr': '|O', 'fortran_order': False, 'shape': (1,), }"
 _OBJECT_NPY = b"\x93NUMPY\x01\x00" + len(_NPY_HEADER).to_bytes(2, "little") + _NPY_HEADER + _PICKLE
 _H5_LAMBDA = b"\x89HDF\r\n" + b'...{"class_name": "Lambda", "config": {}}...' + b"\x00\x00"
+_SIGNED_H5_LAMBDA = b"\x89HDF\r\n\x1a\n" + _H5_LAMBDA
 _XXE = b'<?xml version="1.0"?><!DOCTYPE r [<!ENTITY x SYSTEM "file:///etc/passwd">]><r>&x;</r>'
 _GADGET = "{{ cycler.__init__.__globals__ }}"
 
@@ -103,6 +104,8 @@ _CASES = (
     _Case(KerasLambdaRule, "model.keras", "model.KERAS", _keras_with_lambda()),
     _Case(KerasLambdaRule, "model.h5", "model.H5", _H5_LAMBDA),
     _Case(KerasLambdaRule, "model.hdf5", "model.HDF5", _H5_LAMBDA),
+    _Case(KerasLambdaRule, "model.bin", "model.BIN", _SIGNED_H5_LAMBDA),
+    _Case(KerasLambdaRule, "m.weights", "m.Weights", _SIGNED_H5_LAMBDA),
     _Case(ChatTemplateRule, "m.gguf", "m.GGUF", build_gguf({"tokenizer.chat_template": _GADGET})),
     _Case(ChatTemplateRule, "chat_template.jinja", "chat_template.JINJA", _GADGET.encode()),
     _Case(ChatTemplateRule, "chat_template.j2", "chat_template.J2", _GADGET.encode()),
@@ -239,3 +242,23 @@ def test_a_capitalised_malicious_pickle_fails_the_gate(tmp_path: Path) -> None:
 
     assert [f.rule_id for f in result.findings] == ["guardana.supply_chain.pickle_opcode"]
     assert gate_outcome(result, policy) is not GateOutcome.PASS
+
+
+def _keras_directory_outcome(root: Path, config: str, metadata: str) -> list[tuple[object, ...]]:
+    root.mkdir()
+    (root / config).write_text(json.dumps({"class_name": "Lambda", "config": {}}), encoding="utf-8")
+    (root / metadata).write_text("{}", encoding="utf-8")
+    return [
+        (f.rule_id, f.severity, f.target_ref == str(root / config))
+        for f in KerasLambdaRule().run(ArtifactTarget(root), RuleContext())
+    ]
+
+
+def test_a_keras_model_directory_with_capitalised_names_gets_the_same_finding(
+    tmp_path: Path,
+) -> None:
+    lowercase = _keras_directory_outcome(tmp_path / "lower", "config.json", "metadata.json")
+    assert lowercase, "the Keras model directory fixture no longer produces a finding"
+
+    shouted = _keras_directory_outcome(tmp_path / "upper", "Config.JSON", "METADATA.json")
+    assert shouted == lowercase

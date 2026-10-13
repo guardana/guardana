@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -433,6 +437,9 @@ half.</p>
 <p>Full mapping to OWASP and MITRE ATLAS:
 <a href="generated/rule-catalog.html">the generated catalog</a>.</p>
 <h2 id="a-truncated-trace-is-not-a-shorter-one">A truncated trace is not a shorter one</h2>
+<p>The read ceilings count the bytes in the file: 64 MiB in all, blank lines and line endings
+included, and 1 MiB for one record, in UTF-8. A path that is not a regular file, such as a FIFO,
+is refused with exit <code>3</code> without waiting for anything to be written to it.</p>
 <p>If the header says <code>truncated</code>, or the file exceeds a read ceiling, then a rule that
 <strong>found</strong> something still reports it — the evidence is real — and a rule that found
 nothing reports <code>inconclusive</code>, because the step it needed may be in the part that is
@@ -470,7 +477,7 @@ session that ends when the process does is <code>unterminated</code> by construc
 </tr>
 <tr>
 <td><code>--write-trace PATH</code></td>
-<td>Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits <code>3</code></td>
+<td>Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits <code>3</code>. A <code>PATH</code> that is <code>--output</code>, its <code>&lt;stem&gt;.exchanges.jsonl</code>, or a file the command reads — the trace, <code>--profile</code>, a <code>--rules</code> or <code>--contract</code> file or one read from such a directory, or a file the profile names under <code>rules.paths</code>, <code>contracts:</code>, <code>calibrations:</code> or a judge's <code>adapter</code> — exits <code>3</code> before any rule is loaded or run</td>
 </tr>
 <tr>
 <td><code>--profile</code>, <code>--preset</code></td>
@@ -541,7 +548,7 @@ tool's results in as unverified claims</li>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-analyze-trace.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

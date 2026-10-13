@@ -28,9 +28,10 @@ waivers:
     expires: 2026-12-31
 ```
 
-**A generated baseline is deliberately not usable as-is.** Every waiver carries
-placeholder text for the reason and the approver, and `verify` fails while it is
-still there. A baseline nobody edited is a list of findings somebody silenced in a
+**A generated baseline waives its findings as soon as a scan reads it and states
+that it is unreviewed.** Every waiver has placeholder text for its reason and
+approver. `scan` warns about each such waiver; `verify` fails while the text
+remains. Gate on `guardana baseline verify` to require review. An unedited baseline lists findings somebody silenced in a
 hurry, and it should look like one.
 
 ## Flags
@@ -41,6 +42,9 @@ hurry, and it should look like one.
 | Flag | Default | Meaning |
 |---|---|---|
 | `PATH` (positional) | — | Directory to scan; required unless `--target` is used |
+| `--file PATH` | `guardana-baseline.yaml` | The baseline to refresh (`update` only; `create` writes with `--output`) |
+| `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file |
+| `--preset [ci\|pre-training\|monitor\|release]` | none | Named policy preset (mutually exclusive with `--profile`) — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--target SCHEME://LOCATOR` | none | Build a trusted installed artifact target for `create` or `update` |
 | `--target-option KEY=VALUE` | none | Repeatable, non-secret configuration passed to that target |
 | `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe` |

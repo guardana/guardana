@@ -21,7 +21,7 @@ To try a candidate, join a pilot or contribute, read [Community](docs/community.
 | Probe a model, agent, MCP server or A2A agent | `guardana probe ...`, `probe --mcp URL`, `probe --a2a URL` | bounded active checks with graded evidence; a protocol server is sent reads only and never asked to call a tool or run a task |
 | Analyze an existing execution | `guardana analyze-trace TRACE` | trace rules over a local file, calling no model or tool |
 | Grade recorded answers | `guardana grade RECORDING` | your rules over answers you supplied or a probe kept, with no target request |
-| Pin and run a team's checks in CI | `guardana recipe lock`, `guardana recipe run` | a lock of rules, datasets, judges, calibrations and the files of a directory-installed pack, checked before anything is sent, against a connection, a recording or an installed `target:`, and one artifact directory that never shows an earlier green |
+| Pin and run a team's checks in CI | `guardana recipe lock`, `guardana recipe run` | a lock of rules, datasets, judges, calibrations and the files of a directory-installed pack, checked before anything is sent, against a connection, a recording or an installed `target:`, and one artifact directory an interrupted, stopped or refused run overwrites with its own outcome (a few refusals that must not rewrite an input leave earlier files, so the exit code is the verdict) |
 | Promote a reviewed failure into a regression case | `guardana case add`, `guardana case list` | one kept exchange added to a suite's dataset, labelled and versioned, only once its expectation fails the failure and passes a correct reply |
 | Declare the synthetic data an application runs with | `guardana-fixtures.yaml`, `guardana fixtures render FILE --out DIR` | tenants with their own credentials, seeded documents and records each carrying markers derived from what was declared, the documents a team ingests, and a recipe lock that pins the file and every tenant adapter |
 | Serve an application's tools in CI | `guardana.core.doubles.open_doubles(FILE, trace=PATH)` | the declared tools over an in-memory copy of the declared records, each call acting for one tenant and seeing only its records, and a trace of every call and effect for `analyze-trace` |
@@ -84,8 +84,10 @@ severity bar: how bad an unmeasured thing is has no answer, so `fail_on_inconclu
 governs all of them or none, and a check that went dark between two runs is a
 regression at any severity. Saved runs carry versions, policy identity (the profile's digest),
 target identity, the plugin trust in force, protocol versions, usage, redaction mode, rule
-provenance, and for a file scan every file it listed and the excludes it applied with
-their source. `diff` calls a finding resolved only where the second run listed its file;
+provenance, and for a file scan every listed file, applied exclude with its source,
+file a model loader reads that the target's `.guardanaignore` could not exclude,
+and model file named inside directories every scan skips. `diff` calls a finding
+resolved only where the second run listed its file;
 one that was deleted, moved, renamed or excluded is a `left_scan` regression.
 Usage keeps the judges configured under `evaluators:` on their own meters, apart from
 the target. `guardana plan probe` prices those judge calls before the run, names what
@@ -159,7 +161,7 @@ Built-in evaluators are:
 - `contains` for required or forbidden case-sensitive substrings; a forbidden one fails in any reply under grade;
 - `exact_match` for comparison with a reference answer, with optional normalization;
 - `json_valid` for valid JSON and optional required keys;
-- `regex` for matching a bounded reply against a pattern; `must_match: false` fails in any reply under grade;
+- `regex` for matching a bounded reply against a pattern; each search is stopped after 2 seconds as `inconclusive`; `must_match: false` fails in any reply under grade;
 - `reference_judge` for grading against a reference answer with a versioned rubric;
 - `guard` for an optional external safety classifier, given every reply under grade in one call.
 
@@ -199,7 +201,8 @@ without guessing from a short id.
 - Python 3.11–3.13 and five separately installable distributions.
 - A SHA-pinned GitHub Action and generic JSON, SARIF, JUnit, and human output.
 - CI examples for GitHub, GitLab, Jenkins, and Azure DevOps.
-- Multi-architecture CLI and collector containers.
+- Multi-architecture CLI and collector containers. Their dependencies are the
+  versions in `uv.lock`, installed by hash.
 - OpenTelemetry GenAI input plus LangChain, Pydantic AI, OpenAI Agents, Hermes,
   and shell-hook integration examples.
 - No account and no telemetry; an artifact scan opens no network connection unless a `--reporter` is configured.
@@ -252,7 +255,7 @@ The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs
 - scoped, hashed, revocable, and expiring API keys;
 - run and finding history, lifecycle states, expiring waivers, and audit events;
 - retention and deletion commands, backup/restore checks, health, and readiness;
-- a read-only dashboard authenticated with a read-scoped session.
+- a read-only dashboard authenticated with a read-scoped session, which shows skipped checks and indeterminate gates next to the findings.
 
 The collector is optional. Local and CI verification do not depend on it. It does
 not yet provide quality-assessment trends, human SSO/RBAC or a supported

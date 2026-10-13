@@ -8,26 +8,24 @@ public entry points the built-ins use — there is no built-in-vs-custom
 distinction at the registry level.
 
 **All four entry-point groups are registered here, and that is deliberate.** A
-documented group nothing registers is a seam nobody has run: `guardana.targets`
-sat in the contract from 0.1 with no example behind it, so `pack validate`
-shipped in 0.18.0 accusing every pack that had a target of not registering one,
-and there was nothing installed anywhere that could notice. `guardana.taxonomies`
-was in the same state until 0.19.0.
+documented group nothing registers is a seam nobody has run: a defect in how
+`pack validate` reads `guardana.targets` or `guardana.taxonomies` would go unnoticed,
+because nothing installed anywhere would exercise it. This package is that registrant
+for all four.
 
 `AcmePromptLibraryTarget` implements the surface it declares, and the tests prove
 it: `tests/test_prompt_library_target.py` runs `guardana.testing.assert_target_conforms`
 against it, then drives a real `Runner` over it and checks that the built-in
-artifact rules — not just Acme's own — actually ran. A target that only declared
-`READ_FILES` without a `FileReader` behind it used to pass every test in this
-package, because none of them ran the `Runner`; this is the one that would have
-caught it.
+artifact rules — not just Acme's own — actually ran. Tests that do not run the
+`Runner` can miss a target that declares `READ_FILES` without a `FileReader`
+behind it; this test checks that the declared surface works in execution.
 
 ## What it ships
 
 | File | What it demonstrates |
 |---|---|
-| `src/acme_rules/hardcoded_secret.py` | A **Python plugin rule** (`acme.supply_chain.hardcoded_key`) — logic YAML can't express. Its `fixtures()` samples a live key, a vault reference, and a config path nobody can read (a dangling symlink), so all three outcomes — finding, clean, inconclusive — are proven. |
-| `src/acme_rules/approved_model.py` | A rule that **inspects a model file** (`acme.supply_chain.approved_model`) — and is entirely policy, because the GGUF parsing comes from the public [`guardana.core.formats`](../../docs/model-formats.md) readers. Its `fixtures()` method builds three samples with `guardana.core.testing.build_gguf` — an unapproved organization, an approved one, and bytes that are not a GGUF file at all — so no binary is checked in and the inconclusive case is proven, not assumed. |
+| `src/acme_rules/hardcoded_secret.py` | A **Python plugin rule** (`acme.supply_chain.hardcoded_key`) — logic YAML can't express. Its `fixtures()` samples a live key, a vault reference, and a config file that disappears after the scan listed it and before the rule reads it, so all three outcomes — finding, clean, inconclusive — are proven, the last for a file that was already in the scan's scope. |
+| `src/acme_rules/approved_model.py` | A rule that **inspects a model file** (`acme.supply_chain.approved_model`) — and is entirely policy, because the GGUF parsing comes from the [`guardana.core.formats`](../../docs/model-formats.md) readers. Those readers sit outside the [supported surface](../../docs/compatibility.md#the-supported-surface), so a pack built this way pins the exact `guardana-core` version it was tested with. Its `fixtures()` method builds three samples with `guardana.core.testing.build_gguf` — an unapproved organization, an approved one, and bytes that are not a GGUF file at all — so no binary is checked in and the inconclusive case is proven, not assumed. |
 | `src/acme_rules/catalog/customer_data.yaml` | A YAML rule for an invariant **no public framework knows about** (`acme.agent.customer_data`) — this assistant serves one customer at a time. Its `fixtures:` block samples a leak, a clean refusal, and an empty reply. |
 | `src/acme_rules/catalog/overreach.yaml` | A **declarative YAML rule** (`acme.prompt.overreach`) graded with Guardana's built-in `keyword` evaluator. Its `fixtures:` block samples a claimed order, a deferred one, and an empty reply. |
 | `src/acme_rules/catalog/refusal.yaml` | A YAML rule (`acme.prompt.data_exfiltration`) graded with Acme's **own** evaluator — referenced by id, resolved from the registry at run time — and mapped to Acme's **own** control `ACME-14` beside its OWASP entries. Its `fixtures:` block samples a hedged refusal, a clean one, and an empty reply. |

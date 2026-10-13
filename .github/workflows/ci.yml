@@ -120,6 +120,12 @@ jobs:
           python-version: "3.13"
           cache-suffix: images
 
+      # The images install the requirement files exported from uv.lock; a lock change
+      # without a re-export would ship versions the test job never ran. The check reads
+      # them with `packaging`, so it runs in the locked development environment.
+      - name: Image requirements match uv.lock
+        run: uv run --locked python scripts/export_image_requirements.py --check
+
       # The base images are pinned by digest, so the mirror serves the same bytes or
       # the build fails; Docker Hub stays the fallback when the mirror has no copy.
       - name: Pull Docker Hub images through Google's mirror

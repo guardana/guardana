@@ -6,7 +6,7 @@ format its numbers eventually land in.
 """
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import monotonic
 from time import sleep as _sleep
 from typing import TYPE_CHECKING
@@ -201,7 +201,12 @@ class UsageMeter:
         return slot
 
     def record(self, tokens: TokenUsage | None) -> None:
-        """Record one request, with the tokens it cost if the provider said so."""
+        """Record one request, with the tokens it cost if the provider said so.
+
+        A negative count is no count: added to a sum, it would let every later request
+        pass a ceiling.
+        """
+        tokens = _counted(tokens)
         with self._lock:
             self._requests += 1
             if tokens is None or (tokens.input_tokens is None and tokens.output_tokens is None):
@@ -225,6 +230,7 @@ class UsageMeter:
         held, rather than finishing unbounded.
         """
         self.record(tokens)
+        tokens = _counted(tokens)
         with self._lock:
             if tokens is None or tokens.input_tokens is None:
                 self._input_uncounted = True
@@ -261,3 +267,14 @@ class UsageMeter:
                 output_tokens=self._output_tokens if self._any_tokens_reported else None,
                 requests_missing_token_counts=self._missing_token_counts,
             )
+
+
+def _counted(tokens: TokenUsage | None) -> TokenUsage | None:
+    """Return `tokens` with any negative count read as not reported."""
+    if tokens is None:
+        return None
+    return replace(
+        tokens,
+        input_tokens=None if (tokens.input_tokens or 0) < 0 else tokens.input_tokens,
+        output_tokens=None if (tokens.output_tokens or 0) < 0 else tokens.output_tokens,
+    )

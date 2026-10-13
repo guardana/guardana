@@ -6,6 +6,7 @@ away, and reporting "did not misbehave" about a run that was cut short is the
 fail-open this whole package is shaped to avoid.
 """
 
+import importlib
 from collections.abc import Sequence
 
 import pytest
@@ -26,6 +27,7 @@ from guardana.core.trajectory import (
     drive,
 )
 
+drive_module = importlib.import_module("guardana.core.trajectory.drive")
 _READ = ToolSpec("read_file", "Read a file.")
 _SEND = ToolSpec("send_email", "Send an email.")
 _POISONED = (
@@ -131,6 +133,46 @@ def test_the_deadline_truncates_a_slow_run() -> None:
     )
 
     assert trajectory.truncated is Truncation.DEADLINE
+
+
+class _CallsWithBulk:
+    """Asks for one tool per step with `bulk` added to the named field, counting its requests."""
+
+    def __init__(self, field: str, bulk: str) -> None:
+        self._field = field
+        self._bulk = bulk
+        self.requests = 0
+
+    def send(
+        self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
+    ) -> str:
+        return "hello"
+
+    def send_tools(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+        tools: Sequence[ToolSpec],
+    ) -> ToolCallReply:
+        self.requests += 1
+        call = {"name": "read_file", "arguments": "{}", "id": f"c{self.requests}"}
+        call[self._field] += self._bulk
+        return ToolCallReply(text=None, tool_calls=(ToolCall(**call),))
+
+
+@pytest.mark.parametrize("field", ["arguments", "id", "name"])
+def test_the_history_bound_counts_what_each_tool_call_resends(
+    field: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(drive_module, "MAX_HISTORY_BYTES", 1_000)
+    agent = _CallsWithBulk(field, "x" * 5_000)
+
+    trajectory = drive(_target(agent), "summarise", _offers(), max_steps=4)
+
+    assert trajectory.truncated is Truncation.HISTORY_BYTES
+    assert agent.requests == 1, "a history over the bound must never be sent"
 
 
 def test_asking_past_the_ceiling_is_refused() -> None:

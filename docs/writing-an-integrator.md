@@ -80,6 +80,12 @@ with open_trace(
     ...
 ```
 
+The versioned contract is the trace file format, schema 3
+([`schemas/trace-v3.schema.json`](../schemas/trace-v3.schema.json)). The Python writer in
+`guardana.core.trace` (`open_trace`, `resume_trace`, `TraceWriter` and the types beside them)
+is outside the [supported surface](compatibility.md#the-supported-surface). An integrator that
+imports it pins the exact `guardana-core` version it was tested with.
+
 `instrumented` is a **promise**, and it works in both directions.
 
 Leave a dimension out and its rules do not run — the safe direction, and how you start:
@@ -254,12 +260,12 @@ first-class producer with no Python anywhere. If the writer's refusals are usefu
 you, take them; if you write your own emitter, take the four rules in
 [the format reference](usage-analyze-trace.md#the-native-format) instead.
 
-**Not somebody else's problem to keep working.** Two worked examples live in
-[`examples/`](../examples/), each pinned to the upstream version it was written against
-and each in one of the two shapes above:
-[`hermes_integrator/`](../examples/hermes_integrator/) is a plugin holding the file for
-a whole session, and [`shell_hook_integrator/`](../examples/shell_hook_integrator/) is a
-command the agent spawns per event. They are examples rather than integrations this
-project carries — a later release of that framework may break either — and neither
-imports the agent it integrates with, which is what lets their tests run in CI without a
-green build here depending on somebody else's release.
+**Not somebody else's problem to keep working.** Two worked examples are in
+[`examples/`](../examples/). Each is written against a named upstream version stated in its
+README, and each uses one of the two forms above.
+[`hermes_integrator/`](../examples/hermes_integrator/) is a plugin that holds the file for a
+whole session. [`shell_hook_integrator/`](../examples/shell_hook_integrator/) is a command the
+agent spawns per event. They are examples rather than integrations maintained by this
+project; neither is guaranteed to work with later releases of its framework. Neither imports
+the agent it integrates with, so their tests run in CI without a passing build here depending
+on somebody else's release.

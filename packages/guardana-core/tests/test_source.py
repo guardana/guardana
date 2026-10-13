@@ -8,9 +8,11 @@ tests pin both halves of the deal — the data is right, and it is computed once
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from guardana.core.source import PythonSource, read_python_source
+from guardana.core import source as source_module
+from guardana.core.source import PythonSource, UnreadSource, read_python_source, read_source
 from guardana.core.target import ArtifactTarget
 
 # Inert fixture text, never executed: it is parsed into a tree so the index can be
@@ -160,3 +162,77 @@ def test_python_source_is_reusable_without_a_target(tmp_path: Path) -> None:
     # Third-party rules get the same entry point the built-ins use.
     source = read_python_source(_write(tmp_path, "sample.py", _SAMPLE))
     assert isinstance(source, PythonSource)
+
+
+def test_a_declared_encoding_is_decoded_the_way_the_interpreter_runs_it(tmp_path: Path) -> None:
+    path = tmp_path / "latin.py"
+    path.write_bytes(b"# -*- coding: latin-1 -*-\nname = 'caf\xe9'\n")
+    source = read_source(path)
+    assert isinstance(source, PythonSource)
+    assert "name = 'caf\u00e9'" in source.text
+    assert [node.lineno for node in source.nodes(ast.Assign)] == [2]
+
+
+def test_a_byte_order_mark_is_not_part_of_the_text(tmp_path: Path) -> None:
+    path = tmp_path / "bom.py"
+    path.write_bytes(b"\xef\xbb\xbfx = 1\n")
+    source = read_source(path)
+    assert isinstance(source, PythonSource)
+    assert source.text == "x = 1\n"
+
+
+@pytest.mark.parametrize(
+    ("raw", "why"),
+    [
+        (b"# coding: ascii\nname = 'caf\xe9'\n", "cannot be decoded"),
+        (b"# coding: no-such-codec\nx = 1\n", "encoding"),
+        (b"\xef\xbb\xbf# coding: latin-1\nx = 1\n", "encoding"),
+        (b"def (:\n", "cannot be parsed"),
+        (b"x = 1\x00\n", "cannot be parsed"),
+    ],
+)
+def test_bytes_the_interpreter_would_refuse_are_unread_not_nothing(
+    tmp_path: Path, raw: bytes, why: str
+) -> None:
+    path = tmp_path / "refused.py"
+    path.write_bytes(raw)
+    result = read_source(path)
+    assert isinstance(result, UnreadSource)
+    assert why in result.reason
+    assert "refused.py" in result.reason
+
+
+def test_a_source_too_complex_to_parse_is_unread(tmp_path: Path) -> None:
+    path = tmp_path / "deep.py"
+    path.write_text("x=" + "-" * 200_000 + "1\n", encoding="utf-8")
+    result = read_source(path)
+    assert isinstance(result, UnreadSource)
+    assert "cannot be parsed" in result.reason
+
+
+def test_a_parser_recursion_failure_is_unread_and_parsed_once_per_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _write(tmp_path, "nested.py", "x = 1\n")
+    calls: list[str] = []
+
+    def exhausted(text: str) -> ast.Module:
+        calls.append(text)
+        raise RecursionError("maximum recursion depth exceeded")
+
+    # Only the module under test sees the failing parser; pytest itself parses too.
+    monkeypatch.setattr(source_module, "ast", SimpleNamespace(parse=exhausted))
+    target = ArtifactTarget(tmp_path)
+    for _ in range(3):
+        assert target.python_source(path) is None
+    assert len(calls) == 1
+    assert [u.path for u in target.unread_sources()] == [path]
+    assert "RecursionError" in target.unread_sources()[0].reason
+
+
+def test_a_null_byte_reason_names_no_missing_line(tmp_path: Path) -> None:
+    path = tmp_path / "null.py"
+    path.write_bytes(b"x = 1\x00\n")
+    result = read_source(path)
+    assert isinstance(result, UnreadSource)
+    assert "None" not in result.reason

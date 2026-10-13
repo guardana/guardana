@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html" aria-current="page">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html" aria-current="page">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -363,8 +367,9 @@ most the number of cases, since its default of 30 refuses a small suite at load.
 <code>regression</code> tag is a label: a case that carries it without a pair changes no gate. See
 <a href="usage-suites.html">quality suites</a>.</p>
 <h2 id="regrading">Regrading</h2>
-<p>A live run sends the case's input and grades the target's reply; it never reads <code>observed</code> or
-<code>accepted</code>, and neither is part of the case's identity.</p>
+<p>A live run sends the case's input and grades the target's reply. It never sends <code>observed</code> or
+<code>accepted</code> or grades either as the target's reply. It only regrades the pair offline as the
+list below describes. Neither is part of the case's identity.</p>
 <ul>
 <li><code>guardana rule test</code> regrades every pair of every selected suite with the rule as it is now,
 sending nothing, and names each case whose pair no longer holds: exit <code>1</code> when a side graded
@@ -389,7 +394,7 @@ format 1 (<a href="https://guardana.dev/schemas/dataset/v1.schema.json"><code>da
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-case.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

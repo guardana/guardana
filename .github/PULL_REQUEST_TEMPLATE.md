@@ -19,8 +19,8 @@
 Issue:
 
 <!-- Propose one using docs/compatibility.md#versioning; the maintainer confirms
-     the version when grouping a release. Before stable 1.0, rc2 takes fixes
-     only. A merge does not publish a package. -->
+     the version when grouping a release. Until stable 1.0, RCs take fixes only.
+     A merge does not publish a package. -->
 - [ ] No package release needed (tests, docs, or maintainer tooling only)
 - [ ] Patch: compatible correction to documented behavior
 - [ ] Minor: compatible opt-in functionality or deprecation

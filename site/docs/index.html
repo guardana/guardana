@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -248,7 +252,7 @@
 <tr>
 <td>a coverage shortfall</td>
 <td>evidence you demanded, or a model file no rule read</td>
-<td><code>indeterminate</code>, <code>2</code>, always</td>
+<td><code>indeterminate</code>, <code>2</code>, regardless of <code>fail_on_*</code> switches. A finding or failed suite still makes it <code>fail</code>, <code>1</code>. A stopped run keeps its own code.</td>
 </tr>
 <tr>
 <td>a stopped run</td>
@@ -300,6 +304,7 @@ output. An unsupported format is invalid usage, exit <code>3</code>, before comm
 <h2 id="evidence-and-regression">Evidence and regression</h2>
 <ul>
 <li><a href="usage-run.html"><code>usage-run.md</code></a> — inspect and migrate saved runs</li>
+<li><a href="reading-results.html"><code>reading-results.md</code></a> — read a saved run, SARIF or JUnit from your own tool</li>
 <li><a href="usage-diff.html"><code>usage-diff.md</code></a> — compare runs without hiding coverage changes</li>
 <li><a href="usage-baseline.html"><code>usage-baseline.md</code></a> — accept risk with an expiry</li>
 <li><a href="usage-monitor.html"><code>usage-monitor.md</code></a> — schedule active re-verification</li>
@@ -343,6 +348,7 @@ output. An unsupported format is invalid usage, exit <code>3</code>, before comm
 <ul>
 <li><a href="architecture.html"><code>architecture.md</code></a> — understand package and trust boundaries</li>
 <li><a href="threat-model.html"><code>threat-model.md</code></a> — see what Guardana does and does not defend</li>
+<li><a href="reproducible-builds.html"><code>reproducible-builds.md</code></a> — rebuild a release from its tag and compare it with PyPI byte for byte</li>
 <li><a href="product-status.html"><code>product-status.md</code></a> — check maturity and known limitations</li>
 </ul>
 <h2 id="reference">Reference</h2>
@@ -383,7 +389,7 @@ coverage. Do not edit them by hand.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/index.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

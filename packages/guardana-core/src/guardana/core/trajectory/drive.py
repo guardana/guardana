@@ -1,7 +1,7 @@
 import time
 from collections.abc import Callable, Mapping, Sequence
 
-from guardana.core.target.endpoint import ChatMessage, ToolCall
+from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply
 from guardana.core.target.protocols import ToolOfferingEndpoint
 from guardana.core.trajectory.limits import (
     DEADLINE_SECONDS,
@@ -35,7 +35,9 @@ def drive(  # noqa: PLR0913, PLR0911 — one parameter per knob; one return per 
     back what the doubles say. Nothing is executed. The loop ends when the model
     stops asking for tools, when `stop_after` says the question is already
     answered, or when a bound in `limits` is hit — and only that last ending marks
-    the run truncated, which every evaluator must read as inconclusive.
+    the run truncated, which every evaluator must read as inconclusive. A reply holding
+    a call that could not be read ends it the same way, once its readable calls are
+    answered and recorded, so a leak they show is still graded.
 
     `stop_after` is how a rule avoids paying for steps that cannot change its
     verdict: once a forbidden tool has been called, four more round trips buy
@@ -63,7 +65,7 @@ def drive(  # noqa: PLR0913, PLR0911 — one parameter per knob; one return per 
         reply = target.offer_tools(messages, specs)
         if not reply.tool_calls:
             steps.append(TrajectoryStep(text=reply.text))
-            return finish(None)
+            return finish(None if reply.unreadable is None else Truncation.UNREADABLE_CALL)
         if len(reply.tool_calls) > MAX_CALLS_PER_STEP:
             # Deliberately not "answer the first eight": a run that quietly drops
             # calls is a different experiment from the one the rule described.
@@ -72,8 +74,9 @@ def drive(  # noqa: PLR0913, PLR0911 — one parameter per knob; one return per 
 
         invocations, oversized = _answer(reply.tool_calls, doubles)
         steps.append(TrajectoryStep(text=reply.text, invocations=invocations))
-        if oversized:
-            return finish(Truncation.TOOL_RESULT_BYTES)
+        cut_short = _cut_short(reply, oversized=oversized)
+        if cut_short is not None:
+            return finish(cut_short)
 
         messages.append(
             ChatMessage(role="assistant", content=reply.text or "", tool_calls=reply.tool_calls)
@@ -88,6 +91,15 @@ def drive(  # noqa: PLR0913, PLR0911 — one parameter per knob; one return per 
         if clock() > deadline:
             return finish(Truncation.DEADLINE)
     return finish(Truncation.MAX_STEPS)
+
+
+def _cut_short(reply: ToolCallReply, *, oversized: bool) -> Truncation | None:
+    """Say why a step whose readable calls were answered ends the run, or None when it does not."""
+    if oversized:
+        return Truncation.TOOL_RESULT_BYTES
+    if reply.unreadable is not None:
+        return Truncation.UNREADABLE_CALL
+    return None
 
 
 def _answer(
@@ -112,4 +124,13 @@ def _answer(
 
 
 def _history_bytes(messages: Sequence[ChatMessage]) -> int:
-    return sum(len(m.content.encode("utf-8")) for m in messages)
+    """Count every text the next request re-sends, the tool calls each turn carried included."""
+    return sum(
+        _utf8(message.role, message.content, message.tool_call_id or "")
+        + sum(_utf8(call.name, call.arguments, call.id) for call in message.tool_calls)
+        for message in messages
+    )
+
+
+def _utf8(*texts: str) -> int:
+    return sum(len(text.encode("utf-8")) for text in texts)

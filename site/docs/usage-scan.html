@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -309,6 +313,42 @@ system-prompt leak, output-secrets) are not selected by <code>scan</code> — th
 live model, so use <code>guardana probe</code> for those. A local endpoint rule loaded
 with <code>--rules</code> or <code>rules.paths</code> does not run either, and <code>scan</code> prints a note
 naming it.</p>
+<h2 id="what-the-scan-leaves-out">What the scan leaves out</h2>
+<p>Three things keep a file out of a directory scan:</p>
+<ul>
+<li><strong><code>rules.paths_exclude</code></strong> in the profile (<a href="profiles.html"><code>profiles.md</code></a>): glob patterns
+matched against each path relative to the scanned directory. A matching directory is not
+walked. This is the policy you chose, and it may exclude any file, a model file included.</li>
+<li><strong><code>.guardanaignore</code></strong> at the root of the scanned directory: one glob pattern per line,
+blank lines and <code>#</code> comments skipped, matched the same way. The file ships with the
+target, so whoever controls the target writes it. It excludes ordinary files, but never a
+file a model loader reads: a file the scan observes as a model (every row of the table
+under <a href="#model-files-no-rule-reads">model files no rule reads</a>, an unzipped Keras model's
+<code>config.json</code> and <code>metadata.json</code> included), an archive or compressed file (<code>.zip</code>,
+<code>.tar</code>, <code>.tgz</code>, <code>.tbz2</code>, <code>.tbz</code>, <code>.txz</code>, or a name ending in <code>.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>,
+<code>.bz2</code>, <code>.lzma</code> or <code>.lz4</code>) whatever it is named, and, in a directory
+that holds a model or a tokenizer (<code>tokenizer_config.json</code> or <code>tokenizer.json</code>), every
+<code>*config.json</code>, <code>chat_template.json</code>, <code>chat_template*.jinja</code>, <code>chat_template*.j2</code> and
+<code>keras_metadata.pb</code>, with the templates in its <code>additional_chat_templates/</code>. A link is
+judged by its name alone. A directory it matches is still walked for such files. A file
+it matches that a model loader reads is scanned anyway and named in the output: <code>Scope</code>
+in the terminal (the first ten, then a count), <code>scope.kept_models</code> in the saved run with
+the pattern that matched it.
+Every pattern it applied is named there too, with the file it came from
+(<code>scope.excludes[].file</code>). It still excludes a notebook, source code and a configuration
+with no model or tokenizer beside it. To leave a model file
+out, use <code>rules.paths_exclude</code>.</li>
+<li><strong>Directories every scan skips</strong>, wherever they occur: <code>.git</code>, <code>.venv</code>, <code>venv</code>, <code>env</code>,
+<code>__pycache__</code>, <code>.mypy_cache</code>, <code>.ruff_cache</code>, <code>.pytest_cache</code>, <code>node_modules</code>, <code>.tox</code>,
+<code>.eggs</code>, <code>dist</code>, <code>build</code>, <code>.idea</code>, <code>.vscode</code> and <code>*.egg-info</code>. They stay skipped, and the
+gate does not change, but the scan searches them by file name for model files, without
+opening a file and within a bound of 10,000 entries shared across them, shallowest first.
+A <code>.bin</code>, <code>.model</code> or <code>.sav</code> counts by its name there; a file with no suffix is not
+counted.
+A skipped directory holding model files is named in the terminal with their count, and in
+the saved run as <code>scope.skipped_models</code>; <code>searched_all</code> is <code>false</code> there when the search
+stopped at its bound. To scan such a model, scan its directory directly.</li>
+</ul>
 <h2 id="a-path-with-no-file-to-scan">A path with no file to scan</h2>
 <p>A scan whose path holds no file other than <code>.guardanaignore</code> files is a coverage
 shortfall named <code>empty_target</code>, naming the scanned path: the directory is empty, or
@@ -328,22 +368,130 @@ remove, or a directory link named like a directory every scan skips, is not repo
 symlinked file whose target lies inside the scanned directory is listed and read, the
 scanned directory itself may be reached through a symlink, and a single file named on the
 command line is read even when it is a symlink.</p>
+<h2 id="python-files-the-scan-cannot-read">Python files the scan cannot read</h2>
+<p>A <code>.py</code> file is decoded the way Python decodes a module it runs, so a UTF-8 byte order
+mark or a PEP 263 coding line (<code># -*- coding: latin-1 -*-</code>) is honoured. A file that is
+too large, cannot be opened, cannot be decoded, or does not parse under the Python
+running the scan (syntax from a newer Python, a Python 2 file, a null byte) is not
+skipped: it is recorded as a source the scan could not read, so the run records an
+error, and every rule that reads Python reports it as an inconclusive &quot;not scanned&quot;
+result with an <code>unexamined_component</code> shortfall. The run is <code>indeterminate</code> (exit <code>2</code>)
+whenever such a rule runs, even with <code>fail_on_error: false</code>. Scan with a Python that parses the file, or exclude it
+with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>.</p>
+<h2 id="chat-templates-and-model-configs">Chat templates and model configs</h2>
+<p><code>chat_template</code> reads chat templates from every location a loader uses: GGUF metadata
+(<code>tokenizer.chat_template</code> and its named variants); the <code>chat_template</code> key of
+<code>tokenizer_config.json</code>, <code>chat_template.json</code> or <code>processor_config.json</code> (a string or a list
+of named templates); a <code>.jinja</code> or <code>.j2</code> file whose name starts with <code>chat_template</code>; and
+every <code>.jinja</code> or <code>.j2</code> file in an <code>additional_chat_templates/</code> directory. Transformers 5
+loads these directory files as named templates and uses <code>default</code> ahead of the rest.</p>
+<p><code>remote_code_config</code> reads every <code>*config.json</code>. A Hub kernel repository named in
+<code>_attn_implementation_internal</code> or <code>_attn_implementation</code> is <code>critical</code>. Transformers sets
+either field from the config without consulting <code>trust_remote_code</code>, then downloads and
+imports the kernel. The rule reads every accepted form: <code>org/repo</code>, with a <code>@revision</code>,
+a <code>:function</code> or a prefix such as <code>paged|</code>; a dict keyed by sub-config name
+(<code>{&quot;&quot;: &quot;org/repo&quot;}</code>); and a nested sub-config such as <code>text_config</code> or <code>decoder</code>.
+A kernel named in the documented <code>attn_implementation</code> field is a <code>medium</code> lead.</p>
 <h2 id="model-files-no-rule-reads">Model files no rule reads</h2>
 <p>Every model file the scan observes must be read by a rule that ran. One that no rule
 read is a coverage shortfall named <code>unexamined_component</code>, one per format, so the run
 is <code>indeterminate</code> (exit <code>2</code>) and never clean. There is no switch: exclude the file
-with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>, which the saved run then records, or
-install a rule that reads the format.</p>
+with <code>rules.paths_exclude</code>, which the saved run then records, or install a rule that reads
+the format. <code>.guardanaignore</code> does not exclude a model file.</p>
 <p>A model or notebook a rule tried to read and could not is a shortfall of the same kind,
-named by its file: a pickle, archive or graph that does not parse, a pickle import whose
-name the scanner cannot resolve, a model file that cannot be opened (a <code>.bin</code> included,
-since it may be a model), a safetensors file whose header is malformed, a file cut by a
-read bound, a PMML document past the bound, a notebook that is not JSON. The rule reports two things for it: an inconclusive
-&quot;not scanned&quot; result on the unverified channel, and an <code>unexamined_component</code> shortfall
-whose name is the file's path and whose detail reads <code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format. With no switch over it, a scan
-holding one such file is <code>indeterminate</code> (exit <code>2</code>) under every preset, <code>ci</code> included,
-unless a finding fails it. A notebook cell that does not parse as Python is not one: the
-notebook was read, and the cell is reported as an unverified result only.</p>
+named by its file: a pickle, archive or graph that does not parse, an archive member named
+as a pickle (<code>data.pkl</code>, <code>*.pkl</code>, a legacy tar's <code>pickle</code>) that ends before its STOP, an
+NPY header whose <code>descr</code>, <code>shape</code> or <code>fortran_order</code> numpy would refuse, a pickle import whose
+name the scanner cannot resolve, a pickle of any protocol naming a callable by an
+extension-registry code (<code>EXT1</code>, <code>EXT2</code>, <code>EXT4</code>), a model file that cannot be opened (a <code>.bin</code> included,
+since it may be a model), a safetensors file with a malformed header (including a tensor entry
+with a missing or mistyped <code>dtype</code>, <code>shape</code> or <code>data_offsets</code>, and tensors that do not
+describe the payload exactly), a GGUF file declaring an unsupported version, an ONNX
+file without a graph (including an empty file), a <code>.keras</code> archive or Keras model directory
+whose <code>config.json</code> is not a JSON object and declares no Lambda layer, a <code>chat_template</code>
+list entry that holds no template (each one, beside whatever its siblings hold), a file cut
+by a read bound, an archive refused
+before it is opened (below), a PMML document past the bound, a notebook that is not JSON
+or has a cell that is not an object or a code cell whose source is not text, a notebook whose
+<code>cells</code> or <code>worksheets</code> is not a list or has a worksheet that holds no list of cells, a
+notebook whose <code>kernelspec.language</code> or <code>language_info.name</code> is not Python.
+A Git LFS pointer (<code>version https://git-lfs.github.com/spec/v1</code>, what a clone without the
+LFS objects holds; the whole file, not a model that merely opens with one) named as a model a rule reads, a <code>.pb</code>, <code>.bin</code>, <code>.sav</code>, <code>.p</code> or <code>.model</code>
+included, is reported with the reason <code>a Git LFS pointer, not the model; fetch the LFS object</code>. It is reported as not scanned, never as a checked model. A pointer named as a
+format no rule reads is the per-format shortfall above. A plain <code>.zip</code> or <code>.tar</code> names no
+model: it is read by content, and a pointer under that name is not reported. In CI, fetch
+the LFS objects before the scan (<code>lfs: true</code> on <code>actions/checkout</code>, or <code>git lfs pull</code>), or
+exclude the file.
+The rule reports
+two things for it: an inconclusive &quot;not scanned&quot; result on the unverified channel, and an
+<code>unexamined_component</code> shortfall whose name is the file's path and whose detail reads
+<code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format.
+With no switch over it, a scan holding one such file is <code>indeterminate</code> (exit <code>2</code>) under
+every preset, <code>ci</code> included, unless a finding fails it. Every cell a notebook reader runs is
+read: the top-level <code>cells</code> by their <code>source</code>; the <code>code</code> of a v1 code cell, which nbformat
+runs from a notebook that declares no version; and the cells of each <code>worksheets</code> entry by
+their <code>input</code>, which nbformat runs instead of the top-level cells when it upgrades a v2 or v3
+notebook. Each of these readings is scanned on its own, so a name bound in one does not
+change how another is read. A notebook cell that does not
+parse as Python is not one: the notebook was read, and the cell is reported as an
+unverified result only. A cell too complex for the Python parser to hold is inconclusive
+and a shortfall. The IPython line magics <code>%time</code>, <code>%timeit</code>, <code>%prun</code> and <code>%debug</code>,
+and the first line of the <code>%%timeit</code>, <code>%%prun</code> and <code>%%debug</code> cell magics, are read as
+Python after their options are removed; the bodies of <code>%%time</code>, <code>%%capture</code>, <code>%%writefile</code>
+and <code>%%script python</code> cells are read as Python. <code>%system</code> and <code>%sx</code> lines are read as shell
+escapes, like <code>!</code>, and so is the command an <code>%alias</code> defines, wherever the alias is called.
+<code>%%bash</code>, <code>%%sh</code>, <code>%%sx</code>, <code>%%system</code>, <code>%%!</code> and <code>%%script</code> with a shell are shell cells,
+whose magic is found on the first non-blank line. A shell cell is read as the shell joins
+it: a line ending in a backslash, <code>|</code>, <code>&amp;&amp;</code> or <code>||</code> continues on the next, and a <code>!</code> or
+<code>%</code> line ending in a backslash continues as IPython joins it. Magics that only change
+interpreter state (<code>%matplotlib</code>, <code>%config</code>, <code>%env</code>, <code>%cd</code>, <code>%autoreload</code>, <code>%load_ext</code>
+of IPython's own <code>autoreload</code> or <code>storemagic</code>, and the like) are skipped. Any other magic
+is not skipped: <code>%run</code>, <code>%load_ext</code>, <code>%pip</code>, <code>%conda</code>, a magic the rule does not know,
+and a cell magic that runs another language (<code>%%perl</code>, <code>%%R</code>, <code>%%html</code>, <code>%%script perl</code>)
+make the cell inconclusive and add an <code>unexamined_component</code> shortfall naming the notebook
+and the magic, and a foreign cell's body is never read as Python. A magic whose statement
+does not parse makes the cell inconclusive. Each <code>{…}</code> expression IPython evaluates
+inside a <code>!</code> line or a magic's arguments (<code>{{</code> and <code>}}</code> are literal braces) is scanned as
+Python with the rest of the cell; one that is not Python syntax, such as an <code>awk</code>
+program, evaluates nothing, since IPython then runs the command unexpanded.
+<code>target = !cmd</code> and <code>target = %magic</code> are read as the bare form. A cell that is a single
+line starting with a line magic's name (<code>run x.py</code>, <code>pip install x</code>, <code>ls -la</code>) is read as
+that magic, as IPython's automagic runs it, unless the rest starts with <code>=</code> or <code>,</code> or an
+earlier cell, a builtin or a keyword binds the name; after <code>%rehashx</code>, such a line
+starting with any other unbound word is inconclusive, since it may name an executable.
+A magic defined with <code>%alias_magic</code> is read as its target. Calls on the IPython object,
+under any name <code>get_ipython</code> is imported or assigned as, are read as the escape, magic
+or cell they spell (<code>system</code>, <code>getoutput</code>, <code>run_line_magic</code>, <code>run_cell_magic</code>,
+<code>run_cell</code>, <code>run_cell_async</code>, a magic returned by <code>find_line_magic</code> and called, the same
+methods reached through <code>getattr</code>). Its namespaces, history and display data are inert.
+Any other method, an argument that is not a literal, or a method taken without being
+called is reported unscanned: inconclusive and a shortfall. The same applies to a call
+that receives the IPython object, or <code>get_ipython</code> itself, as an argument
+(<code>helper(get_ipython())</code>), because the rule does not follow what the callee does with it.
+A builtin that only inspects or prints it (<code>print</code>, <code>isinstance</code>, <code>hasattr</code>, <code>type</code> and
+the like) is exempt unless the notebook rebinds its name.</p>
+<p>A cell running a local script gets one <code>low</code> finding naming each script as written:
+a file passed to <code>sh</code>, <code>bash</code> or another shell, or to <code>python</code>, as an argument or
+standard input (<code>sh &lt; setup.sh</code>); a file passed to <code>source</code> or <code>.</code>; or a path run as
+the command (<code>./run</code>, <code>tools/stage2.sh</code>, or a bare or absolute name ending in <code>.sh</code> or
+<code>.py</code>). This applies wherever the shell command comes from: a <code>!</code> line, <code>%system</code>,
+a shell cell magic, a magic defined with <code>%alias_magic</code>, an automagic <code>system</code> line
+or a call on the IPython object. The rule does not read what the script runs.
+<code>python -m</code>, <code>sh -c</code> with its command (which the rule reads for scripts in turn) and
+a tool run by name are not scripts. A download piped to a shell remains a <code>high</code> finding.</p>
+<p>An archive is refused before it is opened when listing it would cost more than listing a
+model does. A zip, a <code>.keras</code> included, is refused when its end records declare more than
+100,000 entries or a central directory over 25,600,000 bytes, or when that directory holds
+more than 100,000 entries. A tar is refused when it holds more than 100,000 members or
+more than 400,000 headers, a compressed tar's headers included; more than 8 extended headers, or more than 1 MiB of them, in
+front of one member; more than 1,000,000 global PAX records applied, counting the records
+in force once for every member and PAX header after them; sparse maps listing more than
+100,000 regions in all, or one stored in a member's data over 1 MiB; or a header the
+scanner cannot follow. A sparse member within those bounds is read like any other. An
+archive that holds no model but exceeds the entry bound, such as an image dataset,
+is reported not scanned like any other refused archive. Exclude it from the scan
+with <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an archive), or
+scan the model's directory instead.</p>
 <p>Shortfall names are relative to the working directory, as finding locations are, and the
 scan root is removed from their detail, so a saved run names the same file on a laptop
 and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.</p>
@@ -356,7 +504,7 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 </thead>
 <tbody>
 <tr>
-<td><code>.pkl</code>, <code>.pickle</code>, <code>.dill</code>, <code>.joblib</code>, <code>.pt</code>, <code>.pth</code>, <code>.ckpt</code>, <code>.ptl</code>, <code>.pdparams</code>, <code>.pth.tar</code>, <code>.pt.tar</code></td>
+<td><code>.pkl</code>, <code>.pkl3</code>, <code>.pickle</code>, <code>.dill</code>, <code>.joblib</code>, <code>.pt</code>, <code>.pth</code>, <code>.th</code>, <code>.ckpt</code>, <code>.ptl</code>, <code>.pdparams</code>, <code>.mdl</code>, <code>.pth.tar</code>, <code>.pt.tar</code></td>
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
@@ -368,11 +516,19 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
+<td>a compressed pickle, checkpoint or array (<code>.pkl</code>, <code>.pickle</code> or <code>.joblib</code> followed by <code>.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code> or <code>.lzma</code>; <code>.joblib.lz4</code>; <code>.pt.gz</code>; <code>.pth.gz</code>; <code>.ckpt.gz</code>; <code>.npy.gz</code>, read as an NPY array when it decompresses to one)</td>
+<td><code>guardana.supply_chain.pickle_opcode</code></td>
+</tr>
+<tr>
+<td>a <code>.dat</code>, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a <code>.dat.gz</code> or <code>.dat</code> with another codec above, or a file named only by a codec (<code>clf.gz</code>, as <code>joblib.dump</code> writes it, or <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code>, <code>.lzma</code>, <code>.lz4</code>), read when it decompresses to a pickle</td>
+<td><code>guardana.supply_chain.pickle_opcode</code></td>
+</tr>
+<tr>
 <td><code>.onnx</code></td>
 <td><code>guardana.supply_chain.onnx_graph</code></td>
 </tr>
 <tr>
-<td><code>.keras</code>, <code>.h5</code>, <code>.hdf5</code></td>
+<td><code>.keras</code>, <code>.h5</code>, <code>.hdf5</code>; a <code>.bin</code>, <code>.model</code>, <code>.hdf</code>, <code>.weights</code> or <code>.tf</code> that holds the HDF5 signature at its start or after a userblock; a file with no suffix that holds it in its first 64 KiB; a <code>config.json</code> beside <code>metadata.json</code>, <code>model.weights.h5</code> or <code>model.weights.npz</code> (an unzipped Keras model directory); a tf_keras SavedModel's <code>keras_metadata.pb</code></td>
 <td><code>guardana.supply_chain.keras_lambda</code></td>
 </tr>
 <tr>
@@ -384,16 +540,116 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.model_format</code></td>
 </tr>
 <tr>
-<td><code>.tflite</code>, <code>.mar</code>, <code>.nemo</code>, <code>.llamafile</code>, <code>model.tar.gz</code>, a compressed pickle or checkpoint (<code>.pkl</code>, <code>.pickle</code> or <code>.joblib</code> followed by <code>.gz</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code> or <code>.lzma</code>; <code>.joblib.lz4</code>; <code>.pt.gz</code>; <code>.pth.gz</code>), a <code>.bin</code> that starts like GGUF or GGML</td>
+<td><code>saved_model.pb</code>, <code>saved_model.pbtxt</code> (the text form TensorFlow loads when there is no <code>.pb</code>; its <code>op</code> values are decoded as protobuf decodes them, and one that cannot be decoded is a shortfall)</td>
+<td><code>guardana.supply_chain.saved_model_ops</code></td>
+</tr>
+<tr>
+<td><code>model.tar.gz</code> (a SageMaker model), read for its members like any compressed tar (below); one holding no member named as a model is still a shortfall</td>
+<td><code>guardana.supply_chain.pickle_opcode</code></td>
+</tr>
+<tr>
+<td><code>.tflite</code>, <code>.mar</code>, <code>.nemo</code>, <code>.llamafile</code>, a <code>.bin</code> that starts like GGUF or GGML</td>
 <td>no built-in rule</td>
 </tr>
 </tbody>
 </table></div>
-<p>A <code>.bin</code>, <code>.sav</code>, <code>.p</code> or <code>.model</code> whose first bytes match none of those is not listed as a
-model. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
-a model (<code>pickle</code>, <code>data.pkl</code>, <code>*.pt</code>, <code>*.pth.tar</code>), and every member of a <code>.tar</code> that is in
-fact a zip; a member named as a model that is itself an archive is a coverage shortfall,
-and one <code>pickle.load</code> would read is still read as a stream. Any file <code>pickle_opcode</code> reads
+<p>A <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or a file with no suffix, whose first bytes match
+none of those is not listed as a model. A <code>.dat</code>, a file with no suffix or a file named only by
+a codec costs <code>pickle_opcode</code> one read of its first 64 KiB, and a file with no suffix the same one read for
+<code>keras_lambda</code>: a pickle, a compressed pickle, an NPY array or an archive holding a model is
+read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
+them, is left alone without a result. A zip or tar under such a name is read like a plain
+<code>.zip</code> or <code>.tar</code>. The HDF5 signature is looked for where the HDF5 library looks: at the
+start and after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file,
+and in a file with no suffix up to the end of its first 64 KiB. The
+model config is read from the first 16 MiB, so a file whose signature or config lies past
+that, or a <code>.keras</code> whose <code>config.json</code> is longer, is reported as not scanned rather than
+clean, also when a Lambda layer was found in the part read. An HDF5 model saved with no
+suffix behind a userblock that ends past its first 64 KiB is neither listed nor read. An
+HDF5 file holding a fractal heap stored compressed, where an attribute such as the model
+config is kept as bytes no search can read, is reported as not scanned. A <code>TFOpLambda</code> or
+<code>SlicingOpLambda</code> layer, which tf_keras rebuilds by calling the TensorFlow function its
+config names, is a <code>high</code> finding, like a Lambda layer, when that function is more than
+tensor arithmetic (anything outside <code>math</code>, <code>nn</code>, <code>linalg</code>, <code>__operators__</code> and the other
+arithmetic namespaces, or array functions such as <code>reshape</code> and <code>concat</code>), such as
+<code>io.write_file</code>; so is a <code>ClassMethod</code> layer, which calls the method its config names on
+the class it names, unless it builds a tensor (<code>RaggedTensor.from_row_splits</code> and the other
+<code>RaggedTensor</code> constructors, <code>SparseTensor.from_value</code>). A layer of either kind that names
+nothing it calls, or whose config cannot be decoded, is reported as not scanned. A
+marshalled function (<code>&quot;class_name&quot;: &quot;__lambda__&quot;</code>) anywhere in a config, which Keras 3 runs
+on load without a Lambda layer around it, is a <code>high</code> finding, and so is an object naming a
+callable in <code>os</code>, <code>subprocess</code>, <code>builtins</code> or another module a model has no use for (<code>sys</code>,
+<code>socket</code>, <code>shutil</code>, <code>pty</code>, <code>importlib</code>, <code>posix</code>, <code>nt</code>, <code>runpy</code>, <code>ctypes</code>, <code>pickle</code>,
+<code>marshal</code>, <code>code</code>), which Keras before 3.9 imports on load; a callable in any other module
+outside Keras, such as a project's own, is not reported. A <code>TFSMLayer</code> is a <code>high</code> finding
+naming the SavedModel it loads, which <code>load_model</code> in Keras through 3.11 loads whatever
+<code>safe_mode</code> says; one
+naming no path, or whose config cannot be decoded, is reported as not scanned. A layer counts
+as a Lambda or a <code>TFSMLayer</code> when its <code>class_name</code> or its <code>registered_name</code> names one, since
+Keras 3.8 builds the class <code>registered_name</code> names when <code>class_name</code> names nothing in the
+layer's module. A <code>StringLookup</code>, <code>IntegerLookup</code> or <code>TextVectorization</code> layer reads a
+string <code>vocabulary</code> as a file while Keras builds it, <code>safe_mode</code> or not; one naming an absolute path, a <code>..</code> path or a URL (<code>gs://</code> too) is a <code>medium</code> lead, the
+same judgement <code>saved_model_ops</code> makes of a table's file below, and a list or a relative path
+stays quiet. A tf_keras SavedModel's <code>keras_metadata.pb</code> is searched like an HDF5 model. Keras metadata that an
+older SavedModel keeps inside <code>saved_model.pb</code> is not read, and neither is a <code>config.json</code>
+with none of Keras' own files beside it, although <code>keras.saving.load_model</code> loads such a
+directory. <code>saved_model_ops</code> reports <code>ReadFile</code> and <code>WriteFile</code> as <code>medium</code> leads wherever
+they sit. <code>MatchingFiles</code>, <code>InitializeTableFromTextFile</code> and <code>InitializeTableFromTextFileV2</code>
+are <code>medium</code> leads only when the graph also holds a string constant naming a file outside
+the model: an absolute path, a <code>..</code> path or a URL (<code>file://</code>, <code>gs://</code>, <code>s3://</code>, which
+TensorFlow opens alike) whose file name is not one the model ships under its own <code>assets/</code>,
+so a vocabulary read from <code>assets/vocab.txt</code> stays quiet. <code>Save</code>, <code>SaveV2</code> and
+<code>MergeV2Checkpoints</code> are not reported: every SavedModel's saver writes its checkpoint with
+them. <code>PrintV2</code> is a <code>medium</code> lead only when the graph also holds a <code>file://</code> string (in
+the text form, a <code>file://</code> string attribute), the output stream it writes to. The operator and
+the string are not tied through the graph: a constant naming a file elsewhere beside an op
+that reads another file is reported, and a path the graph builds from pieces none of which
+looks like one, or a constant of fewer than five characters, is not. <code>pickle_opcode</code> also reads a <code>.tar</code> or <code>.zip</code> by its content: the members named like
+a model (<code>pickle</code>, <code>data.pkl</code>, <code>*.pt</code>, <code>*.pth.tar</code>, <code>*.pkl.gz</code>; a <code>*.bin</code>, <code>*.sav</code>, <code>*.p</code>,
+<code>*.model</code> or <code>*.dat</code> member only when its bytes are a pickle), every member of a <code>.zip</code>
+whose first bytes are an NPY array or a pickle <code>PROTO</code> opcode whatever its name, and every member
+of a <code>.tar</code> that is in fact a zip. The first bytes of a <code>.zip</code>'s other members are read for
+the first 10,000 of them, and for no more than 64 MiB of local headers and first blocks;
+the members past either bound are a coverage shortfall that counts them. A member of a plain
+<code>.tar</code> with no suffix and no legacy torch name (<code>pickle</code>, <code>storages</code>, <code>tensors</code>) is not read,
+so a pickle saved under such a name inside one is not found. A <code>.tar.gz</code>, <code>.tgz</code>, <code>.tar.bz2</code>,
+<code>.tbz2</code>, <code>.tbz</code>, <code>.tar.xz</code> or <code>.txz</code> is decompressed as <code>tar</code> decompresses it, as gzip, bz2 or
+xz by its first bytes and across streams written back to back, in memory and never to disk,
+and its members are read like those of a plain <code>.tar</code>, under the same bounds. At most 32 bytes
+are decompressed for each byte of the file, and at least 64 MiB; a compressed tar past that
+bound, damaged or cut before its end, or with a header <code>tarfile</code> stops listing at before the
+end of the archive, is a coverage shortfall, and so is a link named as a model inside one,
+which is not followed. One that is a plain tar under that name is read as a <code>.tar</code>, and one
+that holds no tar is read as <code>joblib.load</code> reads a file, by its first bytes: a pickle in it,
+compressed or not, is found, and anything else is left alone. <code>tar</code> detects the compression
+from the content, so a <code>.tar</code> whose bytes are gzip, bz2 or xz, a file named only by a codec
+(<code>bundle.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code>, <code>.lzma</code>, <code>.lz4</code>) and a <code>.dat</code> or a file with no
+suffix are read as a compressed tar when they decompress to one, found in the same first
+read that looks for a pickle. A compressed tar whose decompressed bytes start like a pickle
+is also read as the stream <code>joblib.load</code> would unpickle from them. A <code>.bin</code> whose bytes are a
+compressed tar is not read as one. A member named as
+a model that is itself an archive is a coverage shortfall, and one <code>pickle.load</code> would read is still read as a stream. A member named as a
+model it does not open inside an archive (<code>*.safetensors</code>, <code>*.gguf</code>, <code>*.onnx</code>, <code>*.keras</code>,
+a nested <code>model.tar.gz</code> and the rest of the last row above, and HDF5 files (<code>*.h5</code>, <code>*.hdf5</code>, <code>*.hdf</code>, <code>*.weights</code>, <code>*.tf</code>) and a Keras directory's
+<code>config.json</code>, <code>model.weights.h5</code> or <code>model.weights.npz</code> inside a model archive, though not inside a plain
+<code>.zip</code> or <code>.tar</code>, where HDF5 is as often a dataset) is a
+coverage shortfall that names it; a zip member counts under its directory name and under an
+Info-ZIP Unicode Path alike. A file or member it reads whose first bytes are a zlib, gzip,
+bz2, lzma, xz or lz4 header, or joblib's own legacy one, is decompressed first, as
+<code>joblib.load</code> does whatever the name, up to 64 MiB per file or member, 512 MiB per archive
+and 1,024 streams back to back; past a bound, damaged part-way (what was decompressed
+before the damage is still read), or in lz4 or another form it cannot decompress, it is a
+coverage shortfall. A zip whose
+central directory is not where its end record declares it, as with bytes before the zip
+or two directories, is a coverage shortfall rather than read, because zip readers would
+disagree on its members, and so is a member stored with two different sizes or whose local
+header disagrees with its directory entry, and a pickle read that crosses the end of a
+frame; a <code>.zip</code> is found by its end record wherever the zip data starts, and is
+also read as a stream when its first bytes are not a zip's,
+and a file that starts with an end record is opened as a zip, as <code>np.load</code> does. In a
+legacy tar, the <code>storages</code> and <code>tensors</code> members are read as <code>torch.load</code> reads them, a
+pickle before each run of raw tensor bytes; a layout it cannot follow is a coverage
+shortfall. Any file <code>pickle_opcode</code> reads
 that does not start as a zip and whose first 512-byte block is a tar header (<code>ustar</code>, or
 the older v7 form without <code>ustar</code> magic) is read as a tar, whatever it is named, because
 <code>torch.load</code> opens a legacy <code>torch.save</code> file that way. The same file is also read as the
@@ -435,8 +691,19 @@ callable the file imports, sorted and each once, after a digest of that set
 summary, so a file that imports a different callable is a new finding, even when the
 listing is long enough to be cut by the evidence bound. Callables found in the members
 read before a member that failed are still reported. A pickle that imports a callable
-and then one whose name the scanner cannot resolve, or that is cut by a read bound, is
-reported both ways: the finding for what was found, and the file as unread.</p>
+and then one whose name the scanner cannot resolve, or names one by an extension-registry
+code, or that is cut by a read bound, is reported both ways: the finding for what was
+found, and the file as unread. An extension code counts where a loader reads the bytes
+as a pickle: from the first byte of a file or member named as one (<code>*.pkl</code>, <code>*.pt</code>,
+<code>data.pkl</code>, an object array); in the four pickles that follow a first pickle returning the
+legacy <code>torch.save</code> magic number; in a file or member named <code>.bin</code>, <code>.sav</code>, <code>.p</code> or
+<code>.model</code> when its stream goes on to a clean STOP, calls what the code named, or imports a
+callable after the code;
+and wherever a pickle opens with a <code>PROTO</code> opcode of any protocol. It stays data in a
+tensor storage beside a checkpoint's <code>data.pkl</code>, a numeric array, everything after those
+four pickles in a file whose first pickle returns the magic number, whatever the file is
+named, a
+member named as no model, and after a complete pickle without a <code>PROTO</code> opcode.</p>
 <h2 id="other-formats">Other formats</h2>
 <pre><code class="language-bash">guardana scan . --format json    # machine-readable findings + summary
 guardana scan . --format sarif   # SARIF 2.1.0, for GitHub code-scanning upload
@@ -498,8 +765,11 @@ exit &quot;$status&quot;
 <h2 id="forwarding-to-a-collector">Forwarding to a collector</h2>
 <pre><code class="language-bash">guardana scan . --reporter server://https://collector.example.com
 </code></pre>
-<p>Findings are POSTed to the collector after being printed locally — this
-never blocks the local exit-code gate. See
+<p>Findings are POSTed to the collector after being printed locally — by default
+a collector that refuses or cannot be reached is a warning and changes no exit
+code. A profile that sets <a href="profiles.html#delivery"><code>delivery.required</code></a> prints
+an unacknowledged delivery as an <code>error:</code> line, and a final <code>0</code>, <code>1</code> or <code>2</code>
+becomes <code>8</code> (see <a href="exit-codes.html"><code>exit-codes.md</code></a>). See
 <a href="architecture.html#the-coreserver-boundary"><code>architecture.md</code></a>.</p>
 <h2 id="saving-a-run-for-comparison">Saving a run for comparison</h2>
 <p><code>--output &lt;path&gt;</code> writes the report to a file instead of stdout. With
@@ -510,6 +780,13 @@ you can ask whether the next run is worse than this one — see
 </code></pre>
 <p>Prefer it to a shell redirect: PowerShell redirects write UTF-16, and the reader
 on the other end cannot parse that.</p>
+<p>A scan never writes its report over a file it scanned. If <code>--output</code> or its
+<code>&lt;stem&gt;.exchanges.jsonl</code> is a file the scan read, the command exits <code>3</code> after scanning
+and writes nothing. Two files are exempt by content, never by name: an earlier saved
+run, which <code>guardana scan . --format json --output run.json</code> replaces when run again,
+and exchanges that an adjacent saved run (<code>&lt;stem&gt;.json</code> or <code>&lt;stem&gt;</code>) records by digest.
+A recording named <code>customer.exchanges.jsonl</code> that no saved run records is refused
+like any other scanned file.</p>
 <p><strong><code>--format json</code> is not optional here.</strong> <code>--output</code> on its own writes whatever
 <code>--format</code> says, and that defaults to human text — a file named like a saved run
 that <code>guardana diff</code> refuses. Since 0.7.1 saving any other format says so at the
@@ -519,7 +796,7 @@ which is the run you wanted compared.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-scan.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

@@ -137,6 +137,24 @@ def test_out_of_range_min_confidence_is_rejected(tmp_path: Path, bad: str) -> No
         load_profile(tmp_path / "p.yaml")
 
 
+@pytest.mark.parametrize("bad", ["true", "false", "[0.5]", "'abc'", "'nan'", "'inf'"])
+def test_a_min_confidence_that_is_not_a_number_is_rejected(tmp_path: Path, bad: str) -> None:
+    # YAML `true` loads as a bool, which float() reads as 1.0 and which then hides every
+    # finding below full confidence from the gate.
+    (tmp_path / "p.yaml").write_text(f"fail_on:\n  min_confidence: {bad}\n", encoding="utf-8")
+    with pytest.raises(ProfileError, match="min_confidence must be a number"):
+        load_profile(tmp_path / "p.yaml")
+
+
+@pytest.mark.parametrize(("quoted", "expected"), [("'0.5'", 0.5), ("'1'", 1.0)])
+def test_a_quoted_min_confidence_still_loads_as_the_number_it_spells(
+    tmp_path: Path, quoted: str, expected: float
+) -> None:
+    (tmp_path / "p.yaml").write_text(f"fail_on:\n  min_confidence: {quoted}\n", encoding="utf-8")
+
+    assert load_profile(tmp_path / "p.yaml").policy.fail_on.min_confidence == expected
+
+
 def test_a_proper_list_still_loads(tmp_path: Path) -> None:
     (tmp_path / "p.yaml").write_text(
         "rules:\n"

@@ -65,6 +65,26 @@ def test_ignores_call_without_the_flag(tmp_path: Path) -> None:
     assert _scan(tmp_path) == []
 
 
-def test_does_not_crash_on_a_syntax_error(tmp_path: Path) -> None:
+def test_a_syntax_error_is_declined_as_not_scanned(tmp_path: Path) -> None:
     (tmp_path / "broken.py").write_text("def (:\n", encoding="utf-8")
-    assert _scan(tmp_path) == []
+    assert [s.split(":")[0] for s in _scan(tmp_path)] == ["Python file not scanned"]
+
+
+_LOADER = (
+    "from transformers import AutoModel\n"
+    "m = AutoModel.from_pretrained('o/m', trust_remote_code=True)\n"
+)
+
+
+def test_a_loader_in_another_declared_encoding_is_flagged_like_its_utf8_twin(
+    tmp_path: Path,
+) -> None:
+    for name, raw in (
+        ("utf8", _LOADER.encode()),
+        ("latin", b"# -*- coding: latin-1 -*-\n# caf\xe9\n" + _LOADER.encode()),
+        ("bom", b"\xef\xbb\xbf" + _LOADER.encode()),
+    ):
+        root = tmp_path / name
+        root.mkdir()
+        (root / "loader.py").write_bytes(raw)
+        assert len(_scan(root)) == 1, name

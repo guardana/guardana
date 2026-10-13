@@ -15,13 +15,17 @@ import json
 import marshal
 import os
 import py_compile
+import shutil
 import sys
 import sysconfig
 import threading
-from collections.abc import Iterator, Mapping
+import zipfile
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
+from _setuptools_finder import FINDER_TEMPLATE
 from guardana.core import recipe_source
 from guardana.core.recipe import moves_under_one_version
 from guardana.core.recipe_source import (
@@ -123,7 +127,7 @@ def test_an_editable_install_is_pinned_by_its_source_files_and_nothing_else(
     pinned = pin_distribution_source("acme-pack")
 
     assert pinned == SourcePin(
-        digest="sha256:d88dbd444d175cf6d68fe1d26a432cf639315c153c419647b682377123dace4e", files=5
+        digest="sha256:ebd784384d74e443f74cc8140e7ef2392ed1452cbd8a1efd151970de4012075c", files=5
     )
 
 
@@ -222,6 +226,65 @@ def test_a_symlink_inside_the_directory_is_pinned_by_what_it_holds(tmp_path: Pat
     assert first.files == 6
     assert isinstance(edited, SourcePin)
     assert edited.digest != first.digest
+
+
+@pytest.mark.parametrize("link", ["current", "zcurrent"])  # walked before and after its targets
+def test_retargeting_a_directory_symlink_inside_the_directory_changes_the_pin(
+    tmp_path: Path, link: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    for name, body in (("v1", "SAFE = True\n"), ("v2", "SAFE = False\n")):
+        (root / "src" / name).mkdir()
+        (root / "src" / name / "impl.py").write_text(body, encoding="utf-8")
+    (root / "src" / link).symlink_to("v1", target_is_directory=True)
+    first = tree_pin(root)
+
+    (root / "src" / link).unlink()
+    (root / "src" / link).symlink_to("v2", target_is_directory=True)
+    retargeted = tree_pin(root)
+
+    assert isinstance(first, SourcePin)
+    assert isinstance(retargeted, SourcePin)
+    assert retargeted.digest != first.digest
+    assert retargeted.files == first.files
+
+
+def _versions(root: Path) -> None:
+    for name, body in (("v1", "SAFE = True\n"), ("v2", "SAFE = False\n")):
+        (root / "src" / name).mkdir()
+        (root / "src" / name / "impl.py").write_text(body, encoding="utf-8")
+
+
+def test_retargeting_a_link_chained_through_an_excluded_directory_changes_the_pin(
+    tmp_path: Path,
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _versions(root)
+    (root / ".venv").mkdir(exist_ok=True)
+    (root / ".venv/hop").symlink_to("../src/v1", target_is_directory=True)
+    (root / "src/zcurrent").symlink_to("../.venv/hop", target_is_directory=True)
+    first = tree_pin(root)
+
+    (root / ".venv/hop").unlink()
+    (root / ".venv/hop").symlink_to("../src/v2", target_is_directory=True)
+    retargeted = tree_pin(root)
+
+    assert isinstance(first, SourcePin)
+    assert isinstance(retargeted, SourcePin)
+    assert retargeted.digest != first.digest
+
+
+def test_an_absolute_directory_link_pins_the_same_in_every_checkout(tmp_path: Path) -> None:
+    pins = []
+    for checkout in ("one", "two"):
+        root = _source_tree(tmp_path / checkout / "acme-pack")
+        _versions(root)
+        (root / "src/zcurrent").symlink_to(root / "src/v1", target_is_directory=True)
+        pins.append(tree_pin(root))
+        pins.append(tree_pin(root))
+
+    assert isinstance(pins[0], SourcePin)
+    assert pins == [pins[0]] * 4
 
 
 def _record(*rows: str) -> str:
@@ -717,8 +780,8 @@ def test_bytecode_that_cannot_be_read_leaves_it_unpinned(
     unreadable = tree_pin(root)
 
     relative = cached.relative_to(root).as_posix()
-    assert too_large == f"its {relative} is too large to read"
-    assert unreadable == f"its {relative} cannot be read"
+    assert too_large == f"with its {relative}, it holds more than 0 MiB"
+    assert unreadable == f"its {relative} is not a regular file"
 
 
 def test_bytecode_python_would_load_in_place_of_a_recorded_source_leaves_it_unpinned(
@@ -1201,12 +1264,15 @@ def _editable_with(site: Path, root: Path, files: Mapping[str, str]) -> None:
     )
 
 
-def _finder(mapping: Mapping[str, str], namespaces: Mapping[str, list[str]]) -> str:
-    return (
-        "import sys\n"
-        f"MAPPING: dict[str, str] = {dict(mapping)!r}\n"
-        f"NAMESPACES: dict[str, list[str]] = {dict(namespaces)!r}\n"
-        "def install():\n    pass\n"
+def _finder(
+    mapping: Mapping[str, str],
+    namespaces: Mapping[str, list[str]],
+    *,
+    name: str = "__editable__.acme_pack-1.0.finder",
+) -> str:
+    """The finder setuptools writes for an editable install mapping `mapping`."""
+    return FINDER_TEMPLATE.format(
+        mapping=dict(sorted(mapping.items())), namespaces=dict(namespaces), name=name
     )
 
 
@@ -1228,6 +1294,26 @@ def test_an_editable_path_file_inside_its_directory_is_pinned(tmp_path: Path, si
     )
 
     assert isinstance(pin_distribution_source("acme-pack"), SourcePin)
+
+
+@pytest.mark.parametrize(
+    "mapped", ["build/acme_pack", ".venv/lib/acme_pack", "src/acme_pack.egg-info/acme_pack"]
+)
+def test_an_editable_finder_mapping_into_a_directory_the_pin_leaves_out_leaves_it_unpinned(
+    tmp_path: Path, site: Path, mapped: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    (root / mapped).mkdir(parents=True, exist_ok=True)
+    finder = _finder({"acme_pack": str(root / mapped)}, {})
+    _editable_with(
+        site,
+        root,
+        {"_acme_pack.pth": f"import {_FINDER}; {_FINDER}.install()\n", f"{_FINDER}.py": finder},
+    )
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its {_FINDER}.py loads code from {root / mapped}, which the pin leaves out"
+    )
 
 
 @pytest.mark.parametrize(
@@ -1314,15 +1400,18 @@ def test_an_editable_finder_mapping_inside_its_directory_is_pinned(
 
 
 @pytest.mark.parametrize(
-    "finder",
-    ["MAPPING = {'acme_pack': SRC}\n", "def broken(:\n", "MAPPING = ['not', 'a', 'mapping']\n"],
+    "mapping",
+    ["{'acme_pack': SRC}", "{'acme_pack': (}", "['not', 'a', 'mapping']"],
     ids=["not-a-literal", "not-python", "not-a-mapping"],
 )
 def test_an_editable_finder_that_cannot_be_read_leaves_it_unpinned(
-    tmp_path: Path, site: Path, finder: str
+    tmp_path: Path, site: Path, mapping: str
 ) -> None:
     root = _source_tree(tmp_path / "acme-pack")
     name = "__editable___acme_pack_1_0_finder.py"
+    finder = _finder({}, {}).replace(
+        "MAPPING: dict[str, str] = {}", f"MAPPING: dict[str, str] = {mapping}", 1
+    )
     _editable_with(site, root, {name: finder})
 
     assert pin_distribution_source("acme-pack") == (
@@ -1340,3 +1429,847 @@ def test_an_editable_install_without_a_record_stays_unpinned(tmp_path: Path, sit
     )
 
     assert pin_distribution_source("acme-pack") == "it has no RECORD to read"
+
+
+def test_a_plain_tree_pin_keeps_the_digest_earlier_locks_hold(tmp_path: Path) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+
+    assert tree_pin(root) == SourcePin(
+        digest="sha256:d88dbd444d175cf6d68fe1d26a432cf639315c153c419647b682377123dace4e", files=5
+    )
+
+
+def _importable(
+    root: Path, *, mapped: str = "src/acme_pack", pth_extra: str = ""
+) -> dict[str, str]:
+    """The path file and finder a setuptools editable install of `root` writes, by file name."""
+    return {
+        "__editable__.acme_pack-1.0.pth": (
+            f"{root / 'src'}\n{pth_extra}import {_FINDER}; {_FINDER}.install()\n"
+        ),
+        f"{_FINDER}.py": _finder({"acme_pack": str(root / mapped)}, {"acme_ns": [str(root)]}),
+    }
+
+
+def _pinned_with(site: Path, root: Path, files: Mapping[str, str]) -> SourcePin:
+    """Install `acme-pack` editable from `root` with `files` again, and return its pin."""
+    for stale in site.iterdir():
+        if stale.is_dir():
+            shutil.rmtree(stale)
+        else:
+            stale.unlink()
+    _editable_with(site, root, files)
+    pinned = pin_distribution_source("acme-pack")
+    assert isinstance(pinned, SourcePin)
+    return pinned
+
+
+def test_an_editable_pin_moves_when_its_finder_or_path_file_changes(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    files = _importable(root)
+    first = _pinned_with(site, root, files)
+
+    finder = _pinned_with(
+        site,
+        root,
+        {
+            **files,
+            f"{_FINDER}.py": _finder(
+                {"acme_pack": str(root / "src/acme_pack")},
+                {"acme_ns": [str(root)], "acme_extra": []},
+            ),
+        },
+    )
+    path_file = _pinned_with(site, root, _importable(root, pth_extra="# rebuilt\n"))
+
+    assert first.files == 7
+    assert finder.digest != first.digest
+    assert path_file.digest != first.digest
+    assert _pinned_with(site, root, files) == first
+
+
+def test_an_editable_pin_moves_when_a_package_is_mapped_to_another_directory_of_the_tree(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    link = tmp_path / "current"
+    link.symlink_to(root / "src" / "acme_pack", target_is_directory=True)
+    files = {
+        "__editable__.acme_pack-1.0.pth": f"import {_FINDER}; {_FINDER}.install()\n",
+        f"{_FINDER}.py": _finder({"acme_pack": str(link)}, {}),
+    }
+    first = _pinned_with(site, root, files)
+
+    link.unlink()
+    link.symlink_to(root / "src" / "acme_pack" / "build", target_is_directory=True)
+    remapped = _pinned_with(site, root, files)
+
+    assert remapped.files == first.files
+    assert remapped.digest != first.digest
+
+
+def test_an_editable_pin_moves_when_a_path_its_path_file_names_resolves_elsewhere_in_the_tree(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    link = tmp_path / "current"
+    link.symlink_to(root / "src", target_is_directory=True)
+    files = {"_acme_pack.pth": f"{link}\n"}
+    first = _pinned_with(site, root, files)
+
+    link.unlink()
+    link.symlink_to(root / "src" / "acme_pack", target_is_directory=True)
+    relinked = _pinned_with(site, root, files)
+
+    assert relinked.files == first.files
+    assert relinked.digest != first.digest
+
+
+def _pinned_before_and_after_a_move(
+    tmp_path: Path,
+    site: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    files: Callable[[Path], Mapping[str, str]],
+) -> tuple[SourcePin, SourcePin]:
+    """Pin `acme-pack` installed editable, then moved with its environment and installed again.
+
+    `files` writes the path file and finder for the root they are installed from.
+    """
+    root = _source_tree(tmp_path / "one" / name)
+    first = _pinned_with(site, root, files(root))
+    moved_root = tmp_path / "two" / "checkouts" / name
+    moved_root.parent.mkdir(parents=True)
+    root.rename(moved_root)
+    moved_site = tmp_path / "two" / "venv" / "site-packages"
+    moved_site.mkdir(parents=True)
+    site.rename(tmp_path / "gone")
+    monkeypatch.syspath_prepend(str(moved_site))
+    importlib.invalidate_caches()
+    return first, _pinned_with(moved_site, moved_root, files(moved_root))
+
+
+@pytest.mark.parametrize("name", ["acme-pack", "acme\\pack"], ids=["plain", "escaped-in-a-literal"])
+def test_an_editable_pin_holds_when_the_project_and_its_environment_move(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    first, moved = _pinned_before_and_after_a_move(tmp_path, site, monkeypatch, name, _importable)
+
+    assert moved == first
+    assert first.files == 7
+
+
+def test_a_directory_beside_the_editable_root_is_not_read_as_a_path_inside_it(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, moved = _pinned_before_and_after_a_move(
+        tmp_path,
+        site,
+        monkeypatch,
+        "acme-pack",
+        lambda root: _importable(root, pth_extra=f"# {root}-old/src\n"),
+    )
+
+    assert moved.digest != first.digest
+
+
+def test_bytecode_python_would_load_in_place_of_an_editable_finder_leaves_it_unpinned(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, _importable(root))
+    cached = _cached(site / f"{_FINDER}.py")
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its __pycache__/{cached.name} is not what {_FINDER}.py compiles to"
+    )
+
+
+def test_bytecode_compiled_from_an_editable_finder_leaves_its_pin_where_it_was(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    first = _pinned_with(site, root, _importable(root))
+    finder = site / f"{_FINDER}.py"
+
+    py_compile.compile(str(finder), doraise=True)
+
+    assert (site / "__pycache__").is_dir()
+    assert pin_distribution_source("acme-pack") == first
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_an_editable_finder_that_is_a_fifo_is_never_opened_and_leaves_it_unpinned(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, _importable(root))
+    finder = site / f"{_FINDER}.py"
+    finder.unlink()
+    os.mkfifo(finder)
+    pinned: list[SourcePin | str] = []
+    worker = threading.Thread(
+        target=lambda: pinned.append(pin_distribution_source("acme-pack")), daemon=True
+    )
+
+    worker.start()
+    worker.join(timeout=10)
+    blocked = worker.is_alive()
+    if blocked:
+        os.close(os.open(finder, os.O_WRONLY | os.O_NONBLOCK))
+        worker.join(timeout=10)
+
+    assert not blocked
+    assert pinned == [f"its {_FINDER}.py is not a regular file"]
+
+
+def test_an_editable_install_with_no_path_file_or_finder_is_not_pinned_as_a_plain_tree(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable(site, root)
+
+    pinned = pin_distribution_source("acme-pack")
+    tree = tree_pin(root)
+
+    assert isinstance(pinned, SourcePin)
+    assert isinstance(tree, SourcePin)
+    assert pinned.files == tree.files
+    assert pinned.digest != tree.digest
+
+
+def test_an_editable_path_file_above_the_read_cap_is_refused_unread_with_its_name(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, {"_acme_pack.pth": f"# {'x' * 300}\n{root / 'src'}\n"})
+    monkeypatch.setattr(recipe_source, "_IMPORT_FILE_BYTES", 256)
+
+    assert pin_distribution_source("acme-pack") == "its _acme_pack.pth is too large to read"
+
+
+def test_an_editable_path_file_crossing_the_source_bound_leaves_it_unpinned_with_its_name(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, {"_acme_pack.pth": f"# {'x' * 300}\n{root / 'src'}\n"})
+    monkeypatch.setattr(recipe_source, "MAX_SOURCE_FILES", 0)
+
+    assert pin_distribution_source("acme-pack") == (
+        "with its _acme_pack.pth, it holds more than 0 files"
+    )
+
+
+_PINNED_TREE = (
+    "pyproject.toml",
+    "src/acme_pack/__init__.py",
+    "src/acme_pack/rules/refuses.yaml",
+    "src/acme_pack/build/__init__.py",
+    "src/acme_pack/stale.pyc",
+)
+
+
+@pytest.mark.parametrize("bound", ["MAX_SOURCE_FILES", "MAX_SOURCE_BYTES"])
+def test_editable_path_files_and_the_tree_are_held_to_the_source_bounds_together(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch, bound: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    (root / "pyproject.toml").write_text(f"# {'x' * 4096}\n", encoding="utf-8")
+    _editable_with(site, root, {"_acme_pack.pth": f"{root / 'src'}\n"})
+    held = {
+        "MAX_SOURCE_FILES": len(_PINNED_TREE),
+        "MAX_SOURCE_BYTES": sum((root / path).stat().st_size for path in _PINNED_TREE),
+    }
+    monkeypatch.setattr(recipe_source, bound, held[bound])
+
+    tree = tree_pin(root)
+    pinned = pin_distribution_source("acme-pack")
+
+    assert isinstance(tree, SourcePin)
+    assert tree.files == len(_PINNED_TREE)
+    assert isinstance(pinned, str)
+    assert pinned.startswith("it holds more than")
+
+
+def _pinned_unless_blocked(pin: Callable[[], SourcePin | str], fifo: Path) -> SourcePin | str:
+    """Run `pin` in a thread; fail the test if it blocks on `fifo`, after letting it go."""
+    pinned: list[SourcePin | str] = []
+    worker = threading.Thread(target=lambda: pinned.append(pin()), daemon=True)
+
+    worker.start()
+    worker.join(timeout=10)
+    blocked = worker.is_alive()
+    if blocked:
+        os.close(os.open(fifo, os.O_WRONLY | os.O_NONBLOCK))
+        worker.join(timeout=10)
+
+    assert not blocked, f"the pin blocked on {fifo.name}"
+    assert len(pinned) == 1
+    return pinned[0]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_a_fifo_in_a_source_tree_is_never_opened_and_leaves_it_unpinned_with_its_name(
+    tmp_path: Path,
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    pipe = root / "src" / "acme_pack" / "pipe.py"
+    os.mkfifo(pipe)
+
+    pinned = _pinned_unless_blocked(lambda: tree_pin(root), pipe)
+
+    assert pinned == "src/acme_pack/pipe.py is not a regular file"
+
+
+def _after_listing(monkeypatch: pytest.MonkeyPatch, change: Callable[[], object]) -> None:
+    """Make `change` once the tree has been listed and before any file of it is hashed."""
+    listed = recipe_source._listed
+
+    def listed_then_changed(
+        root: Path, leave_out: frozenset[Path], *, counted: int, read: int
+    ) -> object:
+        found = listed(root, leave_out, counted=counted, read=read)
+        change()
+        return found
+
+    monkeypatch.setattr(recipe_source, "_listed", listed_then_changed)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_a_file_swapped_for_a_fifo_after_listing_is_never_waited_on_and_leaves_it_unpinned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    swapped = root / "pyproject.toml"
+
+    def swap() -> None:
+        swapped.unlink()
+        os.mkfifo(swapped)
+
+    _after_listing(monkeypatch, swap)
+
+    pinned = _pinned_unless_blocked(lambda: tree_pin(root), swapped)
+
+    assert pinned == "pyproject.toml is not a regular file"
+
+
+def test_a_file_that_grows_after_listing_is_not_hashed_past_its_listed_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    grown = root / "src" / "acme_pack" / "rules" / "refuses.yaml"
+    _after_listing(monkeypatch, lambda: grown.write_text("x" * 4096, encoding="utf-8"))
+
+    assert tree_pin(root) == "src/acme_pack/rules/refuses.yaml changed while it was read"
+
+
+def test_a_file_replaced_after_listing_by_one_of_the_same_size_leaves_the_tree_unpinned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    replaced = root / "pyproject.toml"
+    size = replaced.stat().st_size
+
+    def replace() -> None:
+        staged = root / "staged"
+        staged.write_bytes(b"#" * size)
+        staged.replace(replaced)
+
+    _after_listing(monkeypatch, replace)
+
+    assert tree_pin(root) == "pyproject.toml changed while it was read"
+
+
+def test_an_editable_install_whose_tree_grows_after_listing_stays_unpinned(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, _importable(root))
+    grown = root / "pyproject.toml"
+    _after_listing(monkeypatch, lambda: grown.write_text("x" * 4096, encoding="utf-8"))
+
+    assert pin_distribution_source("acme-pack") == "pyproject.toml changed while it was read"
+
+
+@pytest.mark.parametrize("written", ["x" * 4096, ""], ids=["grows", "shrinks"])
+def test_a_file_that_changes_size_once_opened_is_read_no_further_than_listed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, written: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    changed = root / "src" / "acme_pack" / "rules" / "refuses.yaml"
+    opened = recipe_source._open_unblocked
+    read: list[int] = []
+
+    def open_then_change(path: Path) -> tuple[BinaryIO, os.stat_result] | None:
+        regular = opened(path)
+        if regular is None:
+            return None
+        handle, status = regular
+        if path == changed.resolve():
+            changed.write_text(written, encoding="utf-8")
+            reads = handle.read
+
+            def counted(size: int = -1) -> bytes:
+                chunk = reads(size)
+                read.append(len(chunk))
+                return chunk
+
+            monkeypatch.setattr(handle, "read", counted)
+        return handle, status
+
+    monkeypatch.setattr(recipe_source, "_open_unblocked", open_then_change)
+    listed = len("id: acme.refuses\n")
+
+    assert tree_pin(root) == "src/acme_pack/rules/refuses.yaml changed while it was read"
+    assert read, "the file was not read"
+    assert sum(read) <= listed + 1
+
+
+@pytest.mark.parametrize(
+    "beside",
+    [
+        "MAPPING['evil'] = {outside!r}\n",
+        "sys.path.insert(0, {outside!r})\n",
+        "import acme_hook\n",
+    ],
+    ids=["mapping-changed", "path-added", "module-imported"],
+)
+def test_an_editable_finder_running_code_beside_its_tables_leaves_it_unpinned(
+    tmp_path: Path, site: Path, beside: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    finder = _finder({"acme_pack": str(root / "src/acme_pack")}, {})
+    _editable_with(
+        site,
+        root,
+        {
+            "__editable__.acme_pack-1.0.pth": f"import {_FINDER}; {_FINDER}.install()\n",
+            f"{_FINDER}.py": finder + beside.format(outside=str(outside)),
+        },
+    )
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its {_FINDER}.py is not a setuptools finder template Guardana knows"
+    )
+
+
+def test_an_editable_finder_naming_itself_with_code_leaves_it_unpinned(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    finder = _finder({"acme_pack": str(root / "src/acme_pack")}, {}).replace(
+        "PATH_PLACEHOLDER = '__editable__.acme_pack-1.0.finder'",
+        "PATH_PLACEHOLDER = __import__('os').getcwd()",
+    )
+    _editable_with(
+        site,
+        root,
+        {
+            "__editable__.acme_pack-1.0.pth": f"import {_FINDER}; {_FINDER}.install()\n",
+            f"{_FINDER}.py": finder,
+        },
+    )
+
+    assert "__import__" in finder
+    assert pin_distribution_source("acme-pack") == (
+        f"its {_FINDER}.py is not a setuptools finder template Guardana knows"
+    )
+
+
+def test_an_editable_finder_as_setuptools_writes_it_is_pinned(tmp_path: Path, site: Path) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(
+        site,
+        root,
+        {
+            "__editable__.acme_pack-1.0.pth": f"import {_FINDER}; {_FINDER}.install()\n",
+            f"{_FINDER}.py": _finder(
+                {"acme_pack": str(root / "src/acme_pack")}, {"acme_ns": [str(root / "src")]}
+            ),
+        },
+    )
+
+    pinned = pin_distribution_source("acme-pack")
+
+    assert isinstance(pinned, SourcePin)
+    assert pinned.files == 7
+
+
+def test_a_path_file_with_a_byte_order_mark_is_read_as_site_reads_it(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    inner = root / "env" / "site-packages"
+    inner.mkdir(parents=True)
+    sys.path.insert(0, str(inner))
+    importlib.invalidate_caches()
+    try:
+        _editable_with(inner, root, {"_acme_pack.pth": "\ufeffimport json\n"})
+        hook = pin_distribution_source("acme-pack")
+    finally:
+        sys.path.remove(str(inner))
+        importlib.invalidate_caches()
+
+    assert hook == "its _acme_pack.pth runs json, which Guardana cannot read"
+
+
+def test_a_path_line_after_a_byte_order_mark_is_resolved_without_it(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    _editable_with(site, root, {"_acme_pack.pth": f"\ufeff{outside}\n"})
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its _acme_pack.pth loads code from {outside}, outside the directory it was installed from"
+    )
+
+
+def test_a_byte_order_mark_on_a_path_file_moves_the_pin(tmp_path: Path, site: Path) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    plain = _pinned_with(site, root, {"_acme_pack.pth": f"{root / 'src'}\n"})
+
+    marked = _pinned_with(site, root, {"_acme_pack.pth": f"\ufeff{root / 'src'}\n"})
+
+    assert marked.files == plain.files
+    assert marked.digest != plain.digest
+
+
+def test_bytecode_is_compared_with_the_source_as_it_was_hashed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src" / "acme_pack" / "__init__.py"
+    hashed = source.read_text(encoding="utf-8")
+    loaded = "CHECK = 'loaded'\n"
+    source.write_text(loaded, encoding="utf-8")
+    _cached(source, loaded, flags=0b11)
+    source.write_text(hashed, encoding="utf-8")
+    digest = recipe_source._listed_digest
+
+    def hashed_then_swapped(
+        listed: recipe_source._ListedFile,
+    ) -> tuple[str, bytes | None] | str:
+        found = digest(listed)
+        if listed.path == source:
+            source.write_text(loaded, encoding="utf-8")
+        return found
+
+    monkeypatch.setattr(recipe_source, "_listed_digest", hashed_then_swapped)
+
+    assert tree_pin(root) == (
+        "its src/acme_pack/__pycache__/"
+        f"{source.stem}.{_TAG}.pyc is not what src/acme_pack/__init__.py compiles to"
+    )
+
+
+def test_bytecode_read_counts_toward_the_byte_bound_with_the_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src" / "acme_pack" / "__init__.py"
+    cached = _cached(source, source.read_text(encoding="utf-8"), flags=0b11)
+    tree = sum((root / path).stat().st_size for path in _PINNED_TREE)
+    monkeypatch.setattr(recipe_source, "MAX_SOURCE_BYTES", tree + 8)
+
+    assert tree_pin(root) == (
+        f"with its {cached.relative_to(root).as_posix()}, it holds more than 0 MiB"
+    )
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_bytecode_that_is_a_fifo_is_never_waited_on_and_leaves_it_unpinned(
+    tmp_path: Path,
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    source = root / "src" / "acme_pack" / "__init__.py"
+    cached = source.parent / "__pycache__" / f"{source.stem}.{_TAG}.pyc"
+    cached.unlink(missing_ok=True)
+    os.mkfifo(cached)
+
+    pinned = _pinned_unless_blocked(lambda: tree_pin(root), cached)
+
+    assert pinned == f"its {cached.relative_to(root).as_posix()} is not a regular file"
+
+
+def _shadowed(site: Path, root: Path) -> None:
+    """Install `acme-pack` editable from `root` with the finder setuptools writes."""
+    _editable_with(
+        site,
+        root,
+        {
+            "__editable__.acme_pack-1.0.pth": f"import {_FINDER}; {_FINDER}.install()\n",
+            f"{_FINDER}.py": _finder({"acme_pack": str(root / "src/acme_pack")}, {}),
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "shadow",
+    [
+        f"{_FINDER}/__init__.py",
+        f"{_FINDER}/portion.py",
+        f"{_FINDER}{importlib.machinery.EXTENSION_SUFFIXES[0]}",
+        f"{_FINDER}.pyc",
+    ],
+    ids=["package", "namespace-portion", "extension-module", "legacy-bytecode"],
+)
+def test_anything_importable_in_place_of_an_editable_finder_beside_it_leaves_it_unpinned(
+    tmp_path: Path, site: Path, shadow: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _shadowed(site, root)
+    planted = site / shadow
+    planted.parent.mkdir(exist_ok=True)
+    planted.write_bytes(b"raise SystemExit('shadowed')\n")
+    shadowing = site / shadow.split("/", maxsplit=1)[0]
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its {_FINDER}.py is shadowed by {shadowing}, which Python could import in its place"
+    )
+
+
+def test_a_module_named_like_an_editable_finder_earlier_on_the_path_leaves_it_unpinned(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _shadowed(site, root)
+    earlier = tmp_path / "earlier"
+    earlier.mkdir()
+    (earlier / f"{_FINDER}.py").write_text("raise SystemExit('shadowed')\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(earlier))
+
+    assert pin_distribution_source("acme-pack") == (
+        f"its {_FINDER}.py is shadowed by {earlier / f'{_FINDER}.py'}, "
+        "which Python could import in its place"
+    )
+
+
+def test_a_module_named_like_an_editable_finder_later_on_the_path_leaves_its_pin(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _shadowed(site, root)
+    first = pin_distribution_source("acme-pack")
+    later = tmp_path / "later"
+    later.mkdir()
+    (later / f"{_FINDER}.py").write_text("raise SystemExit('shadowed')\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "path", [*sys.path, str(later)])
+
+    assert isinstance(first, SourcePin)
+    assert pin_distribution_source("acme-pack") == first
+
+
+def _with_finder(site: Path, root: Path, finder: str) -> SourcePin | str:
+    """Install `acme-pack` editable from `root` with `finder` as its finder, and pin it."""
+    _editable_with(
+        site,
+        root,
+        {
+            "__editable__.acme_pack-1.0.pth": f"import {_FINDER}; {_FINDER}.install()\n",
+            f"{_FINDER}.py": finder,
+        },
+    )
+    return pin_distribution_source("acme-pack")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "/srv/acme/evil",
+        "__editable__./srv/acme.finder",
+        "__editable__.acme_pack-2.0.finder",
+        "__editable__.acme:pack.finder",
+    ],
+    ids=["a-path", "a-path-inside-the-form", "another-finder", "a-drive"],
+)
+def test_an_editable_finder_whose_path_hook_is_not_its_own_name_leaves_it_unpinned(
+    tmp_path: Path, site: Path, name: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    finder = _finder({"acme_pack": str(root / "src/acme_pack")}, {"acme_ns": []}, name=name)
+
+    assert _with_finder(site, root, finder) == (
+        f"its {_FINDER}.py maps its packages in a way Guardana cannot read"
+    )
+
+
+@pytest.mark.parametrize("table", ["mapping", "namespaces"])
+def test_an_editable_finder_mapping_a_relative_path_leaves_it_unpinned(
+    tmp_path: Path, site: Path, table: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    relative = "../acme-pack/src/acme_pack"
+    mapping = {"acme_pack": relative if table == "mapping" else str(root / "src/acme_pack")}
+    namespaces = {"acme_ns": [relative]} if table == "namespaces" else {}
+
+    assert _with_finder(site, root, _finder(mapping, namespaces)) == (
+        f"its {_FINDER}.py maps its packages in a way Guardana cannot read"
+    )
+
+
+@pytest.mark.parametrize(
+    "statement",
+    ["x = " + "-" * 20_000 + "1", "x = a" + ".b" * 20_000],
+    ids=["parser-stack", "recursion"],
+)
+def test_an_editable_finder_too_deep_to_parse_leaves_it_unpinned(
+    tmp_path: Path, site: Path, statement: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+
+    assert _with_finder(site, root, statement + "\n") == (
+        f"its {_FINDER}.py maps its packages in a way Guardana cannot read"
+    )
+
+
+@pytest.mark.parametrize(
+    "statement",
+    ["y = " + "-" * 20_000 + "1", "y = a" + ".b" * 20_000],
+    ids=["parser-stack", "recursion"],
+)
+def test_a_path_file_line_too_deep_to_parse_leaves_it_unpinned(
+    tmp_path: Path, site: Path, statement: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable_with(site, root, {"_acme_pack.pth": f"import acme_hook; {statement}\n"})
+
+    assert pin_distribution_source("acme-pack") == (
+        "its _acme_pack.pth runs a line that is not Python, which Guardana cannot read"
+    )
+
+
+@pytest.mark.parametrize("finder", [True, False], ids=["finder", "not-a-finder"])
+def test_an_editable_finder_that_is_no_known_template_says_so(
+    tmp_path: Path, site: Path, finder: bool
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    text = (
+        _finder({"acme_pack": str(root / "src/acme_pack")}, {}).replace("chain", "chain ")
+        if finder
+        else "MAPPING = {}\nNAMESPACES = {}\n"
+    )
+
+    assert _with_finder(site, root, text) == (
+        f"its {_FINDER}.py is not a setuptools finder template Guardana knows"
+    )
+
+
+def test_a_zip_on_the_path_before_an_editable_finder_leaves_it_unpinned(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    archive = tmp_path / "earlier.zip"
+    with zipfile.ZipFile(archive, "w") as written:
+        written.writestr(f"{_FINDER}.py", "raise SystemExit('shadowed')\n")
+    monkeypatch.syspath_prepend(str(archive))
+
+    pinned = _with_finder(site, root, _finder({"acme_pack": str(root / "src/acme_pack")}, {}))
+
+    assert pinned == (
+        f"its {_FINDER}.py could be shadowed by {archive}, which Guardana cannot look into"
+    )
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+@pytest.mark.parametrize("document", ["RECORD", "direct_url.json"])
+def test_install_metadata_that_is_a_fifo_is_never_waited_on_and_leaves_it_unpinned(
+    tmp_path: Path, site: Path, document: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable(site, root)
+    pipe = site / "acme_pack-1.0.dist-info" / document
+    pipe.unlink()
+    os.mkfifo(pipe)
+
+    pinned = _pinned_unless_blocked(lambda: pin_distribution_source("acme-pack"), pipe)
+
+    assert pinned == f"its {document} is not a regular file"
+
+
+@pytest.mark.parametrize("document", ["RECORD", "direct_url.json"])
+def test_install_metadata_above_its_cap_is_refused_unread(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch, document: str
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable(site, root)
+    info = site / "acme_pack-1.0.dist-info"
+    held = (info / "direct_url.json").stat().st_size
+    if document == "RECORD":
+        (info / "RECORD").write_text("\n" * (held + 1), encoding="utf-8")
+    else:
+        held -= 1
+    monkeypatch.setattr(recipe_source, "_METADATA_BYTES", held)
+
+    assert pin_distribution_source("acme-pack") == f"its {document} is too large to read"
+
+
+def test_the_setuptools_in_this_environment_writes_a_finder_template_guardana_knows() -> None:
+    editable_wheel = pytest.importorskip("setuptools.command.editable_wheel")
+    template = editable_wheel._FINDER_TEMPLATE
+    filled = template.format(mapping={"a": "/a"}, namespaces={}, name="__editable__.a-1.finder")
+
+    assert recipe_source._finder_mapping(filled, "__editable___a_1_finder") == [
+        ("package", "a", "/a")
+    ]
+
+
+def test_a_record_row_too_long_for_its_reader_leaves_it_unpinned(site: Path) -> None:
+    info = _install_directory(site)
+    with (info / "RECORD").open("a", encoding="utf-8") as record:
+        record.write("a" * 200_000 + ",sha256=x,1\n")
+
+    assert pin_distribution_source("acme-pack") == "its RECORD cannot be read"
+
+
+def test_an_editable_record_row_too_long_for_its_reader_leaves_it_unpinned(
+    tmp_path: Path, site: Path
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    _editable(site, root)
+    with (site / "acme_pack-1.0.dist-info" / "RECORD").open("a", encoding="utf-8") as record:
+        record.write("a" * 200_000 + ",sha256=x,1\n")
+
+    assert pin_distribution_source("acme-pack") == "its RECORD cannot be read"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+def test_entry_points_that_are_a_fifo_are_never_waited_on_and_leave_it_unpinned(
+    site: Path,
+) -> None:
+    info = _install_directory(site, info_files={"entry_points.txt": "[console_scripts]\n"})
+    pipe = info / "entry_points.txt"
+    pipe.unlink()
+    os.mkfifo(pipe)
+
+    pinned = _pinned_unless_blocked(lambda: pin_distribution_source("acme-pack"), pipe)
+
+    assert pinned == "its entry_points.txt is not a regular file"
+
+
+def test_entry_points_that_cannot_be_parsed_leave_it_unpinned(site: Path) -> None:
+    _install_directory(site, info_files={"entry_points.txt": "[console_scripts]\nno pair\n"})
+
+    assert pin_distribution_source("acme-pack") == "its entry_points.txt cannot be read"
+
+
+def test_a_path_entry_inside_an_archive_before_an_editable_finder_leaves_it_unpinned(
+    tmp_path: Path, site: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _source_tree(tmp_path / "acme-pack")
+    archive = tmp_path / "earlier.zip"
+    with zipfile.ZipFile(archive, "w") as written:
+        written.writestr(f"sub/{_FINDER}.py", "raise SystemExit('shadowed')\n")
+    inside = archive / "sub"
+    monkeypatch.syspath_prepend(str(inside))
+
+    pinned = _with_finder(site, root, _finder({"acme_pack": str(root / "src/acme_pack")}, {}))
+
+    assert pinned == (
+        f"its {_FINDER}.py could be shadowed by {inside}, which Guardana cannot look into"
+    )

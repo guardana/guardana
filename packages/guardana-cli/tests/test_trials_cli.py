@@ -46,7 +46,7 @@ def test_a_probe_with_trials_saves_every_trial_and_what_each_rule_did(
 
     document = json.loads(out.read_text(encoding="utf-8"))
     run = document["run"]
-    assert document["schema_version"] == 17
+    assert document["schema_version"] == 18
     assert run["execution"]["trials"] == 3
     repeating = [r for r in run["rules"] if r["trial_summary"] is not None]
     assert repeating, "no rule repeated at --trials 3"

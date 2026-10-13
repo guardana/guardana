@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html" aria-current="page">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html" aria-current="page">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -247,8 +251,9 @@ per-rule declaration; <code>guardana rules</code> groups by it and takes <code>-
 <p>Built-ins: <code>ArtifactTarget</code> (walks a directory, exposing <code>iter_files(suffixes)</code>
 over model files, dependency manifests, and source, skipping <code>.git</code>,
 <code>.venv</code>, <code>node_modules</code>, etc., plus <code>python_source(path)</code> — a Python file read,
-parsed and indexed <strong>once per scan</strong> rather than once per rule, so scan cost
-grows with the target instead of with the rule count) and <code>EndpointTarget</code> (a live chat endpoint,
+parsed and indexed <strong>once per scan</strong>, not once per rule, while parsed sources
+fit an 8 MiB cache. Within that budget, scan cost grows with the target, not the
+rule count. Beyond it, each further read reparses the file) and <code>EndpointTarget</code> (a live chat endpoint,
 exposing <code>chat(messages) -&gt; str</code>, with a pluggable <code>ChatTransport</code> so tests
 never hit the network). The transport is selected by a provider name —
 <code>openai</code> (the default, any OpenAI-compatible server), <code>ollama</code> (native
@@ -320,9 +325,11 @@ class Verdict:
 message sequence plus <code>reply_text</code> (the last assistant reply, <code>None</code> when
 there is nothing to grade) and <code>transcript</code> (the whole conversation, so a
 multi-turn scenario's &quot;across the conversation&quot; goal is gradable). Every
-built-in evaluator fails closed on <code>reply_text is None</code>: the verdict is
-<code>inconclusive</code>, never a silent pass.</p>
-<p>Shipped evaluators: <code>keyword</code> (cheap refusal-marker matching — honestly
+built-in evaluator that grades reply text fails closed on <code>reply_text is None</code>:
+the verdict is <code>inconclusive</code>, never a silent pass. <code>tool_call</code> grades actions,
+even when a run has tool calls but no text. Its verdict is
+<code>inconclusive</code> when required action evidence is missing.</p>
+<p>Shipped evaluators include <code>keyword</code> (cheap refusal-marker matching — honestly
 low-confidence, ~0.5–0.6), <code>canary</code> (near-perfect detection of a planted marker
 verbatim, ~0.9–0.99), <code>length</code> (grades a reply by length — a runaway answer to a
 divergence prompt is a lead, for the unbounded-consumption check), <code>amplification</code>
@@ -333,9 +340,11 @@ confidence is measured as agreement across <code>min_agreement</code> samples, a
 version is stamped into <code>evaluator_id</code> — <code>llm_judge@2026.1</code> — so grading stays
 reproducible as the rubric evolves), and <code>guard</code> (an opt-in external
 safety-classifier — see
-<a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>).
-<code>guardana calibrate</code> measures and corrects for errors in <code>keyword</code>, <code>guard</code>, and
-<code>llm_judge</code>; the other evaluators are deterministic and need no such correction. A
+<a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>); the
+<a href="generated/evaluator-catalog.html">evaluator catalog</a> lists every one.
+<code>guardana calibrate</code> measures and corrects errors in <code>keyword</code>, <code>answered</code>,
+<code>guard</code>, <code>llm_judge</code> and <code>reference_judge</code>, each under its own evaluator id. Other
+evaluators are deterministic and need no such correction. A
 rule references an evaluator by its string <code>id</code>, resolved from the registry at run
 time; swapping which evaluator grades a rule requires no change to the rule
 itself.</p>
@@ -483,11 +492,14 @@ class Runner:
 
     def run(self, target: Target) -&gt; ScanResult: ...
 </code></pre>
-<p>For each registered rule: skip it if <code>target.kind</code> doesn't match
+<p>Before it selects anything, the runner refuses with <code>ProfileError</code> an include pattern
+that matches no registered rule, naming each one
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).
+For each registered rule: skip it if <code>target.kind</code> doesn't match
 <code>meta.target_kind</code>, or the profile's <code>Policy.matches(rule_id)</code> excludes it;
 skip it (recording it under <code>rules_skipped</code>) if the target can't satisfy
-<code>meta.required_capabilities</code>; otherwise run it, catching any <code>Exception</code> per
-rule (not <code>KeyboardInterrupt</code> or <code>SystemExit</code>) and recording it on the result's
+<code>meta.required_capabilities</code>; otherwise run it, catching any <code>Exception</code> or
+<code>SystemExit</code> per rule (not <code>KeyboardInterrupt</code>) and recording it on the result's
 <code>errors</code> channel, so one bad rule can't abort the whole scan and the gate fails on
 it by default (<a href="writing-rules.html#what-happens-when-your-rule-raises">when a rule raises</a>). Findings whose verdict is
 <code>inconclusive</code> are partitioned onto the result's <code>unverified</code> channel rather
@@ -577,7 +589,7 @@ fleet management are not built.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/architecture.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

@@ -217,6 +217,8 @@ def _graded(run: Callable[[], Verification]) -> Verification:
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
     except UnenforceableBudgetError as exc:
         raise refuse_unenforceable_budget(exc) from exc
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     except JudgeUnreachableError as exc:
         if exc.__cause__ is not None:
             raise exc.__cause__ from None

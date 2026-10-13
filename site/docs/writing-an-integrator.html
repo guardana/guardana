@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -272,6 +276,11 @@ with open_trace(
 ) as trace:
     ...
 </code></pre>
+<p>The versioned contract is the trace file format, schema 3
+(<a href="https://github.com/guardana/guardana/blob/main/schemas/trace-v3.schema.json"><code>schemas/trace-v3.schema.json</code></a>). The Python writer in
+<code>guardana.core.trace</code> (<code>open_trace</code>, <code>resume_trace</code>, <code>TraceWriter</code> and the types beside them)
+is outside the <a href="compatibility.html#the-supported-surface">supported surface</a>. An integrator that
+imports it pins the exact <code>guardana-core</code> version it was tested with.</p>
 <p><code>instrumented</code> is a <strong>promise</strong>, and it works in both directions.</p>
 <p>Leave a dimension out and its rules do not run — the safe direction, and how you start:
 declare <code>messages</code> and <code>tools</code> on day one, add <code>approval</code> and <code>effects</code> when the hooks
@@ -408,20 +417,20 @@ a convenience over it. A team emitting the same JSONL from Go or TypeScript is a
 first-class producer with no Python anywhere. If the writer's refusals are useful to
 you, take them; if you write your own emitter, take the four rules in
 <a href="usage-analyze-trace.html#the-native-format">the format reference</a> instead.</p>
-<p><strong>Not somebody else's problem to keep working.</strong> Two worked examples live in
-<a href="https://github.com/guardana/guardana/tree/main/examples"><code>examples/</code></a>, each pinned to the upstream version it was written against
-and each in one of the two shapes above:
-<a href="https://github.com/guardana/guardana/tree/main/examples/hermes_integrator"><code>hermes_integrator/</code></a> is a plugin holding the file for
-a whole session, and <a href="https://github.com/guardana/guardana/tree/main/examples/shell_hook_integrator"><code>shell_hook_integrator/</code></a> is a
-command the agent spawns per event. They are examples rather than integrations this
-project carries — a later release of that framework may break either — and neither
-imports the agent it integrates with, which is what lets their tests run in CI without a
-green build here depending on somebody else's release.</p>
+<p><strong>Not somebody else's problem to keep working.</strong> Two worked examples are in
+<a href="https://github.com/guardana/guardana/tree/main/examples"><code>examples/</code></a>. Each is written against a named upstream version stated in its
+README, and each uses one of the two forms above.
+<a href="https://github.com/guardana/guardana/tree/main/examples/hermes_integrator"><code>hermes_integrator/</code></a> is a plugin that holds the file for a
+whole session. <a href="https://github.com/guardana/guardana/tree/main/examples/shell_hook_integrator"><code>shell_hook_integrator/</code></a> is a command the
+agent spawns per event. They are examples rather than integrations maintained by this
+project; neither is guaranteed to work with later releases of its framework. Neither imports
+the agent it integrates with, so their tests run in CI without a passing build here depending
+on somebody else's release.</p>
 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/writing-an-integrator.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

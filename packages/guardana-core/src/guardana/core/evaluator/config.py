@@ -4,8 +4,8 @@ The judge's differentiating value is that it grades "did the attack succeed" —
 it needs a model to ask, and nothing built one from config until here. Both the
 judge and the optional guard model are ordinary endpoints, so they can point at a
 local OpenAI-compatible server for fully offline grading. Absent config leaves an
-evaluator unregistered, and a rule that names it is then skipped visibly by the
-runner — never a silent pass.
+evaluator unregistered, and a rule that names it then records a `RuleLoadError`
+(`unknown evaluator`) error in the run — never a silent pass.
 
 A judge block is read as a `Connection` (`endpoint` is its URL), so it takes a
 provider and an adapter as the endpoint commands do, and a key variable that is unset

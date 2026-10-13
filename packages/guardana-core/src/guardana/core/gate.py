@@ -228,5 +228,10 @@ def exit_code_for(outcome: GateOutcome, stopped_by: StopReason | None = None) ->
     turns it into a differently-red one.
     """
     if stopped_by is not None:
-        return _STOP_EXIT_CODES[stopped_by]
+        return stop_exit_code(stopped_by)
     return _OUTCOME_EXIT_CODES[outcome]
+
+
+def stop_exit_code(stopped_by: StopReason) -> int:
+    """Return the exit code of a run that stopped, which outranks any other outcome it has."""
+    return _STOP_EXIT_CODES[stopped_by]

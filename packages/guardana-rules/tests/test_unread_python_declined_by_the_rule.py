@@ -71,15 +71,17 @@ def test_a_file_past_the_read_limit_leaves_the_run_indeterminate_without_errors_
 
 
 @pytest.mark.parametrize("rule_id", _RULES)
-def test_a_file_that_is_not_python_stays_quiet(tmp_path: Path, rule_id: str) -> None:
-    (tmp_path / "broken.py").write_text("def (:\n", encoding="utf-8")
+def test_a_file_this_interpreter_cannot_parse_leaves_the_run_indeterminate(
+    tmp_path: Path, rule_id: str
+) -> None:
+    broken = tmp_path / "broken.py"
+    broken.write_text("def (:\n", encoding="utf-8")
     policy = _policy((rule_id,))
 
     result = _run(ArtifactTarget(tmp_path), policy)
 
-    assert result.errors == ()
-    assert _declined(result, rule_id) == ([], [])
-    assert gate_outcome(result, policy) is GateOutcome.PASS
+    assert gate_outcome(result, policy) is GateOutcome.INDETERMINATE
+    assert _declined(result, rule_id) == ([str(broken)], [str(broken)])
 
 
 def test_a_loader_past_the_default_limit_is_not_a_clean_scan(tmp_path: Path) -> None:

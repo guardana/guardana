@@ -27,7 +27,7 @@ Start with the root [README](../README.md). Before production use, read [Product
 | an error | a check could not run: it raised, or could not be resolved | `indeterminate`, `2` (`fail_on_error`, on by default) |
 | skipped for a missing capability | the target cannot serve the check | `indeterminate`, `2`, when `fail_on_skipped` is on (`--preset release`) |
 | skipped as `not_applicable` | the check is for a protocol the target does not speak | never gates; listed with its reason |
-| a coverage shortfall | evidence you demanded, or a model file no rule read | `indeterminate`, `2`, always |
+| a coverage shortfall | evidence you demanded, or a model file no rule read | `indeterminate`, `2`, regardless of `fail_on_*` switches. A finding or failed suite still makes it `fail`, `1`. A stopped run keeps its own code. |
 | a stopped run | a budget, an interrupt or the target ended it early | `indeterminate`; `6` for a budget, `7` for an interrupt, `4` for the target |
 | `not recorded`, "not measured" | nobody counted it; never zero | — |
 | `pass` | none of the above held | `pass`, `0` |
@@ -67,6 +67,7 @@ output. An unsupported format is invalid usage, exit `3`, before command work.
 ## Evidence and regression
 
 - [`usage-run.md`](usage-run.md) — inspect and migrate saved runs
+- [`reading-results.md`](reading-results.md) — read a saved run, SARIF or JUnit from your own tool
 - [`usage-diff.md`](usage-diff.md) — compare runs without hiding coverage changes
 - [`usage-baseline.md`](usage-baseline.md) — accept risk with an expiry
 - [`usage-monitor.md`](usage-monitor.md) — schedule active re-verification
@@ -110,6 +111,7 @@ output. An unsupported format is invalid usage, exit `3`, before command work.
 
 - [`architecture.md`](architecture.md) — understand package and trust boundaries
 - [`threat-model.md`](threat-model.md) — see what Guardana does and does not defend
+- [`reproducible-builds.md`](reproducible-builds.md) — rebuild a release from its tag and compare it with PyPI byte for byte
 - [`product-status.md`](product-status.md) — check maturity and known limitations
 
 ## Reference

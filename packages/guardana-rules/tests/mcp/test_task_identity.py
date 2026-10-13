@@ -136,6 +136,33 @@ def test_an_empty_anonymous_listing_beside_the_operators_tasks_shows_owner_bindi
     assert set(_OWN) <= set(target.sent_secrets())
 
 
+def test_an_empty_first_page_naming_a_further_one_is_inconclusive_not_owner_binding() -> None:
+    # The same server as above, except the anonymous listing says it has more pages.
+    # The run reads one, so what a later page shows a caller without a credential
+    # is unknown, and the operator's tasks prove nothing about it.
+    server = guarded(
+        tasks=_OWN,
+        tasks_owner_bound=True,
+        tasks_unguarded=True,
+        session_ids=[_CONVERSATION_SESSION],
+        tasks_next_cursor="page-2",
+    )
+
+    reported = list(RULE.run(_target(server, credential=CREDENTIAL), RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "names a further page" in summaries(reported)[0]
+
+
+def test_a_listing_naming_a_further_page_says_so_in_what_was_observed() -> None:
+    server = guarded(tasks=[], tasks_unguarded=True, tasks_next_cursor="page-2")
+
+    tasks = _target(server, credential=CREDENTIAL).authorization().tasks
+
+    assert tasks.answer is TaskAnswer.ANSWERED
+    assert tasks.more is True
+
+
 def test_an_empty_anonymous_listing_on_a_gated_server_without_a_credential_is_inconclusive() -> (
     None
 ):

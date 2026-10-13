@@ -11,10 +11,16 @@ one that matters most, a scan of the deliberately malicious fixture exiting `1`
 rather than reporting a clean bill of health), and a real HTTP request against a
 collector started exactly the way the image's `CMD` starts it.
 
+Before building, it checks that every package the images install from
+`deploy/docker/*-requirements.txt` has a wheel in `uv.lock` that installs on
+linux/amd64 and one that installs on linux/arm64, the two platforms a release
+publishes. The images refuse source builds (`--only-binary=:all:`), so a package
+without one fails the release build of that platform; this names it first.
+
     uv run python scripts/image_smoke.py
     uv run python scripts/image_smoke.py --no-build   # reuse what is already built
 
-Needs Docker. CI runs it on every push.
+Needs Docker. CI runs it on every push. The wheel check reads only `uv.lock`.
 """
 
 import argparse
@@ -25,9 +31,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+
+from export_image_requirements import pins as exported_pins
 
 _ROOT = Path(__file__).resolve().parent.parent
 _VERSION_RE = re.compile(r'^version = "(?P<v>[^"]+)"', re.MULTILINE)
@@ -36,6 +45,22 @@ _COLLECTOR_IMAGE = "guardana-collector:smoke"
 _CONTAINER = "guardana-collector-smoke"
 _PORT = 18000
 _STARTUP_SECONDS = 30
+_FROM_RE = re.compile(r"^FROM\s+(?P<image>\S+)", re.MULTILINE)
+_BASE_RE = re.compile(r"python:(?P<major>\d+)\.(?P<minor>\d+)-slim-bookworm@sha256:[0-9a-f]+")
+_DOCKERFILES = ("cli.Dockerfile", "collector.Dockerfile")
+_MANYLINUX_RE = re.compile(r"manylinux_(?P<major>\d+)_(?P<minor>\d+)_(?P<arch>\w+)")
+# The legacy manylinux tags and the glibc each one stands for (PEP 600).
+_LEGACY_MANYLINUX = {"manylinux1": (2, 5), "manylinux2010": (2, 12), "manylinux2014": (2, 17)}
+# Each platform a release publishes, and the machine tag its wheels carry.
+PLATFORMS = {"linux/amd64": "x86_64", "linux/arm64": "aarch64"}
+# manylinux reaches below glibc 2.17 only on x86_64 and i686; pip offers no older tag elsewhere.
+_OLDEST_GLIBC = {"x86_64": (2, 5), "i686": (2, 5)}
+# The stable ABI begins with CPython 3.2; pip offers no abi3 tag below it.
+_FIRST_ABI3_MINOR = 2
+_INTERPRETER_RE = re.compile(r"(?P<kind>py|cp)(?P<major>\d)(?P<minor>\d*)")
+# The glibc of Debian bookworm; `_base_python` refuses any other base, so a move to a
+# distribution with another glibc has to change this too.
+_BASE_GLIBC = (2, 36)
 
 
 @dataclass(frozen=True)
@@ -56,6 +81,121 @@ def _version() -> str:
     if match is None:
         raise SystemExit("could not read the version from guardana-core/pyproject.toml")
     return match.group("v")
+
+
+def _normalized(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _interpreter_fits(interpreter: str, abi: str, python: tuple[int, int]) -> bool:
+    match = _INTERPRETER_RE.fullmatch(interpreter)
+    if match is None or int(match["major"]) != python[0]:
+        return False
+    minor = int(match["minor"]) if match["minor"] else None
+    if abi == "none":
+        if match["kind"] == "py":
+            return minor is None or minor <= python[1]
+        return minor == python[1]
+    if abi == "abi3":
+        return (
+            match["kind"] == "cp" and minor is not None and _FIRST_ABI3_MINOR <= minor <= python[1]
+        )
+    return match["kind"] == "cp" and minor == python[1] and abi == interpreter
+
+
+def _platform_fits(platform: str, arch: str) -> bool:
+    legacy, _, legacy_arch = platform.partition("_")
+    if legacy in _LEGACY_MANYLINUX:
+        tag_arch, glibc = legacy_arch, _LEGACY_MANYLINUX[legacy]
+    elif match := _MANYLINUX_RE.fullmatch(platform):
+        tag_arch, glibc = match["arch"], (int(match["major"]), int(match["minor"]))
+    else:
+        return False
+    return tag_arch == arch and _OLDEST_GLIBC.get(arch, (2, 17)) <= glibc <= _BASE_GLIBC
+
+
+def wheel_installs_on(filename: str, python: tuple[int, int], arch: str) -> bool:
+    """Whether pip on the images' CPython would install this wheel on linux/`arch`.
+
+    `arch` is a wheel's machine tag, a value of `PLATFORMS`. musllinux never fits:
+    the base image is glibc, and pip there refuses musl wheels. `any` fits only a
+    wheel with no compiled ABI.
+    """
+    interpreters, abis, platforms = filename.removesuffix(".whl").split("-")[-3:]
+    return any(
+        _interpreter_fits(interpreter, abi, python)
+        and (abi == "none" if platform == "any" else _platform_fits(platform, arch))
+        for interpreter in interpreters.split(".")
+        for abi in abis.split(".")
+        for platform in platforms.split(".")
+    )
+
+
+def _locked_wheels(lock: Path) -> dict[tuple[str, str], list[str]]:
+    with lock.open("rb") as handle:
+        packages = tomllib.load(handle).get("package", [])
+    return {
+        (_normalized(package["name"]), package.get("version", "")): [
+            wheel["url"].rsplit("/", 1)[-1] for wheel in package.get("wheels", []) if "url" in wheel
+        ]
+        for package in packages
+    }
+
+
+def _base_python(docker: Path) -> tuple[int, int] | str:
+    """Return the CPython both images are built on, or why the check cannot rely on it."""
+    bases = {}
+    for name in _DOCKERFILES:
+        images = set(_FROM_RE.findall((docker / name).read_text(encoding="utf-8")))
+        match = _BASE_RE.fullmatch(images.pop()) if len(images) == 1 else None
+        if match is None:
+            return f"{name} is not built on one digest-pinned python:X.Y-slim-bookworm image"
+        bases[name] = match
+    if len({match[0] for match in bases.values()}) != 1:
+        return f"{' and '.join(_DOCKERFILES)} are built on different base images"
+    match = bases[_DOCKERFILES[0]]
+    return int(match["major"]), int(match["minor"])
+
+
+def wheel_gaps(root: Path) -> list[str]:
+    """Name every exported requirement without a wheel installable on each of `PLATFORMS`.
+
+    Markers are not evaluated: a package limited to another platform is checked
+    anyway, so the check can only be stricter than the install. A file is read the
+    way the export check reads it, so a line it cannot read or a pin to more than one
+    version is named rather than skipped.
+    """
+    python = _base_python(root / "deploy" / "docker")
+    if isinstance(python, str):
+        return [python]
+    wheels = _locked_wheels(root / "uv.lock")
+    files = sorted((root / "deploy" / "docker").glob("*-requirements.txt"))
+    if not files:
+        return ["deploy/docker holds no exported requirement files to check"]
+    gaps = []
+    for path in files:
+        try:
+            pins = exported_pins(path.read_text(encoding="utf-8"))
+        except ValueError as error:
+            gaps.append(f"{path.name}: {error}")
+            continue
+        if not pins:
+            gaps.append(f"{path.name} pins no package")
+        for name, specifier, _marker, _hashes in sorted(pins):
+            version = specifier.removeprefix("==")
+            if version == specifier or not re.fullmatch(r"[^\s,;=<>!~*]+", version):
+                gaps.append(f"{path.name}: {name}{specifier} is not pinned to one version")
+                continue
+            key = (_normalized(name), version)
+            if key not in wheels:
+                gaps.append(f"{path.name}: {name}=={version} is not in uv.lock")
+                continue
+            gaps += [
+                f"{path.name}: {name}=={version} has no wheel for {platform} in uv.lock"
+                for platform, arch in PLATFORMS.items()
+                if not any(wheel_installs_on(name, python, arch) for name in wheels[key])
+            ]
+    return gaps
 
 
 def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
@@ -204,11 +344,18 @@ def main(argv: list[str] | None = None) -> int:
     """Build both images, run every check, and report what failed."""
     no_build: bool = _parser().parse_args(argv).no_build
     version = _version()
+    failures = 0
+    gaps = wheel_gaps(_ROOT)
+    for gap in gaps:
+        failures += 1
+        print(f"  FAIL  wheels: {gap}")
+    if not gaps:
+        platforms = " and ".join(PLATFORMS)
+        print(f"  ok    wheels: every exported requirement has a wheel for {platforms}")
     if not no_build:
         _build("cli.Dockerfile", _CLI_IMAGE, version)
         _build("collector.Dockerfile", _COLLECTOR_IMAGE, version)
 
-    failures = 0
     with tempfile.TemporaryDirectory(prefix="guardana-image-smoke-") as workspace:
         clean = Path(workspace) / "clean"
         clean.mkdir()

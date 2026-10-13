@@ -427,6 +427,37 @@ def migrate_v16(document: Mapping[str, Any]) -> dict[str, Any]:
     return {**document, "schema_version": 17, "$schema": schema_url(17)}
 
 
+def migrate_v17(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-17 saved run as a schema-18 one, recomputing nothing.
+
+    A recorded **`scope`** gains `kept_models: []`, since a version-17 build let a
+    target's ignore file exclude any file and so kept none, and `skipped_models: null`,
+    since no version-17 build searched the skipped directories. Each exclude gains
+    `file: null`: the file a pattern was read from was not recorded.
+    """
+    _mapping(document.get("run"), "run")
+    scope = document.get("scope")
+    if scope is None:
+        return {**document, "schema_version": 18, "$schema": schema_url(18)}
+    scope = _mapping(scope, "scope")
+    excludes = scope.get("excludes")
+    if excludes is not None and not isinstance(excludes, list):
+        raise ManifestLoadError("scope.excludes must be null or a list")
+    return {
+        **document,
+        "schema_version": 18,
+        "$schema": schema_url(18),
+        "scope": {
+            **scope,
+            "excludes": None
+            if excludes is None
+            else [{**_mapping(entry, "scope.excludes[]"), "file": None} for entry in excludes],
+            "kept_models": [],
+            "skipped_models": None,
+        },
+    }
+
+
 _PER_CLASS_CALIBRATION = (
     "assessor",
     "judge_identity",

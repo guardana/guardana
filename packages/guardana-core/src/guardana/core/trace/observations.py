@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from guardana.core.fingerprint import DigestKind, DocumentDigest
+from guardana.core.formats._stream import read_regular
 from guardana.core.severity import Severity
 from guardana.core.trace._parse import TraceLoadError
 from guardana.core.trace.limits import MAX_TRACE_BYTES
@@ -163,11 +164,11 @@ def _read_bytes(path: Path) -> bytes:
     """Read the whole document's bytes, refusing one over the ceiling.
 
     Bounded by the read itself rather than by the size on disk, which a file still being
-    written can outgrow between the check and the read.
+    written can outgrow between the check and the read. Only a regular file is read, opened
+    without waiting on a writer.
     """
     try:
-        with path.open("rb") as handle:
-            data = handle.read(MAX_TRACE_BYTES + 1)
+        data = read_regular(path, MAX_TRACE_BYTES)
     except OSError as exc:
         raise TraceLoadError(f"{path} could not be read: {exc}") from exc
     if len(data) > MAX_TRACE_BYTES:

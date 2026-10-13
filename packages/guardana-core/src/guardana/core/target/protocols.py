@@ -43,8 +43,8 @@ class FileReader(Protocol):
     def python_source(self, path: Path) -> "PythonSource | None":
         """Return the parsed, indexed source for `path`, or None if there is no tree.
 
-        A file this target was *prevented* from reading also belongs in
-        `unread_sources`; one that simply is not Python does not.
+        A Python file that yields no tree also belongs in `unread_sources`, with
+        the reason: nobody examined it.
         """
         raise NotImplementedError
 

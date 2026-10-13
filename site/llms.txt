@@ -1,10 +1,10 @@
 # Guardana
 
-> Guardana is open-source AI security verification. Its rule engine scans model artifacts, probes live endpoints and MCP servers, and grades completed agent runs. Use it on a laptop, in CI, or beside a served model. It runs offline, needs no account, and sends nothing anywhere except to the target you name.
+> Guardana is open-source AI security verification. Its rule engine scans model artifacts, probes live endpoints and MCP servers, and grades completed agent runs. Use it on a laptop, in CI, or beside a served model. Artifact scans run offline and send nothing unless `--reporter` names a destination; Guardana needs no account and sends no telemetry. A probe contacts the named target, the judges or guards configured under `evaluators:`, and, for an MCP target requiring authorization, the authorization metadata it advertises, possibly on other hosts; results go to a collector or reporter only when `--reporter` names it.
 
-Version 1.0.0rc1, Apache-2.0. 58 built-in rules: 19 static ones that need no model and no network, and 39 that grade a live system or a recorded run. Every rule maps to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).
+Version 1.0.0rc2, Apache-2.0. 58 built-in rules: 19 static ones that need no model and no network, and 39 that grade a live system or a recorded run. Every rule maps to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).
 
-Guardana reports four separate outcomes: a finding, an unverified check, a check that errored, and required evidence that was unavailable. None silently counts as a pass. If a run cannot establish something, it says so and exits non-zero.
+Guardana reports four separate outcomes: a finding, an unverified check, a check that errored, and required evidence that was unavailable. None of the four outcomes is reported as a pass; by default, an error or a coverage shortfall makes the run indeterminate (exit 2). An unverified (inconclusive) check is always listed but fails the run only under `fail_on_inconclusive`, which is on in `--preset release` and in `monitor`.
 
 This file is generated from the documentation map; do not edit it by hand.
 
@@ -37,6 +37,7 @@ This file is generated from the documentation map; do not edit it by hand.
 ## Evidence and regression
 
 - [usage-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-run.md): inspect and migrate saved runs
+- [reading-results.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/reading-results.md): read a saved run, SARIF or JUnit from your own tool
 - [usage-diff.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-diff.md): compare runs without hiding coverage changes
 - [usage-baseline.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-baseline.md): accept risk with an expiry
 - [usage-monitor.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-monitor.md): schedule active re-verification
@@ -80,6 +81,7 @@ This file is generated from the documentation map; do not edit it by hand.
 
 - [architecture.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/architecture.md): understand package and trust boundaries
 - [threat-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/threat-model.md): see what Guardana does and does not defend
+- [reproducible-builds.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/reproducible-builds.md): rebuild a release from its tag and compare it with PyPI byte for byte
 - [product-status.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/product-status.md): check maturity and known limitations
 
 ## Reference
@@ -117,7 +119,7 @@ This file is generated from the documentation map; do not edit it by hand.
 - [Guardana Recipe Lock v2](https://guardana.dev/schemas/recipe-lock/v2.schema.json): guardana-recipe.lock.yaml: what a recipe's run is pinned to, written by `guardana recipe lock`.
 - [Guardana Recipe v3](https://guardana.dev/schemas/recipe/v3.schema.json): guardana-recipe.yaml: the profile a team's checks come from, what answers them, and where the artifact goes.
 - [Guardana Recording v3](https://guardana.dev/schemas/recording/v3.schema.json): One record of a Guardana recording: what an application answered, graded later without calling it.
-- [Guardana Saved Run v17](https://guardana.dev/schemas/run/v17.schema.json): One Guardana run written to disk: the manifest (what was verified, against what, under which configuration and limits, at what cost, with what reach, and with what verdict) plus the finding channels.
+- [Guardana Saved Run v18](https://guardana.dev/schemas/run/v18.schema.json): One Guardana run written to disk: the manifest (what was verified, against what, under which configuration and limits, at what cost, with what reach, and with what verdict) plus the finding channels.
 - [Guardana Trace v3](https://guardana.dev/schemas/trace/v3.schema.json): One record of a Guardana native trace file.
 
 ## Related project

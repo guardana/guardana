@@ -32,6 +32,7 @@ _AUTHORIZATION_METADATA_PATHS = (
     "/.well-known/openid-configuration",
 )
 _METHOD_NOT_FOUND = -32601
+_INVALID_PARAMS = -32602
 
 
 class ScriptedMcpServer:
@@ -71,6 +72,12 @@ class ScriptedMcpServer:
     modern tasks extension in `server/discover`). `server_info` is the identity reported
     in both eras.
 
+    `tool_pages` splits the listing into pages joined by `nextCursor`, in place of `tools`;
+    a cursor it never handed out is answered as invalid params. `tasks_next_cursor` is the
+    `nextCursor` every `tasks/list` result names, for a listing with more pages than one.
+    `expire_session_on_page` answers the listing page at that index with `404` once, to a
+    request carrying a session id, the way a server whose session expired mid-listing does.
+
     `resource_metadata_body` is served as given in place of `resource_metadata`, for a
     document that came back but is not JSON, or not a JSON object.
     `resource_metadata_status` and `authorization_metadata_status` answer that document's
@@ -102,6 +109,9 @@ class ScriptedMcpServer:
         tasks_unguarded: bool = False,
         task_declaration: str | None = None,
         server_info: Mapping[str, Any] | None = None,
+        tool_pages: Sequence[Sequence[Mapping[str, Any]]] | None = None,
+        tasks_next_cursor: str | None = None,
+        expire_session_on_page: int | None = None,
     ) -> None:
         self.url = url
         self.tools = list(tools)
@@ -124,6 +134,10 @@ class ScriptedMcpServer:
         self.tasks_unguarded = tasks_unguarded
         self.task_declaration = task_declaration
         self.server_info = dict(server_info or {"name": "scripted", "version": "0"})
+        self.tool_pages = [list(page) for page in tool_pages] if tool_pages is not None else None
+        self.tasks_next_cursor = tasks_next_cursor
+        self.expire_session_on_page = expire_session_on_page
+        self._expired = False
         self.requests: list[tuple[str, str, dict[str, str]]] = []
         self.bodies: list[Mapping[str, Any]] = []
         """Every JSON-RPC request this server was sent, parsed.
@@ -171,7 +185,7 @@ class ScriptedMcpServer:
         if "id" not in request:
             # A notification: accepted, and nothing answers it.
             return RawReply(status=202, headers={}, body=b"")
-        return self._json_rpc(method_name, _era_of_request(request), sent)
+        return self._json_rpc(method_name, _era_of_request(request), sent, request)
 
     @property
     def offers_legacy(self) -> bool:
@@ -205,7 +219,7 @@ class ScriptedMcpServer:
         return self.session_authenticates and "Mcp-Session-Id" in headers
 
     def _json_rpc(  # noqa: PLR0911 — one answer per method the double serves
-        self, method: str, era: Era, headers: Mapping[str, str]
+        self, method: str, era: Era, headers: Mapping[str, str], request: Mapping[str, Any]
     ) -> RawReply:
         if method == "tasks/list":
             return self._task_listing(headers, era)
@@ -226,8 +240,31 @@ class ScriptedMcpServer:
                 headers=self._session_headers(),
             )
         if method == "tools/list":
-            return _reply(200, {"tools": self.tools, **self._caching()}, era=era)
+            return self._tool_listing(request, era, headers)
         return _reply(200, {}, era=era)
+
+    def _tool_listing(
+        self, request: Mapping[str, Any], era: Era, headers: Mapping[str, str]
+    ) -> RawReply:
+        if self.tool_pages is None:
+            return _reply(200, {"tools": self.tools, **self._caching()}, era=era)
+        params = request.get("params")
+        cursor = params.get("cursor") if isinstance(params, Mapping) else None
+        handed_out = [f"page-{index}" for index in range(1, len(self.tool_pages))]
+        if cursor is None:
+            index = 0
+        elif cursor in handed_out:
+            index = handed_out.index(cursor) + 1
+        else:
+            return _error(200, _INVALID_PARAMS, "Invalid cursor", None)
+        expiring = index == self.expire_session_on_page and "Mcp-Session-Id" in headers
+        if expiring and not self._expired:
+            self._expired = True
+            return _reply(404, {})
+        listed: dict[str, Any] = {"tools": self.tool_pages[index], **self._caching()}
+        if index + 1 < len(self.tool_pages):
+            listed["nextCursor"] = handed_out[index]
+        return _reply(200, listed, era=era)
 
     def _task_listing(self, headers: Mapping[str, str], era: Era) -> RawReply:
         if self.tasks is None:
@@ -235,7 +272,10 @@ class ScriptedMcpServer:
         owner = headers.get("Authorization") == f"Bearer {self.credential}"
         shown = [] if self.tasks_owner_bound and not owner else self.tasks
         listed = [{"taskId": task_id, "status": "completed"} for task_id in shown]
-        return _reply(200, {"tasks": listed}, era=era)
+        result: dict[str, Any] = {"tasks": listed}
+        if self.tasks_next_cursor is not None:
+            result["nextCursor"] = self.tasks_next_cursor
+        return _reply(200, result, era=era)
 
     def _legacy_capabilities(self) -> dict[str, Any]:
         if self.task_declaration == "listing":

@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html" aria-current="page">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html" aria-current="page">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -200,7 +204,6 @@
 <h1>Threat model</h1><p class="lede">what Guardana defends against, what it does not, and where the trust boundaries sit</p><p>What Guardana defends against, what it deliberately does not, and where the
 trust boundaries sit. A security tool without a stated threat model is asking to
 be trusted on vibes.</p>
-<p><strong>Status:</strong> first published for v0.7.</p>
 <h2 id="the-shape-of-the-system">The shape of the system</h2>
 <pre><code>┌─ your machine / CI runner ──────────────────────────────┐
 │  guardana CLI                                           │
@@ -237,7 +240,12 @@ pickle, a zip bomb, a 40 GB &quot;model&quot;, or a file designed to exploit a p
 <p><strong>Stance:</strong> scanning must never execute what it reads. Model-format readers are
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
 fails becomes an <code>errors</code> entry rather than an exception or a silent skip. Pickle
-is parsed at the opcode level, never unpickled.</p>
+is parsed at the opcode level, never unpickled. The repository cannot hide its own
+model files: its <code>.guardanaignore</code> excludes ordinary files only, never a file a model
+loader reads (a model, an archive or compressed file, and configuration, chat templates and Keras
+metadata beside a model or tokenizer). The output names every applied pattern and
+counts model files inside directories every scan skips (<code>build</code>, <code>env</code>,
+<code>node_modules</code>, …). Only the profile's <code>rules.paths_exclude</code> excludes such a file.</p>
 <p><strong>Residual risk:</strong> a parser bug is still a parser bug. Since 0.22.0 every rule that
 opens a file is property-tested against generated input — arbitrary bytes behind
 each format's magic number, declared lengths up to 2⁶³ pointed past the end of the
@@ -258,7 +266,7 @@ address that Guardana then fetches</strong> — which turns the target from some
 answers into something that can aim the scanner.</p>
 <p><strong>Stance:</strong> responses are size-bounded and timed out; a hang is an error, not a
 pass. Model output is treated as untrusted throughout — it is never executed, and
-since v0.7 it is redacted before it reaches any output path.</p>
+it is redacted before it reaches any output path.</p>
 <p>The address a target <em>chooses</em> is a different question from the address an
 operator <em>types</em>, and they are answered differently.</p>
 <ul>
@@ -366,9 +374,9 @@ for an installed reporter, since the reporter's own code makes the connection; t
 <h3 id="t4--evidence-containing-secrets">T4 — Evidence containing secrets</h3>
 <p><strong>Scenario:</strong> a rule finds a leaked API key, records it as evidence, and the
 report is committed to a repository or uploaded to a collector.</p>
-<p><strong>Stance:</strong> evidence is redacted, and after v0.7 centrally rather than by
+<p><strong>Stance:</strong> evidence is redacted centrally rather than by
 convention (see <a href="privacy.html">privacy</a>). Prompts and
-responses are not stored by default; <code>full</code> evidence mode warns loudly.</p>
+responses are not stored by default. <code>guardana doctor</code> warns when a profile selects <code>full</code> evidence mode. Commands that run checks do not repeat the warning.</p>
 <p><strong>Residual risk:</strong> a third-party rule that writes a secret into a field the
 redactor does not know about. Mitigated by redacting at one seam every output path
 goes through, rather than trusting rules. An installed output receives what the saved run
@@ -377,7 +385,7 @@ webhook sends no evidence, yet its rule ids, severities and titles per deploymen
 inventory of weaknesses: it should go only where the report itself may go.</p>
 <h3 id="t5--a-compromised-collector-api-key">T5 — A compromised collector API key</h3>
 <p><strong>Scenario:</strong> a CI secret leaks; the holder can write findings to the collector.</p>
-<p><strong>Stance (v0.7):</strong> keys are scoped to a project, revocable, hashed at rest, shown
+<p><strong>Stance:</strong> keys are scoped to a project, revocable, hashed at rest, shown
 once. A runner key can <strong>write runs, not read other projects</strong> — so a leaked CI
 key does not become a read of the whole fleet's findings.</p>
 <p><strong>Residual risk:</strong> a write-capable key can poison history with fabricated clean
@@ -385,7 +393,7 @@ runs. Audit log records the key used; detecting a fabricated <em>pass</em> is ha
 detecting a fabricated <em>finding</em>, and is an open problem. Anyone with database write access can fabricate a run and its audit row. The log has no per-row signature or hash chain, so it does not prove the run occurred.</p>
 <h3 id="t6--cross-tenant-access-in-the-collector">T6 — Cross-tenant access in the collector</h3>
 <p><strong>Scenario:</strong> one organization reads another's findings by guessing an id.</p>
-<p><strong>Stance (v0.7):</strong> tenancy enforced at the query boundary, not in handlers; no
+<p><strong>Stance:</strong> tenancy enforced at the query boundary, not in handlers; no
 unscoped query exists. Tested per entity, both read and write.</p>
 <p><strong>Residual risk:</strong> tenancy is enforced only in the API. Anyone with the database credential or a backup can read every project. Database write access can add API keys, rewrite submissions and edit the audit log. Stored API keys are digests, so a leak does not expose existing keys.</p>
 <h3 id="t7--stored-xss-through-evidence-in-the-dashboard">T7 — Stored XSS through evidence in the dashboard</h3>
@@ -417,8 +425,8 @@ rate limits on ingest, bounded submission counts in storage.</p>
 <h3 id="t9--unsafe-active-testing-against-production">T9 — Unsafe active testing against production</h3>
 <p><strong>Scenario:</strong> a probe against a production agent calls a real tool, writes to real
 memory, sends a real email.</p>
-<p><strong>Stance:</strong> tool calls go to doubles; Guardana never executes a real tool. After
-v0.7, rules declare <code>impact</code> and destructive checks require an explicit
+<p><strong>Stance:</strong> tool calls go to doubles; Guardana never executes a real tool. Rules
+declare <code>impact</code> and destructive checks require an explicit
 <code>--allow-destructive</code>. Documented in <a href="safe-testing.html">safe testing</a>.</p>
 <p><strong>Residual risk:</strong> a <em>model</em> wired to real tools by its own deployment can take
 actions Guardana merely prompted. Probing staging is the recommendation, and the
@@ -428,9 +436,12 @@ README says so before the quickstart.</p>
 <p><strong>Stance:</strong> trusted publishing via OIDC (no long-lived token). Each release
 publishes Sigstore-signed build provenance and PyPI's PEP 740 attestation for the
 distributions, a CycloneDX SBOM per distribution, and an SBOM and provenance
-attestation beside each container image. How to check them is in
+attestation beside each container image. Both images install third-party
+dependencies as wheels only, using versions and hashes exported from <code>uv.lock</code>.
+They run the versions CI tested, and no build step resolves unpinned build
+requirements. Check them as described in
 <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a>.</p>
-<p>A tag ruleset lets only maintainers create, move or delete <code>v*</code> tags. The <code>pypi</code> environment requires one reviewer's approval for every publish. The <code>publish</code> job requires <code>ci-passed</code>, so a tag publishes only a commit CI passed. Both ghcr packages are public. <code>scripts/check_repo_settings.py</code> reports each setting as <code>PRESENT</code>, <code>ABSENT</code> or <code>NOT CHECKED</code>.</p>
+<p>A tag ruleset lets only maintainers create, move or delete <code>v*</code> tags. The <code>pypi</code> environment requires one reviewer's approval for every publish. The <code>publish</code> job requires <code>ci-passed</code>, so a tag publishes only a commit CI passed. Both ghcr packages are public. <code>scripts/check_repo_settings.py</code> reports each setting as <code>PRESENT</code>, <code>ABSENT</code> or <code>NOT CHECKED</code>. <code>scripts/reproduce_release.py</code> rebuilds a release from its tag and reports whether each PyPI file matches byte for byte (<a href="reproducible-builds.html">reproducible builds</a>).</p>
 <p><strong>Residual risk:</strong> Git tags are not signed. Images before 0.33.0 carry unsigned
 attestations only, so <code>gh attestation verify</code> cannot check them; from 0.33.0 each
 image digest has a signed provenance statement. The documented pins are moving <code>X.Y</code>
@@ -454,7 +465,7 @@ declares, not on who signed it. Only the JSON-RPC binding is spoken.</p>
 <h3 id="t12--a-reply-that-steers-its-grader">T12 — A reply that steers its grader</h3>
 <p><strong>Scenario:</strong> the reply under test is attacker-influenced input to <code>llm_judge</code>, <code>guard</code>, <code>keyword</code> and <code>reference_judge</code>. A crafted reply can make a judge grade an attack as a pass; wrappers often flip judges.</p>
 <p><strong>Stance:</strong> prefer deterministic evaluators (<code>canary</code>, <code>tool_call</code> and the equality checks). A judge-graded rate is corrected only with a calibration that measures the judge's error per class. Otherwise it reads <code>uncorrected</code> and declines. An evaluator that does not declare itself <code>deterministic</code> is treated as a judge.</p>
-<p><strong>Residual risk:</strong> correction assumes the judge errs the same way on the calibration corpus as on this run's replies. One model's refusals do not calibrate a judge reading another model's jailbreaks. The corpus digest is printed beside the rate so a reader can check it. The judge receives the conversation as <code>role: content</code> lines: a role label a reply writes inside its own text cannot be distinguished from a real turn, so a reply can make its own content look like another speaker's. Deterministic evaluators (<code>canary</code>, <code>tool_call</code>, the equality checks) do not read the transcript this way.</p>
+<p><strong>Residual risk:</strong> correction assumes the judge errs the same way on the calibration corpus and this run's replies. One model's refusals do not calibrate a judge reading another model's jailbreaks. The corpus digest is printed beside the rate for readers to check. With the default prompt version <code>2026.1</code>, <code>llm_judge</code> receives the conversation as one JSON-encoded string on a single line between <code>TRANSCRIPT BEGIN</code> and <code>TRANSCRIPT END</code>. A reply cannot end that block or start its own line. The prompt tells the judge everything inside is data. Within the string, turns remain <code>role: content</code> lines joined by encoded line breaks. A role label within a reply looks like a real turn, so the reply can impersonate another speaker and argue for a verdict. With the opt-in <code>prompt_version: &quot;2025.1&quot;</code>, the judge receives those lines as raw text without a surrounding block. A reply can also write text that looks like the transcript's end. Deterministic evaluators (<code>canary</code>, <code>tool_call</code>, the equality checks) do not read the transcript this way.</p>
 <h2 id="explicit-non-goals">Explicit non-goals</h2>
 <ul>
 <li>Guardana is <strong>not an inline control</strong>. It does not sit in the request path and
@@ -470,7 +481,7 @@ vulnerability reporting is enabled on the repository.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/threat-model.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

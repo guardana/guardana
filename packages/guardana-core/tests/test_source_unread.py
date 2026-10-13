@@ -1,15 +1,10 @@
 """A source file the scan could not read must be reported, never silently skipped.
 
-Two ways a `.py` file can fail to become a tree are *not* the file's fault and are
-not "nothing to see here": it was too large to read, or it could not be opened.
-Both mean the static rules never looked at it, so the run has to say so — an
-oversized file that vanishes from the scan is a scanner-bypass anyone can build
-by padding a loader with comments.
-
-The other two ways — invalid syntax, undecodable bytes — mean the file is not
-runnable Python, so a rule looking for Python constructs has genuinely nothing to
-find. Those stay quiet on purpose, and the tests below pin that difference so
-neither half drifts.
+Every way a `.py` file can fail to become a tree means the static rules never
+looked at it: too large to read, unopenable, undecodable, or not parseable by this
+interpreter. The run has to say so — an oversized file that vanishes from the scan
+is a scanner-bypass anyone can build by padding a loader with comments, and syntax
+newer than the scanning interpreter is one built with a single line.
 """
 
 import os
@@ -48,15 +43,26 @@ def test_an_unreadable_file_is_recorded_as_unread(tmp_path: Path) -> None:
         path.chmod(0o644)
 
 
-def test_unparseable_and_undecodable_files_stay_quiet(tmp_path: Path) -> None:
-    # Not runnable Python, so a rule looking for Python constructs has nothing to
-    # find — reporting these would be noise on every repo with a Python 2 relic.
+def test_unparseable_and_undecodable_files_are_recorded_as_unread(tmp_path: Path) -> None:
+    # A file this interpreter cannot parse may still run under another one, so
+    # nobody examined it: newer syntax must not buy a clean report.
     (tmp_path / "broken.py").write_text("def (:\n", encoding="utf-8")
     (tmp_path / "latin.py").write_bytes(b"# \xff\xfe\nx = 1\n")
     target = ArtifactTarget(tmp_path)
     for name in ("broken.py", "latin.py"):
         assert target.python_source(tmp_path / name) is None
-    assert target.unread_sources() == ()
+    assert [u.path.name for u in target.unread_sources()] == ["broken.py", "latin.py"]
+
+
+def test_a_scan_fails_the_gate_on_an_undecodable_source(tmp_path: Path) -> None:
+    (tmp_path / "loader.py").write_bytes(b"# \xff\xfe\n" + _SINK.encode())
+    result = Runner(
+        registry=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)),
+        profile=Profile(name="t", policy=Policy()),
+    ).run(ArtifactTarget(tmp_path))
+    assert [e.source for e in result.errors] == ["guardana.core.source"]
+    assert "loader.py" in result.errors[0].reason
+    assert gate_outcome(result, Policy()) is GateOutcome.INDETERMINATE
 
 
 def test_the_same_file_is_reported_once_however_many_rules_asked(tmp_path: Path) -> None:

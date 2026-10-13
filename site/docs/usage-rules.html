@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -202,8 +206,7 @@
 </code></pre>
 <p>Pass <code>--rules &lt;dir&gt;</code> to include YAML rules, as with <code>scan</code> and <code>probe</code>. Files that fail to load produce a warning.</p>
 <h2 id="flags">Flags</h2>
-<p><code>rules</code> discovers plugins the same way <code>scan</code>/<code>probe</code> do, so it takes the same
-plugin-trust flags:</p>
+<p><code>rules</code> takes a layer filter and the same plugin-trust flags <code>scan</code>/<code>probe</code> do:</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -213,6 +216,11 @@ plugin-trust flags:</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>--surface [all|build|runtime]</code></td>
+<td><code>all</code></td>
+<td>Filter by security layer: list every rule, or only build-time or runtime ones</td>
+</tr>
 <tr>
 <td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
 <td><code>builtins</code>, or the profile's <code>plugins:</code></td>
@@ -239,7 +247,7 @@ plugin-trust flags:</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-rules.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

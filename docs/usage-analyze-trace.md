@@ -210,6 +210,10 @@ Full mapping to OWASP and MITRE ATLAS:
 
 ## A truncated trace is not a shorter one
 
+The read ceilings count the bytes in the file: 64 MiB in all, blank lines and line endings
+included, and 1 MiB for one record, in UTF-8. A path that is not a regular file, such as a FIFO,
+is refused with exit `3` without waiting for anything to be written to it.
+
 If the header says `truncated`, or the file exceeds a read ceiling, then a rule that
 **found** something still reports it — the evidence is real — and a rule that found
 nothing reports `inconclusive`, because the step it needed may be in the part that is
@@ -234,7 +238,7 @@ session that ends when the process does is `unterminated` by construction.
 | `--target SCHEME://LOCATOR` | Build a trusted installed trace target instead of reading the positional trace file |
 | `--target-option KEY=VALUE` | Repeatable, non-secret configuration passed to that target |
 | `--dialect guardana\|otel` | Override detection |
-| `--write-trace PATH` | Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits `3` |
+| `--write-trace PATH` | Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits `3`. A `PATH` that is `--output`, its `<stem>.exchanges.jsonl`, or a file the command reads — the trace, `--profile`, a `--rules` or `--contract` file or one read from such a directory, or a file the profile names under `rules.paths`, `contracts:`, `calibrations:` or a judge's `adapter` — exits `3` before any rule is loaded or run |
 | `--profile`, `--preset` | Policy, as for every other command — see [`profiles.md`](profiles.md) |
 | `--format human\|json\|sarif\|junit` | `json` is what [`guardana diff`](usage-diff.md) reads; an [installed format](outputs.md) is named the same way |
 | `--output PATH` | Save the run |

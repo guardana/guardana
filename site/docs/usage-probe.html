@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -211,6 +215,12 @@ speaks Ollama's native <code>/api/chat</code> instead, and <code>--provider tgi<
 Hugging Face TGI's <code>/generate</code>. <code>--mcp</code> examines an
 <a href="#probing-an-mcp-server">MCP server</a> and <code>--a2a</code> an <a href="#probing-an-a2a-agent">A2A agent</a>
 instead of a model.</p>
+<p>A tool call whose <code>arguments</code> arrive as a JSON object instead of a JSON string is graded,
+and sent back to the endpoint, as that object's JSON text. A tool call that cannot be read
+whole — no function name, or arguments that are neither — is never dropped or emptied: the
+calls beside it that can be read are still graded, and a case they do not fail is
+<code>inconclusive</code>, while the other checks go on. A reply whose <code>tool_calls</code> is not a list stops
+the run (exit <code>4</code>).</p>
 <pre><code class="language-bash">guardana probe (--url &lt;base-url&gt; --model &lt;name&gt; | --target &lt;scheme://locator&gt; | --mcp &lt;server&gt; | --a2a &lt;agent-url&gt;) [OPTIONS]
 </code></pre>
 <h2 id="flags">Flags</h2>
@@ -426,7 +436,7 @@ guardana probe \
   --mcp-token-env MCP_TOKEN
 </code></pre>
 <p><strong>Guardana never calls a tool on your server.</strong> Every observation is made with
-<code>server/discover</code>, <code>tools/list</code>, the <code>initialize</code> handshake (followed by
+<code>server/discover</code>, <code>tools/list</code> (every page of it), the <code>initialize</code> handshake (followed by
 <code>notifications/initialized</code>) where the server still expects one, one <code>tasks/list</code> sent
 without a credential, and unauthenticated <code>GET</code>s of the two discovery documents. Calling a
 tool is a side effect on somebody's system — possibly a write, possibly a payment
@@ -514,6 +524,12 @@ guardana probe --mcp https://mcp.example.com/mcp \
 <p>The pin stores a digest per tool rather than the prose, so the file records <em>that</em>
 the manifest was approved and cannot be edited into agreement. Without <code>--mcp-pin</code>
 drift is reported <code>inconclusive</code>, never as a clean server.</p>
+<p>Every page of the listing is read, following <code>nextCursor</code>, and both the checks and the
+pin cover every page, up to 16 pages and 4 MiB of UTF-8 in total. A listing that cannot be read to its
+last page is never graded as a shorter one: more pages or bytes than that, a cursor that
+repeats or is not a string, a page that holds no tool list, an entry that is not a tool
+declaration, or a tool named twice is an error of the checks that read the manifest
+(exit <code>2</code>), and <code>--write-mcp-pin</code> exits <code>4</code> without writing a pin.</p>
 <p>Pins written before 0.13.0 are <code>schema_version 1</code> and cover <strong>descriptions
 only</strong>. They still load and still compare, and every run that uses one carries a
 note saying which drift it cannot see — re-approve with <code>--write-mcp-pin</code> to cover
@@ -563,7 +579,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.task_identity</code></td>
-<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. A server that declares no tasks and answers <code>tasks/list</code> as an unknown method is skipped <code>not_offered</code>, a coverage gap; when what it declares could not be read at all, the check is <code>inconclusive</code> instead</td>
+<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. Only the first page of the listing is read, so an empty one that names a further page is <code>inconclusive</code> too. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. A server that declares no tasks and answers <code>tasks/list</code> as an unknown method is skipped <code>not_offered</code>, a coverage gap; when what it declares could not be read at all, the check is <code>inconclusive</code> instead</td>
 </tr>
 </tbody>
 </table></div>
@@ -644,7 +660,7 @@ what was graded before it (<a href="#when-the-target-fails-part-way">below</a>):
 </thead>
 <tbody>
 <tr>
-<td>no reply: no connection, a timeout, a reset, an stdio server that exited or closed its output</td>
+<td>no reply: no connection, a timeout, a reset, an stdio server that exited, closed its output or did not read a request within the timeout</td>
 <td>the run stops (<code>stopped_by: target_unavailable</code>)</td>
 <td><code>4</code></td>
 </tr>
@@ -659,7 +675,7 @@ what was graded before it (<a href="#when-the-target-fails-part-way">below</a>):
 <td><code>4</code></td>
 </tr>
 <tr>
-<td>a <code>2xx</code> that is not JSON-RPC, or an stdio line that is over-long or not JSON</td>
+<td>a <code>2xx</code> that is not JSON-RPC, an stdio line that is over-long or not JSON, or an stdio server request whose id is not an integer or a string of at most 256 characters</td>
 <td>the run stops</td>
 <td><code>4</code></td>
 </tr>
@@ -690,8 +706,8 @@ waiting on one does not stall the run; its notifications are ignored. An stdio c
 cannot be started exits <code>4</code> before any rule, with nothing saved, and <code>--write-mcp-pin</code>
 against a server that fails exits <code>4</code> without writing a pin.</p>
 <h3 id="cost">Cost</h3>
-<p>An MCP probe sends these requests: one <code>server/discover</code> to settle the revision, a
-listing without a credential (preceded by a handshake where the server still expects
+<p>An MCP probe sends these requests: one <code>server/discover</code> to settle the revision, one
+request per page of the tool listing (up to 16), a listing without a credential (preceded by a handshake where the server still expects
 one), up to six discovery fetches, a listing with the forged token, a handful of
 handshakes to sample session ids, one <code>initialize</code> to ask whether a modern server still
 offers <code>2025-11-25</code>, one <code>tasks/list</code> (and up to three more requests — a handshake, its
@@ -1079,8 +1095,8 @@ alike (<a href="exit-codes.html">exit codes</a>).</p>
 <p>The <code>llm_judge</code> and <code>guard</code> evaluators need a model of their own, wired from
 an <code>evaluators:</code> block in <code>guardana.yaml</code> — see
 <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>. With
-no block configured, a rule that names one of them is <strong>skipped visibly</strong> in
-the run summary rather than silently passed. <code>plan probe</code> prices their calls before
+no block configured, a rule that names one of them records a <code>RuleLoadError</code>
+(<code>unknown evaluator</code>) error in the run rather than grading or silently passing. <code>plan probe</code> prices their calls before
 the run (<a href="usage-plan.html#pricing-judge-calls"><code>usage-plan.md</code></a>), and the saved run
 records what they spent in <code>usage.judge</code> (<a href="usage-run.html#what-a-run-costs"><code>usage-run.md</code></a>).</p>
 <h2 id="exit-codes">Exit codes</h2>
@@ -1193,15 +1209,21 @@ declined line holds no reply and is never <code>altered</code>.</li>
 <li>Keeping is off by default. The file holds every reply, passes included, so it widens
 what a leaked run exposes; the collector never receives it. See <a href="privacy.html">privacy</a>.</li>
 <li>A probe that kept nothing writes no file and says so on stderr.</li>
-<li>Any command writing at <code>--output</code> removes an earlier <code>&lt;stem&gt;.exchanges.jsonl</code> unless this
-run writes its own there: <code>scan</code>, <code>grade</code>, <code>analyze-trace</code>, <code>import-observations</code>,
-<code>run migrate</code> (which keeps the migrated run's own) and a probe that keeps nothing.
-Removal also applies when an installed <code>--format</code> or redaction fails and writes nothing
-new; stderr says <code>removed …</code>. A failed removal warns without changing the exit code.
+<li>Any command writing at <code>--output</code> removes the adjacent <code>&lt;stem&gt;.exchanges.jsonl</code> only when
+the saved run it replaces recorded exactly those bytes, unless this run writes its own
+exchanges there: <code>scan</code>, <code>grade</code>, <code>analyze-trace</code>, <code>import-observations</code>, <code>run migrate</code>
+(which keeps the migrated run's own) and a probe that keeps nothing. Removal also applies
+when an installed <code>--format</code> or redaction fails and writes nothing new; stderr says
+<code>removed …</code>. A sidecar is kept when no run saved at <code>--output</code> recorded it: no file was
+there, the file is not a Guardana run, or it records no exchanges or another digest.
+Stderr says <code>warning: kept …</code>; the name alone never establishes ownership.
+A failed removal warns without changing the exit code.
 A report or sidecar that cannot be written removes nothing. <code>run</code> and <code>run.json</code> share
 one sidecar path; a sidecar the other saved run records by digest is kept with a warning,
 and a probe that keeps exchanges refuses with exit <code>3</code>, before sending anything, to
-overwrite it. An <code>--output</code> whose sidecar path is a file named on the command line is
+overwrite it. It refuses the same way to overwrite a sidecar no run saved at <code>--output</code>
+recorded; it replaces only the exchanges that run kept, and a link at the sidecar path,
+which it never writes through. An <code>--output</code> whose sidecar path is a file named on the command line is
 refused with exit <code>3</code>; see <a href="exit-codes.html">exit codes</a>. <code>guardana grade</code> warns when no
 saved run beside a sidecar records its digest, and grades it as given; <code>guardana diff</code>
 compares runs by that digest.</li>
@@ -1237,7 +1259,7 @@ mean: <a href="usage-fixtures.html#the-two-checks-a-run-given-fixtures-makes"><c
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-probe.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

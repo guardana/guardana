@@ -1,6 +1,6 @@
 [project]
 name = "guardana-server"
-version = "1.0.0rc1"
+version = "1.0.0rc2"
 description = "Guardana collector: minimal FastAPI server that ingests and lists findings."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,7 +37,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["fastapi>=0.142.2", "pydantic>=2.13.5", "psycopg[binary]>=3.3.6"]
+dependencies = ["fastapi>=0.143.0", "pydantic>=2.14.0", "psycopg[binary]>=3.3.6"]
 
 # The ASGI server is an extra, not a dependency: FastAPI builds the application,
 # and which server runs it is the deployment's decision — a site already running
@@ -55,7 +55,9 @@ Issues = "https://github.com/guardana/guardana/issues"
 Changelog = "https://github.com/guardana/guardana/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["hatchling"]
+# Exact, so a rebuild from the tag uses the backend the release used
+# (`scripts/reproduce_release.py` compares the two byte for byte).
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

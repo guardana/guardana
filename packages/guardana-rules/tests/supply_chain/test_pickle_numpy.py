@@ -253,6 +253,83 @@ def test_an_npy_whose_header_cannot_be_read_is_unread_not_clean(
     assert str(path) in ctx.examined_paths()
 
 
+def _numeric_header(fortran_order: str, shape: str) -> str:
+    return f"{{'descr': '<f4', 'fortran_order': {fortran_order}, 'shape': {shape}, }}"
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        _npy("<f4", bytes(4), header=_numeric_header("'False'", "'not a shape'")),
+        _npy("<f4", bytes(4), header=_numeric_header("0", "(1,)")),
+        _npy("<f4", bytes(4), header=_numeric_header("None", "(1,)")),
+        _npy("<f4", bytes(4), header=_numeric_header("False", "[1]")),
+        _npy("<f4", bytes(4), header=_numeric_header("False", "(1.0,)")),
+        _npy("<f4", bytes(4), header=_numeric_header("False", "1")),
+        _npy([("a", "<f4", "x")], bytes(4)),
+        _npy([("a", "<f4", -1)], bytes(4)),
+        _npy([("a", "<f4", (2.0,))], bytes(4)),
+        _npy([("a", "<f4", True)], bytes(4)),
+        _npy([(1, "<f4")], bytes(4)),
+        _npy([("a", "|O"), ("b", "<f4", "x")], _SYSTEM),
+        _npy([("a", "|O"), ("b", [("c", "<f4", "x")])], _SYSTEM),
+        _npy([("a", "|O"), ("b", 7)], _SYSTEM),
+    ],
+    ids=[
+        "string-fields",
+        "integer-fortran-order",
+        "none-fortran-order",
+        "list-shape",
+        "float-dimension",
+        "integer-shape",
+        "string-field-shape",
+        "negative-field-shape",
+        "float-field-dimension",
+        "bool-field-shape",
+        "integer-field-name",
+        "object-field-beside-a-malformed-one",
+        "object-field-beside-a-malformed-nested-one",
+        "object-field-beside-a-dtype-that-is-no-dtype",
+    ],
+)
+def test_a_header_numpy_refuses_is_unread_not_a_numeric_array(
+    tmp_path: Path, content: bytes
+) -> None:
+    path, ctx, titles = _scan(tmp_path, "weights.npy", content)
+
+    assert titles == ["Unscanned model file"]
+    assert _unread(ctx) == [str(path)]
+
+
+@pytest.mark.parametrize(
+    "descr",
+    [
+        [("a", "<f4", 2)],
+        [("a", "<f4", (2, 3))],
+        [("a", "<f4", [2])],
+        [("a", "<f4", ())],
+        [(("title", "a"), "<f4")],
+    ],
+    ids=["integer", "tuple", "list", "empty", "titled-field"],
+)
+def test_field_shapes_numpy_accepts_keep_a_numeric_array_clean(
+    tmp_path: Path, descr: object
+) -> None:
+    _path, ctx, titles = _scan(tmp_path, "records.npy", _npy(descr, bytes(8)))
+
+    assert titles == []
+    assert _unread(ctx) == []
+
+
+def test_a_header_numpy_refuses_inside_an_npz_is_unread(tmp_path: Path) -> None:
+    member = _npy("<f4", bytes(4), header=_numeric_header("'False'", "'not a shape'"))
+
+    path, ctx, titles = _scan(tmp_path, "arrays.npz", _npz({"x.npy": member}))
+
+    assert titles == ["Unscanned model file"]
+    assert _unread(ctx) == [str(path)]
+
+
 def test_an_object_array_with_no_pickle_after_its_header_is_unread(tmp_path: Path) -> None:
     path, ctx, titles = _scan(tmp_path, "weights.npy", _npy("|O", b"\xff\xfe"))
 

@@ -1,19 +1,23 @@
 """A report written at `--output` never sits beside exchanges another run kept.
 
-Whatever command writes the report, the sidecar at `exchanges_path(output)` afterwards is
-this run's or absent, and a removal is said on stderr. A built-in format that cannot be
-written removes the earlier report and sidecar and still exits `3`.
+Whatever command writes the report, the exchanges the run it replaced recorded beside
+`output` are removed, and the removal is said on stderr. A sidecar no replaced run recorded
+is kept with a warning. A report that cannot be written removes nothing and exits `3`.
 """
 
+import contextlib
 import hashlib
 import json
+import os
 import re
 import shutil
 from collections.abc import Callable
 from pathlib import Path
+from typing import IO, Any
 
 import guardana.cli._endpoint as endpoint_module
 import pytest
+from guardana.cli._output import emit
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.testing import RefusingTransport
@@ -235,26 +239,52 @@ def test_a_run_whose_exchanges_could_not_be_written_records_none(tmp_path: Path)
     assert json.loads(saved.read_text(encoding="utf-8"))["run"]["exchanges"] is None
 
 
+def _fill_the_disk_writing(monkeypatch: pytest.MonkeyPatch, destination: Path) -> None:
+    """Make the file staged to replace `destination` stop part way, as a full disk does."""
+    open_file = Path.open
+
+    class _Full:
+        def __init__(self, handle: IO[bytes]) -> None:
+            self.handle = handle
+
+        def __enter__(self) -> "_Full":
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            self.handle.close()
+
+        def write(self, data: bytes) -> int:
+            self.handle.write(data[:10])
+            raise OSError("No space left on device")
+
+    def opening(  # noqa: PLR0913, PLR0917 — Path.open's own parameters
+        path: Path,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> object:
+        handle = open_file(path, mode, buffering, encoding, errors, newline)
+        if "x" in mode and path.name.startswith(f".{destination.name}."):
+            return _Full(handle)
+        return handle
+
+    monkeypatch.setattr(Path, "open", opening)
+
+
 def test_exchanges_written_part_way_leave_neither_a_sidecar_nor_a_digest_of_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     saved = tmp_path / "run.json"
     sidecar = exchanges_path(saved)
-    write_bytes = Path.write_bytes
-
-    def fill_the_disk(path: Path, data: bytes) -> int:
-        if path == sidecar:
-            write_bytes(path, data[:10])
-            raise OSError("No space left on device")
-        return write_bytes(path, data)
-
-    monkeypatch.setattr(Path, "write_bytes", fill_the_disk)
+    _fill_the_disk_writing(monkeypatch, sidecar)
 
     result = _probe("--keep-exchanges", "--format", "json", "--output", str(saved))
 
     assert result.exit_code == ExitCode.INVALID_USAGE, result.output
     assert json.loads(saved.read_text(encoding="utf-8"))["run"]["exchanges"] is None
-    assert not sidecar.exists()
+    assert sorted(path.name for path in tmp_path.iterdir()) == [saved.name]
 
 
 def _write_text_as_windows(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -480,8 +510,17 @@ def test_a_sidecar_the_runs_partner_recorded_is_kept_and_said_to_be(tmp_path: Pa
     )
 
 
+def _kept_sidecar(sidecar: Path, output: Path) -> str:
+    return (
+        f"warning: kept {sidecar}: no run saved at {output} before this one recorded it, so it "
+        f"is not an earlier run's exchanges"
+    )
+
+
 @pytest.mark.parametrize("partner", ["another digest", "no exchanges"])
-def test_a_sidecar_its_partner_did_not_record_is_removed(tmp_path: Path, partner: str) -> None:
+def test_a_sidecar_neither_run_of_the_pair_recorded_is_kept_and_said_to_be(
+    tmp_path: Path, partner: str
+) -> None:
     kept_by = tmp_path / "run.json"
     sidecar = _probe_that_kept_exchanges(kept_by)
     if partner == "another digest":
@@ -490,12 +529,40 @@ def test_a_sidecar_its_partner_did_not_record_is_removed(tmp_path: Path, partner
         other = tmp_path / "other.json"
         assert _scan(tmp_path, other).exit_code == ExitCode.OK
         kept_by.write_bytes(other.read_bytes())
+    before = sidecar.read_bytes()
+    saved = tmp_path / "run"
 
-    result = _scan(tmp_path, tmp_path / "run")
+    result = _scan(tmp_path, saved)
 
     assert result.exit_code == ExitCode.OK, result.output
-    assert not sidecar.exists()
-    assert _removals(result) == [_removed_sidecar(sidecar)]
+    assert sidecar.read_bytes() == before
+    assert _removals(result) == []
+    assert _kept_sidecar(sidecar, saved) in _lines(result.stderr)
+
+
+@pytest.mark.parametrize(
+    "earlier", ["nothing", "a file that is no run", "a run recording none", "a run recording other"]
+)
+def test_a_recording_beside_the_report_that_no_replaced_run_recorded_is_kept(
+    tmp_path: Path, earlier: str
+) -> None:
+    saved = tmp_path / "results.json"
+    if earlier == "a file that is no run":
+        saved.write_text('{"results": []}\n', encoding="utf-8")
+    elif earlier == "a run recording none":
+        assert _scan(tmp_path, saved).exit_code == ExitCode.OK
+    elif earlier == "a run recording other":
+        _probe_that_kept_exchanges(saved)
+    recording = exchanges_path(saved)
+    recording.write_text('{"messages": [{"role": "user", "content": "hi"}]}\n', encoding="utf-8")
+
+    result = _scan(tmp_path, saved)
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert '"schema_version"' in saved.read_text(encoding="utf-8")
+    assert recording.read_text(encoding="utf-8").startswith('{"messages"')
+    assert _removals(result) == []
+    assert _kept_sidecar(recording, saved) in _lines(result.stderr)
 
 
 def test_a_probe_keeping_beside_a_sidecar_its_partner_recorded_is_refused_before_sending(
@@ -520,19 +587,30 @@ def test_a_probe_keeping_beside_a_sidecar_its_partner_recorded_is_refused_before
     )
 
 
-def test_a_probe_keeping_beside_a_sidecar_its_partner_did_not_record_replaces_it(
-    tmp_path: Path,
+@pytest.mark.parametrize("beside", ["a sidecar its partner did not record", "a recording alone"])
+def test_a_probe_keeping_beside_exchanges_no_run_there_recorded_is_refused_before_sending(
+    tmp_path: Path, endpoint: RefusingTransport, monkeypatch: pytest.MonkeyPatch, beside: str
 ) -> None:
-    kept_by = tmp_path / "run.json"
-    sidecar = _probe_that_kept_exchanges(kept_by)
-    sidecar.write_bytes(sidecar.read_bytes() + b"\n")
+    if beside == "a recording alone":
+        sidecar = exchanges_path(tmp_path / "run.json")
+        sidecar.write_text('{"messages": []}\n', encoding="utf-8")
+    else:
+        sidecar = _probe_that_kept_exchanges(tmp_path / "run.json")
+        sidecar.write_bytes(sidecar.read_bytes() + b"\n")
+    before = {path: path.read_bytes() for path in tmp_path.iterdir()}
+    sent: list[object] = []
+    monkeypatch.setattr(endpoint, "send", lambda *args, **kwargs: sent.append(args))
     saved = tmp_path / "run"
 
     result = _probe("--keep-exchanges", "--format", "json", "--output", str(saved))
 
-    assert result.exit_code == ExitCode.OK, result.output
-    recorded = json.loads(saved.read_text(encoding="utf-8"))["run"]["exchanges"]["digest"]
-    assert recorded == "sha256:" + hashlib.sha256(sidecar.read_bytes()).hexdigest()
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert sent == []
+    assert {path: path.read_bytes() for path in tmp_path.iterdir()} == before
+    assert _lines(result.stderr)[-1] == (
+        f"error: {sidecar} holds exchanges no run saved at {saved} recorded, and keeping this "
+        f"run's beside it would replace them — choose another --output"
+    )
 
 
 def test_kept_exchanges_replace_a_link_at_their_path_and_never_write_through_it(
@@ -545,6 +623,107 @@ def test_kept_exchanges_replace_a_link_at_their_path_and_never_write_through_it(
 
     sidecar = _probe_that_kept_exchanges(saved)
 
+    assert elsewhere.read_text(encoding="utf-8") == "not exchanges\n"
+    assert not sidecar.is_symlink()
+    recorded = json.loads(saved.read_text(encoding="utf-8"))["run"]["exchanges"]["digest"]
+    assert recorded == "sha256:" + hashlib.sha256(sidecar.read_bytes()).hexdigest()
+
+
+def test_a_scan_over_a_tree_holding_a_probes_run_replaces_it_and_removes_its_exchanges(
+    tmp_path: Path,
+) -> None:
+    tree = _tree(tmp_path)
+    saved = tree / "run.json"
+    sidecar = _probe_that_kept_exchanges(saved)
+
+    result = runner.invoke(app, ["scan", str(tree), "--format", "json", "--output", str(saved)])
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert json.loads(saved.read_text(encoding="utf-8"))["run"]["exchanges"] is None
+    assert not sidecar.exists()
+    assert _removals(result) == [_removed_sidecar(sidecar)]
+
+
+def test_exchanges_that_changed_after_the_run_there_was_read_are_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    saved = tmp_path / "run.json"
+    sidecar = _probe_that_kept_exchanges(saved)
+
+    def edited_meanwhile(*args: Any, **kwargs: Any) -> None:  # noqa: ANN401 — emit's own arguments
+        sidecar.write_bytes(sidecar.read_bytes() + b"\n")
+        emit(*args, **kwargs)
+
+    monkeypatch.setattr("guardana.cli._outputs.emit", edited_meanwhile)
+
+    result = _scan(tmp_path, saved)
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert sidecar.is_file()
+    assert _removals(result) == []
+    assert _kept_sidecar(sidecar, saved) in _lines(result.stderr)
+
+
+def test_exchanges_planted_while_the_probe_ran_are_kept_and_none_are_claimed(
+    tmp_path: Path, endpoint: RefusingTransport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    saved = tmp_path / "run.json"
+    sidecar = exchanges_path(saved)
+    send = endpoint.send
+
+    def planting(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401 — the transport's own call
+        if not sidecar.exists():
+            sidecar.write_bytes(b'{"messages": []}\n')
+        return send(*args, **kwargs)
+
+    monkeypatch.setattr(endpoint, "send", planting)
+
+    result = _probe("--keep-exchanges", "--format", "json", "--output", str(saved))
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert sidecar.read_bytes() == b'{"messages": []}\n'
+    assert json.loads(saved.read_text(encoding="utf-8"))["run"]["exchanges"] is None
+    assert (
+        f"error: {sidecar} changed while the probe ran and no run saved at {saved} records it, "
+        f"so it was kept and this run's exchanges were not written"
+    ) in _lines(result.stderr)
+
+
+def test_kept_exchanges_replace_a_hard_link_at_their_path_and_never_write_through_it(
+    tmp_path: Path,
+) -> None:
+    saved = tmp_path / "run.json"
+    sidecar = _probe_that_kept_exchanges(saved)
+    elsewhere = tmp_path / "elsewhere.jsonl"
+    os.link(sidecar, elsewhere)
+    linked = elsewhere.read_bytes()
+
+    result = _probe("--keep-exchanges", "--format", "json", "--output", str(saved))
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert elsewhere.read_bytes() == linked
+    assert not elsewhere.samefile(sidecar)
+
+
+def test_a_link_planted_while_the_probe_ran_is_replaced_and_never_written_through(
+    tmp_path: Path, endpoint: RefusingTransport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    saved = tmp_path / "run.json"
+    sidecar = exchanges_path(saved)
+    elsewhere = tmp_path / "elsewhere.txt"
+    elsewhere.write_text("not exchanges\n", encoding="utf-8")
+    send = endpoint.send
+
+    def planting(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401 — the transport's own call
+        with contextlib.suppress(FileExistsError):
+            sidecar.symlink_to(elsewhere)
+        return send(*args, **kwargs)
+
+    monkeypatch.setattr(endpoint, "send", planting)
+
+    result = _probe("--keep-exchanges", "--format", "json", "--output", str(saved))
+
+    assert result.exit_code == ExitCode.OK, result.output
     assert elsewhere.read_text(encoding="utf-8") == "not exchanges\n"
     assert not sidecar.is_symlink()
     recorded = json.loads(saved.read_text(encoding="utf-8"))["run"]["exchanges"]["digest"]

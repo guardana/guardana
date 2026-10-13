@@ -80,8 +80,9 @@ per-rule declaration; `guardana rules` groups by it and takes `--surface`.
 Built-ins: `ArtifactTarget` (walks a directory, exposing `iter_files(suffixes)`
 over model files, dependency manifests, and source, skipping `.git`,
 `.venv`, `node_modules`, etc., plus `python_source(path)` — a Python file read,
-parsed and indexed **once per scan** rather than once per rule, so scan cost
-grows with the target instead of with the rule count) and `EndpointTarget` (a live chat endpoint,
+parsed and indexed **once per scan**, not once per rule, while parsed sources
+fit an 8 MiB cache. Within that budget, scan cost grows with the target, not the
+rule count. Beyond it, each further read reparses the file) and `EndpointTarget` (a live chat endpoint,
 exposing `chat(messages) -> str`, with a pluggable `ChatTransport` so tests
 never hit the network). The transport is selected by a provider name —
 `openai` (the default, any OpenAI-compatible server), `ollama` (native
@@ -165,10 +166,12 @@ An `Exchange` (`guardana.core.exchange`) is the graded conversation — the
 message sequence plus `reply_text` (the last assistant reply, `None` when
 there is nothing to grade) and `transcript` (the whole conversation, so a
 multi-turn scenario's "across the conversation" goal is gradable). Every
-built-in evaluator fails closed on `reply_text is None`: the verdict is
-`inconclusive`, never a silent pass.
+built-in evaluator that grades reply text fails closed on `reply_text is None`:
+the verdict is `inconclusive`, never a silent pass. `tool_call` grades actions,
+even when a run has tool calls but no text. Its verdict is
+`inconclusive` when required action evidence is missing.
 
-Shipped evaluators: `keyword` (cheap refusal-marker matching — honestly
+Shipped evaluators include `keyword` (cheap refusal-marker matching — honestly
 low-confidence, ~0.5–0.6), `canary` (near-perfect detection of a planted marker
 verbatim, ~0.9–0.99), `length` (grades a reply by length — a runaway answer to a
 divergence prompt is a lead, for the unbounded-consumption check), `amplification`
@@ -179,9 +182,11 @@ confidence is measured as agreement across `min_agreement` samples, and the prom
 version is stamped into `evaluator_id` — `llm_judge@2026.1` — so grading stays
 reproducible as the rubric evolves), and `guard` (an opt-in external
 safety-classifier — see
-[`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)).
-`guardana calibrate` measures and corrects for errors in `keyword`, `guard`, and
-`llm_judge`; the other evaluators are deterministic and need no such correction. A
+[`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)); the
+[evaluator catalog](generated/evaluator-catalog.md) lists every one.
+`guardana calibrate` measures and corrects errors in `keyword`, `answered`,
+`guard`, `llm_judge` and `reference_judge`, each under its own evaluator id. Other
+evaluators are deterministic and need no such correction. A
 rule references an evaluator by its string `id`, resolved from the registry at run
 time; swapping which evaluator grades a rule requires no change to the rule
 itself.
@@ -317,11 +322,14 @@ class Runner:
     def run(self, target: Target) -> ScanResult: ...
 ```
 
+Before it selects anything, the runner refuses with `ProfileError` an include pattern
+that matches no registered rule, naming each one
+([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
 For each registered rule: skip it if `target.kind` doesn't match
 `meta.target_kind`, or the profile's `Policy.matches(rule_id)` excludes it;
 skip it (recording it under `rules_skipped`) if the target can't satisfy
-`meta.required_capabilities`; otherwise run it, catching any `Exception` per
-rule (not `KeyboardInterrupt` or `SystemExit`) and recording it on the result's
+`meta.required_capabilities`; otherwise run it, catching any `Exception` or
+`SystemExit` per rule (not `KeyboardInterrupt`) and recording it on the result's
 `errors` channel, so one bad rule can't abort the whole scan and the gate fails on
 it by default ([when a rule raises](writing-rules.md#what-happens-when-your-rule-raises)). Findings whose verdict is
 `inconclusive` are partitioned onto the result's `unverified` channel rather

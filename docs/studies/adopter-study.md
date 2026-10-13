@@ -1,18 +1,13 @@
 ---
 title: "Adopter study"
 nav_order: 16
-summary: "How the maintainer records two independent teams' runs required before 1.0, their consent, and the generated application measures"
+summary: "How the maintainer records two independent teams' consented runs and generates adoption measures, separate from stable 1.0 release criteria"
 status: stable
 ---
 
 # Adopter study
 
-The [F6 release criterion](../product-status.md#before-the-first-stable-release) asks two independent teams to run Guardana against their own application
-and gate a regression in CI, and the milestone publishes two measures from their runs: coverage
-of the real application and the share of attempted checks that reached a supported verdict.
-Only teams outside this project can answer that. This page explains how the maintainer records
-their runs. The published answer is [generated from the sheet](../generated/application-measures.md)
-and says "not measured" until two teams have rows.
+The [F6 adoption measure](../product-status.md#adoption-measures) covers two independent teams running locked checks on their own application. It is not a stable 1.0 release criterion. This page explains how the maintainer records their runs and consent. The published application measures are [generated from the sheet](../generated/application-measures.md) and read "not measured": 0 of 2 teams have recorded runs. Pilot invitations remain open; the maintainer-run retrieval proof uses the reference application in `examples/retrieval_pilot/`, while the adoption pilot uses a team's own target.
 
 ## One run
 

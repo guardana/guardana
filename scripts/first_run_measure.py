@@ -119,8 +119,9 @@ def render(sessions: list[Session]) -> str:
     """Render the measure as Markdown: counts and observed times, or "not measured"."""
     if len(sessions) < REQUIRED:
         return (
-            f"**Not measured.** {len(sessions)} of the {REQUIRED} first-run sessions required "
-            f"before 1.0 are recorded, so no completion rate or time is published.\n"
+            f"**Not measured.** {len(sessions)} of the {REQUIRED} first-run sessions this "
+            f"adoption measure needs are recorded, so no completion rate or time is published. "
+            f"It is not a stable-release criterion.\n"
         )
     unaided = [s for s in sessions if s.finished_in_10_min and s.maintainer_help == "none"]
     times = sorted(s.saved_run_seconds for s in sessions if s.saved_run_seconds is not None)

@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -211,7 +215,7 @@ base classes, same discovery mechanism where discovery exists.</p>
 <code>guardana.core</code>, so plugin code needs one import line:</p>
 <pre><code class="language-python">from guardana.core import (
     Capability, Evaluator, Evidence, Finding, Registry, Rule, RuleContext,
-    LocatorError, RuleMeta, Runner, ScanResult, Severity, SystemPromptPlanter,
+    LocatorError, RuleMeta, ScanResult, Severity, SystemPromptPlanter,
     Target, TargetKind,
 )
 </code></pre>
@@ -224,6 +228,16 @@ valid — the re-exports are the same objects. The full list is
 <code>RuleLoadError</code>, <code>RuleMeta</code>, <code>Runner</code>, <code>ScanResult</code>, <code>Severity</code>, <code>Surface</code>, <code>LocatorError</code>,
 <code>SystemPromptPlanter</code>, <code>Target</code>, <code>TargetKind</code>, <code>TaxonomyRef</code>, <code>Verdict</code>, and
 <code>__version__</code>.</p>
+<p>An importable name is not necessarily supported. <code>Runner</code> is re-exported here but is internal
+and subject to change in any release. Applications run Guardana through <code>Verifier</code>
+(<a href="python-api.html">Python API</a>). The
+<a href="compatibility.html#the-supported-surface">compatibility page</a> lists the names preserved across
+upgrades: the rest of <code>guardana.core.__all__</code> and a few names from deeper modules. Helpers
+outside that list, such as the <code>guardana.core.formats</code> readers, <code>guardana.core.evaluator.grade</code>
+or <code>guardana.core.assessment.from_verdict</code>, are subject to change in any release. A pack that
+imports one pins the exact <code>guardana-core</code> version it was tested with.
+<a href="https://github.com/guardana/guardana/tree/main/examples/reference_pack"><code>examples/reference_pack/</code></a> imports nothing outside the supported
+surface.</p>
 <p>Two names live on <code>guardana.core.registry</code> rather than at the top, because they
 are what the registry refuses rather than something an extension implements:
 <code>RESERVED_NAMESPACE</code> is the <code>guardana.</code> prefix no third-party id may take, and
@@ -286,7 +300,7 @@ only for a rule that grades in its own code and stamps verdicts with its own id,
 </tr>
 <tr>
 <td><code>Rule.not_applicable_to(target)</code></td>
-<td>Return why the rule has nothing to check on <code>target</code> as a non-empty string, or <code>None</code>. The run and the plan record the rule as skipped <code>not_applicable</code>, never as a check that ran. Any other return (<code>False</code>, <code>&quot;&quot;</code>) is an error naming the hook and what it returned, and the rule runs.</td>
+<td>Return why the rule has nothing to check on <code>target</code> as a non-empty string, or <code>None</code>. The run and the plan record the rule as skipped <code>not_applicable</code>, never as a check that ran. Any other return (<code>False</code>, <code>&quot;&quot;</code>) is an error naming the hook and what it returned, and the rule runs. A hook that raises is also an error naming the hook and the exception, recorded in the run and the plan, and the rule runs. Only rules the profile selects are asked.</td>
 </tr>
 <tr>
 <td><code>raise NotOffered(detail, missing=(...))</code></td>
@@ -373,6 +387,44 @@ five small one-file examples spanning cheap heuristic, exact marker match,
 reply-length lead, LLM-judge, and safety-classifier patterns. (<code>llm_judge</code> and <code>guard</code> need a
 model of their own and are wired from the profile's <code>evaluators:</code> block —
 see <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>.)</p>
+<h3 id="declaring-what-an-evaluator-reads-expects">Declaring what an evaluator reads: <code>expects</code></h3>
+<p><code>Expectation</code> holds what a rule declared under <code>expect:</code>. <code>canary</code> and <code>goal</code> are typed
+attributes because the engine plants the canary and can render a goal. Every other key is in
+<code>expectation.fields</code>, read with <code>expectation.get(name, default)</code>. An evaluator lists the keys
+it reads in <code>expects</code>, a class attribute that maps each key to whether a rule must set it:</p>
+<pre><code class="language-python">from typing import ClassVar
+
+from guardana.core import Evaluator, Exchange, Expectation, Verdict
+
+
+class MarkerEvaluator(Evaluator):
+    id = &quot;acme.marker&quot;
+    expects: ClassVar[dict[str, bool]] = {&quot;marker&quot;: True, &quot;case_sensitive&quot;: False}
+
+    def evaluate(self, exchange: Exchange, expectation: Expectation) -&gt; Verdict:
+        reply = exchange.reply_text
+        if reply is None:
+            return Verdict(&quot;inconclusive&quot;, 0.0, &quot;no reply to grade&quot;, self.id)
+        marker = str(expectation.get(&quot;marker&quot;))
+        if not expectation.get(&quot;case_sensitive&quot;, False):
+            marker, reply = marker.casefold(), reply.casefold()
+        if marker in reply:
+            return Verdict(&quot;fail&quot;, 1.0, &quot;the reply repeats the marker&quot;, self.id)
+        return Verdict(&quot;pass&quot;, 1.0, &quot;the reply does not repeat the marker&quot;, self.id)
+</code></pre>
+<p>A YAML rule configures it under <code>expect:</code>:</p>
+<pre><code class="language-yaml">evaluator: acme.marker
+expect:
+  marker: BLUEFINCH
+  goal: The assistant never names its internal codename.
+</code></pre>
+<p>A rule that omits a required key or sets a key the evaluator does not list is recorded as an
+error at stage <code>load</code> (<code>evaluator 'acme.marker' requires 'expect.marker'</code>). This prevents a rule
+from appearing configured while grading nothing. <code>canary</code> and <code>goal</code> are always accepted;
+listing either as <code>True</code> requires a rule to set it. An evaluator that reads nothing from the
+rule leaves <code>expects</code> empty. The reference pack's <code>reference.marker</code>
+(<a href="https://github.com/guardana/guardana/blob/main/examples/reference_pack/src/guardana_reference_pack/evaluator.py"><code>evaluator.py</code></a>) and the
+YAML rule that uses it for grading form a complete, tested example.</p>
 <h3 id="reading-a-declined-request-read_decline">Reading a declined request: <code>read_decline</code></h3>
 <p>An application behind a guard declines some requests; the adapter's <code>declines:</code> names
 which replies are declines and reads each as <code>refusal</code> or <code>ungraded</code>
@@ -534,8 +586,8 @@ class MyTarget(Target):
         return self._sources[path]
 
     def unread_sources(self) -&gt; tuple[UnreadSource, ...]:
-        # A file you were *prevented* from reading (too large, unopenable) —
-        # the runner turns these into `errors`: a check that did not run.
+        # A file that yielded no tree (too large, unopenable, undecodable,
+        # unparseable) — the runner turns these into `errors`: a check that did not run.
         return tuple(self._unread)
 </code></pre>
 <p><code>ref</code> is printed in messages and saved in the run document, SARIF and the collector
@@ -671,9 +723,12 @@ parameterized by a path/URL at construction time) via the <code>guardana.targets
 entry point, and <code>registry.targets()</code> returns it. Declaring a unique lowercase
 <code>scheme</code> and implementing <code>from_locator</code> also makes it selectable from every
 matching CLI workflow:</p>
-<pre><code class="language-bash">guardana scan --target acme-files://./prompts
-guardana plan scan --target acme-files://./prompts
+<pre><code class="language-bash">guardana scan --target acme-files://./prompts --plugins allowlist --allow-plugin acme-rules
+guardana plan scan --target acme-files://./prompts --plugins allowlist --allow-plugin acme-rules
 </code></pre>
+<p>Both commands assume that the distribution <code>acme-rules</code> is installed and registers the
+<code>acme-files</code> scheme. Every command starts with only Guardana's own distributions. Admit
+<code>acme-rules</code> by its distribution name or through <code>plugins:</code> in a profile.</p>
 <p>The command still chooses the kind: an artifact target is refused by <code>probe</code>,
 and an endpoint target is refused by <code>scan</code>. Schemes match
 <code>[a-z][a-z0-9-]*</code>; <code>file</code>, <code>http</code>, <code>https</code>, <code>mcp</code>, and <code>trace</code> are reserved,
@@ -760,17 +815,17 @@ my_evaluators = &quot;acme_rules:provide_evaluators&quot;
 [project.entry-points.&quot;guardana.targets&quot;]
 my_targets = &quot;acme_rules:provide_targets&quot;
 </code></pre>
-<p><code>provide_rules()</code> / <code>provide_evaluators()</code> / <code>provide_targets()</code> /
-<code>provide_taxonomies()</code> are zero-argument callables returning an instance or a
-list of instances. Any pip-installed package —
-ours or a third party's private one — is discovered identically; there is
-no built-in/custom distinction at the registry level, only namespacing by
-<code>id</code>. The CLI starts with <code>--plugins builtins</code>, so a user admits your pack by its
-distribution name (<code>--plugins allowlist --allow-plugin &lt;your-distribution&gt;</code>, or
-<code>plugins:</code> in a profile); from Python, <code>Registry.discover(trust)</code> takes the same
-<code>PluginTrust</code> and has no default. <code>guardana scan --no-plugins</code> is a deprecated alias for <code>--plugins disabled</code>: discovery still runs, every plugin is refused, and each refusal is
-recorded — see <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for the trust modes and why
-this exists.</p>
+<p><code>provide_rules()</code>, <code>provide_evaluators()</code> and <code>provide_taxonomies()</code> are zero-argument
+callables that return an instance or a list of instances. <code>provide_targets()</code> returns a
+<code>Target</code> subclass or a list of subclasses. It returns the classes themselves because a target
+is built from a locator when a command names it. Discovery works the same for any
+pip-installed package, whether ours or a third party's private package. The registry makes no
+built-in/custom distinction; it only namespaces by <code>id</code>. The CLI starts with
+<code>--plugins builtins</code>, so a user admits your pack by its distribution name
+(<code>--plugins allowlist --allow-plugin &lt;your-distribution&gt;</code>, or <code>plugins:</code> in a profile). From
+Python, <code>Registry.discover(trust)</code> takes the same <code>PluginTrust</code> and has no default.
+<code>guardana scan --no-plugins</code> is a deprecated alias for <code>--plugins disabled</code>: discovery still runs, every plugin is refused, and each refusal is recorded. See
+<a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for the trust modes and why this exists.</p>
 <p><a href="https://github.com/guardana/guardana/tree/main/examples/reference_pack"><code>examples/reference_pack/</code></a> is one pack that uses all six
 groups — a YAML and a Python rule, an evaluator, a target, a control catalogue, the format
 <code>reference-summary</code> and the reporter <code>reference-file</code> — with a schema-3 manifest and a
@@ -890,7 +945,7 @@ which no rule ran — so a format is tried on the runs it most needs to describe
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/extending.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

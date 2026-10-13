@@ -96,3 +96,47 @@ def test_the_cli_image_installs_the_rules() -> None:
 
     assert "guardana-rules" in text
     assert "guardana-server" not in text, "the CLI image ships the collector"
+
+
+@pytest.mark.parametrize(
+    ("dockerfile", "exported"),
+    [(_CLI, "cli-requirements.txt"), (_COLLECTOR, "collector-requirements.txt")],
+    ids=["cli", "collector"],
+)
+def test_the_image_installs_only_hash_pinned_locked_versions(
+    dockerfile: Path, exported: str
+) -> None:
+    """The versions CI tests from `uv.lock`, by hash, and nothing pip resolves itself."""
+    commands = [
+        " ".join(command.split())
+        for command in re.split(r"&&|\n(?=RUN)", _instructions(dockerfile).replace("\\\n", " "))
+        if "pip install" in command or "pip wheel" in command
+    ]
+    hashed = [command for command in commands if "--require-hashes" in command]
+
+    assert any(f"-r {exported}" in command for command in hashed), commands
+    assert any("-r build-requirements.txt" in command for command in hashed), commands
+    assert all("--no-deps" in command for command in commands), commands
+    assert not [command for command in commands if "--upgrade" in command or " -U " in command]
+    assert any("--no-build-isolation" in command for command in commands), commands
+    assert "pip check" in _instructions(dockerfile)
+
+
+@pytest.mark.parametrize("dockerfile", [_CLI, _COLLECTOR], ids=["cli", "collector"])
+def test_every_third_party_install_refuses_source_builds(dockerfile: Path) -> None:
+    """A hashed sdist is still built from source, with build requirements nobody pinned.
+
+    The exported hashes cover sdists too, so only `--only-binary=:all:` keeps pip from
+    resolving an unpinned build environment on a platform where a wheel is missing.
+    """
+    commands = [
+        " ".join(command.split())
+        for command in re.split(r"&&|\n(?=RUN)", _instructions(dockerfile).replace("\\\n", " "))
+        if "pip install" in command
+    ]
+    exported = [command for command in commands if re.search(r"-r \S+-requirements\.txt", command)]
+
+    assert len(exported) == 2, commands
+    for command in exported:
+        for flag in ("--only-binary=:all:", "--require-hashes", "--no-deps"):
+            assert flag in command.split(), f"{dockerfile.name}: {flag} missing from {command}"

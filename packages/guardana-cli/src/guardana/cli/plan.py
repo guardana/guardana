@@ -7,6 +7,7 @@ something parses the JSON form its shape is a promise.
 """
 
 import json
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Annotated
@@ -59,6 +60,7 @@ from guardana.core.probe import plan_target_probe
 from guardana.core.profile import Profile, ProfileError
 from guardana.core.recording import RecordingError, read_recording
 from guardana.core.registry import Registry
+from guardana.core.runner import refuse_unmatched_includes
 from guardana.core.target import (
     ArtifactTarget,
     EndpointTarget,
@@ -420,7 +422,7 @@ def plan_scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this
         fallback=lambda: _plan_scan_path(path, prof.path_excludes),
     )
     _emit(
-        build_plan(registry, prof, selected),
+        _refusing_invalid_profile(lambda: build_plan(registry, prof, selected)),
         format,
         selected.kind,
         profile=prof,
@@ -594,6 +596,10 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
     warn_about_load_errors(registry, resolved, what="rule")
     hint_refused_plugins(registry, resolved)
     load_custom_rules(registry, prof, rules)
+    try:
+        refuse_unmatched_includes(prof, registry)
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
     registry.apply_trials(prof.trials)
     selected = resolve_target(
         registry,
@@ -616,10 +622,12 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
         selected.apply_budgets(prof.budgets)
     except BudgetExhausted as exc:
         raise refuse_unenforceable_budget(exc) from exc
-    planned = (
-        build_plan(registry, prof, selected, judge_meters=judge_meters)
-        if examined_by_rules_only(selected)
-        else plan_target_probe(registry, prof, selected, judge_meters=judge_meters)
+    planned = _refusing_invalid_profile(
+        lambda: (
+            build_plan(registry, prof, selected, judge_meters=judge_meters)
+            if examined_by_rules_only(selected)
+            else plan_target_probe(registry, prof, selected, judge_meters=judge_meters)
+        )
     )
     _emit(
         planned,
@@ -682,7 +690,9 @@ def plan_grade(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
     _emit(
-        build_plan(registry, prof, target, judge_meters=judge_meters),
+        _refusing_invalid_profile(
+            lambda: build_plan(registry, prof, target, judge_meters=judge_meters)
+        ),
         format,
         target.kind,
         profile=prof,
@@ -727,10 +737,20 @@ def judge_traffic(registry: Registry, profile: Profile, target: Target) -> list[
     meters = _wire_judges(priced, profile)
     if not meters:
         return []
-    judge = build_plan(priced, profile, target, judge_meters=meters).judge
+    judge = _refusing_invalid_profile(
+        lambda: build_plan(priced, profile, target, judge_meters=meters)
+    ).judge
     if judge is None or (judge.is_complete and judge.max_calls == 0):
         return []
     return _judge_lines(judge, profile.budgets)
+
+
+def _refusing_invalid_profile(plan: Callable[[], RunPlan]) -> RunPlan:
+    """Plan, ending a profile the plan refuses, such as an unmatched include, with exit `3`."""
+    try:
+        return plan()
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
 
 
 def _wire_judges(registry: Registry, profile: Profile) -> tuple[tuple[str, ...], ...]:

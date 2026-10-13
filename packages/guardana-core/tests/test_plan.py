@@ -137,7 +137,7 @@ def test_a_rule_the_target_cannot_satisfy_is_listed_as_skipped() -> None:
 def test_a_rule_the_policy_excludes_is_absent_entirely() -> None:
     registry = Registry()
     registry.register_rule(_Priced())
-    profile = Profile("t", Policy(include=("acme.*",)))
+    profile = Profile("t", Policy(exclude=("guardana.test.*",)))
     plan = build_plan(registry, profile, ArtifactTarget(Path()))
 
     assert plan.rules == ()

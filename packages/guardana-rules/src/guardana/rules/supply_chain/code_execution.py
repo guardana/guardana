@@ -16,6 +16,7 @@ from guardana.core.taxonomy import (
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._code_sinks import code_sinks
+from guardana.rules.supply_chain._leads import lead_verdict
 from guardana.rules.supply_chain._unread_python import unread_python
 
 
@@ -72,7 +73,7 @@ class CodeExecutionRule(ArtifactRule):
 
     def _scan(self, source: PythonSource) -> Iterator[Finding]:
         path = source.path
-        for lineno, why in code_sinks(source):
+        for lineno, why, lead in code_sinks(source):
             yield Finding(
                 rule_id=self.meta.id,
                 severity=self.meta.severity,
@@ -80,4 +81,5 @@ class CodeExecutionRule(ArtifactRule):
                 taxonomy=self.meta.taxonomy,
                 target_ref=f"{path}:{lineno}",
                 evidence=Evidence(summary=why, detail=f"{path.name}:{lineno}"),
+                verdict=lead_verdict(why) if lead else None,
             )

@@ -48,6 +48,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -86,6 +87,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -136,6 +138,7 @@
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool<span class="tag">beta</span></a></li>
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
@@ -174,6 +177,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds<span class="tag">beta</span></a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -206,7 +210,7 @@ guardana diff accepted-run.json run.json
 </code></pre>
 <ol>
 <li><code>plan scan</code> lists the rules that would run and those that would be skipped. It exits <code>3</code> if the run could not pass with the current configuration.</li>
-<li><code>scan</code> reads files without loading them. It exits <code>0</code> for a pass, <code>1</code> for a finding at or above the policy's severity, or <code>2</code> when a check could not run at all, such as a refused plugin. A Python file it cannot open, or one over the size limit, is an error, which makes the run indeterminate (<code>2</code>) under the default gate. A model file it cannot read is listed as UNVERIFIED and also counts as an <code>unexamined_component</code> shortfall, so the run is indeterminate (<code>2</code>) under every preset unless a finding fails it (<a href="usage-scan.html#model-files-no-rule-reads">details</a>). The saved run records the plugin trust in force (<code>run.configuration.plugins</code>).</li>
+<li><code>scan</code> reads files without loading them. It exits <code>0</code> for a pass, <code>1</code> for a finding at or above the policy's severity, or <code>2</code> when a check could not run at all, such as a refused plugin. A Python file it cannot open, one over the size limit, or one the scanning interpreter cannot decode or parse is an error and a &quot;not scanned&quot; result, which makes the run indeterminate (<code>2</code>) under the default gate; exclude such a file with <code>.guardanaignore</code> or <code>rules.paths_exclude</code> (<a href="usage-scan.html#python-files-the-scan-cannot-read">details</a>). A model file it cannot read is listed as UNVERIFIED and also counts as an <code>unexamined_component</code> shortfall, so the run is indeterminate (<code>2</code>) under every preset unless a finding fails it (<a href="usage-scan.html#model-files-no-rule-reads">details</a>). The saved run records the plugin trust in force (<code>run.configuration.plugins</code>).</li>
 <li>The first run you have reviewed is the accepted one: keep <code>accepted-run.json</code> in the repository or your CI's artifact store, and replace it only when you deliberately accept a change. <code>diff</code> compares a later run against it and says whether the result is worse, better, unchanged, or cannot be compared.</li>
 </ol>
 <p>This does not check how a model responds to a question. Use <a href="recipe-real-application.html"><code>probe</code></a> for that. The scan does not load or execute the files it reads. A file in a format it reads but cannot parse is listed as UNVERIFIED, never as clean. A file in a format no rule reads is not examined: any format it does not recognise, and TFLite, which it lists but does not read. Check the formats you ship against <a href="model-formats.html">model formats</a>.</p>
@@ -215,7 +219,7 @@ guardana diff accepted-run.json run.json
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc1 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/recipe-local-scan.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

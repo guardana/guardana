@@ -6,6 +6,7 @@ from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
 from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
 from guardana.core.target import (
+    MAX_LISTING_PAGES,
     Capability,
     Era,
     McpAuthorizationView,
@@ -72,8 +73,14 @@ class McpCacheScopeRule(McpReporting):
 
     @property
     def estimated_requests(self) -> int:
-        """The discovery probe, the anonymous three, and the handshake, notification and listing."""
-        return 7
+        """The discovery probe, the anonymous three, the handshake, its notification, every page.
+
+        The listing is read to its last page, and a server may name up to
+        `MAX_LISTING_PAGES` of them; one that names more is refused rather than read. A
+        session that expires is opened again once per run: a handshake, its notification
+        and the request again.
+        """
+        return 6 + MAX_LISTING_PAGES + 3
 
     def fixtures(self) -> Iterable[RuleFixture]:
         """Sample a gated listing declared public, one declared private, and an unread server."""

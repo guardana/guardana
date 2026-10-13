@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_by": "scripts/generate_docs.py from the installed registry \u2014 do not edit by hand",
-  "guardana_version": "1.0.0rc1",
+  "guardana_version": "1.0.0rc2",
   "rules": [
     {
       "id": "guardana.a2a.agent_card",
@@ -282,7 +282,7 @@
       "requires": [
         "list_tools"
       ],
-      "estimated_requests": 4,
+      "estimated_requests": 22,
       "goal": null,
       "taxonomy": [
         {
@@ -608,7 +608,7 @@
         "inspect_authorization",
         "list_tools"
       ],
-      "estimated_requests": 7,
+      "estimated_requests": 25,
       "goal": null,
       "taxonomy": [
         {
