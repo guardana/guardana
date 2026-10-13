@@ -64,18 +64,19 @@ def test_a_formatting_only_difference_is_current(tmp_path: Path) -> None:
 
 
 _ANOTHER_HASH = "--hash=sha256:" + "0" * 64
+_TYPER_PIN = re.compile(r"^typer==\S+", re.MULTILINE)
 
 
 @pytest.mark.parametrize(
     "change",
     [
-        lambda text: text.replace("typer==0.27.2", "typer==0.27.3"),
+        lambda text: _TYPER_PIN.sub("typer==0.0.0", text, count=1),
         lambda text: text.replace("--hash=sha256:", f"{_ANOTHER_HASH} \\\n    --hash=sha256:", 1),
         lambda text: re.sub(r"\n +--hash=\S+ \\(?=\n +--hash)", "", text, count=1),
         lambda text: text + f"another==1.0 \\\n    {_ANOTHER_HASH}\n",
         lambda text: re.sub(r"^defusedxml==.*?(?=^\S)", "", text, flags=re.MULTILINE | re.DOTALL),
         lambda text: text.replace("sys_platform == 'win32'", "sys_platform == 'darwin'"),
-        lambda text: text.replace("typer==0.27.2 \\", "typer==0.27.2 ; python_version < '3.12' \\"),
+        lambda text: _TYPER_PIN.sub(r"\g<0> ; python_version < '3.12'", text, count=1),
         lambda text: text.replace("defusedxml==", "defusedxml >= ", 1),
     ],
     ids=[
