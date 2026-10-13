@@ -7,7 +7,7 @@ status: stable
 
 # First-run study
 
-The [F2 adoption measure](../product-status.md#adoption-measures) covers five consented sessions with people new to Guardana, with a target of at least four of five completing a failure, a fix and one custom check in ten minutes without help. It is not a stable 1.0 release criterion. This page explains how the maintainer runs those sessions and records consent. The published measure is [generated from the sheet](../generated/first-run.md) and reads "not measured": 0 of 5 sessions are recorded. Invitations remain open.
+The [first-run study](../product-status.md#adoption-measures) covers five consented sessions with people new to Guardana, with a target of at least four of five completing a failure, a fix and one custom check in ten minutes without help. It is not a stable 1.0 release criterion. This page explains how the maintainer runs those sessions and records consent. The published measure is [generated from the sheet](../generated/first-run.md) and reads "not measured": 0 of 5 sessions are recorded. Invitations remain open.
 
 ## One session
 

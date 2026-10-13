@@ -152,8 +152,12 @@ report: `migrate` and `status` refuse such a database, and `/readyz` answers `50
 Neither stops the process or refuses its writes. Keep the collector stopped until
 the two match.
 
-**Pin the image to a minor tag** (`:0.30`) rather than `latest`. You want fixes
-without a schema you did not plan for; `latest` gives you both.
+**Pin the image to a minor tag**: use
+`ghcr.io/guardana/guardana-collector:0.41` instead of `latest`, as
+`deploy/docker-compose.yml` does, for patch fixes without a new collector
+schema. `latest` can move to a new minor and schema. Candidates carry only
+exact version tags, such as `1.0.0rc3`; `latest` and the moving minor stay on
+the last stable release.
 
 ## Backups, and restoring one
 

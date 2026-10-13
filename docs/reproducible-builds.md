@@ -25,8 +25,8 @@ checkout's copy:
 ```bash
 git clone https://github.com/guardana/guardana
 cd guardana
-git worktree add --detach ../guardana-v1.0.0rc2 v1.0.0rc2
-uv run --no-project python scripts/reproduce_release.py 1.0.0rc2 --source ../guardana-v1.0.0rc2
+git worktree add --detach ../guardana-v1.0.0rc3 v1.0.0rc3
+uv run --no-project python scripts/reproduce_release.py 1.0.0rc3 --source ../guardana-v1.0.0rc3
 ```
 
 Without a source checkout, the script builds the checkout it runs from. In a tag checkout
@@ -102,6 +102,10 @@ runs from, and has read-only repository access. It does not run on a push becaus
 has no files for a version until its release publishes them. If the check runs before
 PyPI lists the version, each package is `NOT CHECKED` and the job fails with exit status
 `2`. Run it again by hand once the files are on PyPI.
+
+The [1.0.0rc3 Reproducibility run](https://github.com/guardana/guardana/actions/runs/38378931536)
+rebuilt every published file: a wheel and an sdist for each of the five packages and the
+reference pack, 12 files in total. Every file reproduced.
 
 ## What a match does not prove
 

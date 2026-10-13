@@ -17,7 +17,7 @@ so this page is maintained as carefully as the code.
 
 | Component | Maturity | What that means in practice |
 |---|---|---|
-| Engine + built-in rules | **beta** | Stable enough to gate a build on. Outside `guardana.core.verify`, the Python API still moves between minor releases. |
+| Engine + built-in rules | **beta** | Stable enough to gate a build on. [Compatibility](compatibility.md) lists the supported surface preserved by 1.0. Everything else, including `Runner` and `guardana.cli.*`, is internal and may change in any release. |
 | Python API (`guardana.core.verify`) | **beta** | Runs what `guardana scan` and `guardana probe` run and returns every outcome as typed data, failed and stopped runs included. Its supported surface is `guardana.core.verify.__all__`; a change to it is announced as breaking with what to write instead. Trace analysis, `monitor` and baselines run from the command line only. |
 | `guardana scan` | **beta** | Deterministic, offline, no false-positive theatre. The most mature part of the product. |
 | `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints, live MCP servers — on both their tool manifest and their authorization surface, and never by calling a tool — and A2A v1 agents, on their card and whom they answer, with reads only. Verdict quality depends on the evaluator you configure. |
@@ -34,13 +34,13 @@ so this page is maintained as carefully as the code.
 
 **Experimental:** Judge-graded suites use `answered` and `reference_judge`. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with `guardana calibrate --record`. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental behaviour and thresholds are outside the compatibility promise, but saved documents remain versioned and readers continue to support older versions under the persisted-document policy.
 
-**Released (beta), first half of F6:** [repository recipes](usage-recipe.md) that pin a team's checks and refuse a run whose pins moved, one set of connection settings across `probe`, `plan probe`, `target inspect`, `monitor` and every judge, and a tested [provider table](providers.md).
+**Released (beta):** [repository recipes](usage-recipe.md) that pin a team's checks and refuse a run whose pins moved, one set of connection settings across `probe`, `plan probe`, `target inspect`, `monitor` and every judge, and a tested [provider table](providers.md).
 
-**Released (beta), F7:** MCP checks proven against servers built on the `mcp` SDK in both revisions, and the A2A checks against agents built on `a2a-sdk`; a capability a server does not offer is recorded as skipped `not_offered`, a coverage gap.
+**Released (beta):** MCP checks proven against servers built on the `mcp` SDK in both revisions, and the A2A checks against agents built on `a2a-sdk`; a capability a server does not offer is recorded as skipped `not_offered`, a coverage gap.
 
-**Released (beta), F4:** an installed package adds a format for `--format` and a reporter for `--reporter` ([installed outputs](outputs.md)), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit `8` when an installed output fails. `examples/output_pack` is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own `output_api`. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on `monitor`, `import-observations` and `recipe run`.
+**Released (beta):** an installed package adds a format for `--format` and a reporter for `--reporter` ([installed outputs](outputs.md)), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit `8` when an installed output fails. `examples/output_pack` is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own `output_api`. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on `monitor`, `import-observations` and `recipe run`.
 
-**Not released:** The five-user first-run study (F2) and the rest of F6 (the team regression loop and the live retrieval pilot) remain open [adoption measures](#adoption-measures); the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.
+**Not released:** The five-user first-run study, the team regression loop and the live retrieval pilot remain open [adoption measures](#adoption-measures); the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.
 
 ## Before the first stable release
 
@@ -78,7 +78,7 @@ Stable 1.0 is the compatibility promise for the supported surface. It ships only
 
 The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.
 
-No maintainer-run proof is published. The reference pack is attached to the GitHub Release but is not on PyPI. Recovery runbooks are exercised by tests; the security drill is not recorded.
+No maintainer-run proof is published. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The stable-release proof that installs it from PyPI outside the repository and passes the conformance kit is not published. Recovery runbooks are exercised by tests. The security drill is not recorded.
 
 [Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. With `1.0.0rc3` released, `1.0.0` is the only open release milestone.
 
@@ -86,7 +86,7 @@ The owner decides changes to release criteria and records each one here and in t
 
 ### Adoption measures
 
-These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study, F2; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study, F6); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.
+These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.
 
 Each is published only as a generated aggregate with consent. The generated [first-run](generated/first-run.md) and [application](generated/application-measures.md) measures read "not measured": 0 of 5 sessions and 0 of 2 teams. First-run and pilot invitations remain open.
 
@@ -192,9 +192,9 @@ held in an `HttpOnly`, `SameSite=Strict` cookie.
 
 What it does **not** hold is a measurement trend. The generated application coverage and supported-verdict share remain "not measured" until two independent teams have rows in [`docs/generated/application-measures.md`](generated/application-measures.md). It aggregates findings,
 `unverified` and errors — so it can answer "is this system accumulating security
-problems", and cannot yet answer "did quality improve". Assessments are recorded in
-the run document from 0.22.0; carrying them into the collector, with the sample
-sizes and confidence bounds a trend needs to be honest, is the next horizon.
+problems", and cannot answer "did quality improve". Assessments are recorded in
+the run document from 0.22.0. The collector carries neither assessments nor the
+sample sizes and confidence bounds an honest trend needs.
 
 ### RAG coverage is a slice, not a story
 

@@ -219,7 +219,7 @@ so this page is maintained as carefully as the code.</p>
 <tr>
 <td>Engine + built-in rules</td>
 <td><strong>beta</strong></td>
-<td>Stable enough to gate a build on. Outside <code>guardana.core.verify</code>, the Python API still moves between minor releases.</td>
+<td>Stable enough to gate a build on. <a href="compatibility.html">Compatibility</a> lists the supported surface preserved by 1.0. Everything else, including <code>Runner</code> and <code>guardana.cli.*</code>, is internal and may change in any release.</td>
 </tr>
 <tr>
 <td>Python API (<code>guardana.core.verify</code>)</td>
@@ -271,10 +271,10 @@ so this page is maintained as carefully as the code.</p>
 <h2 id="released-and-experimental">Released and experimental</h2>
 <p><strong>Released (beta):</strong> Quality suites use the deterministic assessors <code>exact_match</code>, <code>contains</code>, <code>regex</code>, <code>json_valid</code>, and <code>length</code>. They support versioned JSONL datasets (<code>name@version</code>), deterministic sampling (<code>sample: {size, seed}</code>), repeated trials per case, and a suite gate that passes, fails, or declines with <code>min_sample</code>. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.</p>
 <p><strong>Experimental:</strong> Judge-graded suites use <code>answered</code> and <code>reference_judge</code>. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with <code>guardana calibrate --record</code>. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental behaviour and thresholds are outside the compatibility promise, but saved documents remain versioned and readers continue to support older versions under the persisted-document policy.</p>
-<p><strong>Released (beta), first half of F6:</strong> <a href="usage-recipe.html">repository recipes</a> that pin a team's checks and refuse a run whose pins moved, one set of connection settings across <code>probe</code>, <code>plan probe</code>, <code>target inspect</code>, <code>monitor</code> and every judge, and a tested <a href="providers.html">provider table</a>.</p>
-<p><strong>Released (beta), F7:</strong> MCP checks proven against servers built on the <code>mcp</code> SDK in both revisions, and the A2A checks against agents built on <code>a2a-sdk</code>; a capability a server does not offer is recorded as skipped <code>not_offered</code>, a coverage gap.</p>
-<p><strong>Released (beta), F4:</strong> an installed package adds a format for <code>--format</code> and a reporter for <code>--reporter</code> (<a href="outputs.html">installed outputs</a>), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit <code>8</code> when an installed output fails. <code>examples/output_pack</code> is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own <code>output_api</code>. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on <code>monitor</code>, <code>import-observations</code> and <code>recipe run</code>.</p>
-<p><strong>Not released:</strong> The five-user first-run study (F2) and the rest of F6 (the team regression loop and the live retrieval pilot) remain open <a href="#adoption-measures">adoption measures</a>; the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.</p>
+<p><strong>Released (beta):</strong> <a href="usage-recipe.html">repository recipes</a> that pin a team's checks and refuse a run whose pins moved, one set of connection settings across <code>probe</code>, <code>plan probe</code>, <code>target inspect</code>, <code>monitor</code> and every judge, and a tested <a href="providers.html">provider table</a>.</p>
+<p><strong>Released (beta):</strong> MCP checks proven against servers built on the <code>mcp</code> SDK in both revisions, and the A2A checks against agents built on <code>a2a-sdk</code>; a capability a server does not offer is recorded as skipped <code>not_offered</code>, a coverage gap.</p>
+<p><strong>Released (beta):</strong> an installed package adds a format for <code>--format</code> and a reporter for <code>--reporter</code> (<a href="outputs.html">installed outputs</a>), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit <code>8</code> when an installed output fails. <code>examples/output_pack</code> is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own <code>output_api</code>. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on <code>monitor</code>, <code>import-observations</code> and <code>recipe run</code>.</p>
+<p><strong>Not released:</strong> The five-user first-run study, the team regression loop and the live retrieval pilot remain open <a href="#adoption-measures">adoption measures</a>; the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.</p>
 <h2 id="before-the-first-stable-release">Before the first stable release</h2>
 <p>At 1.0, the supported Python facade, rule, evaluator and target contracts,
 output contracts, CLI flags and exit codes, profile schema and collector
@@ -309,11 +309,11 @@ required only if a release blocker needs one.</p>
 </li>
 </ul>
 <p>The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.</p>
-<p>No maintainer-run proof is published. The reference pack is attached to the GitHub Release but is not on PyPI. Recovery runbooks are exercised by tests; the security drill is not recorded.</p>
+<p>No maintainer-run proof is published. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The stable-release proof that installs it from PyPI outside the repository and passes the conformance kit is not published. Recovery runbooks are exercised by tests. The security drill is not recorded.</p>
 <p><a href="https://github.com/guardana/guardana/issues">Issues</a> track work; <a href="https://github.com/guardana/guardana/milestones">milestones</a> group scope. With <code>1.0.0rc3</code> released, <code>1.0.0</code> is the only open release milestone.</p>
 <p>The owner decides changes to release criteria and records each one here and in the changelog.</p>
 <h3 id="adoption-measures">Adoption measures</h3>
-<p>These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study, F2; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study, F6); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.</p>
+<p>These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.</p>
 <p>Each is published only as a generated aggregate with consent. The generated <a href="generated/first-run.html">first-run</a> and <a href="generated/application-measures.html">application</a> measures read &quot;not measured&quot;: 0 of 5 sessions and 0 of 2 teams. First-run and pilot invitations remain open.</p>
 <h3 id="after-10">After 1.0</h3>
 <p>Paired statistical diff (M1) starts when two independent pilot teams use local
@@ -383,9 +383,9 @@ a restore-tested backup procedure. The dashboard signs in with a read-scoped key
 held in an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie.</p>
 <p>What it does <strong>not</strong> hold is a measurement trend. The generated application coverage and supported-verdict share remain &quot;not measured&quot; until two independent teams have rows in <a href="generated/application-measures.html"><code>docs/generated/application-measures.md</code></a>. It aggregates findings,
 <code>unverified</code> and errors — so it can answer &quot;is this system accumulating security
-problems&quot;, and cannot yet answer &quot;did quality improve&quot;. Assessments are recorded in
-the run document from 0.22.0; carrying them into the collector, with the sample
-sizes and confidence bounds a trend needs to be honest, is the next horizon.</p>
+problems&quot;, and cannot answer &quot;did quality improve&quot;. Assessments are recorded in
+the run document from 0.22.0. The collector carries neither assessments nor the
+sample sizes and confidence bounds an honest trend needs.</p>
 <h3 id="rag-coverage-is-a-slice-not-a-story">RAG coverage is a slice, not a story</h3>
 <p><code>scenario.indirect_injection</code> tests the shape of retrieval-time injection through
 a scripted context. <code>guardana.trace.cross_tenant_retrieval</code> grades cross-tenant

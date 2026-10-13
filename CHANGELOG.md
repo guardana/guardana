@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Corrected installation, release and compatibility documentation.** The reference pack install covers PyPI and admission flags; the roadmap corrects rc2/rc3 tense; collector advice uses an existing minor tag and says candidates carry only their exact version tag; the reproducible-builds example uses `1.0.0rc3` with a [green run](https://github.com/guardana/guardana/actions/runs/38378931536); and product status removes undefined internal codes, aligns the engine row with compatibility and removes future promises about collector trends.
+
 ## [1.0.0rc3] - 2026-10-13 — the third release candidate
 
 ### Added

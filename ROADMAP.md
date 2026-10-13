@@ -33,20 +33,19 @@ allowed only to correct a defect in it and must be announced.
 |---|---|---|
 | `1.0.0` | The stable compatibility promise | All stable-release criteria hold, a candidate has had a period without new defect reports, and the full gate and CI are green on the exact commit. |
 
-Three candidates are required: rc1, rc2 and rc3. The rc3 round lets fixes found
-after the first external reports land before the stable promise. A further
-candidate is required only if a release blocker needs one. Stable 1.0.0 does not
-follow rc3 automatically.
+1.0.0rc1 shipped on 2026-10-05, 1.0.0rc2 on 2026-10-11 and 1.0.0rc3 on
+2026-10-13. A further candidate is required only if a release blocker needs
+one. Stable 1.0.0 does not follow rc3 automatically.
 
 Stable 1.0 is the compatibility promise for the supported surface. It ships when the [stable-release criteria](docs/product-status.md#before-the-first-stable-release) hold:
 
-- `1.0.0rc2` and `1.0.0rc3` each ship after a full green release gate and green CI on the exact commit; a candidate has a period without new supported-surface defect reports. A further candidate is required only if a release blocker needs one.
+- `1.0.0rc2` and `1.0.0rc3` each shipped after its own full green release gate and green CI on the exact commit. A candidate must have a period without new supported-surface defect reports. A further candidate is required only if a release blocker needs one.
 - Maintainer-run proofs are published with commands and results, labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failure, fix and custom check; the reference retrieval pilot in `examples/retrieval_pilot/` catching a poisoned document and tenant-filter failure; the regression loop on the same reference application (a failed and an incomplete result saved, a redacted regression regraded and gated in CI); customization through published extension points only, using the reference pack installed from PyPI outside the repository and passing the conformance kit; the security runbook drill's completion and lessons safe to share; exercised recovery runbooks.
 - The engineering criteria in product status hold.
 
 Adoption measures — five consented first runs, two independent application teams, a team's live retrieval pilot and independent third-party customization and its reproduction — are published separately, not release criteria. The generated [first-run](docs/generated/first-run.md) and [application](docs/generated/application-measures.md) measures read "not measured": 0 of 5 sessions and 0 of 2 teams. Invitations remain open.
 
-No maintainer-run proof is published. The reference pack is attached to the GitHub Release, not on PyPI; recovery runbooks are exercised by tests; the security drill is not recorded.
+No maintainer-run proof is published. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The stable-release proof that installs it from PyPI outside the repository and passes the conformance kit is not published. Recovery runbooks are exercised by tests. The security drill is not recorded.
 
 The owner decides release-criteria changes openly in `docs/product-status.md` and the changelog.
 

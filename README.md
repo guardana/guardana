@@ -228,7 +228,7 @@ The 58 built-ins cover shared risks. Installed packages have six entry-point gro
 
 A profile (`guardana.yaml`) configures a run. A finding is a result format. A [security contract](docs/usage-contracts.md) declares policy for one application. None is an entry-point group.
 
-One pack flow is: install `guardana-reference-pack` 0.1.0 from the GitHub Release; admit its distribution with `--plugins allowlist --allow-plugin` or `plugins:`; select its rules in `guardana.yaml`; run `guardana probe`. [`examples/reference_pack`](examples/reference_pack) includes sampled rules, a target, an evaluator, a taxonomy, a renderer and a reporter. The [conformance kit](docs/conformance-kit.md) checks that an extension keeps its contract.
+One pack flow is: install `guardana-reference-pack` from PyPI with `pip install guardana-cli guardana-reference-pack`; admit it with `--plugins allowlist --allow-plugin guardana-reference-pack` or `plugins:` in a profile; select its rules in `guardana.yaml`; run `guardana probe`. [`examples/reference_pack`](examples/reference_pack) includes sampled rules, a target, an evaluator, a taxonomy, a renderer and a reporter. The [conformance kit](docs/conformance-kit.md) checks that an extension keeps its contract.
 
 By default, Guardana loads only its own distributions. It refuses an installed third-party pack before importing it and records the refusal as an error. Under the default gate, a run with a refused pack is `indeterminate`, even if that run did not select its rules. `guardana doctor` shows what would load. Admitted Python packs run with your privileges; see [`SECURITY.md`](SECURITY.md).
 

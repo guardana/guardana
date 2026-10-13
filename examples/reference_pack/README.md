@@ -5,10 +5,12 @@ the [supported surface](../../docs/compatibility.md). It has its own version (`0
 depends on `guardana-core>=0.41` with no upper bound, and declares the `extension_api` and
 `output_api` ranges it runs on in its manifest. `guardana pack validate` checks those ranges;
 installing the pack or running a scan does not. A CI job that depends on the pack therefore
-runs `guardana pack validate` and `guardana pack lock --check`. Install it from this directory
-or from the wheel and sdist attached to each GitHub Release. The release workflow's PyPI step
-for the pack is off unless a maintainer has registered the pack's trusted publisher on PyPI
-and switched the step on in the repository settings.
+runs `guardana pack validate` and `guardana pack lock --check`. Install it from PyPI with
+`pip install guardana-cli guardana-reference-pack`, or use the wheel and sdist attached to each
+GitHub Release. The pack depends only on `guardana-core>=0.41`, so installing it alone gives
+no `guardana` command.
+Guardana refuses installed third-party packs by default. Admit this pack with
+`--plugins allowlist --allow-plugin guardana-reference-pack` or `plugins:` in a profile.
 
 `custom_rule` and `output_pack` teach one idea each. This pack is an example a third party
 can copy: everything in it is checked by the commands and the conformance kit Guardana

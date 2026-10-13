@@ -333,8 +333,12 @@ than its schema is exactly the situation <code>/readyz</code> and the version ch
 report: <code>migrate</code> and <code>status</code> refuse such a database, and <code>/readyz</code> answers <code>503</code>.
 Neither stops the process or refuses its writes. Keep the collector stopped until
 the two match.</p>
-<p><strong>Pin the image to a minor tag</strong> (<code>:0.30</code>) rather than <code>latest</code>. You want fixes
-without a schema you did not plan for; <code>latest</code> gives you both.</p>
+<p><strong>Pin the image to a minor tag</strong>: use
+<code>ghcr.io/guardana/guardana-collector:0.41</code> instead of <code>latest</code>, as
+<code>deploy/docker-compose.yml</code> does, for patch fixes without a new collector
+schema. <code>latest</code> can move to a new minor and schema. Candidates carry only
+exact version tags, such as <code>1.0.0rc3</code>; <code>latest</code> and the moving minor stay on
+the last stable release.</p>
 <h2 id="backups-and-restoring-one">Backups, and restoring one</h2>
 <p>The <code>guardana-data</code> volume is the only state that matters, and the only backup
 that counts is one you have restored. This procedure is <strong>exercised by the test
