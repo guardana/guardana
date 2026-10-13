@@ -63,7 +63,7 @@ class _Resolver:
     ) -> list[_AddrInfo]:
         name = host.decode() if isinstance(host, bytes) else host
         if name is None or name not in self._answers:
-            return _REAL_GETADDRINFO(host, port, family, type, proto, flags)
+            return list[_AddrInfo](_REAL_GETADDRINFO(host, port, family, type, proto, flags))
         self.asked.append(name)
         script = self._answers[name]
         answer = script.pop(0) if len(script) > 1 else script[0]
