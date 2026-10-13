@@ -45,7 +45,7 @@ dependencies = [
     "guardana-core==1.0.0rc2",
     "guardana-rules==1.0.0rc2",
     "guardana-report==1.0.0rc2",
-    "typer>=0.27.2",
+    "typer>=0.27.3",
     "pyyaml>=6.0",
 ]
 
