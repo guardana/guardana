@@ -3,8 +3,9 @@
 Exits 0 only when every job the summary waited for succeeded, each proof left one record
 in each of the cells `--expect` names, and every record's own steps show it passed: a job
 that ended before writing its record, or a matrix that ran fewer cells, leaves nothing to
-read, so neither the records nor the job results alone decide. Writes `<out>/summary.json`
-and `<out>/summary.md`.
+read, so neither the records nor the job results alone decide. A job and its cells named
+with `--report-only` are shown without being required, but must still leave their records.
+Writes `<out>/summary.json` and `<out>/summary.md`.
 """
 
 import json
@@ -39,10 +40,19 @@ def recomputed(document: dict[str, Any]) -> str:
     return INCOMPLETE if document.get("not_exercised") else PASSED
 
 
+def reported(cell: str, report_only: dict[str, str]) -> bool:
+    """Tell a cell whose verdict the summary shows without requiring it."""
+    return any(cell.startswith(prefix) for prefix in report_only.values())
+
+
 def problems(
-    found: list[dict[str, Any]], needs: dict[str, Any], expected: dict[str, int]
+    found: list[dict[str, Any]],
+    needs: dict[str, Any],
+    expected: dict[str, int],
+    report_only: dict[str, str] | None = None,
 ) -> list[str]:
     """Name every reason this run does not prove what it set out to."""
+    report_only = report_only or {}
     reasons: list[str] = []
     for proof in sorted(expected):
         cells = [r["cell"] for r in found if r["proof"] == proof]
@@ -58,9 +68,11 @@ def problems(
     reasons += [
         f"job {name} ended {job.get('result')}"
         for name, job in sorted(needs.items())
-        if job.get("result") != "success"
+        if job.get("result") != "success" and name not in report_only
     ]
     for r in found:
+        if reported(r["cell"], report_only):
+            continue
         verdict = recomputed(r)
         if verdict != r.get("verdict"):
             reasons.append(
@@ -75,7 +87,9 @@ def problems(
     return reasons
 
 
-def markdown(found: list[dict[str, Any]], reasons: list[str]) -> str:
+def markdown(
+    found: list[dict[str, Any]], reasons: list[str], report_only: dict[str, str] | None = None
+) -> str:
     """Render the table a reader of the run sees first."""
     lines = [
         "| proof | cell | version | isolation | steps held | verdict |",
@@ -83,22 +97,38 @@ def markdown(found: list[dict[str, Any]], reasons: list[str]) -> str:
     ]
     for r in found:
         held = sum(1 for s in r["steps"] if s.get("held"))
+        verdict = f"**{recomputed(r)}**"
+        if reported(r["cell"], report_only or {}):
+            verdict += " (reported, not required)"
         lines.append(
             f"| {r['proof']} | {r['cell']} | {r['version']} | {r.get('isolation') or 'none'} "
-            f"| {held} of {len(r['steps'])} | **{r['verdict']}** |"
+            f"| {held} of {len(r['steps'])} | {verdict} |"
         )
     lines.append("")
-    lines += [f"- {reason}" for reason in reasons] or ["Every proof passed."]
+    lines += [f"- {reason}" for reason in reasons] or ["Every required proof passed."]
     return "\n".join(lines) + "\n"
 
 
-def summarise(records: Path, out: Path, needs: dict[str, Any], expected: dict[str, int]) -> int:
+def summarise(
+    records: Path,
+    out: Path,
+    needs: dict[str, Any],
+    expected: dict[str, int],
+    report_only: dict[str, str] | None = None,
+) -> int:
     """Write both summaries and return the exit code."""
     found = collect(records)
-    reasons = problems(found, needs, expected)
+    reasons = problems(found, needs, expected, report_only)
     out.mkdir(parents=True, exist_ok=True)
-    document = {"schema": 1, "records": found, "problems": reasons, "passed": not reasons}
+    document = {
+        "schema": 1,
+        "records": found,
+        "report_only": report_only or {},
+        "problems": reasons,
+        "passed": not reasons,
+    }
     (out / "summary.json").write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-    (out / "summary.md").write_text(markdown(found, reasons), encoding="utf-8")
-    print(markdown(found, reasons))
+    text = markdown(found, reasons, report_only)
+    (out / "summary.md").write_text(text, encoding="utf-8")
+    print(text)
     return 0 if not reasons else 1

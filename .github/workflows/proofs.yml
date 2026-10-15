@@ -100,21 +100,19 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  # #138 on macOS and Windows: the runner's own interpreter, the network cut around the
-  # proof process. macOS: sandbox-exec denies every network operation to the process tree.
-  # Windows: the firewall blocks outbound traffic of the interpreter and the venv launchers.
-  first-run-hosted:
+  # #138 on macOS: the runner's own interpreter, every network operation of the proof's
+  # process tree denied by sandbox-exec.
+  first-run-macos:
     needs: inputs
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-15
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, windows-2025]
         python: ["3.11", "3.13"]
         installer: [pip, uv]
     env:
-      PROOF_RUNNER: ${{ matrix.os }}
+      PROOF_RUNNER: macos-15
     defaults:
       run:
         shell: bash
@@ -149,8 +147,76 @@ jobs:
           "$PYTHON" -m proofs install --installer "$INSTALLER" --version "$VERSION"
           --project "$RUNNER_TEMP/proof/project" --record "$RUNNER_TEMP/proof/records/install.json"
 
+      - name: Walk the starter offline
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          set -- "$PYTHON" -m proofs first-run --venv "$RUNNER_TEMP/proof/project/.venv" \
+            --project "$RUNNER_TEMP/proof/project" --version "$VERSION" \
+            --record "$RUNNER_TEMP/proof/records/first-run.json"
+          /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
+            "$@" --isolation "sandbox-exec, every network operation denied"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proof-first-run-macOS-${{ matrix.python }}-${{ matrix.installer }}
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #138 on Windows: the firewall blocks outbound traffic of the interpreter and the venv
+  # launchers. The summary reports these cells without requiring them: `diff` and `doctor`
+  # end with exit 5 there when their output goes to a pipe.
+  first-run-windows:
+    needs: inputs
+    runs-on: windows-2025
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        installer: [pip, uv]
+    env:
+      PROOF_RUNNER: windows-2025
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A python.org build, the interpreter a user downloads; setup-uv below only adds uv.
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install uv
+        if: matrix.installer == 'uv'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Install from PyPI
+        id: install
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          INSTALLER: ${{ matrix.installer }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: >-
+          "$PYTHON" -m proofs install --installer "$INSTALLER" --version "$VERSION"
+          --project "$RUNNER_TEMP/proof/project" --record "$RUNNER_TEMP/proof/records/install.json"
       - name: Cut the network (Windows)
-        if: runner.os == 'Windows'
         shell: pwsh
         env:
           PYTHON: ${{ steps.python.outputs.python-path }}
@@ -188,18 +254,13 @@ jobs:
           set -- "$PYTHON" -m proofs first-run --venv "$RUNNER_TEMP/proof/project/.venv" \
             --project "$RUNNER_TEMP/proof/project" --version "$VERSION" \
             --record "$RUNNER_TEMP/proof/records/first-run.json"
-          if [[ $RUNNER_OS == macOS ]]; then
-            /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
-              "$@" --isolation "sandbox-exec, every network operation denied"
-          else
-            "$@" --isolation "Windows Firewall, outbound blocked for python.exe (base and venv) and guardana.exe only; another executable would not be blocked"
-          fi
+          "$@" --isolation "Windows Firewall, outbound blocked for python.exe (base and venv) and guardana.exe only; another executable would not be blocked"
 
       - name: Upload the records
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: proof-first-run-${{ runner.os }}-${{ matrix.python }}-${{ matrix.installer }}
+          name: proof-first-run-Windows-${{ matrix.python }}-${{ matrix.installer }}
           path: ${{ runner.temp }}/proof/records
           if-no-files-found: error
           retention-days: 90
@@ -238,7 +299,7 @@ jobs:
           retention-days: 90
 
   summary:
-    needs: [first-run-linux, first-run-hosted, customization]
+    needs: [first-run-linux, first-run-macos, first-run-windows, customization]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -254,7 +315,8 @@ jobs:
           pattern: proof-*
           path: ${{ runner.temp }}/records
 
-      # The counts are the matrix sizes above: 2 × 2 Linux cells, 2 × 2 × 2 hosted ones.
+      # The counts are the matrix sizes above: 2 × 2 cells each on Linux, macOS and Windows.
+      # Windows must still leave its four records; their verdicts are reported, not required.
       - name: Every expected record passed
         working-directory: scripts
         env:
@@ -262,7 +324,8 @@ jobs:
         run: |
           set +e
           python3 -m proofs summary --records "$RUNNER_TEMP/records" --out "$RUNNER_TEMP/summary" \
-            --expect first-run=12 --expect customization=1 --needs "$NEEDS"
+            --expect first-run=12 --expect customization=1 --needs "$NEEDS" \
+            --report-only first-run-windows=proof-first-run-Windows
           verdict=$?
           cat "$RUNNER_TEMP/summary/summary.md" >> "$GITHUB_STEP_SUMMARY"
           exit $verdict

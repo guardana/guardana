@@ -67,6 +67,13 @@ def _parser() -> argparse.ArgumentParser:
         metavar="PROOF=COUNT",
         help="how many records a proof must leave, e.g. first-run=12; repeatable",
     )
+    p.add_argument(
+        "--report-only",
+        action="append",
+        default=[],
+        metavar="JOB=CELL_PREFIX",
+        help="a job whose result, and cells whose verdicts, are shown but not required",
+    )
     return parser
 
 
@@ -150,7 +157,13 @@ def _summary(args: argparse.Namespace) -> int:
         if not count.isdigit():
             raise SystemExit(f"--expect takes PROOF=COUNT, not {item!r}")
         expected[proof] = int(count)
-    return summary.summarise(args.records, args.out, needs, expected)
+    report_only = {}
+    for item in args.report_only:
+        job, _, prefix = item.partition("=")
+        if not job or not prefix:
+            raise SystemExit(f"--report-only takes JOB=CELL_PREFIX, not {item!r}")
+        report_only[job] = prefix
+    return summary.summarise(args.records, args.out, needs, expected, report_only)
 
 
 def main(argv: list[str] | None = None) -> int:

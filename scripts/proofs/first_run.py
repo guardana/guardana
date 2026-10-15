@@ -162,7 +162,8 @@ def evidence_problems(starter: Path) -> list[str]:
     found = [(f.get("rule_id"), f.get("severity")) for f in before.get("findings", [])]
     if ("guardana.supply_chain.pickle_opcode", "CRITICAL") not in found:
         problems.append(f"before.json lacks the CRITICAL pickle_opcode finding: {found}")
-    observed = {o.get("ref") for o in after.get("observations", [])}
+    # A run written on Windows records `model\weights.safetensors`; the file is the same.
+    observed = {str(o.get("ref")).replace("\\", "/") for o in after.get("observations", [])}
     if "model/weights.safetensors" not in observed:
         problems.append(f"after.json did not observe model/weights.safetensors: {sorted(observed)}")
     if after.get("findings") or after.get("errors"):

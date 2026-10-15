@@ -725,6 +725,48 @@ def test_a_summary_names_every_reason_it_does_not_pass(
     assert [r for r in summary.problems(found, needs, expected) if says in r]
 
 
+_WINDOWS = {"first-run-windows": "proof-first-run-Windows"}
+
+
+def test_a_reported_cell_may_fail_without_failing_the_summary() -> None:
+    found = [
+        _record("first-run", "passed", "proof-first-run-linux-3.13-pip"),
+        _record("first-run", "failed", "proof-first-run-Windows-3.13-pip", steps=_FAILED_STEP),
+    ]
+    needs = {"first-run-linux": {"result": "success"}, "first-run-windows": {"result": "failure"}}
+
+    assert summary.problems(found, needs, {"first-run": 2}, _WINDOWS) == []
+    assert "(reported, not required)" in summary.markdown(found, [], _WINDOWS)
+
+
+def test_a_reported_cell_must_still_leave_its_record_and_others_still_count() -> None:
+    found = [_record("first-run", "failed", "proof-first-run-macOS-3.13-pip", steps=_FAILED_STEP)]
+    needs = {"first-run-macos": {"result": "failure"}, "first-run-windows": {"result": "failure"}}
+
+    reasons = summary.problems(found, needs, {"first-run": 2}, _WINDOWS)
+
+    assert reasons == [
+        "first-run: 1 cell(s) left a record, 2 expected",
+        "job first-run-macos ended failure",
+        "proof-first-run-macOS-3.13-pip: first-run failed",
+    ]
+
+
+def test_the_safetensors_file_counts_as_observed_whichever_separator_the_run_used(
+    tmp_path: Path,
+) -> None:
+    finding = {"rule_id": "guardana.supply_chain.pickle_opcode", "severity": "CRITICAL"}
+    (tmp_path / "before.json").write_text(json.dumps({"findings": [finding]}), encoding="utf-8")
+    after = {"findings": [], "errors": [], "observations": [{"ref": "model\\weights.safetensors"}]}
+    (tmp_path / "after.json").write_text(json.dumps(after), encoding="utf-8")
+
+    assert first_run.evidence_problems(tmp_path) == []
+
+    after["observations"] = [{"ref": "elsewhere\\weights.safetensors"}]
+    (tmp_path / "after.json").write_text(json.dumps(after), encoding="utf-8")
+    assert len(first_run.evidence_problems(tmp_path)) == 1
+
+
 def test_a_summary_reads_records_by_artifact_and_ignores_other_json(tmp_path: Path) -> None:
     proof = record.Record(proof="first-run", version="1", steps=[record.Step("a", "c")])
     proof.write(tmp_path / "proof-first-run-linux-3.11-pip" / "first-run.json")
@@ -818,10 +860,9 @@ def test_the_summary_expects_one_record_per_matrix_cell() -> None:
     jobs = _workflow()["jobs"]
     (step,) = [s for s in jobs["summary"]["steps"] if "proofs summary" in str(s.get("run", ""))]
 
-    assert (
-        f"--expect first-run={_cells(jobs['first-run-linux']) + _cells(jobs['first-run-hosted'])}"
-        in step["run"]
-    )
+    first_runs = [name for name in jobs if name.startswith("first-run-")]
+    assert first_runs == ["first-run-linux", "first-run-macos", "first-run-windows"]
+    assert f"--expect first-run={sum(_cells(jobs[name]) for name in first_runs)}" in step["run"]
     assert "--expect customization=1" in step["run"]
     assert jobs["summary"]["if"] == "always()"
     assert set(jobs["summary"]["needs"]) == {
@@ -854,4 +895,15 @@ def test_no_proof_runs_on_a_python_outside_the_supported_range() -> None:
     jobs = _workflow()["jobs"]
 
     assert jobs["first-run-linux"]["strategy"]["matrix"]["python"] == ["3.11", "3.13"]
-    assert jobs["first-run-hosted"]["strategy"]["matrix"]["python"] == ["3.11", "3.13"]
+    assert jobs["first-run-macos"]["strategy"]["matrix"]["python"] == ["3.11", "3.13"]
+    assert jobs["first-run-windows"]["strategy"]["matrix"]["python"] == ["3.11", "3.13"]
+
+
+def test_only_windows_is_reported_without_being_required() -> None:
+    jobs = _workflow()["jobs"]
+    (step,) = [s for s in jobs["summary"]["steps"] if "proofs summary" in str(s.get("run", ""))]
+    (upload,) = [s for s in jobs["first-run-windows"]["steps"] if "upload" in str(s.get("uses"))]
+
+    assert step["run"].count("--report-only") == 1
+    assert "--report-only first-run-windows=proof-first-run-Windows" in step["run"]
+    assert str(upload["with"]["name"]).startswith("proof-first-run-Windows-")
