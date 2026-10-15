@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`guardana scan`, `guardana diff` and `guardana doctor` now complete on Windows when piped or redirected output contains characters unavailable in the ANSI code page.** Guardana switches stdout and stderr to UTF-8 before the command runs if their encoding is not UTF-8, preventing `UnicodeEncodeError` failures on `✖`, `✓` or scanned file text. Windows CI jobs that previously ended with internal-error exit code 5 now return the run’s own code, such as 0, 1 or 2, which may change gate results. Found in the maintainer’s [proof run on windows-2025](https://github.com/guardana/guardana/actions/runs/38657608072).
+
 ### Documentation
 
 - **Corrected installation, release and compatibility documentation.** The reference pack install covers PyPI and admission flags; the roadmap corrects rc2/rc3 tense; collector advice uses an existing minor tag and says candidates carry only their exact version tag; the reproducible-builds example uses `1.0.0rc3` with a [green run](https://github.com/guardana/guardana/actions/runs/38378931536); and product status removes undefined internal codes, aligns the engine row with compatibility and removes future promises about collector trends.

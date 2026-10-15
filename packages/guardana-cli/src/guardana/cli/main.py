@@ -1,3 +1,6 @@
+import codecs
+import io
+import sys
 from collections.abc import Sequence
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
@@ -149,6 +152,18 @@ app.command()(doctor)
 _TYPER_INTERRUPT_EXIT = 130
 
 
+def _write_every_character() -> None:
+    """Switch stdout and stderr to UTF-8 when their encoding cannot carry every character.
+
+    A Windows pipe or redirect uses the ANSI code page, which has no `✖` or `✓` and no
+    character a scanned file's name or evidence may hold; writing one would end the
+    command as an internal error. UTF-8 is what Python's UTF-8 mode writes and CI logs read.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper) and codecs.lookup(stream.encoding).name != "utf-8":
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Run the `guardana` command and end with a code from the documented exit table.
 
@@ -157,6 +172,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     exception type; the traceback is printed only with `GUARDANA_DEBUG=1`, because
     it can carry a URL or a payload from the run.
     """
+    _write_every_character()
     try:
         app(args=None if argv is None else list(argv))
     except SystemExit as stopped:
