@@ -99,37 +99,33 @@ def _verdict(record: Record) -> int:
 
 def _proof(args: argparse.Namespace) -> Record:
     """Run the command that writes one record."""
-    match args.command:
-        case "install":
-            return install.install(
-                installer=args.installer,
-                version=args.version,
-                project=args.project,
-                record_path=args.record,
-                extra=tuple(args.extra),
-                uv=args.uv,
-            )
-        case "first-run":
-            return first_run.first_run(
-                venv=args.venv,
-                project=args.project,
-                record_path=args.record,
-                version=args.version,
-                isolation=args.isolation,
-            )
-        case "fetch-sdist":
-            return customization.fetch_sdist(
-                venv=args.venv, into=args.into, record_path=args.record
-            )
-        case _:
-            return customization.customization(
-                venv=args.venv,
-                project=args.project,
-                record_path=args.record,
-                version=args.version,
-                isolation=args.isolation,
-                sdist=args.sdist,
-            )
+    if args.command == "install":
+        return install.install(
+            installer=args.installer,
+            version=args.version,
+            project=args.project,
+            record_path=args.record,
+            extra=tuple(args.extra),
+            uv=args.uv,
+        )
+    if args.command == "first-run":
+        return first_run.first_run(
+            venv=args.venv,
+            project=args.project,
+            record_path=args.record,
+            version=args.version,
+            isolation=args.isolation,
+        )
+    if args.command == "fetch-sdist":
+        return customization.fetch_sdist(venv=args.venv, into=args.into, record_path=args.record)
+    return customization.customization(
+        venv=args.venv,
+        project=args.project,
+        record_path=args.record,
+        version=args.version,
+        isolation=args.isolation,
+        sdist=args.sdist,
+    )
 
 
 def _container(args: argparse.Namespace) -> int:

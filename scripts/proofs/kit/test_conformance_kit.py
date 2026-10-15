@@ -10,14 +10,13 @@ declarations, that the pack ships nothing the row covers; every other skip is no
 """
 
 import ast
-import importlib
 import json
 import shutil
 import subprocess
 import sys
 import urllib.error
 import urllib.request
-from importlib import metadata
+from importlib import import_module, metadata
 from pathlib import Path
 from typing import Any
 
@@ -80,7 +79,7 @@ LISTED = {
 
 def surface() -> dict[str, set[str]]:
     """The supported names per module, taken from the installed build."""
-    names = {module: set(importlib.import_module(module).__all__) for module in WHOLE}
+    names = {module: set(import_module(module).__all__) for module in WHOLE}
     names["guardana.core"].discard("Runner")
     return {**names, **LISTED}
 
