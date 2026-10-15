@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customization through published extension points (#141) — Guardana notes</title>
+<meta name="description" content="The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut.">
+<link rel="canonical" href="https://guardana.dev/notes/customization-through-published-extension-points">
+<link rel="alternate" type="application/atom+xml" title="Guardana notes" href="/notes/feed.xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="/docs/docs.css">
+<style>main.notes{margin:0 auto;padding:34px 20px 88px}.notes-index{list-style:none;padding:0}.notes-index li{margin:0 0 26px}.notes-index time,.notes time{color:var(--faint);font-size:14px}.notes-index h2{font-size:21px;margin:2px 0 4px;border:0;padding:0}.notes-index p{margin:0;color:var(--muted)}</style>
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="/docs/">Docs</a>
+<a href="/notes/">Notes</a>
+</nav>
+</div></header>
+<main class="notes">
+<p class="crumb"><a href="/notes/">Notes</a> · <time datetime="2026-10-15">2026-10-15</time></p><h1>Customization through published extension points (#141)</h1><p class="lede">The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut.</p><p>The maintainer ran this proof with Guardana 1.0.0rc3 from PyPI, using proof scripts at commit <code>a1801e0a</code>. The <a href="https://github.com/guardana/guardana/actions/runs/38747291852">workflow run</a> records the results.</p>
+<h2 id="environment-and-packages">Environment and packages</h2>
+<p>The proof used <code>.github/workflows/proofs.yml</code>, with one job on ubuntu-24.04 in a <code>python:3.13-slim</code> container.</p>
+<p>A fresh environment outside the repository contained <code>guardana-cli==1.0.0rc3</code>, <code>guardana-reference-pack</code> 0.1.2 and pytest, installed from PyPI. The reference pack depends only on <code>guardana-core</code>.</p>
+<p>Before the network cut, the pack's sdist was downloaded from PyPI and its sha256 checked against PyPI's JSON API. The proof then ran with <code>--network none</code>. The network canary was refused.</p>
+<h2 id="pack-discovery-and-admission">Pack discovery and admission</h2>
+<pre><code class="language-console">$ guardana doctor
+</code></pre>
+<p>Doctor exited with code 0 and listed <code>guardana-reference-pack</code>.</p>
+<pre><code class="language-console">$ guardana rule test 'reference.*'
+</code></pre>
+<p>This exited with code 3: an installed pack is refused until admitted.</p>
+<pre><code class="language-console">$ guardana rule test 'reference.*' --plugins allowlist --allow-plugin guardana-reference-pack
+</code></pre>
+<p>With the pack admitted, the command exited with code 0 and reported:</p>
+<pre><code class="language-text">2 rule(s); 6 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
+</code></pre>
+<h2 id="validation-and-lock-file">Validation and lock file</h2>
+<pre><code class="language-console">$ guardana pack validate --plugins allowlist --allow-plugin guardana-reference-pack
+</code></pre>
+<p>Validation exited with code 0 and reported:</p>
+<pre><code class="language-text">2 pack(s) checked, 0 with problems
+</code></pre>
+<p>The proof wrote and checked a lock file:</p>
+<pre><code class="language-console">$ guardana pack lock guardana-lock.yaml --plugins allowlist --allow-plugin guardana-reference-pack
+$ guardana pack lock guardana-lock.yaml --check --plugins allowlist --allow-plugin guardana-reference-pack
+</code></pre>
+<p>Both commands exited with code 0.</p>
+<h2 id="target-output-format-and-reporter">Target, output format and reporter</h2>
+<pre><code class="language-console">$ guardana scan --target reference-requirements://. --plugins allowlist --allow-plugin guardana-reference-pack --format reference-summary --reporter reference-file://summaries
+</code></pre>
+<p>The scan exited with code 0. It listed the pack's MEDIUM finding for an unpinned requirement, below the default <code>fail_on.severity</code> of <code>high</code>. The reporter wrote one summary file.</p>
+<h2 id="pack-tests-and-conformance-kit">Pack tests and conformance kit</h2>
+<p>The pack's own test suite, taken from the PyPI sdist, ran against the installed wheel: 45 tests passed and none was skipped.</p>
+<p>The conformance kit in <code>docs/conformance-kit.md</code> ran row by row from a test module that imports only names in the supported surface documented in <code>docs/compatibility.md</code>. The module checks its own imports. 13 of its tests passed.</p>
+<p>Three kit rows were recorded as not applicable to this pack. Each decision came from the pack's own rule declarations:</p>
+<ul>
+<li><code>verify_rule</code> is outside the supported surface. The <code>guardana rule test</code> command above runs the same check.</li>
+<li>No pack rule needs what the MCP and A2A doubles serve, so the row for running a rule against those doubles was not applicable.</li>
+<li>No pack rule reads a trace, so the row using a <code>Trace</code> in a <code>TraceTarget</code> was not applicable.</li>
+</ul>
+<p>The kit page names those helpers without saying they are outside the supported surface. This was recorded in #145 on 2026-10-14 as a documentation correction.</p>
+<h2 id="result">Result</h2>
+<p>The proof passed: 12 of 12 steps held.</p>
+<h2 id="what-this-proof-does-not-show">What this proof does not show</h2>
+<p>The kit page lists what each check does not prove, row by row. Those limits also apply here.</p>
+<p>This proof does not cover a pack that uses the MCP, A2A or trace rows. It does not show that a rule's samples resemble a team's real targets.</p>
+
+</main>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana · Apache-2.0</span>
+<a href="/notes/feed.xml">Atom feed</a>
+<a href="/llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

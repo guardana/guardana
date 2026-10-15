@@ -5,8 +5,22 @@
   <subtitle>Articles from the Guardana maintainers about AI security verification.</subtitle>
   <link rel="self" type="application/atom+xml" href="https://guardana.dev/notes/feed.xml"/>
   <link rel="alternate" type="text/html" href="https://guardana.dev/notes/"/>
-  <updated>2026-10-07T00:00:00Z</updated>
+  <updated>2026-10-15T00:00:00Z</updated>
   <author><name>Guardana maintainers</name></author>
+  <entry>
+    <id>tag:guardana.dev,2026-10-15:notes/customization-through-published-extension-points</id>
+    <title>Customization through published extension points (#141)</title>
+    <link rel="alternate" type="text/html" href="https://guardana.dev/notes/customization-through-published-extension-points"/>
+    <updated>2026-10-15T00:00:00Z</updated>
+    <summary>The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut.</summary>
+  </entry>
+  <entry>
+    <id>tag:guardana.dev,2026-10-15:notes/clean-install-offline-first-run</id>
+    <title>Clean-install offline first run (#138)</title>
+    <link rel="alternate" type="text/html" href="https://guardana.dev/notes/clean-install-offline-first-run"/>
+    <updated>2026-10-15T00:00:00Z</updated>
+    <summary>The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 12 of 14 steps.</summary>
+  </entry>
   <entry>
     <id>tag:guardana.dev,2026-10-07:notes/tenant-leaks-and-poisoned-documents</id>
     <title>Catching tenant leaks and poisoned documents before release</title>

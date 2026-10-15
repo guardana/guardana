@@ -103,6 +103,8 @@ This file is generated from the documentation map; do not edit it by hand.
 
 ## Notes
 
+- [Customization through published extension points (#141)](https://guardana.dev/notes/customization-through-published-extension-points): The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut.
+- [Clean-install offline first run (#138)](https://guardana.dev/notes/clean-install-offline-first-run): The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 12 of 14 steps.
 - [Catching tenant leaks and poisoned documents before release](https://guardana.dev/notes/tenant-leaks-and-poisoned-documents): A reference retrieval app shows how to check tenant answers and document instructions, save the result, and rerun it with clear coverage limits.
 
 ## Schemas

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Readers can now find notes on the [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points).** Both proofs were run by the maintainer against 1.0.0rc3 ([workflow run](https://github.com/guardana/guardana/actions/runs/38747291852)). The first-run note states the Windows result. Product status and the roadmap now identify which proofs are published.
 - **Corrected installation, release and compatibility documentation.** The reference pack install covers PyPI and admission flags; the roadmap corrects rc2/rc3 tense; collector advice uses an existing minor tag and says candidates carry only their exact version tag; the reproducible-builds example uses `1.0.0rc3` with a [green run](https://github.com/guardana/guardana/actions/runs/38378931536); and product status removes undefined internal codes, aligns the engine row with compatibility and removes future promises about collector trends.
 
 ## [1.0.0rc3] - 2026-10-13 — the third release candidate
