@@ -17,12 +17,6 @@ on:
         description: "The guardana-reference-pack version on PyPI; the newest when empty"
         required: false
         type: string
-  # TEMPORARY, removed before merge: a dispatch-only workflow cannot run before it is on
-  # main, so this pull request runs it against 1.0.0rc3.
-  pull_request:
-    paths:
-      - .github/workflows/proofs.yml
-      - scripts/proofs/**
 
 # Read-only: it checks out the scripts, installs from PyPI and uploads its own artifacts.
 permissions:
@@ -45,7 +39,7 @@ jobs:
       - name: The versions to prove
         id: check
         env:
-          VERSION: ${{ inputs.version || '1.0.0rc3' }}
+          VERSION: ${{ inputs.version }}
           PACK: ${{ inputs.pack }}
         run: |
           # A whole-string match: a line-based one would accept a value with a newline in it.
@@ -176,6 +170,8 @@ jobs:
     needs: inputs
     runs-on: windows-2025
     timeout-minutes: 30
+    # Paired with the summary's --report-only: a failed Windows cell is shown, not required.
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:

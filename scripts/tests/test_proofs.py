@@ -882,6 +882,16 @@ def test_every_proof_job_uploads_its_records_whatever_happened() -> None:
         assert job.get("strategy", {}).get("fail-fast", False) is False, name
 
 
+def test_the_proofs_run_only_when_a_maintainer_dispatches_them() -> None:
+    raw: dict[object, Any] = yaml.safe_load(
+        (_ROOT / ".github" / "workflows" / "proofs.yml").read_text(encoding="utf-8")
+    )
+    triggers = raw[True]  # PyYAML reads the bare key `on` as the boolean True
+
+    assert set(triggers) == {"workflow_dispatch"}
+    assert set(triggers["workflow_dispatch"]["inputs"]) == {"version", "pack"}
+
+
 def test_a_dispatched_value_reaches_a_shell_only_through_the_environment() -> None:
     workflow = _workflow()
     for job in workflow["jobs"].values():
@@ -906,4 +916,6 @@ def test_only_windows_is_reported_without_being_required() -> None:
 
     assert step["run"].count("--report-only") == 1
     assert "--report-only first-run-windows=proof-first-run-Windows" in step["run"]
+    assert jobs["first-run-windows"]["continue-on-error"] is True
+    assert [n for n, job in jobs.items() if "continue-on-error" in job] == ["first-run-windows"]
     assert str(upload["with"]["name"]).startswith("proof-first-run-Windows-")
