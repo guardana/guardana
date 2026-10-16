@@ -39,6 +39,8 @@ _BARE_FLAG = re.compile(r"(?<![\w-])--[a-z][a-z0-9-]*")
 
 
 _RAG_NOTE = "notes/tenant-leaks-and-poisoned-documents.md"
+_FIRST_RUN_NOTE = "notes/clean-install-offline-first-run.md"
+_CUSTOMIZATION_NOTE = "notes/customization-through-published-extension-points.md"
 _FOREIGN_OR_ABSENT_FLAGS: Mapping[tuple[str, str], str] = {
     ("docs/usage-collector.md", "--api-key"): "named as the flag probe deliberately does not take",
     ("docs/usage-collector.md", "--with"): "a uv run flag",
@@ -46,6 +48,8 @@ _FOREIGN_OR_ABSENT_FLAGS: Mapping[tuple[str, str], str] = {
     ("docs/usage-recipe.md", "--prefix"): "a pip install flag",
     (_RAG_NOTE, "--break-tenant-filter"): "a switch of the reference application",
     (_RAG_NOTE, "--obey-documents"): "a switch of the reference application",
+    (_FIRST_RUN_NOTE, "--network"): "a docker run flag",
+    (_CUSTOMIZATION_NOTE, "--network"): "a docker run flag",
 }
 """Flags named alone in prose that belong to another tool or are named as absent: (page, flag)."""
 

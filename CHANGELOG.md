@@ -7,12 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Run maintainer proofs against published PyPI packages with the manually dispatched `.github/workflows/proofs.yml` workflow.** Supply a version and optionally a reference-pack version; the checkout supplies only proof scripts. Twelve clean-install runs cover Linux, macOS and Windows, Python 3.11 and 3.13, and pip and uv. They follow the install guide, verify the network cut with a canary, check every generated starter README command against its stated exit code and output, apply its edit, and check both saved runs. Customization proofs cover reference-pack admission, validation, locking, scanning, package tests and supported-surface conformance; a conformance-kit row shown by the pack’s rule declarations to cover nothing it ships is not applicable and does not block the proof, and any other row that cannot run is not exercised, leaving the record incomplete, never passed. JSON artifacts capture commands, exit codes and output excerpts; installer reports show Guardana files’ files.pythonhosted.org origins and SHA-256 hashes. The summary passes only when every expected record exists and passed.
+
 ### Fixed
 
 - **`guardana scan`, `guardana diff` and `guardana doctor` now complete on Windows when piped or redirected output contains characters unavailable in the ANSI code page.** Guardana switches stdout and stderr to UTF-8 before the command runs if their encoding is not UTF-8, preventing `UnicodeEncodeError` failures on `✖`, `✓` or scanned file text. Windows CI jobs that previously ended with internal-error exit code 5 now return the run’s own code, such as 0, 1 or 2, which may change gate results. Found in the maintainer’s [proof run on windows-2025](https://github.com/guardana/guardana/actions/runs/38657608072).
 
 ### Documentation
 
+- **Readers can now find notes on the [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points).** Both proofs were run by the maintainer against 1.0.0rc3 ([workflow run](https://github.com/guardana/guardana/actions/runs/38747291852)). The first-run note states the Windows result. Product status and the roadmap now identify which proofs are published.
 - **Corrected installation, release and compatibility documentation.** The reference pack install covers PyPI and admission flags; the roadmap corrects rc2/rc3 tense; collector advice uses an existing minor tag and says candidates carry only their exact version tag; the reproducible-builds example uses `1.0.0rc3` with a [green run](https://github.com/guardana/guardana/actions/runs/38378931536); and product status removes undefined internal codes, aligns the engine row with compatibility and removes future promises about collector trends.
 
 ## [1.0.0rc3] - 2026-10-13 — the third release candidate

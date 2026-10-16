@@ -1,0 +1,336 @@
+# Runs the maintainer proofs against the packages PyPI serves, on clean runners
+# (`scripts/proofs/`). Nothing is built from this checkout: it supplies the proof scripts
+# only, and every package comes from pypi.org at the version dispatched. The network is cut
+# after the install and a canary inside the isolation shows it. Every record is uploaded,
+# passed or not, and the summary passes only when every expected record passed.
+
+name: Proofs
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The guardana-cli version on PyPI, e.g. 1.0.0rc3"
+        required: true
+        type: string
+      pack:
+        description: "The guardana-reference-pack version on PyPI; the newest when empty"
+        required: false
+        type: string
+
+# Read-only: it checks out the scripts, installs from PyPI and uploads its own artifacts.
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.9"
+  PYTEST_VERSION: "8.4.2"
+  PROOF_COMMIT: ${{ github.sha }}
+  PROOF_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      pack: ${{ steps.check.outputs.pack }}
+    steps:
+      - name: The versions to prove
+        id: check
+        env:
+          VERSION: ${{ inputs.version }}
+          PACK: ${{ inputs.pack }}
+        run: |
+          # A whole-string match: a line-based one would accept a value with a newline in it.
+          pattern='^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?(\.post[0-9]+)?(\.dev[0-9]+)?$'
+          if [[ ! $VERSION =~ $pattern ]]; then
+            echo "::error::'$VERSION' is not a version."
+            exit 1
+          fi
+          if [[ -n $PACK && ! $PACK =~ $pattern ]]; then
+            echo "::error::'$PACK' is not a version."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "pack=$PACK" >> "$GITHUB_OUTPUT"
+
+  # #138 on Linux: one container installs with the network, a second runs the first run
+  # with `--network none`. The image is Debian's python:<version>-slim on the runner's kernel.
+  first-run-linux:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        installer: [pip, uv]
+    env:
+      PROOF_RUNNER: "ubuntu-24.04, python:${{ matrix.python }}-slim container"
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install from PyPI, then walk the starter offline
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PY: ${{ matrix.python }}
+          INSTALLER: ${{ matrix.installer }}
+        run: >-
+          python3 -m proofs container --proof first-run --python "$PY" --installer "$INSTALLER"
+          --version "$VERSION" --out "$RUNNER_TEMP/proof"
+          --uv-version "$UV_VERSION" --pytest-version "$PYTEST_VERSION"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proof-first-run-linux-${{ matrix.python }}-${{ matrix.installer }}
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #138 on macOS: the runner's own interpreter, every network operation of the proof's
+  # process tree denied by sandbox-exec.
+  first-run-macos:
+    needs: inputs
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        installer: [pip, uv]
+    env:
+      PROOF_RUNNER: macos-15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A python.org build, the interpreter a user downloads; setup-uv below only adds uv.
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install uv
+        if: matrix.installer == 'uv'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Install from PyPI
+        id: install
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          INSTALLER: ${{ matrix.installer }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: >-
+          "$PYTHON" -m proofs install --installer "$INSTALLER" --version "$VERSION"
+          --project "$RUNNER_TEMP/proof/project" --record "$RUNNER_TEMP/proof/records/install.json"
+
+      - name: Walk the starter offline
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          set -- "$PYTHON" -m proofs first-run --venv "$RUNNER_TEMP/proof/project/.venv" \
+            --project "$RUNNER_TEMP/proof/project" --version "$VERSION" \
+            --record "$RUNNER_TEMP/proof/records/first-run.json"
+          /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
+            "$@" --isolation "sandbox-exec, every network operation denied"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proof-first-run-macOS-${{ matrix.python }}-${{ matrix.installer }}
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #138 on Windows: the firewall blocks outbound traffic of the interpreter and the venv
+  # launchers. The summary reports these cells without requiring them: `diff` and `doctor`
+  # end with exit 5 there when their output goes to a pipe.
+  first-run-windows:
+    needs: inputs
+    runs-on: windows-2025
+    timeout-minutes: 30
+    # Paired with the summary's --report-only: a failed Windows cell is shown, not required.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        installer: [pip, uv]
+    env:
+      PROOF_RUNNER: windows-2025
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A python.org build, the interpreter a user downloads; setup-uv below only adds uv.
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install uv
+        if: matrix.installer == 'uv'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Install from PyPI
+        id: install
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          INSTALLER: ${{ matrix.installer }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: >-
+          "$PYTHON" -m proofs install --installer "$INSTALLER" --version "$VERSION"
+          --project "$RUNNER_TEMP/proof/project" --record "$RUNNER_TEMP/proof/records/install.json"
+      - name: Cut the network (Windows)
+        shell: pwsh
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $venv = Join-Path $env:RUNNER_TEMP 'proof\project\.venv\Scripts'
+          $programs = @($env:PYTHON, (Join-Path $venv 'python.exe'), (Join-Path $venv 'guardana.exe'))
+          # Whether this worked is decided by the canary inside the next step, not here:
+          # an error is recorded and the proof still runs, so a reachable network fails it.
+          $errors = @()
+          try { Start-Service -Name MpsSvc } catch { $errors += "$_" }
+          try { Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True } catch { $errors += "$_" }
+          foreach ($program in $programs) {
+            try {
+              New-NetFirewallRule -DisplayName 'guardana proof offline' -Direction Outbound `
+                -Action Block -Program $program | Out-Null
+            } catch { $errors += "$_" }
+          }
+          [ordered]@{
+            errors = $errors
+            services = @(Get-Service BFE, MpsSvc | ForEach-Object { @{ name = $_.Name; status = "$($_.Status)" } })
+            profiles = @(Get-NetFirewallProfile | ForEach-Object { @{ name = $_.Name; enabled = "$($_.Enabled)"; outbound = "$($_.DefaultOutboundAction)" } })
+            blocked = $programs
+          } | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $env:RUNNER_TEMP 'proof\records\isolation-windows.json') -Encoding utf8
+
+      # Runs even when the isolation step failed: the canary then records the network as
+      # reachable and the record fails, which says more than a skipped step.
+      - name: Walk the starter offline
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          set -- "$PYTHON" -m proofs first-run --venv "$RUNNER_TEMP/proof/project/.venv" \
+            --project "$RUNNER_TEMP/proof/project" --version "$VERSION" \
+            --record "$RUNNER_TEMP/proof/records/first-run.json"
+          "$@" --isolation "Windows Firewall, outbound blocked for python.exe (base and venv) and guardana.exe only; another executable would not be blocked"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proof-first-run-Windows-${{ matrix.python }}-${{ matrix.installer }}
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #141: the reference pack from PyPI, its own published suite and the conformance kit,
+  # offline after the install.
+  customization:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PROOF_RUNNER: "ubuntu-24.04, python:3.13-slim container"
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install from PyPI, then run the pack and the kit offline
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PACK: ${{ needs.inputs.outputs.pack }}
+        run: >-
+          python3 -m proofs container --proof customization --python 3.13 --installer pip
+          --version "$VERSION" ${PACK:+--pack "$PACK"} --out "$RUNNER_TEMP/proof"
+          --uv-version "$UV_VERSION" --pytest-version "$PYTEST_VERSION"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proof-customization-linux-3.13-pip
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  summary:
+    needs: [first-run-linux, first-run-macos, first-run-windows, customization]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Download every record
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: proof-*
+          path: ${{ runner.temp }}/records
+
+      # The counts are the matrix sizes above: 2 × 2 cells each on Linux, macOS and Windows.
+      # Windows must still leave its four records; their verdicts are reported, not required.
+      - name: Every expected record passed
+        working-directory: scripts
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set +e
+          python3 -m proofs summary --records "$RUNNER_TEMP/records" --out "$RUNNER_TEMP/summary" \
+            --expect first-run=12 --expect customization=1 --needs "$NEEDS" \
+            --report-only first-run-windows=proof-first-run-Windows
+          verdict=$?
+          cat "$RUNNER_TEMP/summary/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          exit $verdict
+
+      - name: Upload the summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proofs-summary
+          path: ${{ runner.temp }}/summary
+          if-no-files-found: error
+          retention-days: 90

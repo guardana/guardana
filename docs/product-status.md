@@ -78,7 +78,7 @@ Stable 1.0 is the compatibility promise for the supported surface. It ships only
 
 The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.
 
-No maintainer-run proof is published. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The stable-release proof that installs it from PyPI outside the repository and passes the conformance kit is not published. Recovery runbooks are exercised by tests. The security drill is not recorded.
+Two maintainer-run proofs are published as notes, both run against 1.0.0rc3 from PyPI by the proofs workflow: [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points). First-run Linux and macOS cells passed; on Windows, `guardana diff` and `guardana doctor` end with exit 5 when their output goes to a pipe ([#145](https://github.com/guardana/guardana/issues/145)). For customization, the reference pack installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The retrieval pilot and regression loop proofs are not published. Recovery runbooks are exercised by tests. The security drill is not recorded.
 
 [Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. With `1.0.0rc3` released, `1.0.0` is the only open release milestone.
 

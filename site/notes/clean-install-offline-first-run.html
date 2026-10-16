@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clean-install offline first run (#138) — Guardana notes</title>
+<meta name="description" content="The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 12 of 14 steps.">
+<link rel="canonical" href="https://guardana.dev/notes/clean-install-offline-first-run">
+<link rel="alternate" type="application/atom+xml" title="Guardana notes" href="/notes/feed.xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="/docs/docs.css">
+<style>main.notes{margin:0 auto;padding:34px 20px 88px}.notes-index{list-style:none;padding:0}.notes-index li{margin:0 0 26px}.notes-index time,.notes time{color:var(--faint);font-size:14px}.notes-index h2{font-size:21px;margin:2px 0 4px;border:0;padding:0}.notes-index p{margin:0;color:var(--muted)}</style>
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="/docs/">Docs</a>
+<a href="/notes/">Notes</a>
+</nav>
+</div></header>
+<main class="notes">
+<p class="crumb"><a href="/notes/">Notes</a> · <time datetime="2026-10-15">2026-10-15</time></p><h1>Clean-install offline first run (#138)</h1><p class="lede">The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 12 of 14 steps.</p><p>The maintainer ran this proof with Guardana 1.0.0rc3 from PyPI, using proof scripts at commit <code>a1801e0a</code>. The <a href="https://github.com/guardana/guardana/actions/runs/38747291852">workflow run</a> records the results.</p>
+<h2 id="installation-and-platforms">Installation and platforms</h2>
+<p>The workflow, <code>.github/workflows/proofs.yml</code>, was dispatched with the version. The checkout supplied only the proof scripts in <code>scripts/proofs/</code>. Every package came from pypi.org.</p>
+<p>The twelve cells covered Python 3.11 and 3.13, each with pip and uv, on three platforms:</p>
+<ul>
+<li>Linux: a <code>python:3.11-slim</code> or <code>python:3.13-slim</code> container on an ubuntu-24.04 runner, with Debian userspace.</li>
+<li>macOS 15 on arm64.</li>
+<li>Windows Server 2025.</li>
+</ul>
+<p>The installation followed <code>docs/install.md</code> for a candidate release. With pip:</p>
+<pre><code class="language-console">$ python -m venv .venv
+$ .venv/bin/python -m pip install --pre guardana-cli==1.0.0rc3
+</code></pre>
+<p>With uv:</p>
+<pre><code class="language-console">$ uv init --bare
+$ uv add --prerelease allow guardana-cli==1.0.0rc3
+</code></pre>
+<p>Both installers named pypi.org. Each installer's own report showed that every file came from files.pythonhosted.org, with a sha256.</p>
+<h2 id="network-cut">Network cut</h2>
+<p>The network was cut after installation. Linux ran the proof in a second container with <code>--network none</code>. macOS ran it under <code>sandbox-exec</code>, denying every network operation to the process tree.</p>
+<p>Windows used firewall rules to block outbound traffic from <code>python.exe</code>, both the base and environment executables, and <code>guardana.exe</code>. Another executable would not be blocked.</p>
+<p>Before the cut, a canary reached pypi.org:443 and a literal address. Both connections were refused after the cut.</p>
+<h2 id="following-the-starter-readme">Following the starter README</h2>
+<p>The proof followed the README written by the starter command. Each command was checked against the exit code and output lines stated in that README.</p>
+<pre><code class="language-console">$ guardana init --starter first-run
+$ guardana scan model --format json --output before.json
+</code></pre>
+<p>The first scan exited with code 1. Its saved run, <code>before.json</code>, holds a CRITICAL <code>guardana.supply_chain.pickle_opcode</code> finding in <code>model/weights.pkl</code>.</p>
+<p>The README then replaces the pickle file with the safe model file:</p>
+<pre><code class="language-console">$ rm model/weights.pkl
+$ cp safe/weights.safetensors model/
+$ guardana scan model --format json --output after.json
+</code></pre>
+<p>The second scan exited with code 0. Its saved report, <code>after.json</code>, observed <code>model/weights.safetensors</code>.</p>
+<pre><code class="language-console">$ guardana diff before.json after.json
+$ guardana doctor
+$ guardana rule test --rules checks 'starter.*'
+</code></pre>
+<p>The README specifies exit 1 for the diff, showing that the finding left the scan, and exit 0 for doctor. The rule test exited with code 0 and reported:</p>
+<pre><code class="language-text">1 rule(s); 3 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
+</code></pre>
+<p>The proof then made the README's edit to <code>checks/codename.yaml</code>, adding a second codename and a fourth sample, and repeated the test:</p>
+<pre><code class="language-console">$ guardana rule test --rules checks 'starter.*'
+</code></pre>
+<p>It exited with code 0 and reported:</p>
+<pre><code class="language-text">1 rule(s); 4 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
+</code></pre>
+<h2 id="results-and-windows-limitations">Results and Windows limitations</h2>
+<pre><code class="language-text">Linux:   4 of 4 cells passed; 14 of 14 steps each
+macOS:   4 of 4 cells passed; 14 of 14 steps each
+Windows: 0 of 4 cells passed; 12 of 14 steps each
+</code></pre>
+<p>On Windows, with output going to a pipe in the ANSI code page, cp1252, <code>guardana diff</code> and <code>guardana doctor</code> ended with exit 5, an internal error caused by <code>UnicodeEncodeError</code>. The other steps passed with the network cut. This was recorded in #145 on 2026-10-15. The fix for 1.0.1 is prepared in #166. The workflow reports the Windows cells without requiring them to pass.</p>
+<p>Runs written on Windows record <code>model\weights.pkl</code>, where Linux and macOS record <code>model/weights.pkl</code>. A finding's fingerprint follows that path, so baselines do not carry between Windows and the other platforms. This known limitation is tracked in #167.</p>
+<h2 id="saved-evidence">Saved evidence</h2>
+<p>Each cell has a JSON record containing every step's command, exit code and a short output excerpt. These records and the two saved scan runs are uploaded as artifacts of the workflow run. Artifacts are kept for 90 days.</p>
+<h2 id="what-this-proof-does-not-show">What this proof does not show</h2>
+<p>This proof does not show how people new to Guardana experience a first run. That is the first-run study in <code>docs/studies</code>, which needs real participants. It does not show adoption.</p>
+<p>On Windows, it does not show that an executable other than the blocked <code>python.exe</code> and <code>guardana.exe</code> stays offline. On Linux, it does not show an Ubuntu userspace: the containers use Debian userspace.</p>
+
+</main>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana · Apache-2.0</span>
+<a href="/notes/feed.xml">Atom feed</a>
+<a href="/llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

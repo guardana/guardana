@@ -207,6 +207,8 @@
   <url><loc>https://guardana.dev/docs/writing-an-integrator</loc></url>
   <url><loc>https://guardana.dev/docs/writing-rules</loc></url>
   <url><loc>https://guardana.dev/</loc></url>
+  <url><loc>https://guardana.dev/notes/clean-install-offline-first-run</loc></url>
+  <url><loc>https://guardana.dev/notes/customization-through-published-extension-points</loc></url>
   <url><loc>https://guardana.dev/notes/</loc></url>
   <url><loc>https://guardana.dev/notes/tenant-leaks-and-poisoned-documents</loc></url>
 </urlset>
