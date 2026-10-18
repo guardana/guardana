@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Reproducibility workflow requires a reference pack published by the release.** A check that started before PyPI listed a reference pack the release had just published could report it `NOT PUBLISHED` and pass without rebuilding it. `.github/workflows/reproducibility.yml` now reads the release run's jobs and passes `--pack-published` to `scripts/reproduce_release.py` when `publish-reference-pack` succeeded; a reference pack version PyPI does not list is then `NOT CHECKED` with exit status `2`. This changes no package. May now fail: the Reproducibility job when the release published the reference pack and PyPI does not list it yet; run it again by hand once PyPI lists it.
+
 ### Documentation
 
 - **Corrected release and conformance documentation after 1.0.0rc4.** Product status, the roadmap and compatibility cover four required candidates and their gates; product status and the roadmap update the published proofs and milestone scope; reproducible builds uses the `1.0.0rc4` run; and the conformance kit marks helpers outside the supported surface and gives exact-version pinning advice.

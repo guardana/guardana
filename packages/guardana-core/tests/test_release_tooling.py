@@ -888,7 +888,7 @@ def test_a_run_that_names_no_version_is_refused(
 def test_the_reproducibility_check_is_read_only() -> None:
     workflow = _reproducibility()
 
-    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["permissions"] == {"contents": "read", "actions": "read"}
     assert all("permissions" not in job for job in workflow["jobs"].values())
     steps = workflow["jobs"]["reproduce"]["steps"]
     checkouts = [step for step in steps if "actions/checkout" in str(step.get("uses"))]

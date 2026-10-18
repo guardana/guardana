@@ -83,7 +83,7 @@ Each file gets one line, followed by a count:
 | `REPRODUCES` | the rebuilt and published files have identical bytes |
 | `DIFFERS` | the bytes differ; the next line names the first difference found |
 | `NOT CHECKED` | the file was not compared: PyPI could not be read or lists no files, a download did not match its digest, the build failed, a published file was not rebuilt, or a rebuilt file is not published |
-| `NOT PUBLISHED` | PyPI has no reference pack release at the tag's version because this release did not publish it; this does not change the exit status |
+| `NOT PUBLISHED` | PyPI has no reference pack release at the tag's version and `--pack-published` was not passed; this does not change the exit status |
 
 `NOT CHECKED` is never a pass. The script cannot establish whether the file reproduces
 and states why.
@@ -98,10 +98,18 @@ start: the checkout carries another version, a package directory has no readable
 `.github/workflows/reproducibility.yml` runs the check after each successful release
 workflow run and on demand for any version from the Actions tab (`Run workflow`, with
 the version). It checks out `v<version>`, takes the script from the commit the workflow
-runs from, and has read-only repository access. It does not run on a push because PyPI
-has no files for a version until its release publishes them. If the check runs before
-PyPI lists the version, each package is `NOT CHECKED` and the job fails with exit status
-`2`. Run it again by hand once the files are on PyPI.
+runs from, and has read-only repository access, including `actions: read`. It reads
+the jobs of the release workflow run that triggered it or, when started by hand, the
+latest successful release run for tag `v<version>`. If that run's
+`publish-reference-pack` job succeeded, it passes `--pack-published` to
+`scripts/reproduce_release.py`. With this flag, a reference pack version PyPI does
+not list is `NOT CHECKED` with exit status `2`, never `NOT PUBLISHED`. Without the
+flag, it stays `NOT PUBLISHED` and does not change the exit status. If the release
+run's jobs cannot be read, the check stops. If no release run exists for the tag,
+the reference pack stays optional. The workflow writes nowhere. It does not run
+on a push because PyPI has no files for a version until its release publishes them.
+If the check runs before PyPI lists the version, each package is `NOT CHECKED` and
+the job fails with exit status `2`. Run it again by hand once the files are on PyPI.
 
 The [1.0.0rc4 Reproducibility run](https://github.com/guardana/guardana/actions/runs/39129688804)
 rebuilt every published file: a wheel and an sdist for each of the five packages and the

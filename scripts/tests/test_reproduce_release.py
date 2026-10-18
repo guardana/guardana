@@ -480,6 +480,37 @@ def test_a_reference_pack_this_release_did_not_publish_is_reported_and_changes_n
     assert exit_code(results) == reproduce_release.EXIT_REPRODUCES
 
 
+def test_a_reference_pack_the_release_published_but_pypi_does_not_list_is_not_checked(
+    tmp_path: Path,
+) -> None:
+    release = _release()
+    published_pack = Distribution(_PACK.name, _PACK.path, _PACK.version)
+
+    results = _run(tmp_path, release, release, projects=[*_PROJECTS, published_pack])
+
+    pack = _only(results, "guardana-reference-pack 0.1.0")
+    assert pack.outcome is Outcome.NOT_CHECKED
+    assert exit_code(results) == reproduce_release.EXIT_NOT_CHECKED
+
+
+def test_pack_published_makes_the_reference_pack_required(tmp_path: Path) -> None:
+    (tmp_path / "packages" / "guardana-core").mkdir(parents=True)
+    (tmp_path / "packages" / "guardana-core" / "pyproject.toml").write_text(
+        f'[project]\nname = "guardana-core"\nversion = "{_VERSION}"\n', encoding="utf-8"
+    )
+    (tmp_path / "examples" / "reference_pack").mkdir(parents=True)
+    (tmp_path / "examples" / "reference_pack" / "pyproject.toml").write_text(
+        '[project]\nname = "guardana-reference-pack"\nversion = "0.1.0"\n', encoding="utf-8"
+    )
+
+    required = reproduce_release.distributions(tmp_path, pack_published=True)[-1]
+    by_default = reproduce_release.distributions(tmp_path)[-1]
+
+    assert (required.name, required.optional) == ("guardana-reference-pack", False)
+    assert by_default.optional is True
+    assert reproduce_release._parser().parse_args(["1.0.0", "--pack-published"]).pack_published
+
+
 def test_a_published_reference_pack_is_compared_like_the_packages(tmp_path: Path) -> None:
     published = {**_release(), _PACK.name: _files(_PACK.name, _PACK.version)}
     rebuilt = {**_release(), _PACK.name: _files(_PACK.name, "0.1.1")}

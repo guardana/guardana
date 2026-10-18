@@ -20,9 +20,11 @@ on:
         required: true
         type: string
 
-# Read-only: it checks out, builds and downloads, and writes nowhere.
+# Read-only: it checks out, builds and downloads, reads the release run's jobs, and
+# writes nowhere.
 permissions:
   contents: read
+  actions: read
 
 jobs:
   reproduce:
@@ -70,7 +72,40 @@ jobs:
           python-version: "3.12"
           enable-cache: false
 
+      # A pack the release published must be on PyPI, so its absence is NOT CHECKED rather
+      # than NOT PUBLISHED: a check that starts before PyPI lists the pack cannot pass.
+      - name: Whether the release published the reference pack
+        id: pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          run_id="$RELEASE_RUN"
+          if [[ -z $run_id ]]; then
+            run_id=$(gh run list --workflow release.yml --branch "v$VERSION" --status success \
+              --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          fi
+          published=false
+          if [[ -z $run_id ]]; then
+            echo "::notice::No successful release run for v$VERSION; a reference pack PyPI does not list is reported NOT PUBLISHED."
+          else
+            conclusion=$(gh run view "$run_id" --json jobs \
+              --jq '.jobs[] | select(.name == "publish-reference-pack") | .conclusion')
+            if [[ $conclusion == success ]]; then
+              published=true
+            fi
+          fi
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+
       - name: Rebuild and compare with PyPI
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: uv run --no-project python tooling/scripts/reproduce_release.py "$VERSION" --source release
+          PACK_PUBLISHED: ${{ steps.pack.outputs.published }}
+        run: |
+          pack=()
+          if [[ $PACK_PUBLISHED == true ]]; then
+            pack=(--pack-published)
+          fi
+          uv run --no-project python tooling/scripts/reproduce_release.py "$VERSION" --source release "${pack[@]}"

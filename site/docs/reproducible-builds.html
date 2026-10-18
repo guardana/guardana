@@ -279,7 +279,7 @@ produces from the same data.</li>
 </tr>
 <tr>
 <td><code>NOT PUBLISHED</code></td>
-<td>PyPI has no reference pack release at the tag's version because this release did not publish it; this does not change the exit status</td>
+<td>PyPI has no reference pack release at the tag's version and <code>--pack-published</code> was not passed; this does not change the exit status</td>
 </tr>
 </tbody>
 </table></div>
@@ -293,10 +293,18 @@ start: the checkout carries another version, a package directory has no readable
 <p><code>.github/workflows/reproducibility.yml</code> runs the check after each successful release
 workflow run and on demand for any version from the Actions tab (<code>Run workflow</code>, with
 the version). It checks out <code>v&lt;version&gt;</code>, takes the script from the commit the workflow
-runs from, and has read-only repository access. It does not run on a push because PyPI
-has no files for a version until its release publishes them. If the check runs before
-PyPI lists the version, each package is <code>NOT CHECKED</code> and the job fails with exit status
-<code>2</code>. Run it again by hand once the files are on PyPI.</p>
+runs from, and has read-only repository access, including <code>actions: read</code>. It reads
+the jobs of the release workflow run that triggered it or, when started by hand, the
+latest successful release run for tag <code>v&lt;version&gt;</code>. If that run's
+<code>publish-reference-pack</code> job succeeded, it passes <code>--pack-published</code> to
+<code>scripts/reproduce_release.py</code>. With this flag, a reference pack version PyPI does
+not list is <code>NOT CHECKED</code> with exit status <code>2</code>, never <code>NOT PUBLISHED</code>. Without the
+flag, it stays <code>NOT PUBLISHED</code> and does not change the exit status. If the release
+run's jobs cannot be read, the check stops. If no release run exists for the tag,
+the reference pack stays optional. The workflow writes nowhere. It does not run
+on a push because PyPI has no files for a version until its release publishes them.
+If the check runs before PyPI lists the version, each package is <code>NOT CHECKED</code> and
+the job fails with exit status <code>2</code>. Run it again by hand once the files are on PyPI.</p>
 <p>The <a href="https://github.com/guardana/guardana/actions/runs/39129688804">1.0.0rc4 Reproducibility run</a>
 rebuilt every published file: a wheel and an sdist for each of the five packages and the
 reference pack 0.1.3, 12 files in total. Every file reproduced.</p>

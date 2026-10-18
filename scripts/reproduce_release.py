@@ -5,6 +5,7 @@ Run it in a checkout of the release tag, or name that checkout with `--source`:
 
     uv run --no-project python scripts/reproduce_release.py 1.0.0
     uv run --no-project python scripts/reproduce_release.py 1.0.0 --source ../guardana-v1.0.0
+    uv run --no-project python scripts/reproduce_release.py 1.0.0 --pack-published
 
 Every directory under `packages/` and the reference pack are built the way
 `.github/workflows/release.yml` builds them, `uv build <directory> --out-dir <dir>` from
@@ -16,7 +17,8 @@ Each file prints REPRODUCES, DIFFERS with the first difference found, or NOT CHE
 with the reason it could not be compared: PyPI could not be read, a download did not
 match its digest, the build failed, or a file was published but not rebuilt (or the
 other way round). The reference pack reaches PyPI only when the release is told to
-publish it, so a pack version PyPI does not have is NOT PUBLISHED and changes nothing.
+publish it, so a pack version PyPI does not have is NOT PUBLISHED and changes nothing,
+unless `--pack-published` says the release published it: then it is NOT CHECKED.
 
 It needs `uv` and the network (pypi.org and the file host PyPI names), and writes only
 to a temporary directory it removes; the checkout is built from, not changed.
@@ -416,18 +418,19 @@ def _shown(attribute: str, value: object) -> str:
     return repr(value)
 
 
-def distributions(source: Path) -> list[Distribution]:
+def distributions(source: Path, *, pack_published: bool = False) -> list[Distribution]:
     """Every project the release workflow builds from this checkout, read from its own files.
 
     `release.yml` builds every directory under `packages/`, so the list is read from the
-    checkout rather than written here, and a package added later is compared too.
+    checkout rather than written here, and a package added later is compared too. The
+    reference pack may be absent from PyPI unless `pack_published` says the release put it there.
     """
     directories = sorted(path for path in (source / "packages").glob("*/") if path.is_dir())
     if not directories:
         raise NotCheckedError(f"{source} has no directory under packages/ to build")
     found = [_distribution(source, f"packages/{path.name}/") for path in directories]
     if (source / REFERENCE_PACK).is_dir():
-        found.append(_distribution(source, REFERENCE_PACK, optional=True))
+        found.append(_distribution(source, REFERENCE_PACK, optional=not pack_published))
     return found
 
 
@@ -602,6 +605,11 @@ def _parser() -> argparse.ArgumentParser:
         default=_ROOT,
         help="a checkout of the release tag to build (default: this repository)",
     )
+    parser.add_argument(
+        "--pack-published",
+        action="store_true",
+        help="the release published the reference pack, so PyPI must list it",
+    )
     return parser
 
 
@@ -609,7 +617,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Rebuild the release named on the command line and report every file."""
     args = _parser().parse_args(argv)
     try:
-        return _check(args.version, args.source.resolve())
+        return _check(args.version, args.source.resolve(), pack_published=args.pack_published)
     except NotCheckedError as exc:
         print(f"NOT CHECKED: {exc}", file=sys.stderr)
     # An error nobody anticipated says nothing about the files, so it must never exit as
@@ -619,14 +627,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     return EXIT_NOT_CHECKED
 
 
-def _check(version: str, source: Path) -> int:
+def _check(version: str, source: Path, *, pack_published: bool = False) -> int:
     packaged = packaged_version(source)
     if packaged != version:
         raise NotCheckedError(
             f"{source} carries version {packaged or 'unreadable'}, not {version}; "
             f"run this in a checkout of v{version}"
         )
-    projects = distributions(source)
+    projects = distributions(source, pack_published=pack_published)
     with tempfile.TemporaryDirectory(prefix="guardana-reproduce-") as work:
         results = Rebuild(source, Path(work), fetch_url, uv_build, projects).run()
     print(report(results))

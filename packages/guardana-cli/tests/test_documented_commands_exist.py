@@ -46,6 +46,7 @@ _FOREIGN_OR_ABSENT_FLAGS: Mapping[tuple[str, str], str] = {
     ("docs/usage-collector.md", "--with"): "a uv run flag",
     ("docs/usage-new-pack.md", "--force"): "named as the flag new-pack deliberately does not take",
     ("docs/usage-recipe.md", "--prefix"): "a pip install flag",
+    ("docs/reproducible-builds.md", "--pack-published"): "a flag of scripts/reproduce_release.py",
     (_RAG_NOTE, "--break-tenant-filter"): "a switch of the reference application",
     (_RAG_NOTE, "--obey-documents"): "a switch of the reference application",
     (_FIRST_RUN_NOTE, "--network"): "a docker run flag",
