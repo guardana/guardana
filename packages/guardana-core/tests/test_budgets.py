@@ -229,6 +229,41 @@ def test_a_zero_duration_ceiling_built_in_code_is_still_accepted() -> None:
     assert Budgets(max_duration_seconds=0.0).max_duration_seconds == 0.0
 
 
+_COUNTED_CEILINGS = (
+    "max_requests",
+    "max_input_tokens",
+    "max_output_tokens",
+    "max_requests_per_minute",
+)
+
+
+def _refusal(ceiling: str, value: int) -> ValueError | None:
+    try:
+        Budgets(**{ceiling: value})
+    except ValueError as refused:
+        return refused
+    return None
+
+
+@pytest.mark.parametrize("ceiling", _COUNTED_CEILINGS)
+def test_a_positive_counted_ceiling_built_in_code_is_accepted(ceiling: str) -> None:
+    assert _refusal(ceiling, 1) is None
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Budgets checks only the duration ceiling, so zero or a negative count constructs",
+)
+@pytest.mark.parametrize("value", [0, -1])
+@pytest.mark.parametrize("ceiling", _COUNTED_CEILINGS)
+def test_a_counted_ceiling_below_one_built_in_code_is_refused(ceiling: str, value: int) -> None:
+    refused = _refusal(ceiling, value)
+
+    assert refused is not None
+    assert ceiling in str(refused)
+
+
 # --- The profile side: a ceiling nobody can mistype into silence. ---
 
 

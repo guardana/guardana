@@ -35,7 +35,6 @@ from guardana.server.tenancy import TenantScope, create_organization, create_pro
 
 _TODAY = datetime.date(2026, 8, 6)
 _IDENTITY = "sha256:" + "a" * 64
-_OTHER = "sha256:" + "b" * 64
 _PROJECT = "acme/web"
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from guardana.cli._mcp_run import McpConnection
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.target import McpServerTarget
@@ -155,3 +156,105 @@ def test_a_pin_written_over_the_profile_is_refused(
 
     assert profile.read_text(encoding="utf-8") == _PROFILE, result.exit_code
     assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="--write-mcp-pin is not checked against the files the stdio command names",
+)
+def test_a_pin_written_over_the_stdio_server_script_is_refused_before_anything_is_written(
+    tmp_path: Path,
+) -> None:
+    command = _command(tmp_path, "server.py")
+    script = tmp_path / "server.py"
+
+    result = runner.invoke(
+        app, ["probe", "--mcp", command, "--allow-exec", "--write-mcp-pin", str(script)]
+    )
+
+    assert script.read_text(encoding="utf-8") == _STDIO_SERVER, result.exit_code
+    assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+_LOOPBACK_A = "http://127.0.0.1:8001/mcp"
+_LOOPBACK_B = "http://127.0.0.1:8002/mcp"
+_LENIENT = "schema_version: 1\nname: lenient\nfail_on:\n  fail_on_inconclusive: false\n"
+
+
+def _serve_both(monkeypatch: pytest.MonkeyPatch) -> None:
+    servers = {
+        url: ScriptedMcpServer(url, tools=[{"name": "read", "description": "Read."}])
+        for url in (_LOOPBACK_A, _LOOPBACK_B)
+    }
+
+    def build(connection: McpConnection) -> McpServerTarget:
+        server = servers[connection.address]
+        return McpServerTarget(server.url, sender=server, discovery_sender=server)
+
+    monkeypatch.setattr("guardana.cli._mcp_run.build_mcp_target", build)
+
+
+def _lenient_probe(tmp_path: Path, url: str, pin: Path) -> tuple[Result, dict[str, Any]]:
+    profile = tmp_path / "lenient.yaml"
+    profile.write_text(_LENIENT, encoding="utf-8")
+    saved = tmp_path / "run.json"
+    result = runner.invoke(
+        app,
+        [
+            "probe",
+            "--mcp",
+            url,
+            "--mcp-pin",
+            str(pin),
+            "--profile",
+            str(profile),
+            "--format",
+            "json",
+            "--output",
+            str(saved),
+        ],
+    )
+    if not saved.exists():
+        raise RuntimeError(f"the probe saved no run: {result.output}")
+    return result, json.loads(saved.read_text(encoding="utf-8"))
+
+
+def _approve_loopback_a(tmp_path: Path) -> Path:
+    pin = tmp_path / "approved.json"
+    written = runner.invoke(app, ["probe", "--mcp", _LOOPBACK_A, "--write-mcp-pin", str(pin)])
+    if written.exit_code != ExitCode.OK or not pin.exists():
+        raise RuntimeError(f"the pin was not written: {written.output}")
+    return pin
+
+
+def test_a_pin_given_for_the_server_it_approved_verifies_the_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _serve_both(monkeypatch)
+    pin = _approve_loopback_a(tmp_path)
+
+    result, document = _lenient_probe(tmp_path, _LOOPBACK_A, pin)
+
+    assert _declined(document) == []
+    assert _RULE in {entry["id"] for entry in document["run"]["rules"]}
+    assert [f for f in document["findings"] if f["rule_id"] == _RULE] == []
+    assert result.exit_code == ExitCode.OK, result.output
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="a pin approved for another server leaves the manifest unverified, which gates "
+    "only under fail_on_inconclusive",
+)
+def test_a_pin_given_for_another_server_ends_the_run_indeterminate_whatever_fail_on_says(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _serve_both(monkeypatch)
+    pin = _approve_loopback_a(tmp_path)
+
+    result, document = _lenient_probe(tmp_path, _LOOPBACK_B, pin)
+
+    assert any("approved for" in said for said in _declined(document))
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 import yaml
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
@@ -81,6 +82,22 @@ def test_an_update_that_did_not_run_the_waived_rule_keeps_its_waiver(tmp_path: P
     _code, said = _attempt(tree, baseline, "--profile", str(narrow))
 
     assert _rules(baseline) == [_SINK], said
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="a waiver whose file is gone is kept as unexamined and has to be removed by hand",
+)
+def test_an_update_after_the_waived_file_was_deleted_removes_the_waiver(tmp_path: Path) -> None:
+    tree = _tree(tmp_path)
+    baseline = _created(tmp_path, tree)
+    (tree / "run.py").unlink()
+
+    said = _update(tree, baseline)
+
+    assert _rules(baseline) == [], said
+    assert "removed:" in said, said
 
 
 def _verify(baseline: Path) -> int:
