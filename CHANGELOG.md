@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Require the four Windows first-run cells in `.github/workflows/proofs.yml`, alongside Linux and macOS.** Windows Server 2025 cells cover Python 3.11 and 3.13 with pip and uv; the Windows job no longer continues on error, and the summary requires these cells to pass. One starter README line remains a recorded known difference: `guardana diff` displays `model\weights.pkl` where the README shows `weights.pkl`, because runs written on Windows keep backslash paths (#167). The proof accepts this line only when everything before the file name matches exactly and the Windows path ends in the same file name; a different verdict, severity, rule or file still fails the step. The difference is retained in the cell’s `known_differences` record and listed in the run summary. No package changes. May now fail: a proofs run whose Windows cells do not pass every other step.
+
 ### Fixed
 
 - **The Reproducibility workflow requires a reference pack published by the release.** A check that started before PyPI listed a reference pack the release had just published could report it `NOT PUBLISHED` and pass without rebuilding it. `.github/workflows/reproducibility.yml` now reads the release run's jobs and passes `--pack-published` to `scripts/reproduce_release.py` when `publish-reference-pack` succeeded; a reference pack version PyPI does not list is then `NOT CHECKED` with exit status `2`. This changes no package. May now fail: the Reproducibility job when the release published the reference pack and PyPI does not list it yet; run it again by hand once PyPI lists it.

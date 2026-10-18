@@ -170,6 +170,90 @@ def test_a_step_is_held_to_its_exit_code_and_the_lines_it_must_print(tmp_path: P
     assert step.problems == ["exit 3, expected 0", "output lacks: three"]
 
 
+_README_LINE = "✖ [LEFT THE SCAN · CRITICAL] guardana.supply_chain.pickle_opcode — weights.pkl"
+
+
+def _shown(tmp_path: Path, output: str, *, windows_paths: bool) -> record.Step:
+    step = record.Step(name="compare", command="c", expected_exit=1)
+    record.run(
+        step,
+        [sys.executable, "-c", f"print({output!r}); raise SystemExit(1)"],
+        cwd=tmp_path,
+        environment={**record.clean_environment(None), "PYTHONIOENCODING": "utf-8"},
+        expect_lines=(_README_LINE,),
+        windows_paths=windows_paths,
+    )
+    return step
+
+
+def test_a_windows_path_to_the_readme_file_holds_as_a_recorded_difference(
+    tmp_path: Path,
+) -> None:
+    shown = _README_LINE.replace("— weights.pkl", "— model\\weights.pkl")
+
+    step = _shown(tmp_path, shown, windows_paths=True)
+
+    assert step.problems == []
+    assert step.held
+    assert step.known_differences == [
+        f"shows model\\weights.pkl where the README shows weights.pkl ({record.WINDOWS_PATHS})"
+    ]
+
+
+def test_a_windows_path_is_a_problem_where_paths_are_not_windows_paths(tmp_path: Path) -> None:
+    shown = _README_LINE.replace("— weights.pkl", "— model\\weights.pkl")
+
+    step = _shown(tmp_path, shown, windows_paths=False)
+
+    assert step.problems == [f"output lacks: {_README_LINE}"]
+    assert step.known_differences == []
+
+
+@pytest.mark.parametrize(
+    "shown",
+    [
+        "✖ [LEFT THE SCAN · CRITICAL] guardana.supply_chain.pickle_opcode — model\\other.pkl",
+        "✖ [APPEARED · CRITICAL] guardana.supply_chain.pickle_opcode — model\\weights.pkl",
+        "✖ [LEFT THE SCAN · HIGH] guardana.supply_chain.pickle_opcode — model\\weights.pkl",
+        "✖ [LEFT THE SCAN · CRITICAL] guardana.supply_chain.code_execution — model\\weights.pkl",
+        "✖ [LEFT THE SCAN · CRITICAL] guardana.supply_chain.pickle_opcode — model/weights.pkl",
+        "✖ [LEFT THE SCAN · CRITICAL] guardana.supply_chain.pickle_opcode — model\\weights.pkl.bak",
+    ],
+    ids=[
+        "other-file",
+        "other-verdict",
+        "other-severity",
+        "other-rule",
+        "posix-path",
+        "longer-name",
+    ],
+)
+def test_only_the_displayed_directory_may_differ_on_windows(tmp_path: Path, shown: str) -> None:
+    step = _shown(tmp_path, shown, windows_paths=True)
+
+    assert step.problems == [f"output lacks: {_README_LINE}"]
+    assert step.known_differences == []
+
+
+def test_a_summary_lists_known_differences_without_failing() -> None:
+    held = {
+        "held": True,
+        "ran": True,
+        "problems": [],
+        "name": "4. Compare the two runs",
+        "known_differences": ["shows model\\weights.pkl where the README shows weights.pkl"],
+    }
+    found = [_record("first-run", "passed", "proof-first-run-Windows-3.13-pip", steps=[held])]
+
+    assert summary.problems(found, {}, {"first-run": 1}) == []
+    text = summary.markdown(found, [])
+    assert "Every required proof passed." in text
+    assert (
+        "- proof-first-run-Windows-3.13-pip, 4. Compare the two runs: shows model\\weights.pkl"
+        in text
+    )
+
+
 def test_a_command_that_hangs_is_stopped_and_recorded(tmp_path: Path) -> None:
     step = record.Step(name="n", command="c", expected_exit=0)
 
@@ -909,13 +993,11 @@ def test_no_proof_runs_on_a_python_outside_the_supported_range() -> None:
     assert jobs["first-run-windows"]["strategy"]["matrix"]["python"] == ["3.11", "3.13"]
 
 
-def test_only_windows_is_reported_without_being_required() -> None:
+def test_every_first_run_cell_is_required_and_windows_still_uploads_its_record() -> None:
     jobs = _workflow()["jobs"]
     (step,) = [s for s in jobs["summary"]["steps"] if "proofs summary" in str(s.get("run", ""))]
     (upload,) = [s for s in jobs["first-run-windows"]["steps"] if "upload" in str(s.get("uses"))]
 
-    assert step["run"].count("--report-only") == 1
-    assert "--report-only first-run-windows=proof-first-run-Windows" in step["run"]
-    assert jobs["first-run-windows"]["continue-on-error"] is True
-    assert [n for n, job in jobs.items() if "continue-on-error" in job] == ["first-run-windows"]
+    assert "--report-only" not in step["run"]
+    assert [n for n, job in jobs.items() if "continue-on-error" in job] == []
     assert str(upload["with"]["name"]).startswith("proof-first-run-Windows-")

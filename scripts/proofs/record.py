@@ -26,6 +26,9 @@ INCOMPLETE = "incomplete"
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 _BIN = "Scripts" if sys.platform == "win32" else "bin"
+# Runs written on Windows keep backslash paths, so a location the README shows as a bare
+# file name is displayed with its directory there; the known limitation is tracked here.
+WINDOWS_PATHS = "https://github.com/guardana/guardana/issues/167"
 _EXE = ".exe" if sys.platform == "win32" else ""
 
 # A host name and a literal address, so a block that only breaks name resolution is not
@@ -58,6 +61,7 @@ class Step:
     seconds: float = 0.0
     excerpt: str = ""
     problems: list[str] = field(default_factory=list)
+    known_differences: list[str] = field(default_factory=list)
     ran: bool = True
 
     @property
@@ -159,11 +163,14 @@ def run(  # noqa: PLR0913 — the step, the command and how to run it
     environment: dict[str, str],
     expect_lines: tuple[str, ...] = (),
     timeout: int = COMMAND_TIMEOUT,
+    windows_paths: bool = sys.platform == "win32",
 ) -> str:
     """Run `argv`, fill `step` with what happened, and return the combined output.
 
     Output is decoded as UTF-8 with replacement, so a byte the runner's encoding produced
     is recorded rather than raised here; the command's own exit code is what is judged.
+    With `windows_paths`, an expected line ending in a bare file name also holds when the
+    output shows a Windows path to that file; the difference is recorded, never dropped.
     """
     started = time.monotonic()
     try:
@@ -191,10 +198,32 @@ def run(  # noqa: PLR0913 — the step, the command and how to run it
     if step.expected_exit is not None and finished.returncode != step.expected_exit:
         step.problems.append(f"exit {finished.returncode}, expected {step.expected_exit}")
     flat = plain(output)
-    step.problems.extend(
-        f"output lacks: {line}" for line in expect_lines if plain(line) not in flat
-    )
+    for line in expect_lines:
+        if plain(line) in flat:
+            continue
+        shown = windows_location(line, flat) if windows_paths else None
+        if shown is None:
+            step.problems.append(f"output lacks: {line}")
+        else:
+            step.known_differences.append(
+                f"shows {shown} where the README shows {line.rpartition(' — ')[2]} "
+                f"({WINDOWS_PATHS})"
+            )
     return output
+
+
+def windows_location(line: str, flat: str) -> str | None:
+    """Return the Windows path `flat` shows where `line` ends in ` — <file name>`, or None.
+
+    Everything before the file name must match exactly, and the path must end in that
+    same file name, so a different verdict, rule or file is still a problem.
+    """
+    head, separator, name = line.rpartition(" — ")
+    if not separator or not name or any(c in name for c in "\\/ "):
+        return None
+    pattern = re.escape(plain(head + separator) + " ") + r"((?:[^\s\\/]+\\)+)" + re.escape(name)
+    found = re.search(pattern + r"(?=\s|$)", flat)
+    return None if found is None else found.group(1) + name
 
 
 def canary(python: Path, cwd: Path, environment: dict[str, str], *, cut: bool) -> Step:

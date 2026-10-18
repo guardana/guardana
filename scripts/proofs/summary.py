@@ -106,6 +106,14 @@ def markdown(
         )
     lines.append("")
     lines += [f"- {reason}" for reason in reasons] or ["Every required proof passed."]
+    known = [
+        f"- {r['cell']}, {s.get('name')}: {difference}"
+        for r in found
+        for s in r["steps"]
+        for difference in s.get("known_differences") or []
+    ]
+    if known:
+        lines += ["", "Known differences (held, recorded):", *known]
     return "\n".join(lines) + "\n"
 
 

@@ -164,13 +164,12 @@ jobs:
           retention-days: 90
 
   # #138 on Windows: the firewall blocks outbound traffic of the interpreter and the venv
-  # launchers. The summary reports these cells without requiring them.
+  # launchers. A README line whose location Windows displays with its directory holds as a
+  # recorded known difference, never silently.
   first-run-windows:
     needs: inputs
     runs-on: windows-2025
     timeout-minutes: 30
-    # Paired with the summary's --report-only: a failed Windows cell is shown, not required.
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -311,7 +310,6 @@ jobs:
           path: ${{ runner.temp }}/records
 
       # The counts are the matrix sizes above: 2 × 2 cells each on Linux, macOS and Windows.
-      # Windows must still leave its four records; their verdicts are reported, not required.
       - name: Every expected record passed
         working-directory: scripts
         env:
@@ -319,8 +317,7 @@ jobs:
         run: |
           set +e
           python3 -m proofs summary --records "$RUNNER_TEMP/records" --out "$RUNNER_TEMP/summary" \
-            --expect first-run=12 --expect customization=1 --needs "$NEEDS" \
-            --report-only first-run-windows=proof-first-run-Windows
+            --expect first-run=12 --expect customization=1 --needs "$NEEDS"
           verdict=$?
           cat "$RUNNER_TEMP/summary/summary.md" >> "$GITHUB_STEP_SUMMARY"
           exit $verdict
