@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "The guardana-cli version on PyPI, e.g. 1.0.0rc3"
+        description: "The guardana-cli version on PyPI, e.g. 1.0.0rc4"
         required: true
         type: string
       pack:
@@ -164,8 +164,7 @@ jobs:
           retention-days: 90
 
   # #138 on Windows: the firewall blocks outbound traffic of the interpreter and the venv
-  # launchers. The summary reports these cells without requiring them: `diff` and `doctor`
-  # end with exit 5 there when their output goes to a pipe.
+  # launchers. The summary reports these cells without requiring them.
   first-run-windows:
     needs: inputs
     runs-on: windows-2025

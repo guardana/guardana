@@ -285,17 +285,22 @@ corrects three defects, each announced under &quot;Changed — breaking&quot; in
 the collector's <code>/docs</code>, <code>/redoc</code> and <code>/docs/oauth2-redirect</code> routes return 404;
 a <code>rules.include</code> pattern matching no registered rule refuses the command with
 exit 3; a scanned target's own <code>.guardanaignore</code> can no longer exclude a file
-a model loader reads. The surface remains frozen until stable 1.0 except for
+a model loader reads. 1.0.0rc4 corrects supported-surface defects, each announced
+in the changelog. Two are under &quot;Changed — breaking&quot;: stdio server references
+distinguish the full command (<code>mcp+stdio://&lt;executable&gt;#argv-&lt;digest&gt;</code>), and native
+trace readers refuse a trace without span records or with a record missing a
+schema-required field. Its Security section lists five published advisories.
+The surface remains frozen until stable 1.0 except for
 announced defect corrections. Candidates add no CLI flag, persisted field,
 rule family or public API.</p>
-<p>Three candidates were required: rc1, rc2 and rc3. The rc3 round, the second
-stabilization round, let fixes found after the first external reports land
-before the stable promise. <code>1.0.0rc2</code> and <code>1.0.0rc3</code> each shipped after its own
-full green release gate and green CI on the exact commit. A further candidate is
+<p>Four candidates were required: rc1, rc2, rc3 and rc4. 1.0.0rc4 was required because
+defects reported against 1.0.0rc3 needed release-blocker fixes. <code>1.0.0rc2</code>,
+<code>1.0.0rc3</code> and <code>1.0.0rc4</code> each shipped after its own full green release gate and
+green CI on the exact commit. A further candidate is
 required only if a release blocker needs one.</p>
-<p>Stable 1.0 is the compatibility promise for the supported surface. It ships only when all criteria below hold; it does not follow rc3 automatically.</p>
+<p>Stable 1.0 is the compatibility promise for the supported surface. It ships only when all criteria below hold; it does not follow the last candidate automatically.</p>
 <ul>
-<li><code>1.0.0rc2</code> and <code>1.0.0rc3</code> have shipped, each after its own full green release gate and green CI on the exact commit. A candidate has had a period without new defect reports against the supported surface. A further candidate is required only if a release blocker needs one.</li>
+<li><code>1.0.0rc2</code>, <code>1.0.0rc3</code> and <code>1.0.0rc4</code> have shipped, each after its own full green release gate and green CI on the exact commit. A candidate has had a period without new defect reports against the supported surface. A further candidate is required only if a release blocker needs one.</li>
 <li>Maintainer-run proofs are published with commands and results, each labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failing result, a fix and one custom check; the retrieval pilot against the reference application in <code>examples/retrieval_pilot/</code>, catching a poisoned document and a tenant-filter failure; the regression loop on the same reference application, with a failed and an incomplete result saved and a redacted regression regraded and gated in CI with a reviewable artifact; customization through published extension points only, installing the reference pack from PyPI outside the repository and passing the conformance kit; the security runbook drill, reporting completion and lessons safe to share; recovery runbooks exercised.</li>
 <li>The engineering criteria hold:
 <ul>
@@ -309,8 +314,8 @@ required only if a release blocker needs one.</p>
 </li>
 </ul>
 <p>The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.</p>
-<p>Two maintainer-run proofs are published as notes, both run against 1.0.0rc3 from PyPI by the proofs workflow: <a href="https://guardana.dev/notes/clean-install-offline-first-run">clean-install offline first run</a> and <a href="https://guardana.dev/notes/customization-through-published-extension-points">customization through published extension points</a>. First-run Linux and macOS cells passed; on Windows, <code>guardana diff</code> and <code>guardana doctor</code> end with exit 5 when their output goes to a pipe (<a href="https://github.com/guardana/guardana/issues/145">#145</a>). For customization, the reference pack installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The retrieval pilot and regression loop proofs are not published. Recovery runbooks are exercised by tests. The security drill is not recorded.</p>
-<p><a href="https://github.com/guardana/guardana/issues">Issues</a> track work; <a href="https://github.com/guardana/guardana/milestones">milestones</a> group scope. With <code>1.0.0rc3</code> released, <code>1.0.0</code> is the only open release milestone.</p>
+<p>Two maintainer-run proofs are published as notes, both run against 1.0.0rc4 from PyPI by the proofs workflow: <a href="https://guardana.dev/notes/clean-install-offline-first-run">clean-install offline first run</a> and <a href="https://guardana.dev/notes/customization-through-published-extension-points">customization through published extension points</a>. First-run Linux and macOS cells passed; the four Windows cells reached 13 of 14 steps and are reported, not required: there <code>guardana diff</code> displays the Windows path <code>model\weights.pkl</code> (<a href="https://github.com/guardana/guardana/issues/167">#167</a>). For customization, the reference pack 0.1.3 installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The retrieval pilot and regression loop proofs are not published. Recovery runbooks are exercised by tests. The security drill is not recorded.</p>
+<p><a href="https://github.com/guardana/guardana/issues">Issues</a> track work; <a href="https://github.com/guardana/guardana/milestones">milestones</a> group scope. With <code>1.0.0rc4</code> released, <code>1.0.0</code> is the next release milestone; the <code>next</code> milestone holds work for releases after 1.0.0.</p>
 <p>The owner decides changes to release criteria and records each one here and in the changelog.</p>
 <h3 id="adoption-measures">Adoption measures</h3>
 <p>These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.</p>

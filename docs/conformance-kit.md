@@ -13,12 +13,17 @@ what its row says. It proves nothing else.
 
 | Check | What it proves | What it does not prove |
 |---|---|---|
-| [`guardana rule test`](usage-rule-test.md), `guardana.core.rule.verify.verify_rule` | each rule classifies its own `finding`, `clean` and `inconclusive` samples as declared; a rule missing one of the three is reported as a gap, never as passed | that a prompt carries an attack against a real model, or that the samples resemble your targets |
+| [`guardana rule test`](usage-rule-test.md), `guardana.core.rule.verify.verify_rule` (outside the supported surface) | each rule classifies its own `finding`, `clean` and `inconclusive` samples as declared; a rule missing one of the three is reported as a gap, never as passed | that a prompt carries an attack against a real model, or that the samples resemble your targets |
 | `guardana.testing.assert_target_conforms` | a target implements every capability it declares and declares every capability it implements, has a `ref`, and finds its files in any suffix case | that it reads the right data or reaches the right address; over an empty root it has no file to sample |
-| `ScriptedMcpServer`, `ScriptedA2aAgent` | a rule runs against a server or agent that enforces authorization and one that does not, through the same interfaces a live one uses | that a real server implementation behaves like the double |
-| `files_target` (with `source_read_limit=` for a file the target leaves unread), a `Trace` in a `TraceTarget`, the scripted transports | a rule's fixtures built in code: a file tree, a recorded execution, a model's replies | anything about the model or the files your team actually ships |
+| `ScriptedMcpServer`, `ScriptedA2aAgent` (via `McpServerTarget` or `A2aAgentTarget`, both outside the supported surface) | a rule runs against a server or agent that enforces authorization and one that does not, through the same interfaces a live one uses | that a real server implementation behaves like the double |
+| `files_target` (with `source_read_limit=` for a file the target leaves unread), a `Trace` in a `TraceTarget` (both outside the supported surface), the scripted transports | a rule's fixtures built in code: a file tree, a recorded execution, a model's replies | anything about the model or the files your team actually ships |
 | `guardana.testing.assert_renderer_conforms` | a format's name can be selected, and `render` returns text for every sample run, through the boundary `--format` uses | that the text is correct or complete, or that it states the verdict |
 | `guardana.testing.assert_reporter_conforms` | `prepare` sends nothing, the deliverer has the right shape, and each destination yields its own status for every sample run, through the boundary `--reporter` uses; given the `receiver()` it delivers to, each `delivered` arrived there as exactly one request | what the request carries, whether it ignores proxy variables, or a connection made by a subprocess or a C extension during `prepare`; without `receiver=`, that anything was sent at all |
+
+`guardana.core.rule.verify.verify_rule`, `Trace`, `TraceTarget`, and `McpServerTarget` and
+`A2aAgentTarget` from `guardana.core.target` are outside the
+[supported surface](compatibility.md#the-supported-surface). They are subject to change in
+any release. While your code imports them, pin the exact `guardana-core` version you tested.
 
 The kit has no evaluator check: an evaluator is exercised through the fixtures of the rules
 that use it.
@@ -26,9 +31,11 @@ that use it.
 ## Rules, targets and fixtures
 
 [`guardana rule test`](usage-rule-test.md) runs every fixture a rule declares;
-`verify_rule(rule)` does the same from Python and returns the gaps it found.
-[`extending.md`](extending.md#testing-your-extension) lists every double in
-`guardana.core.testing` and shows `assert_target_conforms`. A file the target could not read
+`verify_rule(rule)`, outside the supported surface, does the same from Python and returns
+the gaps it found. [`extending.md`](extending.md#testing-your-extension) lists every double in
+`guardana.core.testing` and shows `assert_target_conforms`. As it shows, pointing a rule at
+`ScriptedMcpServer` or `ScriptedA2aAgent` needs `McpServerTarget` or `A2aAgentTarget` from
+`guardana.core.target`, both outside the supported surface. A file the target could not read
 makes a sample `inconclusive`, as a run reports it, so a fixture over an unreadable file never
 counts as clean.
 

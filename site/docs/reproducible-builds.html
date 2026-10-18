@@ -215,8 +215,8 @@ tag. Some release tags contain no copy of the script, so always use the current
 checkout's copy:</p>
 <pre><code class="language-bash">git clone https://github.com/guardana/guardana
 cd guardana
-git worktree add --detach ../guardana-v1.0.0rc3 v1.0.0rc3
-uv run --no-project python scripts/reproduce_release.py 1.0.0rc3 --source ../guardana-v1.0.0rc3
+git worktree add --detach ../guardana-v1.0.0rc4 v1.0.0rc4
+uv run --no-project python scripts/reproduce_release.py 1.0.0rc4 --source ../guardana-v1.0.0rc4
 </code></pre>
 <p>Without a source checkout, the script builds the checkout it runs from. In a tag checkout
 that contains the script, this is enough:</p>
@@ -297,9 +297,9 @@ runs from, and has read-only repository access. It does not run on a push becaus
 has no files for a version until its release publishes them. If the check runs before
 PyPI lists the version, each package is <code>NOT CHECKED</code> and the job fails with exit status
 <code>2</code>. Run it again by hand once the files are on PyPI.</p>
-<p>The <a href="https://github.com/guardana/guardana/actions/runs/38378931536">1.0.0rc3 Reproducibility run</a>
+<p>The <a href="https://github.com/guardana/guardana/actions/runs/39129688804">1.0.0rc4 Reproducibility run</a>
 rebuilt every published file: a wheel and an sdist for each of the five packages and the
-reference pack, 12 files in total. Every file reproduced.</p>
+reference pack 0.1.3, 12 files in total. Every file reproduced.</p>
 <h2 id="what-a-match-does-not-prove">What a match does not prove</h2>
 <p>A match shows that the tagged source builds into the published files. It does not show
 that the source is safe. Build provenance, SBOMs and review of each change serve that

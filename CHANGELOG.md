@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Corrected release and conformance documentation after 1.0.0rc4.** Product status, the roadmap and compatibility cover four required candidates and their gates; product status and the roadmap update the published proofs and milestone scope; reproducible builds uses the `1.0.0rc4` run; and the conformance kit marks helpers outside the supported surface and gives exact-version pinning advice.
+
 ## [1.0.0rc4] - 2026-10-16 — the fourth release candidate
 
 ### Added

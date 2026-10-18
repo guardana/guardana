@@ -215,7 +215,7 @@ what its row says. It proves nothing else.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="usage-rule-test.html"><code>guardana rule test</code></a>, <code>guardana.core.rule.verify.verify_rule</code></td>
+<td><a href="usage-rule-test.html"><code>guardana rule test</code></a>, <code>guardana.core.rule.verify.verify_rule</code> (outside the supported surface)</td>
 <td>each rule classifies its own <code>finding</code>, <code>clean</code> and <code>inconclusive</code> samples as declared; a rule missing one of the three is reported as a gap, never as passed</td>
 <td>that a prompt carries an attack against a real model, or that the samples resemble your targets</td>
 </tr>
@@ -225,12 +225,12 @@ what its row says. It proves nothing else.</p>
 <td>that it reads the right data or reaches the right address; over an empty root it has no file to sample</td>
 </tr>
 <tr>
-<td><code>ScriptedMcpServer</code>, <code>ScriptedA2aAgent</code></td>
+<td><code>ScriptedMcpServer</code>, <code>ScriptedA2aAgent</code> (via <code>McpServerTarget</code> or <code>A2aAgentTarget</code>, both outside the supported surface)</td>
 <td>a rule runs against a server or agent that enforces authorization and one that does not, through the same interfaces a live one uses</td>
 <td>that a real server implementation behaves like the double</td>
 </tr>
 <tr>
-<td><code>files_target</code> (with <code>source_read_limit=</code> for a file the target leaves unread), a <code>Trace</code> in a <code>TraceTarget</code>, the scripted transports</td>
+<td><code>files_target</code> (with <code>source_read_limit=</code> for a file the target leaves unread), a <code>Trace</code> in a <code>TraceTarget</code> (both outside the supported surface), the scripted transports</td>
 <td>a rule's fixtures built in code: a file tree, a recorded execution, a model's replies</td>
 <td>anything about the model or the files your team actually ships</td>
 </tr>
@@ -246,13 +246,19 @@ what its row says. It proves nothing else.</p>
 </tr>
 </tbody>
 </table></div>
+<p><code>guardana.core.rule.verify.verify_rule</code>, <code>Trace</code>, <code>TraceTarget</code>, and <code>McpServerTarget</code> and
+<code>A2aAgentTarget</code> from <code>guardana.core.target</code> are outside the
+<a href="compatibility.html#the-supported-surface">supported surface</a>. They are subject to change in
+any release. While your code imports them, pin the exact <code>guardana-core</code> version you tested.</p>
 <p>The kit has no evaluator check: an evaluator is exercised through the fixtures of the rules
 that use it.</p>
 <h2 id="rules-targets-and-fixtures">Rules, targets and fixtures</h2>
 <p><a href="usage-rule-test.html"><code>guardana rule test</code></a> runs every fixture a rule declares;
-<code>verify_rule(rule)</code> does the same from Python and returns the gaps it found.
-<a href="extending.html#testing-your-extension"><code>extending.md</code></a> lists every double in
-<code>guardana.core.testing</code> and shows <code>assert_target_conforms</code>. A file the target could not read
+<code>verify_rule(rule)</code>, outside the supported surface, does the same from Python and returns
+the gaps it found. <a href="extending.html#testing-your-extension"><code>extending.md</code></a> lists every double in
+<code>guardana.core.testing</code> and shows <code>assert_target_conforms</code>. As it shows, pointing a rule at
+<code>ScriptedMcpServer</code> or <code>ScriptedA2aAgent</code> needs <code>McpServerTarget</code> or <code>A2aAgentTarget</code> from
+<code>guardana.core.target</code>, both outside the supported surface. A file the target could not read
 makes a sample <code>inconclusive</code>, as a run reports it, so a fixture over an unreadable file never
 counts as clean.</p>
 <h2 id="outputs">Outputs</h2>
