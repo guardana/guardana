@@ -42,4 +42,4 @@ def test_control_prose_without_secret_names_costs_linear_time() -> None:
 
 
 def test_a_run_of_a_secret_name_costs_linear_time() -> None:
-    assert _growth(_entropy, "password", 25, 100) < 1.3
+    assert _growth(_entropy, "password", 75, 300) < 1.3
