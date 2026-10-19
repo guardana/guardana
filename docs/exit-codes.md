@@ -20,7 +20,7 @@ behaviour.
 | 2 | result indeterminate, or a comparison could not be made |
 | 3 | invalid configuration or CLI usage |
 | 4 | target or judge unavailable, or authentication failed; a run its target stopped part-way is saved |
-| 5 | internal Guardana error |
+| 5 | internal Guardana error, or a third-party evaluator's own code failing in `calibrate` |
 | 6 | budget exhausted |
 | 7 | run interrupted before it finished |
 | 8 | an installed output failed: a format raised or returned no text, or a reporter failed, or a delivery `delivery.required` asks for was not acknowledged; the verdict is printed |
@@ -79,7 +79,7 @@ to read the missing findings as an improvement.
 **`4` is separate from `5`.** An unreachable endpoint is the user's environment;
 an internal error is our defect. A crash prints one line naming the exception type
 and exits `5`; the traceback is printed only with `GUARDANA_DEBUG=1`, because it can
-carry a URL or a payload from the run. A judge configured under `evaluators:` that cannot be
+carry a URL or a payload from the run. In `calibrate`, a third-party evaluator whose own code raises also causes exit `5`; the message names the evaluator and does not call it a Guardana defect. A judge configured under `evaluators:` that cannot be
 reached or rejects the request is `4` too, and the message names the judge's block
 (`evaluators.llm_judge`), not the target. Conflating them sends bug reports to the wrong
 place and hides real bugs in a category people learn to ignore.
@@ -174,6 +174,7 @@ or one the profile names under `rules.paths`, `contracts:`, `calibrations:` or a
 guard's `adapter`; `recipe run` refuses the same profile files inside its
 `output.directory`; `analyze-trace` also exits `3` when `--write-trace` is `--output`, its
 sidecar path or such a file, a file in a `--rules` or `--contract` directory included.
+For `probe`, `--output` also refuses an existing file named by an argument of the stdio `--mcp` command, with exit `3` before anything is written or the server started.
 After scanning and before writing, `scan` exits `3` when `--output` or its sidecar path is
 a file it scanned, other than an earlier saved run and the exchanges a saved run beside it
 records by digest. `run migrate` exits `3` when the sidecar path of `--output`
@@ -181,21 +182,21 @@ is its input; writing over the input itself is migrating in place. It also exits
 when `--output` is the input's own sidecar or the destination cannot be written; the
 destination is then left as it was. `scan --write-baseline` and
 `probe --mcp … --write-mcp-pin` exit `3` beside `--output` or when their file cannot be
-written; the pin command also refuses a destination it reads (a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names) before sending or reading anything. `probe` exits `3` for an MCP-only flag without `--mcp`; `recipe run` exits `3`
+written; the pin command also refuses a destination it reads (a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names) before sending or reading anything. It also refuses an existing file named by an argument of the stdio `--mcp` command, with exit `3` before anything is written or the server started. An argument joining an option and a path, such as `--config=conf.json`, is not recognised as a file. `probe` exits `3` for an MCP-only flag without `--mcp`; `recipe run` exits `3`
 for a recipe that names a file inside its own `output.directory`.
 `probe --keep-exchanges` exits `3` before sending anything when its sidecar path holds
 exchanges the other saved run of the pair (`<stem>` or `<stem>.json`) records, or a file
 the run saved at `--output` does not record by digest.
-`analyze-trace` adds one route to `2` the others do not have: demanded coverage that
+`analyze-trace` exits `2` for demanded coverage that
 was not available, and a security contract that turned out to be about a different
-AI system than the one under test. `baseline create`, `baseline update` and
+AI system than the one under test. `probe --mcp` with a pin also exits `2` for demanded coverage that was not available. `baseline create`, `baseline update` and
 `scan --write-baseline` write nothing and produce `2` when the run is not entitled
 to a snapshot — any open question the gate refuses, with a check that did not run
 counted whatever `fail_on_error` says — because a snapshot taken over a rule that
 never ran is missing whatever it would have found. A run that stopped exits `6` or
 `7` there, as it does on `scan`. `calibrate` exits `3` when `--max-ece` is not finite or is outside [0, 1], `1` when the measured error is over
 `--max-ece`, `2` when the measurement is not reliable, `4` when its judge cannot be
-reached, and `6` when the profile's `budgets:` stop its judge — then nothing is
+reached, `5` when a third-party evaluator's own code raises, and `6` when the profile's `budgets:` stop its judge — then nothing is
 measured or recorded.
 
 A connection that cannot be used as written is `3` on `probe`, `plan probe`,
@@ -204,12 +205,12 @@ unknown `--provider`, a `--system-prompt-file` or `--adapter` that cannot be rea
 `--api-key-env` naming an unset or empty variable, `--adapter` with `--provider` or
 `--api-key-env`, and an adapter whose `url:` differs from `--url` or whose `method:` is
 not `POST`. On `probe --mcp` the same holds for an stdio command given without
-`--allow-exec`, which starts nothing, an `--mcp-token-env` naming an unset or empty
+`--allow-exec`, which starts nothing, an stdio `--mcp` command that cannot be split into a program and its arguments, an `--mcp-token-env` naming an unset or empty
 variable, and an `--mcp-registry-entry` that cannot be read or is not an entry; on
 `probe --a2a` and `plan probe --a2a`, for an agent URL whose path is neither an agent card
 (ending in `.json`) nor the origin; and on `probe --a2a`, for an unset token variable, a
 second caller's variable without the first, or two variables holding the same value. None
-of them is `5`, which is reserved for Guardana's own defects.
+of them is `5`, which covers Guardana's own defects and a third-party evaluator's own failure in `calibrate`.
 
 `recipe lock` and `recipe run` exit `4`, writing no lock and sending nothing, when the
 installed target the recipe names fails to connect while it is being built.

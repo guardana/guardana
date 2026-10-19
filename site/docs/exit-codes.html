@@ -237,7 +237,7 @@ behaviour.</p>
 </tr>
 <tr>
 <td>5</td>
-<td>internal Guardana error</td>
+<td>internal Guardana error, or a third-party evaluator's own code failing in <code>calibrate</code></td>
 </tr>
 <tr>
 <td>6</td>
@@ -299,7 +299,7 @@ to read the missing findings as an improvement.</p>
 <p><strong><code>4</code> is separate from <code>5</code>.</strong> An unreachable endpoint is the user's environment;
 an internal error is our defect. A crash prints one line naming the exception type
 and exits <code>5</code>; the traceback is printed only with <code>GUARDANA_DEBUG=1</code>, because it can
-carry a URL or a payload from the run. A judge configured under <code>evaluators:</code> that cannot be
+carry a URL or a payload from the run. In <code>calibrate</code>, a third-party evaluator whose own code raises also causes exit <code>5</code>; the message names the evaluator and does not call it a Guardana defect. A judge configured under <code>evaluators:</code> that cannot be
 reached or rejects the request is <code>4</code> too, and the message names the judge's block
 (<code>evaluators.llm_judge</code>), not the target. Conflating them sends bug reports to the wrong
 place and hides real bugs in a category people learn to ignore.</p>
@@ -383,6 +383,7 @@ or one the profile names under <code>rules.paths</code>, <code>contracts:</code>
 guard's <code>adapter</code>; <code>recipe run</code> refuses the same profile files inside its
 <code>output.directory</code>; <code>analyze-trace</code> also exits <code>3</code> when <code>--write-trace</code> is <code>--output</code>, its
 sidecar path or such a file, a file in a <code>--rules</code> or <code>--contract</code> directory included.
+For <code>probe</code>, <code>--output</code> also refuses an existing file named by an argument of the stdio <code>--mcp</code> command, with exit <code>3</code> before anything is written or the server started.
 After scanning and before writing, <code>scan</code> exits <code>3</code> when <code>--output</code> or its sidecar path is
 a file it scanned, other than an earlier saved run and the exchanges a saved run beside it
 records by digest. <code>run migrate</code> exits <code>3</code> when the sidecar path of <code>--output</code>
@@ -390,21 +391,21 @@ is its input; writing over the input itself is migrating in place. It also exits
 when <code>--output</code> is the input's own sidecar or the destination cannot be written; the
 destination is then left as it was. <code>scan --write-baseline</code> and
 <code>probe --mcp … --write-mcp-pin</code> exit <code>3</code> beside <code>--output</code> or when their file cannot be
-written; the pin command also refuses a destination it reads (a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names) before sending or reading anything. <code>probe</code> exits <code>3</code> for an MCP-only flag without <code>--mcp</code>; <code>recipe run</code> exits <code>3</code>
+written; the pin command also refuses a destination it reads (a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names) before sending or reading anything. It also refuses an existing file named by an argument of the stdio <code>--mcp</code> command, with exit <code>3</code> before anything is written or the server started. An argument joining an option and a path, such as <code>--config=conf.json</code>, is not recognised as a file. <code>probe</code> exits <code>3</code> for an MCP-only flag without <code>--mcp</code>; <code>recipe run</code> exits <code>3</code>
 for a recipe that names a file inside its own <code>output.directory</code>.
 <code>probe --keep-exchanges</code> exits <code>3</code> before sending anything when its sidecar path holds
 exchanges the other saved run of the pair (<code>&lt;stem&gt;</code> or <code>&lt;stem&gt;.json</code>) records, or a file
 the run saved at <code>--output</code> does not record by digest.
-<code>analyze-trace</code> adds one route to <code>2</code> the others do not have: demanded coverage that
+<code>analyze-trace</code> exits <code>2</code> for demanded coverage that
 was not available, and a security contract that turned out to be about a different
-AI system than the one under test. <code>baseline create</code>, <code>baseline update</code> and
+AI system than the one under test. <code>probe --mcp</code> with a pin also exits <code>2</code> for demanded coverage that was not available. <code>baseline create</code>, <code>baseline update</code> and
 <code>scan --write-baseline</code> write nothing and produce <code>2</code> when the run is not entitled
 to a snapshot — any open question the gate refuses, with a check that did not run
 counted whatever <code>fail_on_error</code> says — because a snapshot taken over a rule that
 never ran is missing whatever it would have found. A run that stopped exits <code>6</code> or
 <code>7</code> there, as it does on <code>scan</code>. <code>calibrate</code> exits <code>3</code> when <code>--max-ece</code> is not finite or is outside [0, 1], <code>1</code> when the measured error is over
 <code>--max-ece</code>, <code>2</code> when the measurement is not reliable, <code>4</code> when its judge cannot be
-reached, and <code>6</code> when the profile's <code>budgets:</code> stop its judge — then nothing is
+reached, <code>5</code> when a third-party evaluator's own code raises, and <code>6</code> when the profile's <code>budgets:</code> stop its judge — then nothing is
 measured or recorded.</p>
 <p>A connection that cannot be used as written is <code>3</code> on <code>probe</code>, <code>plan probe</code>,
 <code>target inspect</code>, <code>monitor</code> and every judge, refused before anything is sent: an
@@ -412,12 +413,12 @@ unknown <code>--provider</code>, a <code>--system-prompt-file</code> or <code>--
 <code>--api-key-env</code> naming an unset or empty variable, <code>--adapter</code> with <code>--provider</code> or
 <code>--api-key-env</code>, and an adapter whose <code>url:</code> differs from <code>--url</code> or whose <code>method:</code> is
 not <code>POST</code>. On <code>probe --mcp</code> the same holds for an stdio command given without
-<code>--allow-exec</code>, which starts nothing, an <code>--mcp-token-env</code> naming an unset or empty
+<code>--allow-exec</code>, which starts nothing, an stdio <code>--mcp</code> command that cannot be split into a program and its arguments, an <code>--mcp-token-env</code> naming an unset or empty
 variable, and an <code>--mcp-registry-entry</code> that cannot be read or is not an entry; on
 <code>probe --a2a</code> and <code>plan probe --a2a</code>, for an agent URL whose path is neither an agent card
 (ending in <code>.json</code>) nor the origin; and on <code>probe --a2a</code>, for an unset token variable, a
 second caller's variable without the first, or two variables holding the same value. None
-of them is <code>5</code>, which is reserved for Guardana's own defects.</p>
+of them is <code>5</code>, which covers Guardana's own defects and a third-party evaluator's own failure in <code>calibrate</code>.</p>
 <p><code>recipe lock</code> and <code>recipe run</code> exit <code>4</code>, writing no lock and sending nothing, when the
 installed target the recipe names fails to connect while it is being built.
 <code>recipe lock</code> exits <code>0</code> once it wrote the lock, <code>1</code>, writing nothing, when a regression

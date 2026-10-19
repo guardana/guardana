@@ -84,7 +84,8 @@ looking complete; for `update`, it would delete every waiver as "fixed".
 
 ## `update` only removes, and only on a complete scan
 
-It drops waivers for findings confirmed absent and **never adds new ones**; a waiver whose rule did not run or whose file the run does not list is retained and listed as `kept: … unknown`.
+It drops waivers for findings confirmed absent and **never adds new ones**; a waiver whose rule did not run, whose file exists but the run does not list, whose directory is missing, or from a `--target` run is retained and listed as `kept: … unknown`.
+On a path run where the rule ran, a waiver whose file no longer exists under the scanned path and whose directory still does is removed and listed as `removed: <fingerprint> (<rule>) — <location> is no longer in the scanned tree`.
 Accepting a risk is a decision somebody makes; `create` is where that happens.
 An update that quietly widened a baseline would be the same failure as a gate that
 weakens itself.

@@ -429,6 +429,8 @@ tensor storage beside a checkpoint's `data.pkl`, a numeric array, everything aft
 four pickles in a file whose first pickle returns the magic number, whatever the file is
 named, a
 member named as no model, and after a complete pickle without a `PROTO` opcode.
+Storage is still reported when it holds a pickle with a dotted-name import, a `PROTO` header with hidden operands or a read cut short, or an archive.
+A member any zip reader shows as `data.pkl` is read as a pickle.
 
 ## Other formats
 

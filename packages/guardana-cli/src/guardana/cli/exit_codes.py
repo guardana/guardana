@@ -49,7 +49,10 @@ class ExitCode(IntEnum):
     """
 
     INTERNAL_ERROR = 5
-    """Guardana itself failed. This one is a bug report; `GUARDANA_DEBUG=1` prints the traceback."""
+    """Guardana failed, or under `calibrate` an evaluator's own code did.
+
+    A bug report to whoever the message names; `GUARDANA_DEBUG=1` prints the traceback.
+    """
 
     BUDGET_EXHAUSTED = 6
     """A budget ran out and the run stopped early.

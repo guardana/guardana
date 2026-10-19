@@ -285,7 +285,7 @@ any release. While your code imports them, pin the exact <code>guardana-core</co
 </tr>
 </tbody>
 </table></div>
-<p>Budgets, failure bars, redaction and trials come from the profile, as on the command line.</p>
+<p>Budgets, failure bars, redaction and trials come from the profile, as on the command line; a <code>Budgets</code> built in code refuses a counted ceiling below <code>1</code> with <code>ValueError</code> and a non-whole number with <code>TypeError</code>.</p>
 <h2 id="run-a-target">Run a target</h2>
 <pre><code class="language-python">verification = verifier.scan(path, relative_to=None, baseline=None, source=None, deployment=None)
 verification = verifier.run(target, relative_to=None, baseline=None, source=None, deployment=None)

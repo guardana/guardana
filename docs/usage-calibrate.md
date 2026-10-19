@@ -190,6 +190,7 @@ Guardana version, or upgrade every Guardana install that reads the file together
 | too few graded samples, or too many abstentions | **indeterminate** | `2` |
 | no such evaluator, or an unreadable corpus | refused | `3` |
 | the judge endpoint could not be reached or rejected the request | refused | `4` |
+| a third-party evaluator's own code raised | nothing measured or recorded | `5` |
 | the profile's `budgets:` stopped the judge before every sample was graded | **stopped** | `6` |
 
 Exit `2` rather than `0` because "we measured nothing" must not read as "we measured,

@@ -300,7 +300,8 @@ counts whatever <code>fail_on_error</code> says. A profile that selects no rule 
 scan with nothing in it, and a baseline taken over it would waive nothing while
 looking complete; for <code>update</code>, it would delete every waiver as &quot;fixed&quot;.</p>
 <h2 id="update-only-removes-and-only-on-a-complete-scan"><code>update</code> only removes, and only on a complete scan</h2>
-<p>It drops waivers for findings confirmed absent and <strong>never adds new ones</strong>; a waiver whose rule did not run or whose file the run does not list is retained and listed as <code>kept: … unknown</code>.
+<p>It drops waivers for findings confirmed absent and <strong>never adds new ones</strong>; a waiver whose rule did not run, whose file exists but the run does not list, whose directory is missing, or from a <code>--target</code> run is retained and listed as <code>kept: … unknown</code>.
+On a path run where the rule ran, a waiver whose file no longer exists under the scanned path and whose directory still does is removed and listed as <code>removed: &lt;fingerprint&gt; (&lt;rule&gt;) — &lt;location&gt; is no longer in the scanned tree</code>.
 Accepting a risk is a decision somebody makes; <code>create</code> is where that happens.
 An update that quietly widened a baseline would be the same failure as a gate that
 weakens itself.</p>

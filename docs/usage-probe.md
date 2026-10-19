@@ -58,10 +58,10 @@ guardana probe (--url <base-url> --model <name> | --target <scheme://locator> | 
 | `--reporter TEXT` | none | Forward findings to a collector, e.g. `server://https://collector.example.com`, or to an [installed reporter](outputs.md) as `<name>://<locator>` |
 | `--mcp TEXT` | none | Examine an **MCP server** instead of a chat model — see [Probing an MCP server](#probing-an-mcp-server). Refused with `--url`, `--model`, `--provider`, `--api-key-env`, `--adapter`, `--system-prompt-file` or `--a2a`, which configure another target (exit `3`). `--mcp-token-env`, `--mcp-pin`, `--write-mcp-pin`, `--mcp-registry-entry` and `--allow-exec` are refused without `--mcp` (exit `3`). |
 | `--mcp-token-env TEXT` | none | Name of an environment variable holding a bearer token for the MCP server |
-| `--mcp-pin PATH` | none | Approved MCP manifest to compare the live one against |
-| `--write-mcp-pin PATH` | none | Write the server's current manifest as approved, and exit without reporting. It produces no report, so `--output` or any `--reporter` beside it is refused with exit `3` before anything is sent. A destination the command reads — a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names — is also refused with exit `3` before anything is sent or read. |
+| `--mcp-pin PATH` | none | Approved MCP manifest to compare the live one against. A pin that cannot be compared, or is not checked because the rule is left out of the profile or the run does not finish it, ends the run `indeterminate` (exit `2`). |
+| `--write-mcp-pin PATH` | none | Write the server's current manifest as approved, and exit without reporting. It produces no report, so `--output` or any `--reporter` beside it is refused with exit `3` before anything is sent. A destination the command reads — a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names — is also refused with exit `3` before anything is sent or read. An existing file named by an argument of the stdio `--mcp` command is refused with exit `3` before anything is written or the server started. |
 | `--mcp-registry-entry PATH` | none | The server's registry `server.json`, compared with the URL the server answered at and the version it reports — see [The registry entry](#the-registry-entry). A file that cannot be read or is not an entry is refused (exit `3`); needs `--mcp` |
-| `--allow-exec` | off | Permit `--mcp` to **start** an stdio server, which executes the code under examination. Without it an stdio command is refused (exit `3`) and nothing is started |
+| `--allow-exec` | off | Permit `--mcp` to **start** an stdio server, which executes the code under examination. Without it an stdio command is refused (exit `3`) and nothing is started. An stdio command that cannot be split into a program and its arguments is refused with exit `3` before anything starts. |
 | `--a2a TEXT` | none | Examine an **A2A agent** instead of a chat model: the http(s) URL of its card (ending in `.json`) or its origin; any other path is refused (exit `3`) — see [Probing an A2A agent](#probing-an-a2a-agent). Refused with the endpoint and MCP flags (exit `3`) |
 | `--a2a-token-env TEXT` | none | Name of an environment variable holding the first caller's bearer token for the A2A agent. An unset or empty variable is refused (exit `3`) |
 | `--a2a-other-token-env TEXT` | none | Name of an environment variable holding a second, different caller's bearer token. Needs `--a2a-token-env`; the same value in both is refused (exit `3`) |
@@ -72,7 +72,7 @@ guardana probe (--url <base-url> --model <name> | --target <scheme://locator> | 
 | `--ai-system TEXT` | none | Which AI system this run verifies, e.g. `support-agent`. Never guessed. |
 | `--environment TEXT` | none | Where it runs, e.g. `production`. Never guessed from a branch name. |
 | `--deployment-id TEXT` | none | Which version of it, if you have an identifier. |
-| `--output PATH` | stdout | Write the report to a file instead of stdout — needed by `guardana diff`. A `PATH` that is, or whose `<stem>.exchanges.jsonl` is, a file the probe reads — `--profile`, a `--rules` file, `--system-prompt-file`, `--fixtures` or a tenant's adapter, `--adapter`, `--mcp-pin`, `--mcp-registry-entry`, or a file the profile names — is refused with exit `3` before anything is sent. See [Saving a run for comparison](#saving-a-run-for-comparison) |
+| `--output PATH` | stdout | Write the report to a file instead of stdout — needed by `guardana diff`. A `PATH` that is, or whose `<stem>.exchanges.jsonl` is, a file the probe reads — `--profile`, a `--rules` file, `--system-prompt-file`, `--fixtures` or a tenant's adapter, `--adapter`, `--mcp-pin`, `--mcp-registry-entry`, or a file the profile names — is refused with exit `3` before anything is sent. A `PATH` that is an existing file named by an argument of the stdio `--mcp` command is refused with exit `3` before anything is written or the server started. See [Saving a run for comparison](#saving-a-run-for-comparison) |
 | `--keep-exchanges` | off (or `privacy.keep_exchanges`) | Keep every chat exchange of the plain pass, redacted, beside the saved run so [`guardana grade`](usage-grade.md) can grade it again without calling the endpoint — see [Keeping the exchanges](#keeping-the-exchanges). Needs `--format json --output`; refused with `--mcp` and `--a2a`, with a `--target` not built on the built-in endpoint, and with `privacy.evidence_mode: metadata_only` (exit `3`) |
 
 `--target` is mutually exclusive with `--url`, `--model`, provider, adapter, credential,
@@ -200,8 +200,14 @@ guardana probe --mcp https://mcp.example.com/mcp \
 ```
 
 The pin stores a digest per tool rather than the prose, so the file records *that*
-the manifest was approved and cannot be edited into agreement. Without `--mcp-pin`
-drift is reported `inconclusive`, never as a clean server.
+the manifest was approved and cannot be edited into agreement. A pin given with `--mcp-pin`
+or set in the profile's rule config is demanded coverage. If it is approved for another
+server, names no server or is unusable, the run records a `demanded_check` coverage shortfall
+and ends `indeterminate` (exit `2`) whatever `fail_on` says.
+The same outcome applies when `--mcp-pin` is given and the rule is left out of the profile
+or the run does not finish it. The warning on stderr is:
+`warning: --mcp-pin <path> was given and the pinned manifest was not checked: <detail>`.
+Without a pin, drift is reported `inconclusive`, never as a clean server.
 
 Every page of the listing is read, following `nextCursor`, and both the checks and the
 pin cover every page, up to 16 pages and 4 MiB of UTF-8 in total. A listing that cannot be read to its

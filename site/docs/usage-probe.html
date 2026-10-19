@@ -337,12 +337,12 @@ the run (exit <code>4</code>).</p>
 <tr>
 <td><code>--mcp-pin PATH</code></td>
 <td>none</td>
-<td>Approved MCP manifest to compare the live one against</td>
+<td>Approved MCP manifest to compare the live one against. A pin that cannot be compared, or is not checked because the rule is left out of the profile or the run does not finish it, ends the run <code>indeterminate</code> (exit <code>2</code>).</td>
 </tr>
 <tr>
 <td><code>--write-mcp-pin PATH</code></td>
 <td>none</td>
-<td>Write the server's current manifest as approved, and exit without reporting. It produces no report, so <code>--output</code> or any <code>--reporter</code> beside it is refused with exit <code>3</code> before anything is sent. A destination the command reads — a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names — is also refused with exit <code>3</code> before anything is sent or read.</td>
+<td>Write the server's current manifest as approved, and exit without reporting. It produces no report, so <code>--output</code> or any <code>--reporter</code> beside it is refused with exit <code>3</code> before anything is sent. A destination the command reads — a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names — is also refused with exit <code>3</code> before anything is sent or read. An existing file named by an argument of the stdio <code>--mcp</code> command is refused with exit <code>3</code> before anything is written or the server started.</td>
 </tr>
 <tr>
 <td><code>--mcp-registry-entry PATH</code></td>
@@ -352,7 +352,7 @@ the run (exit <code>4</code>).</p>
 <tr>
 <td><code>--allow-exec</code></td>
 <td>off</td>
-<td>Permit <code>--mcp</code> to <strong>start</strong> an stdio server, which executes the code under examination. Without it an stdio command is refused (exit <code>3</code>) and nothing is started</td>
+<td>Permit <code>--mcp</code> to <strong>start</strong> an stdio server, which executes the code under examination. Without it an stdio command is refused (exit <code>3</code>) and nothing is started. An stdio command that cannot be split into a program and its arguments is refused with exit <code>3</code> before anything starts.</td>
 </tr>
 <tr>
 <td><code>--a2a TEXT</code></td>
@@ -407,7 +407,7 @@ the run (exit <code>4</code>).</p>
 <tr>
 <td><code>--output PATH</code></td>
 <td>stdout</td>
-<td>Write the report to a file instead of stdout — needed by <code>guardana diff</code>. A <code>PATH</code> that is, or whose <code>&lt;stem&gt;.exchanges.jsonl</code> is, a file the probe reads — <code>--profile</code>, a <code>--rules</code> file, <code>--system-prompt-file</code>, <code>--fixtures</code> or a tenant's adapter, <code>--adapter</code>, <code>--mcp-pin</code>, <code>--mcp-registry-entry</code>, or a file the profile names — is refused with exit <code>3</code> before anything is sent. See <a href="#saving-a-run-for-comparison">Saving a run for comparison</a></td>
+<td>Write the report to a file instead of stdout — needed by <code>guardana diff</code>. A <code>PATH</code> that is, or whose <code>&lt;stem&gt;.exchanges.jsonl</code> is, a file the probe reads — <code>--profile</code>, a <code>--rules</code> file, <code>--system-prompt-file</code>, <code>--fixtures</code> or a tenant's adapter, <code>--adapter</code>, <code>--mcp-pin</code>, <code>--mcp-registry-entry</code>, or a file the profile names — is refused with exit <code>3</code> before anything is sent. A <code>PATH</code> that is an existing file named by an argument of the stdio <code>--mcp</code> command is refused with exit <code>3</code> before anything is written or the server started. See <a href="#saving-a-run-for-comparison">Saving a run for comparison</a></td>
 </tr>
 <tr>
 <td><code>--keep-exchanges</code></td>
@@ -523,8 +523,14 @@ guardana probe --mcp https://mcp.example.com/mcp \
   --mcp-pin mcp.pin.json                # compare against it
 </code></pre>
 <p>The pin stores a digest per tool rather than the prose, so the file records <em>that</em>
-the manifest was approved and cannot be edited into agreement. Without <code>--mcp-pin</code>
-drift is reported <code>inconclusive</code>, never as a clean server.</p>
+the manifest was approved and cannot be edited into agreement. A pin given with <code>--mcp-pin</code>
+or set in the profile's rule config is demanded coverage. If it is approved for another
+server, names no server or is unusable, the run records a <code>demanded_check</code> coverage shortfall
+and ends <code>indeterminate</code> (exit <code>2</code>) whatever <code>fail_on</code> says.
+The same outcome applies when <code>--mcp-pin</code> is given and the rule is left out of the profile
+or the run does not finish it. The warning on stderr is:
+<code>warning: --mcp-pin &lt;path&gt; was given and the pinned manifest was not checked: &lt;detail&gt;</code>.
+Without a pin, drift is reported <code>inconclusive</code>, never as a clean server.</p>
 <p>Every page of the listing is read, following <code>nextCursor</code>, and both the checks and the
 pin cover every page, up to 16 pages and 4 MiB of UTF-8 in total. A listing that cannot be read to its
 last page is never graded as a shorter one: more pages or bytes than that, a cursor that

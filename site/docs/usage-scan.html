@@ -709,7 +709,9 @@ and wherever a pickle opens with a <code>PROTO</code> opcode of any protocol. It
 tensor storage beside a checkpoint's <code>data.pkl</code>, a numeric array, everything after those
 four pickles in a file whose first pickle returns the magic number, whatever the file is
 named, a
-member named as no model, and after a complete pickle without a <code>PROTO</code> opcode.</p>
+member named as no model, and after a complete pickle without a <code>PROTO</code> opcode.
+Storage is still reported when it holds a pickle with a dotted-name import, a <code>PROTO</code> header with hidden operands or a read cut short, or an archive.
+A member any zip reader shows as <code>data.pkl</code> is read as a pickle.</p>
 <h2 id="other-formats">Other formats</h2>
 <pre><code class="language-bash">guardana scan . --format json    # machine-readable findings + summary
 guardana scan . --format sarif   # SARIF 2.1.0, for GitHub code-scanning upload
