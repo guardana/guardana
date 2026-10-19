@@ -11,6 +11,7 @@ import math
 import re
 import reprlib
 from dataclasses import dataclass, field
+from typing import get_args, get_type_hints
 
 from guardana.core.redaction import OMITTED_WHEN_DEFAULT
 
@@ -70,7 +71,22 @@ class Budgets:
     """The pace requests may be sent at, so a rate-limited target is not run into its limit."""
 
     def __post_init__(self) -> None:
-        """Refuse a duration ceiling no elapsed time can exceed: NaN, infinite or negative."""
+        """Refuse a ceiling that bounds nothing.
+
+        That is a count that is not a whole number of at least 1, or a duration that is NaN,
+        infinite or negative.
+        """
+        for name in _COUNTED_CEILINGS:
+            value = getattr(self, name)
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{name} must be a whole number, got {value!r}")
+            if value < 1:
+                raise ValueError(
+                    f"{name} must be at least 1 — a ceiling of {value} would stop the run "
+                    f"before it checked anything, which is not a budget"
+                )
         seconds = self.max_duration_seconds
         if seconds is not None and not (math.isfinite(seconds) and seconds >= 0):
             raise ValueError(
@@ -94,3 +110,9 @@ class Budgets:
                 self.max_requests_per_minute is not None,
             )
         )
+
+
+_COUNTED_CEILINGS: tuple[str, ...] = tuple(
+    name for name, hint in get_type_hints(Budgets).items() if int in get_args(hint)
+)
+"""Every `Budgets` field that counts something, so each new count is refused below 1."""

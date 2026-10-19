@@ -1,13 +1,18 @@
 import math
+import traceback
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import typer
 from guardana.cli._errors import run_against_endpoint
 from guardana.cli._evaluators import wire_config_evaluators
-from guardana.cli._exit import refuse_invalid_profile, refuse_unenforceable_budget
+from guardana.cli._exit import (
+    print_debug_traceback,
+    refuse_invalid_profile,
+    refuse_unenforceable_budget,
+)
 from guardana.cli._plugins import (
     AllowPluginOption,
     PluginsOption,
@@ -20,6 +25,7 @@ from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
 from guardana.core.calibration import CalibrationReport, calibrate
 from guardana.core.calibration.corpus import CorpusError, bundled_corpus, load_corpus
+from guardana.core.calibration.sample import CalibrationSample
 from guardana.core.calibration.store import (
     CalibrationStoreError,
     RecordedCalibration,
@@ -27,10 +33,19 @@ from guardana.core.calibration.store import (
     load_calibrations,
     write_calibrations,
 )
+from guardana.core.evaluator.base import Evaluator
+from guardana.core.evaluator.guard import GuardEvaluator
+from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
+from guardana.core.evaluator.reference_judge import ReferenceJudgeEvaluator
+from guardana.core.origin import Origin
 from guardana.core.profile import ProfileError
+from guardana.core.redaction import RedactionPolicy
 from guardana.core.registry import Registry
 
 _UNMEASURED = "—"
+_BUILT_FROM_THE_PROFILE = (LlmJudgeEvaluator, ReferenceJudgeEvaluator, GuardEvaluator)
+"""The judges a profile's evaluator blocks build from Guardana's own code; they are
+registered with no distribution, so their origin cannot say so."""
 
 
 def calibrate_command(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
@@ -97,20 +112,7 @@ def calibrate_command(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI fl
     except CorpusError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    # No `accepts`: the judge's credentials live in the profile, and calibrate takes none of
-    # the endpoint flags the shared advice would otherwise name. A config-built judge names
-    # its own block and URL when it fails; this label is only for a plugin's own network.
-    try:
-        report = run_against_endpoint(
-            f"of evaluator {evaluator!r}", lambda: calibrate(grader, samples), privacy=prof.privacy
-        )
-    except BudgetExhausted as exc:
-        typer.echo(
-            f"error: {exc} — the calibration stopped before every sample was graded, "
-            f"so nothing was measured or recorded",
-            err=True,
-        )
-        raise typer.Exit(code=ExitCode.BUDGET_EXHAUSTED) from exc
+    report = _measure(grader, samples, registry.evaluator_origin(evaluator), prof.privacy)
     typer.echo(_render(report, len(samples), starter=corpus is None))
     if record is not None:
         _record(report, corpus, record)
@@ -123,6 +125,93 @@ def calibrate_command(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI fl
     if max_ece is not None and measured_ece is not None and measured_ece > max_ece:
         # This one *is* a verdict: it measured, and the result is over the bar.
         raise typer.Exit(code=ExitCode.POLICY_FAILED)
+
+
+def _measure(
+    grader: Evaluator,
+    samples: list[CalibrationSample],
+    origin: Origin,
+    privacy: RedactionPolicy,
+) -> CalibrationReport:
+    """Grade every sample with `grader`, ending the command when the measurement cannot finish.
+
+    A failure of `grader`'s own code exits `5` naming the evaluator; a failure of the
+    calibration itself, or of an evaluator that is Guardana's own code, is left to the
+    command's handler for a Guardana defect.
+    """
+    # No `accepts`: the judge's credentials live in the profile, and calibrate takes none of
+    # the endpoint flags the shared advice would otherwise name. A config-built judge names
+    # its own block and URL when it fails; this label is only for a plugin's own network.
+    try:
+        return run_against_endpoint(
+            f"of evaluator {grader.id!r}", lambda: calibrate(grader, samples), privacy=privacy
+        )
+    except BudgetExhausted as exc:
+        typer.echo(
+            f"error: {exc} — the calibration stopped before every sample was graded, "
+            f"so nothing was measured or recorded",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.BUDGET_EXHAUSTED) from exc
+    except typer.Exit as exc:
+        # Guardana's own handlers raise an exit *from* the grader's exception, so only the
+        # exit's own traceback says whether the grader itself ended the command.
+        if _passed_through(grader, exc) and not _guardanas_own(grader, origin):
+            _end_with_failed_evaluator(grader.id, origin, exc, exc)
+        raise
+    except Exception as exc:
+        raised = _raised_by(grader, exc)
+        if raised is None or _guardanas_own(grader, origin):
+            raise
+        _end_with_failed_evaluator(grader.id, origin, raised, exc)
+
+
+def _guardanas_own(grader: Evaluator, origin: Origin) -> bool:
+    """Whether `grader` is Guardana's code: built in, or a judge built exactly from the profile.
+
+    A subclass of a profile-built judge is somebody else's code, so it is named when it fails.
+    """
+    return origin.is_builtin or type(grader) in _BUILT_FROM_THE_PROFILE
+
+
+def _raised_by(grader: Evaluator, exc: BaseException) -> BaseException | None:
+    """Return the exception in `exc`'s cause chain raised while `grader`'s own code ran.
+
+    None when no link passed through a method of `grader`: the calibration itself
+    failed, which stays Guardana's defect.
+    """
+    link: BaseException | None = exc
+    while link is not None:
+        if _passed_through(grader, link):
+            return link
+        link = link.__cause__
+    return None
+
+
+def _passed_through(grader: Evaluator, exc: BaseException) -> bool:
+    """Whether `exc` was raised while a method of `grader` was running, by its own traceback."""
+    return any(
+        frame.f_locals.get("self") is grader
+        for frame, _line in traceback.walk_tb(exc.__traceback__)
+    )
+
+
+def _end_with_failed_evaluator(
+    evaluator: str, origin: Origin, raised: BaseException, exc: Exception
+) -> NoReturn:
+    """Exit `5` naming the evaluator whose own code failed, and only the exception's type.
+
+    The exception's text is not printed: it may quote a sample or a credential.
+    """
+    print_debug_traceback(exc)
+    owner = origin.distribution or "the distribution that installed it"
+    typer.echo(
+        f"error: evaluator {evaluator!r} raised {type(raised).__name__} while grading — "
+        f"nothing was measured or recorded; report it to {owner}. "
+        f"Set GUARDANA_DEBUG=1 to print the traceback.",
+        err=True,
+    )
+    raise typer.Exit(code=ExitCode.INTERNAL_ERROR) from exc
 
 
 def _record(report: CalibrationReport, corpus: Path | None, destination: Path) -> None:

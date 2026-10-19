@@ -475,6 +475,30 @@ def test_an_stdio_command_without_allow_exec_is_a_usage_error_and_starts_nothing
     assert not marker.exists()
 
 
+@pytest.mark.parametrize("pin", [False, True], ids=["probe", "write-pin"])
+def test_an_stdio_command_that_does_not_split_is_a_usage_error_and_starts_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pin: bool
+) -> None:
+    from guardana.cli.main import app  # noqa: PLC0415
+    from typer.testing import CliRunner  # noqa: PLC0415
+
+    built = _pin_server(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    extra = ["--write-mcp-pin", "pin.json"] if pin else ["--output", "run.json"]
+
+    result = CliRunner().invoke(
+        app, ["probe", "--mcp", "python 'x", "--allow-exec", *extra], catch_exceptions=False
+    )
+
+    assert result.exit_code == 3, result.output
+    assert (
+        "error: the --mcp command cannot be split into a program and its arguments: "
+        "No closing quotation"
+    ) in _plain(result.output)
+    assert built == []
+    assert list(tmp_path.iterdir()) == []
+
+
 def _files_under(root: Path) -> dict[str, bytes]:
     return {
         str(path.relative_to(root)): path.read_bytes()

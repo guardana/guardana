@@ -819,13 +819,13 @@ def test_an_import_on_an_unterminated_last_line_is_flagged(
     _assert_flagged(findings)
 
 
-def _unicode_path_zip(stored: str, shown: str) -> bytes:
+def _unicode_path_zip(stored: str, shown: str, payload: bytes = _PAYLOAD) -> bytes:
     body = struct.pack("<BL", 1, zlib.crc32(stored.encode())) + shown.encode()
     info = zipfile.ZipInfo(stored)
     info.extra = struct.pack("<HH", 0x7075, len(body)) + body
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr(info, _PAYLOAD)
+        archive.writestr(info, payload)
     return buffer.getvalue()
 
 
@@ -840,6 +840,25 @@ def test_a_member_named_as_a_model_by_any_zip_reader_is_read(
     findings, _ctx = _run(tmp_path, "bundle.zip", _unicode_path_zip(stored, shown))
 
     _assert_flagged(findings)
+
+
+# A header-less pickle whose import sits past the end of a one-byte frame.
+_FRAMED_IMPORT = (
+    b"\x95" + (1).to_bytes(8, "little") + b"\x8c\x08builtins\x8c\x03len\x93\x8c\x01x\x85R."
+)
+
+
+@pytest.mark.parametrize(
+    ("stored", "shown"),
+    [("archive/data.pkl", "archive/data/0"), ("archive/data/0", "archive/data.pkl")],
+    ids=["stored-as-data-pkl", "shown-as-data-pkl"],
+)
+def test_a_data_pkl_any_zip_reader_shows_is_never_taken_for_a_tensor_storage(
+    tmp_path: Path, stored: str, shown: str
+) -> None:
+    findings, _ctx = _run(tmp_path, "model.pt", _unicode_path_zip(stored, shown, _FRAMED_IMPORT))
+
+    assert any("crosses the end of a frame" in line for line in _unscanned(findings)), findings
 
 
 def _text(value: str) -> bytes:

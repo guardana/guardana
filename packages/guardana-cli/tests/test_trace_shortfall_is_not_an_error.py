@@ -72,13 +72,10 @@ def test_a_missing_dimension_is_recorded_as_a_shortfall_and_no_error(
     assert [gap["name"] for gap in shortfall] == ["retrieval"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="every coverage shortfall is echoed to stderr with an `error:` prefix",
-)
 @pytest.mark.parametrize("mode", ["redacted", "metadata_only"])
 def test_a_shortfall_is_not_reported_as_an_error(tmp_path: Path, mode: str) -> None:
     _code, stderr, _document = _analyze(tmp_path, mode)
 
     assert [line for line in stderr if line.startswith("error:")] == [], stderr
+    shortfall = "coverage missing (missing_dimension): retrieval"
+    assert [line for line in stderr if line.startswith(shortfall)] != [], stderr

@@ -1368,9 +1368,13 @@ def _starts_as_array_or_pickle(archive: zipfile.ZipFile, info: zipfile.ZipInfo) 
 def _zip_member_kind(
     info: zipfile.ZipInfo, names: frozenset[str], *, every_member: bool
 ) -> "_Member":
-    """How a chosen zip member's bytes are judged, by every name it may be read under."""
+    """How a chosen zip member's bytes are judged, by every name it may be read under.
+
+    A storage only when every reader sees one: a reader that shows the member as `data.pkl`
+    unpickles it.
+    """
     member_names = _zip_names(info)
-    if any(_is_raw_storage(name, names) for name in member_names):
+    if all(_is_raw_storage(name, names) for name in member_names):
         return _Member.STORAGE
     modelled = [name for name in member_names if _model_named(name)]
     if not every_member and all(_member_suffix(name) in _SNIFFED_SUFFIXES for name in modelled):
@@ -1387,13 +1391,16 @@ def _is_raw_storage(name: str, names: frozenset[str]) -> bool:
 def _holds_a_pickle(head: bytes, scan: _OpcodeScan, *, cut: bool) -> bool:
     """Whether a tensor storage's bytes are a pickle rather than values that parse as opcodes.
 
-    A pickle imports a callable with a real dotted name, or hides the operands of an
-    import, or says it is one in its header and was still parsing where the read was cut.
-    Tensor values end on a short stack, a malformed opcode or the end of their bytes.
+    A pickle imports a callable with a real dotted name, or says it is one in its header
+    and hides the operands of an import or was still parsing where the read was cut.
+    Tensor values can parse as an import with hidden operands, but `torch.load` never
+    unpickles a storage, so without a header that is not taken as evidence of a pickle.
     """
-    if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs) or _unproven_pickle(scan):
+    if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs):
         return True
-    return cut and scan.end is ParseEnd.RAN_OUT and head.startswith(_PICKLE_HEADERS)
+    if not head.startswith(_PICKLE_HEADERS):
+        return False
+    return _unproven_pickle(scan) or (cut and scan.end is ParseEnd.RAN_OUT)
 
 
 @dataclass(slots=True)

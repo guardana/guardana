@@ -6,7 +6,7 @@ from pathlib import Path
 
 from guardana.core.evaluator.base import Verdict
 from guardana.core.fingerprint import digest_of
-from guardana.core.report import Evidence, Finding
+from guardana.core.report import CoverageShortfall, Evidence, Finding, ShortfallKind
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.rule.fixture import DeclaredFixture, FixtureOutcome, RuleFixture, materialise
 from guardana.core.safety import Detection, Impact
@@ -136,6 +136,8 @@ class McpServerManifestRule(Rule):
     Without an approved manifest to compare against, drift cannot be detected at
     all. That is reported as `inconclusive`, never as a clean server: "nothing
     changed" and "we have no idea whether anything changed" are different answers.
+    A pin that was given and cannot be compared — unusable, or approved for another
+    server — is also a coverage shortfall: the comparison was demanded.
     """
 
     meta = RuleMeta(
@@ -250,7 +252,7 @@ class McpServerManifestRule(Rule):
             # Never a finding: the server may be perfectly intact, and saying it
             # drifted on the strength of somebody else's approved manifest would be
             # a confident answer to a question this run cannot ask.
-            yield self._unverified(ref, mismatch)
+            yield self._unmet(ref, mismatch, ctx)
             return
         if pinned.version == _DESCRIPTIONS_ONLY:
             # An older pin still compares, and still says what it cannot compare.
@@ -278,7 +280,7 @@ class McpServerManifestRule(Rule):
             try:
                 return _pin_of(self._approved)
             except ValueError as exc:
-                return self._unverified(ref, f"the approved manifest is unusable: {exc}")
+                return self._unmet(ref, f"the approved manifest is unusable: {exc}", ctx)
         pin_path = ctx.get("pin", None)
         if not isinstance(pin_path, str) or not pin_path:
             return self._unverified(
@@ -289,7 +291,7 @@ class McpServerManifestRule(Rule):
         try:
             return _load_pin(Path(pin_path))
         except (OSError, ValueError) as exc:
-            return self._unverified(ref, f"the pinned manifest at {pin_path} is unusable: {exc}")
+            return self._unmet(ref, f"the pinned manifest at {pin_path} is unusable: {exc}", ctx)
 
     def _finding(self, ref: str, summary: str, severity: Severity | None = None) -> Finding:
         return Finding(
@@ -300,6 +302,11 @@ class McpServerManifestRule(Rule):
             target_ref=ref,
             evidence=Evidence(summary=summary, detail=f"server={ref}"),
         )
+
+    def _unmet(self, ref: str, why: str, ctx: RuleContext) -> Finding:
+        """Report a given pin that cannot be compared, a demand with no `fail_on` switch."""
+        ctx.shortfall(CoverageShortfall(ShortfallKind.DEMANDED_CHECK, self.meta.id, why))
+        return self._unverified(ref, why)
 
     def _unverified(self, ref: str, why: str) -> Finding:
         return Finding(

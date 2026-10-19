@@ -6,11 +6,13 @@ like success: a team whose gate is red can otherwise lower the budget until the
 run ends early and the pipeline goes quiet.
 """
 
+import dataclasses
 import math
 from collections.abc import Iterable, Sequence
+from typing import Any
 
 import pytest
-from guardana.core.budget import BudgetExhausted, Budgets, parse_duration
+from guardana.core.budget import _COUNTED_CEILINGS, BudgetExhausted, Budgets, parse_duration
 from guardana.core.gate import GateOutcome, gate_outcome
 from guardana.core.profile import Policy, Profile
 from guardana.core.registry import Registry
@@ -229,18 +231,17 @@ def test_a_zero_duration_ceiling_built_in_code_is_still_accepted() -> None:
     assert Budgets(max_duration_seconds=0.0).max_duration_seconds == 0.0
 
 
-_COUNTED_CEILINGS = (
-    "max_requests",
-    "max_input_tokens",
-    "max_output_tokens",
-    "max_requests_per_minute",
-)
+def test_every_ceiling_but_the_duration_is_a_counted_one() -> None:
+    every = {field.name for field in dataclasses.fields(Budgets)}
+
+    assert set(_COUNTED_CEILINGS) == every - {"max_duration_seconds"}
 
 
-def _refusal(ceiling: str, value: int) -> ValueError | None:
+def _refusal(ceiling: str, value: object) -> ValueError | TypeError | None:
+    built_in_code: dict[str, Any] = {ceiling: value}
     try:
-        Budgets(**{ceiling: value})
-    except ValueError as refused:
+        Budgets(**built_in_code)
+    except (ValueError, TypeError) as refused:
         return refused
     return None
 
@@ -250,11 +251,6 @@ def test_a_positive_counted_ceiling_built_in_code_is_accepted(ceiling: str) -> N
     assert _refusal(ceiling, 1) is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Budgets checks only the duration ceiling, so zero or a negative count constructs",
-)
 @pytest.mark.parametrize("value", [0, -1])
 @pytest.mark.parametrize("ceiling", _COUNTED_CEILINGS)
 def test_a_counted_ceiling_below_one_built_in_code_is_refused(ceiling: str, value: int) -> None:
@@ -318,3 +314,14 @@ def test_a_profile_without_budgets_sets_no_ceiling(tmp_path: object) -> None:
     profile.write_text("name: ci\n", encoding="utf-8")
 
     assert load_profile(profile).budgets.is_unbounded
+
+
+@pytest.mark.parametrize("value", [True, 1.5, float("nan"), "3"])
+@pytest.mark.parametrize("ceiling", _COUNTED_CEILINGS)
+def test_a_counted_ceiling_that_is_not_a_whole_number_is_refused(
+    ceiling: str, value: object
+) -> None:
+    refused = _refusal(ceiling, value)
+
+    assert refused is not None
+    assert ceiling in str(refused)

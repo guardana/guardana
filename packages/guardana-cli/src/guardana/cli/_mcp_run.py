@@ -28,6 +28,7 @@ from guardana.core.profile import Profile
 from guardana.core.profile.digest import profile_digest
 from guardana.core.redaction import MessageQuoting, RedactionPolicy
 from guardana.core.registry import Registry
+from guardana.core.report import ShortfallKind
 from guardana.core.runner import DEFAULT_ENDPOINT_CONCURRENCY
 from guardana.core.target import (
     EndpointError,
@@ -137,6 +138,23 @@ def refuse_userinfo(address: str) -> None:
         )
 
 
+def refuse_an_unsplittable_command(address: str | None) -> None:
+    """Exit `3` when an stdio server command does not split into words, before anything starts.
+
+    The message carries shlex's reason and not the command, whose arguments may hold a secret.
+    """
+    if address is None or address.startswith(_HTTP_PREFIXES):
+        return
+    try:
+        shlex.split(address)
+    except ValueError as exc:
+        typer.echo(
+            f"error: the --mcp command cannot be split into a program and its arguments: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
+
+
 def plan_target(address: str, registry_entry: RegistryEntry | None = None) -> McpServerTarget:
     """Build a target for *pricing* an MCP server, which must not start one.
 
@@ -153,6 +171,21 @@ def plan_target(address: str, registry_entry: RegistryEntry | None = None) -> Mc
         )
     refuse_userinfo(address)
     return McpServerTarget(address, registry_entry=registry_entry)
+
+
+def files_named_by(address: str | None) -> tuple[Path, ...]:
+    """Return the existing files an stdio server command names, which the command reads or runs.
+
+    An `http(s)://` address names none, and so does a command that does not split. An
+    argument that is not an existing file is not an input.
+    """
+    if address is None or address.startswith(_HTTP_PREFIXES):
+        return ()
+    try:
+        words = shlex.split(address)
+    except ValueError:
+        return ()
+    return tuple(Path(word) for word in words if os.path.isfile(word))  # noqa: PTH113 — never raises
 
 
 def build_mcp_target(connection: McpConnection) -> McpServerTarget:
@@ -247,6 +280,9 @@ def run_mcp_probe(  # noqa: PLR0913 — a connection, a destination and the run'
 
     `concurrency` is taken rather than defaulted by the command because the manifest
     records it either way. The server this builds is closed here, whatever the run did.
+
+    A pin given is a comparison demanded: a run whose profile leaves the manifest rule
+    out, or that does not complete it, records a coverage shortfall and cannot pass.
     """
     refuse_userinfo(connection.address)
     if write_to is not None:
@@ -262,11 +298,14 @@ def run_mcp_probe(  # noqa: PLR0913 — a connection, a destination and the run'
         concurrency=concurrency,
         judge_endpoint=judge_endpoint,
         remedies=_REMEDIES,
+        demanded_rules=frozenset() if connection.pin is None else frozenset({_PIN_RULE_ID}),
     )
     try:
         verification = verifier.run(target, source=source, deployment=deployment)
     finally:
         target.close()
+    if connection.pin is not None:
+        _say_an_unchecked_pin(connection.pin, verification)
     # The pin path is where this operator keeps an approval, not a setting of the profile,
     # so the run records the digest of the profile it was given.
     configuration = replace(
@@ -275,6 +314,23 @@ def run_mcp_probe(  # noqa: PLR0913 — a connection, a destination and the run'
     return replace(
         verification, manifest=replace(verification.manifest, configuration=configuration)
     )
+
+
+def _say_an_unchecked_pin(pin: Path, verification: Verification) -> None:
+    """Warn that `pin` was never compared when the manifest rule did not complete.
+
+    A rule that ran and could not compare declines in its own words; this covers the rule
+    the profile left out or the run never finished.
+    """
+    for gap in verification.result.coverage_shortfall:
+        if gap.kind is ShortfallKind.DEMANDED_CHECK and gap.name == _PIN_RULE_ID:
+            if _PIN_RULE_ID not in verification.result.rules_run:
+                typer.echo(
+                    f"warning: --mcp-pin {pin} was given and the pinned manifest was not "
+                    f"checked: {gap.detail}",
+                    err=True,
+                )
+            return
 
 
 def with_pin(profile: Profile, pin: Path | None) -> Profile:
@@ -294,7 +350,9 @@ __all__ = [
     "McpError",
     "build_mcp_target",
     "credential_from",
+    "files_named_by",
     "plan_target",
+    "refuse_an_unsplittable_command",
     "refuse_userinfo",
     "registry_entry_from",
     "require_chat_endpoint",

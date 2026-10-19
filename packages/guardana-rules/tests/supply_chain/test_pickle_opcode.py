@@ -565,6 +565,58 @@ def test_a_raw_tensor_storage_beside_its_data_pkl_is_not_read_as_a_pickle(
     assert list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
 
 
+# Float values that read as NEWTRUE, EMPTY_SET and a STACK_GLOBAL of neither.
+_STORAGE_READ_AS_A_HIDDEN_IMPORT = b"\x88\x8f\x93" + bytes(16381)
+
+
+def test_a_raw_tensor_storage_whose_values_read_as_a_hidden_import_stays_quiet(
+    tmp_path: Path,
+) -> None:
+    _checkpoint(
+        tmp_path,
+        {
+            "optimizer/data.pkl": pickle.dumps({"state": {}}, protocol=2),
+            "optimizer/data/0": _STORAGE_READ_AS_A_HIDDEN_IMPORT,
+        },
+    )
+
+    assert list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+def test_the_same_bytes_with_no_data_pkl_beside_them_are_not_cleared(tmp_path: Path) -> None:
+    _checkpoint(
+        tmp_path,
+        {
+            "other/data.pkl": pickle.dumps({"state": {}}, protocol=2),
+            "optimizer/data/0": _STORAGE_READ_AS_A_HIDDEN_IMPORT,
+        },
+    )
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.title for f in findings] == ["Unscanned model file"]
+    assert "optimizer/data/0" in findings[0].evidence.summary
+
+
+@pytest.mark.parametrize("protocol", [0, 1])
+def test_a_pickle_with_no_protocol_header_stored_as_a_tensor_storage_is_critical(
+    tmp_path: Path, protocol: int
+) -> None:
+    _checkpoint(
+        tmp_path,
+        {
+            "archive/data.pkl": pickle.dumps({"w": 1}, protocol=2),
+            "archive/data/0": pickle.dumps(_Evil(), protocol=protocol),
+        },
+    )
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [(f.severity, f.evidence.detail) for f in findings] == [
+        (Severity.CRITICAL, f"{_SYSTEM} in optimizer.pt::archive/data/0")
+    ]
+
+
 def test_a_malicious_data_pkl_beside_raw_storages_is_still_critical(tmp_path: Path) -> None:
     _checkpoint(
         tmp_path,

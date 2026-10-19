@@ -216,7 +216,7 @@ def analyze_trace(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface pl
         for line in [*describe_coverage(read, trace_view), *describe_contracts(contracts)]:
             typer.echo(line, err=True)
         for gap in result.coverage_shortfall:
-            typer.echo(f"error: {gap.detail}", err=True)
+            typer.echo(f"coverage missing ({gap.kind}): {gap.name}: {gap.detail}", err=True)
 
         outcome = gate_outcome(result, prof.policy)
         deployment = detect_deployment(ai_system, environment, deployment_id)

@@ -158,11 +158,6 @@ def test_a_pin_written_over_the_profile_is_refused(
     assert result.exit_code == ExitCode.INVALID_USAGE
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="--write-mcp-pin is not checked against the files the stdio command names",
-)
 def test_a_pin_written_over_the_stdio_server_script_is_refused_before_anything_is_written(
     tmp_path: Path,
 ) -> None:
@@ -171,6 +166,19 @@ def test_a_pin_written_over_the_stdio_server_script_is_refused_before_anything_i
 
     result = runner.invoke(
         app, ["probe", "--mcp", command, "--allow-exec", "--write-mcp-pin", str(script)]
+    )
+
+    assert script.read_text(encoding="utf-8") == _STDIO_SERVER, result.exit_code
+    assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+def test_a_report_written_over_the_stdio_server_script_is_refused(tmp_path: Path) -> None:
+    command = _command(tmp_path, "server.py")
+    script = tmp_path / "server.py"
+
+    result = runner.invoke(
+        app,
+        ["probe", "--mcp", command, "--allow-exec", "--format", "json", "--output", str(script)],
     )
 
     assert script.read_text(encoding="utf-8") == _STDIO_SERVER, result.exit_code
@@ -242,12 +250,6 @@ def test_a_pin_given_for_the_server_it_approved_verifies_the_manifest(
     assert result.exit_code == ExitCode.OK, result.output
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="a pin approved for another server leaves the manifest unverified, which gates "
-    "only under fail_on_inconclusive",
-)
 def test_a_pin_given_for_another_server_ends_the_run_indeterminate_whatever_fail_on_says(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -258,3 +260,71 @@ def test_a_pin_given_for_another_server_ends_the_run_indeterminate_whatever_fail
 
     assert any("approved for" in said for said in _declined(document))
     assert result.exit_code == ExitCode.INDETERMINATE, result.output
+
+
+def test_an_unusable_pin_ends_the_run_indeterminate_whatever_fail_on_says(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _serve_both(monkeypatch)
+    pin = tmp_path / "approved.json"
+    pin.write_text("[]", encoding="utf-8")
+
+    result, document = _lenient_probe(tmp_path, _LOOPBACK_A, pin)
+
+    assert any("unusable" in said for said in _declined(document))
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+
+
+_WITHOUT_THE_MANIFEST_RULE = _LENIENT + f"rules:\n  exclude: ['{_RULE}']\n"
+
+
+def _probe_without_the_manifest_rule(
+    tmp_path: Path, pin: Path | None
+) -> tuple[Result, dict[str, Any]]:
+    profile = tmp_path / "without.yaml"
+    profile.write_text(_WITHOUT_THE_MANIFEST_RULE, encoding="utf-8")
+    saved = tmp_path / "run.json"
+    pinned = [] if pin is None else ["--mcp-pin", str(pin)]
+    result = runner.invoke(
+        app,
+        [
+            "probe",
+            "--mcp",
+            _LOOPBACK_A,
+            *pinned,
+            "--profile",
+            str(profile),
+            "--format",
+            "json",
+            "--output",
+            str(saved),
+        ],
+    )
+    if not saved.exists():
+        raise RuntimeError(f"the probe saved no run: {result.output}")
+    return result, json.loads(saved.read_text(encoding="utf-8"))
+
+
+def test_a_pin_given_to_a_profile_that_excludes_the_manifest_rule_ends_the_run_indeterminate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _serve_both(monkeypatch)
+    pin = _approve_loopback_a(tmp_path)
+
+    result, document = _probe_without_the_manifest_rule(tmp_path, pin)
+
+    shortfall = document["run"]["coverage"]["shortfall"]
+    assert [gap["name"] for gap in shortfall] == [_RULE], shortfall
+    assert "pinned manifest was not checked" in " ".join(result.output.split())
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+
+
+def test_control_without_a_pin_a_profile_that_excludes_the_manifest_rule_demands_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _serve_both(monkeypatch)
+
+    result, document = _probe_without_the_manifest_rule(tmp_path, None)
+
+    assert document["run"]["coverage"]["shortfall"] == []
+    assert result.exit_code == ExitCode.OK, result.output

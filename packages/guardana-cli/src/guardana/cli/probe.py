@@ -36,6 +36,8 @@ from guardana.cli._formats import FORMAT_HELP, OutputFormat
 from guardana.cli._mcp_run import (
     McpConnection,
     credential_from,
+    files_named_by,
+    refuse_an_unsplittable_command,
     registry_entry_from,
     require_chat_endpoint,
     run_mcp_probe,
@@ -285,6 +287,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
     _refuse_flags_of_another_target(
         target, a2a, mcp, chat=chat_flags, mcp_flags=mcp_flags, a2a_flags=a2a_flags
     )
+    refuse_an_unsplittable_command(mcp)
     installed_reporter = installed_reporter_or_check(reporter)
     refuse_installed_output_beside("--write-mcp-pin", write_mcp_pin, format, installed_reporter)
     collector = reporter if installed_reporter is None else None
@@ -299,6 +302,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
         ("--fixtures", fixtures),
         ("--mcp-pin", mcp_pin),
         ("--mcp-registry-entry", mcp_registry_entry),
+        *(("--mcp", named) for named in files_named_by(mcp)),
     ]
     refuse_writing_over_named_inputs(output, named_inputs)
     _refuse_a_pin_over_an_input(write_mcp_pin, named_inputs)

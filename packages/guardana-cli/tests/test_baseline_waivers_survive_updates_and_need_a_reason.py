@@ -47,8 +47,8 @@ def _attempt(tree: Path, baseline: Path, *profile: str) -> tuple[int, str]:
     return result.exit_code, " ".join(result.output.split())
 
 
-def _update(tree: Path, baseline: Path) -> str:
-    code, said = _attempt(tree, baseline)
+def _update(tree: Path, baseline: Path, *profile: str) -> str:
+    code, said = _attempt(tree, baseline, *profile)
     if code != ExitCode.OK:
         raise RuntimeError(f"precondition: the update should complete: {said}")
     return said
@@ -84,11 +84,6 @@ def test_an_update_that_did_not_run_the_waived_rule_keeps_its_waiver(tmp_path: P
     assert _rules(baseline) == [_SINK], said
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="a waiver whose file is gone is kept as unexamined and has to be removed by hand",
-)
 def test_an_update_after_the_waived_file_was_deleted_removes_the_waiver(tmp_path: Path) -> None:
     tree = _tree(tmp_path)
     baseline = _created(tmp_path, tree)
@@ -98,6 +93,94 @@ def test_an_update_after_the_waived_file_was_deleted_removes_the_waiver(tmp_path
 
     assert _rules(baseline) == [], said
     assert "removed:" in said, said
+    assert "run.py is no longer in the scanned tree" in said, said
+
+
+def test_a_deleted_file_named_relative_to_the_working_directory_loses_its_waiver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tree = _tree(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    baseline = _created(tmp_path, Path("src"))
+    (tree / "run.py").unlink()
+
+    said = _update(Path("src"), baseline)
+
+    assert _rules(baseline) == [], said
+    assert "removed:" in said, said
+
+
+def test_an_update_from_inside_the_scanned_tree_keeps_a_waiver_whose_file_still_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tree = _tree(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    baseline = _created(tmp_path, Path("src"))
+    monkeypatch.chdir(tree)
+
+    code, said = _attempt(Path(), baseline)
+
+    assert code == ExitCode.OK, said
+    assert (tree / "run.py").is_file()
+    assert _rules(baseline) == [_SINK], said
+    assert "removed:" not in said, said
+    assert "so whether it is fixed is unknown" in said, said
+
+
+def test_a_waived_file_that_exists_but_is_out_of_scope_keeps_its_waiver(tmp_path: Path) -> None:
+    tree = _tree(tmp_path)
+    baseline = _created(tmp_path, tree)
+    narrow = tmp_path / "narrow.yaml"
+    narrow.write_text("rules:\n  paths_exclude: ['run.py']\n", encoding="utf-8")
+
+    said = _update(tree, baseline, "--profile", str(narrow))
+
+    assert _rules(baseline) == [_SINK], said
+    assert "so whether it is fixed is unknown" in said, said
+    assert "removed:" not in said, said
+
+
+def test_a_deleted_file_whose_rule_did_not_run_keeps_its_waiver(tmp_path: Path) -> None:
+    tree = _tree(tmp_path)
+    baseline = _created(tmp_path, tree)
+    (tree / "run.py").unlink()
+    narrow = tmp_path / "narrow.yaml"
+    narrow.write_text(f"rules:\n  exclude: ['{_SINK}']\n", encoding="utf-8")
+
+    said = _update(tree, baseline, "--profile", str(narrow))
+
+    assert _rules(baseline) == [_SINK], said
+    assert "did not run, so whether it is fixed is unknown" in said, said
+
+
+def test_a_waived_file_left_as_an_excluded_broken_symlink_keeps_its_waiver(
+    tmp_path: Path,
+) -> None:
+    tree = _tree(tmp_path)
+    baseline = _created(tmp_path, tree)
+    (tree / "run.py").unlink()
+    (tree / "run.py").symlink_to(tree / "nowhere.py")
+    narrow = tmp_path / "narrow.yaml"
+    narrow.write_text("rules:\n  paths_exclude: ['run.py']\n", encoding="utf-8")
+
+    said = _update(tree, baseline, "--profile", str(narrow))
+
+    assert _rules(baseline) == [_SINK], said
+    assert "removed:" not in said, said
+
+
+def test_a_deleted_file_outside_the_scanned_tree_keeps_its_waiver(tmp_path: Path) -> None:
+    tree = _tree(tmp_path)
+    baseline = _created(tmp_path, tree)
+    (tree / "run.py").unlink()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "notes.py").write_text("NOTE = 1\n", encoding="utf-8")
+
+    said = _update(elsewhere, baseline)
+
+    assert _rules(baseline) == [_SINK], said
+    assert "removed:" not in said, said
 
 
 def _verify(baseline: Path) -> int:

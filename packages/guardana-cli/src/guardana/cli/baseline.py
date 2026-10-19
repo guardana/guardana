@@ -1,5 +1,6 @@
 """`guardana baseline create|verify|update` — accepted risk with an owner and an end date."""
 
+import stat
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -314,8 +315,9 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
     somebody makes rather than something an update does on their behalf.
 
     A waiver is removed only when this run could have reported its finding: its rule
-    ran and, for a file run, its file was listed. Any other waiver is kept and named,
-    because a check that did not look cannot say the finding is gone.
+    ran and, for a file run, its file was listed or, when a path was scanned, no longer
+    exists under that path. Any other waiver is kept and named, because a check that
+    did not look cannot say the finding is gone.
     """
     if target is not None and path is not None:
         raise typer.BadParameter("pass either a path or --target, not both")
@@ -335,7 +337,7 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
     unexamined = {
         w.fingerprint: why
         for w in baseline.waivers
-        if w.fingerprint not in current and (why := _not_examined(w, result)) is not None
+        if w.fingerprint not in current and (why := _not_examined(w, result, path)) is not None
     }
     kept = [w for w in baseline.waivers if w.fingerprint in current or w.fingerprint in unexamined]
     dropped = [w for w in baseline.waivers if w not in kept]
@@ -347,7 +349,13 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
                 f"{unexamined[waiver.fingerprint]}, so whether it is fixed is unknown"
             )
     for waiver in dropped:
-        typer.echo(f"removed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) is fixed")
+        gone = _deleted_from(waiver, path)
+        typer.echo(
+            f"removed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) — "
+            f"{gone} is no longer in the scanned tree"
+            if gone is not None
+            else f"removed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) is fixed"
+        )
     waived_now = replace(baseline, waivers=tuple(kept)).active()
     unwaived = [f for f in result.findings if f.fingerprint not in waived_now]
     typer.echo(
@@ -356,8 +364,11 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
     )
 
 
-def _not_examined(waiver: Waiver, result: ScanResult) -> str | None:
-    """Say why `result` could not have reported `waiver`'s finding, or None when it could."""
+def _not_examined(waiver: Waiver, result: ScanResult, root: Path | None) -> str | None:
+    """Say why `result` could not have reported `waiver`'s finding, or None when it could.
+
+    `root` is the path a path run scanned, and None for a `--target` run.
+    """
     if not waiver.rule:
         return "it names no rule, so no run can show its finding is gone"
     if waiver.rule not in result.rules_run:
@@ -369,7 +380,64 @@ def _not_examined(waiver: Waiver, result: ScanResult) -> str | None:
     listed = set(result.scope.files)
     if head in listed or head.rsplit(":", 1)[0] in listed:
         return None
+    if _deleted_from(waiver, root) is not None:
+        return None
     return f"this run did not list {head}"
+
+
+def _deleted_from(waiver: Waiver, root: Path | None) -> str | None:
+    """Return the file `waiver` names when it is gone from the scanned `root`, else None.
+
+    The location is read as `create` wrote it, relative to the working directory. Only
+    a path under `root` that the filesystem reports missing, in a directory that still
+    exists under `root`, counts: a file that exists but was not listed, a broken symlink,
+    one that cannot be checked, or one whose whole directory is gone stays in doubt.
+    """
+    if root is None or not waiver.location or "#" in waiver.location:
+        return None
+    path, _line = split_ref(waiver.location)
+    try:
+        base = Path.cwd().resolve()
+        top = root.resolve()
+    except (OSError, RuntimeError):
+        return None
+    # An archive member is spelled `archive:member`, so the archive must be gone too.
+    outer = path.rsplit(":", 1)[0]
+    if not _directory_under((base / outer).parent, top):
+        # Without the directory the location may be spelled from another working
+        # directory than `create` ran in, so a missing candidate proves nothing.
+        return None
+    if all(_missing_under(base / spelled, top) for spelled in {path, outer}):
+        return path
+    return None
+
+
+def _directory_under(candidate: Path, top: Path) -> bool:
+    """Whether `candidate` is `top` or lies under it and is a directory, not a link to one."""
+    if candidate != top and top not in candidate.parents:
+        return False
+    try:
+        return stat.S_ISDIR(candidate.lstat().st_mode)
+    except OSError:
+        return False
+
+
+def _missing_under(candidate: Path, top: Path) -> bool:
+    """Whether `candidate` lies under `top` and does not exist there, not even as a link."""
+    if candidate != top and top not in candidate.parents:
+        return False
+    try:
+        if not candidate.resolve().is_relative_to(top):
+            return False
+    except (OSError, RuntimeError):
+        return False
+    try:
+        candidate.lstat()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return False
 
 
 def _write_waivers(file: Path, waivers: Sequence[Waiver]) -> None:
