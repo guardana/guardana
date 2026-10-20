@@ -133,7 +133,7 @@ A risky minor or major release may first use a release candidate, such as
 
 ### When to release 1.0
 
-Release `1.0.0` when all [stable-release criteria](product-status.md#before-the-first-stable-release) hold: required `1.0.0rc2`, `1.0.0rc3` and `1.0.0rc4` gates, a candidate period without new supported-surface defect reports, published maintainer-run proofs and engineering criteria. A further candidate is required only if a release blocker needs one. Stable 1.0 is the compatibility promise for the supported surface; adoption measures are published separately and are not release criteria. The [GitHub milestones](https://github.com/guardana/guardana/milestones) group release scope.
+Release `1.0.0` when all [stable-release criteria](product-status.md#before-the-first-stable-release) hold: required `1.0.0rc2`, `1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` gates, a candidate period without new supported-surface defect reports, published maintainer-run proofs and engineering criteria. A further candidate is required only if a release blocker needs one. Stable 1.0 is the compatibility promise for the supported surface; adoption measures are published separately and are not release criteria. The [GitHub milestones](https://github.com/guardana/guardana/milestones) group release scope.
 
 ## The collector envelope
 

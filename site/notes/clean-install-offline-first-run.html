@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Clean-install offline first run (#138) — Guardana notes</title>
-<meta name="description" content="The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 13 of 14 steps.">
+<meta name="description" content="The offline first-run proof passed all 12 cells across Linux, macOS and Windows, each with 14 of 14 steps.">
 <link rel="canonical" href="https://guardana.dev/notes/clean-install-offline-first-run">
 <link rel="alternate" type="application/atom+xml" title="Guardana notes" href="/notes/feed.xml">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -21,7 +21,7 @@
 </nav>
 </div></header>
 <main class="notes">
-<p class="crumb"><a href="/notes/">Notes</a> · <time datetime="2026-10-17">2026-10-17</time></p><h1>Clean-install offline first run (#138)</h1><p class="lede">The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 13 of 14 steps.</p><p>The maintainer ran this proof with Guardana 1.0.0rc4 from PyPI, using proof scripts at commit <code>2ea87bb5</code>. The <a href="https://github.com/guardana/guardana/actions/runs/39038349905">workflow run</a> records the results.</p>
+<p class="crumb"><a href="/notes/">Notes</a> · <time datetime="2026-10-20">2026-10-20</time></p><h1>Clean-install offline first run (#138)</h1><p class="lede">The offline first-run proof passed all 12 cells across Linux, macOS and Windows, each with 14 of 14 steps.</p><p>The maintainer ran this proof with Guardana 1.0.0rc5 from PyPI, using proof scripts at commit <code>91196fd6</code>. The <a href="https://github.com/guardana/guardana/actions/runs/39424046832">workflow run</a> records the results.</p>
 <h2 id="installation-and-platforms">Installation and platforms</h2>
 <p>The workflow, <code>.github/workflows/proofs.yml</code>, was dispatched with the version. The checkout supplied only the proof scripts in <code>scripts/proofs/</code>. Every package came from pypi.org.</p>
 <p>The twelve cells covered Python 3.11 and 3.13, each with pip and uv, on three platforms:</p>
@@ -32,11 +32,11 @@
 </ul>
 <p>The installation followed <code>docs/install.md</code> for a candidate release. With pip:</p>
 <pre><code class="language-console">$ python -m venv .venv
-$ .venv/bin/python -m pip install --pre guardana-cli==1.0.0rc4
+$ .venv/bin/python -m pip install --pre guardana-cli==1.0.0rc5
 </code></pre>
 <p>With uv:</p>
 <pre><code class="language-console">$ uv init --bare
-$ uv add --prerelease allow guardana-cli==1.0.0rc4
+$ uv add --prerelease allow guardana-cli==1.0.0rc5
 </code></pre>
 <p>Both installers named pypi.org. Each installer's own report showed that every file came from files.pythonhosted.org, with a sha256.</p>
 <h2 id="network-cut">Network cut</h2>
@@ -71,10 +71,10 @@ $ guardana rule test --rules checks 'starter.*'
 <h2 id="results-and-windows-limitations">Results and Windows limitations</h2>
 <pre><code class="language-text">Linux:   4 of 4 cells passed; 14 of 14 steps each
 macOS:   4 of 4 cells passed; 14 of 14 steps each
-Windows: 0 of 4 cells passed; 13 of 14 steps each
+Windows: 4 of 4 cells passed; 14 of 14 steps each
 </code></pre>
-<p>On Windows, with output going to a pipe in the ANSI code page, cp1252, <code>guardana diff</code> and <code>guardana doctor</code> no longer end with exit 5. Since 1.0.0rc4 Guardana writes UTF-8 when the output stream cannot carry a character. Every Windows step now exits with the code the starter README states. The comparison does not hold: <code>guardana diff before.json after.json</code> exits <code>1</code> as the README states, but names the file <code>model\weights.pkl</code> where the README shows <code>weights.pkl</code>. The other steps passed with the network cut. The workflow reports the Windows cells without requiring them to pass.</p>
-<p>Runs written on Windows record <code>model\weights.pkl</code>, where Linux and macOS record <code>model/weights.pkl</code>. A finding's fingerprint follows that path, so baselines do not carry between Windows and the other platforms. This known limitation is tracked in #167.</p>
+<p>On Windows, with output going to a pipe in the ANSI code page, cp1252, <code>guardana diff</code> and <code>guardana doctor</code> no longer end with exit 5. Since 1.0.0rc4 Guardana writes UTF-8 when the output stream cannot carry a character. Every Windows step now exits with the code the starter README states. The comparison holds with a recorded known difference: <code>guardana diff before.json after.json</code> exits <code>1</code> as the README states, but names the file <code>model\weights.pkl</code> where the README shows <code>weights.pkl</code>. The other steps passed with the network cut. The workflow requires the Windows cells to pass.</p>
+<p>Runs written on Windows record <code>model\weights.pkl</code>, where Linux and macOS record <code>model/weights.pkl</code>. A finding's fingerprint follows that path, so baselines do not carry between Windows and the other platforms. This known difference is tracked in #167.</p>
 <h2 id="saved-evidence">Saved evidence</h2>
 <p>Each cell has a JSON record containing every step's command, exit code and a short output excerpt. These records and the two saved scan runs are uploaded as artifacts of the workflow run. Artifacts are kept for 90 days.</p>
 <h2 id="what-this-proof-does-not-show">What this proof does not show</h2>

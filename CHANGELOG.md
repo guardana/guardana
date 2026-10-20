@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0rc5] - 2026-10-20
+### Documentation
+
+- **Updated release and proof documentation after 1.0.0rc5.** Product status, the roadmap and compatibility cover five required candidates and their gates; reproducible builds uses the `1.0.0rc5` run; and product status, the roadmap and the two proof notes describe the 1.0.0rc5 proofs.
+
+## [1.0.0rc5] - 2026-10-20 — the fifth release candidate
 
 ### Changed
 

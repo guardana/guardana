@@ -25,8 +25,8 @@ checkout's copy:
 ```bash
 git clone https://github.com/guardana/guardana
 cd guardana
-git worktree add --detach ../guardana-v1.0.0rc4 v1.0.0rc4
-uv run --no-project python scripts/reproduce_release.py 1.0.0rc4 --source ../guardana-v1.0.0rc4
+git worktree add --detach ../guardana-v1.0.0rc5 v1.0.0rc5
+uv run --no-project python scripts/reproduce_release.py 1.0.0rc5 --source ../guardana-v1.0.0rc5
 ```
 
 Without a source checkout, the script builds the checkout it runs from. In a tag checkout
@@ -111,7 +111,7 @@ on a push because PyPI has no files for a version until its release publishes th
 If the check runs before PyPI lists the version, each package is `NOT CHECKED` and
 the job fails with exit status `2`. Run it again by hand once the files are on PyPI.
 
-The [1.0.0rc4 Reproducibility run](https://github.com/guardana/guardana/actions/runs/39129688804)
+The [1.0.0rc5 Reproducibility run](https://github.com/guardana/guardana/actions/runs/39418407720)
 rebuilt every published file: a wheel and an sdist for each of the five packages and the
 reference pack 0.1.3, 12 files in total. Every file reproduced.
 

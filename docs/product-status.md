@@ -59,19 +59,22 @@ in the changelog. Two are under "Changed — breaking": stdio server references
 distinguish the full command (`mcp+stdio://<executable>#argv-<digest>`), and native
 trace readers refuse a trace without span records or with a record missing a
 schema-required field. Its Security section lists five published advisories.
+1.0.0rc5 corrects supported-surface defects, each announced under "Fixed" in
+the changelog, with no "Changed — breaking" entry.
 The surface remains frozen until stable 1.0 except for
 announced defect corrections. Candidates add no CLI flag, persisted field,
 rule family or public API.
 
-Four candidates were required: rc1, rc2, rc3 and rc4. 1.0.0rc4 was required because
-defects reported against 1.0.0rc3 needed release-blocker fixes. `1.0.0rc2`,
-`1.0.0rc3` and `1.0.0rc4` each shipped after its own full green release gate and
+Five candidates were required: rc1, rc2, rc3, rc4 and rc5. 1.0.0rc4 was required because
+defects reported against 1.0.0rc3 needed release-blocker fixes. 1.0.0rc5 was required
+because a defect reported against 1.0.0rc4 needed a release-blocker fix. `1.0.0rc2`,
+`1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` each shipped after its own full green release gate and
 green CI on the exact commit. A further candidate is
 required only if a release blocker needs one.
 
 Stable 1.0 is the compatibility promise for the supported surface. It ships only when all criteria below hold; it does not follow the last candidate automatically.
 
-- `1.0.0rc2`, `1.0.0rc3` and `1.0.0rc4` have shipped, each after its own full green release gate and green CI on the exact commit. A candidate has had a period without new defect reports against the supported surface. A further candidate is required only if a release blocker needs one.
+- `1.0.0rc2`, `1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` have shipped, each after its own full green release gate and green CI on the exact commit. A candidate has had a period without new defect reports against the supported surface. A further candidate is required only if a release blocker needs one.
 - Maintainer-run proofs are published with commands and results, each labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failing result, a fix and one custom check; the retrieval pilot against the reference application in `examples/retrieval_pilot/`, catching a poisoned document and a tenant-filter failure; the regression loop on the same reference application, with a failed and an incomplete result saved and a redacted regression regraded and gated in CI with a reviewable artifact; customization through published extension points only, installing the reference pack from PyPI outside the repository and passing the conformance kit; the security runbook drill, reporting completion and lessons safe to share; recovery runbooks exercised.
 - The engineering criteria hold:
   - Python consumers receive failed, incomplete and stopped outcomes as typed data; case outcomes and missing evidence survive serialization, redaction and export.
@@ -83,9 +86,9 @@ Stable 1.0 is the compatibility promise for the supported surface. It ships only
 
 The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.
 
-Two maintainer-run proofs are published as notes, both run against 1.0.0rc4 from PyPI by the proofs workflow: [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points). First-run Linux and macOS cells passed; the four Windows cells reached 13 of 14 steps and are reported, not required: there `guardana diff` displays the Windows path `model\weights.pkl` ([#167](https://github.com/guardana/guardana/issues/167)). For customization, the reference pack 0.1.3 installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The retrieval pilot and regression loop proofs are not published. Recovery runbooks are exercised by tests. The security drill is not recorded.
+Two maintainer-run proofs are published as notes, both run against 1.0.0rc5 from PyPI by the proofs workflow ([run](https://github.com/guardana/guardana/actions/runs/39424046832)): [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points). First-run Linux and macOS cells passed; all Windows cells passed and are required: there `guardana diff` displays the Windows path `model\weights.pkl` as a recorded known difference ([#167](https://github.com/guardana/guardana/issues/167)). For customization, the reference pack 0.1.3 installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The retrieval pilot and regression loop proofs are not published. Recovery runbooks are exercised by tests. The security drill is not recorded.
 
-[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. With `1.0.0rc4` released, `1.0.0` is the next release milestone; the `next` milestone holds work for releases after 1.0.0.
+[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. With `1.0.0rc5` released, `1.0.0` is the next release milestone; the `next` milestone holds work for releases after 1.0.0.
 
 The owner decides changes to release criteria and records each one here and in the changelog.
 
