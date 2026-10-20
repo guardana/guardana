@@ -4,7 +4,9 @@
 which other processes on a loaded machine do not stretch. Each size is repeated until
 the timed batch lasts long enough to dwarf the clock's resolution, and a single call that
 already overruns a generous budget fails at once: a pattern that turned quadratic again
-fails in seconds instead of running for minutes.
+fails in seconds instead of running for minutes. A busy machine can still slow one size
+of one attempt, so the lowest of a few attempts is taken; a search that really grows
+faster than linear is slower at every attempt.
 """
 
 import math
@@ -14,6 +16,7 @@ from collections.abc import Callable
 _BATCH_SECONDS = 0.005
 _CALL_BUDGET_SECONDS = 0.25
 _TRIES = 5
+_ATTEMPTS = 3
 
 
 class TooSlowError(AssertionError):
@@ -38,6 +41,8 @@ def _per_call(search: Callable[[str], object], text: str) -> float:
 
 def growth(search: Callable[[str], object], small: str, large: str) -> float:
     """Return the exponent of cost against length between `small` and `large`: 1 is linear."""
-    return math.log(_per_call(search, large) / _per_call(search, small)) / math.log(
-        len(large) / len(small)
+    return min(
+        math.log(_per_call(search, large) / _per_call(search, small))
+        / math.log(len(large) / len(small))
+        for _ in range(_ATTEMPTS)
     )
