@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
-"""Cut a release in one command: gate -> bump -> changelog -> commit -> push -> CI -> tag.
+"""Cut a release: gate -> bump -> changelog -> release PR -> merge -> CI -> signed tag.
 
 Pushing the tag is what triggers `release.yml` to build and publish all five packages to PyPI (which
 still pauses on the `pypi` environment's approval — a deliberate final gate).
 
-The branch and the tag go up as two steps with CI in between, and that ordering is
-load-bearing: pushing both at once races CI against the publish, and a red run then
-costs a second approval click and leaves a cancelled release in the history.
+The release commit goes up on a `release/vX.Y.Z` branch and reaches `main` only through a pull
+request, squash-merged once its required checks pass, so branch protection holds for
+administrators too. The tag follows as a separate step, signed, verified and created on the
+merge commit only after CI is green on it: pushing both at once races CI against the publish,
+and a red run then costs a second approval click and leaves a cancelled release in the history.
 
     uv run python scripts/release.py patch            # 0.1.0 -> 0.1.1
     uv run python scripts/release.py minor            # 0.1.0 -> 0.2.0
     uv run python scripts/release.py 0.1.0            # release the current version (first release)
     uv run python scripts/release.py patch --dry-run  # show the plan, change nothing
 
-Run it from a clean `main`. Only a maintainer (repo admin) can push the resulting
-`v*` tag — enforced by a tag protection ruleset — so a release is a deliberate act.
+Run it from a clean `main` that matches `origin/main`. It writes the release branch, the pull
+request, the squash merge and the tag. It needs `gh` with write access, and git configured to sign
+tags with a key `git tag -v` can verify (`gpg.ssh.allowedSignersFile` for an SSH key). Only a
+maintainer (repo admin) can push the resulting `v*` tag — enforced by a tag protection ruleset —
+so a release is a deliberate act.
 """
 
 import argparse
@@ -22,6 +27,8 @@ import datetime
 import re
 import subprocess
 import sys
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import NoReturn
 
@@ -57,12 +64,21 @@ _VERSIONING = _ROOT / "docs" / "compatibility.md"
 # The versioning policy's statement of the project's status, which a final 1.x release makes
 # false; a wrapped line may split it, so the gap between the words may hold a newline.
 _PRE_1_STATEMENT_RE = re.compile(r"\bis\s+\**(?P<status>pre-1\.0)\b")
-# What `main` does after a green CI, spelled for a hand to type when the wait could not be done.
+# What follows a green CI on the merge commit, spelled for a hand to type when the wait could
+# not be done.
 _TAG_BY_HAND = (
-    'git tag -a vX.Y.Z -m "Guardana vX.Y.Z"',
+    'git tag -s vX.Y.Z -m "Guardana vX.Y.Z" <merge commit>',
+    "git tag -v vX.Y.Z",
     "git push origin refs/tags/vX.Y.Z",
-    'git tag -f vX.Y "vX.Y.Z^{commit}" && git push -f origin vX.Y',
+    'git -c tag.gpgSign=false tag -f vX.Y "vX.Y.Z^{commit}" && git push -f origin vX.Y',
 )
+# A run is listed a few seconds after the push that starts it; longer than this, nothing is coming.
+_CI_APPEARS_WITHIN_S = 600
+_CI_POLL_S = 10
+# Two lines: the state, then the merge commit (empty until merged).
+_STATE_JQ = '.state, (.mergeCommit.oid // "")'
+_sleep = time.sleep
+_monotonic = time.monotonic
 _SURFACE_SECTION_RE = re.compile(r"^### (Changed|Deprecated|Removed)\b", re.MULTILINE)
 _RELEASE_TAG_GLOB = "v[0-9]*.[0-9]*.[0-9]*"
 _PACK = "examples/reference_pack"
@@ -101,7 +117,7 @@ def _target_version(arg: str, current: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
-def _preflight() -> None:
+def _preflight(release_branch: str) -> None:
     branch = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True).strip()
     if branch != "main":
         _fail(f"releases are cut from main, not {branch!r}")
@@ -112,6 +128,13 @@ def _preflight() -> None:
     remote = _run(["git", "rev-parse", "origin/main"], capture=True).strip()
     if local != remote:
         _fail("local main is not in sync with origin/main — pull/push first")
+    if (
+        _run(["git", "branch", "--list", release_branch], capture=True).strip()
+        or _run(
+            ["git", "ls-remote", "--heads", "origin", f"refs/heads/{release_branch}"], capture=True
+        ).strip()
+    ):
+        _fail(f"{release_branch} already exists here or on origin — finish or remove that release")
 
 
 DOGFOOD_PROFILE = "scripts/dogfood.yaml"
@@ -175,13 +198,18 @@ def main(argv: list[str]) -> None:
     current = _current_version()
     version = _target_version(part, current)
     tag = f"v{version}"
+    branch = f"release/{tag}"
     print(f"releasing {tag} (current {current}){' [dry run]' if dry_run else ''}")
 
-    _preflight()
+    _preflight(branch)
     _check_surface(version)
     _check_pre_1_statement(version)
     _check_reference_pack()
     _gate()
+    if not dry_run:
+        # Everything the release writes lands on its own branch, so a stop part-way leaves
+        # `main` as it was.
+        _run(["git", "switch", "--create", branch])
 
     bumped: frozenset[str] = frozenset()
     if version != current:
@@ -216,8 +244,9 @@ def main(argv: list[str]) -> None:
 
     if dry_run:
         print(
-            f"  would: commit 'chore(release): {tag}', push main without tags, "
-            f"wait for green CI, then tag {tag} and push the tag"
+            f"  would: commit 'chore(release): {tag}' on {branch}, open a pull request into main, "
+            f"squash-merge it once its required checks pass, wait for green CI on the merge "
+            f"commit, then create, verify and push the signed tag {tag}"
         )
         return
 
@@ -225,13 +254,26 @@ def main(argv: list[str]) -> None:
     _run(_DOGFOOD)
     _stage_release(bumped)
     _run(["git", "commit", "-m", f"chore(release): {tag}"])
+    _publish(branch, tag, version)
+
+
+def _publish(branch: str, tag: str, version: str) -> None:
+    """Take the committed release through its pull request, then sign, verify and push the tag."""
+    head = _run(["git", "rev-parse", "HEAD"], capture=True).strip()
     # The tag does not exist until CI is green, and the branch push never carries one:
-    # with `push.followTags` set, any reachable annotated tag would leave with `main`.
-    _run(["git", "push", "--no-follow-tags", "origin", "main"])
-    _await_green_ci()
-    _run(["git", "tag", "-a", tag, "-m", f"Guardana {tag}"])
-    _run(["git", "push", "origin", f"refs/tags/{tag}"])
+    # with `push.followTags` set, any reachable annotated tag would leave with it.
+    _run(["git", "push", "--no-follow-tags", "--set-upstream", "origin", branch])
+    pr = _open_pull_request(branch, tag)
+    _await_required_checks(pr, head)
+    merged = _merge(pr, head)
+    _await_green_ci(merged)
+    _sign_and_verify_tag(tag, merged)
+    try:
+        _run(["git", "push", "origin", f"refs/tags/{tag}"])
+    except subprocess.CalledProcessError:
+        _stop_with_an_unpushed_tag(tag)
     _move_marketplace_tag(version, tag)
+    _return_to_main(branch)
     print(f"pushed {tag} — release.yml is building; approve the 'pypi' deployment to publish.")
 
 
@@ -426,39 +468,153 @@ def _stage_release(bumped: frozenset[str]) -> None:
     _run(["git", "add", "--", *sorted(set(changed))])
 
 
-def _await_green_ci() -> None:
-    """Block until CI concludes on the commit just pushed, and stop if it is not green.
+def _await_ci_run(commit: str, event: str, stop: Callable[[str], NoReturn]) -> str:
+    """Return the id of the CI run `event` started on `commit`, waiting for it to be listed.
 
-    The tag is what starts the publish, so pushing it beside the branch races CI: a red
+    A run is listed seconds after the push that starts it, so an empty answer means "not yet"
+    until `_CI_APPEARS_WITHIN_S` has passed, and "none" after; then `stop` refuses rather than
+    going on without a run to read.
+    """
+    deadline = _monotonic() + _CI_APPEARS_WITHIN_S
+    while True:
+        try:
+            run_id = _run(
+                [
+                    "gh",
+                    "run",
+                    "list",
+                    "--workflow=CI",
+                    f"--commit={commit}",
+                    f"--event={event}",
+                    "--limit=1",
+                    "--json=databaseId",
+                    "--jq=.[0].databaseId",
+                ],
+                capture=True,
+            ).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            stop("the GitHub CLI (`gh`) could not list the CI runs here")
+        if run_id:
+            return run_id
+        if _monotonic() >= deadline:
+            stop(f"no CI run started on {commit[:9]} within {_CI_APPEARS_WITHIN_S // 60} minutes")
+        _sleep(_CI_POLL_S)
+
+
+def _open_pull_request(branch: str, tag: str) -> str:
+    """Open the release pull request into `main` and return its number."""
+    try:
+        url = _run(
+            [
+                "gh",
+                "pr",
+                "create",
+                "--base",
+                "main",
+                "--head",
+                branch,
+                "--title",
+                f"chore(release): {tag}",
+                "--body",
+                f"The release commit for {tag}, opened by `scripts/release.py`.",
+            ],
+            capture=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        _stop_before_merge(f"the pull request for {branch} could not be opened", None)
+    number = url.rstrip("/").rsplit("/", 1)[-1]
+    if not number.isdigit():
+        _stop_before_merge(f"`gh pr create` answered {url!r}, not a pull request", None)
+    return number
+
+
+def _await_required_checks(pr: str, head: str) -> None:
+    """Block until the checks `main` requires pass on the release pull request.
+
+    `gh pr checks` has nothing to report until the pull request's CI run is listed, so that run
+    is awaited first. A failed check, or a wait that cannot be done, leaves the pull request open.
+    """
+
+    def stop(reason: str) -> NoReturn:
+        _stop_before_merge(reason, pr)
+
+    print(f"waiting for the required checks on pull request #{pr}...")
+    _await_ci_run(head, "pull_request", stop)
+    try:
+        _run(["gh", "pr", "checks", pr, "--required", "--watch", "--fail-fast"])
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        stop(f"the required checks of pull request #{pr} did not pass")
+
+
+def _tree(commit: str) -> str:
+    return _run(["git", "rev-parse", f"{commit}^{{tree}}"], capture=True).strip()
+
+
+def _merge_state(pr: str) -> tuple[str, str] | None:
+    """Return the pull request's state and merge commit, or None when they cannot be read."""
+    try:
+        answer = _run(
+            ["gh", "pr", "view", pr, "--json", "state,mergeCommit", "--jq", _STATE_JQ],
+            capture=True,
+        ).splitlines()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    if not answer:
+        return None
+    return answer[0].strip(), (answer[1].strip() if len(answer) > 1 else "")
+
+
+def _merge(pr: str, head: str) -> str:
+    """Squash-merge the release pull request and return the commit it put on `main`.
+
+    `--match-head-commit` refuses a head other than the commit the checks ran on, and the
+    merge commit has to hold that commit's tree, so the tag names exactly what was checked.
+    A merge call that fails may still have merged, so the state is read back either way.
+    """
+    try:
+        _run(["gh", "pr", "merge", pr, "--squash", "--match-head-commit", head])
+        refused = False
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        refused = True
+    state = _merge_state(pr)
+    if state is not None and state[0] == "MERGED" and state[1]:
+        merged = state[1]
+    elif refused and state is not None:
+        _stop_before_merge(f"GitHub did not merge pull request #{pr} ({state[0]})", pr)
+    else:
+        _stop_unsure_of_the_merge(pr)
+    try:
+        _run(["git", "fetch", "--quiet", "origin"])
+        merged_tree, head_tree = _tree(merged), _tree(head)
+    except subprocess.CalledProcessError:
+        _stop_before_tagging(
+            f"the tree of merge commit {merged[:9]} could not be compared with the checked "
+            f"release commit {head[:9]}; compare them before any tag"
+        )
+    if merged_tree != head_tree:
+        _stop_without_a_tag(
+            f"merge commit {merged[:9]} does not hold the tree of the checked release commit "
+            f"{head[:9]}"
+        )
+    return merged
+
+
+def _await_green_ci(commit: str) -> None:
+    """Block until CI concludes on the merged release commit, and stop if it is not green.
+
+    The tag is what starts the publish, so pushing it before CI concludes races CI: a red
     run — for any reason, including one that has nothing to do with the code — then
     leaves a publish already waiting on the `pypi` approval. Cancelling, fixing and
     re-tagging costs a second approval click and leaves a `cancelled` run in the history
-    that reads as a failed release.
+    that reads as a failed release. The run awaited is the `push` run on `main`, the one
+    `release.yml` requires.
 
     Fail-closed when the wait itself cannot be done: without `gh`, this stops before a
     tag exists rather than creating it blind, because an unverified tag is the thing
     being avoided.
     """
-    commit = _run(["git", "rev-parse", "HEAD"], capture=True).strip()
     print(f"waiting for CI on {commit[:9]} before creating the tag...")
-    try:
-        run_id = _run(
-            [
-                "gh",
-                "run",
-                "list",
-                "--workflow=CI",
-                f"--commit={commit}",
-                "--limit=1",
-                "--json=databaseId",
-                "--jq=.[0].databaseId",
-            ],
-            capture=True,
-        ).strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        _stop_before_tagging("the GitHub CLI (`gh`) is not available here")
-    if not run_id:
-        _stop_before_tagging(f"no CI run has started for {commit[:9]} yet")
+    run_id = _await_ci_run(commit, "push", _stop_before_tagging)
     # `gh run watch --exit-status` exits non-zero when the run failed, which is the
     # whole check: without the flag it reports the failure and returns 0.
     try:
@@ -468,16 +624,97 @@ def _await_green_ci() -> None:
     print("CI is green; tagging.")
 
 
-def _stop_before_tagging(reason: str) -> NoReturn:
-    """Leave the release commit pushed and unreleased, which is a state worth being in."""
+def _sign_and_verify_tag(tag: str, commit: str) -> None:
+    """Create the signed release tag on `commit`, and go on only when its signature verifies.
+
+    A tag that does not verify here verifies for nobody else either, so it is deleted
+    before anything could push it.
+    """
+    try:
+        _run(["git", "tag", "-s", tag, "-m", f"Guardana {tag}", commit])
+    except subprocess.CalledProcessError:
+        _stop_before_tagging(f"git could not create the signed tag {tag}")
+    try:
+        _run(["git", "tag", "-v", tag])
+    except subprocess.CalledProcessError:
+        _run(["git", "tag", "-d", tag])
+        _stop_before_tagging(f"the signature of {tag} does not verify (`git tag -v {tag}`)")
+
+
+def _stop_before_merge(reason: str, pr: str | None) -> NoReturn:
+    """Leave the release branch pushed and unmerged, with `main` untouched."""
+    holder = f"pull request #{pr}" if pr else "the pushed release branch"
+    first = "" if pr else "Open a pull request from it into `main`. "
     print(
-        f"error: {reason}, so no tag was created.\n"
-        f"The release commit is on `main` and nothing has been published. Once CI is\n"
-        f"green on it, create and push the tag by hand (the last line only for a final\n"
-        f"release):\n  " + "\n  ".join(_TAG_BY_HAND),
+        f"error: {reason}, so nothing was merged and no tag was created.\n"
+        f"Nothing reached `main` and nothing has been published; {holder} holds the release\n"
+        f"commit. {first}Once its required checks pass, squash-merge it, wait for green CI on\n"
+        f"the merge commit, then create, verify and push the tag on that commit by hand (the\n"
+        f"last line only for a final release):\n  " + "\n  ".join(_TAG_BY_HAND),
         file=sys.stderr,
     )
     raise SystemExit(1)
+
+
+def _stop_unsure_of_the_merge(pr: str) -> NoReturn:
+    """Stop when GitHub's answer does not say whether the release pull request merged."""
+    print(
+        f"error: could not tell whether pull request #{pr} merged, so no tag was created.\n"
+        f"Nothing has been published. Check it with `gh pr view {pr}`. If it merged, wait for\n"
+        f"green CI on its merge commit; if not, squash-merge it once its required checks pass\n"
+        f"and wait for that. Then create, verify and push the tag on the merge commit by hand\n"
+        f"(the last line only for a final release):\n  " + "\n  ".join(_TAG_BY_HAND),
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+def _stop_without_a_tag(reason: str) -> NoReturn:
+    """Stop for good: what `main` received is not what was checked, so it must not be tagged."""
+    print(
+        f"error: {reason}, so no tag was created.\n"
+        f"Do not tag that commit: `main` holds something other than the release commit the gate\n"
+        f"and the required checks ran on. Find out what changed; if the release commit has to\n"
+        f"go, revert it through a pull request, then cut the release again.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+def _stop_with_an_unpushed_tag(tag: str) -> NoReturn:
+    """Stop when the signed, verified tag exists here but the push of it was refused."""
+    print(
+        f"error: {tag} is signed and verified here but could not be pushed, so nothing has\n"
+        f"been published. The release commit is on `main`. Push the tag, move the minor tag\n"
+        f"(final release only) and return to `main`:\n  "
+        + "\n  ".join(_TAG_BY_HAND[2:])
+        + "\n  git switch main && git merge --ff-only origin/main",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+def _stop_before_tagging(reason: str) -> NoReturn:
+    """Leave the release commit merged and unreleased, which is a state worth being in."""
+    print(
+        f"error: {reason}, so no tag was pushed.\n"
+        f"The release commit is on `main` and nothing has been published. Once CI is\n"
+        f"green on it, create, verify and push the tag on that commit by hand (the last\n"
+        f"line only for a final release):\n  " + "\n  ".join(_TAG_BY_HAND),
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+def _return_to_main(branch: str) -> None:
+    """Put the checkout back on an up-to-date `main`; the release is out whatever happens here."""
+    try:
+        _run(["git", "switch", "main"])
+        _run(["git", "merge", "--ff-only", "origin/main"])
+    except subprocess.CalledProcessError:
+        print(f"note: could not return to main; switch back by hand ({branch} is merged)")
+        return
+    print(f"note: {branch} is merged; delete the local branch when it is no longer needed")
 
 
 def _move_marketplace_tag(version: str, tag: str) -> None:
@@ -497,7 +734,8 @@ def _move_marketplace_tag(version: str, tag: str) -> None:
     try:
         # Peel to the commit (`tag` is annotated) so the moving tag is a clean
         # lightweight pointer straight at the release commit, not at a tag object.
-        _run(["git", "tag", "-f", moving, f"{tag}^{{commit}}"])
+        # With `tag.gpgSign` set, a bare `git tag -f` would demand a message and sign.
+        _run(["git", "-c", "tag.gpgSign=false", "tag", "-f", moving, f"{tag}^{{commit}}"])
         _run(["git", "push", "--force", "origin", moving])
         print(f"moved {moving} -> {tag} (pin this for the Marketplace Action)")
     except subprocess.CalledProcessError:

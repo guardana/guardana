@@ -39,6 +39,12 @@ def _healthy() -> dict[str, object]:
     return {
         f"repos/{REPO}": {"owner": {"type": "Organization"}},
         f"repos/{REPO}/private-vulnerability-reporting": {"enabled": True},
+        f"repos/{REPO}/branches/main/protection": {
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {"required_approving_review_count": 0},
+            "required_status_checks": {"strict": True, "checks": [{"context": "test (3.12)"}]},
+            "allow_force_pushes": {"enabled": False},
+        },
         f"repos/{REPO}/rulesets?includes_parents=true&per_page=100": [
             {"id": 7, "target": "branch", "enforcement": "active"},
             {"id": 9, "target": "tag", "enforcement": "active"},
@@ -100,7 +106,7 @@ def test_every_setting_in_place_is_present_and_exits_zero() -> None:
     results = _run()
 
     assert {result.outcome for result in results.values()} == {check.Outcome.PRESENT}
-    assert len(results) == 6
+    assert len(results) == 7
     assert check.exit_code(list(results.values())) == 0
 
 
@@ -296,6 +302,49 @@ def test_a_pypi_environment_without_a_reviewer_is_absent(rules: list[object]) ->
     assert _outcome(_run(table), "pypi environment") is check.Outcome.ABSENT
 
 
+_PROTECTION = f"repos/{REPO}/branches/main/protection"
+
+
+@pytest.mark.parametrize(
+    ("change", "gap"),
+    [
+        ({"enforce_admins": {"enabled": False}}, "administrators are exempt"),
+        ({"required_pull_request_reviews": None}, "no pull request is required"),
+        ({"required_status_checks": None}, "no status check is required"),
+        ({"required_status_checks": {"strict": True, "checks": []}}, "no status check"),
+        ({"allow_force_pushes": {"enabled": True}}, "force pushes are allowed"),
+    ],
+    ids=["admins-exempt", "no-pr", "no-checks", "empty-checks", "force-push"],
+)
+def test_a_main_branch_anyone_can_change_outside_a_checked_pull_request_is_absent(
+    change: dict[str, object], gap: str
+) -> None:
+    table = _healthy()
+    protection = table[_PROTECTION]
+    assert isinstance(protection, dict)
+    table[_PROTECTION] = {**protection, **change}
+
+    (result,) = [r for name, r in _run(table).items() if name.startswith("main takes")]
+
+    assert result.outcome is check.Outcome.ABSENT
+    assert gap in result.detail
+
+
+def test_a_main_protection_answered_without_the_admin_flag_is_not_checked() -> None:
+    table = _healthy()
+    table[_PROTECTION] = {"required_pull_request_reviews": {}}
+
+    assert _outcome(_run(table), "main takes") is check.Outcome.NOT_CHECKED
+
+
+def test_an_unprotected_or_unreadable_main_is_not_checked_never_absent() -> None:
+    """GitHub answers 404 for no protection and for a token that may not read it alike."""
+    table = _healthy()
+    del table[_PROTECTION]
+
+    assert _outcome(_run(table), "main takes") is check.Outcome.NOT_CHECKED
+
+
 def test_a_pypi_environment_answering_404_is_not_checked() -> None:
     table = _healthy()
     del table[f"repos/{REPO}/environments/pypi"]
@@ -485,7 +534,7 @@ def test_without_gh_on_path_every_setting_is_not_checked(
     out = capsys.readouterr().out
     assert code == 2
     assert "PRESENT " not in out
-    assert out.count("NOT CHECKED") == 6
+    assert out.count("NOT CHECKED") == len(check.CHECKS)
     assert "gh is not installed" in out
 
 

@@ -26,7 +26,7 @@ paths:
   re-triggers a publish.
 - **A squash merge is not a release.** CI runs on the PR and on main; a maintainer groups
   completed issues, chooses the version under `docs/compatibility.md#versioning`, and uses
-  `scripts/release.py` to gate, push main, wait for green CI, then tag. Do not publish
+  `scripts/release.py` to gate, merge the release PR, wait for green CI, then push a signed tag. Do not publish
   packages from a pull_request or main-push workflow.
 - **A push to `main` deploys `site/`** through Cloudflare's `npx wrangler deploy`, from the
   tree, before CI has run: `wrangler.jsonc` is a static-assets Worker with no build step,

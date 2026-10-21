@@ -12,8 +12,8 @@ paths:
 - **Generated files are never edited by hand**: `docs/generated/`, the built-in pack manifest,
   `site/docs/`, `site/llms.txt`, the counts in `site/index.html`. Every generator has `--check`
   and each is a CI gate.
-- **`release.py` pushes `main` first, waits for green CI, then pushes the tag** — and refuses
-  when it cannot check. A tag that moved after a publish no longer names the bytes people
+- **`release.py` merges the release commit through a pull request, waits for green CI on the
+  merge commit, then pushes a signed tag it verified** — and refuses when it cannot check. A tag that moved after a publish no longer names the bytes people
   installed.
 - **Hooks live here, not under `.claude/`**, because `mypy --strict` skips dot-directories and a
   checked-in script the gate cannot see is an unverified corner. `guard_hook.py` is tested by a

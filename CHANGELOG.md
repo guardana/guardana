@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Route the release commit through a pull request and create a signed, verified tag.** `scripts/release.py` puts the release commit on a `release/vX.Y.Z` branch, opens a pull request into `main` and squash-merges it only after the checks `main` requires pass, using `--match-head-commit` to name the checked commit. It checks that the merge commit holds that commit's tree, waits for green CI on the merge commit and creates the tag there with `git tag -s`. It pushes the tag only after `git tag -v` verifies the signature; any step it cannot complete or check stops the release before a tag is pushed.
+
 ### Documentation
 
 - **Updated release and proof documentation after 1.0.0rc5.** Product status, the roadmap and compatibility cover five required candidates and their gates; reproducible builds uses the `1.0.0rc5` run; and product status, the roadmap and the two proof notes describe the 1.0.0rc5 proofs.

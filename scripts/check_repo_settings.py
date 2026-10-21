@@ -42,6 +42,7 @@ RELEASE_WORKFLOW = ".github/workflows/release.yml"
 GATE_JOB = "ci-passed"
 PUBLISH_JOB = "publish"
 ENVIRONMENT = "pypi"
+MAIN = "main"
 RELEASE_TAGS = (
     "refs/tags/v1.2.3",
     "refs/tags/v1.2",
@@ -359,8 +360,36 @@ def package_public(api: Api, repo: str, package: str) -> Finding:
     return (Outcome.PRESENT, "") if visibility == "public" else (Outcome.ABSENT, visibility)
 
 
+def _enabled(answer: dict[str, object], key: str) -> bool:
+    flag = _mapping(answer.get(key), key).get("enabled")
+    if not isinstance(flag, bool):
+        raise NotCheckedError(f"{key}: unexpected answer")
+    return flag
+
+
+def main_protection(api: Api, repo: str) -> Finding:
+    """Check that `main` takes changes only through a pull request with required checks.
+
+    Administrators have to be held to it too: the release commit reaches `main` through a pull
+    request, and an exemption for administrators would let it, or anything else, skip that.
+    """
+    answer = _mapping(api.get(f"repos/{repo}/branches/{MAIN}/protection"), "protection")
+    checks = answer.get("required_status_checks")
+    gaps: list[str] = []
+    if not _enabled(answer, "enforce_admins"):
+        gaps.append("administrators are exempt")
+    if answer.get("required_pull_request_reviews") is None:
+        gaps.append("no pull request is required")
+    if checks is None or not _sequence(_mapping(checks, "checks").get("checks"), "checks"):
+        gaps.append("no status check is required")
+    if _enabled(answer, "allow_force_pushes"):
+        gaps.append("force pushes are allowed")
+    return (Outcome.ABSENT, "; ".join(gaps)) if gaps else (Outcome.PRESENT, "")
+
+
 CHECKS: tuple[tuple[str, Callable[[Api, str], Finding]], ...] = (
     ("private vulnerability reporting is on", vulnerability_reporting),
+    (f"{MAIN} takes changes only through a checked pull request, admins included", main_protection),
     ("tag ruleset guards refs/tags/v*, bypassable by maintainers only", tag_ruleset),
     (f"{ENVIRONMENT} environment requires a reviewer", environment_approval),
     (f"release workflow publishes only after {GATE_JOB}", release_ci_gate),

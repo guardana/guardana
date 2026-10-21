@@ -1,12 +1,14 @@
-"""The release script refuses twice: it tags only what CI passed, and commits only what it wrote.
+"""The release script refuses at every step it cannot check, and commits only what it wrote.
 
-Pushing the branch and the tag together races CI against the publish, and a red run
-then leaves a publish waiting on the `pypi` approval — a second click, and a cancelled
-run in the history that reads as a failed release.
+The release commit reaches `main` through a pull request that merges only once its required
+checks pass, and the tag follows only once CI is green on the merge commit and the tag's
+signature verifies. Pushing the branch and the tag together races CI against the publish,
+and a red run then leaves a publish waiting on the `pypi` approval — a second click, and a
+cancelled run in the history that reads as a failed release.
 
 The direction that matters is the refusal. A gate that pushed the tag anyway when it
-could not check is the same defect wearing a different hat, so both ways of being unable
-to check — no `gh`, and no run to look at — stop before the tag.
+could not check is the same defect wearing a different hat, so every way of being unable
+to check — no `gh`, no run to look at, a signature that does not verify — stops before the tag.
 """
 
 import subprocess
@@ -18,27 +20,53 @@ import pytest
 import bump_version
 import release
 
+_COMMIT = "cafebabe1234"
 
-def test_a_tag_is_not_pushed_when_ci_cannot_be_reached(monkeypatch: pytest.MonkeyPatch) -> None:
+
+class _Clock:
+    """Time that moves only when the code under test sleeps."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.slept: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> _Clock:
+    fake = _Clock()
+    monkeypatch.setattr(release, "_monotonic", fake.monotonic)
+    monkeypatch.setattr(release, "_sleep", fake.sleep)
+    return fake
+
+
+def test_a_tag_is_not_pushed_when_ci_cannot_be_reached(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
     """Without `gh` there is no way to know, and an unverified tag is the thing avoided."""
 
     def _no_gh(cmd: list[str], **_: bool) -> str:
-        if cmd[0] == "gh":
-            raise FileNotFoundError(cmd[0])
-        return "cafebabe1234\n"
+        raise FileNotFoundError(cmd[0])
 
     monkeypatch.setattr(release, "_run", _no_gh)
 
     with pytest.raises(SystemExit) as exit_info:
-        release._await_green_ci()
+        release._await_green_ci(_COMMIT)
 
     assert exit_info.value.code == 1
+    assert clock.slept == []
 
 
 def test_a_stop_before_tagging_spells_out_the_tag_commands(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The release commit is pushed and untagged, so the message is all a hand has to go on."""
+    """The release commit is merged and untagged, so the message is all a hand has to go on."""
     with pytest.raises(SystemExit):
         release._stop_before_tagging("CI run 42 is not green")
 
@@ -46,51 +74,119 @@ def test_a_stop_before_tagging_spells_out_the_tag_commands(
     assert all(command in err for command in release._TAG_BY_HAND), err
 
 
-def test_a_tag_is_not_pushed_when_no_ci_run_exists_yet(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A commit CI has not started on is a commit CI has not passed."""
+def test_a_stop_before_merging_spells_out_the_rest_of_the_release(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit):
+        release._stop_before_merge("the required checks of pull request #190 did not pass", "190")
+
+    err = capsys.readouterr().err
+    assert "pull request #190" in err
+    assert "Nothing reached `main`" in err
+    assert all(command in err for command in release._TAG_BY_HAND), err
+
+
+def test_the_hand_written_tag_is_signed_and_verified_before_it_is_pushed() -> None:
+    lines = list(release._TAG_BY_HAND)
+    create = next(i for i, line in enumerate(lines) if line.startswith("git tag -s vX.Y.Z "))
+    verify = lines.index("git tag -v vX.Y.Z")
+    push = lines.index("git push origin refs/tags/vX.Y.Z")
+
+    assert create < verify < push
+    assert not any(" -a " in line for line in lines)
+
+
+def test_a_tag_is_not_pushed_when_no_ci_run_ever_starts(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    """A commit CI has not started on is a commit CI has not passed, once the wait is over."""
+    listed: list[list[str]] = []
 
     def _no_run(cmd: list[str], **_: bool) -> str:
-        return "" if cmd[0] == "gh" else "cafebabe1234\n"
+        listed.append(cmd)
+        return ""
 
     monkeypatch.setattr(release, "_run", _no_run)
 
     with pytest.raises(SystemExit):
-        release._await_green_ci()
+        release._await_green_ci(_COMMIT)
+
+    assert clock.now >= release._CI_APPEARS_WITHIN_S
+    assert not [cmd for cmd in listed if cmd[:3] == ["gh", "run", "watch"]]
 
 
-def test_a_tag_is_not_pushed_when_ci_is_red(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_run_listed_after_the_push_is_waited_for_rather_than_refused(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    """Seconds after a push the run is not listed yet; that is "not yet", not "red"."""
+    answers = iter(["", "", "42\n"])
+    calls: list[list[str]] = []
+
+    def _late(cmd: list[str], **_: bool) -> str:
+        calls.append(cmd)
+        return next(answers) if cmd[:3] == ["gh", "run", "list"] else ""
+
+    monkeypatch.setattr(release, "_run", _late)
+
+    release._await_green_ci(_COMMIT)
+
+    assert clock.slept == [release._CI_POLL_S, release._CI_POLL_S]
+    assert calls[-1] == ["gh", "run", "watch", "42", "--exit-status"]
+
+
+def test_the_ci_run_awaited_before_the_tag_is_the_push_run_release_yml_requires(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    calls: list[list[str]] = []
+
+    def _green(cmd: list[str], **_: bool) -> str:
+        calls.append(cmd)
+        return "42\n"
+
+    monkeypatch.setattr(release, "_run", _green)
+
+    release._await_green_ci(_COMMIT)
+
+    (listing,) = [cmd for cmd in calls if cmd[:3] == ["gh", "run", "list"]]
+    assert f"--commit={_COMMIT}" in listing
+    assert "--event=push" in listing
+    assert "--workflow=CI" in listing
+
+
+def test_a_tag_is_not_pushed_when_ci_is_red(monkeypatch: pytest.MonkeyPatch, clock: _Clock) -> None:
     """`gh run watch --exit-status` failing is the whole check, so it has to stop here."""
 
     def _red(cmd: list[str], **_: bool) -> str:
         if cmd[:3] == ["gh", "run", "watch"]:
             raise subprocess.CalledProcessError(1, cmd)
-        return "42\n" if cmd[0] == "gh" else "cafebabe1234\n"
+        return "42\n"
 
     monkeypatch.setattr(release, "_run", _red)
 
     with pytest.raises(SystemExit):
-        release._await_green_ci()
+        release._await_green_ci(_COMMIT)
 
 
-def test_a_green_run_lets_the_release_continue(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_green_run_lets_the_release_continue(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
     """The inversion: the same path, green, returns rather than stopping.
 
-    Without this the three refusals above would pass against a gate that refused
+    Without this the refusals above would pass against a gate that refused
     everything, which is a gate nobody could cut a release with.
     """
     watched: list[list[str]] = []
 
     def _green(cmd: list[str], **_: bool) -> str:
-        if cmd[0] == "gh":
-            watched.append(cmd)
-            return "42\n"
-        return "cafebabe1234\n"
+        watched.append(cmd)
+        return "42\n"
 
     monkeypatch.setattr(release, "_run", _green)
 
-    release._await_green_ci()
+    release._await_green_ci(_COMMIT)
 
     assert ["gh", "run", "watch", "42", "--exit-status"] in watched
+    assert clock.slept == []
 
 
 _BUMP_PLAN = (
@@ -110,34 +206,65 @@ _RELEASED = (
 )
 
 
-def _cut(
+_HEAD = "1" * 40
+_MERGED = "2" * 40
+_PR_URL = "https://github.com/guardana/guardana/pull/190\n"
+_TAG_PUSH = ["git", "push", "origin", "refs/tags/v0.1.1"]
+
+
+def _cut(  # noqa: PLR0913 — each keyword is one answer the fake world gives
     monkeypatch: pytest.MonkeyPatch,
     status: tuple[str, ...],
     calls: list[list[str]],
     *,
     ci_green: bool = True,
+    checks_green: bool = True,
+    merged_tree: str = "tree-of-head",
+    pr_state: str = "MERGED",
+    failing: tuple[tuple[str, ...], ...] = (),
 ) -> None:
-    """Run `release.main`, recording into `calls` every side effect instead of performing it."""
+    """Run `release.main`, recording into `calls` every side effect instead of performing it.
+
+    `failing` names command prefixes that exit non-zero, as git and gh do when they refuse.
+    """
+    exact: dict[tuple[str, ...], str] = {
+        ("git", "rev-parse", "HEAD"): f"{_HEAD}\n",
+        ("git", "rev-parse", f"{_HEAD}^{{tree}}"): "tree-of-head\n",
+        ("git", "rev-parse", f"{_MERGED}^{{tree}}"): f"{merged_tree}\n",
+    }
+    by_prefix: dict[tuple[str, ...], str] = {
+        ("git", "status"): "".join(f"{line}\0" for line in status),
+        ("gh", "pr", "create"): _PR_URL,
+        ("gh", "pr", "view"): f"{pr_state}\n{_MERGED if pr_state == 'MERGED' else ''}\n",
+    }
 
     def _fake(cmd: list[str], **_: bool) -> str:
         calls.append(cmd)
+        if any(tuple(cmd[: len(prefix)]) == prefix for prefix in failing):
+            raise subprocess.CalledProcessError(1, cmd)
         if "scripts/bump_version.py" in cmd and "--dry-run" in cmd:
             return _BUMP_PLAN
-        if cmd[:2] == ["git", "status"]:
-            return "".join(f"{line}\0" for line in status)
-        return ""
+        if tuple(cmd) in exact:
+            return exact[tuple(cmd)]
+        return next((out for head, out in by_prefix.items() if tuple(cmd[: len(head)]) == head), "")
 
-    def _ci() -> None:
-        calls.append(["<ci>"])
+    def _checks(pr: str, head: str) -> None:
+        calls.append(["<checks>", pr, head])
+        if not checks_green:
+            raise SystemExit(1)
+
+    def _ci(commit: str) -> None:
+        calls.append(["<ci>", commit])
         if not ci_green:
             raise SystemExit(1)
 
     monkeypatch.setattr(release, "_run", _fake)
     monkeypatch.setattr(release, "_current_version", lambda: "0.1.0")
-    monkeypatch.setattr(release, "_preflight", lambda: None)
+    monkeypatch.setattr(release, "_preflight", lambda branch: calls.append(["<preflight>", branch]))
     monkeypatch.setattr(release, "_gate", lambda: None)
     monkeypatch.setattr(release, "_check_reference_pack", lambda: None)
     monkeypatch.setattr(release, "_roll_changelog", lambda version, dry_run: None)
+    monkeypatch.setattr(release, "_await_required_checks", _checks)
     monkeypatch.setattr(release, "_await_green_ci", _ci)
     monkeypatch.setattr(release, "_move_marketplace_tag", lambda version, tag: None)
     release.main(["patch"])
@@ -147,26 +274,328 @@ def _position(calls: list[list[str]], head: list[str]) -> int:
     return next(i for i, cmd in enumerate(calls) if cmd[: len(head)] == head)
 
 
-def test_the_tag_is_created_only_after_ci_is_green(monkeypatch: pytest.MonkeyPatch) -> None:
+def _pushes(calls: list[list[str]]) -> list[list[str]]:
+    return [cmd for cmd in calls if cmd[:2] == ["git", "push"]]
+
+
+def test_the_release_commit_reaches_main_only_through_a_pull_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nothing is pushed to `main`; the commit rides a release branch merged once checks pass."""
+    calls: list[list[str]] = []
+    _cut(monkeypatch, _RELEASED, calls)
+
+    assert ["<preflight>", "release/v0.1.1"] in calls
+    assert _position(calls, ["git", "switch", "--create", "release/v0.1.1"]) < _position(
+        calls, ["git", "add"]
+    )
+    branch_push = _pushes(calls)[0]
+    assert branch_push == [
+        "git",
+        "push",
+        "--no-follow-tags",
+        "--set-upstream",
+        "origin",
+        "release/v0.1.1",
+    ]
+    assert not [cmd for cmd in _pushes(calls) if "main" in cmd]
+    create = calls[_position(calls, ["gh", "pr", "create"])]
+    assert create[create.index("--base") + 1] == "main"
+    assert create[create.index("--head") + 1] == "release/v0.1.1"
+    merge = calls[_position(calls, ["gh", "pr", "merge"])]
+    assert merge == ["gh", "pr", "merge", "190", "--squash", "--match-head-commit", _HEAD]
+    assert (
+        _position(calls, ["git", "push", "--no-follow-tags"])
+        < _position(calls, ["gh", "pr", "create"])
+        < _position(calls, ["<checks>", "190", _HEAD])
+        < _position(calls, ["gh", "pr", "merge"])
+    )
+
+
+def test_the_tag_is_signed_on_the_merge_commit_after_ci_and_verified_before_the_push(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A tag that exists before CI is green leaves with any push that follows tags."""
     calls: list[list[str]] = []
     _cut(monkeypatch, _RELEASED, calls)
 
-    push_main = calls[_position(calls, ["git", "push"])]
-    assert "--no-follow-tags" in push_main
-    assert push_main[-1] == "main"
-    assert _position(calls, ["git", "push"]) < _position(calls, ["<ci>"])
-    assert _position(calls, ["<ci>"]) < _position(calls, ["git", "tag", "-a"])
-    assert calls[-1] == ["git", "push", "origin", "refs/tags/v0.1.1"]
+    sign = ["git", "tag", "-s", "v0.1.1", "-m", "Guardana v0.1.1", _MERGED]
+    assert (
+        _position(calls, ["gh", "pr", "merge"])
+        < _position(calls, ["<ci>", _MERGED])
+        < calls.index(sign)
+        < calls.index(["git", "tag", "-v", "v0.1.1"])
+        < calls.index(_TAG_PUSH)
+    )
+    assert not [cmd for cmd in calls if cmd[:3] == ["git", "tag", "-a"]]
+    assert _TAG_PUSH in _pushes(calls)
 
 
-def test_a_red_ci_leaves_no_tag_behind(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_red_required_check_leaves_the_pull_request_unmerged_and_untagged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    with pytest.raises(SystemExit):
+        _cut(monkeypatch, _RELEASED, calls, checks_green=False)
+
+    assert ["<checks>", "190", _HEAD] in calls
+    assert not [cmd for cmd in calls if cmd[:3] == ["gh", "pr", "merge"]]
+    assert not [cmd for cmd in calls if cmd[:2] == ["git", "tag"]]
+
+
+def test_a_red_ci_on_the_merge_commit_leaves_no_tag_behind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[list[str]] = []
     with pytest.raises(SystemExit):
         _cut(monkeypatch, _RELEASED, calls, ci_green=False)
 
-    assert ["<ci>"] in calls
+    assert ["<ci>", _MERGED] in calls
     assert not [cmd for cmd in calls if cmd[:2] == ["git", "tag"]]
+
+
+def test_a_merge_github_refuses_stops_before_any_tag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unresolved review threads or a stale branch make GitHub refuse; the script stops there."""
+    calls: list[list[str]] = []
+    with pytest.raises(SystemExit):
+        _cut(monkeypatch, _RELEASED, calls, failing=(("gh", "pr", "merge"),), pr_state="OPEN")
+
+    assert not [cmd for cmd in calls if cmd[:2] == ["git", "tag"] or cmd == ["<ci>", _MERGED]]
+    assert _TAG_PUSH not in calls
+
+
+def test_a_merge_commit_holding_another_tree_is_never_tagged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The tag must name what the gate and the checks saw, not whatever `main` merged."""
+    calls: list[list[str]] = []
+    with pytest.raises(SystemExit):
+        _cut(monkeypatch, _RELEASED, calls, merged_tree="tree-of-something-else")
+
+    assert not [cmd for cmd in calls if cmd[:2] == ["git", "tag"] or cmd[0] == "<ci>"]
+
+
+def test_a_tag_whose_signature_does_not_verify_is_deleted_and_never_pushed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    with pytest.raises(SystemExit):
+        _cut(monkeypatch, _RELEASED, calls, failing=(("git", "tag", "-v"),))
+
+    assert ["git", "tag", "-d", "v0.1.1"] in calls
+    assert _TAG_PUSH not in calls
+
+
+def test_a_tag_git_cannot_sign_is_never_pushed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No signing key, or one git cannot use, must not fall back to an unsigned tag."""
+    calls: list[list[str]] = []
+    with pytest.raises(SystemExit):
+        _cut(monkeypatch, _RELEASED, calls, failing=(("git", "tag", "-s"),))
+
+    assert not [cmd for cmd in calls if cmd[:3] in (["git", "tag", "-a"], ["git", "tag", "-v"])]
+    assert _TAG_PUSH not in calls
+
+
+def _pr_world(
+    monkeypatch: pytest.MonkeyPatch, answers: dict[tuple[str, ...], str | Exception]
+) -> list[list[str]]:
+    """Fake `_run` answering by command prefix; an exception answer is raised."""
+    calls: list[list[str]] = []
+
+    def _fake(cmd: list[str], **_: bool) -> str:
+        calls.append(cmd)
+        for prefix, answer in answers.items():
+            if tuple(cmd[: len(prefix)]) == prefix:
+                if isinstance(answer, Exception):
+                    raise answer
+                return answer
+        return ""
+
+    monkeypatch.setattr(release, "_run", _fake)
+    return calls
+
+
+def test_the_required_checks_are_awaited_on_the_pull_request_run(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    calls = _pr_world(monkeypatch, {("gh", "run", "list"): "77\n"})
+
+    release._await_required_checks("190", _HEAD)
+
+    (listing,) = [cmd for cmd in calls if cmd[:3] == ["gh", "run", "list"]]
+    assert "--event=pull_request" in listing
+    assert f"--commit={_HEAD}" in listing
+    assert calls[-1] == ["gh", "pr", "checks", "190", "--required", "--watch", "--fail-fast"]
+
+
+def test_a_failed_required_check_stops_before_the_merge(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    _pr_world(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): "77\n",
+            ("gh", "pr", "checks"): subprocess.CalledProcessError(1, ["gh"]),
+        },
+    )
+
+    with pytest.raises(SystemExit) as stopped:
+        release._await_required_checks("190", _HEAD)
+
+    assert stopped.value.code == 1
+
+
+@pytest.mark.parametrize("answer", ["", "OPEN\n\n"], ids=["unreadable", "open"])
+def test_a_merge_github_did_not_confirm_is_neither_tagged_nor_called_unmerged(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], answer: str
+) -> None:
+    """The merge call said yes but the state does not: the operator has to look, not guess."""
+    calls = _pr_world(monkeypatch, {("gh", "pr", "view"): answer})
+
+    with pytest.raises(SystemExit):
+        release._merge("190", _HEAD)
+
+    assert not [cmd for cmd in calls if cmd[:2] == ["git", "tag"]]
+    assert "could not tell whether pull request #190 merged" in capsys.readouterr().err
+
+
+def test_a_merge_call_that_failed_after_github_merged_goes_on_to_the_tree_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A timeout on the response can hide a merge that happened; the state says which."""
+    _pr_world(
+        monkeypatch,
+        {
+            ("gh", "pr", "merge"): subprocess.CalledProcessError(1, ["gh"]),
+            ("gh", "pr", "view"): f"MERGED\n{_MERGED}\n",
+            ("git", "rev-parse"): "same-tree\n",
+        },
+    )
+
+    assert release._merge("190", _HEAD) == _MERGED
+
+
+def test_a_merge_call_that_failed_on_an_open_pull_request_says_nothing_reached_main(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _pr_world(
+        monkeypatch,
+        {
+            ("gh", "pr", "merge"): subprocess.CalledProcessError(1, ["gh"]),
+            ("gh", "pr", "view"): "OPEN\n\n",
+        },
+    )
+
+    with pytest.raises(SystemExit):
+        release._merge("190", _HEAD)
+
+    err = capsys.readouterr().err
+    assert "GitHub did not merge pull request #190 (OPEN)" in err
+    assert "Nothing reached `main`" in err
+
+
+def test_a_merge_commit_holding_another_tree_tells_the_operator_not_to_tag_it(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spelling out the tag commands here would hand the rejected commit a tag by hand."""
+    trees = iter(["tree-of-merge\n", "tree-of-head\n"])
+    calls = _pr_world(monkeypatch, {("gh", "pr", "view"): f"MERGED\n{_MERGED}\n"})
+
+    def _fake(cmd: list[str], **_: bool) -> str:
+        calls.append(cmd)
+        if cmd[:2] == ["git", "rev-parse"]:
+            return next(trees)
+        return f"MERGED\n{_MERGED}\n" if cmd[:3] == ["gh", "pr", "view"] else ""
+
+    monkeypatch.setattr(release, "_run", _fake)
+
+    with pytest.raises(SystemExit):
+        release._merge("190", _HEAD)
+
+    err = capsys.readouterr().err
+    assert "Do not tag that commit" in err
+    assert not any(command in err for command in release._TAG_BY_HAND), err
+
+
+def test_trees_that_cannot_be_compared_stop_before_the_tag(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _pr_world(
+        monkeypatch,
+        {
+            ("gh", "pr", "view"): f"MERGED\n{_MERGED}\n",
+            ("git", "fetch"): subprocess.CalledProcessError(128, ["git"]),
+        },
+    )
+
+    with pytest.raises(SystemExit):
+        release._merge("190", _HEAD)
+
+    assert "compare them before any tag" in capsys.readouterr().err
+
+
+def test_a_pull_request_that_cannot_be_opened_stops_with_nothing_merged(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _pr_world(monkeypatch, {("gh", "pr", "create"): "could not create pull request\n"})
+
+    with pytest.raises(SystemExit):
+        release._open_pull_request("release/v0.1.1", "v0.1.1")
+
+    err = capsys.readouterr().err
+    assert "Nothing reached `main`" in err
+    assert "Open a pull request from it into `main`" in err
+
+
+def test_a_refused_tag_push_stops_with_the_remaining_steps_and_moves_nothing(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The release is merged and the signed tag exists here; a traceback would strand both."""
+    calls: list[list[str]] = []
+    moved: list[str] = []
+    monkeypatch.setattr(release, "_return_to_main", moved.append)
+
+    with pytest.raises(SystemExit) as stopped:
+        _cut(monkeypatch, _RELEASED, calls, failing=(tuple(_TAG_PUSH),))
+
+    err = capsys.readouterr().err
+    assert stopped.value.code == 1
+    assert "git push origin refs/tags/vX.Y.Z" in err
+    assert "git switch main" in err
+    assert moved == []
+
+
+@pytest.mark.parametrize(
+    ("local", "remote"),
+    [("  release/v0.1.1\n", ""), ("", "abc123\trefs/heads/release/v0.1.1\n")],
+)
+def test_a_release_branch_that_already_exists_stops_the_release_before_the_gate(
+    monkeypatch: pytest.MonkeyPatch, local: str, remote: str
+) -> None:
+    """A leftover branch from a stopped release must be finished or removed, never reused blind."""
+    _pr_world(
+        monkeypatch,
+        {
+            ("git", "rev-parse", "--abbrev-ref"): "main\n",
+            ("git", "rev-parse"): "same\n",
+            ("git", "branch", "--list"): local,
+            ("git", "ls-remote"): remote,
+        },
+    )
+
+    with pytest.raises(SystemExit) as refused:
+        release._preflight("release/v0.1.1")
+
+    assert "release/v0.1.1 already exists" in str(refused.value.code)
+
+
+def test_a_free_release_branch_passes_the_preflight(monkeypatch: pytest.MonkeyPatch) -> None:
+    _pr_world(
+        monkeypatch,
+        {("git", "rev-parse", "--abbrev-ref"): "main\n", ("git", "rev-parse"): "same\n"},
+    )
+
+    release._preflight("release/v0.1.1")
 
 
 def test_the_release_stages_exactly_the_paths_it_wrote(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -237,13 +666,15 @@ def test_the_tag_by_hand_moves_the_minor_tag_the_way_the_script_does(
 
     monkeypatch.setattr(release, "_run", _record)
     release._move_marketplace_tag("0.1.1", "v0.1.1")
-    by_hand = [
-        line for line in release._TAG_BY_HAND if line.startswith("git tag") and " vX.Y " in line
-    ]
+    by_hand = [line for line in release._TAG_BY_HAND if " tag -f vX.Y " in line]
 
-    assert calls[0] == ["git", "tag", "-f", "v0.1", "v0.1.1^{commit}"]
+    # `tag.gpgSign` would otherwise turn the pointer into a signed tag that needs a message.
+    assert calls[0] == ["git", "-c", "tag.gpgSign=false", "tag", "-f", "v0.1", "v0.1.1^{commit}"]
     assert by_hand
-    assert all(" -a " not in line and "^{commit}" in line for line in by_hand), by_hand
+    assert all(
+        line.startswith("git -c tag.gpgSign=false tag -f") and "^{commit}" in line
+        for line in by_hand
+    ), by_hand
 
 
 _SURFACE = '{"facade": {}}\n'
@@ -460,7 +891,7 @@ def test_a_final_whose_candidate_tag_has_no_surface_is_refused(
 def test_the_surface_check_runs_before_the_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     order: list[str] = []
     monkeypatch.setattr(release, "_current_version", lambda: "1.0.0rc1")
-    monkeypatch.setattr(release, "_preflight", lambda: order.append("preflight"))
+    monkeypatch.setattr(release, "_preflight", lambda branch: order.append("preflight"))
     monkeypatch.setattr(release, "_check_surface", order.append)
     monkeypatch.setattr(release, "_check_reference_pack", lambda: None)
 
@@ -581,7 +1012,7 @@ def test_the_pre_1_0_statement_refuses_a_dry_run_before_the_gate(
     _policy(monkeypatch, tmp_path, _PRE_1_POLICY)
     ran: list[str] = []
     monkeypatch.setattr(release, "_current_version", lambda: "1.0.0rc2")
-    monkeypatch.setattr(release, "_preflight", lambda: None)
+    monkeypatch.setattr(release, "_preflight", lambda branch: None)
     monkeypatch.setattr(release, "_check_surface", lambda version: None)
     monkeypatch.setattr(release, "_check_reference_pack", lambda: None)
     monkeypatch.setattr(release, "_gate", lambda: ran.append("gate"))
@@ -694,7 +1125,7 @@ def test_the_reference_pack_check_refuses_without_an_earlier_tag(
 def test_the_reference_pack_check_runs_before_the_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     order: list[str] = []
     monkeypatch.setattr(release, "_current_version", lambda: "0.41.0")
-    monkeypatch.setattr(release, "_preflight", lambda: None)
+    monkeypatch.setattr(release, "_preflight", lambda branch: None)
     monkeypatch.setattr(release, "_check_surface", lambda version: None)
     monkeypatch.setattr(release, "_check_reference_pack", lambda: order.append("pack"))
 
