@@ -359,7 +359,7 @@ delivery:                       # optional; see &quot;delivery:&quot; below
 <td><code>fail_on.fail_on_inconclusive</code></td>
 <td>bool</td>
 <td><code>false</code></td>
-<td>When <code>true</code>, a check that ran but could not reach a verdict (reported on the <code>unverified</code> channel) also fails the gate — the strict posture for a hard CI gate. <strong><code>severity</code> does not apply to it.</strong> A severity answers how bad a problem is, and an unverified result is the absence of an answer, so any of them fails the gate once this is on. This is what makes &quot;an artifact I could not read does not get promoted&quot; expressible in one key.</td>
+<td>When <code>true</code>, a check that ran but could not reach a verdict (reported on the <code>unverified</code> channel) leaves the run <code>indeterminate</code> (exit <code>2</code>), rather than <code>fail</code> (exit <code>1</code>) — the strict posture for a hard CI gate. <strong><code>severity</code> does not apply to it.</strong> A severity answers how bad a problem is, and an unverified result is the absence of an answer, so any of them leaves the run <code>indeterminate</code> once this is on. This is what makes &quot;an artifact I could not read does not get promoted&quot; expressible in one key.</td>
 </tr>
 <tr>
 <td><code>fail_on.fail_on_error</code></td>
@@ -523,7 +523,8 @@ gate on) <strong>or</strong> <code>finding.verdict.confidence &gt;= fail_on.min_
 and each <code>monitor</code> cycle's gate check.</p>
 <p>Checks that could not reach a verdict are reported on the separate
 <code>unverified</code> channel and do <strong>not</strong> fail the gate by default; set
-<code>fail_on.fail_on_inconclusive: true</code> to make them count.</p>
+<code>fail_on.fail_on_inconclusive: true</code> to leave the run <code>indeterminate</code> (exit <code>2</code>)
+when they occur.</p>
 <p><strong>One thing no <code>fail_on</code> switch governs: coverage you demanded and did not get.</strong>
 A dimension named in <code>trace.require</code>, or needed by an assertion you wrote in a
 security contract, that the producer does not record makes the run <code>indeterminate</code>

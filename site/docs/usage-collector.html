@@ -876,7 +876,7 @@ One that fails half-way leaves the database as it found it, rather than in a sta
 no version describes.</p>
 <p><strong>A Postgres advisory lock covers the whole run</strong>, so two replicas starting
 together cannot both apply the same version.</p>
-<h3 id="three-things-the-runner-refuses">Three things the runner refuses</h3>
+<h3 id="four-things-the-runner-refuses">Four things the runner refuses</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -905,6 +905,10 @@ together cannot both apply the same version.</p>
 </table></div>
 <p>Rolling back <code>0004</code> needs no refusal: it drops labels, which loses information and
 merges no tenants, and the submissions themselves stay.</p>
+<p><code>rollback --steps N</code> undoes one migration at a time, each in its own transaction.
+A refusal at <code>0003</code> comes after the later migrations are already rolled back.
+The command exits <code>1</code>; <code>migrate</code> applies them again, but labels dropped by rolling
+back <code>0004</code> stay lost.</p>
 <h2 id="health-and-readiness-are-two-questions">Health and readiness are two questions</h2>
 <pre><code class="language-bash">curl -s localhost:8000/healthz   # the process is running. Touches no database
 curl -s localhost:8000/readyz    # the schema this build expects is the one present

@@ -245,7 +245,8 @@ assertions:
 </code></pre>
 <p>Each assertion becomes a rule with the id <code>contract.&lt;name&gt;.&lt;assertion-id&gt;</code>, so a
 profile can exclude one with a glob and a baseline can waive one without waiving
-the rest.</p>
+the rest. A finding carries the assertion's <code>severity</code>; an assertion without
+<code>severity</code> is <code>high</code>.</p>
 <h2 id="the-five-assertion-kinds">The five assertion kinds</h2>
 <div class="table-wrap"><table>
 <thead>

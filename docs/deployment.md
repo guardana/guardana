@@ -178,12 +178,13 @@ docker compose -f deploy/docker-compose.yml exec -T db \
 ```
 
 Restore it — into an **empty** database, which is what a rebuild on a new machine
-actually looks like. Name the dump to restore. The sequence checks that it
-reads, stops the collector to prevent writes mid-restore, recreates the database,
-restores, and checks `/readyz` (storage reachable, schema current). Each step requires
-the preceding step to succeed. An unreadable dump stops everything before the database
-is dropped. A failed restore leaves the collector stopped. Set `BACKUP` to the dump
-to restore:
+actually looks like. Name the dump to restore. The sequence checks that it reads,
+stops the collector to prevent writes mid-restore, recreates the database,
+restores, and waits up to about 30 seconds for `/readyz` (storage reachable,
+schema current). Each step requires the preceding step to succeed. An unreadable
+dump stops everything before the database is dropped. A failed restore leaves the
+collector stopped. If `/readyz` does not answer `200` in that time, the sequence
+exits non-zero with the collector running. Set `BACKUP` to the dump to restore:
 
 ```bash
 set -a; . deploy/.env; set +a
@@ -199,7 +200,7 @@ docker compose -f deploy/docker-compose.yml exec -T db \
   pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists \
   < "$BACKUP" &&
 docker compose -f deploy/docker-compose.yml start collector &&
-curl -fsS http://127.0.0.1:8000/readyz
+curl -fsS --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8000/readyz
 ```
 
 Three things this procedure is deliberate about:

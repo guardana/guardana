@@ -332,7 +332,7 @@ the run (exit <code>4</code>).</p>
 <tr>
 <td><code>--mcp-token-env TEXT</code></td>
 <td>none</td>
-<td>Name of an environment variable holding a bearer token for the MCP server</td>
+<td>Name of an environment variable holding a bearer token for the MCP server. A variable that is unset or empty is refused (exit <code>3</code>) before anything is sent</td>
 </tr>
 <tr>
 <td><code>--mcp-pin PATH</code></td>
@@ -463,7 +463,7 @@ Guardana deliberately does not use the cheaper route the HTTP binding allows
 older revision will answer <code>tools/list</code> without a handshake, and a client that
 opened with one would take their manifest and record <code>2026-07-28</code> in the run
 manifest — a coverage claim about a revision that server has never heard of.</p>
-<p>Three consequences worth knowing:</p>
+<p>Four consequences worth knowing:</p>
 <ul>
 <li><strong>The negotiated revision is in the run manifest</strong>, so <a href="usage-diff.html"><code>guardana diff</code></a>
 reports a server that moved between revisions as <em>the reach changed</em>, not as the
@@ -473,6 +473,9 @@ conforming <code>2026-07-28</code> server mints none, so there is nothing to gue
 nothing to authenticate with. A server that still offers an older revision
 alongside the new one is graded over that older one, because it is still handing
 sessions to every client that asks for them.</li>
+<li><strong><code>guardana.mcp.cache_scope</code> is silent on a <code>2025-11-25</code> conversation.</strong>
+<code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare nothing on the older
+revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there.</li>
 <li><strong>Whether a server still offers <code>2025-11-25</code> is asked, not read.</strong> Some servers list
 only the new revision in <code>server/discover</code> and still answer <code>initialize</code>. When
 discovery lists no older revision, the checks that need it send one <code>initialize</code> over
@@ -582,11 +585,11 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.cache_scope</code></td>
-<td>A tool listing the server gates behind a credential is not also declared <code>cacheScope: &quot;public&quot;</code>, which would invite any shared gateway to serve it to a caller the server would have refused</td>
+<td>A tool listing the server gates behind a credential is not also declared <code>cacheScope: &quot;public&quot;</code>, which would invite any shared gateway to serve it to a caller the server would have refused. The check is silent on a <code>2025-11-25</code> conversation: <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there</td>
 </tr>
 <tr>
 <td><code>guardana.mcp.task_identity</code></td>
-<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. Only the first page of the listing is read, so an empty one that names a further page is <code>inconclusive</code> too. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. A server that declares no tasks and answers <code>tasks/list</code> as an unknown method is skipped <code>not_offered</code>, a coverage gap; when what it declares could not be read at all, the check is <code>inconclusive</code> instead</td>
+<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. Only the first page of the listing is read, so an empty one that names a further page is <code>inconclusive</code> too. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. A server that declares no tasks and answers <code>tasks/list</code> as an unknown method is skipped <code>not_offered</code>, a coverage gap; when what it declares could not be read at all, the check is <code>inconclusive</code> instead. Only JSON-RPC <code>-32601</code> counts as an unknown method. A <code>tasks/list</code> answered any other way, such as HTTP <code>400</code> without a JSON-RPC error or a JSON-RPC error other than <code>-32601</code>, is <code>inconclusive</code></td>
 </tr>
 </tbody>
 </table></div>

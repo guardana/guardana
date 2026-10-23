@@ -353,12 +353,13 @@ docker compose -f deploy/docker-compose.yml exec -T db \
   &gt; &quot;$BACKUP&quot;
 </code></pre>
 <p>Restore it — into an <strong>empty</strong> database, which is what a rebuild on a new machine
-actually looks like. Name the dump to restore. The sequence checks that it
-reads, stops the collector to prevent writes mid-restore, recreates the database,
-restores, and checks <code>/readyz</code> (storage reachable, schema current). Each step requires
-the preceding step to succeed. An unreadable dump stops everything before the database
-is dropped. A failed restore leaves the collector stopped. Set <code>BACKUP</code> to the dump
-to restore:</p>
+actually looks like. Name the dump to restore. The sequence checks that it reads,
+stops the collector to prevent writes mid-restore, recreates the database,
+restores, and waits up to about 30 seconds for <code>/readyz</code> (storage reachable,
+schema current). Each step requires the preceding step to succeed. An unreadable
+dump stops everything before the database is dropped. A failed restore leaves the
+collector stopped. If <code>/readyz</code> does not answer <code>200</code> in that time, the sequence
+exits non-zero with the collector running. Set <code>BACKUP</code> to the dump to restore:</p>
 <pre><code class="language-bash">set -a; . deploy/.env; set +a
 BACKUP=guardana-2026-08-05.dump
 
@@ -372,7 +373,7 @@ docker compose -f deploy/docker-compose.yml exec -T db \
   pg_restore -U &quot;$POSTGRES_USER&quot; -d &quot;$POSTGRES_DB&quot; --clean --if-exists \
   &lt; &quot;$BACKUP&quot; &amp;&amp;
 docker compose -f deploy/docker-compose.yml start collector &amp;&amp;
-curl -fsS http://127.0.0.1:8000/readyz
+curl -fsS --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8000/readyz
 </code></pre>
 <p>Three things this procedure is deliberate about:</p>
 <p><strong>Run <code>pg_dump</code> inside the database container.</strong> Not because it is tidier —

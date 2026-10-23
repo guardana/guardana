@@ -670,7 +670,7 @@ no version describes.
 **A Postgres advisory lock covers the whole run**, so two replicas starting
 together cannot both apply the same version.
 
-### Three things the runner refuses
+### Four things the runner refuses
 
 | Refused | Why |
 |---|---|
@@ -681,6 +681,11 @@ together cannot both apply the same version.
 
 Rolling back `0004` needs no refusal: it drops labels, which loses information and
 merges no tenants, and the submissions themselves stay.
+
+`rollback --steps N` undoes one migration at a time, each in its own transaction.
+A refusal at `0003` comes after the later migrations are already rolled back.
+The command exits `1`; `migrate` applies them again, but labels dropped by rolling
+back `0004` stay lost.
 
 ## Health and readiness are two questions
 

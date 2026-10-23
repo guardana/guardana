@@ -56,7 +56,8 @@ assertions:
 
 Each assertion becomes a rule with the id `contract.<name>.<assertion-id>`, so a
 profile can exclude one with a glob and a baseline can waive one without waiving
-the rest.
+the rest. A finding carries the assertion's `severity`; an assertion without
+`severity` is `high`.
 
 ## The five assertion kinds
 

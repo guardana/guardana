@@ -57,7 +57,7 @@ guardana probe (--url <base-url> --model <name> | --target <scheme://locator> | 
 | `--concurrency INTEGER` | `4` | How many rules may query the model at once. The probe is almost entirely spent waiting on the model, so overlapping rules is the biggest speed-up available; results stay in rule order, so two runs match. Rate limits (429) are retried with backoff — lower this if an endpoint keeps refusing. Each retry counts against `--max-requests` and in the run's usage. |
 | `--reporter TEXT` | none | Forward findings to a collector, e.g. `server://https://collector.example.com`, or to an [installed reporter](outputs.md) as `<name>://<locator>` |
 | `--mcp TEXT` | none | Examine an **MCP server** instead of a chat model — see [Probing an MCP server](#probing-an-mcp-server). Refused with `--url`, `--model`, `--provider`, `--api-key-env`, `--adapter`, `--system-prompt-file` or `--a2a`, which configure another target (exit `3`). `--mcp-token-env`, `--mcp-pin`, `--write-mcp-pin`, `--mcp-registry-entry` and `--allow-exec` are refused without `--mcp` (exit `3`). |
-| `--mcp-token-env TEXT` | none | Name of an environment variable holding a bearer token for the MCP server |
+| `--mcp-token-env TEXT` | none | Name of an environment variable holding a bearer token for the MCP server. A variable that is unset or empty is refused (exit `3`) before anything is sent |
 | `--mcp-pin PATH` | none | Approved MCP manifest to compare the live one against. A pin that cannot be compared, or is not checked because the rule is left out of the profile or the run does not finish it, ends the run `indeterminate` (exit `2`). |
 | `--write-mcp-pin PATH` | none | Write the server's current manifest as approved, and exit without reporting. It produces no report, so `--output` or any `--reporter` beside it is refused with exit `3` before anything is sent. A destination the command reads — a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names — is also refused with exit `3` before anything is sent or read. An existing file named by an argument of the stdio `--mcp` command is refused with exit `3` before anything is written or the server started. |
 | `--mcp-registry-entry PATH` | none | The server's registry `server.json`, compared with the URL the server answered at and the version it reports — see [The registry entry](#the-registry-entry). A file that cannot be read or is not an entry is refused (exit `3`); needs `--mcp` |
@@ -134,7 +134,7 @@ older revision will answer `tools/list` without a handshake, and a client that
 opened with one would take their manifest and record `2026-07-28` in the run
 manifest — a coverage claim about a revision that server has never heard of.
 
-Three consequences worth knowing:
+Four consequences worth knowing:
 
 - **The negotiated revision is in the run manifest**, so [`guardana diff`](usage-diff.md)
   reports a server that moved between revisions as *the reach changed*, not as the
@@ -144,6 +144,9 @@ Three consequences worth knowing:
   nothing to authenticate with. A server that still offers an older revision
   alongside the new one is graded over that older one, because it is still handing
   sessions to every client that asks for them.
+- **`guardana.mcp.cache_scope` is silent on a `2025-11-25` conversation.**
+  `cacheScope` and `ttlMs` arrive with `2026-07-28` and declare nothing on the older
+  revision, so even `cacheScope: "public"` produces no finding there.
 - **Whether a server still offers `2025-11-25` is asked, not read.** Some servers list
   only the new revision in `server/discover` and still answer `initialize`. When
   discovery lists no older revision, the checks that need it send one `initialize` over
@@ -235,8 +238,8 @@ saying plainly when it could not reach a verdict:
 | `guardana.mcp.scope_breadth` | The advertised scopes can express least privilege, and the challenge names the scope a request needs |
 | `guardana.mcp.discovery_target` | Every discovery address the server advertises is one a client may follow; every advertised authorization server is checked against the address guard, but only the first is fetched. A refused later address is a finding; an unfetched one that passes the guard is `inconclusive` |
 | `guardana.mcp.issuer_identification` | The authorization server advertises `authorization_response_iss_parameter_supported`, without which a client cannot detect an authorization-server mix-up (RFC 9207) |
-| `guardana.mcp.cache_scope` | A tool listing the server gates behind a credential is not also declared `cacheScope: "public"`, which would invite any shared gateway to serve it to a caller the server would have refused |
-| `guardana.mcp.task_identity` | One `tasks/list` sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without `--mcp-token-env`, or with no task to show, the check is `inconclusive`. Only the first page of the listing is read, so an empty one that names a further page is `inconclusive` too. An operator's session refused with `401` or `403` is `inconclusive` too. A server that declares no tasks and answers `tasks/list` as an unknown method is skipped `not_offered`, a coverage gap; when what it declares could not be read at all, the check is `inconclusive` instead |
+| `guardana.mcp.cache_scope` | A tool listing the server gates behind a credential is not also declared `cacheScope: "public"`, which would invite any shared gateway to serve it to a caller the server would have refused. The check is silent on a `2025-11-25` conversation: `cacheScope` and `ttlMs` arrive with `2026-07-28` and declare nothing on the older revision, so even `cacheScope: "public"` produces no finding there |
+| `guardana.mcp.task_identity` | One `tasks/list` sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without `--mcp-token-env`, or with no task to show, the check is `inconclusive`. Only the first page of the listing is read, so an empty one that names a further page is `inconclusive` too. An operator's session refused with `401` or `403` is `inconclusive` too. A server that declares no tasks and answers `tasks/list` as an unknown method is skipped `not_offered`, a coverage gap; when what it declares could not be read at all, the check is `inconclusive` instead. Only JSON-RPC `-32601` counts as an unknown method. A `tasks/list` answered any other way, such as HTTP `400` without a JSON-RPC error or a JSON-RPC error other than `-32601`, is `inconclusive` |
 
 On a server that answers an anonymous caller, `authorization_discovery`, `scope_breadth`,
 `issuer_identification` and `discovery_target` are `inconclusive`: no credential was asked

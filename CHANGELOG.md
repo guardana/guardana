@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - **Updated release and proof documentation after 1.0.0rc5.** Product status, the roadmap and compatibility cover five required candidates and their gates; reproducible builds uses the `1.0.0rc5` run; and product status, the roadmap and the two proof notes describe the 1.0.0rc5 proofs.
+- **Correct usage-probe, usage-contracts, profiles, deployment and usage-collector documentation.** Probe documents refusal of unset or empty token variables, silence from `cache_scope` over `2025-11-25`, and inconclusive task listings unless an unknown method is reported as JSON-RPC `-32601`. Contracts documents assertion severity and its `high` default. Profiles states that strict inconclusive handling leaves runs `indeterminate` (exit `2`). Deployment waits for readiness after restore and explains timeout behaviour. Collector counts four refusals and explains partial rollback, exit `1`, reapplying migrations and permanent label loss. No behaviour changes.
 
 ## [1.0.0rc5] - 2026-10-20 — the fifth release candidate
 
