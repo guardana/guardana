@@ -530,6 +530,94 @@ def test_an_environment_on_another_python_is_named(tmp_path: Path) -> None:
     ]
 
 
+_PILOT = "guardana-retrieval-pilot"
+_LOCAL = {"url": "file:///proof/project/application", "sha256": ""}
+
+
+def test_the_application_under_test_is_the_one_distribution_from_its_copy() -> None:
+    fetched = {
+        **{name: {"url": _WHEEL.format(name), "sha256": "ab"} for name in install.GUARDANA},
+        _PILOT: _LOCAL,
+    }
+
+    assert install.fetched_problems(fetched, (*install.GUARDANA, _PILOT), _PILOT) == []
+    assert install.fetched_problems(fetched, install.GUARDANA) != []
+
+
+@pytest.mark.parametrize(
+    ("fetched", "says"),
+    [
+        ({_PILOT: {"url": _WHEEL.format("pilot"), "sha256": "ab"}}, "not from its copy"),
+        ({"guardana-core": _LOCAL}, "did not come from https://files.pythonhosted.org/"),
+    ],
+)
+def test_only_the_named_application_may_come_from_a_local_copy(
+    fetched: dict[str, dict[str, str]], says: str
+) -> None:
+    problems = install.fetched_problems(fetched, (), _PILOT)
+
+    assert [p for p in problems if says in p]
+
+
+def test_the_installed_application_must_be_the_copy_at_its_declared_version(
+    tmp_path: Path,
+) -> None:
+    copy = tmp_path / "application"
+    good = {"version": "0.1.0", "direct_url": json.dumps({"url": copy.resolve().as_uri()})}
+
+    def found(**override: str) -> dict[str, Any]:
+        return {"found": {_PILOT: {**good, **override}}}
+
+    assert install.application_problems(found(), _PILOT, "0.1.0", copy) == []
+    assert install.application_problems(found(version="0.2.0"), _PILOT, "0.1.0", copy)
+    elsewhere = json.dumps({"url": "file:///src/examples/retrieval_pilot"})
+    assert install.application_problems(found(direct_url=elsewhere), _PILOT, "0.1.0", copy)
+    assert install.application_problems({"found": {}}, _PILOT, "0.1.0", copy) == [
+        f"{_PILOT} is not installed"
+    ]
+
+
+def test_an_application_declares_its_normalised_name_and_version(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "Guardana_Retrieval_Pilot"\nversion = "0.1.0"\n', encoding="utf-8"
+    )
+
+    assert install.declared_application(tmp_path) == (_PILOT, "0.1.0")
+
+
+def test_the_checkout_matches_its_tag_only_while_the_files_are_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def git(*args: str) -> None:
+        subprocess.run(  # noqa: S603 — git with literal arguments in a temporary repository
+            ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t", *args],  # noqa: S607
+            check=True,
+            capture_output=True,
+        )
+
+    git("init", "-q")
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "x.py").write_text("x = 1\n", encoding="utf-8")
+    git("add", ".")
+    git("commit", "-q", "-m", "x")
+    git("tag", "v1.0.0")
+
+    assert record.same_as_tag(tmp_path, "v1.0.0", ("app",)).held
+    (tmp_path / "app" / "stray.py").write_text("y = 1\n", encoding="utf-8")
+    assert record.same_as_tag(tmp_path, "v1.0.0", ("app",)).problems == [
+        "not tracked by git: app/stray.py"
+    ]
+    (tmp_path / "app" / "stray.py").unlink()
+    (tmp_path / "app" / "x.py").write_text("x = 2\n", encoding="utf-8")
+    changed = record.same_as_tag(tmp_path, "v1.0.0", ("app",))
+    assert changed.problems == ["exit 1, expected 0"]
+    assert "x.py" in changed.excerpt
+    assert not record.same_as_tag(tmp_path, "v9.9.9", ("app",)).held
+    monkeypatch.chdir(tmp_path / "app")
+    (tmp_path / "app" / "x.py").write_text("x = 1\n", encoding="utf-8")
+    assert record.same_as_tag(Path(".."), "v1.0.0", ("app",)).held
+
+
 # Docker.
 
 
@@ -572,6 +660,44 @@ def test_a_uv_cell_installs_the_pinned_uv_before_the_proof() -> None:
     assert install_run[-3:-1] == ["sh", "-c"]
     assert "uv==0.12.9" in install_run[-1]
     assert "--uv /proof/tools/bin/uv" in install_run[-1]
+
+
+def _pilot_plan(proof: str, application: Path | None) -> list[list[str]]:
+    return container.plan(
+        proof=proof,
+        python="3.13",
+        installer="pip",
+        version="1.0.0rc5",
+        out=Path("/out"),
+        uv_version="0.12.9",
+        pytest_version="8.4.2",
+        pack=None,
+        application=application,
+    )
+
+
+@pytest.mark.parametrize("proof", container.APPLICATION_PROOFS)
+def test_the_pilot_is_mounted_only_where_it_is_installed_and_proven_from_its_copy(
+    proof: str,
+) -> None:
+    runs = [c for c in _pilot_plan(proof, Path("/app")) if c[:2] == ["docker", "run"]]
+
+    install_run, offline = runs
+    assert "/app:/application:ro" in install_run
+    assert install_run[-2:] == ["--application", "/application"]
+    assert not any(":/application" in word for word in offline)
+    assert offline[3:5] == ["--network", "none"]
+    assert offline[offline.index("proofs") + 1] == proof
+    assert offline[-2:] == ["--application", "/proof/project/application"]
+
+
+@pytest.mark.parametrize(
+    ("proof", "application"),
+    [("pilot", None), ("regression", None), ("first-run", Path("/app"))],
+)
+def test_an_application_goes_only_with_a_proof_of_one(proof: str, application: Path | None) -> None:
+    with pytest.raises(ValueError, match="application directory"):
+        _pilot_plan(proof, application)
 
 
 def _record_docker(monkeypatch: pytest.MonkeyPatch, digest: str | None) -> list[list[str]]:
@@ -730,6 +856,9 @@ def test_the_kits_surface_is_the_generated_surface() -> None:
 # The summary.
 
 
+_CANARY = {"name": record.NETWORK_CUT, "held": True, "ran": True, "problems": []}
+
+
 def _record(
     proof: str, verdict: str, cell: str, *, steps: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
@@ -739,7 +868,7 @@ def _record(
         "version": "1",
         "verdict": verdict,
         "isolation": "x",
-        "steps": held if steps is None else steps,
+        "steps": [] if steps == [] else [_CANARY, *(held if steps is None else steps)],
         "not_exercised": ["a kit row"] if verdict == "incomplete" else [],
         "cell": cell,
     }
@@ -791,6 +920,18 @@ _FAILED_STEP = [{"held": False, "ran": True, "problems": ["exit 1, expected 0"]}
         ),
         ([_record("first-run", "passed", "a")], {}, {}, "no record count was expected"),
         ([], {}, {"first-run": 0}, "no proof record was found"),
+        (
+            [{**_record("pilot", "passed", "a"), "steps": [{"held": True, "problems": []}]}],
+            {},
+            {"pilot": 1},
+            "a: pilot names an isolation no canary step shows",
+        ),
+        (
+            [{**_record("pilot", "passed", "a"), "steps": [{**_CANARY, "held": False}]}],
+            {},
+            {"pilot": 1},
+            "a: pilot names an isolation no canary step shows",
+        ),
     ],
     ids=[
         "missing",
@@ -801,6 +942,8 @@ _FAILED_STEP = [{"held": False, "ran": True, "problems": ["exit 1, expected 0"]}
         "passed-with-a-failed-step",
         "no-inventory",
         "nothing",
+        "isolated-without-a-canary",
+        "isolated-with-a-canary-that-failed",
     ],
 )
 def test_a_summary_names_every_reason_it_does_not_pass(
@@ -877,6 +1020,11 @@ _MINIMAL = {
     "container": ["--proof", "first-run", "--python", "3.13", "--installer", "pip",
                   "--version", "1", "--out", "o", "--uv-version", "1", "--pytest-version", "1"],
     "summary": ["--records", "r", "--out", "o"],
+    "pilot": [*_OFFLINE, "--application", "a"],
+    "regression": [*_OFFLINE, "--application", "a"],
+    "recovery": ["--version", "1", "--old-version", "0", "--repository", "r", "--work", "w",
+                 "--record", "r"],
+    "same-as-tag": ["--repository", "r", "--version", "1", "--path", "p", "--record", "r"],
 }  # fmt: skip
 _COMMANDS = list(_MINIMAL)
 
@@ -948,10 +1096,28 @@ def test_the_summary_expects_one_record_per_matrix_cell() -> None:
     assert first_runs == ["first-run-linux", "first-run-macos", "first-run-windows"]
     assert f"--expect first-run={sum(_cells(jobs[name]) for name in first_runs)}" in step["run"]
     assert "--expect customization=1" in step["run"]
+    for proof in ("pilot", "regression", "recovery"):
+        assert f"--expect {proof}=1" in step["run"]
+    compared = [n for n, job in jobs.items() if "proofs same-as-tag" in str(job["steps"])]
+    assert compared == ["retrieval-pilot", "regression-loop"]
+    assert f"--expect same-as-tag={len(compared)}" in step["run"]
     assert jobs["summary"]["if"] == "always()"
     assert set(jobs["summary"]["needs"]) == {
         name for name in jobs if name not in {"inputs", "summary"}
     }
+
+
+def test_the_summary_collects_a_record_of_every_proof_it_expects(tmp_path: Path) -> None:
+    jobs = _workflow()["jobs"]
+    (step,) = [s for s in jobs["summary"]["steps"] if "proofs summary" in str(s.get("run", ""))]
+    expected = [word.partition("=")[0] for word in step["run"].split() if "=" in word and
+                word.partition("=")[2].isdigit()]  # fmt: skip
+    for proof in expected:
+        written = record.Record(proof=proof, version="1", steps=[record.Step("s", "c")])
+        written.write(tmp_path / f"proof-{proof}" / f"{proof}.json")
+
+    assert sorted(r["proof"] for r in summary.collect(tmp_path)) == sorted(expected)
+    assert len(expected) == 6
 
 
 def test_every_proof_job_uploads_its_records_whatever_happened() -> None:
@@ -964,6 +1130,27 @@ def test_every_proof_job_uploads_its_records_whatever_happened() -> None:
         assert uploads[0]["with"]["if-no-files-found"] == "error", name
         assert str(uploads[0]["with"]["name"]).startswith("proof-"), name
         assert job.get("strategy", {}).get("fail-fast", False) is False, name
+
+
+def test_the_pilot_jobs_prove_even_when_the_tag_comparison_fails() -> None:
+    jobs = _workflow()["jobs"]
+    for name, proof in (("retrieval-pilot", "pilot"), ("regression-loop", "regression")):
+        (proving,) = [s for s in jobs[name]["steps"] if f"--proof {proof}" in str(s.get("run"))]
+        assert proving["if"] == "${{ !cancelled() }}", name
+        assert "--application ../examples/retrieval_pilot" in proving["run"], name
+
+
+def test_the_recovery_proof_upgrades_a_database_the_pinned_release_created() -> None:
+    workflow = _workflow()
+    (step,) = [
+        s
+        for s in workflow["jobs"]["recovery-runbooks"]["steps"]
+        if "proofs recovery" in str(s.get("run"))
+    ]
+
+    assert '--old-version "$RECOVERY_FROM"' in step["run"]
+    assert workflow["env"]["RECOVERY_FROM"] == "0.41.0"
+    assert "refs/tags/v$VERSION" in step["run"]
 
 
 def test_the_proofs_run_only_when_a_maintainer_dispatches_them() -> None:

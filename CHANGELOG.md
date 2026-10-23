@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Add three required jobs to the manually dispatched `.github/workflows/proofs.yml`; the summary requires their records.** `retrieval-pilot` installs the checkout application beside PyPI `guardana-cli`: offline, the fixed application passes without coverage shortfall; each broken mode fails only its intended check, naming every leaked document and order. `regression-loop` saves a failed and an incomplete run, shows the redacted regression still graded differently, regrades the kept recordings, gates the regression with `guardana diff`, promotes it with `guardana case add` and tests the promoted pair; runs, recordings, reports and the suite are uploaded. `recovery-runbooks` proves the documented migration and Compose restore commands with PyPI packages and the published collector image, reading synthetic data back per tenant. Pilot and deployment files must match the supplied version's tag; claimed network cuts require canaries. No package changes.
+
 ### Changed
 
 - **Route the release commit through a pull request and create a signed, verified tag.** `scripts/release.py` puts the release commit on a `release/vX.Y.Z` branch, opens a pull request into `main` and squash-merges it only after the checks `main` requires pass, using `--match-head-commit` to name the checked commit. It checks that the merge commit holds that commit's tree, waits for green CI on the merge commit and creates the tag there with `git tag -s`. It pushes the tag only after `git tag -v` verifies the signature; any step it cannot complete or check stops the release before a tag is pushed.

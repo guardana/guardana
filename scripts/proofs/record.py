@@ -34,6 +34,8 @@ _EXE = ".exe" if sys.platform == "win32" else ""
 # A host name and a literal address, so a block that only breaks name resolution is not
 # mistaken for a network that is cut.
 CANARY_DESTINATIONS = (("pypi.org", 443), ("151.101.0.223", 443))
+# The name of the canary step inside an isolation; a record claiming one must hold it.
+NETWORK_CUT = "the network is cut"
 _CANARY = """
 import json, socket, sys
 reached = []
@@ -234,7 +236,7 @@ def canary(python: Path, cwd: Path, environment: dict[str, str], *, cut: bool) -
     a broken interpreter is never read as isolation: each try must report its own result.
     """
     step = Step(
-        name="the network is cut" if cut else "the network is reachable before it is cut",
+        name=NETWORK_CUT if cut else "the network is reachable before it is cut",
         command=(
             f"{python.name} -I -c '<connect to "
             + ", ".join(f"{h}:{p}" for h, p in CANARY_DESTINATIONS)
@@ -262,6 +264,35 @@ def canary(python: Path, cwd: Path, environment: dict[str, str], *, cut: bool) -
             step.problems.append(f"{host}:{port} was reached")
         elif not cut and not answer.get("reached"):
             step.problems.append(f"{host}:{port} was not reached: {answer.get('refused')}")
+    return step
+
+
+def same_as_tag(repository: Path, tag: str, paths: tuple[str, ...]) -> Step:
+    """Check that the files a proof reads from this checkout are the ones `tag` holds.
+
+    The checkout may be newer than the version under proof; a file changed since the tag,
+    or one git does not track, would otherwise be proven against packages that never
+    shipped with it.
+    """
+    checkout = repository.resolve()
+    step = Step(
+        name=f"the checkout's files are the ones {tag} holds",
+        command=" ".join(["git", "diff", "--stat", "--exit-code", tag, "--", *paths]),
+        expected_exit=0,
+    )
+    argv = ["git", "diff", "--stat", "--exit-code", tag, "--", *paths]
+    run(step, argv, cwd=checkout, environment=dict(os.environ))
+    # S603/S607: git with this function's own arguments.
+    untracked = subprocess.run(  # noqa: S603
+        ["git", "ls-files", "--others", "--exclude-standard", "--", *paths],  # noqa: S607
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    step.problems += [f"not tracked by git: {name}" for name in untracked.stdout.split()]
+    if untracked.returncode != 0:
+        step.problems.append(f"git ls-files exited {untracked.returncode}")
     return step
 
 

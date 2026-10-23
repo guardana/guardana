@@ -16,11 +16,16 @@ _SCRIPTS = Path(__file__).resolve().parent.parent
 # Forwarded into every container, when set, so the records name the commit, the run and
 # the image digest.
 _FORWARDED = ("PROOF_COMMIT", "PROOF_RUN_URL", "PROOF_RUNNER", "PROOF_IMAGE")
+_APPLICATION = "/application"
+APPLICATION_PROOFS = ("pilot", "regression")
 
 
-def _docker_run(image: str, inner: list[str], *, out: Path, network: bool) -> list[str]:
+def _docker_run(
+    image: str, inner: list[str], *, out: Path, network: bool, application: Path | None = None
+) -> list[str]:
     user = [] if sys.platform == "win32" else ["--user", f"{os.getuid()}:{os.getgid()}"]
     forwarded = [f"--env={name}" for name in _FORWARDED]
+    mounted = [] if application is None else ["--volume", f"{application}:{_APPLICATION}:ro"]
     return [
         "docker", "run", "--rm",
         *([] if network else ["--network", "none"]),
@@ -30,6 +35,7 @@ def _docker_run(image: str, inner: list[str], *, out: Path, network: bool) -> li
         *forwarded,
         "--volume", f"{out}:/proof",
         "--volume", f"{_SCRIPTS}:/src:ro",
+        *mounted,
         "--workdir", "/src",
         image,
         *inner,
@@ -46,8 +52,16 @@ def plan(  # noqa: PLR0913 — one keyword per flag of the command
     uv_version: str,
     pytest_version: str,
     pack: str | None,
+    application: Path | None = None,
 ) -> list[list[str]]:
-    """Every host command the proof takes, in order; nothing here runs them."""
+    """Every host command the proof takes, in order; nothing here runs them.
+
+    A proof of an application under test (`APPLICATION_PROOFS`) needs `application`, the
+    directory mounted read-only into the install container only; the install copies it
+    into the project, and the offline proof reads that copy.
+    """
+    if (proof in APPLICATION_PROOFS) != (application is not None):
+        raise ValueError(f"{proof} takes an application directory only when it proves one")
     image = IMAGE.format(python=python)
     install = [
         "python", "-m", "proofs", "install",
@@ -62,6 +76,8 @@ def plan(  # noqa: PLR0913 — one keyword per flag of the command
             f"guardana-reference-pack=={pack}" if pack else "guardana-reference-pack",
         ]
         install += ["--with", f"pytest=={pytest_version}"]
+    if application is not None:
+        install += ["--application", _APPLICATION]
     setup = install
     if installer == "uv":
         tools = [
@@ -83,9 +99,11 @@ def plan(  # noqa: PLR0913 — one keyword per flag of the command
     ]  # fmt: skip
     if proof == "customization":
         offline += ["--sdist", "/proof/project/sdist"]
+    if application is not None:
+        offline += ["--application", "/proof/project/application"]
     commands = [
         ["docker", "pull", "--quiet", image],
-        _docker_run(image, setup, out=out, network=True),
+        _docker_run(image, setup, out=out, network=True, application=application),
     ]
     if proof == "customization":
         fetch = [

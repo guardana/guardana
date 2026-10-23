@@ -1,7 +1,8 @@
 """Merge the records of one workflow run into `summary.json` and a Markdown table.
 
 Exits 0 only when every job the summary waited for succeeded, each proof left one record
-in each of the cells `--expect` names, and every record's own steps show it passed: a job
+in each of the cells `--expect` names, every record's own steps show it passed, and every
+record that names an isolation holds the canary step that shows the network cut: a job
 that ended before writing its record, or a matrix that ran fewer cells, leaves nothing to
 read, so neither the records nor the job results alone decide. A job and its cells named
 with `--report-only` are shown without being required, but must still leave their records.
@@ -12,9 +13,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from proofs.record import FAILED, INCOMPLETE, PASSED
+from proofs.record import FAILED, INCOMPLETE, NETWORK_CUT, PASSED
 
-_PROOFS = {"first-run", "customization"}
+_PROOFS = {"first-run", "customization", "pilot", "regression", "recovery", "same-as-tag"}
 
 
 def collect(records: Path) -> list[dict[str, Any]]:
@@ -80,6 +81,10 @@ def problems(
             )
         elif verdict != PASSED:
             reasons.append(f"{r['cell']}: {r['proof']} {verdict}")
+        if r.get("isolation") and not any(
+            s.get("name") == NETWORK_CUT and s.get("held") for s in r.get("steps") or []
+        ):
+            reasons.append(f"{r['cell']}: {r['proof']} names an isolation no canary step shows")
     if not found:
         reasons.append("no proof record was found")
     if not expected:

@@ -4,8 +4,10 @@ pip: `python -m venv .venv`, then `pip install guardana-cli==<version>`. uv: `uv
 then `uv add guardana-cli==<version>`. A candidate takes the pre-release flag
 `docs/install.md` gives (`--pre`, `--prerelease allow`). Both name pypi.org and ignore any
 installer configuration on the runner. Writes the project, the record, and the installer's
-own account of what it fetched (`pip-report.json` or `uv.lock`) beside the record. Needs the
-network, and checks it is reachable, so a later refusal means the isolation worked.
+own account of what it fetched (`pip-report.json` or `uv.lock`) beside the record. With
+`--application`, an application under test is copied into the project and installed beside
+it with pip, the one distribution not from PyPI. Needs the network, and checks it is
+reachable, so a later refusal means the isolation worked.
 """
 
 import json
@@ -32,6 +34,8 @@ GUARDANA = ("guardana-cli", "guardana-core", "guardana-rules", "guardana-report"
 INDEX = "https://pypi.org/simple"
 PROJECT = "proof-project"
 FILES_HOST = "https://files.pythonhosted.org/"
+APPLICATION = "application"
+_NOT_COPIED = shutil.ignore_patterns("__pycache__", ".venv", "build", "dist", "*.egg-info")
 _PRE_RELEASE = re.compile(r"(a|b|rc|\.dev)\d+")
 
 # Run by the installed interpreter, so it reads that environment's metadata, not ours.
@@ -133,17 +137,24 @@ def fetched_from_uv(lock: dict[str, Any]) -> dict[str, dict[str, str]]:
     return fetched
 
 
-def fetched_problems(fetched: dict[str, dict[str, str]], required: tuple[str, ...]) -> list[str]:
+def fetched_problems(
+    fetched: dict[str, dict[str, str]], required: tuple[str, ...], local: str | None = None
+) -> list[str]:
     """Name every installed file that did not come from PyPI's file host with a hash.
 
     Every distribution counts, not only Guardana's: a pack or a dependency from another
-    index runs inside the same proof.
+    index runs inside the same proof. `local` names the one application under test, which
+    must come from its local copy instead.
     """
     problems = [
         f"the installer reports no download of {name}" for name in required if name not in fetched
     ]
     for name, got in sorted(fetched.items()):
         if name == PROJECT:
+            continue
+        if name == local:
+            if not got["url"].startswith("file://"):
+                problems.append(f"{name} is the application under test, not from its copy: {got}")
             continue
         if not got["url"].startswith(FILES_HOST) or not got["sha256"]:
             problems.append(f"{name} did not come from {FILES_HOST} with a sha256: {got}")
@@ -191,8 +202,13 @@ def install(  # noqa: PLR0913 — one keyword per flag of the command
     record_path: Path,
     extra: tuple[str, ...] = (),
     uv: str | None = None,
+    application: Path | None = None,
 ) -> Record:
-    """Create the project, install into it, record each command and the provenance."""
+    """Create the project, install into it, record each command and the provenance.
+
+    `application` is the one distribution installed from a local directory: it is copied
+    into the project first, so the record names exactly the files that were installed.
+    """
     python = sys.executable
     record = Record(
         proof="install",
@@ -203,8 +219,16 @@ def install(  # noqa: PLR0913 — one keyword per flag of the command
     record_path.parent.mkdir(parents=True, exist_ok=True)
     environment = install_environment()
     report = record_path.parent / "pip-report.json"
+    requested = extra
+    local = declared = None
+    copy = project / APPLICATION
+    if application is not None:
+        if installer != "pip":
+            raise SystemExit("--application is installed with --installer pip only")
+        local, declared = _copy_application(application, copy, record)
+        requested = (*extra, str(copy))
     if installer == "pip":
-        commands = pip_commands(python, project, version, extra, report)
+        commands = pip_commands(python, project, version, requested, report)
     else:
         uv = uv or shutil.which("uv")
         if uv is None:
@@ -229,11 +253,10 @@ def install(  # noqa: PLR0913 — one keyword per flag of the command
         shutil.copy2(lock, record_path.parent / "uv.lock")
         fetched = fetched_from_uv(tomllib.loads(lock.read_text(encoding="utf-8")))
     record.environment["fetched"] = fetched
-    required = (*GUARDANA, *(_distribution_name(r) for r in extra))
-    fetched_step.problems.extend(fetched_problems(fetched, required))
+    names = [*GUARDANA, *(_distribution_name(r) for r in extra), *([local] if local else [])]
+    fetched_step.problems.extend(fetched_problems(fetched, tuple(names), local))
     record.steps.append(fetched_step)
 
-    names = [*GUARDANA, *(_distribution_name(r) for r in extra)]
     check = Step(
         name="installed into the project environment", command="importlib.metadata", expected_exit=0
     )
@@ -247,6 +270,8 @@ def install(  # noqa: PLR0913 — one keyword per flag of the command
         document = json.loads(output.strip().splitlines()[-1])
         record.environment["installed"] = document
         check.problems.extend(provenance_problems(document, venv, version, extra))
+        if local is not None and declared is not None:
+            check.problems.extend(application_problems(document, local, declared, copy))
     record.steps.append(check)
     record.steps.append(
         canary(venv_executable(venv, "python"), project, clean_environment(venv), cut=False)
@@ -264,6 +289,41 @@ def _requested_problems(found: dict[str, Any], extra: tuple[str, ...]) -> list[s
             problems.append(f"{name} is not installed")
         elif pinned and dist["version"] != pinned:
             problems.append(f"{name} is {dist['version']}, not {pinned}")
+    return problems
+
+
+def _copy_application(application: Path, copy: Path, record: Record) -> tuple[str, str]:
+    shutil.rmtree(copy, ignore_errors=True)
+    shutil.copytree(application, copy, ignore=_NOT_COPIED)
+    name, version = declared_application(copy)
+    record.environment["application"] = {
+        "name": name,
+        "version": version,
+        "source": str(application),
+        "commit": record.environment.get("commit"),
+    }
+    return name, version
+
+
+def declared_application(source: Path) -> tuple[str, str]:
+    """Return the normalised distribution name and the version `source/pyproject.toml` declares."""
+    project = tomllib.loads((source / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    return str(project["name"]).lower().replace("_", "-"), str(project["version"])
+
+
+def application_problems(
+    document: dict[str, Any], name: str, version: str, copy: Path
+) -> list[str]:
+    """Name every reason the installed application might not be the copy this proof made."""
+    dist = document["found"].get(name)
+    if not isinstance(dist, dict):
+        return [f"{name} is not installed"]
+    problems = []
+    if dist["version"] != version:
+        problems.append(f"{name} is {dist['version']}, not the {version} its project declares")
+    direct = json.loads(dist["direct_url"] or "{}")
+    if direct.get("url") != copy.resolve().as_uri():
+        problems.append(f"{name} was not installed from {copy}: {dist['direct_url']}")
     return problems
 
 
