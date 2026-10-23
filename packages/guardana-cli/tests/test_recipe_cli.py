@@ -142,6 +142,19 @@ def _artifact(recipe: Path) -> Path:
     return recipe.parent / "guardana-artifact"
 
 
+@pytest.mark.parametrize("command", ["lock", "run"])
+def test_recipe_refuses_non_utf8_profile_with_its_name(tmp_path: Path, command: str) -> None:
+    recipe = _team(tmp_path, "http://127.0.0.1:9")
+    profile = tmp_path / "guardana.yaml"
+    profile.write_bytes(b"name: valid\n# \xff\n")
+
+    result = _invoke(command, str(recipe))
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid profile {profile}: not UTF-8" in normalised(result.output)
+    assert "internal error" not in normalised(result.output)
+
+
 def test_a_rule_file_the_profile_reads_from_the_artifact_directory_is_refused_before_sending(
     tmp_path: Path, wire: _Wire
 ) -> None:

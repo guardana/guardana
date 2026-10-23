@@ -460,6 +460,8 @@ def load_profile(path: Path) -> Profile:
     """
     try:
         raw_document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ProfileError(f"invalid profile {path}: not UTF-8: {exc}") from exc
     except OSError as exc:
         raise ProfileError(f"cannot read profile {path}: {exc}") from exc
     except yaml.YAMLError as exc:
