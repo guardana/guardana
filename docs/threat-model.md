@@ -70,10 +70,7 @@ hang. The corpus of extensions is measured from what the rules actually ask for,
 so a rule for a new format is fed automatically rather than when somebody
 remembers.
 
-What that is not: a long-running fuzzing campaign, a coverage-guided one, or
-OSS-Fuzz. It is a fixed budget of generated cases per run, chosen so it can live
-in every pull request. A crash-free property suite is evidence that the obvious
-malformations are handled, not that the parsers are correct.
+What that is not: a long-running fuzzing campaign or OSS-Fuzz. Property tests still run in every pull request with a fixed case budget; crash-free runs provide evidence that obvious malformations are handled. `.github/workflows/fuzz.yml` adds coverage-guided Atheris fuzzing of artifact rules (pickle, PyTorch zip, safetensors), the trace reader and profile loader: `120` seconds per target, on every push to `main`, weekly and on manual dispatch, on Linux `x86_64` only. Neither the property suite nor these short runs shows that the parsers are correct.
 
 ### T2 — A malicious or hostile target endpoint
 
@@ -293,13 +290,7 @@ README says so before the quickstart.
 
 **Scenario:** a malicious version is published to PyPI.
 
-**Stance:** trusted publishing via OIDC (no long-lived token). Each release
-publishes Sigstore-signed build provenance and PyPI's PEP 740 attestation for the
-distributions, a CycloneDX SBOM per distribution, and an SBOM and provenance
-attestation beside each container image. Both images install third-party
-dependencies as wheels only, using versions and hashes exported from `uv.lock`.
-They run the versions CI tested, and no build step resolves unpinned build
-requirements. Check them as described in
+**Stance:** trusted publishing via OIDC uses no long-lived token. Each release publishes Sigstore-signed build provenance and PyPI's PEP 740 attestation for the distributions, a CycloneDX SBOM per distribution, and an SBOM and provenance attestation beside each container image. From the first release after `1.0.0rc5`, the distribution provenance bundle is attached to the GitHub Release as `guardana-<version>.sigstore.json`; the reference pack has its own bundle, `guardana-reference-pack-<pack version>.sigstore.json`. Both images install third-party dependencies as wheels only, using versions and hashes exported from `uv.lock`. The Guardana packages built in each image are installed with `--require-hashes`, using the digests computed when those wheels are built. This checks the installed wheels against that build, without an outside-source check. The images run the versions CI tested, and no build step resolves unpinned build requirements. Check them as described in
 [`SECURITY.md`](../SECURITY.md#what-a-release-publishes-and-how-to-check-it-yourself).
 
 A tag ruleset lets only maintainers create, move or delete `v*` tags. `main` accepts changes only through a pull request with required status checks; force pushes are refused, and administrators are held to the same rules. `scripts/release.py` puts the release commit on a `release/vX.Y.Z` branch and opens a pull request into `main`. It squash-merges the pull request only after the checks `main` requires pass, with `--match-head-commit` naming the commit those checks ran on, and stops unless the merge commit holds that commit's tree. It then waits for a green CI run on the merge commit, creates the tag on that commit with `git tag -s` and pushes it only after `git tag -v` verifies the signature. Any step it cannot complete or check stops the release before a tag is pushed. The `pypi` environment requires one reviewer's approval for every publish. The `publish` job requires `ci-passed`, so a tag publishes only a commit CI passed. Both ghcr packages are public. `scripts/check_repo_settings.py` reports each setting, including these protections for `main`, as `PRESENT`, `ABSENT` or `NOT CHECKED`. `scripts/reproduce_release.py` rebuilds a release from its tag and reports whether each PyPI file matches byte for byte ([reproducible builds](reproducible-builds.md)).

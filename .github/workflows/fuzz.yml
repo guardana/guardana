@@ -1,0 +1,56 @@
+name: Fuzz
+
+# Coverage-guided fuzzing of the readers of hostile input. A crash fails the job and
+# prints its input in the log; no crash file is uploaded, so nothing beyond the log is kept.
+# libFuzzer prints only inputs of up to 256 bytes itself, so the failure step prints the rest.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: ["fuzz/**", ".github/workflows/fuzz.yml"]
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [fuzz_artifacts, fuzz_profile, fuzz_trace]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # Atheris publishes wheels for Linux x86_64 on CPython 3.12 and later only.
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          cache-suffix: fuzz
+
+      - name: Install dependencies with the fuzz group
+        run: uv sync --locked --group fuzz
+
+      - name: Fuzz ${{ matrix.target }}
+        run: |
+          mkdir -p findings
+          uv run --no-sync python fuzz/${{ matrix.target }}.py -artifact_prefix=findings/ \
+            -max_total_time=120 -timeout=30 -rss_limit_mb=2048
+
+      - name: Print the failing input
+        if: failure()
+        run: |
+          for file in findings/*; do
+            [ -f "$file" ] || continue
+            echo "$file (base64):"
+            base64 -w0 "$file"
+            echo
+          done

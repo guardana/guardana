@@ -72,9 +72,9 @@ repository:
         predicate-uri: https://slsa.dev/provenance/v1
         location: https://github.com/guardana/guardana/attestations
         comment: |
-          Keyless-signed build provenance for the five packages' wheels and
-          sdists, the reference pack's wheel and sdist, and the two container
-          images, verifiable with `gh attestation verify`.
+          Keyless-signed provenance: five packages' wheels/sdists, reference pack's
+          wheel/sdist and both images; verify with `gh attestation verify`.
+          `.sigstore.json` bundles are attached to the GitHub Release.
     distribution-points:
       - uri: https://github.com/guardana/guardana/releases
         comment: GitHub Releases (SBOMs and the reference pack's wheel and sdist).

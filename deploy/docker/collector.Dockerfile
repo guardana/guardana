@@ -22,8 +22,9 @@ COPY packages/guardana-server packages/guardana-server
 COPY LICENSE LICENSE
 
 # The same install as the CLI image: locked, hash-checked wheels only, the package
-# built by the locked backend outside the shipped venv, and `pip check` as the proof
-# that the locked set is complete. The `serve` extra is in the exported set, not here.
+# built by the locked backend outside the shipped venv and installed by its own digest,
+# and `pip check` as the proof that the locked set is complete. The `serve` extra is in
+# the exported set, not here.
 RUN python -m venv /opt/build \
     && /opt/build/bin/pip install --no-cache-dir --only-binary=:all: \
         --require-hashes --no-deps -r build-requirements.txt \
@@ -32,7 +33,11 @@ RUN python -m venv /opt/build \
     && python -m venv /opt/guardana \
     && /opt/guardana/bin/pip install --no-cache-dir --only-binary=:all: \
         --require-hashes --no-deps -r collector-requirements.txt \
-    && /opt/guardana/bin/pip install --no-cache-dir --no-deps /src/wheels/*.whl \
+    && sha256sum /src/wheels/*.whl > /src/wheels.sha256 \
+    && sed -E 's/^([0-9a-f]{64}) [ *](.+)$/\2 --hash=sha256:\1/' /src/wheels.sha256 \
+        > /src/wheel-hashes.txt \
+    && /opt/guardana/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r /src/wheel-hashes.txt \
     && /opt/guardana/bin/pip check
 
 FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed

@@ -1,0 +1,158 @@
+# The pins in requirements.txt are deliberately vulnerable: this directory is a test
+# fixture whose dependencies Guardana must flag, and nothing here is ever installed.
+
+[[IgnoredVulns]]
+id = "GHSA-29pf-2h5f-8g72"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-3749-ghw9-m3mg"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-53q9-r3pm-6pq6"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-69w3-r845-3855"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-887c-mr87-cxwp"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-c678-jfcj-6jmf"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-f4hp-rmr7-r7v8"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-fgcw-684q-jj6r"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-qfhq-4f3w-5fph"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-rrmf-rvhw-rf47"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-vgrw-7cvw-pwgx"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-x3gm-94wq-g975"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-x9r9-c232-4q39"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "GHSA-xrqw-3rrv-vx5w"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2024-154"
+reason = "Deliberately vulnerable ultralytics 8.3.41 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2024-259"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-191"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-198"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-203"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-204"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-205"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-206"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-207"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-208"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-209"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-214"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-215"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-216"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-217"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-218"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2025-41"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-139"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-1970"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2286"
+reason = "Deliberately vulnerable torch 2.2.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2288"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2289"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-2290"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-3929"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-4174"
+reason = "Deliberately vulnerable transformers 4.57.0 pin in a test fixture that Guardana's dependency rules must flag; never installed."

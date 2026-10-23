@@ -22,8 +22,9 @@ COPY LICENSE LICENSE
 # Every third-party version and hash comes from uv.lock, the set CI tests, and only
 # as a wheel: a source build would resolve its own unpinned build requirements. The
 # four packages are built from this tree by the locked backend in a separate venv,
-# so the shipped one carries no build tooling; `pip check` fails the build if the
-# locked set does not satisfy what the packages declare.
+# so the shipped one carries no build tooling, and installed by their own digests
+# because pip checks no hash for a local wheel unless it is given one; `pip check`
+# fails the build if the locked set does not satisfy what the packages declare.
 RUN python -m venv /opt/build \
     && /opt/build/bin/pip install --no-cache-dir --only-binary=:all: \
         --require-hashes --no-deps -r build-requirements.txt \
@@ -36,7 +37,11 @@ RUN python -m venv /opt/build \
     && python -m venv /opt/guardana \
     && /opt/guardana/bin/pip install --no-cache-dir --only-binary=:all: \
         --require-hashes --no-deps -r cli-requirements.txt \
-    && /opt/guardana/bin/pip install --no-cache-dir --no-deps /src/wheels/*.whl \
+    && sha256sum /src/wheels/*.whl > /src/wheels.sha256 \
+    && sed -E 's/^([0-9a-f]{64}) [ *](.+)$/\2 --hash=sha256:\1/' /src/wheels.sha256 \
+        > /src/wheel-hashes.txt \
+    && /opt/guardana/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r /src/wheel-hashes.txt \
     && /opt/guardana/bin/pip check
 
 FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
