@@ -139,9 +139,11 @@ def test_the_image_pin_moves_both_collector_lines_and_nothing_else() -> None:
     [
         "services:\n  collector:\n    image: ghcr.io/guardana/guardana-collector:0.41\n",
         "services:\n  db:\n    image: postgres:16-alpine\n",
-        "x:\n  image: ghcr.io/guardana/guardana-collector:0.41\n"
-        "y:\n  image: ghcr.io/guardana/guardana-collector:0.41\n"
-        "# also ghcr.io/guardana/guardana-collector:0.41 in a comment\n",
+        (
+            "x:\n  image: ghcr.io/guardana/guardana-collector:0.41\n"
+            "y:\n  image: ghcr.io/guardana/guardana-collector:0.41\n"
+            "# also ghcr.io/guardana/guardana-collector:0.41 in a comment\n"
+        ),
     ],
     ids=["one-line", "no-pin", "a-third-mention"],
 )
