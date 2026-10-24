@@ -336,6 +336,14 @@ does not.</p>
 saved documents still follow the persisted-document policy. A contract break,
 removal, dropped reader or intentionally stricter default requires a major
 release.</p>
+<h3 id="severity">Severity</h3>
+<p>A finding's severity is documented behaviour; the
+<a href="generated/rule-catalog.html">rule catalog</a> lists each rule's default severity
+and every condition under which a finding carries another severity, higher
+or lower. Raising a default or conditional severity is an intentionally
+stricter default and requires a major release. Restoring the documented
+severity is a patch. Lowering a severity requires a minor release whose
+changelog names the gates that may now pass.</p>
 <h3 id="merging-and-publishing">Merging and publishing</h3>
 <p>Documentation-only, test-only and maintainer-tooling-only changes need no
 package release. A maintainer squash-merges a pull request after review and

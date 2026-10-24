@@ -12,6 +12,9 @@ stop being hand-maintained.
 `release.py` runs the first; `test_generated_docs.py` runs the second, so a rule
 added between releases turns the suite red rather than waiting for someone to cut
 one. Prose links to these files instead of repeating them.
+
+The rule catalog also reads `scripts/severity_conditions.yaml`, which says when a
+finding carries a severity other than its rule's default.
 """
 
 import argparse
@@ -20,7 +23,10 @@ import sys
 import tomllib
 from collections import Counter, defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
+
+import yaml
 
 _REPO = Path(__file__).resolve().parent.parent
 _OUT = _REPO / "docs" / "generated"
@@ -65,7 +71,8 @@ _FRONTMATTER: dict[str, tuple[str, int, str]] = {
     "rule-catalog.md": (
         "Rule catalog",
         20,
-        "Every built-in rule, its severity, surface, target, maturity, and what it maps to.",
+        "Every built-in rule, its default severity, surface, target, maturity, what it maps "
+        "to, and the findings it reports at another severity.",
     ),
     "evaluator-catalog.md": (
         "Evaluator catalog",
@@ -148,13 +155,86 @@ def _summary(rules: list[Rule]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _catalog(rules: list[Rule]) -> str:
+SEVERITY_CONDITIONS = _REPO / "scripts" / "severity_conditions.yaml"
+_SEVERITY_INTRO = (
+    "The main table shows each rule's default severity; this section lists every condition "
+    "under which a finding carries another severity, higher or lower. Changes follow "
+    "[the severity policy](../compatibility.md#severity)."
+)
+_CONDITION_FIELDS = frozenset({"severity", "when"})
+
+
+class SeverityConditionsError(ValueError):
+    """The severity conditions file says something the rule catalog cannot back."""
+
+
+@dataclass(frozen=True)
+class SeverityCondition:
+    """One documented case in which a rule's finding carries a non-default severity."""
+
+    severity: Severity
+    when: str
+
+
+def load_severity_conditions(
+    rules: list[Rule], path: Path = SEVERITY_CONDITIONS
+) -> dict[str, list[SeverityCondition]]:
+    """Read the severity conditions file, refusing anything the rule catalog cannot back.
+
+    Raises `SeverityConditionsError` naming the file and the key for an unknown rule id, a severity
+    that is not a `Severity` name or equals the rule's default, a blank `when`, or a
+    document of the wrong shape.
+    """
+    defaults = {rule.meta.id: rule.meta.severity for rule in rules}
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise SeverityConditionsError(
+            f"{path}: the top level must map rule ids to lists of entries"
+        )
+    conditions: dict[str, list[SeverityCondition]] = {}
+    for key, entries in document.items():
+        if key not in defaults:
+            raise SeverityConditionsError(f"{path}: {key!r} is not a built-in rule id")
+        if not isinstance(entries, list) or not entries:
+            raise SeverityConditionsError(f"{path}: {key}: must be a non-empty list of entries")
+        parsed = [_severity_condition(path, key, entry, defaults[key]) for entry in entries]
+        if len(set(parsed)) != len(parsed):
+            raise SeverityConditionsError(f"{path}: {key}: lists the same entry twice")
+        conditions[key] = parsed
+    return conditions
+
+
+def _severity_condition(
+    path: Path, key: str, entry: object, default: Severity
+) -> SeverityCondition:
+    if not isinstance(entry, dict) or set(entry) != _CONDITION_FIELDS:
+        raise SeverityConditionsError(
+            f"{path}: {key}: each entry must have exactly 'severity' and 'when'"
+        )
+    name, when = entry["severity"], entry["when"]
+    if not isinstance(name, str) or name not in Severity.__members__:
+        raise SeverityConditionsError(
+            f"{path}: {key}: severity {name!r} is not one of {', '.join(Severity.__members__)}"
+        )
+    severity = Severity[name]
+    if severity == default:
+        raise SeverityConditionsError(f"{path}: {key}: severity {name} is the rule's default")
+    if not isinstance(when, str) or not when.strip():
+        raise SeverityConditionsError(f"{path}: {key}: 'when' must be a non-blank string")
+    if "|" in when:
+        raise SeverityConditionsError(
+            f"{path}: {key}: 'when' must not contain '|', which splits the table"
+        )
+    return SeverityCondition(severity, when.strip())
+
+
+def _catalog(rules: list[Rule], conditions_path: Path = SEVERITY_CONDITIONS) -> str:
     lines = [
         _HEADER,
-        "Every built-in rule, its severity, the surface it runs on, the kind of",
+        "Every built-in rule, its default severity, the surface it runs on, the kind of",
         "target it reads, its maturity, and the frameworks it maps to. A rule",
         "without a mapping does not ship.\n",
-        "| Rule | Severity | Surface | Target | Maturity | Maps to |",
+        "| Rule | Default severity | Surface | Target | Maturity | Maps to |",
         "|---|---|---|---|---|---|",
     ]
     for rule in rules:
@@ -164,6 +244,16 @@ def _catalog(rules: list[Rule]) -> str:
             f"| `{meta.id}` | {meta.severity.name} | {meta.surface.value} "
             f"| {meta.target_kind} | {meta.maturity} | {taxonomy} |"
         )
+    conditions = load_severity_conditions(rules, conditions_path)
+    lines += [
+        "\n## Other finding severities\n",
+        _SEVERITY_INTRO + "\n",
+        "| Rule | Severity | When |",
+        "|---|---|---|",
+    ]
+    for rule in rules:
+        entries = sorted(conditions.get(rule.meta.id, ()), key=lambda c: c.severity, reverse=True)
+        lines += [f"| `{rule.meta.id}` | {c.severity.name} | {c.when} |" for c in entries]
     return "\n".join(lines) + "\n"
 
 

@@ -105,6 +105,16 @@ saved documents still follow the persisted-document policy. A contract break,
 removal, dropped reader or intentionally stricter default requires a major
 release.
 
+### Severity
+
+A finding's severity is documented behaviour; the
+[rule catalog](generated/rule-catalog.md) lists each rule's default severity
+and every condition under which a finding carries another severity, higher
+or lower. Raising a default or conditional severity is an intentionally
+stricter default and requires a major release. Restoring the documented
+severity is a patch. Lowering a severity requires a minor release whose
+changelog names the gates that may now pass.
+
 ### Merging and publishing
 
 Documentation-only, test-only and maintainer-tooling-only changes need no

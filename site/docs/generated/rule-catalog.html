@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rule catalog — Guardana documentation</title>
-<meta name="description" content="Every built-in rule, its severity, surface, target, maturity, and what it maps to.">
+<meta name="description" content="Every built-in rule, its default severity, surface, target, maturity, what it maps to, and the findings it reports at another severity.">
 <link rel="canonical" href="https://guardana.dev/docs/generated/rule-catalog">
 <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../../assets/brand/v1/tokens.css">
@@ -202,14 +202,14 @@
 </nav>
 </details>
 <main id="main">
-<h1>Rule catalog</h1><p class="lede">Every built-in rule, its severity, surface, target, maturity, and what it maps to.</p><p>Every built-in rule, its severity, the surface it runs on, the kind of
+<h1>Rule catalog</h1><p class="lede">Every built-in rule, its default severity, surface, target, maturity, what it maps to, and the findings it reports at another severity.</p><p>Every built-in rule, its default severity, the surface it runs on, the kind of
 target it reads, its maturity, and the frameworks it maps to. A rule
 without a mapping does not ship.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>Rule</th>
-<th>Severity</th>
+<th>Default severity</th>
 <th>Surface</th>
 <th>Target</th>
 <th>Maturity</th>
@@ -680,6 +680,234 @@ without a mapping does not ship.</p>
 <td>artifact</td>
 <td>stable</td>
 <td><code>LLM04:2025</code>, <code>LLM05:2026</code>, <code>ML02:2023</code>, <code>poisoning</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="other-finding-severities">Other finding severities</h2>
+<p>The main table shows each rule's default severity; this section lists every condition under which a finding carries another severity, higher or lower. Changes follow <a href="../compatibility.html#severity">the severity policy</a>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Severity</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.a2a.caller_identity</code></td>
+<td>LOW</td>
+<td>the card declares no security scheme, the agent answers a caller with no credential, and the card's host is a loopback or private address</td>
+</tr>
+<tr>
+<td><code>guardana.agent.mcp_server_manifest</code></td>
+<td>CRITICAL</td>
+<td>a pinned tool's live declaration differs from the digest approved by the pin</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.registry_entry</code></td>
+<td>LOW</td>
+<td>the version the server reports differs from the version in its registry entry</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.scope_breadth</code></td>
+<td>LOW</td>
+<td>the anonymous authorization challenge has no <code>scope</code> parameter</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.session_binding</code></td>
+<td>CRITICAL</td>
+<td>a request carrying only the session id, with the credential removed, returns the tool manifest</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.session_binding</code></td>
+<td>CRITICAL</td>
+<td>the server issues the same session id to more than one handshake</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.session_binding</code></td>
+<td>CRITICAL</td>
+<td>session ids differ only by an increasing number after a shared prefix</td>
+</tr>
+<tr>
+<td><code>guardana.mcp.unauthenticated_access</code></td>
+<td>LOW</td>
+<td>the manifest is returned to an anonymous caller and the server is on a loopback or private address</td>
+</tr>
+<tr>
+<td><code>guardana.prompt.hidden_instructions</code></td>
+<td>LOW</td>
+<td>invisible characters are present but are not shaped like an instruction payload</td>
+</tr>
+<tr>
+<td><code>guardana.prompt.hidden_instructions</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.prompt.mcp_tool_poisoning</code></td>
+<td>MEDIUM</td>
+<td>a tool description contains a base64 blob of 48 or more characters</td>
+</tr>
+<tr>
+<td><code>guardana.prompt.mcp_tool_poisoning</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.chat_template</code></td>
+<td>HIGH</td>
+<td>only an <code>include</code>, <code>extends</code>, <code>import</code> or <code>from</code> tag matches, with no dunder access, <code>attr</code> filter, Jinja global or code sink</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.chat_template</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.code_execution</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.dependency_risk</code></td>
+<td>MEDIUM</td>
+<td>a <code>yaml.load</code> call uses <code>Loader=FullLoader</code></td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.dependency_risk</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.hallucinated_package</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.hardcoded_secret</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.insecure_transport</code></td>
+<td>MEDIUM</td>
+<td>a fetch call uses a plaintext <code>http://</code> URL</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.insecure_transport</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.keras_lambda</code></td>
+<td>MEDIUM</td>
+<td>a <code>StringLookup</code>, <code>IntegerLookup</code> or <code>TextVectorization</code> layer reads its vocabulary from a file outside the model</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.keras_lambda</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.malicious_dependency</code></td>
+<td>MEDIUM</td>
+<td>a <code>setup.py</code> file fetches from the network at install time</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.malicious_dependency</code></td>
+<td>MEDIUM</td>
+<td>a pin matches a bundled vulnerable-loader advisory; the finding takes the advisory's severity (<code>medium</code> for every bundled advisory)</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.malicious_dependency</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.model_format</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.notebook_payload</code></td>
+<td>LOW</td>
+<td>a cell runs local scripts whose code the rule does not read</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.notebook_payload</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.onnx_graph</code></td>
+<td>MEDIUM</td>
+<td>a node or opset uses a domain outside the standard ONNX domains</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.onnx_graph</code></td>
+<td>MEDIUM</td>
+<td>a <code>metadata_props</code> value looks like code, such as <code>exec</code>, <code>eval</code>, <code>subprocess</code> or <code>b64decode</code></td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.onnx_graph</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.pickle_opcode</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.provenance</code></td>
+<td>LOW</td>
+<td>the model card names AGPL, non-commercial or no-redistribution terms</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.provenance</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.remote_code</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.remote_code_config</code></td>
+<td>CRITICAL</td>
+<td>a Hub kernel reference is set through the private key <code>_attn_implementation_internal</code> or <code>_attn_implementation</code></td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.remote_code_config</code></td>
+<td>MEDIUM</td>
+<td>a Hub kernel reference is set through the public key <code>attn_implementation</code></td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.remote_code_config</code></td>
+<td>MEDIUM</td>
+<td>an <code>auto_map</code> or <code>custom_pipelines</code> pointer names a module that is not present beside the config</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.remote_code_config</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.supply_chain.saved_model_ops</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
+</tr>
+<tr>
+<td><code>guardana.training.dataset_integrity</code></td>
+<td>LOW</td>
+<td>a <code>load_dataset(...)</code> call omits <code>revision=</code> or sets it to a value other than a literal commit SHA</td>
+</tr>
+<tr>
+<td><code>guardana.training.dataset_integrity</code></td>
+<td>LOW</td>
+<td>the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive</td>
 </tr>
 </tbody>
 </table></div>
