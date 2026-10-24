@@ -19,7 +19,7 @@ so this page is maintained as carefully as the code.
 |---|---|---|
 | Engine + built-in rules | **beta** | Stable enough to gate a build on. [Compatibility](compatibility.md) lists the supported surface preserved by 1.0. Everything else, including `Runner` and `guardana.cli.*`, is internal and may change in any release. |
 | Python API (`guardana.core.verify`) | **beta** | Runs what `guardana scan` and `guardana probe` run and returns every outcome as typed data, failed and stopped runs included. Its supported surface is `guardana.core.verify.__all__`; a change to it is announced as breaking with what to write instead. Trace analysis, `monitor` and baselines run from the command line only. |
-| `guardana scan` | **beta** | Deterministic, offline, no false-positive theatre. The most mature part of the product. |
+| `guardana scan` | **beta** | Deterministic, offline, no false-positive theatre. |
 | `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints, live MCP servers — on both their tool manifest and their authorization surface, and never by calling a tool — and A2A v1 agents, on their card and whom they answer, with reads only. Verdict quality depends on the evaluator you configure. |
 | `guardana monitor` | **beta** | Scheduled **active** verification. Not passive traffic inspection, not inline. |
 | `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and migratable — `guardana run migrate` reads every earlier schema. |

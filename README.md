@@ -178,14 +178,7 @@ guardana plan probe --url https://staging.example/v1 --model support-bot --profi
 guardana probe --url https://staging.example/v1 --model support-bot --profile guardana.yaml
 ```
 
-Against a staging endpoint that refused every prompt, the result was `indeterminate` (exit `2`):
-
-```text
-⚠ No findings, but 4 piece(s) of coverage were missing (this is not an all-clear).
-0 finding(s); 14 rule(s) run, 16 skipped. 4 unverified. 4 piece(s) of coverage missing. 24/28 case(s) measured, 4 ungraded. 1 component(s) observed.
-```
-
-The missing coverage includes a check whose payload was never delivered. Zero findings here is not a pass.
+A probe with missing coverage exits `2` (`indeterminate`), which is not a pass.
 
 ### What Guardana observes in three systems
 
@@ -245,7 +238,7 @@ Guardana's agent harness tests a model with Guardana's scripted tools; it does n
 
 | Category | Examples | Guardana's relationship |
 |---|---|---|
-| **Model and artifact scanners** | ModelScan, picklescan | Overlaps at the static layer and covers additional AI artifact formats. |
+| **Model and artifact scanners** | ModelScan, picklescan | Overlaps at the static layer. |
 | **Red-team harnesses** | garak, PyRIT, promptfoo, DeepTeam | Complements their attack libraries. Guardana separates findings, inconclusive results, errors, and missing coverage, and can import their observations. |
 | **Evaluation frameworks** | DeepEval, Ragas | Guardana also gates answer quality on team-supplied datasets through suites. Use it alongside DeepEval or Ragas. |
 | **Runtime guardrails** | LlamaFirewall, Llama Guard | Verifies and gates; it does not run inline. |

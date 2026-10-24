@@ -423,7 +423,7 @@ footer.foot{border-top:1px solid var(--line);padding:44px 0 56px;font-size:14.5p
     <div class="reveal"><pre class="yml"><code><span class="c"># what will this cost, before it costs anything</span>
 <span class="k">$</span> <span class="s">guardana plan probe --url … --model …</span>
 <span class="c">   14 rule(s) would run, 16 skipped.</span>
-<span class="c">   requests: at least 14, at most 47</span>
+<span class="c">   requests: at least 14, at most 47 — plus up to 94 retries</span>
 <span class="c">   trials: 1 attempt(s) per case, counted in the requests above</span>
 <span class="c">   No request was sent to produce this estimate.</span>
 
@@ -556,12 +556,8 @@ footer.foot{border-top:1px solid var(--line);padding:44px 0 56px;font-size:14.5p
 <span class="c">   budget: 60 request(s)</span>
 <span class="c">   No request was sent to produce this estimate.</span>
 
-<span class="k">$</span> <span class="s">guardana probe --url https://staging.example/v1 --model support-bot --profile guardana.yaml</span>
-<span class="c">   ⚠ No findings, but 4 piece(s) of coverage were missing (this is not an all-clear).</span>
-<span class="c">   …</span>
-<span class="c">   0 finding(s); 14 rule(s) run, 16 skipped. 4 unverified. 4 piece(s) of coverage missing.</span>
-<span class="c">   → exit 2</span></code></pre>
-  <p class="caption">Here <code>indeterminate</code> means the probe found no findings but missed coverage, so exit <code>2</code> is not a pass.</p>
+<span class="k">$</span> <span class="s">guardana probe --url https://staging.example/v1 --model support-bot --profile guardana.yaml</span></code></pre>
+  <p class="caption">A probe with missing coverage exits <code>2</code> (<code>indeterminate</code>), which is not a pass.</p>
 </div></section>
 </main>
 
