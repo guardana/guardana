@@ -2,7 +2,7 @@
 title: "Conformance kit"
 nav_order: 58
 summary: "what a pack runs in its own tests to prove its rules, targets, formats and reporters keep Guardana's contracts, and what each check does not prove"
-status: beta
+status: stable
 ---
 
 # Conformance kit — prove your pack keeps the contract

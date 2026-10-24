@@ -17,16 +17,17 @@ so this page is maintained as carefully as the code.
 
 | Component | Maturity | What that means in practice |
 |---|---|---|
-| Engine + built-in rules | **beta** | Stable enough to gate a build on. [Compatibility](compatibility.md) lists the supported surface preserved by 1.0. Everything else, including `Runner` and `guardana.cli.*`, is internal and may change in any release. |
-| Python API (`guardana.core.verify`) | **beta** | Runs what `guardana scan` and `guardana probe` run and returns every outcome as typed data, failed and stopped runs included. Its supported surface is `guardana.core.verify.__all__`; a change to it is announced as breaking with what to write instead. Trace analysis, `monitor` and baselines run from the command line only. |
-| `guardana scan` | **beta** | Deterministic, offline, no false-positive theatre. |
+| Engine + built-in rules | **stable** | Covered by the compatibility promise and suitable to gate a build on. [Compatibility](compatibility.md) lists the supported surface. Everything else, including `Runner` and `guardana.cli.*`, is internal and may change in any release. |
+| Python API (`guardana.core.verify`) | **stable** | Runs what `guardana scan` and `guardana probe` run and returns every outcome as typed data, failed and stopped runs included. Its supported surface is `guardana.core.verify.__all__`; a change to it is announced as breaking with what to write instead. Trace analysis, `monitor` and baselines run from the command line only. |
+| `guardana scan` | **stable** | Deterministic, offline, no false-positive theatre. |
 | `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints, live MCP servers — on both their tool manifest and their authorization surface, and never by calling a tool — and A2A v1 agents, on their card and whom they answer, with reads only. Verdict quality depends on the evaluator you configure. |
 | `guardana monitor` | **beta** | Scheduled **active** verification. Not passive traffic inspection, not inline. |
-| `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and migratable — `guardana run migrate` reads every earlier schema. |
+| `guardana diff` | **stable** | Compares two saved runs. The saved-run format is versioned and migratable — `guardana run migrate` reads every earlier schema. |
 | Collector (`guardana-server`) | **beta** | PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. Findings have a lifecycle and expiring waivers; actions are audited; retention and deletion are commands. What it does not yet hold is a quality trend — it aggregates findings, not measurements. |
 | `guardana grade` | **beta** | Grades a recording — answers you supplied, or the exchanges `probe --keep-exchanges` kept — with your rules and no target request. MCP and A2A rules are `not_applicable` on a chat recording; canary and tool rules still skip for a missing capability, and a rule the recording does not answer is skipped as `not_recorded`. |
+| `guardana analyze-trace` | **beta** | Grades an execution your agent already performed, offline, from OpenTelemetry GenAI spans (OTLP/JSON or an SDK file exporter) or Guardana's native dialect, versioned by its own JSON schema. It checks trace rules and, with `--contract`, security contracts. A dimension the profile requires but the trace lacks is reported as missing coverage, never as a pass. |
 | Quality suites | **beta** | Gates pass rates on team-supplied versioned datasets, with repeated trials and judge correction. No numeric aggregate gate or statistical comparison between suite runs. |
-| Extension API | **beta** | Frozen at 1.0 under the [compatibility policy](compatibility.md). The remaining 1.0 criteria are below. |
+| Extension API | **stable** | Covered by the [compatibility policy](compatibility.md): rules, evaluators, targets, taxonomies, renderers and reporters, including installed outputs for `--format` and `--reporter`. |
 
 ## Released and experimental
 
@@ -38,43 +39,20 @@ so this page is maintained as carefully as the code.
 
 **Released (beta):** MCP checks proven against servers built on the `mcp` SDK in both revisions, and the A2A checks against agents built on `a2a-sdk`; a capability a server does not offer is recorded as skipped `not_offered`, a coverage gap.
 
-**Released (beta):** an installed package adds a format for `--format` and a reporter for `--reporter` ([installed outputs](outputs.md)), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit `8` when an installed output fails. `examples/output_pack` is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own `output_api`. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on `monitor`, `import-observations` and `recipe run`.
+**Released (stable):** an installed package adds a format for `--format` and a reporter for `--reporter` ([installed outputs](outputs.md)), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit `8` when an installed output fails. `examples/output_pack` is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own `output_api`. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on `monitor`, `import-observations` and `recipe run`.
 
 **Not released:** The five-user first-run study, the team regression loop and the live retrieval pilot remain open [adoption measures](#adoption-measures); the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.
 
-## Before the first stable release
+## Stable-release criteria
 
-At 1.0, the supported Python facade, rule, evaluator and target contracts,
+From 1.0, the supported Python facade, rule, evaluator and target contracts,
 output contracts, CLI flags and exit codes, profile schema and collector
-envelope become a compatibility promise.
+envelope are a compatibility promise.
 [Compatibility](compatibility.md) defines the full surface.
 
-1.0.0rc1 and 1.0.0rc2 shipped the 0.41.0 supported surface unchanged. 1.0.0rc3
-corrects three defects, each announced under "Changed — breaking" in the changelog:
-the collector's `/docs`, `/redoc` and `/docs/oauth2-redirect` routes return 404;
-a `rules.include` pattern matching no registered rule refuses the command with
-exit 3; a scanned target's own `.guardanaignore` can no longer exclude a file
-a model loader reads. 1.0.0rc4 corrects supported-surface defects, each announced
-in the changelog. Two are under "Changed — breaking": stdio server references
-distinguish the full command (`mcp+stdio://<executable>#argv-<digest>`), and native
-trace readers refuse a trace without span records or with a record missing a
-schema-required field. Its Security section lists five published advisories.
-1.0.0rc5 corrects supported-surface defects, each announced under "Fixed" in
-the changelog, with no "Changed — breaking" entry.
-The surface remains frozen until stable 1.0 except for
-announced defect corrections. Candidates add no CLI flag, persisted field,
-rule family or public API.
+The first stable release required every criterion below.
 
-Five candidates were required: rc1, rc2, rc3, rc4 and rc5. 1.0.0rc4 was required because
-defects reported against 1.0.0rc3 needed release-blocker fixes. 1.0.0rc5 was required
-because a defect reported against 1.0.0rc4 needed a release-blocker fix. `1.0.0rc2`,
-`1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` each shipped after its own full green release gate and
-green CI on the exact commit. A further candidate is
-required only if a release blocker needs one.
-
-Stable 1.0 is the compatibility promise for the supported surface. It ships only when all criteria below hold; it does not follow the last candidate automatically.
-
-- `1.0.0rc2`, `1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` have shipped, each after its own full green release gate and green CI on the exact commit. A candidate has had a period without new defect reports against the supported surface. A further candidate is required only if a release blocker needs one.
+- Each of `1.0.0rc2`, `1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` shipped after its own full green release gate and green CI on the exact commit. The last candidate had a period without new defect reports against the supported surface.
 - Maintainer-run proofs are published with commands and results, each labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failing result, a fix and one custom check; the retrieval pilot against the reference application in `examples/retrieval_pilot/`, catching a poisoned document and a tenant-filter failure; the regression loop on the same reference application, with a failed and an incomplete result saved and a redacted regression regraded and gated in CI with a reviewable artifact; customization through published extension points only, installing the reference pack from PyPI outside the repository and passing the conformance kit; the security runbook drill, reporting completion and lessons safe to share; recovery runbooks exercised.
 - The engineering criteria hold:
   - Python consumers receive failed, incomplete and stopped outcomes as typed data; case outcomes and missing evidence survive serialization, redaction and export.
@@ -88,7 +66,7 @@ The compatibility promise lets a team adopt Guardana, so it cannot wait for adop
 
 Five maintainer-run proofs are published as notes. The [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points) ran against 1.0.0rc5 from PyPI by the proofs workflow ([run](https://github.com/guardana/guardana/actions/runs/39424046832)). First-run Linux and macOS cells passed; all Windows cells passed and are required: there `guardana diff` displays the Windows path `model\weights.pkl` as a recorded known difference ([#167](https://github.com/guardana/guardana/issues/167)). For customization, the reference pack 0.1.3 installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The [retrieval pilot](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter), [regression loop](https://guardana.dev/notes/regression-loop-with-a-redacted-regression) and [collector recovery runbooks](https://guardana.dev/notes/collector-recovery-runbooks) passed against 1.0.0rc5 in a later [workflow run](https://github.com/guardana/guardana/actions/runs/40005613709). The pilot distinguished the fixed control from the broken tenant filter and document-obeying model. The regression loop retained a redacted failure through regrading, comparison and promotion with a rewritten question. Recovery covered a database upgrade from 0.41.0, rollback checks and Compose restores in place and onto a new volume, with data read back per tenant. The security drill is not recorded.
 
-[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. With `1.0.0rc5` released, `1.0.0` is the next release milestone; the `next` milestone holds work for releases after 1.0.0.
+[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. The `next` milestone holds work for the next release.
 
 The owner decides changes to release criteria and records each one here and in the changelog.
 

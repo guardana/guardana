@@ -10,7 +10,7 @@ truth are the [rule summary](docs/generated/rule-summary.md),
 [taxonomy coverage](docs/generated/taxonomy-coverage.md).
 
 For maturity and known gaps, read [Product status](docs/product-status.md).
-To try a candidate, join a pilot or contribute, read [Community](docs/community.md).
+To join a pilot or contribute, read [Community](docs/community.md).
 
 ## Core workflows
 
@@ -245,7 +245,7 @@ incomplete implementation. [`docs/conformance-kit.md`](docs/conformance-kit.md) 
 
 All 58 built-in rules have finding, clean and inconclusive samples of their own. `guardana rule test 'guardana.*'` runs them and generates the summary count. A sample whose target cannot read a file is inconclusive. [`examples/reference_pack`](examples/reference_pack) is `guardana-reference-pack`, published on PyPI. Its wheel and sdist are also attached to each GitHub Release, and CI installs it in isolation. It includes YAML and Python rules, an evaluator, a conforming target, a taxonomy, `reference-summary`, `reference-file`, a schema-3 manifest and a committed lock.
 
-The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
+The extension API is stable under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
 
 ## Optional collector
 

@@ -9,7 +9,7 @@ Guardana is an open-source AI security verification tool for security and platfo
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/guardana/guardana/badge)](https://scorecard.dev/viewer/?uri=github.com/guardana/guardana)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
-[![Status: beta](https://img.shields.io/badge/status-beta-yellow.svg)](docs/product-status.md)
+[![Status: stable](https://img.shields.io/badge/status-stable-brightgreen.svg)](docs/product-status.md)
 [![OWASP LLM Top 10](https://img.shields.io/badge/mapped-OWASP%20%C2%B7%20MITRE%20ATLAS%20%C2%B7%20NIST-informational.svg)](#what-it-checks)
 [![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -230,7 +230,7 @@ By default, Guardana loads only its own distributions. It refuses an installed t
 
 ## Maturity and limits
 
-The engine, built-in rules, CLI workflows, supported Python verification API, extension API, quality suites, and optional collector are beta. The extension API is frozen at 1.0 under [`docs/compatibility.md`](docs/compatibility.md). Read [`docs/product-status.md`](docs/product-status.md) before using Guardana as a security gate.
+The engine and built-in rules, `scan`, `diff`, supported Python verification API and extension API are stable under [`docs/compatibility.md`](docs/compatibility.md). `probe`, `grade`, `analyze-trace`, `monitor`, quality suites with deterministic assessors and the optional collector are beta, and judge-graded suites are experimental; read [`docs/product-status.md`](docs/product-status.md) before using Guardana as a security gate.
 
 Guardana's agent harness tests a model with Guardana's scripted tools; it does not exercise your agent's own framework and tools. Trace analysis checks an execution your application recorded. `monitor` samples by running active checks; it does not inspect production traffic. A scan of a path with no file to read is indeterminate rather than a pass, but a scan cannot tell whether the files it read are the ones you meant to ship; a release preset needs rules selected for the target's capabilities. The current checks cover text, not image, PDF, audio, or document carriers. Provider compatibility and judge-graded verdicts need validation for your deployment.
 
@@ -279,7 +279,7 @@ Report suspected vulnerabilities privately through [`SECURITY.md`](SECURITY.md),
 - Try it in about ten minutes and tell us where you got stuck in a [first-run session](docs/studies/first-run-study.md).
 - Bring your team's LLM, RAG or MCP application as a [pilot](docs/studies/adopter-study.md). Start in [GitHub Discussions](https://github.com/guardana/guardana/discussions) or email contact@guardana.dev.
 - Write your own pack or check. See [docs/extending.md](docs/extending.md) and [examples/](examples/).
-- Star the repository or watch releases if you want to follow 1.0.
+- Star the repository or watch releases to follow new releases.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). New rules need a framework mapping and fixtures.
 

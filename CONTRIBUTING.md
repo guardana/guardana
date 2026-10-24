@@ -244,12 +244,11 @@ checklist, and its milestone closes after the promised artifacts are verified.
 A merged pull request runs CI but does not publish a package. The maintainer
 chooses a release from the completed work using
 [the versioning policy](docs/compatibility.md#versioning), then uses the
-tag-gated release process. Until stable 1.0, release candidates carry fixes
-only; proposed features wait outside the candidate milestone.
+tag-gated release process.
 
-### Release cadence after 1.0
+### Release cadence
 
-After stable 1.0, fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
+Fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
 
 Every Monday, the maintainer reviews changes merged since the last release. If any affect a published package, a release ships that day from `main` as it stands. Pull requests merged during preparation enter the next release. Weeks with only documentation, tests or maintainer tooling produce no package release; the site updates on every merge.
 

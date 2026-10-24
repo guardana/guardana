@@ -28,8 +28,7 @@ Run the README's steps inside `DIR`:
 
 If you created the starter with `uvx --from guardana-cli guardana`, `guardana` is not on your
 shell's PATH. Prefix each README command with the same launcher, for example
-`uvx --from guardana-cli guardana scan model --format json --output before.json`. For a
-candidate, use the launcher you installed with: `uvx --prerelease allow --from guardana-cli guardana`.
+`uvx --from guardana-cli guardana scan model --format json --output before.json`.
 Alternatively install the CLI in your environment ([install guide](install.md)) and use the
 README commands as written. Installing needs network access; the starter's steps run offline
 once the CLI is present.

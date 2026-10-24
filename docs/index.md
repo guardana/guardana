@@ -130,7 +130,7 @@ coverage. Do not edit them by hand.
 
 ## Project direction
 
-- [`community.md`](community.md) — try a candidate, join a pilot, contribute a fix or share coverage
+- [`community.md`](community.md) — try Guardana, join a pilot, contribute a fix or share coverage
 - [`../FEATURES.md`](../FEATURES.md) — concise shipped capability overview
 - [Current work](https://github.com/guardana/guardana/issues) and [release milestones](https://github.com/guardana/guardana/milestones) — owners and acceptance criteria
 - [`../CHANGELOG.md`](../CHANGELOG.md) — release history

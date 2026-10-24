@@ -8,16 +8,16 @@ status: stable
 # Take part in Guardana
 
 Try the [offline starter](usage-init.md), bring your own application to a pilot,
-or contribute a focused fix. The [roadmap](../ROADMAP.md) keeps the
-release-candidate work separate from additions after stable 1.0.
+or contribute a focused fix. The [roadmap](../ROADMAP.md) describes current
+capabilities and priorities.
 
-## Try a release candidate
+## Try it
 
-An ordinary install selects stable releases. To opt into a candidate and refresh
-an existing tool environment:
+Start with the latest stable release. `uvx --upgrade` refreshes an existing tool
+environment:
 
 ```bash
-uvx --upgrade --prerelease allow --from guardana-cli guardana init --starter first-run
+uvx --upgrade --from guardana-cli guardana init --starter first-run
 ```
 
 Follow the generated project's instructions to find a failure, fix it and edit
@@ -44,11 +44,11 @@ records or private prompts to a public issue.
 
 ## Contribute a focused change
 
-Documentation fixes, tests, examples and maintainer scripts are open during the
-candidate period. Use [CONTRIBUTING.md](../CONTRIBUTING.md) and the
+Fixes, documentation, tests, examples and maintainer scripts are welcome.
+New rules and features follow demonstrated application needs and the issue
+process in [CONTRIBUTING.md](../CONTRIBUTING.md). New rules need a framework
+mapping and fixtures. See the
 [good first issues](https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
-Candidates keep the supported surface frozen; new rules and feature additions
-follow stable 1.0 and demonstrated application needs.
 
 For a bug, include the installed version, the smallest synthetic reproduction,
 the expected outcome and the observed outcome. Report suspected vulnerabilities
@@ -84,10 +84,9 @@ package can also add its own format or reporter ([installed outputs](outputs.md)
 
 The [compatibility page](compatibility.md) states what stays stable. Every persisted document
 carries its version. The saved run's version changes whenever a change to it is not
-backwards-compatible; earlier run schemas stay published in `schemas/`. Two guarantees apply
-only from the final 1.0 release: incompatible changes to the supported surface occur only in a
-major release, and every 1.x release reads documents written by earlier releases. Before the
-final 1.0 release, the `1.0.0rcN` candidates carry fixes only.
+backwards-compatible; earlier run schemas stay published in `schemas/`. From 1.0,
+incompatible changes to the supported surface require a major release. Every 1.x release
+reads persisted documents written by earlier releases.
 
 If you have built something on Guardana's output, tell the project in
 [GitHub Discussions](https://github.com/guardana/guardana/discussions). Open an

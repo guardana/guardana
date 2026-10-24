@@ -2,7 +2,7 @@
 title: "Read results from your own tool"
 nav_order: 56
 summary: "read a saved run from Python or jq — the recorded verdict, then each channel on its own — and what SARIF, JUnit and the collector keep and leave out"
-status: beta
+status: stable
 ---
 
 # Read results from your own tool

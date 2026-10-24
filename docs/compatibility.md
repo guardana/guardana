@@ -2,7 +2,7 @@
 title: "Compatibility"
 nav_order: 57
 summary: "what Guardana keeps compatible from 1.0 — the Python facade, the extension, output and kit contracts, the command line, the exit codes and every persisted document — how a name is deprecated before it goes, and where the generated surface and matrix live"
-status: beta
+status: stable
 ---
 
 # Compatibility — what stays put, and how a change is announced
@@ -57,13 +57,10 @@ From 1.0:
 - A Python version is supported until its upstream end of life. Dropping one is announced one
   minor release ahead.
 
-Until 1.0, a breaking change can land in a minor release and is announced under
-"Changed — breaking" in the changelog, with what to write instead.
-
 ## Versioning
 
-Guardana is **pre-1.0** until a final 1.x release. [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)
-governs change impact. Package version strings use
+From 1.0.0, [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)
+governs releases. Package version strings use
 [PEP 440](https://packaging.python.org/en/latest/specifications/version-specifiers/).
 
 ### Historical 0.y.z releases
@@ -74,22 +71,7 @@ with replacement guidance. This included a new default-enabled check or an
 intentionally stricter default that could fail a previously passing build.
 A patch was a compatible correction.
 
-### The 1.0 candidate freeze
-
-The `1.0.0rcN` candidates carry fixes only. They follow neither the historical
-`0.y.z` feature rules nor the post-1.0 minor-release rules.
-
-Until stable 1.0, candidates add no CLI flag, persisted field, rule family or
-public API. A change to the existing supported surface is allowed only to
-correct a defect in it and must be announced.
-
-`scripts/release.py` refuses a candidate whose generated
-`docs/generated/api-surface.json` moved since the previous tag unless the
-changelog's Unreleased section has a Changed, Deprecated or Removed entry.
-That check enforces the announcement requirement; the fixes-only policy still
-applies.
-
-### Choosing a release after 1.0
+### Choosing a release
 
 The highest-impact change decides the version. The number of completed issues
 does not.
@@ -103,7 +85,8 @@ does not.
 Experimental behaviour and thresholds are outside the stability promise; their
 saved documents still follow the persisted-document policy. A contract break,
 removal, dropped reader or intentionally stricter default requires a major
-release.
+release. The criteria for the first stable release are in
+[product status](product-status.md#stable-release-criteria).
 
 ### Severity
 
@@ -141,9 +124,11 @@ A release candidate's package version is written in PEP 440 form, for example
 A risky minor or major release may first use a release candidate, such as
 `1.1.0rc1`. A candidate is a pre-release, not a stable release.
 
-### When to release 1.0
-
-Release `1.0.0` when all [stable-release criteria](product-status.md#before-the-first-stable-release) hold: required `1.0.0rc2`, `1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` gates, a candidate period without new supported-surface defect reports, published maintainer-run proofs and engineering criteria. A further candidate is required only if a release blocker needs one. Stable 1.0 is the compatibility promise for the supported surface; adoption measures are published separately and are not release criteria. The [GitHub milestones](https://github.com/guardana/guardana/milestones) group release scope.
+`scripts/release.py` refuses a candidate whose generated
+`docs/generated/api-surface.json` changes since the previous tag unless the
+changelog's `Unreleased` section has a `Changed`, `Deprecated` or `Removed`
+entry. It refuses a final release if that surface changes at all since its
+last candidate.
 
 ## The collector envelope
 
