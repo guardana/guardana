@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload the records
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-first-run-linux-${{ matrix.python }}-${{ matrix.installer }}
           path: ${{ runner.temp }}/proof/records
@@ -161,7 +161,7 @@ jobs:
 
       - name: Upload the records
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-first-run-macOS-${{ matrix.python }}-${{ matrix.installer }}
           path: ${{ runner.temp }}/proof/records
@@ -257,7 +257,7 @@ jobs:
 
       - name: Upload the records
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-first-run-Windows-${{ matrix.python }}-${{ matrix.installer }}
           path: ${{ runner.temp }}/proof/records
@@ -290,7 +290,7 @@ jobs:
 
       - name: Upload the records
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-customization-linux-3.13-pip
           path: ${{ runner.temp }}/proof/records
@@ -333,7 +333,7 @@ jobs:
 
       - name: Upload the records
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-pilot-linux-3.13-pip
           path: ${{ runner.temp }}/proof/records
@@ -375,7 +375,7 @@ jobs:
 
       - name: Upload the records
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-regression-linux-3.13-pip
           path: ${{ runner.temp }}/proof/records
@@ -409,7 +409,7 @@ jobs:
 
       - name: Upload the records
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-recovery-linux
           path: ${{ runner.temp }}/proof/records
@@ -457,7 +457,7 @@ jobs:
 
       - name: Upload the summary
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proofs-summary
           path: ${{ runner.temp }}/summary
