@@ -24,13 +24,14 @@ so a release is a deliberate act.
 
 import argparse
 import datetime
+import json
 import re
 import subprocess
 import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import NoReturn
+from typing import Literal, NoReturn
 
 _ROOT = Path(__file__).resolve().parent.parent
 _CORE_PYPROJECT = _ROOT / "packages" / "guardana-core" / "pyproject.toml"
@@ -75,6 +76,10 @@ _TAG_BY_HAND = (
 # A run is listed a few seconds after the push that starts it; longer than this, nothing is coming.
 _CI_APPEARS_WITHIN_S = 600
 _CI_POLL_S = 10
+# A dropped connection ends a watch early; one more watch rides out a blip, not an outage.
+_WATCH_ATTEMPTS = 2
+# What a plain read of the state shows: passed, failed, or None when it shows neither.
+_Outcome = Literal["pass", "fail"] | None
 # Two lines: the state, then the merge commit (empty until merged).
 _STATE_JQ = '.state, (.mergeCommit.oid // "")'
 _sleep = time.sleep
@@ -540,10 +545,74 @@ def _await_required_checks(pr: str, head: str) -> None:
 
     print(f"waiting for the required checks on pull request #{pr}...")
     _await_ci_run(head, "pull_request", stop)
+    _watch_to_the_end(
+        ["gh", "pr", "checks", pr, "--required", "--watch", "--fail-fast"],
+        lambda: _required_checks_outcome(pr),
+        stop,
+        failed=f"the required checks of pull request #{pr} did not pass",
+        unshown=(
+            f"the required checks of pull request #{pr} could not be watched to the end; "
+            f"they were not shown to pass"
+        ),
+    )
+
+
+def _watch_to_the_end(
+    watch: list[str],
+    read: Callable[[], _Outcome],
+    stop: Callable[[str], NoReturn],
+    *,
+    failed: str,
+    unshown: str,
+) -> None:
+    """Run a `gh` watch, deciding from a plain re-read of the state when the watch fails.
+
+    A watch exits non-zero both for a red result and for a dropped connection, so only the state
+    read afterwards tells them apart. A state that is unreadable or not final is watched once
+    more, and never counts as passed.
+    """
+    for _attempt in range(_WATCH_ATTEMPTS):
+        try:
+            _run(watch)
+        except FileNotFoundError:
+            stop(unshown)
+        except subprocess.CalledProcessError:
+            pass
+        else:
+            return
+        outcome = read()
+        if outcome == "pass":
+            return
+        if outcome == "fail":
+            stop(failed)
+    stop(unshown)
+
+
+def _read_json(cmd: list[str]) -> object:
+    """Return the JSON `cmd` prints, or None when it fails or prints something else."""
     try:
-        _run(["gh", "pr", "checks", pr, "--required", "--watch", "--fail-fast"])
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        stop(f"the required checks of pull request #{pr} did not pass")
+        return json.loads(_run(cmd, capture=True))
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+        return None
+
+
+def _required_checks_outcome(pr: str) -> _Outcome:
+    """Read the required checks once without watching: passed, failed, or None when not shown."""
+    checks = _read_json(["gh", "pr", "checks", pr, "--required", "--json", "name,bucket"])
+    if not isinstance(checks, list) or not checks:
+        return None
+    buckets = [check.get("bucket") if isinstance(check, dict) else None for check in checks]
+    if any(bucket in {"fail", "cancel"} for bucket in buckets):
+        return "fail"
+    return "pass" if all(bucket == "pass" for bucket in buckets) else None
+
+
+def _ci_run_outcome(run_id: str) -> _Outcome:
+    """Read a CI run once without watching: green, concluded otherwise, or None when not shown."""
+    run = _read_json(["gh", "run", "view", run_id, "--json", "status,conclusion"])
+    if not isinstance(run, dict) or run.get("status") != "completed":
+        return None
+    return "pass" if run.get("conclusion") == "success" else "fail"
 
 
 def _tree(commit: str) -> str:
@@ -615,12 +684,15 @@ def _await_green_ci(commit: str) -> None:
     """
     print(f"waiting for CI on {commit[:9]} before creating the tag...")
     run_id = _await_ci_run(commit, "push", _stop_before_tagging)
-    # `gh run watch --exit-status` exits non-zero when the run failed, which is the
-    # whole check: without the flag it reports the failure and returns 0.
-    try:
-        _run(["gh", "run", "watch", run_id, "--exit-status"])
-    except subprocess.CalledProcessError:
-        _stop_before_tagging(f"CI run {run_id} is not green")
+    # `gh run watch --exit-status` exits non-zero when the run failed: without the flag it
+    # reports the failure and returns 0.
+    _watch_to_the_end(
+        ["gh", "run", "watch", run_id, "--exit-status"],
+        lambda: _ci_run_outcome(run_id),
+        _stop_before_tagging,
+        failed=f"CI run {run_id} is not green",
+        unshown=f"CI run {run_id} could not be watched to the end; it was not shown to be green",
+    )
     print("CI is green; tagging.")
 
 
