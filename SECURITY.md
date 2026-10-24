@@ -133,7 +133,6 @@ One maintainer cannot provide independent review or release continuity.
 
 - The sole write collaborator is the sole `guardana` organization and `@guardana/maintainers` member, owning every path.
 - `main` requires pull requests, passing required checks on an up-to-date branch, resolved conversations and linear history; administrators follow these rules, and force pushes are refused. Required approving reviews: `0`.
-- Every pull request gets a GitHub Copilot review under a ruleset with no bypass; this automated review is neither human review nor required approval.
 - The tag-pushing maintainer is the only `pypi` publish reviewer, holds the SSH tag-signing key and publishing approval, and approves every publish. Nobody else holds keys or can take over releases during unavailability.
 - DCO sign-off is optional and unenforced (`CONTRIBUTING.md` § Sign-off).
 - Scorecard's `Code-Review`, `Branch-Protection` and `Contributors` scores reflect these limits and are expected to remain below maximum with one maintainer.
