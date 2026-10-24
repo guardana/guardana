@@ -74,6 +74,26 @@ def test_each_minor_release_shows_its_newest_patch_newest_first(tmp_path: Path) 
     ]
 
 
+def test_a_candidate_stands_for_its_minor_until_the_final_release_is_recorded(
+    tmp_path: Path,
+) -> None:
+    candidates: dict[str, object] = {
+        "0.41.0": _release(17, extension=2),
+        "1.0.0rc2": _release(17, extension=2),
+        "1.0.0rc10": _release(18, extension=2),
+    }
+    final: dict[str, object] = {**candidates, "1.0.0": _release(19, extension=2)}
+
+    def rows(history: dict[str, object]) -> list[str]:
+        page = generate_docs._compatibility_matrix([], _history(tmp_path, history))
+        return [
+            line for line in page.splitlines() if line.startswith("| ") and "Release" not in line
+        ]
+
+    assert [row.split(" | ")[0] for row in rows(candidates)[1:]] == ["| 1.0.0rc10", "| 0.41.0"]
+    assert [row.split(" | ")[0] for row in rows(final)[1:]] == ["| 1.0.0", "| 0.41.0"]
+
+
 @pytest.mark.parametrize(
     "broken",
     [

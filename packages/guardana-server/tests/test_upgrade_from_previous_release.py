@@ -18,16 +18,13 @@ from conftest import DbConnection
 from guardana.server.auth import Scope, generate_key
 from guardana.server.db.migrations import apply_pending, load_migrations, read_state
 from guardana.server.envelope import Submission
+from packaging.version import Version
 from test_historical_envelopes import HISTORICAL, bearer, serve, stored_envelopes
 from test_migrations import _apply_through
 
 _OK = 200
 _TENANCY = 3
 """The migration that introduced projects; the writer below knows only the schema before it."""
-
-
-def _release_key(version: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in version.split("."))
 
 
 def oldest_upgradable_release() -> tuple[str, int]:
@@ -42,7 +39,7 @@ def oldest_upgradable_release() -> tuple[str, int]:
     ]
     if not shipped:
         raise AssertionError("no release in releases.json shipped a collector migration")
-    return min(shipped, key=lambda entry: (entry[1], _release_key(entry[0])))
+    return min(shipped, key=lambda entry: (entry[1], Version(entry[0])))
 
 
 def _a_collector_from_before_the_upgrade(connection: DbConnection) -> str:

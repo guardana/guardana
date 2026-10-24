@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from packaging.version import InvalidVersion, Version
 
 _REPO = Path(__file__).resolve().parent.parent
 _OUT = _REPO / "docs" / "generated"
@@ -601,14 +602,22 @@ def _release_row(release: str, entry: dict[str, object]) -> list[str]:
 
 
 def _release_rows(history: dict[str, dict[str, object]]) -> list[list[str]]:
-    """One row per minor release, from its newest patch, newest minor first."""
-    newest: dict[tuple[int, ...], tuple[tuple[int, ...], str]] = {}
+    """One row per minor release, from its newest patch or candidate, newest minor first."""
+    newest: dict[tuple[int, ...], tuple[Version, str]] = {}
     for release in history:
-        parts = tuple(int(part) for part in release.split("."))
-        if len(parts) != _RELEASE_PARTS:
+        try:
+            version = Version(release)
+        except InvalidVersion as error:
+            raise ValueError(f"{release} is not a MAJOR.MINOR.PATCH release") from error
+        if (
+            len(version.release) != _RELEASE_PARTS
+            or version.is_devrelease
+            or version.is_postrelease
+        ):
             raise ValueError(f"{release} is not a MAJOR.MINOR.PATCH release")
-        if parts[:2] not in newest or parts > newest[parts[:2]][0]:
-            newest[parts[:2]] = (parts, release)
+        minor = version.release[:2]
+        if minor not in newest or version > newest[minor][0]:
+            newest[minor] = (version, release)
     rows = []
     for minor in sorted(newest, reverse=True):
         release = newest[minor][1]

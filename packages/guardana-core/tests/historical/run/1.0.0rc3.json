@@ -1,0 +1,457 @@
+{
+  "schema_version": 18,
+  "$schema": "https://guardana.dev/schemas/run/v18.schema.json",
+  "run": {
+    "run_id": "16646313-d55d-4de9-bff6-b5c9bc9bf5ab",
+    "created_at": "2026-10-24T06:33:53.252552Z",
+    "started_at": "2026-10-24T06:33:53.210366Z",
+    "completed_at": "2026-10-24T06:33:53.252552Z",
+    "migrated_from": null,
+    "source": {
+      "kind": "local",
+      "provider": "local",
+      "run_url": null
+    },
+    "guardana": {
+      "version": "1.0.0rc3",
+      "commit": null,
+      "distribution_versions": {}
+    },
+    "target": {
+      "type": "artifact",
+      "ref": "subject",
+      "fingerprint": "sha256:cf6965804d2fb73b6a022930082687fcf4c9251947c29117b9c4cd4e8fcdcb40",
+      "fingerprint_inputs": [
+        "kind",
+        "ref"
+      ],
+      "capabilities": [
+        "read_files"
+      ],
+      "document": null
+    },
+    "deployment": {
+      "ai_system": "historical-corpus",
+      "environment": "staging",
+      "deployment_id": null,
+      "commit_sha": null,
+      "image_digest": null,
+      "model_digest": null,
+      "model_name": null,
+      "model_revision": null
+    },
+    "configuration": {
+      "profile_name": "default",
+      "profile_digest": "sha256:2219ab15facdd105c1e8fd70d1b970feca4e474d4f9973ef377aae8e2aba3e0c",
+      "system_prompt_digest": null,
+      "tool_manifest_digest": null,
+      "retriever_digest": null,
+      "dataset_digest": null,
+      "adapter_digest": null,
+      "provider": null,
+      "plugins": {
+        "mode": "builtins",
+        "allowed": []
+      }
+    },
+    "execution": {
+      "concurrency": 1,
+      "timeout_seconds": 30,
+      "seed": null,
+      "temperature": null,
+      "max_requests": null,
+      "max_input_tokens": null,
+      "max_output_tokens": null,
+      "max_duration_seconds": null,
+      "max_requests_per_minute": null,
+      "trials": 1
+    },
+    "usage": {
+      "requests": 0,
+      "input_tokens": null,
+      "output_tokens": null,
+      "requests_missing_token_counts": 0,
+      "estimated_cost": null,
+      "wall_time_seconds": 0.042186,
+      "judge": null
+    },
+    "rules": [
+      {
+        "id": "guardana.supply_chain.pickle_opcode",
+        "digest": "29518aa8969a19d7",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.dependency_risk",
+        "digest": "c6536919330f082a",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.remote_code",
+        "digest": "2bcf5f8b5e93b3a9",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.remote_code_config",
+        "digest": "b4c484a61f7b07fb",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.code_execution",
+        "digest": "67574c4041e0e649",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.insecure_transport",
+        "digest": "7430722d58d5c9ef",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.keras_lambda",
+        "digest": "515de4d57bddee35",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.saved_model_ops",
+        "digest": "9cda80c57ed5b8ca",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.malicious_dependency",
+        "digest": "2ba998fc03299963",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.hallucinated_package",
+        "digest": "c71712e81e2de3e6",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.hardcoded_secret",
+        "digest": "5f81dbb2a6b93970",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.model_format",
+        "digest": "53c5df2636c0cbf6",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.chat_template",
+        "digest": "26f3c48b35c6b3b0",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.onnx_graph",
+        "digest": "7eecdc1507bb3b52",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.notebook_payload",
+        "digest": "415b7f7851a1a5b1",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.supply_chain.provenance",
+        "digest": "aa2a435f7738924c",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.prompt.mcp_tool_poisoning",
+        "digest": "0f695bb7d0ee2775",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.prompt.hidden_instructions",
+        "digest": "4dd4f40e9086db28",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      },
+      {
+        "id": "guardana.training.dataset_integrity",
+        "digest": "a1b0b12dd2b8f0d4",
+        "version": "1.0.0rc3",
+        "origin": "guardana-rules",
+        "maturity": "stable",
+        "declared_requests": 0,
+        "trial_summary": null,
+        "suite": null
+      }
+    ],
+    "evaluators": [],
+    "coverage": {
+      "digest": "sha256:e8aaa0faab878dd2172589305f249335ef62acff1ecbd64679dff141e339c3b8",
+      "taxonomies": [
+        {
+          "framework": "MITRE-ATLAS",
+          "digest": "sha256:c739110c2417bfee27690e1b70a419cee8d10baf53878e1f1a4659b407298280",
+          "entries": 18,
+          "version": "5.6.0"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "digest": "sha256:ea03fe4b5e16eb1acf957123f55dc361478bb6f8f391eff9d4cbd7db7c4be3fe",
+          "entries": 4,
+          "version": null
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "digest": "sha256:b7bf962d75646c244324e09341920969a2c29f305730b69b931db569915e76ab",
+          "entries": 10,
+          "version": null
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "digest": "sha256:885b17527735b0df50362266dc8557269af9244dd3f74adfbb2c0fca210a1d76",
+          "entries": 10,
+          "version": null
+        },
+        {
+          "framework": "OWASP-LLM-2026",
+          "digest": "sha256:7a30d74e1feb020dc02d0c231c724245b7e0dd6ba268c69d807b27dcc793868c",
+          "entries": 10,
+          "version": null
+        },
+        {
+          "framework": "OWASP-MCP-2025",
+          "digest": "sha256:89c9accff119c60d6d74b11a4e6cb93a46072278d03fd8e3490fb6b708daf137",
+          "entries": 10,
+          "version": "0.1"
+        },
+        {
+          "framework": "OWASP-ML-2023",
+          "digest": "sha256:5051befd0123ad153505caa2db0b8ebd39da1d3d55a9fc3854b3f1ea8ae2ae87",
+          "entries": 5,
+          "version": null
+        }
+      ],
+      "protocols": {},
+      "shortfall": []
+    },
+    "result_summary": {
+      "findings": 1,
+      "unverified": 0,
+      "waived": 0,
+      "errors": 0,
+      "observations": 1,
+      "rules_run": [
+        "guardana.supply_chain.pickle_opcode",
+        "guardana.supply_chain.dependency_risk",
+        "guardana.supply_chain.remote_code",
+        "guardana.supply_chain.remote_code_config",
+        "guardana.supply_chain.code_execution",
+        "guardana.supply_chain.insecure_transport",
+        "guardana.supply_chain.keras_lambda",
+        "guardana.supply_chain.saved_model_ops",
+        "guardana.supply_chain.malicious_dependency",
+        "guardana.supply_chain.hallucinated_package",
+        "guardana.supply_chain.hardcoded_secret",
+        "guardana.supply_chain.model_format",
+        "guardana.supply_chain.chat_template",
+        "guardana.supply_chain.onnx_graph",
+        "guardana.supply_chain.notebook_payload",
+        "guardana.supply_chain.provenance",
+        "guardana.prompt.mcp_tool_poisoning",
+        "guardana.prompt.hidden_instructions",
+        "guardana.training.dataset_integrity"
+      ],
+      "rules_skipped": [],
+      "max_severity": "CRITICAL",
+      "gate": "fail",
+      "stopped_by": null,
+      "assessments": 0,
+      "measured": 0
+    },
+    "privacy": {
+      "evidence_mode": "redacted",
+      "redaction_policy_digest": "sha256:abbe3d5542a6556472c6a72d16d05bfd8f64831d829070925cd2ef55e3fd89c8"
+    },
+    "exchanges": null,
+    "recording": null,
+    "recipe": null,
+    "fixtures": null
+  },
+  "findings": [
+    {
+      "rule_id": "guardana.supply_chain.pickle_opcode",
+      "severity": "CRITICAL",
+      "title": "Dangerous pickle opcode (arbitrary code on load)",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03",
+          "title": "Supply Chain"
+        },
+        {
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM04",
+          "title": "Supply Chain"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05",
+          "title": "Improper Output Handling"
+        },
+        {
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM10",
+          "title": "Improper Output Handling"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018",
+          "title": "Manipulate AI Model"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain",
+          "title": "GenAI Supply Chain Attack"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05",
+          "title": "Unexpected Code Execution"
+        }
+      ],
+      "target_ref": "subject/model.pkl",
+      "evidence": {
+        "summary": "unpickling imports 1 non-allowlisted callable(s) (set b04a8341e816): os.system",
+        "detail": "os.system in model.pkl"
+      },
+      "verdict": null
+    }
+  ],
+  "unverified": [],
+  "waived": [],
+  "errors": [],
+  "observations": [
+    {
+      "kind": "model",
+      "name": "model.pkl",
+      "ref": "subject/model.pkl",
+      "attributes": {
+        "format": "pickle",
+        "size_bytes": "41"
+      }
+    }
+  ],
+  "assessments": [],
+  "scope": {
+    "files": [
+      "subject/model.pkl"
+    ],
+    "excludes": [],
+    "ignored_directories": [
+      ".git",
+      ".venv",
+      "venv",
+      "env",
+      "__pycache__",
+      ".mypy_cache",
+      ".ruff_cache",
+      ".pytest_cache",
+      "node_modules",
+      ".tox",
+      ".eggs",
+      "dist",
+      "build",
+      ".idea",
+      ".vscode",
+      "*.egg-info"
+    ],
+    "kept_models": [],
+    "skipped_models": {
+      "directories": [],
+      "searched_all": true
+    }
+  }
+}
