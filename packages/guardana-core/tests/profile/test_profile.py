@@ -65,6 +65,14 @@ def test_malformed_yaml_syntax_raises_profileerror(tmp_path: Path) -> None:
         load_profile(tmp_path / "broken.yaml")
 
 
+def test_non_utf8_profile_names_its_file_in_profileerror(tmp_path: Path) -> None:
+    path = tmp_path / "guardana.yaml"
+    path.write_bytes(b"name: valid\n# \xff\n")
+
+    with pytest.raises(ProfileError, match=f"invalid profile {path}: not UTF-8"):
+        load_profile(path)
+
+
 def test_non_mapping_profile_raises(tmp_path: Path) -> None:
     (tmp_path / "list.yaml").write_text("- a\n- b\n", encoding="utf-8")
     with pytest.raises(ProfileError):

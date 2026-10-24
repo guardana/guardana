@@ -85,6 +85,16 @@ def test_a_broken_profile_exits_three(tmp_path: Path) -> None:
     assert result.exit_code == ExitCode.INVALID_USAGE
 
 
+def test_scan_names_a_non_utf8_profile_and_exits_three(tmp_path: Path) -> None:
+    profile = tmp_path / "guardana.yaml"
+    profile.write_bytes(b"name: valid\n# \xff\n")
+
+    result = runner.invoke(app, ["scan", str(tmp_path), "--profile", str(profile)])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid profile {profile}: not UTF-8" in result.output
+
+
 def test_a_budget_that_cannot_be_enforced_exits_three(tmp_path: Path) -> None:
     # A token ceiling on a transport that reports no tokens: refused up front, and
     # refused as configuration rather than as a security verdict.

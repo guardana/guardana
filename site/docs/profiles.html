@@ -207,6 +207,9 @@ fail. Every command that runs the engine (<code>scan</code>, <code>probe</code>,
 <code>analyze-trace</code>, <code>monitor</code> and the others that select or grade rules) takes one
 via <code>--profile PATH</code>; without it, a built-in default profile applies
 (<code>include: [&quot;*&quot;]</code>, <code>fail_on.severity: high</code>, <code>fail_on.min_confidence: 0.0</code>).</p>
+<p>Profile files must be UTF-8. If one contains invalid bytes, commands including
+<code>scan --profile</code>, <code>recipe lock</code> and <code>recipe run</code> refuse it with exit <code>3</code>, name the
+profile file, and start no run.</p>
 <p>Generate a starter file:</p>
 <pre><code class="language-bash">guardana init                # writes ./guardana.yaml
 guardana init my-profile.yaml

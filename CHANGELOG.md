@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Invalid UTF-8 in a profile now names the file and refuses the command.** The profile loader raises `ProfileError` instead of leaking `UnicodeDecodeError`; `scan --profile`, `recipe lock` and `recipe run` exit `3` before a run starts. Previously `recipe run` could report an internal error (exit `5`), while scan and lock printed a codec error without the profile path. May now fail: these commands still refuse the invalid input, but `recipe run` returns `3` instead of `5`.
+
 ### Added
 
 - **Add three required jobs to the manually dispatched `.github/workflows/proofs.yml`; the summary requires their records.** `retrieval-pilot` installs the checkout application beside PyPI `guardana-cli`: offline, the fixed application passes without coverage shortfall; each broken mode fails only its intended check, naming every leaked document and order. `regression-loop` saves a failed and an incomplete run, shows the redacted regression still graded differently, regrades the kept recordings, gates the regression with `guardana diff`, promotes it with `guardana case add` and tests the promoted pair; runs, recordings, reports and the suite are uploaded. `recovery-runbooks` proves the documented migration and Compose restore commands with PyPI packages and the published collector image, reading synthetic data back per tenant. Pilot and deployment files must match the supplied version's tag; claimed network cuts require canaries. No package changes.
