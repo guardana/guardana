@@ -63,7 +63,7 @@ $ guardana-collector serve --port 41661
 </code></pre>
 <p>The first started against an empty database and returned <code>/readyz</code> 200. Plain serve against another empty database returned 503 with eight migrations pending.</p>
 <h2 id="backup-and-restore">Backup and restore</h2>
-<p>The proof used the Compose deployment copied from <code>deploy/</code>, with <code>COMPOSE_PROJECT_NAME=guardana-proof</code>. The deployment files matched <code>v1.0.0rc5</code>. It pinned both collector and migrate images to <code>ghcr.io/guardana/guardana-collector:1.0.0rc5</code>; the candidate carried only exact tags.</p>
+<p>The proof used the Compose deployment copied from <code>deploy/</code>, with <code>COMPOSE_PROJECT_NAME=guardana-proof</code>. The deployment files matched <code>v1.0.0rc5</code>. It pinned both collector and migrate images to the exact tag <code>1.0.0rc5</code> of <code>ghcr.io/guardana/guardana-collector</code>; the candidate carried only exact tags.</p>
 <p>Pull, migrate and startup commands exited 0. Both tenants were bootstrapped with ingest and read scopes. The page's one-key example omitted read scope. Health and readiness checks exited 0.</p>
 <p>Each tenant ingested its synthetic finding with HTTP 200. Its key read only that finding and trend: acme had HIGH 1; globex had MEDIUM 1.</p>
 <p>The proof read both blocks from “Backups, and restoring one” in <code>docs/deployment.md</code> and ran them as written, setting only <code>BACKUP=</code> for restores. The backup block exited 0:</p>

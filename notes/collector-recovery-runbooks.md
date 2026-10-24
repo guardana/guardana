@@ -75,7 +75,7 @@ The first started against an empty database and returned `/readyz` 200. Plain se
 
 ## Backup and restore
 
-The proof used the Compose deployment copied from `deploy/`, with `COMPOSE_PROJECT_NAME=guardana-proof`. The deployment files matched `v1.0.0rc5`. It pinned both collector and migrate images to `ghcr.io/guardana/guardana-collector:1.0.0rc5`; the candidate carried only exact tags.
+The proof used the Compose deployment copied from `deploy/`, with `COMPOSE_PROJECT_NAME=guardana-proof`. The deployment files matched `v1.0.0rc5`. It pinned both collector and migrate images to the exact tag `1.0.0rc5` of `ghcr.io/guardana/guardana-collector`; the candidate carried only exact tags.
 
 Pull, migrate and startup commands exited 0. Both tenants were bootstrapped with ingest and read scopes. The page's one-key example omitted read scope. Health and readiness checks exited 0.
 
