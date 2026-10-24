@@ -2,7 +2,7 @@
 title: "guardana probe"
 nav_order: 70
 summary: "`guardana probe`: adversarial checks against a live endpoint or agent, an MCP server's manifest **and authorization surface**, and an A2A agent's card and callers"
-status: stable
+status: beta
 ---
 
 # `guardana probe` — one-shot dynamic checks against a live endpoint

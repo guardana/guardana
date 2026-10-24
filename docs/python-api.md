@@ -2,7 +2,7 @@
 title: "Python API"
 nav_order: 55
 summary: "`guardana.core.verify`: run what `guardana scan` and `guardana probe` run, and read every outcome as typed data"
-status: beta
+status: stable
 ---
 
 # Python API

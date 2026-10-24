@@ -2,7 +2,7 @@
 title: "Installed outputs"
 nav_order: 245
 summary: "an installed format for --format and an installed reporter for --reporter: choosing one, plugin trust, the delivery line, exit 8, exporting a saved run from Python, and writing your own"
-status: beta
+status: stable
 ---
 
 # Installed outputs: formats and reporters a package adds
