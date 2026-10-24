@@ -5,8 +5,29 @@
   <subtitle>Articles from the Guardana maintainers about AI security verification.</subtitle>
   <link rel="self" type="application/atom+xml" href="https://guardana.dev/notes/feed.xml"/>
   <link rel="alternate" type="text/html" href="https://guardana.dev/notes/"/>
-  <updated>2026-10-20T00:00:00Z</updated>
+  <updated>2026-10-23T00:00:00Z</updated>
   <author><name>Guardana maintainers</name></author>
+  <entry>
+    <id>tag:guardana.dev,2026-10-23:notes/retrieval-pilot-poisoned-document-and-tenant-filter</id>
+    <title>Retrieval pilot: poisoned document and tenant filter (#139)</title>
+    <link rel="alternate" type="text/html" href="https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter"/>
+    <updated>2026-10-23T00:00:00Z</updated>
+    <summary>The fixed pilot passed; a broken tenant filter failed the tenancy check, and a model obeying a document failed the poisoned-document check.</summary>
+  </entry>
+  <entry>
+    <id>tag:guardana.dev,2026-10-23:notes/regression-loop-with-a-redacted-regression</id>
+    <title>Regression loop with a redacted regression (#140)</title>
+    <link rel="alternate" type="text/html" href="https://guardana.dev/notes/regression-loop-with-a-redacted-regression"/>
+    <updated>2026-10-23T00:00:00Z</updated>
+    <summary>A redacted recording retained the regression, failed regrading and the CI comparison, and supplied a regression pair after the question was rewritten.</summary>
+  </entry>
+  <entry>
+    <id>tag:guardana.dev,2026-10-23:notes/collector-recovery-runbooks</id>
+    <title>Collector recovery runbooks (#143)</title>
+    <link rel="alternate" type="text/html" href="https://guardana.dev/notes/collector-recovery-runbooks"/>
+    <updated>2026-10-23T00:00:00Z</updated>
+    <summary>The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.</summary>
+  </entry>
   <entry>
     <id>tag:guardana.dev,2026-10-20:notes/customization-through-published-extension-points</id>
     <title>Customization through published extension points (#141)</title>
