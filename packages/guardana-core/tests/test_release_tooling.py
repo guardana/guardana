@@ -521,6 +521,21 @@ def test_pin_discovery_finds_every_file_carrying_a_tag() -> None:
     assert Path("packages/guardana-core/tests/test_release_tooling.py") not in found
 
 
+def test_a_note_keeps_the_pin_of_the_release_it_ran_against(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pinned = ("notes/a-proof.md", "site/notes/a-proof.html", "docs/install.md")
+    for relative in pinned:
+        (tmp_path / relative).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / relative).write_text(
+            "image: ghcr.io/guardana/guardana-collector:1.0.0rc5\n", encoding="utf-8"
+        )
+    monkeypatch.setattr(_BUMP, "_REPO", tmp_path)
+    monkeypatch.setattr(_BUMP, "_tracked_text_files", lambda: tuple(Path(p) for p in pinned))
+
+    assert _BUMP.pin_bearing_files(_BUMP._IMAGE_PIN_RE) == (Path("docs/install.md"),)
+
+
 def test_a_prerelease_does_not_move_the_documented_image_tag() -> None:
     """`latest` and the moving tag are not pushed for a prerelease, so nor is the doc."""
     text = "docker run ghcr.io/guardana/guardana:0.9 scan ."
