@@ -302,6 +302,154 @@ def test_the_reference_pack_reaches_pypi_only_when_the_owner_turns_it_on() -> No
     assert waiting == []
 
 
+_BUNDLE_UPLOADS = [
+    ("publish", "gh release create", "guardana-1.2.3.sigstore.json"),
+    ("reference-pack", ".sigstore.json", "guardana-reference-pack-0.4.5.sigstore.json"),
+]
+
+_FAKE_GH = """#!/bin/sh
+echo "$*" >> "$GH_LOG"
+if [ "$1 $2" = "release view" ] && [ -z "$RELEASE_EXISTS" ]; then exit 1; fi
+exit 0
+"""
+
+
+def _bundle_step(job: str, needle: str) -> dict[str, object]:
+    steps = _steps(_workflow("release.yml"), job)
+    return steps[_index_of(steps, needle)]
+
+
+def _run_bundle_step(
+    job: str, needle: str, bundle: str, tmp_path: Path, *, release_exists: bool = True
+) -> tuple[int, list[str]]:
+    """Run the step with a `gh` that records its calls; return the exit code and those calls."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text(_FAKE_GH, encoding="utf-8")
+    gh.chmod(0o755)
+    (tmp_path / "CHANGELOG.md").write_text("## [1.2.3]\n\nNotes.\n", encoding="utf-8")
+    pack = tmp_path / "examples" / "reference_pack"
+    pack.mkdir(parents=True)
+    (pack / "pyproject.toml").write_text('[project]\nversion = "0.4.5"\n', encoding="utf-8")
+    log = tmp_path / "gh.log"
+    log.touch()
+    script = str(_bundle_step(job, needle)["run"])
+    done = subprocess.run(  # noqa: S603 — bash runs the workflow's own step
+        ["/bin/bash", "-eo", "pipefail", "-c", script],
+        cwd=tmp_path,
+        env={
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "GH_LOG": str(log),
+            "TAG": "v1.2.3",
+            "BUNDLE": bundle,
+            "RELEASE_EXISTS": "yes" if release_exists else "",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.returncode, log.read_text(encoding="utf-8").splitlines()
+
+
+@pytest.mark.parametrize("job", ["publish", "reference-pack"])
+def test_the_attestation_bundle_is_handed_to_the_release_upload(job: str) -> None:
+    """The bundle is read from the attest step's own output, not guessed from a runner path."""
+    steps = _steps(_workflow("release.yml"), job)
+    attest = steps[_index_of(steps, "actions/attest-build-provenance")]
+    upload_needle = next(needle for name, needle, _ in _BUNDLE_UPLOADS if name == job)
+    upload = _index_of(steps, upload_needle)
+    environment = steps[upload]["env"]
+
+    assert attest.get("id"), "the attest step has no id to read its bundle path from"
+    assert isinstance(environment, dict)
+    assert environment["BUNDLE"] == f"${{{{ steps.{attest['id']}.outputs.bundle-path }}}}"
+    assert steps.index(attest) < upload
+
+
+@pytest.mark.parametrize(("job", "needle", "asset"), _BUNDLE_UPLOADS)
+def test_the_attestation_bundle_is_attached_as_a_sigstore_json_asset(
+    job: str, needle: str, asset: str, tmp_path: Path
+) -> None:
+    """OpenSSF Scorecard counts a release as signed by an asset ending in `.sigstore.json`.
+
+    A re-run replaces the asset, so it repairs a bundle the first run failed to attach.
+    """
+    bundle = tmp_path / "attestation.json"
+    bundle.write_text('{"mediaType": "application/vnd.dev.sigstore.bundle+json"}\n', "utf-8")
+
+    code, calls = _run_bundle_step(job, needle, str(bundle), tmp_path)
+
+    assert code == 0, calls
+    upload = f"release upload v1.2.3 {asset} --clobber"
+    assert upload in calls, calls
+    assert (tmp_path / asset).read_bytes() == bundle.read_bytes()
+
+
+def test_the_bundle_is_uploaded_only_once_the_release_exists(tmp_path: Path) -> None:
+    bundle = tmp_path / "attestation.json"
+    bundle.write_text("{}\n", encoding="utf-8")
+
+    code, calls = _run_bundle_step(
+        "publish", "gh release create", str(bundle), tmp_path, release_exists=False
+    )
+
+    assert code == 0, calls
+    created = next(i for i, call in enumerate(calls) if call.startswith("release create"))
+    uploaded = next(i for i, call in enumerate(calls) if ".sigstore.json" in call)
+    assert created < uploaded, calls
+
+
+@pytest.mark.parametrize(("job", "needle", "asset"), _BUNDLE_UPLOADS)
+@pytest.mark.parametrize("bundle", ["", "absent.json", "empty.json"])
+def test_a_missing_attestation_bundle_fails_the_release(
+    job: str, needle: str, asset: str, bundle: str, tmp_path: Path
+) -> None:
+    """A release that silently lacks its signature bundle would read as signed elsewhere."""
+    if bundle == "empty.json":
+        (tmp_path / bundle).touch()
+    path = str(tmp_path / bundle) if bundle else ""
+
+    code, calls = _run_bundle_step(job, needle, path, tmp_path)
+
+    assert code != 0, calls
+    assert not any(".sigstore.json" in call for call in calls), calls
+    assert not (tmp_path / asset).exists()
+
+
+_PUBLISH_CHECK = "left no bundle at '${BUNDLE}'.\""
+
+
+def test_a_missing_attestation_bundle_stops_the_release_before_pypi() -> None:
+    """The publish cannot be undone, so the bundle the Release needs is checked before it."""
+    steps = _steps(_workflow("release.yml"), "publish")
+    attest = steps[_index_of(steps, "actions/attest-build-provenance")]
+    check = _index_of(steps, _PUBLISH_CHECK)
+    environment = steps[check]["env"]
+
+    assert isinstance(environment, dict)
+    assert environment["BUNDLE"] == f"${{{{ steps.{attest['id']}.outputs.bundle-path }}}}"
+    assert steps.index(attest) < check < _index_of(steps, "pypa/gh-action-pypi-publish")
+
+
+@pytest.mark.parametrize(
+    ("bundle", "passes"), [("", False), ("empty.json", False), ("ok.json", True)]
+)
+def test_the_pre_publish_check_passes_only_a_written_bundle(
+    bundle: str, passes: bool, tmp_path: Path
+) -> None:
+    if bundle == "empty.json":
+        (tmp_path / bundle).touch()
+    if bundle == "ok.json":
+        (tmp_path / bundle).write_text("{}\n", encoding="utf-8")
+
+    code, _ = _run_bundle_step(
+        "publish", _PUBLISH_CHECK, str(tmp_path / bundle) if bundle else "", tmp_path
+    )
+
+    assert (code == 0) is passes
+
+
 def test_ci_writes_the_sboms_on_every_push() -> None:
     """The tag must not be the first time a release artifact is produced."""
     steps = _steps(_workflow("ci.yml"), "clean-install")

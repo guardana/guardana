@@ -122,7 +122,22 @@ CI runs the bandit rule set over our own source (`ruff`'s `S` family), audits
 our dependencies (`uv audit`), and runs `guardana scan packages` — Guardana
 against Guardana, which must stay at zero findings. The pre-commit gate refuses
 a commit that contains a private key (`detect-private-key`) before it ever
-leaves a contributor's machine.
+leaves a contributor's machine. `.github/workflows/fuzz.yml` runs the Atheris
+targets for `120` seconds each. `.github/workflows/scorecard.yml` publishes
+OpenSSF Scorecard results to the OpenSSF API and GitHub code scanning, and
+retains the SARIF workflow artifact for `30` days.
+
+## What one maintainer cannot guarantee
+
+One maintainer cannot provide independent review or release continuity.
+
+- The sole write collaborator is the sole `guardana` organization and `@guardana/maintainers` member, owning every path.
+- `main` requires pull requests, passing required checks on an up-to-date branch, resolved conversations and linear history; administrators follow these rules, and force pushes are refused. Required approving reviews: `0`.
+- The tag-pushing maintainer is the only `pypi` publish reviewer, holds the SSH tag-signing key and publishing approval, and approves every publish. Nobody else holds keys or can take over releases during unavailability.
+- DCO sign-off is optional and unenforced (`CONTRIBUTING.md` § Sign-off).
+- Scorecard's `Code-Review`, `Branch-Protection` and `Contributors` scores reflect these limits and are expected to remain below maximum with one maintainer.
+
+Required checks on every `main` change, signed and GitHub-verified release tags from `v1.0.0rc3` (`v1.0.0rc2`, earlier tags and the moving Action pin `vX.Y` remain unsigned), trusted publishing without a long-lived token, build provenance, SBOMs and reproducible builds anyone can re-run still hold.
 
 ## What a release publishes, and how to check it yourself
 
@@ -134,6 +149,12 @@ Every release publishes, alongside the five distributions:
   operator they had installed Typer;
 - **build provenance** for the distributions, signed keylessly through Sigstore,
   plus PyPI's own PEP 740 attestation from the trusted-publishing upload;
+- **build-provenance bundles**, attached to the GitHub Release as
+  `guardana-<version>.sigstore.json` for the five packages' wheels and sdists, and
+  `guardana-reference-pack-<pack version>.sigstore.json` for the reference pack's
+  wheel and sdist. The pack uses its own version, independent of the release tag.
+  The first release after `1.0.0rc5` carries these bundles; `1.0.0rc5` and earlier
+  have none;
 - **an SBOM and provenance attestation for each container image**, pushed into
   the registry beside it, and from 0.33.0 a provenance statement per image digest
   signed keylessly through Sigstore, which is what `gh attestation verify oci://…`
@@ -145,6 +166,12 @@ Check them without trusting this document:
 gh attestation verify ./guardana_cli-<version>-py3-none-any.whl --repo guardana/guardana
 gh attestation verify oci://ghcr.io/guardana/guardana:0.41 --repo guardana/guardana
 docker buildx imagetools inspect ghcr.io/guardana/guardana:0.41 --format '{{ json .SBOM }}'
+```
+
+For a downloaded file, use `--bundle` to check it against the build-provenance bundle attached to the GitHub Release:
+
+```bash
+gh attestation verify ./guardana_cli-<version>-py3-none-any.whl --bundle guardana-<version>.sigstore.json --repo guardana/guardana
 ```
 
 Release tags from `v1.0.0rc3` are signed with an SSH key registered to the maintainer's GitHub account and reported verified by GitHub; tags `v1.0.0rc2` and earlier are not signed. The following command reads GitHub's verdict on a tag's signature and prints `true` for a verified signature.

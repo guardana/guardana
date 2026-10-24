@@ -120,11 +120,22 @@ jobs:
       # they already have. Named by extension: `uv build` also leaves a
       # `.gitignore` in `dist/`, which is not something this workflow ships.
       - name: Attest what built these distributions
+        id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: |
             dist/*.whl
             dist/*.tar.gz
+
+      # Before the publish, which cannot be undone: the Release step below attaches this bundle.
+      - name: Refuse to publish without an attestation bundle
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          if [ -z "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "::error::The attestation step left no bundle at '${BUNDLE}'."
+            exit 1
+          fi
 
       # `skip-existing` keeps a re-run idempotent, and this keeps it honest: a file PyPI
       # already serves under the same name must be these bytes, or the SBOMs, the
@@ -140,12 +151,14 @@ jobs:
 
       # After a successful publish, create the GitHub Release from the tag's
       # CHANGELOG section — so the Releases page (and the Marketplace listing) never
-      # lags PyPI. Idempotent: the release is created if missing, and the SBOMs are
-      # uploaded either way, so a re-run repairs absent assets.
+      # lags PyPI. Idempotent: the release is created if missing, and the SBOMs and the
+      # attestation bundle are uploaded either way, so a re-run repairs absent assets.
+      # The bundle is named `.sigstore.json`, the suffix verifiers look for on a Release.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
           version="${TAG#v}"
           awk -v v="$version" '
@@ -163,6 +176,12 @@ jobs:
             gh release create "$TAG" --title "Guardana $TAG" --notes-file notes.md --verify-tag "${flags[@]}"
           fi
           gh release upload "$TAG" sbom/*.cdx.json --clobber
+          if [ -z "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "::error::The attestation step left no bundle at '${BUNDLE}' to attach to $TAG."
+            exit 1
+          fi
+          cp "$BUNDLE" "guardana-$version.sigstore.json"
+          gh release upload "$TAG" "guardana-$version.sigstore.json" --clobber
 
   # The reference pack in a job of its own, after the five packages are on PyPI and the
   # GitHub Release exists; the clean-install check in `publish` has already built and
@@ -188,6 +207,7 @@ jobs:
         run: uv build examples/reference_pack --out-dir dist-reference/
 
       - name: Attest what built the reference pack
+        id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: |
@@ -226,6 +246,26 @@ jobs:
               gh release upload "$TAG" "$file"
             fi
           done
+
+      # Named by the pack's own version, which moves apart from the release tag. Replaced
+      # on a re-run: the step above has already refused a pack with other bytes.
+      - name: Upload the reference pack's attestation bundle to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' examples/reference_pack/pyproject.toml)
+          if [ -z "$version" ]; then
+            echo "::error::The reference pack's version is unreadable."
+            exit 1
+          fi
+          if [ -z "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "::error::The attestation step left no bundle at '${BUNDLE}' to attach to $TAG."
+            exit 1
+          fi
+          cp "$BUNDLE" "guardana-reference-pack-$version.sigstore.json"
+          gh release upload "$TAG" "guardana-reference-pack-$version.sigstore.json" --clobber
 
   # The reference pack on PyPI, from the files the reference-pack job built and
   # attested, so what PyPI receives is what was attested. Off until the owner registers the pending

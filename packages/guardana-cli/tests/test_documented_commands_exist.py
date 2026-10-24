@@ -48,6 +48,7 @@ _FOREIGN_OR_ABSENT_FLAGS: Mapping[tuple[str, str], str] = {
     ("docs/usage-recipe.md", "--prefix"): "a pip install flag",
     ("docs/reproducible-builds.md", "--pack-published"): "a flag of scripts/reproduce_release.py",
     ("docs/threat-model.md", "--match-head-commit"): "a flag of gh pr merge",
+    ("docs/threat-model.md", "--require-hashes"): "a flag of pip install",
     ("docs/exit-codes.md", "--config"): "an option of an stdio MCP server's own command",
     (_RAG_NOTE, "--break-tenant-filter"): "a switch of the reference application",
     (_RAG_NOTE, "--obey-documents"): "a switch of the reference application",
