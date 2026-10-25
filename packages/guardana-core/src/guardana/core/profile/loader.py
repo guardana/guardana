@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.budget import Budgets, parse_duration
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile.errors import ProfileError
@@ -120,7 +121,7 @@ def _as_mapping(value: object, what: str, path: Path) -> dict[str, Any]:
 def _reject_unknown_keys(
     raw: Mapping[str, Any], allowed: frozenset[str], what: str, path: Path
 ) -> None:
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise ProfileError(f"invalid profile {path}: unknown {what} key(s): {', '.join(unknown)}")
 
@@ -459,7 +460,7 @@ def load_profile(path: Path) -> Profile:
     a gate you think you configured but didn't is worse than no gate.
     """
     try:
-        raw_document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw_document = load_yaml(path.read_text(encoding="utf-8"))
     except OSError as exc:
         raise ProfileError(f"cannot read profile {path}: {exc}") from exc
     except yaml.YAMLError as exc:
