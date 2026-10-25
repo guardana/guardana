@@ -39,9 +39,12 @@ _NETWORK_CALLS = frozenset({"urlopen", "urlretrieve", "get", "post", "Request"})
 # Only *exact* pins are matched. `torch>=2.0` does not say which version will be
 # installed, and inventing one would manufacture findings; a lockfile — which is
 # what CI actually installs from — always pins exactly. `===` is arbitrary equality.
+# The whitespace runs are possessive and the extras group excludes `[`, so a line of
+# spaces or of unclosed `[` costs time linear in its length, not quadratic. `\s` keeps
+# the Unicode spaces a line may hold around the operator, which `splitlines` does not cut.
 _EXACT_PIN = re.compile(
-    r"""(?:^|[\s"'\[,])(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*"""
-    r"""(?P<operator>===?)\s*["']?(?P<version>[vV]?[0-9][\w.+!-]*)"""
+    r"""(?:^|[\s"'\[,])(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s*+(?:\[[^\]\[]*+\])?\s*+"""
+    r"""(?P<operator>===?)\s*+["']?(?P<version>[vV]?[0-9][\w.+!-]*)"""
 )
 # The `package = "1.2.3"` form of `[tool.poetry.dependencies]`. The quoted value
 # must be a bare version: `"^2.2.0"` and `"~1.4"` are ranges, and treating a range
