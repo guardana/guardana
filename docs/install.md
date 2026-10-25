@@ -7,7 +7,7 @@ status: stable
 
 # Installing Guardana
 
-Guardana requires **Python 3.11+**.
+Guardana requires **Python `3.11` or later**; supported and tested versions are `3.11`, `3.12` and `3.13`. `pip` also installs on `3.14`, where the test suite does not pass ([#164](https://github.com/guardana/guardana/issues/164)).
 
 ## Install from PyPI
 

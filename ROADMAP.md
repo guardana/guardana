@@ -71,7 +71,7 @@ an acceptance criterion and a versioned contract review.
 - Synthetic scheduled verification with anytime-valid monitoring, rather than repeated fixed-level tests presented as reliable alerts.
 - A Prometheus reporter over the common output contract, once a team names the measurements and unknowns it needs.
 - Live RAG and application targets beyond the retrieval pilot, with safe fixtures and explicit data boundaries, ordered by pilot needs.
-- Model-artifact inventory and parser completeness, starting with unlisted formats and safetensors validation; malformed, unreadable and partially scanned inputs must not look clean under the versioned scan and coverage contract.
+- Model-artifact inventory and parser completeness, starting with unlisted formats; malformed, unreadable and partially scanned inputs must not look clean under the versioned scan and coverage contract.
 - Central distribution of signed, versioned profiles and policies, after local locks and recipes prove useful.
 - Profiles distributed in packs as a compatible 1.x addition; `guardana.yaml`, presets and the versioned profile schema remain the 1.0 contract.
 - Optional A2A agent-card signature verification, keeping the JOSE dependency outside `guardana-core`.

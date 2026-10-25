@@ -26,7 +26,7 @@ uv run pre-commit install --install-hooks --hook-type commit-msg --hook-type pre
 
 Documentation fixes, tests for existing behaviour, examples, and maintainer scripts are open now. Browse issues labelled [`good first issue`](https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) for a concrete task.
 
-New declarative rules are welcome after 1.0. A rule needs a framework mapping and positive and negative fixtures. When rules open, `uv run guardana new-rule yourname.prompt.my_check` scaffolds a skeleton. See [`docs/writing-rules.md`](docs/writing-rules.md) and [`examples/custom_rule/`](examples/custom_rule/).
+New declarative rules are welcome. A built-in rule needs a public framework mapping in edition form and positive and negative fixtures. `uv run guardana new-rule yourname.prompt.my_check` scaffolds a skeleton. See [`docs/writing-rules.md`](docs/writing-rules.md) and [`examples/custom_rule/`](examples/custom_rule/).
 
 ## Tooling gates
 
