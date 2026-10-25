@@ -103,6 +103,7 @@ This file is generated from the documentation map; do not edit it by hand.
 
 ## Notes
 
+- [Security runbook drill (#142)](https://guardana.dev/notes/security-runbook-drill): The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.
 - [Retrieval pilot: poisoned document and tenant filter (#139)](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter): The fixed pilot passed; a broken tenant filter failed the tenancy check, and a model obeying a document failed the poisoned-document check.
 - [Regression loop with a redacted regression (#140)](https://guardana.dev/notes/regression-loop-with-a-redacted-regression): A redacted recording retained the regression, failed regrading and the CI comparison, and supplied a regression pair after the question was rewritten.
 - [Collector recovery runbooks (#143)](https://guardana.dev/notes/collector-recovery-runbooks): The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.
