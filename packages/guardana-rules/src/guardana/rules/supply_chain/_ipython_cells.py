@@ -827,9 +827,16 @@ _STDIN = "<"
 _MAX_INLINE_DEPTH = 4
 """How deep `sh -c` programs nested in one another are read for scripts."""
 
+# `shlex` tokenises in time quadratic in the length of one unquoted run, so a single crafted
+# line can stall a scan. Past this length a line is not a real shell command; it is split the
+# plain way, the fallback this function already trusts when `shlex` cannot parse a line.
+_MAX_SHELL_CHARS = 32 * 1024
+
 
 def _shell_words(command: str) -> list[str]:
     """Split a shell command into words and operators as a POSIX shell tokenises it."""
+    if len(command) > _MAX_SHELL_CHARS:
+        return command.split()
     lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     try:

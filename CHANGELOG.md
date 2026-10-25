@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Remove unsupported examples and claims (#160).** The README and landing-page staging output is removed because no test produces it; the README drops the unsupported claim of additional artifact formats compared with ModelScan and picklescan, and product status drops the claim that `scan` is the most mature component. A test runs the README's sample scan of `examples/vulnerable-model` (12 findings, 19 rules run, exit 1) and the two `plan probe` estimates shown on `docs/usage-plan.md` and the landing page, and fails when a shown line is not printed.
 - **Document severity as part of compatibility (#156).** The generated rule catalog adds a `Default severity` column and lists every condition under which a finding carries another severity, higher or lower. Raising a default or conditional severity requires a major release. Restoring the documented severity is a patch. Lowering a severity requires a minor release whose changelog names the gates that may now pass. No rule behaviour changes.
 
+### Security
+
+- **Manifest dependency matching now takes linear time.** `malicious_dependency._EXACT_PIN` in `guardana-rules` previously backtracked quadratically on crafted lines, allowing one text file to stall a scan through the default `MaliciousDependencyRule`. Possessive horizontal whitespace and an extras group that excludes `[` preserve existing matches. ([GHSA-42p6-v3q4-959q](https://github.com/guardana/guardana/security/advisories/GHSA-42p6-v3q4-959q))
+- **MCP authentication challenge parsing now takes linear time.** `_mcp_authorization._CHALLENGE_PARAM` in `guardana-core` previously backtracked quadratically on crafted `WWW-Authenticate` headers, allowing an adversarial HTTP endpoint to stall a probe. Word boundaries and possessive quantifiers preserve parsed parameters. ([GHSA-42p6-v3q4-959q](https://github.com/guardana/guardana/security/advisories/GHSA-42p6-v3q4-959q))
+- **Notebook shell tokenising now bounds use of the quadratic parser.** The `notebook_payload` rule previously passed arbitrarily long shell lines to `shlex` through `_ipython_cells._shell_words` in `guardana-rules`, allowing a crafted `.ipynb` cell to stall a scan. Lines longer than `32 KiB` now use the existing whitespace-splitting fallback; shorter lines are unchanged. ([GHSA-42p6-v3q4-959q](https://github.com/guardana/guardana/security/advisories/GHSA-42p6-v3q4-959q))
+
 ## [1.0.0rc5] - 2026-10-20 — the fifth release candidate
 
 ### Changed
