@@ -10,11 +10,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 import pytest
 import yaml
 from _fake_distribution import MARKING_MODULE, FakeSite
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.calibration.store import RecordedCalibration
 from guardana.core.entrypoints import RULE_GROUP
 from guardana.core.evaluator.base import Evaluator, Expectation, Verdict
@@ -736,3 +737,39 @@ def test_a_recipe_that_does_not_parse_names_nothing_that_can_be_known(
 
     assert paths_named_leniently(recipe) is None
     assert paths_named_leniently(tmp_path / "missing.yaml") is None
+
+
+@pytest.mark.parametrize("section", ["recipe", "subject", "connection", "output", "deployment"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_recipe_keys_raise_recipeerror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = yaml.safe_load(_RECIPE)
+    document["deployment"] = {}
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    blocks = {
+        "recipe": document,
+        "subject": document["subject"],
+        "connection": document["subject"]["connection"],
+        "output": document["output"],
+        "deployment": document["deployment"],
+    }
+    blocks[section].update(extra)
+
+    path = _write(tmp_path, yaml.safe_dump(document, sort_keys=False))
+
+    with pytest.raises(RecipeError, match="unknown key") as caught:
+        load_recipe(path)
+
+    message = str(caught.value)
+    assert message.startswith(str(path))
+    assert shown in message.replace(str(path), "")

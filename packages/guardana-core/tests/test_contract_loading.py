@@ -8,8 +8,11 @@ which this repository holds to be worse than no gate at all.
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.contract import (
     CONTRACT_SCHEMA_VERSION,
     AllowedScopes,
@@ -267,3 +270,38 @@ def test_a_file_that_is_not_a_mapping_is_refused(tmp_path: Path) -> None:
 def test_an_unreadable_file_is_refused_with_its_path(tmp_path: Path) -> None:
     with pytest.raises(ContractError, match="cannot read contract"):
         load_contract(tmp_path / "missing.yaml")
+
+
+@pytest.mark.parametrize("section", ["contract", "applies_to", "assertion"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_contract_keys_raise_contracterror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = _document()
+    document["applies_to"] = {}
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    blocks = {
+        "contract": document,
+        "applies_to": document["applies_to"],
+        "assertion": document["assertions"][0],
+    }
+    blocks[section].update(extra)
+
+    path = tmp_path / "contract.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="unknown") as caught:
+        load_contract(path)
+
+    prefix = f"invalid contract {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert shown in str(caught.value).removeprefix(prefix)

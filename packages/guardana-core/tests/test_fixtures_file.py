@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 import yaml
 from _fixtures_file import fixtures_document
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core import fixtures as fixtures_module
 from guardana.core.fixtures import (
     DOCUMENT_FACT,
@@ -871,3 +872,39 @@ def test_a_verifier_given_fixtures_writes_them_into_the_saved_run(tmp_path: Path
     assert verification.manifest.fixtures == record
     run: Any = verification.document()["run"]
     assert run["fixtures"]["data"] == {"declared": "synthetic"}
+
+
+@pytest.mark.parametrize("section", ["fixtures", "tenant", "document", "record", "tool"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_fixtures_keys_raise_fixtureserror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document = fixtures_document()
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    blocks = {
+        "fixtures": document,
+        "tenant": document["tenants"]["acme"],
+        "document": document["documents"][0],
+        "record": document["records"]["orders"][0],
+        "tool": document["tools"]["lookup_order"],
+    }
+    blocks[section].update(extra)
+
+    path = tmp_path / "fixtures.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(FixturesError, match="unknown key") as caught:
+        load_fixtures(path)
+
+    message = str(caught.value)
+    assert message.startswith(str(path))
+    assert shown in message.replace(str(path), "")

@@ -8,8 +8,11 @@ because it is the point at which the author stops checking.
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.pack import (
     EXTENSION_API_VERSION,
     PACK_SCHEMA_VERSION,
@@ -220,3 +223,31 @@ def test_the_built_in_pack_declares_exactly_what_it_registers() -> None:
 
     assert set(manifest.provides) == {*registered.rules, *registered.evaluators}
     assert check_pack(manifest, registered).ok
+
+
+@pytest.mark.parametrize("section", ["manifest", "provides"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_manifest_keys_raise_packerror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = yaml.safe_load(_GOOD)
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    block = document if section == "manifest" else document["provides"]
+    block.update(extra)
+    path = _write(tmp_path, yaml.safe_dump(document, sort_keys=False))
+
+    with pytest.raises(PackError, match="unknown") as caught:
+        load_manifest(path)
+
+    prefix = f"invalid pack manifest {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert shown in str(caught.value).removeprefix(prefix)

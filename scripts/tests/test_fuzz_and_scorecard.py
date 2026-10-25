@@ -120,7 +120,7 @@ def test_an_undocumented_profile_loader_exception_is_a_crash(
         "empty",
     ],
 )
-def test_yaml_the_loader_lets_out_a_known_way_is_not_a_crash(data: bytes) -> None:
+def test_non_text_profile_keys_are_refused_without_a_crash(data: bytes) -> None:
     fuzz_profile.one_input(data)
 
 
@@ -131,26 +131,28 @@ def _raising(error: type[Exception]) -> Callable[[Path], None]:
     return _load
 
 
+@pytest.mark.parametrize("error", [AttributeError, IndexError, KeyError, TypeError, ValueError])
 @pytest.mark.parametrize(
     "data",
     [b"a:\n  - b: [{null: x}]\n", b"a: &a [*a, {2: x}]\n", b"a: [b, !!float x]\n"],
     ids=["deep-key", "key-through-an-alias", "tagged-scalar"],
 )
-def test_a_known_escape_is_found_anywhere_in_the_profile(
-    monkeypatch: pytest.MonkeyPatch, data: bytes
+def test_a_constructor_exception_is_a_crash_even_on_a_known_bad_profile(
+    monkeypatch: pytest.MonkeyPatch, data: bytes, error: type[Exception]
 ) -> None:
-    monkeypatch.setattr(fuzz_profile, "load_profile", _raising(TypeError))
+    monkeypatch.setattr(fuzz_profile, "load_profile", _raising(error))
 
-    fuzz_profile.one_input(data)
+    with pytest.raises(error):
+        fuzz_profile.one_input(data)
 
 
-@pytest.mark.parametrize("error", [AttributeError, IndexError, TypeError, ValueError])
+@pytest.mark.parametrize("error", [AttributeError, IndexError, KeyError, TypeError, ValueError])
 @pytest.mark.parametrize(
     "data",
     [b"name: x\n", b"a: &a [*a]\n", b"\xe9: x\n", b"{unclosed\n"],
     ids=["text-keys", "self-alias", "not-utf-8", "not-yaml"],
 )
-def test_the_same_exception_on_yaml_that_builds_with_text_keys_is_a_crash(
+def test_an_undocumented_exception_is_a_crash_for_other_profile_inputs(
     monkeypatch: pytest.MonkeyPatch, data: bytes, error: type[Exception]
 ) -> None:
     monkeypatch.setattr(fuzz_profile, "load_profile", _raising(error))

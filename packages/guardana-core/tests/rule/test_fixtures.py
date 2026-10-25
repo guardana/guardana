@@ -10,9 +10,11 @@ never saw.
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.evaluator.base import Expectation, Verdict
 from guardana.core.evaluator.canary import CanaryEvaluator
 from guardana.core.report import Evidence, Finding
@@ -421,3 +423,33 @@ def test_a_keyboard_interrupt_in_a_fixture_still_stops_the_verification() -> Non
 
     with pytest.raises(KeyboardInterrupt):
         verify_rule(_Interrupted([], [RuleFixture("stops", _endpoint("a"), FixtureOutcome.CLEAN)]))
+
+
+@pytest.mark.parametrize("section", ["rule", "fixture"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_rule_keys_raise_ruleloaderror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = yaml.safe_load(_RULE_WITH_FIXTURES)
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    block = document if section == "rule" else document["fixtures"][0]
+    block.update(extra)
+
+    path = tmp_path / "rule.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(RuleLoadError, match="unknown") as caught:
+        load_yaml_rules(path)
+
+    prefix = f"invalid rule in {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert shown in str(caught.value).removeprefix(prefix)

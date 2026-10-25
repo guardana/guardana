@@ -18,6 +18,7 @@ from xml.etree.ElementTree import fromstring
 import pytest
 import yaml
 from _fake_distribution import MARKING_MODULE, FakeSite
+from _yaml_input_cases import PROFILE_KEY_ERRORS, UNBUILDABLE_SCALARS
 from guardana.cli import recipe as recipe_cli
 from guardana.cli._artifact import MARKER
 from guardana.cli.exit_codes import ExitCode
@@ -1561,3 +1562,52 @@ def test_a_lock_that_cannot_be_written_is_a_usage_error_not_a_traceback(
     assert f"error: could not write {lock}: " in normalised(result.output)
     assert not isinstance(result.exception, OSError)
     assert {path.name: path.read_bytes() for path in tmp_path.iterdir() if path.is_file()} == before
+
+
+@pytest.fixture
+def locked_profile_recipe(tmp_path: Path, wire: _Wire) -> tuple[Path, _Wire]:
+    """A valid locked recipe for profile-refusal checks."""
+    recipe = _team(tmp_path, wire.url)
+    _locked(recipe)
+    return recipe, wire
+
+
+@pytest.mark.parametrize("command", ["lock", "run"])
+@pytest.mark.parametrize(("body", "expected", "shown"), PROFILE_KEY_ERRORS)
+def test_invalid_profile_keys_refuse_recipe_before_sending(
+    locked_profile_recipe: tuple[Path, _Wire], command: str, body: str, expected: str, shown: str
+) -> None:
+    recipe, wire = locked_profile_recipe
+    lock = recipe.parent / "guardana-recipe.lock.yaml"
+    before = lock.read_bytes()
+    profile = recipe.parent / "guardana.yaml"
+    profile.write_text(body, encoding="utf-8")
+    result = _invoke(command, str(recipe))
+    text = normalised(result.output)
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid profile {profile}:" in text
+    assert expected in text
+    assert shown in text.replace(str(profile), "")
+    assert "Traceback" not in text
+    assert wire.requests == []
+    assert lock.read_bytes() == before
+
+
+@pytest.mark.parametrize("command", ["lock", "run"])
+@pytest.mark.parametrize(("scalar", "token"), UNBUILDABLE_SCALARS)
+def test_unbuildable_profile_scalars_refuse_recipe_before_sending(
+    locked_profile_recipe: tuple[Path, _Wire], command: str, scalar: str, token: str
+) -> None:
+    recipe, wire = locked_profile_recipe
+    lock = recipe.parent / "guardana-recipe.lock.yaml"
+    before = lock.read_bytes()
+    profile = recipe.parent / "guardana.yaml"
+    profile.write_text(f"name: {scalar}\n", encoding="utf-8")
+    result = _invoke(command, str(recipe))
+    text = normalised(result.output)
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid profile {profile}:" in text
+    assert token in text.replace(str(profile), "")
+    assert "Traceback" not in text
+    assert wire.requests == []
+    assert lock.read_bytes() == before

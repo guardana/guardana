@@ -3,10 +3,13 @@ import io
 import json
 import os
 import pickle
+import re
 import zipfile
 from pathlib import Path
+from typing import Never
 
 import pytest
+from _yaml_input_cases import PROFILE_KEY_ERRORS, UNBUILDABLE_SCALARS
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core import __version__
@@ -564,3 +567,38 @@ def test_a_truncated_npz_is_a_coverage_gap_not_a_pass(tmp_path: Path) -> None:
 
     assert result.exit_code == ExitCode.INDETERMINATE, result.output
     assert "bundle.npz" in " ".join(result.output.split())
+
+
+def _refuse_scan_execution(*_args: object, **_kwargs: object) -> Never:
+    pytest.fail("An invalid profile must be refused before a scan starts")
+
+
+@pytest.mark.parametrize(("body", "expected", "shown"), PROFILE_KEY_ERRORS)
+def test_invalid_profile_keys_exit_invalid_usage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str, expected: str, shown: str
+) -> None:
+    tree, profile, _ = _scan_inputs(tmp_path)
+    profile.write_text(body, encoding="utf-8")
+    monkeypatch.setattr("guardana.cli.scan.Verifier.run", _refuse_scan_execution)
+    result = runner.invoke(app, ["scan", str(tree), "--profile", str(profile)])
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.output).split())
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid profile {profile}:" in text
+    assert expected in text
+    assert shown in text.replace(str(profile), "")
+    assert "Traceback" not in text
+
+
+@pytest.mark.parametrize(("scalar", "token"), UNBUILDABLE_SCALARS)
+def test_unbuildable_profile_scalars_exit_invalid_usage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scalar: str, token: str
+) -> None:
+    tree, profile, _ = _scan_inputs(tmp_path)
+    profile.write_text(f"name: {scalar}\n", encoding="utf-8")
+    monkeypatch.setattr("guardana.cli.scan.Verifier.run", _refuse_scan_execution)
+    result = runner.invoke(app, ["scan", str(tree), "--profile", str(profile)])
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.output).split())
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid profile {profile}:" in text
+    assert token in text.replace(str(profile), "")
+    assert "Traceback" not in text

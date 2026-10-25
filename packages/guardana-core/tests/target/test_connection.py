@@ -1,7 +1,10 @@
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.target import HttpAdapterTransport
 from guardana.core.target.connection import (
     Connection,
@@ -261,3 +264,40 @@ def test_no_secret_a_connection_sends_appears_in_its_repr(tmp_path: Path) -> Non
     assert "sekret-1" not in repr(adapted)
     assert "sekret-1" not in repr(loaded)
     assert "sekret-1" not in repr(loaded.config)
+
+
+@pytest.mark.parametrize("section", ["adapter", "decline"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_adapter_keys_raise_connectionconfigerror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = yaml.safe_load(_BODY)
+    document["declines"] = [
+        {
+            "name": "policy",
+            "status": 200,
+            "as": "refusal",
+            "path": "error.type",
+            "equals": "policy",
+        }
+    ]
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    block = document if section == "adapter" else document["declines"][0]
+    block.update(extra)
+    path = _adapter(tmp_path, yaml.safe_dump(document, sort_keys=False))
+
+    with pytest.raises(ConnectionConfigError, match="unknown key") as caught:
+        load_adapter(path, url=_URL, environ={})
+
+    message = str(caught.value)
+    assert str(path) in message
+    assert shown in message.replace(str(path), "")

@@ -8,8 +8,11 @@ the runner carried and the gate's three answers.
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.evaluator.length import LengthEvaluator
 from guardana.core.gate import GateOutcome, gate_outcome
@@ -329,3 +332,49 @@ def test_a_waiver_on_a_suites_finding_is_honoured_by_the_gate(tmp_path: Path) ->
     accepted = replace(failed, findings=(), waived=failed.findings)
     assert gate_outcome(accepted, Policy()) is GateOutcome.PASS
     assert gate_outcome(failed, Policy()) is GateOutcome.FAIL
+
+
+@pytest.mark.parametrize("section", ["suite", "gate", "sample", "fixture"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_suite_keys_raise_ruleloaderror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    _dataset(tmp_path / "support.jsonl")
+    _dataset(tmp_path / "fixture.jsonl", reply="A short answer.")
+
+    document: dict[str, Any] = json.loads(_suite_yaml())
+    document["sample"] = {"size": 30, "seed": 1}
+    document["fixtures"] = [
+        {
+            "name": "sample",
+            "dataset": "./fixture.jsonl",
+            "outcome": "clean",
+        }
+    ]
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    blocks = {
+        "suite": document,
+        "gate": document["gate"],
+        "sample": document["sample"],
+        "fixture": document["fixtures"][0],
+    }
+    blocks[section].update(extra)
+
+    path = tmp_path / "suite.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(RuleLoadError, match="unknown") as caught:
+        load_yaml_rules(path)
+
+    prefix = f"invalid rule in {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert shown in str(caught.value).removeprefix(prefix)

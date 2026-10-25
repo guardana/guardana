@@ -11,8 +11,11 @@ across two verifications.
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.evaluator.tool_call import ToolCallEvaluator
 from guardana.core.rule import Rule, RuleContext, RuleLoadError, load_yaml_rules
@@ -527,3 +530,34 @@ def test_the_agent_double_has_no_plain_chat_reply() -> None:
 def test_the_agent_double_needs_a_non_empty_session() -> None:
     with pytest.raises(ValueError, match="non-empty session"):
         ScriptedAgentTransport()
+
+
+@pytest.mark.parametrize("section", ["fixture", "turn"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_agent_fixture_keys_raise_ruleloaderror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = yaml.safe_load(_TRAJECTORY)
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    fixture = document["fixtures"][0]
+    block = fixture if section == "fixture" else fixture["turns"][0]
+    block.update(extra)
+
+    path = tmp_path / "agent.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(RuleLoadError, match="unknown key") as caught:
+        load_yaml_rules(path)
+
+    prefix = f"invalid rule in {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert shown in str(caught.value).removeprefix(prefix)
