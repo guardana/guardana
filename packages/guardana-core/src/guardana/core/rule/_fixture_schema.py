@@ -99,7 +99,7 @@ def _fixture(
 ) -> DeclaredFixture:
     if not isinstance(raw, dict):
         raise RuleLoadError(f"invalid rule in {path}: fixture {number} must be a mapping")
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise RuleLoadError(
             f"invalid rule in {path}: fixture {number} has unknown key(s) "
@@ -221,7 +221,7 @@ def _turns(  # noqa: PLR0913 — every bound the script is checked against
 def _turn(raw: object, path: Path, where: str, *, tools: Sequence[str], at: int) -> ToolCallReply:
     if not isinstance(raw, dict):
         raise RuleLoadError(f"invalid rule in {path}: {where} must be a mapping")
-    unknown = sorted(set(raw) - _ALLOWED_TURN_KEYS)
+    unknown = sorted(str(key) for key in raw if key not in _ALLOWED_TURN_KEYS)
     if unknown:
         raise RuleLoadError(
             f"invalid rule in {path}: {where} has unknown key(s) {', '.join(unknown)}; "

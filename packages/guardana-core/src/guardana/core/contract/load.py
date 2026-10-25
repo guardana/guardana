@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.contract.assertion import (
     AllowedScopes,
     ApprovalRequired,
@@ -68,7 +69,7 @@ somebody wrote for a different purpose.
 def load_contract(path: Path) -> SecurityContract:
     """Read one security contract, or raise `ContractError` naming what is wrong with it."""
     try:
-        raw_document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw_document = load_yaml(path.read_text(encoding="utf-8"))
     except OSError as exc:
         raise ContractError(f"cannot read contract {path}: {exc}") from exc
     except yaml.YAMLError as exc:
@@ -127,7 +128,7 @@ def _migrated(raw: dict[str, Any], source: str) -> dict[str, Any]:
 def _reject_unknown(
     raw: Mapping[str, Any], allowed: frozenset[str], what: str, source: str
 ) -> None:
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise ContractError(
             f"invalid contract {source}: unknown {what} key(s): {', '.join(unknown)}"

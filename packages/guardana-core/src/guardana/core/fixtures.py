@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core._yaml import ScalarSafeLoader
 from guardana.core.fingerprint import DigestKind, DocumentDigest, digest_of
 from guardana.core.manifest.records import FixturesRecord
 from guardana.core.target.connection import (
@@ -540,7 +541,7 @@ def parse_fixtures(data: bytes, path: Path) -> Fixtures:
     return fixtures
 
 
-class _StrictLoader(yaml.SafeLoader):
+class _StrictLoader(ScalarSafeLoader):
     """A safe loader that refuses a key written twice instead of keeping the last one."""
 
 

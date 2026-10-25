@@ -92,7 +92,7 @@ def reject_unknown_keys(
     raw: dict[str, Any], allowed: frozenset[str], what: str, path: Path
 ) -> None:
     """Reject any key not in `allowed` — a misspelled key must fail, not be ignored."""
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise RuleLoadError(
             f"invalid rule in {path}: unknown {what} field(s): {', '.join(unknown)}"

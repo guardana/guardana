@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.pack.model import (
     PACK_SCHEMA_VERSION,
     ApiRange,
@@ -56,7 +57,7 @@ _RANGE = re.compile(r"^>=\s*(\d+)\s*,\s*<\s*(\d+)$")
 def load_manifest(path: Path) -> PackManifest:
     """Parse one `guardana-pack.yaml`, or raise `PackError` naming the file and the problem."""
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = load_yaml(path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
         raise PackError(f"could not read pack manifest {path}: {exc}") from exc
     if not isinstance(raw, dict):
@@ -273,7 +274,7 @@ def _require_str(raw: dict[str, Any], key: str, path: Path) -> str:
 
 
 def _reject_unknown(raw: dict[str, Any], allowed: frozenset[str], what: str, path: Path) -> None:
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise PackError(
             f"invalid pack manifest {path}: unknown {what} key(s): {', '.join(unknown)}; "

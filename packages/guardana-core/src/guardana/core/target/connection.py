@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.fingerprint import DigestKind, DocumentDigest, digest_of
 from guardana.core.target._url import display_url, private_url_parts
 from guardana.core.target.adapter import (
@@ -232,7 +233,7 @@ def load_adapter(
         raise ConnectionConfigError(f"cannot read {names.adapter} {path}: {exc}") from exc
     digest = DocumentDigest.of(data, DigestKind.CONTENT).digest
     try:
-        raw = yaml.safe_load(data.decode("utf-8"))
+        raw = load_yaml(data.decode("utf-8"))
     except (UnicodeDecodeError, yaml.YAMLError) as exc:
         raise ConnectionConfigError(f"invalid adapter {path}: {exc}") from exc
     if not isinstance(raw, dict):

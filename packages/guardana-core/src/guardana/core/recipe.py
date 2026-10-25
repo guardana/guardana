@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.calibration.store import RecordedCalibration
 from guardana.core.fingerprint import digest_of
 from guardana.core.manifest import SubjectKind, SubjectSource
@@ -170,7 +171,7 @@ def parse_recipe(text: str, path: Path) -> Recipe:
     rather than read: a key it cannot see would be a pin it silently does not hold.
     """
     try:
-        raw = yaml.safe_load(text)
+        raw = load_yaml(text)
     except yaml.YAMLError as exc:
         raise RecipeError(f"{path} is not valid YAML: {exc}") from exc
     where = str(path)
@@ -308,7 +309,7 @@ def artifact_directory_of(path: Path) -> Path:
     marked as refused; anything unreadable falls back to the default beside the recipe.
     """
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = load_yaml(path.read_text(encoding="utf-8"))
         written = raw["output"]["directory"]
         return _output(written, path, str(path))
     except (OSError, UnicodeDecodeError, yaml.YAMLError, KeyError, TypeError, RecipeError):
@@ -322,7 +323,7 @@ def paths_named_leniently(path: Path) -> tuple[Path, ...] | None:
     alone; None when the file does not parse, since nothing it names can be known then.
     """
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = load_yaml(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return None
     named: list[Path] = []
@@ -880,7 +881,7 @@ def read_text(path: Path, what: str) -> str:
 def parse_lock(text: str, path: Path) -> RecipeLock:
     """Validate a lock's text, read from `path`; raise `RecipeError` if malformed or newer."""
     try:
-        raw = yaml.safe_load(text)
+        raw = load_yaml(text)
     except yaml.YAMLError as exc:
         raise RecipeError(f"{path} is not valid YAML: {exc}") from exc
     where = str(path)

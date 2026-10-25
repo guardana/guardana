@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.assessment import case_id_for, from_verdict
 from guardana.core.evaluator.base import Expectation, Verdict, grade_decline
 from guardana.core.report import Evidence, Finding
@@ -211,7 +212,7 @@ def _build_rule(raw: object, path: Path) -> Rule:
 def load_yaml_rules(path: Path) -> list[Rule]:
     """Parse a YAML file into one or more `Rule`s. Accepts a single rule mapping or a list."""
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = load_yaml(path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
         # Surface as RuleLoadError so Registry.load_yaml_rule_dirs keeps its
         # never-raises contract for malformed or unreadable user rule files.

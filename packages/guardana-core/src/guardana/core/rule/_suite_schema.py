@@ -255,7 +255,7 @@ def _fixture(
 ) -> DeclaredFixture:
     if not isinstance(raw, dict):
         raise RuleLoadError(f"invalid rule in {path}: fixture {number} must be a mapping")
-    unknown = sorted(set(raw) - _ALLOWED_SUITE_FIXTURE_KEYS)
+    unknown = sorted(str(key) for key in raw if key not in _ALLOWED_SUITE_FIXTURE_KEYS)
     if unknown:
         raise RuleLoadError(
             f"invalid rule in {path}: fixture {number} has unknown key(s) "
