@@ -14,7 +14,7 @@
 # in the morning wants one instruction (`guardana-collector rollback`), not a
 # restart with a different environment variable.
 
-FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed AS builder
+FROM python:3.15-slim-bookworm@sha256:575f8bc12ec26542e0678bc6b60e385218248019d433157ec327264a78c3a853 AS builder
 
 WORKDIR /src
 COPY deploy/docker/build-requirements.txt deploy/docker/collector-requirements.txt ./
@@ -40,7 +40,7 @@ RUN python -m venv /opt/build \
         -r /src/wheel-hashes.txt \
     && /opt/guardana/bin/pip check
 
-FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
+FROM python:3.15-slim-bookworm@sha256:575f8bc12ec26542e0678bc6b60e385218248019d433157ec327264a78c3a853
 
 ARG VERSION=0.0.0
 LABEL org.opencontainers.image.title="guardana-collector" \
