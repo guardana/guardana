@@ -419,6 +419,8 @@ def _magic_alias_words(words: list[str]) -> tuple[bool, bool, str, list[str]] | 
 
 def _define_magic_alias(args: str, state: NotebookState) -> bool:
     """Record an `%alias_magic [-l] [-c] [-p PARAMS] name target`; False if unreadable."""
+    if len(args) > _MAX_SHELL_CHARS:
+        return False
     try:
         parsed = _magic_alias_words(shlex.split(args))
     except ValueError:
@@ -828,21 +830,29 @@ _MAX_INLINE_DEPTH = 4
 """How deep `sh -c` programs nested in one another are read for scripts."""
 
 # `shlex` tokenises in time quadratic in the length of one unquoted run, so a single crafted
-# line can stall a scan. Past this length a line is not a real shell command; it is split the
-# plain way, the fallback this function already trusts when `shlex` cannot parse a line.
+# line could stall a scan; a longer line is not tokenised.
 _MAX_SHELL_CHARS = 32 * 1024
 
+# A shell refuses a line whose quote never closes, or reads the quote on into the cell's
+# following lines, which are read in turn; any other refusal leaves a line a shell may run.
+_UNCLOSED_QUOTE = "No closing quotation"
 
-def _shell_words(command: str) -> list[str]:
-    """Split a shell command into words and operators as a POSIX shell tokenises it."""
+
+def _shell_words(command: str) -> tuple[list[str], bool]:
+    """Split a shell command into words and operators as a POSIX shell tokenises it.
+
+    The flag is False when the words come from a plain whitespace split instead, which can
+    miss what quoting makes the line run: a line past `_MAX_SHELL_CHARS`, or one `shlex`
+    refuses for anything but an unclosed quote (a trailing backslash a shell still runs).
+    """
     if len(command) > _MAX_SHELL_CHARS:
-        return command.split()
+        return command.split(), False
     lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     try:
-        return list(lexer)
-    except ValueError:
-        return command.split()
+        return list(lexer), True
+    except ValueError as refusal:
+        return command.split(), str(refusal) == _UNCLOSED_QUOTE
 
 
 def _simple_commands(words: list[str]) -> Iterator[tuple[list[str], str | None]]:
@@ -926,16 +936,20 @@ def _names_a_script(word: str) -> bool:
     return "/" in word and not word.startswith("/")
 
 
-def local_scripts(command: str, depth: int = 0) -> list[str]:
-    """Return the local script files a shell command runs, as they are written in it.
+def local_scripts(command: str, depth: int = 0) -> tuple[list[str], bool]:
+    """Return the local script files a shell command runs, as written, and whether all was read.
 
     A script is the file a shell or Python interpreter is given to run, by argument or as
     its standard input, a file sourced into the shell, or a path run as the command
     itself. A tool run by name, `python -m` and an interpreter given its program inline
     name none; the program given inline is read for scripts in turn.
+
+    The flag is False when the command, or a program given inline, could not be tokenised
+    as a shell would or is nested past `_MAX_INLINE_DEPTH`: a script it runs may be missing.
     """
+    tokens, read = _shell_words(command)
     scripts: list[str] = []
-    for raw, stdin in _simple_commands(_shell_words(command)):
+    for raw, stdin in _simple_commands(tokens):
         words = _unwrapped(raw)
         if not words:
             continue
@@ -957,6 +971,12 @@ def local_scripts(command: str, depth: int = 0) -> list[str]:
             script = program if _names_a_script(program) else None
         if script is not None:
             scripts.append(script)
-        if inline is not None and depth < _MAX_INLINE_DEPTH:
-            scripts.extend(local_scripts(inline, depth + 1))
-    return scripts
+        if inline is None:
+            continue
+        if depth >= _MAX_INLINE_DEPTH:
+            read = False
+            continue
+        nested, nested_read = local_scripts(inline, depth + 1)
+        scripts.extend(nested)
+        read = read and nested_read
+    return scripts, read

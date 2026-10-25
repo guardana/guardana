@@ -4,7 +4,12 @@ A scanned `.ipynb` is attacker-controlled, so one crafted line must not stall th
 """
 
 from _cost import growth
-from guardana.rules.supply_chain._ipython_cells import _shell_words, local_scripts
+from guardana.rules.supply_chain._ipython_cells import (
+    NotebookState,
+    _define_magic_alias,
+    _shell_words,
+    local_scripts,
+)
 
 
 def test_control_a_shell_line_of_words_costs_linear_time() -> None:
@@ -17,3 +22,10 @@ def test_one_unquoted_run_costs_linear_time() -> None:
 
 def test_reading_scripts_from_one_long_line_costs_linear_time() -> None:
     assert growth(local_scripts, "bash " + "a" * 100_000, "bash " + "a" * 400_000) < 1.3
+
+
+def test_reading_one_long_alias_magic_line_costs_linear_time() -> None:
+    def define(args: str) -> bool:
+        return _define_magic_alias(args, NotebookState())
+
+    assert growth(define, "t bash " + "a" * 100_000, "t bash " + "a" * 400_000) < 1.3
