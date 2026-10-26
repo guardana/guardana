@@ -10,10 +10,15 @@ class ScalarSafeLoader(yaml.SafeLoader):
         """Construct a node, preserving source context when scalar conversion fails."""
         try:
             value: object = super().construct_object(node, deep)
+        except yaml.constructor.ConstructorError as exc:
+            if isinstance(node, yaml.ScalarNode):
+                exc.problem = f"{exc.problem}: {node.value!r}"
+            raise
         except (AttributeError, IndexError, KeyError, TypeError, ValueError) as exc:
             if not isinstance(node, yaml.ScalarNode):
                 raise
-            raise yaml.constructor.ConstructorError(None, None, str(exc), node.start_mark) from exc
+            problem = f"{exc}: {node.value!r}"
+            raise yaml.constructor.ConstructorError(None, None, problem, node.start_mark) from exc
         return value
 
 

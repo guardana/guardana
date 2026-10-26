@@ -32,6 +32,13 @@ UNBUILDABLE_SCALARS = [
     pytest.param('!!binary "a"', '!!binary "a"', id="bad-binary"),
 ]
 
+UNBUILDABLE_BLOCK_SCALARS = [
+    pytest.param("!!timestamp", "not-a-timestamp", id="bad-timestamp"),
+    pytest.param("!!timestamp", "2025-99-99", id="bad-date"),
+    pytest.param("!!int", "+", id="sign-only-int"),
+    pytest.param("!!binary", "a", id="bad-binary"),
+]
+
 PROFILE_KEY_ERRORS = [
     pytest.param(
         "314159: ignored\n",

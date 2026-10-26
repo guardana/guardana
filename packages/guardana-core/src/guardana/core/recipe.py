@@ -309,7 +309,7 @@ def artifact_directory_of(path: Path) -> Path:
     marked as refused; anything unreadable falls back to the default beside the recipe.
     """
     try:
-        raw = load_yaml(path.read_text(encoding="utf-8"))
+        raw = _mapping(load_yaml(path.read_text(encoding="utf-8")), str(path))
         written = raw["output"]["directory"]
         return _output(written, path, str(path))
     except (OSError, UnicodeDecodeError, yaml.YAMLError, KeyError, TypeError, RecipeError):

@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Require hashes when installing the Guardana wheels built inside both container images.** Each build writes the digests of its local wheels and installs them with `--require-hashes`; third-party wheels already use hashes exported from `uv.lock`. Every `pip install` in both images now uses hash-checking mode. This checks that installed wheels match those built in that step; it adds no check against an outside source.
 - **Configure OSV-Scanner for the deliberately vulnerable fixture in `examples/vulnerable-model/`.** Its pins, `ultralytics==8.3.41`, `transformers==4.57.0` and `torch==2.2.0`, must trigger Guardana's dependency rules; nothing there is installed. `examples/vulnerable-model/osv-scanner.toml` ignores the `39` advisories on those pins, each with that reason. OSV-Scanner and Scorecard's `Vulnerabilities` check do not report the fixture as a known vulnerability of the project.
 
+### Fixed
+
+- **Malformed YAML configuration uses each loader's documented error instead of escaping as an internal error.** Non-text unknown keys are rendered as text, and invalid tagged scalars retain their source context and filename in profiles, recipes and locks, contracts, pack manifests, rules, fixtures and adapters. `scan --profile`, `recipe lock` and `recipe run` refuse malformed profiles with exit `3` before starting a run. No verdict or valid configuration changes. ([#196](https://github.com/guardana/guardana/issues/196))
+
 ### Documentation
 
 - **Updated release and proof documentation after 1.0.0rc5.** Product status, the roadmap and compatibility cover five required candidates and their gates; reproducible builds uses the `1.0.0rc5` run; and product status, the roadmap and the two proof notes describe the 1.0.0rc5 proofs.

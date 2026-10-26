@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from _yaml_input_cases import UNBUILDABLE_SCALARS
+from _yaml_input_cases import UNBUILDABLE_BLOCK_SCALARS, UNBUILDABLE_SCALARS
 from guardana.core.contract import ContractError, load_contract
 from guardana.core.fixtures import FixturesError, load_fixtures
 from guardana.core.pack import PackError, load_manifest
@@ -70,6 +70,27 @@ def test_unbuildable_scalars_use_the_documented_error(
     assert message.startswith(prefix.format(path=path))
     assert str(path) in message
     assert token in message.replace(str(path), "")
+
+
+@pytest.mark.parametrize("reader", _READERS)
+@pytest.mark.parametrize(("tag", "value"), UNBUILDABLE_BLOCK_SCALARS)
+def test_unbuildable_block_scalars_keep_the_offending_value(
+    tmp_path: Path,
+    reader: tuple[Callable[[Path], object], type[Exception], str],
+    tag: str,
+    value: str,
+) -> None:
+    load, error, prefix = reader
+    path = tmp_path / "input.yaml"
+    path.write_text(f"name: {tag} |-\n  {value}\n", encoding="utf-8")
+
+    with pytest.raises(error) as caught:
+        load(path)
+
+    message = str(caught.value)
+    assert message.startswith(prefix.format(path=path))
+    assert str(path) in message
+    assert repr(value) in message.replace(str(path), "")
 
 
 @pytest.mark.parametrize("reader", _READERS)

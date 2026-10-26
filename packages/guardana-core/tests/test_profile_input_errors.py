@@ -4,7 +4,7 @@ from pathlib import Path
 from textwrap import indent
 
 import pytest
-from _yaml_input_cases import NON_TEXT_KEYS, UNBUILDABLE_SCALARS
+from _yaml_input_cases import NON_TEXT_KEYS, UNBUILDABLE_BLOCK_SCALARS, UNBUILDABLE_SCALARS
 from guardana.core.profile import ProfileError, load_profile
 
 
@@ -103,6 +103,30 @@ def test_unbuildable_profile_scalars_raise_profileerror(
     prefix = f"invalid profile {path}: "
     assert str(caught.value).startswith(prefix)
     assert token in str(caught.value).removeprefix(prefix)
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "{tag} |-\n  {value}\n",
+        "name: {tag} |-\n  {value}\n",
+        "fail_on:\n  severity: {tag} |-\n    {value}\n",
+    ],
+    ids=["root", "field", "nested-field"],
+)
+@pytest.mark.parametrize(("tag", "value"), UNBUILDABLE_BLOCK_SCALARS)
+def test_unbuildable_profile_block_scalars_keep_the_offending_value(
+    tmp_path: Path, template: str, tag: str, value: str
+) -> None:
+    path = tmp_path / "profile.yaml"
+    path.write_text(template.format(tag=tag, value=value), encoding="utf-8")
+
+    with pytest.raises(ProfileError, match="invalid profile") as caught:
+        load_profile(path)
+
+    prefix = f"invalid profile {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert repr(value) in str(caught.value).removeprefix(prefix)
 
 
 def test_valid_typed_profile_scalars_still_load(tmp_path: Path) -> None:
