@@ -29,7 +29,7 @@ so this page is maintained as carefully as the code.
 | Extension API | **beta** | Frozen at 1.0 under the [compatibility policy](compatibility.md). The remaining 1.0 criteria are below. |
 
 The Python verification facade also supports grading saved recordings through
-`Verifier.grade`, alongside `Verifier.scan` and `Verifier.probe`. See the
+`Verifier.grade`, alongside `Verifier.scan` and `Verifier.run`. See the
 [Python API](python-api.md#run-a-target) for all three entry points.
 
 ## Released and experimental
