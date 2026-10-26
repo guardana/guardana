@@ -95,7 +95,7 @@ output. An unsupported format is invalid usage, exit `3`, before command work.
 - [`usage-pack.md`](usage-pack.md) — validate and lock extension packs
 - [`outputs.md`](outputs.md) — add an export or a webhook from an installed package
 - [`conformance-kit.md`](conformance-kit.md) — prove a rule, target, format or reporter keeps its contract
-- [`compatibility.md`](compatibility.md) — the supported surface, what 1.x keeps stable and how a name is deprecated
+- [`compatibility.md`](compatibility.md) — the supported surface, what 1.x keeps stable, feature and field availability, and deprecation
 - [`usage-taxonomy.md`](usage-taxonomy.md) — resolve framework editions and crosswalks
 - [`model-formats.md`](model-formats.md) — use the bounded artifact readers
 

@@ -273,6 +273,9 @@ so this page is maintained as carefully as the code.</p>
 </tr>
 </tbody>
 </table></div>
+<p>The Python verification facade also supports grading saved recordings through
+<code>Verifier.grade</code>, alongside <code>Verifier.scan</code> and <code>Verifier.run</code>. See the
+<a href="python-api.html#run-a-target">Python API</a> for all three entry points.</p>
 <h2 id="released-and-experimental">Released and experimental</h2>
 <p><strong>Released (beta):</strong> Quality suites use the deterministic assessors <code>exact_match</code>, <code>contains</code>, <code>regex</code>, <code>json_valid</code>, and <code>length</code>. They support versioned JSONL datasets (<code>name@version</code>), deterministic sampling (<code>sample: {size, seed}</code>), repeated trials per case, and a suite gate that passes, fails, or declines with <code>min_sample</code>. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.</p>
 <p><strong>Experimental:</strong> Judge-graded suites use <code>answered</code> and <code>reference_judge</code>. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with <code>guardana calibrate --record</code>. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental behaviour and thresholds are outside the compatibility promise, but saved documents remain versioned and readers continue to support older versions under the persisted-document policy.</p>

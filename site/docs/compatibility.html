@@ -355,6 +355,44 @@ beside them.</p>
 changelog's <code>Unreleased</code> section has a <code>Changed</code>, <code>Deprecated</code> or <code>Removed</code>
 entry. It refuses a final release if that surface changes at all since its
 last candidate.</p>
+<h2 id="feature-and-field-availability">Feature and field availability</h2>
+<p>Use the supported 1.0 surface defined above as the baseline. For later CLI options,
+profile parameters, Python keywords and payload fields, place
+<code>Added in Guardana &lt;version&gt;</code> beside the item. Name the first published Guardana
+package version that supports it. Use <code>Added in Guardana Unreleased</code> during
+development; resolve the marker to the chosen version during release preparation.
+Do not infer historical introduction versions from the current source tree.</p>
+<p>Package availability and contract versions answer different questions. A persisted
+field also identifies its document type and schema version. An extension or output
+addition identifies its <code>extension_api</code> or <code>output_api</code> version when applicable.
+Put availability guidance for a JSON Schema field in its <code>description</code>; no runtime
+<code>since</code> key or custom schema keyword is needed.</p>
+<p>An item's documentation can use this template; bracketed values are placeholders:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Available since</th>
+<th>Contract</th>
+<th>Older input</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[item]</td>
+<td><code>Added in Guardana &lt;version&gt;</code></td>
+<td>[document type and schema version, or API version]</td>
+<td>[migration behaviour and unavailable data, or not applicable]</td>
+</tr>
+</tbody>
+</table></div>
+<p>Older readers may refuse a newer schema. Document how older input is migrated and
+which evidence remains unavailable. Missing measurements stay unknown; migration
+does not turn them into zero or a passing verdict. Availability markers follow the
+existing policy for compatible 1.x additions and do not make every schema addition
+a major release.</p>
+<p>See the <a href="generated/compatibility-matrix.html">compatibility matrix</a> for document and
+API versions and the <a href="https://github.com/guardana/guardana/blob/main/CHANGELOG.md">changelog</a> for release records.</p>
 <h2 id="the-collector-envelope">The collector envelope</h2>
 <p>A run reaches the collector as a versioned envelope. Every change to the envelope raises its
 version. A collector accepts every envelope version from 2 up to its own. An agent newer than
