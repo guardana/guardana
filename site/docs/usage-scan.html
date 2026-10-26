@@ -484,7 +484,13 @@ the command (<code>./run</code>, <code>tools/stage2.sh</code>, or a bare or abso
 a shell cell magic, a magic defined with <code>%alias_magic</code>, an automagic <code>system</code> line
 or a call on the IPython object. The rule does not read what the script runs.
 <code>python -m</code>, <code>sh -c</code> with its command (which the rule reads for scripts in turn) and
-a tool run by name are not scripts. A download piped to a shell remains a <code>high</code> finding.</p>
+a tool run by name are not scripts. A download piped to a shell remains a <code>high</code> finding.
+A shell line longer than <code>32 KiB</code>, a line <code>shlex</code> refuses for a reason other than an
+unclosed quote but a shell still runs (such as one ending in a backslash), or a <code>-c</code>
+program nested more than four levels deep makes the cell inconclusive with an
+<code>unexamined_component</code> coverage shortfall naming the notebook. Scripts found by
+splitting such a line on whitespace are still named. <code>%alias_magic</code> arguments longer
+than <code>32 KiB</code> also make the cell inconclusive.</p>
 <p>An archive is refused before it is opened when listing it would cost more than listing a
 model does. A zip, a <code>.keras</code> included, is refused when its end records declare more than
 100,000 entries or a central directory over 25,600,000 bytes, or when that directory holds
