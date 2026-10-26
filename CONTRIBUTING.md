@@ -284,6 +284,14 @@ option) needs documentation alongside the code that introduces it, not as a
 follow-up. Contributor-facing docs live near the code they describe; end-user
 docs live under `docs/`.
 
+Document new options, parameters, Python keywords and payload fields using the
+[availability convention](docs/compatibility.md#feature-and-field-availability).
+Record the first published Guardana package version, using `Unreleased` during
+development and resolving it during release preparation. Include the applicable
+document type and schema version, or `extension_api` / `output_api` version, and
+explain migration and unavailable evidence for older input. JSON Schema field
+descriptions carry this guidance without adding runtime keys.
+
 A user-visible change carries its documentation in the **same PR**, and there are
 five places to consider, each answered with an edit or an explicit "not
 applicable":

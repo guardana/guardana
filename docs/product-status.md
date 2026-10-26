@@ -28,6 +28,10 @@ so this page is maintained as carefully as the code.
 | Quality suites | **beta** | Gates pass rates on team-supplied versioned datasets, with repeated trials and judge correction. No numeric aggregate gate or statistical comparison between suite runs. |
 | Extension API | **beta** | Frozen at 1.0 under the [compatibility policy](compatibility.md). The remaining 1.0 criteria are below. |
 
+The Python verification facade also supports grading saved recordings through
+`Verifier.grade`, alongside `Verifier.scan` and `Verifier.probe`. See the
+[Python API](python-api.md#run-a-target) for all three entry points.
+
 ## Released and experimental
 
 **Released (beta):** Quality suites use the deterministic assessors `exact_match`, `contains`, `regex`, `json_valid`, and `length`. They support versioned JSONL datasets (`name@version`), deterministic sampling (`sample: {size, seed}`), repeated trials per case, and a suite gate that passes, fails, or declines with `min_sample`. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.

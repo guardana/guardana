@@ -364,6 +364,44 @@ beside them.</p>
 <code>1.1.0rc1</code>. A candidate is a pre-release, not a stable release.</p>
 <h3 id="when-to-release-10">When to release 1.0</h3>
 <p>Release <code>1.0.0</code> when all <a href="product-status.html#before-the-first-stable-release">stable-release criteria</a> hold: required <code>1.0.0rc2</code>, <code>1.0.0rc3</code>, <code>1.0.0rc4</code> and <code>1.0.0rc5</code> gates, a candidate period without new supported-surface defect reports, published maintainer-run proofs and engineering criteria. A further candidate is required only if a release blocker needs one. Stable 1.0 is the compatibility promise for the supported surface; adoption measures are published separately and are not release criteria. The <a href="https://github.com/guardana/guardana/milestones">GitHub milestones</a> group release scope.</p>
+<h2 id="feature-and-field-availability">Feature and field availability</h2>
+<p>Use the supported 1.0 surface defined above as the baseline. For later CLI options,
+profile parameters, Python keywords and payload fields, place
+<code>Added in Guardana &lt;version&gt;</code> beside the item. Name the first published Guardana
+package version that supports it. Use <code>Added in Guardana Unreleased</code> during
+development; resolve the marker to the chosen version during release preparation.
+Do not infer historical introduction versions from the current source tree.</p>
+<p>Package availability and contract versions answer different questions. A persisted
+field also identifies its document type and schema version. An extension or output
+addition identifies its <code>extension_api</code> or <code>output_api</code> version when applicable.
+Put availability guidance for a JSON Schema field in its <code>description</code>; no runtime
+<code>since</code> key or custom schema keyword is needed.</p>
+<p>An item's documentation can use this template; bracketed values are placeholders:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Available since</th>
+<th>Contract</th>
+<th>Older input</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[item]</td>
+<td><code>Added in Guardana &lt;version&gt;</code></td>
+<td>[document type and schema version, or API version]</td>
+<td>[migration behaviour and unavailable data, or not applicable]</td>
+</tr>
+</tbody>
+</table></div>
+<p>Older readers may refuse a newer schema. Document how older input is migrated and
+which evidence remains unavailable. Missing measurements stay unknown; migration
+does not turn them into zero or a passing verdict. Availability markers follow the
+existing policy for compatible 1.x additions and do not make every schema addition
+a major release.</p>
+<p>See the <a href="generated/compatibility-matrix.html">compatibility matrix</a> for document and
+API versions and the <a href="https://github.com/guardana/guardana/blob/main/CHANGELOG.md">changelog</a> for release records.</p>
 <h2 id="the-collector-envelope">The collector envelope</h2>
 <p>A run reaches the collector as a versioned envelope. Every change to the envelope raises its
 version. A collector accepts every envelope version from 2 up to its own. An agent newer than

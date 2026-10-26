@@ -50,6 +50,10 @@ Gate impact:
 - [ ] The change keeps the project principles (`CONTRIBUTING.md` § Principles).
 - [ ] Docs updated alongside the code change (`README.md`, `CONTRIBUTING.md`
       or `docs/`, as applicable) — not deferred to a follow-up.
+- [ ] New options, API parameters and payload fields state their minimum Guardana
+      version, applicable schema/API version and older-input behaviour using the
+      [availability convention](https://guardana.dev/docs/compatibility#feature-and-field-availability),
+      or this is explicitly not applicable.
 - [ ] If this PR adds/changes a **Rule**: it has a taxonomy mapping
       (OWASP/MITRE ATLAS/NIST tags) and a positive **and** negative test
       fixture (`guardana.core.testing` has the model doubles).

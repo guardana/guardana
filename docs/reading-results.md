@@ -102,8 +102,8 @@ Save this as `read_run.sh` and run it beside `run.json`:
 ```bash
 run=run.json
 version=$(jq '.schema_version' "$run")
-if [ "$version" != 17 ]; then
-  echo "run schema $version: this reader expects 17" >&2
+if [ "$version" != 18 ]; then
+  echo "run schema $version: this reader expects 18" >&2
   exit 3
 fi
 gate=$(jq -r '.run.result_summary.gate' "$run")

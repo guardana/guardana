@@ -145,6 +145,36 @@ A risky minor or major release may first use a release candidate, such as
 
 Release `1.0.0` when all [stable-release criteria](product-status.md#before-the-first-stable-release) hold: required `1.0.0rc2`, `1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` gates, a candidate period without new supported-surface defect reports, published maintainer-run proofs and engineering criteria. A further candidate is required only if a release blocker needs one. Stable 1.0 is the compatibility promise for the supported surface; adoption measures are published separately and are not release criteria. The [GitHub milestones](https://github.com/guardana/guardana/milestones) group release scope.
 
+## Feature and field availability
+
+Use the supported 1.0 surface defined above as the baseline. For later CLI options,
+profile parameters, Python keywords and payload fields, place
+`Added in Guardana <version>` beside the item. Name the first published Guardana
+package version that supports it. Use `Added in Guardana Unreleased` during
+development; resolve the marker to the chosen version during release preparation.
+Do not infer historical introduction versions from the current source tree.
+
+Package availability and contract versions answer different questions. A persisted
+field also identifies its document type and schema version. An extension or output
+addition identifies its `extension_api` or `output_api` version when applicable.
+Put availability guidance for a JSON Schema field in its `description`; no runtime
+`since` key or custom schema keyword is needed.
+
+An item's documentation can use this template; bracketed values are placeholders:
+
+| Item | Available since | Contract | Older input |
+|---|---|---|---|
+| [item] | `Added in Guardana <version>` | [document type and schema version, or API version] | [migration behaviour and unavailable data, or not applicable] |
+
+Older readers may refuse a newer schema. Document how older input is migrated and
+which evidence remains unavailable. Missing measurements stay unknown; migration
+does not turn them into zero or a passing verdict. Availability markers follow the
+existing policy for compatible 1.x additions and do not make every schema addition
+a major release.
+
+See the [compatibility matrix](generated/compatibility-matrix.md) for document and
+API versions and the [changelog](../CHANGELOG.md) for release records.
+
 ## The collector envelope
 
 A run reaches the collector as a versioned envelope. Every change to the envelope raises its

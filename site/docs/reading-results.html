@@ -323,8 +323,8 @@ that records no gate. <code>load_verification</code> and <code>Verification</cod
 <p>Save this as <code>read_run.sh</code> and run it beside <code>run.json</code>:</p>
 <pre><code class="language-bash">run=run.json
 version=$(jq '.schema_version' &quot;$run&quot;)
-if [ &quot;$version&quot; != 17 ]; then
-  echo &quot;run schema $version: this reader expects 17&quot; &gt;&amp;2
+if [ &quot;$version&quot; != 18 ]; then
+  echo &quot;run schema $version: this reader expects 18&quot; &gt;&amp;2
   exit 3
 fi
 gate=$(jq -r '.run.result_summary.gate' &quot;$run&quot;)
