@@ -412,7 +412,11 @@ $ guardana scan ./some-model-repo
 ```
 
 `hallucinated_package` scans `import`/`from` statements in `.py` source
-files via `ast.parse`; it does not read `requirements.txt` or lockfiles.
+files via `ast.parse`; it also reads every `requirements*.txt` and
+`pyproject.toml` in the scanned tree (`[project].dependencies`,
+`[project].optional-dependencies`, `[tool.poetry].dependencies`). It does not
+flag an import whose normalized name is declared there. It does not read
+lockfiles, `setup.py`, `setup.cfg` or `Pipfile`.
 
 `pickle_opcode` reports one finding per file. Its summary names every non-allowlisted
 callable the file imports, sorted and each once, after a digest of that set

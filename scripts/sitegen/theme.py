@@ -219,6 +219,10 @@ a.pill:hover{border-color:var(--brand); color:var(--brand)}
 @media (max-width:980px){
   .shell{display:block}
   .side{display:none}
+  /* The 60px header and the sticky .mnav (48px summary + 1px border) cover 109px, so an
+     anchor needs 109px plus the same 16px of air the desktop offset leaves under the header.
+     An expanded .mnav is an overlay the reader opened, so it is not accounted for here. */
+  html{scroll-padding-top:125px}
   .mnav{
     display:block; position:sticky; top:60px; z-index:15; margin:0 -20px;
     background:color-mix(in srgb, var(--bg) 92%, transparent);

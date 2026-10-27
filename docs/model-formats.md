@@ -1,7 +1,7 @@
 ---
 title: "Reading model formats"
 nav_order: 270
-summary: "the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract"
+summary: "the importable GGUF / safetensors / ONNX readers, outside the supported surface, and their bounded, fail-closed contract"
 status: stable
 ---
 
@@ -13,8 +13,10 @@ a byte-window scan around a keyword both misses payloads that sit further away
 and invents findings from unrelated neighbouring bytes. Guardana ships the
 parsing so your rule can ship the judgement.
 
-These readers are **public API**. They are what a third-party rule pack is meant
-to build on.
+These readers can be imported but are **outside the supported surface** described
+in [`compatibility.md`](compatibility.md). They may change in any release. A
+third-party rule pack that imports them pins the exact `guardana-core` version it
+was tested with.
 
 ```python
 from guardana.core.formats import FormatError, read_gguf_metadata
