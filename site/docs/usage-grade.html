@@ -211,8 +211,11 @@ so a run that grades recorded answers is gated and compared like a live one.</p>
 <li><strong>You write it</strong>: the answers your application gave to your dataset's questions, collected
 however you run it.</li>
 <li><strong><code>guardana probe --keep-exchanges</code> keeps it</strong>: every chat exchange of the probe, redacted,
-beside the saved run, for <code>--url</code> or a pack's <code>--target</code> built on the built-in endpoint. Grading it again with a new rule, a sharper expectation or a new judge
-measures the grading on the very same replies.</li>
+beside the saved run, for <code>--url</code> or a pack's <code>--target</code> built on the built-in endpoint. Grading it again with a sharper expectation or a new judge
+measures the grading on the very same replies only for rule ids the recording
+names and the exact messages recorded. A rule the recording does not name is
+skipped as <code>not_recorded</code>; a rule whose prompt changed gets no reply and records
+an error.</li>
 </ul>
 <pre><code class="language-bash">guardana grade answers.jsonl --rules rules/ --profile guardana.yaml
 guardana grade run.exchanges.jsonl --rules rules/ --format json --output regraded.json

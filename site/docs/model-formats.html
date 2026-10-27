@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reading model formats — Guardana documentation</title>
-<meta name="description" content="the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract">
+<meta name="description" content="the importable GGUF / safetensors / ONNX readers, outside the supported surface, and their bounded, fail-closed contract">
 <link rel="canonical" href="https://guardana.dev/docs/model-formats">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/brand/v1/tokens.css">
@@ -202,13 +202,15 @@
 </nav>
 </details>
 <main id="main">
-<h1>Reading model formats — <code>guardana.core.formats</code></h1><p class="lede">the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract</p><p>A rule that inspects a model file needs to read a binary format before it can
+<h1>Reading model formats — <code>guardana.core.formats</code></h1><p class="lede">the importable GGUF / safetensors / ONNX readers, outside the supported surface, and their bounded, fail-closed contract</p><p>A rule that inspects a model file needs to read a binary format before it can
 say anything about it. Doing that by hand is where scanners get quietly wrong:
 a byte-window scan around a keyword both misses payloads that sit further away
 and invents findings from unrelated neighbouring bytes. Guardana ships the
 parsing so your rule can ship the judgement.</p>
-<p>These readers are <strong>public API</strong>. They are what a third-party rule pack is meant
-to build on.</p>
+<p>These readers can be imported but are <strong>outside the supported surface</strong> described
+in <a href="compatibility.html"><code>compatibility.md</code></a>. They may change in any release. A
+third-party rule pack that imports them pins the exact <code>guardana-core</code> version it
+was tested with.</p>
 <pre><code class="language-python">from guardana.core.formats import FormatError, read_gguf_metadata
 
 try:

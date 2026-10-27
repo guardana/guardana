@@ -695,7 +695,11 @@ malicious so the quickstart has something real to find. CI therefore scans
 2 finding(s); 19 rule(s) run, 0 skipped. 3 component(s) observed.
 </code></pre>
 <p><code>hallucinated_package</code> scans <code>import</code>/<code>from</code> statements in <code>.py</code> source
-files via <code>ast.parse</code>; it does not read <code>requirements.txt</code> or lockfiles.</p>
+files via <code>ast.parse</code>; it also reads every <code>requirements*.txt</code> and
+<code>pyproject.toml</code> in the scanned tree (<code>[project].dependencies</code>,
+<code>[project].optional-dependencies</code>, <code>[tool.poetry].dependencies</code>). It does not
+flag an import whose normalized name is declared there. It does not read
+lockfiles, <code>setup.py</code>, <code>setup.cfg</code> or <code>Pipfile</code>.</p>
 <p><code>pickle_opcode</code> reports one finding per file. Its summary names every non-allowlisted
 callable the file imports, sorted and each once, after a digest of that set
 (<code>unpickling imports 2 non-allowlisted callable(s) (set 9a0cd5b778d9): builtins.eval, os.system</code>). Its detail names the archive member each was found in

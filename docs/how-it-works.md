@@ -184,7 +184,7 @@ An `Evaluator` supplies a custom grader; a `Target` supplies a new backend. Both
 
 ### Model formats you don't have to parse yourself
 
-A keyword's surrounding bytes can miss distant payloads or make unrelated bytes look suspicious. `guardana.core.formats` provides `read_gguf_metadata`, `read_safetensors_header`, and `read_onnx_summary` as public API. Parsing is bounded, offline, deterministic, and fail-closed. It returns data, never a verdict; your rule supplies the judgment. See [`model-formats.md`](model-formats.md).
+A keyword's surrounding bytes can miss distant payloads or make unrelated bytes look suspicious. `guardana.core.formats` provides `read_gguf_metadata`, `read_safetensors_header`, and `read_onnx_summary` as importable readers outside the supported surface described in [`compatibility.md`](compatibility.md). They may change in any release; a pack that imports them pins the exact `guardana-core` version it was tested with. Parsing is bounded, offline, deterministic, and fail-closed. It returns data, never a verdict; your rule supplies the judgment. See [`model-formats.md`](model-formats.md).
 
 ### Test doubles, so your rule ships with proof
 

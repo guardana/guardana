@@ -46,7 +46,7 @@ guardana init --starter first-run
 
 Its README walks through a failing scan, the fix, a saved run, and a check of your own. Once Guardana is installed, it needs no account, key, model, or network.
 
-Scan the bundled vulnerable model directory for another example:
+Scan the bundled vulnerable model directory in a clone of the repository for another example (`pip`, `uv add` and `uvx` installs do not contain `examples/vulnerable-model`):
 
 ```console
 $ uv run guardana scan examples/vulnerable-model
@@ -68,9 +68,9 @@ $ uv run guardana scan examples/vulnerable-model
 That run exits `1`, so it can gate CI. To check your own work:
 
 ```bash
-guardana scan path/to/your/project     # static, offline, no model needed
-guardana init                          # write a guardana.yaml policy file
-guardana scan . --format sarif         # SARIF 2.1.0 for GitHub code scanning
+guardana scan path/to/your/project                      # static, offline, no model needed
+guardana init                                           # write a guardana.yaml policy file
+guardana scan . --profile guardana.yaml --format sarif  # SARIF 2.1.0 for GitHub code scanning
 
 guardana probe --url http://localhost:11434 --model llama3 --preset ci --format json --output run.json
 guardana diff accepted-run.json run.json   # 0 nothing worse at the policy's bars · 1 it is · 2 cannot tell

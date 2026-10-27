@@ -308,9 +308,9 @@ expect:
 </tr>
 <tr>
 <td><code>requires</code></td>
-<td>no (default <code>[]</code>)</td>
+<td>yes (must include <code>chat</code>)</td>
 <td>list of capability names</td>
-<td>Capabilities the target must support, e.g. <code>[chat]</code> or <code>[chat, plant_system_prompt]</code>. Maps to <code>guardana.core.target.Capability</code> (case-insensitive). The <code>Runner</code> skips the rule (not a crash) if the target lacks any of these.</td>
+<td>Capabilities the target must support, e.g. <code>[chat]</code> or <code>[chat, plant_system_prompt]</code>. Maps to <code>guardana.core.target.Capability</code> (case-insensitive). A rule that omits <code>requires</code> or does not include <code>chat</code> is refused at load with <code>RuleLoadError</code>. Agent-run and suite rules have the same requirement. The <code>Runner</code> skips the rule (not a crash) if the target lacks any of these.</td>
 </tr>
 <tr>
 <td><code>prompts</code></td>
@@ -580,7 +580,8 @@ refused at load when <code>delivered_by</code> names a tool that is not declared
 the marker overlaps the canary (the canary is replaced on every run). Name text that
 only the payload carries, such as the attacker's address.</p>
 <p>A run that hits a bound — steps, per-step tool calls, byte budget, or the 120 s
-deadline — is <code>inconclusive</code> too, whatever evaluator grades it, and the history is
+deadline — is <code>inconclusive</code> if its evaluator grades it as a pass; an established
+failure stands, and an <code>inconclusive</code> result stays <code>inconclusive</code>. The history is
 never trimmed to fit: the span that would be dropped is the one carrying the payload.</p>
 <h3 id="quality-suites-dataset-instead-of-prompts">Quality suites: <code>dataset:</code> instead of <code>prompts:</code></h3>
 <p>A suite grades a versioned dataset and gates its pass rate. For example:</p>

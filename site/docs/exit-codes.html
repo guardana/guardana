@@ -412,7 +412,8 @@ measured or recorded.</p>
 unknown <code>--provider</code>, a <code>--system-prompt-file</code> or <code>--adapter</code> that cannot be read, an
 <code>--api-key-env</code> naming an unset or empty variable, <code>--adapter</code> with <code>--provider</code> or
 <code>--api-key-env</code>, and an adapter whose <code>url:</code> differs from <code>--url</code> or whose <code>method:</code> is
-not <code>POST</code>. On <code>probe --mcp</code> the same holds for an stdio command given without
+not <code>POST</code>. The two <code>--api-key-env</code> cases do not apply to <code>plan probe</code>, which has no
+<code>--api-key-env</code> option; passing it is an unknown-option error, also exit <code>3</code>. On <code>probe --mcp</code> the same holds for an stdio command given without
 <code>--allow-exec</code>, which starts nothing, an stdio <code>--mcp</code> command that cannot be split into a program and its arguments, an <code>--mcp-token-env</code> naming an unset or empty
 variable, and an <code>--mcp-registry-entry</code> that cannot be read or is not an entry; on
 <code>probe --a2a</code> and <code>plan probe --a2a</code>, for an agent URL whose path is neither an agent card
