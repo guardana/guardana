@@ -2,7 +2,7 @@
 title: "Read results from your own tool"
 nav_order: 56
 summary: "read a saved run from Python or jq — the recorded verdict, then each channel on its own — and what SARIF, JUnit and the collector keep and leave out"
-status: beta
+status: stable
 ---
 
 # Read results from your own tool
@@ -102,8 +102,8 @@ Save this as `read_run.sh` and run it beside `run.json`:
 ```bash
 run=run.json
 version=$(jq '.schema_version' "$run")
-if [ "$version" != 17 ]; then
-  echo "run schema $version: this reader expects 17" >&2
+if [ "$version" != 18 ]; then
+  echo "run schema $version: this reader expects 18" >&2
   exit 3
 fi
 gate=$(jq -r '.run.result_summary.gate' "$run")

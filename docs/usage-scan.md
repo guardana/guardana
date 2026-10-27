@@ -234,12 +234,12 @@ a shell cell magic, a magic defined with `%alias_magic`, an automagic `system` l
 or a call on the IPython object. The rule does not read what the script runs.
 `python -m`, `sh -c` with its command (which the rule reads for scripts in turn) and
 a tool run by name are not scripts. A download piped to a shell remains a `high` finding.
-A shell line longer than `32 KiB`, a line `shlex` refuses for a reason other than an
+A shell line longer than `32,768` characters, a line `shlex` refuses for a reason other than an
 unclosed quote but a shell still runs (such as one ending in a backslash), or a `-c`
 program nested more than four levels deep makes the cell inconclusive with an
 `unexamined_component` coverage shortfall naming the notebook. Scripts found by
 splitting such a line on whitespace are still named. `%alias_magic` arguments longer
-than `32 KiB` also make the cell inconclusive.
+than `32,768` characters also make the cell inconclusive.
 
 An archive is refused before it is opened when listing it would cost more than listing a
 model does. A zip, a `.keras` included, is refused when its end records declare more than
@@ -412,7 +412,11 @@ $ guardana scan ./some-model-repo
 ```
 
 `hallucinated_package` scans `import`/`from` statements in `.py` source
-files via `ast.parse`; it does not read `requirements.txt` or lockfiles.
+files via `ast.parse`; it also reads every `requirements*.txt` and
+`pyproject.toml` in the scanned tree (`[project].dependencies`,
+`[project].optional-dependencies`, `[tool.poetry].dependencies`). It does not
+flag an import whose normalized name is declared there. It does not read
+lockfiles, `setup.py`, `setup.cfg` or `Pipfile`.
 
 `pickle_opcode` reports one finding per file. Its summary names every non-allowlisted
 callable the file imports, sorted and each once, after a digest of that set

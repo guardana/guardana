@@ -153,7 +153,7 @@ Neither stops the process or refuses its writes. Keep the collector stopped unti
 the two match.
 
 **Pin the image to a minor tag**: use
-`ghcr.io/guardana/guardana-collector:0.41` instead of `latest`, as
+`ghcr.io/guardana/guardana-collector:1.0` instead of `latest`, as
 `deploy/docker-compose.yml` does, for patch fixes without a new collector
 schema. `latest` can move to a new minor and schema. Candidates carry only
 exact version tags, such as `1.0.0rc3`; `latest` and the moving minor stay on
@@ -347,7 +347,7 @@ The image is the unit; Compose is a convenience:
 docker run -d --name guardana-collector \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:…@db.internal:5432/guardana" \
   -p 127.0.0.1:8000:8000 \
-  ghcr.io/guardana/guardana-collector:0.41
+  ghcr.io/guardana/guardana-collector:1.0
 ```
 
 Or without a container at all — `pip install "guardana-server[serve]"`, then

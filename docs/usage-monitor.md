@@ -2,7 +2,7 @@
 title: "guardana monitor"
 nav_order: 150
 summary: "`guardana monitor`: scheduled re-verification"
-status: stable
+status: beta
 ---
 
 # `guardana monitor` — a long-running sampling observer

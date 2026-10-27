@@ -840,7 +840,7 @@ wheels = [
 
 [[package]]
 name = "guardana-cli"
-version = "1.0.0rc5"
+version = "1.0.0"
 source = { editable = "packages/guardana-cli" }
 dependencies = [
     { name = "guardana-core" },
@@ -861,7 +861,7 @@ requires-dist = [
 
 [[package]]
 name = "guardana-core"
-version = "1.0.0rc5"
+version = "1.0.0"
 source = { editable = "packages/guardana-core" }
 dependencies = [
     { name = "pyyaml" },
@@ -880,7 +880,7 @@ dev = [{ name = "types-pyyaml", specifier = ">=6.0.12.20260815" }]
 
 [[package]]
 name = "guardana-report"
-version = "1.0.0rc5"
+version = "1.0.0"
 source = { editable = "packages/guardana-report" }
 dependencies = [
     { name = "guardana-core" },
@@ -891,7 +891,7 @@ requires-dist = [{ name = "guardana-core", editable = "packages/guardana-core" }
 
 [[package]]
 name = "guardana-rules"
-version = "1.0.0rc5"
+version = "1.0.0"
 source = { editable = "packages/guardana-rules" }
 dependencies = [
     { name = "defusedxml" },
@@ -906,7 +906,7 @@ requires-dist = [
 
 [[package]]
 name = "guardana-server"
-version = "1.0.0rc5"
+version = "1.0.0"
 source = { editable = "packages/guardana-server" }
 dependencies = [
     { name = "fastapi" },
