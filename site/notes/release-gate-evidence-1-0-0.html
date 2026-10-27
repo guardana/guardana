@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.0.0 release gate evidence for engineering criteria (#144) — Guardana notes</title>
+<meta name="description" content="The engineering tests passed on fb9ab309 for 1.0.0; items without their own tests are tracked in #215.">
+<link rel="canonical" href="https://guardana.dev/notes/release-gate-evidence-1-0-0">
+<link rel="alternate" type="application/atom+xml" title="Guardana notes" href="/notes/feed.xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="/docs/docs.css">
+<style>main.notes{margin:0 auto;padding:34px 20px 88px}.notes-index{list-style:none;padding:0}.notes-index li{margin:0 0 26px}.notes-index time,.notes time{color:var(--faint);font-size:14px}.notes-index h2{font-size:21px;margin:2px 0 4px;border:0;padding:0}.notes-index p{margin:0;color:var(--muted)}</style>
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="/docs/">Docs</a>
+<a href="/notes/">Notes</a>
+</nav>
+</div></header>
+<main class="notes">
+<p class="crumb"><a href="/notes/">Notes</a> · <time datetime="2026-10-27">2026-10-27</time></p><h1>1.0.0 release gate evidence for engineering criteria (#144)</h1><p class="lede">The engineering tests passed on fb9ab309 for 1.0.0; items without their own tests are tracked in #215.</p><p>This note records evidence from the final release gate on the <code>1.0.0</code> commit for the <a href="https://guardana.dev/docs/product-status#stable-release-criteria">engineering criteria in product status</a>. The first stable release, <code>1.0.0</code>, was published on 2026-10-27 from commit <code>fb9ab309</code>, which carried the signed tag <code>v1.0.0</code>. Tests ran on the maintainer's machine and in <a href="https://github.com/guardana/guardana/actions/runs/40515502114">CI</a>; the local CI mirror ran on the starting tree described below. <a href="https://github.com/guardana/guardana/pull/235">Release pull request #235</a> was squash-merged as that commit.</p>
+<h2 id="where-the-tests-ran">Where the tests ran</h2>
+<ul>
+<li>Maintainer's machine, 2026-10-27 12:17–14:12 UTC: <code>scripts/release.py 1.0.0</code> ran <code>ruff</code>, <code>ruff format</code>, <code>mypy --strict</code>, the import contract, <code>pytest -q</code>, the dogfood scan and the clean-install check before the release commit. After the version bump, it ran <code>pytest -q</code> and the dogfood scan again. All passed; both dogfood scans returned 0 findings. Both pytest runs included the collector tests against local PostgreSQL. The only skips were a recipe-source test needing <code>setuptools</code> and, before the bump only, a final-version check; that check ran and passed after the bump.</li>
+<li><a href="https://github.com/guardana/guardana/actions/runs/40515502114">CI on <code>fb9ab309</code></a>, tagged <code>v1.0.0</code>: all jobs were green. Each <code>test</code> job on Python <code>3.11</code>, <code>3.12</code> and <code>3.13</code> used a PostgreSQL service and reported 14169 passed and 1 skipped; the skipped recipe-source test needed <code>setuptools</code>, which was absent. Coverage met the floor in all 25 critical areas, the dependency audit found no known vulnerabilities in 95 packages, and dogfood returned 0 findings. <code>example-plugin</code> ran each example's own suite in an isolated environment: custom rule, Hermes integrator, shell-hook integrator, retrieval pilot (5 passed), output pack (125 passed) and reference pack (45 passed). Template-scaffolded packs with 3 rules and 1 rule installed, validated and graded. <code>clean-install</code> answered every documented command as documented and produced 5 SBOMs for <code>1.0.0</code>; <code>images</code> checked that both images behaved as documented. The <a href="https://github.com/guardana/guardana/actions/runs/40512141357">pull-request run</a> used the same tree.</li>
+<li>Local CI mirror, <code>scripts/ci_local.sh --quiet</code>, 2026-10-27 06:14–06:58 UTC: 27 of 27 jobs were green, with 14168 pytest tests passed and 2 skipped. It ran on the tree that main held after #207 (<code>993b11b4</code>), where the release started. The release commit added only the version bump, regenerated pages, the lock file and the changelog roll, with no test or package logic changes. The second skip was the final-version check that ran and passed in CI on the release commit. Coverage floors held in all 25 critical areas, dogfood returned 0 findings, and the six example suites and new-pack check were green.</li>
+</ul>
+<h2 id="before-the-release">Before the release</h2>
+<p>Historical samples written by the published <code>1.0.0rc3</code> packages, using run schema <code>18</code>, were added to <a href="https://github.com/guardana/guardana/blob/v1.0.0/packages/guardana-core/tests/historical/"><code>packages/guardana-core/tests/historical/</code></a> in <a href="https://github.com/guardana/guardana/pull/206">#206</a>. The pre-1.0 statement and rules in <a href="https://guardana.dev/docs/compatibility">the compatibility policy</a> were rewritten in <a href="https://github.com/guardana/guardana/pull/207">#207</a>; before the gate, <code>scripts/release.py</code> checked that the policy no longer stated pre-1.0 rules. The refusal and rewritten-policy paths were guarded by <code>scripts/tests/test_release_script.py::test_a_final_1x_release_is_refused_while_the_policy_says_pre_1_0</code> and <code>scripts/tests/test_release_script.py::test_a_final_1x_release_continues_once_the_policy_is_rewritten</code>.</p>
+<h2 id="the-engineering-criteria">The engineering criteria</h2>
+<h3 id="typed-python-outcomes">Typed Python outcomes</h3>
+<p><em>&quot;Python consumers receive failed, incomplete and stopped outcomes as typed data.&quot;</em></p>
+<ul>
+<li><code>test_python_facade_parity.py</code>: <code>test_a_failed_run_is_returned_as_data_never_raised</code>, <code>test_a_scan_writes_the_same_run_from_python_and_from_the_cli</code> (fail, unverified, indeterminate, unread), <code>test_a_probe_writes_the_same_run_from_python_and_from_the_cli</code> (budget stop).</li>
+<li><code>a2a/test_a2a_rules.py</code>: <code>test_a_stopped_run_keeps_the_same_findings_whatever_the_concurrency</code>.</li>
+<li><code>test_sample_verifications.py</code>: <code>test_the_samples_are_a_passed_a_failed_an_empty_a_stopped_and_an_unverified_run</code>.</li>
+<li><code>test_verify_surface.py</code>: <code>test_a_verification_holds_the_documented_fields</code>.</li>
+</ul>
+<p>Published: <a href="https://guardana.dev/docs/python-api">Python API</a>, <a href="https://github.com/guardana/guardana/blob/v1.0.0/docs/generated/api-surface.json"><code>docs/generated/api-surface.json</code></a>.</p>
+<p>Not guarded by its own test: <code>Verification.exit_code</code> <code>4</code> (target stop) and <code>7</code> (interrupted) through the Python facade (<a href="https://github.com/guardana/guardana/issues/215">#215</a>); <code>7</code> was covered only by <code>test_gate_outcome.py::test_an_interrupted_run_is_indeterminate</code>.</p>
+<h3 id="outcomes-through-saved-evidence">Outcomes through saved evidence</h3>
+<p><em>&quot;Case outcomes and missing evidence survive serialization, redaction and export.&quot;</em></p>
+<ul>
+<li><code>test_saved_run_round_trip.py</code>: <code>test_every_channel_of_a_saved_run_survives_being_written_and_read_back</code>, <code>test_no_key_of_a_saved_run_can_be_deleted_without_the_reader_noticing</code>, <code>test_the_fixture_occupies_every_channel_a_result_has</code>.</li>
+<li><code>test_saved_run_channels.py</code>: <code>test_the_reader_requires_exactly_what_the_published_schema_does</code> (run schema <code>18</code>).</li>
+<li><code>test_redaction_every_text_field.py</code>: <code>test_an_assessment_rationale_loses_the_secret</code>.</li>
+<li><code>report/test_redaction_seam.py</code>: <code>test_a_shortfall_is_never_left_without_a_reason_under_metadata_only</code>, <code>test_the_shortfall_channel_goes_through_the_redactor_like_every_other</code>.</li>
+<li><code>report/test_redaction_every_text_field_rendered.py</code>: <code>test_no_string_field_carries_a_key_through_a_renderer</code>.</li>
+<li><code>examples/output_pack/tests/test_table.py</code>: <code>test_every_field_is_exported_or_excluded_by_name</code>, <code>test_a_case_row_says_how_the_case_ended</code>, <code>test_every_exported_case_field_changes_the_table</code>.</li>
+<li><code>test_output_load_verification.py</code>: <code>test_the_gate_is_read_as_recorded_never_re_derived</code>.</li>
+<li><code>cli/test_suite_accounts_for_every_case.py</code>: <code>test_a_suite_stopped_by_the_budget_is_an_error_testcase_in_junit</code>.</li>
+</ul>
+<p>The collector keeps a reduced envelope by design, rather than the whole saved run. The saved run is the evidence.</p>
+<p>Published: <a href="https://guardana.dev/docs/reading-results#what-the-collector-keeps">What the collector keeps</a>.</p>
+<p>Not guarded by its own test: redacting a result that carries case outcomes and reading it back (<a href="https://github.com/guardana/guardana/issues/215">#215</a>).</p>
+<h3 id="built-in-rule-fixtures">Built-in rule fixtures</h3>
+<p><em>&quot;Every built-in rule that can decline has finding, clean and inconclusive fixtures.&quot;</em></p>
+<ul>
+<li><code>test_builtin_fixture_coverage.py</code>: <code>test_every_built_in_rule_not_exempt_carries_all_three_samples</code>, <code>test_every_fully_sampled_rule_actually_classifies_its_own_samples</code>, <code>test_every_exemption_names_a_shipped_unsampled_rule_and_a_reason</code>.</li>
+</ul>
+<p>All 58 built-in rules classified their own finding, clean and inconclusive samples. The exemption list was empty.</p>
+<p>Published: <a href="https://guardana.dev/docs/generated/rule-summary">Rule summary</a>, <a href="https://guardana.dev/docs/generated/detection-limits">detection limits</a>.</p>
+<h3 id="provider-and-adapter-conformance">Provider and adapter conformance</h3>
+<p><em>&quot;Provider and adapter conformance covers system messages, tools, failure paths, budgets, usage and adapter limits.&quot;</em></p>
+<ul>
+<li><code>target/test_provider_conformance.py</code>: <code>test_the_system_message_arrives_as_the_table_says</code> (each provider), <code>test_offered_tools_reach_the_model_and_its_calls_come_back</code>, <code>test_a_refusal_status_fails_without_a_retry</code>, <code>test_a_retry_is_refused_by_the_request_ceiling</code>, <code>test_token_counts_are_read_when_sent_and_unknown_when_not</code>, <code>test_a_token_ceiling_is_refused_where_counts_are_not_carried</code>, <code>test_the_providers_page_prints_the_table_this_suite_enforces</code>.</li>
+<li><code>test_conformance_of_built_in_endpoints.py</code>: <code>test_every_built_in_provider_conforms</code>, <code>test_an_adapter_transport_conforms</code>.</li>
+<li><code>target/test_adapter_declines.py</code>: <code>test_the_adapter_reports_metadata_and_never_claims_token_counts</code>.</li>
+</ul>
+<p>Published: <a href="https://guardana.dev/docs/providers">Providers</a>, whose table was the one the suite enforced.</p>
+<h3 id="collector-envelope-versions">Collector envelope versions</h3>
+<p><em>&quot;The collector envelope is versioned independently from the run schema; clients and storage migrate together.&quot;</em></p>
+<ul>
+<li><code>server/test_envelope_schema.py</code>: <code>test_the_schema_describes_the_version_both_halves_speak</code>, <code>test_every_property_the_collector_accepts_is_published_and_nothing_else</code>.</li>
+<li><code>server/test_historical_envelopes.py</code>: <code>test_an_envelope_a_release_wrote_is_stored_as_it_was_sent</code>, <code>test_an_agent_newer_than_its_collector_is_refused_with_the_versions_it_speaks</code>.</li>
+<li><code>server/test_upgrade_from_previous_release.py</code>: <code>test_a_collector_upgraded_from_the_oldest_release_keeps_its_data_and_takes_every_envelope</code>.</li>
+</ul>
+<p>These tests needed PostgreSQL. They ran in the release script, the CI <code>test</code> job and the local mirror.</p>
+<p>Published: <a href="https://github.com/guardana/guardana/blob/v1.0.0/schemas/"><code>schemas/</code></a> (collector envelope <code>8</code>, run schema <code>18</code>), <a href="https://guardana.dev/docs/generated/compatibility-matrix">compatibility matrix</a>.</p>
+<p>Not guarded by its own test: the independence of collector envelope <code>8</code> and run schema <code>18</code>, which holds by construction; no test states it (<a href="https://github.com/guardana/guardana/issues/215">#215</a>).</p>
+<h3 id="historical-documents-and-extensions">Historical documents and extensions</h3>
+<p><em>&quot;Older persisted documents and extension conformance pass the release gate, with migrations exercised on older run, dataset, profile, pack and collector documents.&quot;</em></p>
+<ul>
+<li><code>test_historical_documents.py</code>: <code>test_every_stored_run_loads_migrates_and_yields_its_recorded_verdict</code>, <code>test_every_stored_dataset_loads_in_the_format_it_declares</code>, <code>test_every_stored_profile_loads</code>, <code>test_every_stored_pack_manifest_loads</code>, <code>test_every_stored_lock_loads</code>, <code>test_every_version_a_reader_accepts_has_a_stored_document_or_a_reason</code>.</li>
+<li><code>server/test_migrations.py</code>: <code>test_rows_written_before_a_migration_survive_it</code>.</li>
+<li><code>examples/custom_rule/tests/test_every_rule_is_sampled.py</code>: <code>test_every_acme_rule_proves_all_three_outcomes</code>.</li>
+<li><code>test_output_conformance_kit.py</code>: <code>test_a_conforming_reporter_passes_with_its_requests_counted</code>.</li>
+<li><code>test_target_protocols.py</code>: <code>test_the_conformance_kit_catches_a_target_that_under_declares</code>.</li>
+</ul>
+<p>Current tests read historical documents from <code>0.2.0</code> through <code>1.0.0rc5</code>. Four versions a reader accepts had no stored document, each named in the test with its reason: collector envelope <code>6</code> (no published release wrote it); pack manifest <code>1</code> (no release that wrote it could lock a pack; a hand-written manifest of that version is tested separately); pack manifest <code>3</code> and pack lock <code>3</code> (written only for a pack that declares or pins an output, which no captured pack does). Extension conformance also ran the reference pack's and custom-rule example's own suites and checked a new pack scaffolded from the template in the <code>example-plugin</code> job.</p>
+<h3 id="published-supported-surface">Published supported surface</h3>
+<p><em>&quot;The supported surface, compatibility matrix, deprecation policy and conformance kit are published.&quot;</em></p>
+<ul>
+<li><code>scripts/tests/test_api_surface.py</code>: <code>test_the_committed_snapshot_is_what_the_source_says_today</code>, <code>test_the_snapshot_holds_every_surface_and_leaves_the_runner_out</code>.</li>
+<li><code>scripts/tests/test_compatibility_matrix.py</code>: <code>test_a_candidate_stands_for_its_minor_until_the_final_release_is_recorded</code>.</li>
+<li><code>test_docs_consistency.py</code>: <code>test_generated_truth_is_current</code>.</li>
+<li><code>scripts/tests/test_release_script.py</code>: <code>test_a_final_whose_surface_moved_since_its_candidate_is_refused_whatever_the_changelog_says</code>.</li>
+<li><code>test_testing_kit_is_documented.py</code>: <code>test_every_testing_export_is_named_in_the_extension_guide</code>.</li>
+</ul>
+<p>Before its gate, <code>scripts/release.py</code> checked that the final release's supported surface equalled its last candidate's surface, comparing <code>docs/generated/api-surface.json</code> against <code>v1.0.0rc5</code>. The check passed for <code>1.0.0</code>.</p>
+<p>Published: <a href="https://github.com/guardana/guardana/blob/v1.0.0/docs/generated/api-surface.json"><code>docs/generated/api-surface.json</code></a>, <a href="https://guardana.dev/docs/generated/compatibility-matrix">compatibility matrix</a>, <a href="https://guardana.dev/docs/compatibility">versioning and deprecation policy</a>, <a href="https://guardana.dev/docs/conformance-kit">conformance kit</a>.</p>
+<p>Not guarded by its own test: the deprecation policy text and the conformance-kit table (<a href="https://github.com/guardana/guardana/issues/215">#215</a>).</p>
+<h2 id="follow-up">Follow-up</h2>
+<p><a href="https://github.com/guardana/guardana/issues/215">#215</a>, in milestone <code>1.0.1</code>, adds a test for each item above that no single test guards today, with no production code change.</p>
+
+</main>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana · Apache-2.0</span>
+<a href="/notes/feed.xml">Atom feed</a>
+<a href="/llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

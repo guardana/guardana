@@ -104,6 +104,7 @@ This file is generated from the documentation map; do not edit it by hand.
 
 ## Notes
 
+- [1.0.0 release gate evidence for engineering criteria (#144)](https://guardana.dev/notes/release-gate-evidence-1-0-0): The engineering tests passed on fb9ab309 for 1.0.0; items without their own tests are tracked in #215.
 - [Security runbook drill (#142)](https://guardana.dev/notes/security-runbook-drill): The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.
 - [Retrieval pilot: poisoned document and tenant filter (#139)](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter): The fixed pilot passed; a broken tenant filter failed the tenancy check, and a model obeying a document failed the poisoned-document check.
 - [Regression loop with a redacted regression (#140)](https://guardana.dev/notes/regression-loop-with-a-redacted-regression): A redacted recording retained the regression, failed regrading and the CI comparison, and supplied a regression pair after the question was rewritten.
