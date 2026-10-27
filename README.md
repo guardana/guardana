@@ -76,7 +76,7 @@ guardana probe --url http://localhost:11434 --model llama3 --preset ci --format 
 guardana diff accepted-run.json run.json   # 0 nothing worse at the policy's bars · 1 it is · 2 cannot tell
 ```
 
-Choose a guide for [your own project](docs/recipe-local-scan.md), [a run your application recorded](docs/recipe-recorded-answers.md), or [the application your users talk to](docs/recipe-real-application.md).
+Choose a guide for [your own project](docs/recipe-local-scan.md), [a run your application recorded](docs/recipe-recorded-answers.md), or [the application your users talk to](docs/recipe-real-application.md). To add Guardana to an existing repository and pipeline, follow [Adopt Guardana in your project](docs/adopt-guardana.md).
 
 For integration requirements, see [feature and field availability](docs/compatibility.md#feature-and-field-availability) and the [compatibility matrix](docs/generated/compatibility-matrix.md). Package availability identifies when an item first shipped; document schemas, `extension_api` and `output_api` have independent versions.
 

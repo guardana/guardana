@@ -15,6 +15,7 @@ This file is generated from the documentation map; do not edit it by hand.
 - [recipe-local-scan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/recipe-local-scan.md): scan your own project and save the run
 - [recipe-recorded-answers.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/recipe-recorded-answers.md): check a run your application already recorded
 - [recipe-real-application.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/recipe-real-application.md): probe the application your users talk to
+- [adopt-guardana.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/adopt-guardana.md): add Guardana to your repository and CI
 - [usage-scan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-scan.md): scan artifacts offline
 - [usage-probe.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-probe.md): probe a live endpoint, agent, MCP server or A2A agent
 - [usage-testing.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-testing.md): run the same checks from pytest

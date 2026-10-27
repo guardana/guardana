@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://guardana.dev/docs/adopt-guardana</loc></url>
   <url><loc>https://guardana.dev/docs/architecture</loc></url>
   <url><loc>https://guardana.dev/docs/community</loc></url>
   <url><loc>https://guardana.dev/docs/compatibility</loc></url>
