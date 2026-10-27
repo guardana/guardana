@@ -261,7 +261,7 @@ jobs:
       security-events: write   # required to upload SARIF
     steps:
       - uses: actions/checkout@v7
-      - uses: guardana/guardana@v0.41   # moving tag; pins to the latest 0.41.x
+      - uses: guardana/guardana@v1.0   # moving tag; pins to the latest 1.0.x
         with:
           path: .
           # args: --preset ci --baseline guardana-baseline.yaml
@@ -324,12 +324,12 @@ user: the image's default user cannot write to a checkout it does not own:</p>
       - name: Scan and save this run
         # exit 1 is a finding the comparison will judge; 2 and above still stop the job
         run: &gt;
-          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work&quot; ghcr.io/guardana/guardana:0.41
+          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work&quot; ghcr.io/guardana/guardana:1.0
           scan /work --format json --output /work/current.json || test $? -eq 1
 
       - name: Compare against the last accepted run
         run: &gt;
-          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.41
+          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.0
           diff /work/accepted.json /work/current.json --preset ci
 </code></pre>
 <p>Keep <code>accepted.json</code> in the repository (or in your CI's artifact store) and
@@ -341,7 +341,7 @@ these&quot; is not &quot;nothing got worse&quot;. See <a href="usage-diff.html">
 <p>The templates live in <a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md"><code>deploy/ci/</code></a> and are meant to be
 copied. The shortest form, which is also what the Jenkins and Azure templates
 run:</p>
-<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.41 \
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.0 \
   scan /work --format junit &gt; guardana-junit.xml
 </code></pre>
 <p>The redirect is deliberate: the file is written by your shell, with your user's
@@ -351,7 +351,7 @@ the job's test report — GitLab, Jenkins and Azure all read JUnit natively — 
 let the exit code fail the build.</p>
 <p>GitLab can include the job rather than copy it:</p>
 <pre><code class="language-yaml">include:
-  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v0.41/deploy/ci/gitlab-ci.yml&quot;
+  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v1.0/deploy/ci/gitlab-ci.yml&quot;
 
 guardana:
   variables:
@@ -381,7 +381,7 @@ to turn the gate on for an existing repo without fixing the whole backlog first.
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc5 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/integrations.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

@@ -50,8 +50,8 @@ Inside the checkout, `guardana scan .` exits `1` because `examples/vulnerable-mo
 The CLI and collector images are available from GitHub Container Registry:
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.41 scan /work
-docker run --rm ghcr.io/guardana/guardana-collector:0.41 --help
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:1.0 --help
 ```
 
 Tags include the exact version, the moving minor used above, and `latest`. While a release candidate is out, `latest`, the moving minor and the Action's `vX.Y` tag stay on the last stable release, and the candidate's image carries only its exact version as a tag. Pin the moving minor in CI to receive fixes without changing the rule set, or pin a digest (`ghcr.io/guardana/guardana:<version>@sha256:<digest>`) to run exactly the image you reviewed. Both images run as a non-root user, support `linux/amd64` and `linux/arm64`, and include an SBOM and signed provenance attestation. See [`deploy/docker/README.md`](../deploy/docker/README.md) for mounts, exit codes, reports, and image builds.

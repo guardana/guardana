@@ -226,8 +226,8 @@ uv run guardana scan examples/vulnerable-model   # exits 1: finds the planted is
 <p><code>uv sync</code> installs <code>guardana-core</code>, <code>guardana-rules</code>, <code>guardana-cli</code>, <code>guardana-report</code>, and <code>guardana-server</code> from the root <code>pyproject.toml</code>, plus <code>ruff</code>, <code>mypy</code>, and <code>pytest</code>. Run commands with <code>uv run guardana ...</code> inside the checkout. See <a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a> for contributor setup and test/lint gates.</p>
 <h2 id="run-it-as-a-container">Run it as a container</h2>
 <p>The CLI and collector images are available from GitHub Container Registry:</p>
-<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:0.41 scan /work
-docker run --rm ghcr.io/guardana/guardana-collector:0.41 --help
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.0 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:1.0 --help
 </code></pre>
 <p>Tags include the exact version, the moving minor used above, and <code>latest</code>. While a release candidate is out, <code>latest</code>, the moving minor and the Action's <code>vX.Y</code> tag stay on the last stable release, and the candidate's image carries only its exact version as a tag. Pin the moving minor in CI to receive fixes without changing the rule set, or pin a digest (<code>ghcr.io/guardana/guardana:&lt;version&gt;@sha256:&lt;digest&gt;</code>) to run exactly the image you reviewed. Both images run as a non-root user, support <code>linux/amd64</code> and <code>linux/arm64</code>, and include an SBOM and signed provenance attestation. See <a href="https://github.com/guardana/guardana/blob/main/deploy/docker/README.md"><code>deploy/docker/README.md</code></a> for mounts, exit codes, reports, and image builds.</p>
 <h2 id="the-optional-collector">The optional collector</h2>
@@ -246,7 +246,7 @@ guardana-collector migrate             # then: guardana-collector serve
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc5 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/install.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

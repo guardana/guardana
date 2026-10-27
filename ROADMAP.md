@@ -12,7 +12,7 @@ scope, not a date.
 Ideas without a reproducible problem or acceptance test start in
 [Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
 
-## What ships today (1.0.0rc5)
+## What ships today (1.0.0)
 
 The current release carries the stable compatibility promise for its supported surface; [Product status](docs/product-status.md) lists maturity by component.
 It scans model and code artifacts offline, probes live endpoints, MCP servers and A2A agents, grades recordings, compares runs and gates CI.

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-27
+
 1.0.0 is Guardana's first stable release. The [compatibility promise](docs/compatibility.md) covers the supported surface: incompatible changes require a major release, and every 1.x release reads earlier persisted documents. The engine and built-in rules, Python verification API, extension API, `scan` and `diff` are stable. `probe`, `grade`, `analyze-trace`, `monitor`, the optional collector, quality suites with deterministic assessors and repository recipes remain beta; judge-graded suites and judge-error correction remain experimental ([product status](docs/product-status.md)). See the [known limitations](docs/product-status.md#known-limitations) and [published maintainer-run proofs](docs/product-status.md#stable-release-criteria).
 
 **Upgrading from 0.41:** Read the 1.0.0rc3 "Changed — breaking" section: the collector's `/docs`, `/redoc` and `/docs/oauth2-redirect` routes return 404, a `rules.include` pattern matching no registered rule exits 3, and a scanned target's own `.guardanaignore` cannot exclude a file a model loader reads. Read the 1.0.0rc4 "Changed — breaking" section: stdio MCP server references include the full command as `mcp+stdio://<executable>#argv-<digest>`, and native trace readers refuse traces without span records or with a record missing a schema-required field. Check the "May now fail" notes in 1.0.0rc2 through 1.0.0rc5. The default `llm_judge` prompt version is `2026.1` from 1.0.0rc2, so a calibration recorded for `llm_judge@2025.1` no longer applies. 1.0 reads saved runs and baselines from 0.41; `guardana run migrate` reads every earlier run schema.

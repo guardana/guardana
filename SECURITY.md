@@ -164,8 +164,8 @@ Check them without trusting this document:
 
 ```bash
 gh attestation verify ./guardana_cli-<version>-py3-none-any.whl --repo guardana/guardana
-gh attestation verify oci://ghcr.io/guardana/guardana:0.41 --repo guardana/guardana
-docker buildx imagetools inspect ghcr.io/guardana/guardana:0.41 --format '{{ json .SBOM }}'
+gh attestation verify oci://ghcr.io/guardana/guardana:1.0 --repo guardana/guardana
+docker buildx imagetools inspect ghcr.io/guardana/guardana:1.0 --format '{{ json .SBOM }}'
 ```
 
 For a downloaded file, use `--bundle` to check it against the build-provenance bundle attached to the GitHub Release:
@@ -199,7 +199,7 @@ The release controls are described in [the threat model](docs/threat-model.md#t1
 
 ## Supported versions
 
-Guardana is pre-1.0 (0.41.x). Security fixes land on the latest release;
+Guardana supports major 1 (1.0.x). Security fixes land on the latest release;
 there is no LTS branch. Neither 0.41.x nor the 1.0.0 release candidates receive
 further releases. A plain install selects the latest stable release;
 `pip install --upgrade --pre` is needed only for a release candidate. Which
