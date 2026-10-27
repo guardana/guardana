@@ -234,12 +234,12 @@ a shell cell magic, a magic defined with `%alias_magic`, an automagic `system` l
 or a call on the IPython object. The rule does not read what the script runs.
 `python -m`, `sh -c` with its command (which the rule reads for scripts in turn) and
 a tool run by name are not scripts. A download piped to a shell remains a `high` finding.
-A shell line longer than `32 KiB`, a line `shlex` refuses for a reason other than an
+A shell line longer than `32,768` characters, a line `shlex` refuses for a reason other than an
 unclosed quote but a shell still runs (such as one ending in a backslash), or a `-c`
 program nested more than four levels deep makes the cell inconclusive with an
 `unexamined_component` coverage shortfall naming the notebook. Scripts found by
 splitting such a line on whitespace are still named. `%alias_magic` arguments longer
-than `32 KiB` also make the cell inconclusive.
+than `32,768` characters also make the cell inconclusive.
 
 An archive is refused before it is opened when listing it would cost more than listing a
 model does. A zip, a `.keras` included, is refused when its end records declare more than

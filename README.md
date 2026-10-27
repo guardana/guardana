@@ -34,7 +34,14 @@ The command is `guardana`; the distribution is `guardana-cli`. An uncached `uvx`
 Start with an offline result:
 
 ```bash
-guardana init --starter first-run   # a small project with one problem to find and fix
+# With uvx:
+uvx --from guardana-cli guardana init --starter first-run
+
+# After uv add guardana-cli:
+uv run guardana init --starter first-run
+
+# After pip install guardana-cli in an active environment:
+guardana init --starter first-run
 ```
 
 Its README walks through a failing scan, the fix, a saved run, and a check of your own. Once Guardana is installed, it needs no account, key, model, or network.
