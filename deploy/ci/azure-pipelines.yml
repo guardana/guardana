@@ -29,6 +29,7 @@ steps:
       docker run --rm \
         -v "$(Build.SourcesDirectory):/work:ro" \
         -e GUARDANA_COLLECTOR_TOKEN \
+        -e BUILD_SOURCEVERSION -e TF_BUILD \
         "$(guardanaImage)" \
         scan "/work/$(guardanaPath)" $(guardanaArgs) \
           --format junit > "$(Build.SourcesDirectory)/guardana-junit.xml"

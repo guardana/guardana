@@ -17,8 +17,11 @@ A recording comes from one of two places:
 - **You write it**: the answers your application gave to your dataset's questions, collected
   however you run it.
 - **`guardana probe --keep-exchanges` keeps it**: every chat exchange of the probe, redacted,
-  beside the saved run, for `--url` or a pack's `--target` built on the built-in endpoint. Grading it again with a new rule, a sharper expectation or a new judge
-  measures the grading on the very same replies.
+  beside the saved run, for `--url` or a pack's `--target` built on the built-in endpoint. Grading it again with a sharper expectation or a new judge
+  measures the grading on the very same replies only for rule ids the recording
+  names and the exact messages recorded. A rule the recording does not name is
+  skipped as `not_recorded`; a rule whose prompt changed gets no reply and records
+  an error.
 
 ```bash
 guardana grade answers.jsonl --rules rules/ --profile guardana.yaml

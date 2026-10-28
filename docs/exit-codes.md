@@ -204,7 +204,8 @@ A connection that cannot be used as written is `3` on `probe`, `plan probe`,
 unknown `--provider`, a `--system-prompt-file` or `--adapter` that cannot be read, an
 `--api-key-env` naming an unset or empty variable, `--adapter` with `--provider` or
 `--api-key-env`, and an adapter whose `url:` differs from `--url` or whose `method:` is
-not `POST`. On `probe --mcp` the same holds for an stdio command given without
+not `POST`. The two `--api-key-env` cases do not apply to `plan probe`, which has no
+`--api-key-env` option; passing it is an unknown-option error, also exit `3`. On `probe --mcp` the same holds for an stdio command given without
 `--allow-exec`, which starts nothing, an stdio `--mcp` command that cannot be split into a program and its arguments, an `--mcp-token-env` naming an unset or empty
 variable, and an `--mcp-registry-entry` that cannot be read or is not an entry; on
 `probe --a2a` and `plan probe --a2a`, for an agent URL whose path is neither an agent card
