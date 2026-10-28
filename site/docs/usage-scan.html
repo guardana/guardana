@@ -434,8 +434,8 @@ every preset, <code>ci</code> included, unless a finding fails it. The dependenc
 model-card rules likewise report a file they could not read whole, including at the
 16 MiB read bound, as an <code>unexamined_component</code> shortfall (<code>indeterminate</code>, exit <code>2</code>).
 The secret scan and MCP tool-manifest scan read every text/JSON file, data files included,
-and report one they could not read whole at that bound as unverified; that result fails
-the gate only under <code>fail_on_inconclusive: true</code>. Every cell a notebook reader runs is
+and report one they could not read whole at that bound as unverified; that result leaves
+the run <code>indeterminate</code> (exit <code>2</code>) only under <code>fail_on_inconclusive: true</code>. Every cell a notebook reader runs is
 read: the top-level <code>cells</code> by their <code>source</code>; the <code>code</code> of a v1 code cell, which nbformat
 runs from a notebook that declares no version; and the cells of each <code>worksheets</code> entry by
 their <code>input</code>, which nbformat runs instead of the top-level cells when it upgrades a v2 or v3

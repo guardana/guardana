@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **You can follow [Adopt Guardana in your project](docs/adopt-guardana.md) to add Guardana to an existing repository and pipeline.** The guide puts installation, profile selection, waiver review, CI gates, application checks and evidence collection in order, with beta and optional steps marked. No behaviour changes.
 - **Added a [note](https://guardana.dev/notes/release-gate-evidence-1-0-0) recording the release gate evidence on the `1.0.0` commit for the engineering criteria (#144).**
 - **Jump directly to headings when opening guardana.dev documentation at an anchor.** Smooth scrolling applies only after the reader interacts with the page, and never under `prefers-reduced-motion: reduce`. Previously, at 400 px, smooth scrolling targeted a position computed before web fonts loaded and could leave the heading under the sticky mobile menu (#228).
+- **Document that `fail_on_inconclusive: true` leaves unverified results `indeterminate` (exit `2`).** The example comment in `docs/profiles.md`, plus `docs/usage-probe.md`, `docs/usage-scan.md` and `docs/architecture.md`, now agree with the table in `docs/profiles.md`; they previously said it fails the gate. `docs/architecture.md` also states that CLI exit codes come from `gate_outcome()` and that `gate()` is its boolean form. No behaviour changes.
 
 ## [1.0.0] - 2026-10-27 — the first stable release
 

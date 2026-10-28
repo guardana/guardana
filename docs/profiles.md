@@ -66,7 +66,7 @@ fail_on:
   severity: high                # one of: info | low | medium | high | critical
                                  # (case-insensitive); defaults to "high"
   min_confidence: 0.7           # 0.0-1.0; defaults to 0.0
-  fail_on_inconclusive: false   # true: unverified checks also fail the gate
+  fail_on_inconclusive: false   # true: unverified checks leave the run indeterminate
   fail_on_error: true           # false: a check that could not run stops blocking
   fail_on_skipped: false        # true: a selected rule the target cannot run is a gap
   min_graded_share: 0.8         # optional, (0, 1]; least share of its cases a rule grades
