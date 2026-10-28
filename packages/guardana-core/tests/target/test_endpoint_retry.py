@@ -226,10 +226,18 @@ def test_a_refused_connection_stays_the_url_error_it_is(
 
 
 class _UnclosableBody(io.BytesIO):
-    """A reply body whose `close()` fails, as a connection torn down underneath it can."""
+    """A reply body whose first `close()` fails, as a connection torn down underneath it can.
+
+    Later calls close it, so the finaliser that closes the error again at collection is quiet.
+    """
+
+    failed = False
 
     def close(self) -> None:
-        raise OSError("the connection is already gone")
+        if not self.failed:
+            self.failed = True
+            raise OSError("the connection is already gone")
+        super().close()
 
 
 def _error(code: int, body: io.BytesIO) -> HTTPError:

@@ -187,10 +187,18 @@ def test_any_other_failure_says_the_endpoint_could_not_be_reached() -> None:
 
 
 class _UnclosableBody(io.BytesIO):
-    """A reply body whose `close()` fails, as a connection torn down underneath it can."""
+    """A reply body whose first `close()` fails, as a connection torn down underneath it can.
+
+    Later calls close it, so the finaliser that closes the error again at collection is quiet.
+    """
+
+    failed = False
 
     def close(self) -> None:
-        raise OSError("the connection is already gone")
+        if not self.failed:
+            self.failed = True
+            raise OSError("the connection is already gone")
+        super().close()
 
 
 class _UnreadableBody(io.BytesIO):
