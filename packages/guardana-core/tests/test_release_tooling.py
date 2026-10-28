@@ -122,6 +122,31 @@ def test_main_dry_run_lists_the_core_dunder_file(
     assert "src/guardana/core/__init__.py" in capsys.readouterr().out
 
 
+def test_main_dry_run_lists_the_citation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", _next_final_minor(), "--dry-run"])
+    assert _BUMP.main() == 0
+    assert "would update CITATION.cff" in capsys.readouterr().out
+
+
+def test_the_citation_names_the_package_version() -> None:
+    citation = yaml.safe_load((_repo_root() / "CITATION.cff").read_text(encoding="utf-8"))
+
+    assert str(citation["version"]) == _BUMP._current_version()
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(citation["date-released"]))
+
+
+def test_a_bump_moves_the_citation_version_and_release_date() -> None:
+    text = "license: Apache-2.0\nversion: 1.0.0\ndate-released: '2026-10-27'\n"
+
+    marked = _marked("CITATION.cff", text, "1.0.1")
+
+    assert "version: 1.0.1\n" in marked
+    assert "date-released: '2026-10-27'" not in marked
+    assert re.search(r"^date-released: '\d{4}-\d{2}-\d{2}'$", marked, re.MULTILINE)
+
+
 def test_rewrite_action_pin_follows_the_released_minor() -> None:
     # The docs tell users to pin the moving `vMAJOR.MINOR` tag for the Marketplace
     # Action. Left behind by a release, that line silently serves an Action from
