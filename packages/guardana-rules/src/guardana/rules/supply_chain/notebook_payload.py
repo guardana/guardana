@@ -304,14 +304,7 @@ class NotebookPayloadRule(ArtifactRule):
         path = scan.path
         scan.state.bound |= cell.bound
         for line in cell.shell:
-            if PIPE_TO_SHELL.search(line):
-                yield self._finding(
-                    path, where, Severity.HIGH, "shell escape pipes a download into a shell"
-                )
-            scripts, read = local_scripts(line)
-            scan.scripts.extend(scripts)
-            if not read:
-                yield self._unread(scan, where, "a shell line that cannot be tokenised")
+            yield from self._scan_shell_line(scan, where, line, depth)
         for label in dict.fromkeys(cell.unread):
             yield self._unread(scan, where, label)
         tree = yield from self._parse(scan, where, cell)
@@ -331,6 +324,26 @@ class NotebookPayloadRule(ArtifactRule):
                 continue
             nested = read_shell_command(text) if kind == "shell" else read_cell(text, scan.state)
             yield from self._scan_cell(scan, where, nested, depth + 1)
+
+    def _scan_shell_line(
+        self, scan: _NotebookScan, where: _Cell, line: str, depth: int
+    ) -> Iterator[Finding]:
+        """Read one shell command: a download piped into a shell, scripts, Python it runs."""
+        if PIPE_TO_SHELL.search(line):
+            yield self._finding(
+                scan.path, where, Severity.HIGH, "shell escape pipes a download into a shell"
+            )
+        shell = local_scripts(line)
+        scan.scripts.extend(shell.scripts)
+        if shell.untokenised:
+            yield self._unread(scan, where, "a shell line that cannot be tokenised")
+        if shell.computed:
+            yield self._unread(scan, where, "a shell command whose program is computed")
+        for program in shell.python:
+            if depth >= _MAX_IPYTHON_NESTING:
+                yield self._unread(scan, where, "python -c")
+                continue
+            yield from self._scan_cell(scan, where, read_cell(program), depth + 1)
 
     def _local_scripts(self, scan: _NotebookScan, where: _Cell) -> Iterator[Finding]:
         """Name, in one low finding, the local scripts a cell runs, whose code is not read."""

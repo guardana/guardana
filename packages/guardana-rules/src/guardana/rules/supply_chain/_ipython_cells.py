@@ -480,8 +480,10 @@ def _escaped_python(joined: str, state: NotebookState, cell: CellReading) -> str
         cell.bound |= _assigned_names(assign.group("target"))
         stripped = assign.group("kind") + assign.group("rest")
     if stripped.startswith("!"):
-        cell.shell.append(stripped[1:])
-        return _expansion_python(stripped[1:], cell) or None
+        # `!!cmd` runs `cmd` as `%sx` does; the second `!` is IPython's, not the shell's.
+        command = stripped[2:] if stripped.startswith("!!") else stripped[1:]
+        cell.shell.append(command)
+        return _expansion_python(command, cell) or None
     if not stripped.startswith("%%"):
         # IPython takes the magic's name up to the first space, exactly.
         name, _, args = stripped[1:].partition(" ")
@@ -816,10 +818,37 @@ def _call_on_ipython(
 
 
 _COMMAND_SEPARATORS = frozenset({";", ";;", "&", "&&", "|", "||", "|&", "(", ")"})
-_COMMAND_WRAPPERS = frozenset(
-    {"builtin", "command", "env", "exec", "nice", "nohup", "sudo", "time"}
+# Words a shell reads as grammar before the command they introduce, not as the command.
+_RESERVED_WORDS = frozenset(
+    {"!", "{", "}", "if", "then", "else", "elif", "fi", "do", "done", "while", "until"}
 )
-_WRAPPER_VALUED_OPTIONS = frozenset({"-u", "-g", "-n"})
+# Programs that run the command after them, with the options that take a value and the
+# positional arguments (a duration, a priority) they read before that command.
+_COMMAND_WRAPPERS: dict[str, tuple[frozenset[str], int]] = {
+    "builtin": (frozenset(), 0),
+    "chrt": (frozenset(), 1),
+    "command": (frozenset(), 0),
+    "doas": (frozenset({"-u", "-C"}), 0),
+    "env": (frozenset({"-u", "-C", "--unset", "--chdir"}), 0),
+    "exec": (frozenset({"-a"}), 0),
+    "ionice": (frozenset({"-c", "-n", "-p", "-P", "-u"}), 0),
+    "nice": (frozenset({"-n", "--adjustment"}), 0),
+    "nohup": (frozenset(), 0),
+    "setsid": (frozenset(), 0),
+    "stdbuf": (frozenset({"-i", "-o", "-e", "--input", "--output", "--error"}), 0),
+    "sudo": (frozenset({"-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-T", "-U", "-R"}), 0),
+    "taskset": (frozenset(), 1),
+    "time": (frozenset({"-f", "-o", "--format", "--output"}), 0),
+    "timeout": (frozenset({"-k", "-s", "--kill-after", "--signal"}), 1),
+    "xargs": (
+        frozenset(
+            {"-a", "-d", "-E", "-I", "-L", "-n", "-P", "-s", "--arg-file", "--delimiter"}
+            | {"--max-args", "--max-chars", "--max-lines", "--max-procs"}
+        ),
+        0,
+    ),
+}
+_EVAL_COMMANDS = frozenset({"eval"})
 _SOURCE_COMMANDS = frozenset({"source", "."})
 _SCRIPT_SUFFIXES = (".sh", ".bash", ".zsh", ".ksh", ".py")
 _ASSIGNMENT = re.compile(r"[A-Za-z_]\w*=")
@@ -827,7 +856,12 @@ _SHELL_VALUED_OPTIONS = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "--init-f
 _PYTHON_VALUED_OPTIONS = frozenset({"-W", "-X", "--check-hash-based-pycs"})
 _STDIN = "<"
 _MAX_INLINE_DEPTH = 4
-"""How deep `sh -c` programs nested in one another are read for scripts."""
+"""How deep `sh -c` programs and command substitutions nested in one another are read."""
+
+# IPython expands `{sys.executable}` to the interpreter running the kernel; any other
+# expansion in the command's name leaves the program unknown until the cell runs.
+_KERNEL_PYTHON = re.compile(r"\{\s*sys\.executable\s*\}")
+_COMPUTED = re.compile(r"[$`]|\{[^}]*\}")
 
 # `shlex` tokenises in time quadratic in the length of one unquoted run, so a single crafted
 # line could stall a scan; a longer line is not tokenised.
@@ -838,21 +872,120 @@ _MAX_SHELL_CHARS = 32 * 1024
 _UNCLOSED_QUOTE = "No closing quotation"
 
 
-def _shell_words(command: str) -> tuple[list[str], bool]:
+@dataclass
+class ShellReading:
+    """What one shell command runs that the rule names, and what it could not read."""
+
+    scripts: list[str] = field(default_factory=list)
+    """The local script files it runs, as written."""
+
+    python: list[str] = field(default_factory=list)
+    """Programs given to a Python interpreter as text (`python -c`), read as Python in turn."""
+
+    untokenised: bool = False
+    """A command, or a program or substitution in it, was not tokenised as a shell would."""
+
+    computed: bool = False
+    """A command whose program is only known when it runs (`$cmd`, `{cmd}`, a substitution)."""
+
+
+def _without_comment(command: str) -> str:
+    """Cut the comment a shell ignores: from an unquoted `#` that starts a word."""
+    quote: str | None = None
+    escaped = False
+    previous = " "
+    for index, char in enumerate(command):
+        if escaped:
+            escaped = False
+            # An escaped character, a space included, is part of the word, not its boundary.
+            previous = "x"
+            continue
+        if quote == "'":
+            quote = None if char == "'" else quote
+        elif char == "\\":
+            escaped = True
+        elif quote == '"':
+            quote = None if char == '"' else quote
+        elif char in "'\"":
+            quote = char
+        elif char == "#" and (previous.isspace() or previous in ";&|()<>"):
+            return command[:index]
+        previous = char
+    return command
+
+
+def _closing_paren(command: str, start: int) -> int:
+    """Return the index of the `)` that closes a `(` opened just before `start`, or the end."""
+    depth, quote, index = 1, None, start
+    while index < len(command):
+        char = command[index]
+        if quote == "'":
+            quote = None if char == "'" else quote
+        elif char == "\\":
+            index += 1
+        elif quote == '"':
+            quote = None if char == '"' else quote
+        elif char in "'\"":
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return len(command)
+
+
+def _substitutions(command: str) -> list[str]:
+    """Return the commands a shell runs for their output: `$(…)` and backquotes, quoted or not.
+
+    Single quotes keep both literal; double quotes do not. One left open runs to the end.
+    """
+    bodies: list[str] = []
+    quote: str | None = None
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if quote == "'":
+            quote = None if char == "'" else quote
+        elif char == "\\":
+            index += 1
+        elif command.startswith("$(", index) and not command.startswith("$((", index):
+            end = _closing_paren(command, index + 2)
+            bodies.append(command[index + 2 : end])
+            index = end
+        elif char == "`":
+            end = command.find("`", index + 1)
+            end = len(command) if end < 0 else end
+            bodies.append(command[index + 1 : end])
+            index = end
+        elif char == '"':
+            quote = None if quote == '"' else '"'
+        elif char == "'" and quote is None:
+            quote = "'"
+        index += 1
+    return bodies
+
+
+def _shell_words(command: str) -> tuple[list[str], bool, bool]:
     """Split a shell command into words and operators as a POSIX shell tokenises it.
 
-    The flag is False when the words come from a plain whitespace split instead, which can
-    miss what quoting makes the line run: a line past `_MAX_SHELL_CHARS`, or one `shlex`
-    refuses for anything but an unclosed quote (a trailing backslash a shell still runs).
+    The first flag is False when the words come from a plain whitespace split instead, which
+    can miss what quoting makes the line run: a line past `_MAX_SHELL_CHARS`, or one `shlex`
+    refuses for anything but an unclosed quote (a trailing backslash a shell still runs). The
+    second is True only when `shlex` tokenised the whole line.
     """
     if len(command) > _MAX_SHELL_CHARS:
-        return command.split(), False
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        return command.split(), False, False
+    lexer = shlex.shlex(_without_comment(command), posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
+    # `shlex` starts a comment at a `#` inside a word, where a shell does not.
+    lexer.commenters = ""
     try:
-        return list(lexer), True
+        return list(lexer), True, True
     except ValueError as refusal:
-        return command.split(), str(refusal) == _UNCLOSED_QUOTE
+        return command.split(), str(refusal) == _UNCLOSED_QUOTE, False
 
 
 def _simple_commands(words: list[str]) -> Iterator[tuple[list[str], str | None]]:
@@ -875,16 +1008,21 @@ def _simple_commands(words: list[str]) -> Iterator[tuple[list[str], str | None]]
 
 
 def _unwrapped(words: list[str]) -> list[str]:
-    """Drop leading assignments and the wrappers that run the command after them."""
+    """Drop leading assignments, grammar words and the wrappers that run the command after them."""
     index = 0
     while index < len(words):
         word = words[index]
-        if _ASSIGNMENT.match(word):
+        wrapper = _COMMAND_WRAPPERS.get(word.rsplit("/", 1)[-1])
+        if _ASSIGNMENT.match(word) or word in _RESERVED_WORDS:
             index += 1
-        elif word.rsplit("/", 1)[-1] in _COMMAND_WRAPPERS:
+        elif word == "function":
+            index += 2
+        elif wrapper is not None:
+            valued, positional = wrapper
             index += 1
-            while index < len(words) and words[index].startswith("-"):
-                index += 2 if words[index] in _WRAPPER_VALUED_OPTIONS else 1
+            while index < len(words) and words[index].startswith("-") and words[index] != "-":
+                index += 2 if words[index] in valued else 1
+            index += positional
         else:
             break
     return words[index:]
@@ -936,47 +1074,89 @@ def _names_a_script(word: str) -> bool:
     return "/" in word and not word.startswith("/")
 
 
-def local_scripts(command: str, depth: int = 0) -> tuple[list[str], bool]:
-    """Return the local script files a shell command runs, as written, and whether all was read.
+def _program(word: str) -> str | None:
+    """Return the program a command word names, or None when it is computed when it runs."""
+    word = _KERNEL_PYTHON.sub("python", word)
+    return None if _COMPUTED.search(word.rsplit("/", 1)[-1]) else word
+
+
+@dataclass
+class _Inline:
+    """Programs a command is given as text, read once the command's own words are."""
+
+    shell: list[str] = field(default_factory=list)
+    python: list[str] = field(default_factory=list)
+
+
+def _read_command(
+    words: list[str], stdin: str | None, reading: ShellReading, inline: _Inline, *, exact: bool
+) -> None:
+    """Read one simple command into `reading`; a program it is given as text goes to `inline`."""
+    program = _program(words[0])
+    if program is None:
+        reading.computed = True
+        return
+    arguments = words[1:]
+    name = program.rsplit("/", 1)[-1]
+    script: str | None
+    if name in _SHELL_INTERPRETERS or _PYTHON_INTERPRETER.fullmatch(name):
+        shell = name in _SHELL_INTERPRETERS
+        run = _interpreter_run(
+            arguments,
+            _SHELL_VALUED_OPTIONS if shell else _PYTHON_VALUED_OPTIONS,
+            "c" if shell else "cm",
+        )
+        script = run.script if run.named else stdin
+        if run.inline is not None and shell:
+            inline.shell.append(run.inline)
+        elif run.inline is not None:
+            inline.python.append(run.inline)
+            # A Python program cut out of a whitespace split is not the text Python runs.
+            if exact:
+                reading.python.append(run.inline)
+    elif name in _EVAL_COMMANDS:
+        script = None
+        inline.shell.append(" ".join(arguments))
+    elif name in _SOURCE_COMMANDS:
+        script = arguments[0] if arguments else None
+    else:
+        script = program if _names_a_script(program) else None
+    if script is not None:
+        reading.scripts.append(script)
+
+
+def local_scripts(command: str, depth: int = 0) -> ShellReading:
+    """Read what a shell command runs: local scripts, Python programs, and what stayed unread.
 
     A script is the file a shell or Python interpreter is given to run, by argument or as
     its standard input, a file sourced into the shell, or a path run as the command
     itself. A tool run by name, `python -m` and an interpreter given its program inline
-    name none; the program given inline is read for scripts in turn.
+    name none. A shell program given inline (`sh -c`, `eval`) and a command substitution
+    are read for scripts in turn; a Python program given inline is returned to be read as
+    Python.
 
-    The flag is False when the command, or a program given inline, could not be tokenised
-    as a shell would or is nested past `_MAX_INLINE_DEPTH`: a script it runs may be missing.
+    `untokenised` is set when the command, or a program or substitution in it, could not be
+    tokenised as a shell would or is nested past `_MAX_INLINE_DEPTH`; `computed` when a
+    command's program is only known when it runs. Either way a script it runs may be missing.
     """
-    tokens, read = _shell_words(command)
-    scripts: list[str] = []
+    tokens, read, exact = _shell_words(command)
+    reading = ShellReading(untokenised=not read)
+    inline = _Inline(shell=list(_substitutions(command)))
     for raw, stdin in _simple_commands(tokens):
         words = _unwrapped(raw)
-        if not words:
-            continue
-        program, arguments = words[0], words[1:]
-        name = program.rsplit("/", 1)[-1]
-        inline = None
-        if name in _SHELL_INTERPRETERS or _PYTHON_INTERPRETER.fullmatch(name):
-            shell = name in _SHELL_INTERPRETERS
-            run = _interpreter_run(
-                arguments,
-                _SHELL_VALUED_OPTIONS if shell else _PYTHON_VALUED_OPTIONS,
-                "c" if shell else "cm",
-            )
-            script = run.script if run.named else stdin
-            inline = run.inline
-        elif name in _SOURCE_COMMANDS:
-            script = arguments[0] if arguments else None
-        else:
-            script = program if _names_a_script(program) else None
-        if script is not None:
-            scripts.append(script)
-        if inline is None:
-            continue
+        if words:
+            _read_command(words, stdin, reading, inline, exact=exact)
+    for program in inline.shell:
         if depth >= _MAX_INLINE_DEPTH:
-            read = False
-            continue
-        nested, nested_read = local_scripts(inline, depth + 1)
-        scripts.extend(nested)
-        read = read and nested_read
-    return scripts, read
+            reading.untokenised = True
+            break
+        nested = local_scripts(program, depth + 1)
+        reading.scripts.extend(nested.scripts)
+        reading.python.extend(nested.python)
+        reading.untokenised |= nested.untokenised
+        reading.computed |= nested.computed
+    # A Python program is also read as shell words for the script files it names, as a
+    # call such as `runpy.run_path('x.py')` runs one that the Python reader does not count.
+    for program in inline.python if depth < _MAX_INLINE_DEPTH else []:
+        reading.scripts.extend(local_scripts(program, depth + 1).scripts)
+    return reading

@@ -97,6 +97,8 @@ guardana.supply_chain.notebook_payload:
   - severity: LOW
     when: a cell runs local scripts whose code the rule does not read
   - severity: LOW
+    when: a shell line cannot be tokenised as a shell would, or a command's program is only known when the cell runs; the finding is inconclusive
+  - severity: LOW
     when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
 
 guardana.supply_chain.onnx_graph:

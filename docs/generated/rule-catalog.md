@@ -107,6 +107,7 @@ The main table shows each rule's default severity; this section lists every cond
 | `guardana.supply_chain.malicious_dependency` | LOW | the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive |
 | `guardana.supply_chain.model_format` | LOW | the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive |
 | `guardana.supply_chain.notebook_payload` | LOW | a cell runs local scripts whose code the rule does not read |
+| `guardana.supply_chain.notebook_payload` | LOW | a shell line cannot be tokenised as a shell would, or a command's program is only known when the cell runs; the finding is inconclusive |
 | `guardana.supply_chain.notebook_payload` | LOW | the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive |
 | `guardana.supply_chain.onnx_graph` | MEDIUM | a node or opset uses a domain outside the standard ONNX domains |
 | `guardana.supply_chain.onnx_graph` | MEDIUM | a `metadata_props` value looks like code, such as `exec`, `eval`, `subprocess` or `b64decode` |
