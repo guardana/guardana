@@ -64,11 +64,13 @@ jobs:
           path: release
           persist-credentials: false
 
-      # The same interpreter the release builds with. No cache: the build environment
-      # is resolved fresh, as the release resolved it.
+      # The same uv and interpreter the release builds with. The release checkout sits in
+      # a subdirectory, so without an explicit version setup-uv would install the latest.
+      # No cache: the build environment is resolved fresh, as the release resolved it.
       - name: Install uv
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: "0.13.6"
           python-version: "3.12"
           enable-cache: false
 
