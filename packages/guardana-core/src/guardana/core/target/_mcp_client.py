@@ -63,6 +63,7 @@ from guardana.core.target.endpoint import (
     EndpointUnreachable,
     TargetChanged,
     UnreadableReply,
+    close_http_error,
 )
 from guardana.core.usage import UsageMeter
 
@@ -716,7 +717,8 @@ def negotiate(transport: McpTransport) -> Negotiation:
     except McpProtocolError as exc:
         offered = exc.supported_versions()
         return modern(transport, offered, None) if offered else _fall_back(transport)
-    except (McpError, EndpointError, URLError, OSError):
+    except (McpError, EndpointError, URLError, OSError) as exc:
+        close_http_error(exc)
         return _fall_back(transport)
     offered = _versions_in(discovered)
     if not offered:
@@ -837,7 +839,8 @@ def settled_request(  # noqa: PLR0913 — the conversation, the request, and its
             if announce:
                 transport.notify(INITIALIZED)
             return transport.request(method, params)
-        except SessionExpired:
+        except SessionExpired as expired:
+            close_http_error(expired)
             _reopen(transport, agreed, ref)
             return transport.request(method, params)
     except McpProtocolError as exc:
@@ -855,7 +858,8 @@ def announce_opening(transport: McpTransport, negotiation: Negotiation, ref: str
     try:
         try:
             transport.notify(INITIALIZED)
-        except SessionExpired:
+        except SessionExpired as expired:
+            close_http_error(expired)
             _reopen(transport, agreed, ref)
     except McpProtocolError as exc:
         _stop_if_changed(exc, agreed, ref)

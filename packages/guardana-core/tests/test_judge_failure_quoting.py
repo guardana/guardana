@@ -1,7 +1,9 @@
 """A judge's failure quotes its endpoint under the run's privacy policy, never with its key."""
 
+import io
 from collections.abc import Sequence
-from urllib.error import URLError
+from email.message import Message
+from urllib.error import HTTPError, URLError
 
 import pytest
 from guardana.core.evaluator.config import JudgeUnavailableError, wire_config_evaluators
@@ -73,3 +75,52 @@ def test_a_judge_failure_under_metadata_only_quotes_nothing_the_endpoint_said(
     assert "evaluators.llm_judge" in message
     assert "unexpected response" not in message
     assert "is not shown under evidence mode metadata_only" in message
+
+
+class _Refusing:
+    """A judge endpoint that answers every request with one error status."""
+
+    def __init__(self, error: HTTPError) -> None:
+        self.error = error
+
+    def send(
+        self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
+    ) -> str:
+        """Raise the error status."""
+        raise self.error
+
+
+class _UnclosableBody(io.BytesIO):
+    """A reply body whose `close()` fails, as a connection torn down underneath it can."""
+
+    def close(self) -> None:
+        raise OSError("the connection is already gone")
+
+
+def _refused_judge_says(error: HTTPError) -> str:
+    profile = Profile(
+        name="t",
+        policy=Policy(),
+        evaluator_config={"llm_judge": {"endpoint": "https://judge.example/v1", "model": "j"}},
+    )
+
+    def build(url: str, model: str, api_key: str | None) -> EndpointTarget:
+        return EndpointTarget(url, model, api_key=api_key, transport=_Refusing(error))
+
+    (meter,) = wire_config_evaluators(Registry(), profile, build=build).meters
+    with pytest.raises(JudgeUnavailableError) as raised:
+        meter.ask("grade this")
+    return str(raised.value)
+
+
+def test_a_judge_s_error_status_is_closed_once_it_is_reported() -> None:
+    error = HTTPError("https://judge.example/v1", 500, "status", Message(), io.BytesIO(b"down"))
+
+    assert "returned HTTP 500" in _refused_judge_says(error)
+    assert error.fp.closed
+
+
+def test_a_judge_s_error_status_that_fails_to_close_is_reported_all_the_same() -> None:
+    error = HTTPError("https://judge.example/v1", 401, "status", Message(), _UnclosableBody())
+
+    assert "rejected the request (HTTP 401)" in _refused_judge_says(error)

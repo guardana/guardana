@@ -37,7 +37,7 @@ from guardana.core.target import (
     wire_protocols_of,
 )
 from guardana.core.target._scoped import RuleScoped
-from guardana.core.target.endpoint import TargetChanged, secrets_sent_by
+from guardana.core.target.endpoint import TargetChanged, close_http_error, secrets_sent_by
 from guardana.core.target.failure import (
     FailureRemedies,
     FailureScope,
@@ -579,6 +579,7 @@ class Runner:
             # as down while abandoning every remaining rule would be a worse lie.
             if target.kind is TargetKind.ENDPOINT:
                 return self._failed_send(rule, target, ctx, exc, (findings, unverified))
+            close_http_error(exc)
             return _RuleOutcome(
                 rule.meta.id,
                 tuple(findings),

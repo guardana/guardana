@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import json
 import math
@@ -133,6 +134,17 @@ def open_unredirected(request: Request, *, timeout: float) -> HTTPResponse:
     return response
 
 
+def close_http_error(exc: BaseException) -> None:
+    """Close the reply `exc` carries when it is an `HTTPError`; any other error holds none.
+
+    Never raises: a reply that fails to close must not replace the outcome its caller
+    is reporting.
+    """
+    if isinstance(exc, HTTPError):
+        with contextlib.suppress(OSError, ValueError):
+            exc.close()
+
+
 def redirect_refusal(exc: HTTPError, ref: str) -> EndpointError | None:
     """Return the error a redirect from a target becomes, or None for any other status.
 
@@ -141,7 +153,7 @@ def redirect_refusal(exc: HTTPError, ref: str) -> EndpointError | None:
     """
     if not 300 <= exc.code < 400:  # noqa: PLR2004 — the redirect status class
         return None
-    exc.close()
+    close_http_error(exc)
     return EndpointError(
         f"{ref} answered with a redirect (HTTP {exc.code}); redirects are not followed, "
         f"so configure the address that answers directly"
@@ -425,7 +437,9 @@ def read_with_retry(
     reads more than "it succeeded" into a `2xx`.
 
     A failure that survives the retries is raised, never swallowed: a rule handed
-    silence here would grade a model it never actually reached. One byte past the
+    silence here would grade a model it never actually reached. An error status is
+    raised with its reply open and unread, for the caller to read and close; every
+    other reply this function caught is closed here. One byte past the
     cap is read so an over-limit reply is reported as truncated rather than
     mis-diagnosed as non-JSON once `json.loads` chokes on the tail. Every retry
     passes the sending target's meter first, so it counts against the run's
@@ -448,7 +462,7 @@ def read_with_retry(
             last_attempt = attempt == _MAX_ATTEMPTS - 1
             if exc.code not in retry_statuses or last_attempt:
                 raise
-            exc.close()
+            close_http_error(exc)
             before_retry = _BEFORE_RETRY.get()
             if before_retry is not None:
                 before_retry()

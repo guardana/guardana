@@ -5,9 +5,11 @@ the rules read them: the view. What leaves the process is read off the scripted 
 which records every request as the wire would carry it.
 """
 
+import io
 import ipaddress
 import json
 from collections.abc import Mapping
+from email.message import Message
 from typing import Any
 from urllib.error import HTTPError
 
@@ -20,6 +22,7 @@ from guardana.core.target import (
     Capability,
     EndpointUnreachable,
 )
+from guardana.core.target._a2a_view import _rebuilt
 from guardana.core.target._mcp_http import DiscoveryScope, HttpSender, McpError, RawReply
 from guardana.core.target.endpoint import UnreadableReply
 from guardana.core.testing import ScriptedA2aAgent
@@ -666,3 +669,30 @@ def test_a_listing_read_whole_or_showing_a_task_is_an_answer(
     assert listed is not None
     assert listed.answer is A2aAnswer.ANSWERED
     assert listed.lists_tasks is shows
+
+
+class _HungUpBody(io.BytesIO):
+    """A reply body the peer hung up on before it was read."""
+
+    def read(self, size: int | None = -1) -> bytes:
+        raise ConnectionResetError("reset by peer")
+
+
+def test_a_failure_whose_body_is_kept_for_later_readers_is_closed() -> None:
+    error = HTTPError("http://agent", 400, "Bad Request", Message(), io.BytesIO(b"no"))
+
+    again = _rebuilt(error)()
+
+    assert error.fp.closed
+    assert isinstance(again, HTTPError)
+    assert again.read() == b"no"
+    again.close()
+
+
+def test_a_failure_whose_body_could_not_be_read_is_closed_all_the_same() -> None:
+    error = HTTPError("http://agent", 400, "Bad Request", Message(), _HungUpBody(b"no"))
+
+    with pytest.raises(ConnectionResetError):
+        _rebuilt(error)
+
+    assert error.fp.closed

@@ -47,7 +47,11 @@ from guardana.core.target._mcp_http import (
     server_is_local,
 )
 from guardana.core.target._url import display_url
-from guardana.core.target.endpoint import EndpointUnreachable, UnreadableReply
+from guardana.core.target.endpoint import (
+    EndpointUnreachable,
+    UnreadableReply,
+    close_http_error,
+)
 from guardana.core.usage import UsageMeter
 
 CARD_PATH = "/.well-known/agent-card.json"
@@ -724,8 +728,10 @@ def _http_error(url: str, reply: RawReply) -> HTTPError:
 
 def _rebuilt(exc: HTTPError) -> Callable[[], Exception]:
     """Return a builder of `exc` afresh, since reading an error's body for a message consumes it."""
-    body = exc.read()
-    exc.close()
+    try:
+        body = exc.read()
+    finally:
+        close_http_error(exc)
     headers = exc.headers
     return lambda: HTTPError(exc.url, exc.code, exc.reason, headers, BytesIO(body))
 

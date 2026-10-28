@@ -184,3 +184,40 @@ def test_any_other_failure_says_the_endpoint_could_not_be_reached() -> None:
 
     assert said.startswith("could not reach endpoint http://x#m: ")
     assert "gone" in said
+
+
+class _UnclosableBody(io.BytesIO):
+    """A reply body whose `close()` fails, as a connection torn down underneath it can."""
+
+    def close(self) -> None:
+        raise OSError("the connection is already gone")
+
+
+class _UnreadableBody(io.BytesIO):
+    """A reply body the peer hung up on before it was read."""
+
+    def read(self, size: int | None = -1) -> bytes:
+        raise ConnectionResetError("reset by peer")
+
+
+@pytest.mark.parametrize("code", [400, 401, 403, 404, 407, 429, 500])
+def test_a_described_error_status_is_closed(code: int) -> None:
+    body = io.BytesIO(b"refused")
+    error = HTTPError("http://x", code, "status", Message(), body)
+    describe_failure(error, "http://x", _QUOTING, _REMEDIES)
+    assert body.closed
+
+
+def test_an_error_body_that_cannot_be_read_is_still_closed() -> None:
+    body = _UnreadableBody(b"refused")
+    error = HTTPError("http://x", 500, "status", Message(), body)
+    said = describe_failure(error, "http://x", _QUOTING, _REMEDIES)
+    assert said.endswith("its body could not be read")
+    assert body.closed
+
+
+@pytest.mark.parametrize("code", [401, 500])
+def test_an_error_reply_that_fails_to_close_is_described_all_the_same(code: int) -> None:
+    expected = describe_failure(_status(code, b"refused"), "http://x", _QUOTING, _REMEDIES)
+    error = HTTPError("http://x", code, "status", Message(), _UnclosableBody(b"refused"))
+    assert describe_failure(error, "http://x", _QUOTING, _REMEDIES) == expected

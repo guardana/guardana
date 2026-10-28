@@ -55,7 +55,7 @@ from guardana.core.target._mcp_wire import (
     newest_legacy,
 )
 from guardana.core.target._url import display_url
-from guardana.core.target.endpoint import EndpointUnreachable
+from guardana.core.target.endpoint import EndpointUnreachable, close_http_error
 from guardana.core.usage import UsageMeter
 
 _CLIENT = {"name": "guardana", "version": "0"}
@@ -709,6 +709,7 @@ class _Probe:
                 except HTTPError as exc:
                     if exc.code not in REFUSAL_STATUSES:
                         raise
+                    close_http_error(exc)
                     return Tasks(error=f"the operator's session could not be opened: {exc}")
             else:
                 session, _ = self._open_session(wire, credential=self._credential)

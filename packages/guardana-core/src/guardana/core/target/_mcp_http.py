@@ -53,6 +53,7 @@ from urllib.request import (
 )
 
 from guardana.core.target._url import display_url
+from guardana.core.target.endpoint import close_http_error
 
 TIMEOUT_SECONDS = 30
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -508,6 +509,8 @@ def _send(  # noqa: PLR0913 — the `Sender` keywords and the peer recorder
             payload = error.read(MAX_RESPONSE_BYTES + 1)
         except OSError:  # pragma: no cover — depends on the peer hanging up mid-body
             payload = b""
+        finally:
+            close_http_error(error)
         return RawReply(status=error.code, headers=dict(error.headers.items()), body=payload)
     except (URLError, OSError) as exc:
         raise McpError(f"could not reach {display_url(url)}: {exc}") from exc

@@ -7,8 +7,10 @@ own requests — stop it only on no reply at all: an auth proxy answering the an
 probe with a login page must not stop a run whose conversation works.
 """
 
+import io
 import json
 from collections.abc import Callable, Mapping
+from email.message import Message
 from urllib.error import HTTPError
 
 import pytest
@@ -25,10 +27,19 @@ from guardana.core.target import (
 from guardana.core.target._mcp_client import (
     ConversationRefused,
     HttpMcpTransport,
+    Negotiation,
+    SessionExpired,
+    announce_opening,
     negotiate,
+    settled_request,
 )
-from guardana.core.target._mcp_http import AddressRefusedError, RawReply, RedirectRefusedError
-from guardana.core.target._mcp_wire import LEGACY_WIRE, McpProtocolError
+from guardana.core.target._mcp_http import (
+    AddressRefusedError,
+    RawReply,
+    RedirectRefusedError,
+    send,
+)
+from guardana.core.target._mcp_wire import LEGACY_VERSION, LEGACY_WIRE, McpProtocolError
 from guardana.core.target.failure import (
     FailureRemedies,
     FailureScope,
@@ -340,3 +351,88 @@ def test_a_probe_redirected_somewhere_refused_is_an_observation() -> None:
 
     assert anonymous.error is not None
     assert "169.254.169.254" in anonymous.error
+
+
+# --- Every error status caught on the way is closed once it has been read. ---
+
+
+def _status(code: int, body: bytes = b"") -> HTTPError:
+    return HTTPError(ROUTABLE, code, "status", Message(), io.BytesIO(body))
+
+
+class _Opener:
+    """An opener whose every request is answered with `error`."""
+
+    def __init__(self, error: HTTPError) -> None:
+        self.error = error
+
+    def open(self, request: object, timeout: float) -> object:
+        raise self.error
+
+
+def test_an_error_status_the_sender_reads_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = _status(500, b"overloaded")
+    monkeypatch.setattr(
+        "guardana.core.target._mcp_http.build_opener", lambda *handlers: _Opener(error)
+    )
+
+    reply = send(ROUTABLE, body=b"{}")
+
+    assert (reply.status, reply.body) == (500, b"overloaded")
+    assert error.fp.closed
+
+
+class _ExpiringOnce:
+    """A legacy conversation whose first request or announcement meets an expired session."""
+
+    def __init__(self, expired: SessionExpired) -> None:
+        self.expired: SessionExpired | None = expired
+
+    def speak(self, wire: object) -> None:
+        pass
+
+    def _expire(self) -> None:
+        expired, self.expired = self.expired, None
+        if expired is not None:
+            raise expired
+
+    def request(self, method: str, params: object) -> dict[str, object]:
+        if method != "initialize":
+            self._expire()
+        return {"protocolVersion": LEGACY_VERSION} if method == "initialize" else {"tools": []}
+
+    def notify(self, method: str) -> None:
+        self._expire()
+
+    def close(self) -> None:
+        pass
+
+
+def _expired() -> SessionExpired:
+    return SessionExpired(ROUTABLE, 404, "Not Found", Message(), io.BytesIO(b"no session"))
+
+
+def test_an_expired_session_a_request_opens_again_is_closed() -> None:
+    expired = _expired()
+    negotiation = Negotiation(LEGACY_WIRE, agreed=LEGACY_VERSION)
+
+    reply = settled_request(_ExpiringOnce(expired), negotiation, ROUTABLE, "tools/list", {})
+
+    assert reply == {"tools": []}
+    assert expired.fp.closed
+
+
+def test_an_expired_session_an_announcement_opens_again_is_closed() -> None:
+    expired = _expired()
+    negotiation = Negotiation(LEGACY_WIRE, agreed=LEGACY_VERSION)
+
+    announce_opening(_ExpiringOnce(expired), negotiation, ROUTABLE)
+
+    assert expired.fp.closed
+
+
+def test_an_error_status_discovery_falls_back_on_is_closed() -> None:
+    error = _status(400, b"unknown method")
+
+    assert negotiate(_Discovering(error)).wire == LEGACY_WIRE
+    assert error.fp.closed

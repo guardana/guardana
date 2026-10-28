@@ -13,7 +13,12 @@ from urllib.error import HTTPError
 
 from guardana.core.redaction import MessageQuoting
 from guardana.core.report.check_error import bounded_reason
-from guardana.core.target.endpoint import EndpointUnreachable, TargetChanged, UnreadableReply
+from guardana.core.target.endpoint import (
+    EndpointUnreachable,
+    TargetChanged,
+    UnreadableReply,
+    close_http_error,
+)
 
 _CREDENTIAL_STATUSES = frozenset({401, 403, 407})
 _RATE_LIMITED = 429
@@ -94,10 +99,13 @@ def describe_failure(
     could not be reached. The
     quote never holds one of the run's secrets, and under `metadata_only` only sizes
     are given. The message is cut, after its secrets are withheld, to the length a
-    recorded reason may have.
+    recorded reason may have. An `HTTPError` is closed once it is described.
     """
     if isinstance(exc, HTTPError):
-        said = _status_message(exc, ref, quoting, remedies)
+        try:
+            said = _status_message(exc, ref, quoting, remedies)
+        finally:
+            close_http_error(exc)
     elif isinstance(exc, _SAID_BY_THE_TARGET):
         said = _said(exc, quoting)
     else:
@@ -138,8 +146,6 @@ def _body_snippet(exc: HTTPError, quoting: MessageQuoting) -> str:
         raw = exc.read(_BODY_READ_BYTES + max(map(len, secrets), default=0))
     except (OSError, ValueError, HTTPException):
         return "its body could not be read"
-    finally:
-        exc.close()
     raw = raw[: _quoted_end(raw, secrets)]
     if not raw.strip():
         return "its body was empty"

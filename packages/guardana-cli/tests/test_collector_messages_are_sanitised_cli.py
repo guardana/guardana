@@ -5,14 +5,17 @@ written by the other side, which may echo the `Authorization` header it was sent
 escape sequences that rewrite the terminal of whoever reads a CI log.
 """
 
+import io
 import json
 import re
+from email.message import Message
 from pathlib import Path
+from urllib.error import HTTPError
 
 import guardana.cli._reporting as reporting_module
 import pytest
 from _answering_collector import answering
-from guardana.cli._reporting import TOKEN_VARIABLE
+from guardana.cli._reporting import TOKEN_VARIABLE, submit_safely
 from guardana.cli.main import app
 from guardana.core.manifest import DeploymentRef
 from guardana.core.report import ScanResult
@@ -89,3 +92,52 @@ def test_an_unreachable_collector_is_reported_without_the_token(
     assert _TOKEN not in result.output
     assert _CONTROL.search(line) is None
     assert "refused for [redacted:credential]" in line
+
+
+class _RejectingReporter:
+    """A collector that rejects every submission with one error status."""
+
+    def __init__(self, error: HTTPError) -> None:
+        self.error = error
+
+    def submit(self, result: ScanResult, *, source: str) -> None:
+        raise self.error
+
+
+class _UnclosableBody(io.BytesIO):
+    """A reply body whose `close()` fails, as a connection torn down underneath it can."""
+
+    def close(self) -> None:
+        raise OSError("the connection is already gone")
+
+
+def _rejected_by(
+    error: HTTPError, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> str:
+    monkeypatch.delenv(TOKEN_VARIABLE, raising=False)
+    monkeypatch.setattr(reporting_module, "reporter_from_url", lambda *_: _RejectingReporter(error))
+    assert submit_safely("http://collector/findings", ScanResult((), (), ()), source="t") is False
+    return capsys.readouterr().err
+
+
+def test_a_rejected_submission_is_closed_once_its_detail_is_read(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    body = io.BytesIO(json.dumps({"detail": "schema version 9 is unknown"}).encode())
+    error = HTTPError("http://collector/findings", 422, "Unprocessable", Message(), body)
+
+    said = _rejected_by(error, monkeypatch, capsys)
+
+    assert "rejected this submission (HTTP 422): schema version 9 is unknown" in said
+    assert error.fp.closed
+
+
+def test_a_rejected_submission_that_fails_to_close_is_reported_all_the_same(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    body = _UnclosableBody(json.dumps({"detail": "schema version 9 is unknown"}).encode())
+    error = HTTPError("http://collector/findings", 422, "Unprocessable", Message(), body)
+
+    said = _rejected_by(error, monkeypatch, capsys)
+
+    assert "rejected this submission (HTTP 422): schema version 9 is unknown" in said

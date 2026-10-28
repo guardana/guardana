@@ -41,6 +41,7 @@ from guardana.core.target.endpoint import (
     ChatMessage,
     ChatReply,
     EndpointError,
+    close_http_error,
     read_with_retry,
 )
 
@@ -227,7 +228,7 @@ def _post(
         try:
             body = exc.read(_MAX_RESPONSE_BYTES + 1)
         finally:
-            exc.close()
+            close_http_error(exc)
         return FetchedReply(
             status=exc.code,
             body=body,

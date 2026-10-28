@@ -5,11 +5,21 @@ target's contract: a ceiling that does not bind is a ceiling nobody has, and a
 meter that under-counts makes every declared cost agree with it and stay wrong.
 """
 
+import io
+from collections.abc import Callable, Mapping
+from email.message import Message
+from urllib.error import HTTPError
+
 import pytest
 from _offline import refuse_name_lookups
 from guardana.core.budget import BudgetExhausted, Budgets
 from guardana.core.target import McpError, McpServerTarget
+from guardana.core.target._mcp_authorization import _Probe
+from guardana.core.target._mcp_client import Negotiation
+from guardana.core.target._mcp_http import DiscoveryScope, RawReply
+from guardana.core.target._mcp_wire import LEGACY_VERSION, LEGACY_WIRE
 from guardana.core.testing import ScriptedMcpServer
+from guardana.core.usage import UsageMeter
 
 pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
@@ -119,3 +129,64 @@ def test_an_stdio_target_with_no_command_refuses_with_a_sentence() -> None:
     # catches, so a target that should decline crashed with a traceback instead.
     with pytest.raises(McpError, match="needs a command to run"):
         McpServerTarget(command=[], allow_exec=True)
+
+
+def _never_sent(  # noqa: PLR0913 — the `DiscoverySender` keywords
+    url: str,
+    *,
+    method: str = "POST",
+    body: bytes | None = None,
+    headers: Mapping[str, str] | None = None,
+    alongside: str | None = None,
+    discovery: DiscoveryScope | None = None,
+) -> RawReply:
+    """Fail the test: an operator's session that was not opened leaves the listing unasked."""
+    pytest.fail(f"{method} {url} was sent")
+
+
+def _operator_probe(session: Callable[[], str | None]) -> _Probe:
+    """A probe of a handshake-era conversation whose own session `session` opens."""
+    negotiation = Negotiation(LEGACY_WIRE, agreed=LEGACY_VERSION)
+    return _Probe(
+        ROUTABLE,
+        credential="operator-credential",
+        meter=UsageMeter(),
+        send=_never_sent,
+        discovery_send=_never_sent,
+        negotiation=lambda: negotiation,
+        resettle=lambda _: negotiation,
+        opening=lambda: None,
+        conversation_session=session,
+        learn=lambda _: None,
+    )
+
+
+def _refusing(error: HTTPError) -> Callable[[], str | None]:
+    def session() -> str | None:
+        raise error
+
+    return session
+
+
+def test_an_operator_session_refused_by_the_server_is_closed_and_leaves_the_listing_unasked() -> (
+    None
+):
+    error = HTTPError(ROUTABLE, 401, "Unauthorized", Message(), io.BytesIO(b"no"))
+
+    tasks = _operator_probe(_refusing(error))._operator_tasks(LEGACY_WIRE)
+
+    assert tasks.error is not None
+    assert tasks.error.startswith("the operator's session could not be opened")
+    assert error.fp.closed
+
+
+def test_any_other_failure_to_open_the_operator_session_reaches_the_caller_still_readable() -> None:
+    # The caller describes this failure, quoting its body, and closes it then.
+    error = HTTPError(ROUTABLE, 503, "Unavailable", Message(), io.BytesIO(b"overloaded"))
+
+    with pytest.raises(HTTPError) as raised:
+        _operator_probe(_refusing(error))._operator_tasks(LEGACY_WIRE)
+
+    assert raised.value is error
+    assert error.read() == b"overloaded"
+    error.close()

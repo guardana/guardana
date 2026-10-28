@@ -12,6 +12,7 @@ from guardana.core.reporter import (
     check_collector_url,
 )
 from guardana.core.target import EndpointError
+from guardana.core.target.endpoint import close_http_error
 
 _SERVER_SCHEME = "server://"
 TOKEN_VARIABLE = "GUARDANA_COLLECTOR_TOKEN"  # noqa: S105 — the name of a variable, not a value
@@ -99,13 +100,18 @@ _MAX_DETAIL_BYTES = 64 * 1024
 
 
 def _why(exc: HTTPError) -> str:
-    """Return the collector's own explanation, or a fallback that does not invent one."""
+    """Return the collector's own explanation, or a fallback that does not invent one.
+
+    The refusal is closed once its body is read.
+    """
     try:
         body = exc.read(_MAX_DETAIL_BYTES + 1)
         parsed = json.loads(body) if len(body) <= _MAX_DETAIL_BYTES else None
         detail = parsed.get("detail") if isinstance(parsed, dict) else None
     except (ValueError, OSError, RecursionError):
         detail = None
+    finally:
+        close_http_error(exc)
     if isinstance(detail, str) and detail:
         return detail
     return f"{exc.reason} — check that its schema version matches this agent's"

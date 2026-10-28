@@ -10,13 +10,20 @@ The rule that matters: a retry may only turn a *transient* refusal into a real
 answer. It must never turn a genuine failure into silence.
 """
 
+import io
 import json
+from email.message import Message
 from http.client import BadStatusLine, RemoteDisconnected
 from urllib.error import HTTPError, URLError
 
 import pytest
 from guardana.core.target.endpoint import _MAX_BACKOFF_SECONDS as _MAX_BACKOFF
-from guardana.core.target.endpoint import EndpointError, EndpointUnreachable, post_json
+from guardana.core.target.endpoint import (
+    EndpointError,
+    EndpointUnreachable,
+    close_http_error,
+    post_json,
+)
 
 _REPLY = {"choices": [{"message": {"content": "hi"}}]}
 
@@ -216,3 +223,58 @@ def test_a_refused_connection_stays_the_url_error_it_is(
     with pytest.raises(URLError) as raised:
         post_json("http://x", {}, None, "ref")
     assert not isinstance(raised.value, EndpointError)
+
+
+class _UnclosableBody(io.BytesIO):
+    """A reply body whose `close()` fails, as a connection torn down underneath it can."""
+
+    def close(self) -> None:
+        raise OSError("the connection is already gone")
+
+
+def _error(code: int, body: io.BytesIO) -> HTTPError:
+    return HTTPError("http://x", code, "status", Message(), body)
+
+
+def test_an_error_status_that_is_retried_is_closed_before_the_next_attempt(
+    monkeypatch: pytest.MonkeyPatch, slept: list[float]
+) -> None:
+    body = io.BytesIO(b"busy")
+    error = _error(503, body)
+    _install(monkeypatch, [error, _CannedResponse(json.dumps(_REPLY).encode("utf-8"))])
+    assert post_json("http://x", {}, None, "ref") == _REPLY
+    assert error.fp.closed
+
+
+def test_a_refused_redirect_is_closed(monkeypatch: pytest.MonkeyPatch, slept: list[float]) -> None:
+    error = _error(302, io.BytesIO(b"moved"))
+    _install(monkeypatch, [error])
+    with pytest.raises(EndpointError, match="redirect"):
+        post_json("http://x", {}, None, "ref")
+    assert error.fp.closed
+
+
+def test_a_redirect_whose_reply_fails_to_close_is_still_refused(
+    monkeypatch: pytest.MonkeyPatch, slept: list[float]
+) -> None:
+    _install(monkeypatch, [_error(302, _UnclosableBody(b"moved"))])
+    with pytest.raises(EndpointError, match="redirect"):
+        post_json("http://x", {}, None, "ref")
+
+
+def test_an_error_status_the_retries_did_not_clear_reaches_the_caller_unread(
+    monkeypatch: pytest.MonkeyPatch, slept: list[float]
+) -> None:
+    # The caller quotes this body or matches a decline against it, and closes it then.
+    error = _error(400, io.BytesIO(b'{"error":"input_rejected"}'))
+    _install(monkeypatch, [error])
+    with pytest.raises(HTTPError) as raised:
+        post_json("http://x", {}, None, "ref")
+    assert raised.value is error
+    assert raised.value.read() == b'{"error":"input_rejected"}'
+    raised.value.close()
+
+
+def test_closing_an_error_reply_never_raises() -> None:
+    close_http_error(_error(500, _UnclosableBody(b"gone")))
+    close_http_error(ValueError("no reply to close"))

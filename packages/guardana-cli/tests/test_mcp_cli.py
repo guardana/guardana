@@ -5,13 +5,15 @@ is an error, never an empty tool list — a server that answers with junk would
 otherwise look like a server with nothing to poison.
 """
 
+import io
 import json
 import re
 import subprocess
 import sys
 from collections.abc import Iterator, Mapping
+from email.message import Message
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 import pytest
 import typer
@@ -435,6 +437,36 @@ def test_writing_a_pin_against_a_failing_server_exits_4_with_the_targets_words(
     assert f"endpoint {url} returned HTTP 503; its body begins: overloaded, retry later" in said
     assert issued not in said
     assert not pin.exists()
+
+
+class _RefusingListing(_Fake):
+    """A server that answers the handshake and refuses the tool listing with `error`."""
+
+    def __init__(self, error: HTTPError) -> None:
+        super().__init__([])
+        self.error = error
+
+    def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
+        if method == "tools/list":
+            raise self.error
+        return super().request(method, params)
+
+
+def test_a_refusal_met_while_writing_a_pin_is_closed_once_it_is_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    error = HTTPError("https://x", 401, "Unauthorized", Message(), io.BytesIO(b"no"))
+    monkeypatch.setattr(
+        "guardana.cli._mcp_run.build_mcp_target",
+        lambda connection: McpServerTarget("https://x", transport=_RefusingListing(error)),
+    )
+
+    with pytest.raises(typer.Exit) as stopped:
+        write_pin(McpConnection("https://x"), tmp_path / "pin.json")
+
+    assert stopped.value.exit_code == 4
+    assert "rejected the request (HTTP 401)" in _normalised(capsys.readouterr().err)
+    assert error.fp.closed
 
 
 def test_an_stdio_server_that_cannot_be_started_exits_4_before_any_rule(

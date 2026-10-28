@@ -554,3 +554,47 @@ def test_the_python_api_refuses_a_target_that_cannot_say_what_it_sends_before_se
     with pytest.raises(UnsupportedTargetError, match="could not say which values it sends"):
         Verifier(trust=PluginTrust(mode=PluginMode.BUILTINS), registry=registry).run(target)
     assert target.usage().requests == 0
+
+
+class _RaisingOutside(Rule):
+    """Raise `error` from a rule that examines an artifact, not an endpoint."""
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+        self.meta = RuleMeta(
+            id="outside",
+            title="outside",
+            severity=Severity.HIGH,
+            target_kind=TargetKind.ARTIFACT,
+            taxonomy=(),
+        )
+
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        """Fail with the error status."""
+        raise self._error
+        yield  # pragma: no cover — keeps this a generator
+
+
+@pytest.mark.parametrize("code", [400, 401, 503])
+def test_an_error_status_the_endpoint_answered_is_closed_once_the_run_records_it(
+    code: int,
+) -> None:
+    error = _status(code)
+
+    result = _run(_Answers(only=error), _Asking("only"))
+
+    assert [e.source for e in result.errors] == ["only"]
+    assert error.fp.closed
+
+
+def test_an_error_status_outside_an_endpoint_is_closed_once_the_run_records_it(
+    tmp_path: Path,
+) -> None:
+    error = _status(502)
+    registry = Registry()
+    registry.register_rule(_RaisingOutside(error))
+
+    result = Runner(registry=registry, profile=_PROFILE).run(ArtifactTarget(tmp_path))
+
+    assert [(e.source, e.stage) for e in result.errors] == [("outside", "run")]
+    assert error.fp.closed

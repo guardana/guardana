@@ -50,6 +50,7 @@ from guardana.core.target.connection import (
     Spelling,
     resolve_connection,
 )
+from guardana.core.target.endpoint import close_http_error
 from guardana.core.target.failure import http_status_problem
 
 _DEFAULT_PORTS = {"https": 443, "http": 80}
@@ -211,6 +212,7 @@ class JudgeMeter:
             self.stopped = f"{self.name} ({self.endpoint}) stopped the run: {self._scrubbed(exc)}"
             raise BudgetExhausted(self.stopped) from exc
         except HTTPError as exc:
+            close_http_error(exc)
             raise self._unavailable(self._rejection(exc.code)) from exc
         except OSError as exc:
             # `URLError` is the connect failure; a timeout or a reset while the reply is
