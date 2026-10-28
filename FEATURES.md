@@ -10,7 +10,7 @@ truth are the [rule summary](docs/generated/rule-summary.md),
 [taxonomy coverage](docs/generated/taxonomy-coverage.md).
 
 For maturity and known gaps, read [Product status](docs/product-status.md).
-To try a candidate, join a pilot or contribute, read [Community](docs/community.md).
+To join a pilot or contribute, read [Community](docs/community.md).
 
 ## Core workflows
 
@@ -33,9 +33,11 @@ To try a candidate, join a pilot or contribute, read [Community](docs/community.
 | Run verification from Python | `guardana.core.verify.Verifier(trust=...)` | the run `scan` or `probe` writes, as typed data, failed and stopped runs included |
 | Keep and read results over HTTP | `--reporter server://URL`; `GET /findings`; `GET /trend` (optional collector) | Stored runs read back per project with a `read` key; `/openapi.json` describes routes and permissions. No route starts a scan or probe. |
 
-`probe`, `plan probe`, `target inspect`, `monitor` and every judge read one connection —
+`probe`, `target inspect`, `monitor` and every judge read one connection —
 `--url`, `--model`, `--provider`, `--api-key-env`, `--adapter` — and refuse one they cannot
-honour before the first request.
+honour before the first request. `plan probe` reads the same connection except
+`--api-key-env`: it has no such option and reads no key variable. It also refuses
+a connection it cannot honour before the first request.
 [Providers](docs/providers.md) lists what each provider and adapter carries and retries; one
 conformance suite holds them to it. An adapter file maps a guarded application: `declines:`
 names the replies its guard sends when it declines a request, read by the evaluator as a
@@ -210,7 +212,7 @@ without guessing from a short id.
   recipe locks, recipe artifacts, fixtures files, pack manifests, pack locks, profiles and the collector envelope, served at the URL each
   `$id` names under `https://guardana.dev/schemas/`. The profile schema is [`schemas/profile-v1.schema.json`](schemas/profile-v1.schema.json); the envelope schema is [`schemas/collector-envelope-v8.schema.json`](schemas/collector-envelope-v8.schema.json).
 - [`docs/generated/api-surface.json`](docs/generated/api-surface.json) records the supported Python, CLI, output, locator, Action and `GUARDANA_*` surface. The docs check rejects drift, and the file is identical on Python 3.11, 3.12 and 3.13. [`docs/generated/compatibility-matrix.md`](docs/generated/compatibility-matrix.md) records what each published minor release carried. [`docs/compatibility.md`](docs/compatibility.md) states the 1.0 compatibility and deprecation policy; `scripts/release.py` rejects a release candidate with an unrecorded surface change.
-- Stored documents from published releases 0.2.0 through 0.41.0 are read by current tests. They include runs, collector envelopes, profiles, pack manifests and locks, and datasets; `run migrate` and `diff` read the runs; `load_verification` reads every run except those of schema 1, which records no gate. [`scripts/capture_historical_documents.py`](scripts/capture_historical_documents.py) produces them, and [`historical/releases.json`](packages/guardana-core/tests/historical/releases.json) records their versions.
+- Stored documents from published releases 0.2.0 through 1.0.0rc5 are read by current tests. They include runs, collector envelopes, profiles, pack manifests and locks, and datasets; `run migrate` and `diff` read the runs; `load_verification` reads every run except those of schema 1, which records no gate. [`scripts/capture_historical_documents.py`](scripts/capture_historical_documents.py) produces them, and [`historical/releases.json`](packages/guardana-core/tests/historical/releases.json) records their versions.
 
 ## Extension surface
 
@@ -245,7 +247,7 @@ incomplete implementation. [`docs/conformance-kit.md`](docs/conformance-kit.md) 
 
 All 58 built-in rules have finding, clean and inconclusive samples of their own. `guardana rule test 'guardana.*'` runs them and generates the summary count. A sample whose target cannot read a file is inconclusive. [`examples/reference_pack`](examples/reference_pack) is `guardana-reference-pack`, published on PyPI. Its wheel and sdist are also attached to each GitHub Release, and CI installs it in isolation. It includes YAML and Python rules, an evaluator, a conforming target, a taxonomy, `reference-summary`, `reference-file`, a schema-3 manifest and a committed lock.
 
-The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
+The extension API is stable under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
 
 ## Optional collector
 

@@ -26,7 +26,7 @@ uv run pre-commit install --install-hooks --hook-type commit-msg --hook-type pre
 
 Documentation fixes, tests for existing behaviour, examples, and maintainer scripts are open now. Browse issues labelled [`good first issue`](https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) for a concrete task.
 
-New declarative rules are welcome after 1.0. A rule needs a framework mapping and positive and negative fixtures. When rules open, `uv run guardana new-rule yourname.prompt.my_check` scaffolds a skeleton. See [`docs/writing-rules.md`](docs/writing-rules.md) and [`examples/custom_rule/`](examples/custom_rule/).
+New declarative rules are welcome. A built-in rule needs a public framework mapping in edition form and positive and negative fixtures. `uv run guardana new-rule yourname.prompt.my_check` scaffolds a skeleton. See [`docs/writing-rules.md`](docs/writing-rules.md) and [`examples/custom_rule/`](examples/custom_rule/).
 
 ## Tooling gates
 
@@ -244,12 +244,11 @@ checklist, and its milestone closes after the promised artifacts are verified.
 A merged pull request runs CI but does not publish a package. The maintainer
 chooses a release from the completed work using
 [the versioning policy](docs/compatibility.md#versioning), then uses the
-tag-gated release process. Until stable 1.0, release candidates carry fixes
-only; proposed features wait outside the candidate milestone.
+tag-gated release process.
 
-### Release cadence after 1.0
+### Release cadence
 
-After stable 1.0, fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
+Fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
 
 Every Monday, the maintainer reviews changes merged since the last release. If any affect a published package, a release ships that day from `main` as it stands. Pull requests merged during preparation enter the next release. Weeks with only documentation, tests or maintainer tooling produce no package release; the site updates on every merge.
 
@@ -283,6 +282,14 @@ New public behavior (a new rule, evaluator, target, CLI flag, or profile
 option) needs documentation alongside the code that introduces it, not as a
 follow-up. Contributor-facing docs live near the code they describe; end-user
 docs live under `docs/`.
+
+Document new options, parameters, Python keywords and payload fields using the
+[availability convention](docs/compatibility.md#feature-and-field-availability).
+Record the first published Guardana package version, using `Unreleased` during
+development and resolving it during release preparation. Include the applicable
+document type and schema version, or `extension_api` / `output_api` version, and
+explain migration and unavailable evidence for older input. JSON Schema field
+descriptions carry this guidance without adding runtime keys.
 
 A user-visible change carries its documentation in the **same PR**, and there are
 five places to consider, each answered with an edit or an explicit "not

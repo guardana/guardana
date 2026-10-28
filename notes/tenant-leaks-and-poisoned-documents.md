@@ -16,11 +16,11 @@ The [reference application](https://github.com/guardana/guardana/tree/main/examp
 
 The fixtures are synthetic: two tenants, `acme` and `globex`; three documents, including one poisoned document; and two order records. The selected checks are `guardana.tenancy.cross_tenant_answer` and `guardana.retrieval.poisoned_document`. Rendering the fixtures writes `seed/documents.jsonl` for the application to index. The run uses local keys and `127.0.0.1:8000`; no model or third-party endpoint was called.
 
-A [recipe](https://guardana.dev/docs/usage-recipe) records the application connection, profile, fixtures, deployment label and output directory. Here, `guardana recipe lock` wrote `guardana-recipe.lock.yaml`. It pins the recipe, profile, both rules, the fixtures digest and installed source files. The lock check returned this output:
+A [recipe](https://guardana.dev/docs/usage-recipe) records the application connection, profile, fixtures, deployment label and output directory. Here, `guardana recipe lock` wrote `guardana-recipe.lock.yaml`. It pins the recipe, profile, both rules and the fixtures digest. It pins source files only for a distribution installed from a directory or a URL. The lock check returned this output:
 
 ```text
 $ guardana recipe lock
-wrote guardana-recipe.lock.yaml: 2 rule(s), 0 evaluator(s), 0 configured skip(s), 2 source pin(s)
+wrote guardana-recipe.lock.yaml: 2 rule(s), 0 evaluator(s), 0 configured skip(s)
 $ guardana recipe lock --check
 every pin in guardana-recipe.lock.yaml holds
 ```
@@ -77,6 +77,59 @@ A clean tenant pair requires working controls: the owner must get its item’s m
 Save comparable runs as JSON, for example with `--format json --output fixed.json`. The [diff command](https://guardana.dev/docs/usage-diff) takes the older run first. Comparing `fixed.json` with `broken-filter.json` exited 1 and marked the CRITICAL tenant check `APPEARED`. Comparing `broken-filter.json` with the later `fixed-after.json` exited 0 and marked it `RESOLVED`. Comparing `fixed.json` with `partial.json` exited 2 and marked the tenant check `BLINDED`: it could no longer grade three cases.
 
 Order matters. `guardana diff broken-filter.json fixed.json` was refused with exit 2 because the first file was newer. A fixed result must be saved after the failing one to show a resolution. The saved recipe artifacts can be compared in the same way; the broken-filter artifact followed by the fixed artifact reported `RESOLVED`.
+
+## How this was run
+
+The 2026-10-24 re-run used `guardana-cli==1.0.0rc5`, `guardana-core==1.0.0rc5`, `guardana-rules==1.0.0rc5` and `guardana-report==1.0.0rc5` from PyPI. `guardana --version` reported version `1.0.0rc5`. The reference application, `examples/retrieval_pilot`, was exported from tag `v1.0.0rc5`, commit `91196fd688f97941d05d6ab4f2a1fd1da79e50b4`, and installed in the same environment. The platform was macOS arm64 with CPython 3.12.14 and uv 0.12.9. Every output above reproduced on that run except the source-pin count corrected in the recipe section. These commands ran from the example directory:
+
+```bash
+export ACME_KEY=acme-local-key GLOBEX_KEY=globex-local-key
+guardana --version
+guardana fixtures render guardana-fixtures.yaml --out seed/
+
+# Start the application in a separate terminal with the same environment variables.
+# Use a fresh trace file for each start; replace <file> with its path.
+# Add --break-tenant-filter or --obey-documents for the two broken modes.
+# For the incomplete index, point --documents at a copy without globex’s document.
+retrieval-pilot --fixtures guardana-fixtures.yaml --documents seed/documents.jsonl --trace <file> --port 8000
+
+guardana probe --url http://127.0.0.1:8000 --model reference --fixtures guardana-fixtures.yaml --profile guardana.yaml
+
+# Save fixed.json in normal mode, then broken-filter.json with --break-tenant-filter,
+# fixed-after.json in normal mode again, and partial.json with the incomplete index.
+# Restart the application in the matching mode before each run.
+# Replace <file> with the corresponding JSON filename.
+guardana probe --url http://127.0.0.1:8000 --model reference --fixtures guardana-fixtures.yaml --profile guardana.yaml --format json --output <file>
+
+guardana recipe lock
+guardana recipe lock --check
+guardana recipe run
+
+guardana diff fixed.json broken-filter.json
+guardana diff broken-filter.json fixed-after.json
+guardana diff fixed.json partial.json
+guardana diff broken-filter.json fixed.json
+```
+
+The recipe file, `guardana-recipe.yaml`:
+
+```yaml
+schema_version: 2
+name: retrieval-pilot
+profile: guardana.yaml
+subject:
+  kind: application
+  connection:
+    url: http://127.0.0.1:8000
+    model: reference
+  fixtures: guardana-fixtures.yaml
+deployment:
+  ai_system: retrieval-pilot
+  environment: local
+output:
+  directory: guardana-artifact
+  exchanges: false
+```
 
 ## What this does not show
 

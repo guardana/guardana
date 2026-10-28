@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security runbook drill (#142) — Guardana notes</title>
+<meta name="description" content="The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.">
+<link rel="canonical" href="https://guardana.dev/notes/security-runbook-drill">
+<link rel="alternate" type="application/atom+xml" title="Guardana notes" href="/notes/feed.xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="/docs/docs.css">
+<style>main.notes{margin:0 auto;padding:34px 20px 88px}.notes-index{list-style:none;padding:0}.notes-index li{margin:0 0 26px}.notes-index time,.notes time{color:var(--faint);font-size:14px}.notes-index h2{font-size:21px;margin:2px 0 4px;border:0;padding:0}.notes-index p{margin:0;color:var(--muted)}</style>
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="/docs/">Docs</a>
+<a href="/notes/">Notes</a>
+</nav>
+</div></header>
+<main class="notes">
+<p class="crumb"><a href="/notes/">Notes</a> · <time datetime="2026-10-25">2026-10-25</time></p><h1>Security runbook drill (#142)</h1><p class="lede">The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.</p><p>The maintainer ran this drill of <code>SECURITY.md</code> end to end on a made-up report about <a href="https://test.pypi.org/project/guardana-drill/"><code>guardana-drill</code> on TestPyPI</a>. This throwaway package is not a Guardana distribution. No real Guardana release was touched. All times below are UTC.</p>
+<h2 id="intake-and-coordination">Intake and coordination</h2>
+<p>The simulated e-mailed report arrived on 2026-10-22 at 07:56:05. It described <code>guardana-drill</code> <code>0.0.1</code> printing a placeholder instead of its version. The maintainer moved it into a draft advisory at 07:56:07, within seconds and inside the 14-day first-response promise.</p>
+<p>The simulated first response at 07:56:15 recorded receipt, private coordination and the default 90-day disclosure window. No CVE was requested because the report was low severity and made up. The simulated reporter declined credit.</p>
+<h2 id="the-fix">The fix</h2>
+<p>The maintainer prepared the fix on the advisory's temporary private fork. The branch changed one drill file and no product code. Nothing appeared in a public branch, issue or pull request.</p>
+<p>Disclosure was exercised on paper. The advisory fields were prepared and checked: affected <code>&lt;= 0.0.1</code>, patched <code>0.0.2</code>, severity low, no CVE. A <code>### Security</code> changelog line was also prepared and checked. Neither was published because the report was made up.</p>
+<h2 id="release-and-withdrawal-on-testpypi">Release and withdrawal on TestPyPI</h2>
+<p>The first build named a private draft in its public package metadata. It was rebuilt without that reference before publication. Nothing published named a private draft.</p>
+<p>On 2026-10-25 at 19:02, the maintainer uploaded <code>0.0.1</code>, then <code>0.0.2</code>, with a wheel and sdist for each, to TestPyPI only:</p>
+<pre><code class="language-console">$ uv publish --publish-url https://test.pypi.org/legacy/
+</code></pre>
+<p>The uploaded hashes matched the build. Before withdrawal, checks used Python <code>3.12</code> in a fresh environment with the TestPyPI index. The exact pin <code>guardana-drill==0.0.1</code> printed the made-up defect:</p>
+<pre><code class="language-console">version: &lt;placeholder&gt;
+</code></pre>
+<p>An unpinned install of <code>guardana-drill</code> got <code>0.0.2</code> and printed the fix:</p>
+<pre><code class="language-console">version: 0.0.2
+</code></pre>
+<p>At about 19:10, the maintainer yanked <code>0.0.1</code> on TestPyPI with the reason <code>Security runbook drill: made-up defect, fixed in 0.0.2.</code> The API showed <code>0.0.1</code> yanked with that reason and <code>0.0.2</code> live.</p>
+<p>Checks at 19:13 used <code>pip</code> and <code>uv</code> in fresh environments. An exact pin <code>==0.0.1</code> still installed the release with a yank warning in both. An unpinned install got <code>0.0.2</code>. For the range <code>&lt;0.0.2</code>, <code>pip</code> refused installation and reported:</p>
+<pre><code class="language-console">Ignored the following yanked versions: 0.0.1
+</code></pre>
+<p>The first <code>uv</code> resolution of <code>&lt;0.0.2</code>, minutes after the yank, still selected <code>0.0.1</code>. A rerun at about 19:15 refused it and reported:</p>
+<pre><code class="language-console">guardana-drill==0.0.1 was yanked
+</code></pre>
+<h2 id="the-dry-withdrawal-path">The dry withdrawal path</h2>
+<p>The remaining steps in “If a release is withdrawn” would have touched real releases. The maintainer wrote out these commands and checked their required credentials, but did not run them:</p>
+<pre><code class="language-console">$ gh api -X DELETE /orgs/guardana/packages/container/&lt;image&gt;/versions/&lt;id&gt;
+$ docker buildx imagetools create -t ghcr.io/guardana/&lt;image&gt;:X.Y ghcr.io/guardana/&lt;image&gt;@&lt;last good digest&gt;
+$ git -c tag.gpgSign=false tag -f vX.Y &lt;previous vX.Y.Z&gt;^{commit} &amp;&amp; git push -f origin vX.Y
+$ gh release edit vX.Y.Z --prerelease --notes-file &lt;reason&gt;
+</code></pre>
+<p>These covered deleting ghcr image versions, moving the <code>X.Y</code> image tag and <code>vX.Y</code> Action tag back, and marking the GitHub Release pre-release with a reason. Package write access was still missing for the image-tag step.</p>
+<h2 id="cleanup">Cleanup</h2>
+<p>At 19:17 on 2026-10-25, the draft advisory was closed without publication, the advisory's temporary private fork was deleted, and the account-wide TestPyPI token was removed. The TestPyPI project stayed as evidence, with <code>0.0.1</code> yanked and <code>0.0.2</code> live.</p>
+<h2 id="lessons">Lessons</h2>
+<ol>
+<li>No TestPyPI credential is kept on the release machine; the maintainer creates one for a drill and removes it afterward.</li>
+<li>The GitHub CLI token now has <code>read:packages</code>, <code>delete:packages</code> and <code>delete_repo</code>, added after the drill exposed their absence. It still lacks <code>write:packages</code>; the maintainer must grant it before a real withdrawal.</li>
+<li>The advisory's temporary private fork fills asynchronously, taking about a minute. The maintainer waits for it to fill before reading git refs, which fail until then.</li>
+<li>A project-scoped token cannot exist before the project's first upload. The maintainer uses an account-wide token for a new name's first release and removes it after use.</li>
+<li>The project treats any credential copied outside the keychain as exposed and removes it after use.</li>
+<li>The project checks public package metadata for private draft references and rebuilds without them before publication.</li>
+<li>An exact pin still installs a yanked release. The advisory and release notes tell those users to move.</li>
+<li>A resolver can briefly see a yanked release as live. The maintainer checks withdrawal again before announcing completion.</li>
+</ol>
+
+</main>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana · Apache-2.0</span>
+<a href="/notes/feed.xml">Atom feed</a>
+<a href="/llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

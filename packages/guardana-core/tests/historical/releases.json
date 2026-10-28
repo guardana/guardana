@@ -34,16 +34,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 0,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -66,7 +56,17 @@
           "stored": "profile/0.2.0-2.yaml"
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 0,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.3.0": {
     "exclude_newer": "2026-07-26T17:41:54Z",
@@ -103,16 +103,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 0,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -135,7 +125,17 @@
           "stored": "profile/0.3.0-2.yaml"
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 0,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.4.0": {
     "exclude_newer": "2026-07-27T12:37:29Z",
@@ -172,16 +172,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 0,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -204,7 +194,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 0,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.5.0": {
     "exclude_newer": "2026-07-29T10:10:55Z",
@@ -241,16 +241,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 0,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -273,7 +263,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 0,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.6.0": {
     "exclude_newer": "2026-07-31T13:01:40Z",
@@ -312,16 +312,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 0,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -344,7 +334,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 0,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.7.0": {
     "exclude_newer": "2026-08-02T16:53:01Z",
@@ -385,16 +385,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 0,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -459,7 +449,17 @@
           "why": "scan: exit 3: error: invalid profile profile-example.yaml: unknown fail_on key(s): fail_on_skipped; probe: exit 3: error: invalid profile profile-example.yaml: unknown fail_on key(s): fail_on_skipped"
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 0,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.8.0": {
     "exclude_newer": "2026-08-03T21:34:17Z",
@@ -500,16 +500,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 2,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -575,7 +565,17 @@
           "stored": "profile/0.8.0-7.yaml"
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 2,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.9.1": {
     "exclude_newer": "2026-08-05T20:54:03Z",
@@ -614,16 +614,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 5,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -689,7 +679,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 5,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.10.0": {
     "exclude_newer": "2026-08-06T07:22:14Z",
@@ -728,16 +728,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 5,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -803,7 +793,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 5,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.11.0": {
     "exclude_newer": "2026-08-06T06:59:19Z",
@@ -842,16 +842,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -917,7 +907,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.12.0": {
     "exclude_newer": "2026-08-07T08:17:11Z",
@@ -956,16 +956,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1031,7 +1021,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.13.0": {
     "exclude_newer": "2026-08-09T11:39:00Z",
@@ -1070,16 +1070,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1145,7 +1135,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.14.0": {
     "exclude_newer": "2026-08-09T18:22:11Z",
@@ -1184,16 +1184,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1259,7 +1249,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.15.0": {
     "exclude_newer": "2026-08-10T05:53:07Z",
@@ -1298,16 +1298,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1373,7 +1363,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.16.0": {
     "exclude_newer": "2026-08-10T09:47:48Z",
@@ -1412,16 +1412,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1487,7 +1477,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.17.0": {
     "exclude_newer": "2026-08-10T11:32:22Z",
@@ -1526,16 +1526,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1628,7 +1618,17 @@
           "stored": "profile/0.17.0-10.yaml"
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.17.1": {
     "exclude_newer": "2026-08-11T08:27:53Z",
@@ -1667,16 +1667,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": null,
-    "output_api_version": null,
-    "pack_schema_version": null,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1769,7 +1759,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": null,
+    "output_api_version": null,
+    "pack_schema_version": null,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.18.0": {
     "exclude_newer": "2026-08-11T10:40:14Z",
@@ -1808,16 +1808,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 1,
-    "output_api_version": null,
-    "pack_schema_version": 1,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -1918,7 +1908,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 1,
+    "output_api_version": null,
+    "pack_schema_version": 1,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.18.1": {
     "exclude_newer": "2026-08-11T12:39:53Z",
@@ -1957,16 +1957,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 1,
-    "output_api_version": null,
-    "pack_schema_version": 1,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -2067,7 +2057,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 1,
+    "output_api_version": null,
+    "pack_schema_version": 1,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.19.1": {
     "exclude_newer": "2026-08-11T18:51:31Z",
@@ -2106,16 +2106,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 1,
-    "output_api_version": null,
-    "pack_schema_version": 1,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -2216,7 +2206,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 1,
+    "output_api_version": null,
+    "pack_schema_version": 1,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.20.0": {
     "exclude_newer": "2026-08-12T10:29:34Z",
@@ -2257,16 +2257,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 1,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -2367,7 +2357,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 1,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.21.0": {
     "exclude_newer": "2026-08-15T14:29:47Z",
@@ -2408,16 +2408,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 1,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -2518,7 +2508,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 1,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.22.0": {
     "exclude_newer": "2026-08-20T16:12:48Z",
@@ -2559,16 +2559,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 1,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -2669,7 +2659,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 1,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.23.0": {
     "exclude_newer": "2026-09-02T18:53:17Z",
@@ -2710,16 +2710,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 1,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -2820,7 +2810,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 1,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.24.0": {
     "exclude_newer": "2026-09-10T16:19:09Z",
@@ -2861,16 +2861,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -2955,7 +2945,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.25.0": {
     "exclude_newer": "2026-09-20T06:48:18Z",
@@ -2996,16 +2996,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -3090,7 +3080,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.26.0": {
     "exclude_newer": "2026-09-21T13:15:38Z",
@@ -3131,16 +3131,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -3225,7 +3215,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.26.1": {
     "exclude_newer": "2026-09-22T11:42:22Z",
@@ -3266,16 +3266,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -3360,7 +3350,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.27.0": {
     "exclude_newer": "2026-09-24T07:54:39Z",
@@ -3401,16 +3401,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -3495,7 +3485,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.28.0": {
     "exclude_newer": "2026-09-25T08:02:53Z",
@@ -3536,16 +3536,6 @@
         "why": "no read_dataset (No module named 'guardana.core.dataset')"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -3630,7 +3620,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.29.0": {
     "exclude_newer": "2026-09-26T12:32:30Z",
@@ -3677,16 +3677,6 @@
         "stored": "dataset/0.29.0.jsonl"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -3771,7 +3761,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.30.0": {
     "exclude_newer": "2026-09-27T10:38:19Z",
@@ -3818,16 +3818,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -3912,7 +3902,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.31.0": {
     "exclude_newer": "2026-09-30T04:46:46Z",
@@ -3959,16 +3959,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -4053,7 +4043,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.32.0": {
     "exclude_newer": "2026-09-30T10:17:13Z",
@@ -4100,16 +4100,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -4203,7 +4193,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.33.0": {
     "exclude_newer": "2026-09-30T18:55:24Z",
@@ -4250,16 +4250,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -4362,7 +4352,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.34.0": {
     "exclude_newer": "2026-10-01T18:56:35Z",
@@ -4409,16 +4409,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -4521,7 +4511,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.35.0": {
     "exclude_newer": "2026-10-02T06:06:56Z",
@@ -4568,16 +4568,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -4680,7 +4670,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.36.0": {
     "exclude_newer": "2026-10-02T14:32:57Z",
@@ -4727,16 +4727,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -4839,7 +4829,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.37.0": {
     "exclude_newer": "2026-10-03T06:00:49Z",
@@ -4885,16 +4885,6 @@
         "stored": "dataset/0.37.0.jsonl"
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -4997,7 +4987,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.38.0": {
     "exclude_newer": "2026-10-03T17:34:03Z",
@@ -5043,16 +5043,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -5155,7 +5145,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.39.0": {
     "exclude_newer": "2026-10-04T07:02:28Z",
@@ -5201,16 +5201,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": null,
-    "pack_schema_version": 2,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -5313,7 +5303,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": null,
+    "pack_schema_version": 2,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.40.0": {
     "exclude_newer": "2026-10-04T12:33:31Z",
@@ -5359,16 +5359,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": 1,
-    "pack_schema_version": 3,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -5471,7 +5461,17 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   },
   "0.41.0": {
     "exclude_newer": "2026-10-04T18:16:50Z",
@@ -5517,16 +5517,6 @@
         "stored": null
       }
     },
-    "extension_api_version": 2,
-    "output_api_version": 1,
-    "pack_schema_version": 3,
-    "collector_migrations": 7,
-    "requires_python": ">=3.11",
-    "python_classifiers": [
-      "3.11",
-      "3.12",
-      "3.13"
-    ],
     "profile_examples": {
       "tried": true,
       "examples": [
@@ -5647,6 +5637,821 @@
           "stored": null
         }
       ]
-    }
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.0.0rc1": {
+    "exclude_newer": "2026-10-05T09:08:17Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 17,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 17,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/design/one-zero-readiness.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/design/security-contracts.md",
+          "block": 2,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 12,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 13,
+          "tag": "v1.0.0rc1",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.0.0rc2": {
+    "exclude_newer": "2026-10-11T07:38:05Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 17,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 17,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.0rc2",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.0.0rc3": {
+    "exclude_newer": "2026-10-13T09:44:19Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": "run/1.0.0rc3.json"
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": "probe-run/1.0.0rc3.json"
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.0rc3",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 7,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.0.0rc4": {
+    "exclude_newer": "2026-10-17T10:34:28Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.0rc4",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 8,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.0.0rc5": {
+    "exclude_newer": "2026-10-20T11:50:21Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.0rc5",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 8,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   }
 }

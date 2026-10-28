@@ -17,6 +17,7 @@ Start with the root [README](../README.md). Before production use, read [Product
    - the files you ship: [`recipe-local-scan.md`](recipe-local-scan.md)
    - answers your application already gave: [`recipe-recorded-answers.md`](recipe-recorded-answers.md)
    - the application your users talk to: [`recipe-real-application.md`](recipe-real-application.md)
+4. Add Guardana to your repository and CI with [Adopt Guardana in your project](adopt-guardana.md).
 
 ## Reading a result
 
@@ -41,6 +42,7 @@ More in [exit codes](exit-codes.md) and [the gate](profiles.md#the-gate).
 - [`recipe-local-scan.md`](recipe-local-scan.md) — scan your own project and save the run
 - [`recipe-recorded-answers.md`](recipe-recorded-answers.md) — check a run your application already recorded
 - [`recipe-real-application.md`](recipe-real-application.md) — probe the application your users talk to
+- [`adopt-guardana.md`](adopt-guardana.md) — add Guardana to your repository and CI
 - [`usage-scan.md`](usage-scan.md) — scan artifacts offline
 - [`usage-probe.md`](usage-probe.md) — probe a live endpoint, agent, MCP server or A2A agent
 - [`usage-testing.md`](usage-testing.md) — run the same checks from pytest
@@ -95,7 +97,7 @@ output. An unsupported format is invalid usage, exit `3`, before command work.
 - [`usage-pack.md`](usage-pack.md) — validate and lock extension packs
 - [`outputs.md`](outputs.md) — add an export or a webhook from an installed package
 - [`conformance-kit.md`](conformance-kit.md) — prove a rule, target, format or reporter keeps its contract
-- [`compatibility.md`](compatibility.md) — the supported surface, what 1.x keeps stable and how a name is deprecated
+- [`compatibility.md`](compatibility.md) — the supported surface, what 1.x keeps stable, feature and field availability, and deprecation
 - [`usage-taxonomy.md`](usage-taxonomy.md) — resolve framework editions and crosswalks
 - [`model-formats.md`](model-formats.md) — use the bounded artifact readers
 
@@ -130,7 +132,7 @@ coverage. Do not edit them by hand.
 
 ## Project direction
 
-- [`community.md`](community.md) — try a candidate, join a pilot, contribute a fix or share coverage
+- [`community.md`](community.md) — try Guardana, join a pilot, contribute a fix or share coverage
 - [`../FEATURES.md`](../FEATURES.md) — concise shipped capability overview
 - [Current work](https://github.com/guardana/guardana/issues) and [release milestones](https://github.com/guardana/guardana/milestones) — owners and acceptance criteria
 - [`../CHANGELOG.md`](../CHANGELOG.md) — release history

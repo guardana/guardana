@@ -6,9 +6,10 @@ Guardana is an open-source AI security verification tool for security and platfo
 
 [![CI](https://github.com/guardana/guardana/actions/workflows/ci.yml/badge.svg)](https://github.com/guardana/guardana/actions/workflows/ci.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15119/badge)](https://www.bestpractices.dev/projects/15119)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/guardana/guardana/badge)](https://scorecard.dev/viewer/?uri=github.com/guardana/guardana)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
-[![Status: beta](https://img.shields.io/badge/status-beta-yellow.svg)](docs/product-status.md)
+[![Python 3.11 | 3.12 | 3.13](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org)
+[![Status: stable](https://img.shields.io/badge/status-stable-brightgreen.svg)](docs/product-status.md)
 [![OWASP LLM Top 10](https://img.shields.io/badge/mapped-OWASP%20%C2%B7%20MITRE%20ATLAS%20%C2%B7%20NIST-informational.svg)](#what-it-checks)
 [![PyPI](https://img.shields.io/pypi/v/guardana-cli.svg)](https://pypi.org/project/guardana-cli/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -33,12 +34,19 @@ The command is `guardana`; the distribution is `guardana-cli`. An uncached `uvx`
 Start with an offline result:
 
 ```bash
-guardana init --starter first-run   # a small project with one problem to find and fix
+# With uvx:
+uvx --from guardana-cli guardana init --starter first-run
+
+# After uv add guardana-cli:
+uv run guardana init --starter first-run
+
+# After pip install guardana-cli in an active environment:
+guardana init --starter first-run
 ```
 
 Its README walks through a failing scan, the fix, a saved run, and a check of your own. Once Guardana is installed, it needs no account, key, model, or network.
 
-Scan the bundled vulnerable model directory for another example:
+Scan the bundled vulnerable model directory in a clone of the repository for another example (`pip`, `uv add` and `uvx` installs do not contain `examples/vulnerable-model`):
 
 ```console
 $ uv run guardana scan examples/vulnerable-model
@@ -60,15 +68,17 @@ $ uv run guardana scan examples/vulnerable-model
 That run exits `1`, so it can gate CI. To check your own work:
 
 ```bash
-guardana scan path/to/your/project     # static, offline, no model needed
-guardana init                          # write a guardana.yaml policy file
-guardana scan . --format sarif         # SARIF 2.1.0 for GitHub code scanning
+guardana scan path/to/your/project                      # static, offline, no model needed
+guardana init                                           # write a guardana.yaml policy file
+guardana scan . --profile guardana.yaml --format sarif  # SARIF 2.1.0 for GitHub code scanning
 
 guardana probe --url http://localhost:11434 --model llama3 --preset ci --format json --output run.json
 guardana diff accepted-run.json run.json   # 0 nothing worse at the policy's bars · 1 it is · 2 cannot tell
 ```
 
-Choose a guide for [your own project](docs/recipe-local-scan.md), [a run your application recorded](docs/recipe-recorded-answers.md), or [the application your users talk to](docs/recipe-real-application.md).
+Choose a guide for [your own project](docs/recipe-local-scan.md), [a run your application recorded](docs/recipe-recorded-answers.md), or [the application your users talk to](docs/recipe-real-application.md). To add Guardana to an existing repository and pipeline, follow [Adopt Guardana in your project](docs/adopt-guardana.md).
+
+For integration requirements, see [feature and field availability](docs/compatibility.md#feature-and-field-availability) and the [compatibility matrix](docs/generated/compatibility-matrix.md). Package availability identifies when an item first shipped; document schemas, `extension_api` and `output_api` have independent versions.
 
 Every published distribution has signed, keyless build provenance verifiable with `gh attestation verify`, plus a PEP 740 attestation on PyPI.
 
@@ -134,12 +144,12 @@ jobs:
       security-events: write   # to upload SARIF
     steps:
       - uses: actions/checkout@v7
-      - uses: guardana/guardana@v0.41   # moving tag → latest 0.41.x
+      - uses: guardana/guardana@v1.0   # moving tag → latest 1.0.x
         # with:
         #   args: --preset ci --baseline guardana-baseline.yaml
 ```
 
-Both `actions/checkout@v7` and `guardana/guardana@v0.41` are moving tags. Replace them with full commit SHAs if your workflow requires pinned actions. The published Guardana Action pins the actions it calls by SHA; that does not pin these two references in your workflow. A pre-commit hook and templates for GitLab, Jenkins, and Azure DevOps are in [`docs/integrations.md`](docs/integrations.md).
+Both `actions/checkout@v7` and `guardana/guardana@v1.0` are moving tags. Replace them with full commit SHAs if your workflow requires pinned actions. The published Guardana Action pins the actions it calls by SHA; that does not pin these two references in your workflow. A pre-commit hook and templates for GitLab, Jenkins, and Azure DevOps are in [`docs/integrations.md`](docs/integrations.md).
 
 ### Tests and Python
 
@@ -177,14 +187,7 @@ guardana plan probe --url https://staging.example/v1 --model support-bot --profi
 guardana probe --url https://staging.example/v1 --model support-bot --profile guardana.yaml
 ```
 
-Against a staging endpoint that refused every prompt, the result was `indeterminate` (exit `2`):
-
-```text
-⚠ No findings, but 4 piece(s) of coverage were missing (this is not an all-clear).
-0 finding(s); 14 rule(s) run, 16 skipped. 4 unverified. 4 piece(s) of coverage missing. 24/28 case(s) measured, 4 ungraded. 1 component(s) observed.
-```
-
-The missing coverage includes a check whose payload was never delivered. Zero findings here is not a pass.
+A probe with missing coverage exits `2` (`indeterminate`), which is not a pass.
 
 ### What Guardana observes in three systems
 
@@ -236,7 +239,7 @@ By default, Guardana loads only its own distributions. It refuses an installed t
 
 ## Maturity and limits
 
-The engine, built-in rules, CLI workflows, supported Python verification API, extension API, quality suites, and optional collector are beta. The extension API is frozen at 1.0 under [`docs/compatibility.md`](docs/compatibility.md). Read [`docs/product-status.md`](docs/product-status.md) before using Guardana as a security gate.
+The engine and built-in rules, `scan`, `diff`, supported Python verification API and extension API are stable under [`docs/compatibility.md`](docs/compatibility.md). `probe`, `grade`, `analyze-trace`, `monitor`, quality suites with deterministic assessors and the optional collector are beta, and judge-graded suites are experimental; read [`docs/product-status.md`](docs/product-status.md) before using Guardana as a security gate.
 
 Guardana's agent harness tests a model with Guardana's scripted tools; it does not exercise your agent's own framework and tools. Trace analysis checks an execution your application recorded. `monitor` samples by running active checks; it does not inspect production traffic. A scan of a path with no file to read is indeterminate rather than a pass, but a scan cannot tell whether the files it read are the ones you meant to ship; a release preset needs rules selected for the target's capabilities. The current checks cover text, not image, PDF, audio, or document carriers. Provider compatibility and judge-graded verdicts need validation for your deployment.
 
@@ -244,7 +247,7 @@ Guardana's agent harness tests a model with Guardana's scripted tools; it does n
 
 | Category | Examples | Guardana's relationship |
 |---|---|---|
-| **Model and artifact scanners** | ModelScan, picklescan | Overlaps at the static layer and covers additional AI artifact formats. |
+| **Model and artifact scanners** | ModelScan, picklescan | Overlaps at the static layer. |
 | **Red-team harnesses** | garak, PyRIT, promptfoo, DeepTeam | Complements their attack libraries. Guardana separates findings, inconclusive results, errors, and missing coverage, and can import their observations. |
 | **Evaluation frameworks** | DeepEval, Ragas | Guardana also gates answer quality on team-supplied datasets through suites. Use it alongside DeepEval or Ragas. |
 | **Runtime guardrails** | LlamaFirewall, Llama Guard | Verifies and gates; it does not run inline. |
@@ -285,7 +288,7 @@ Report suspected vulnerabilities privately through [`SECURITY.md`](SECURITY.md),
 - Try it in about ten minutes and tell us where you got stuck in a [first-run session](docs/studies/first-run-study.md).
 - Bring your team's LLM, RAG or MCP application as a [pilot](docs/studies/adopter-study.md). Start in [GitHub Discussions](https://github.com/guardana/guardana/discussions) or email contact@guardana.dev.
 - Write your own pack or check. See [docs/extending.md](docs/extending.md) and [examples/](examples/).
-- Star the repository or watch releases if you want to follow 1.0.
+- Star the repository or watch releases to follow new releases.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). New rules need a framework mapping and fixtures.
 

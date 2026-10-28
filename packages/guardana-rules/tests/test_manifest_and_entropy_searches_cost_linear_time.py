@@ -5,7 +5,7 @@ from collections.abc import Callable
 from _cost import growth
 from guardana.rules.supply_chain._advisories import load_advisories
 from guardana.rules.supply_chain.hardcoded_secret import _scan_entropy
-from guardana.rules.supply_chain.malicious_dependency import _mentions
+from guardana.rules.supply_chain.malicious_dependency import _exact_pins, _mentions
 
 _WILDCARD = "torchtriton"
 
@@ -43,3 +43,11 @@ def test_control_prose_without_secret_names_costs_linear_time() -> None:
 
 def test_a_run_of_a_secret_name_costs_linear_time() -> None:
     assert _growth(_entropy, "password", 75, 300) < 1.3
+
+
+def test_a_pin_line_of_spaces_costs_linear_time() -> None:
+    assert growth(_exact_pins, "a" + " " * 2_000 + "\n", "a" + " " * 8_000 + "\n") < 1.3
+
+
+def test_a_pin_line_of_open_brackets_costs_linear_time() -> None:
+    assert growth(_exact_pins, "a[" * 2_000 + "\n", "a[" * 8_000 + "\n") < 1.3

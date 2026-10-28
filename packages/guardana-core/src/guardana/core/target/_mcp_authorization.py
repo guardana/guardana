@@ -59,7 +59,11 @@ from guardana.core.target.endpoint import EndpointUnreachable
 from guardana.core.usage import UsageMeter
 
 _CLIENT = {"name": "guardana", "version": "0"}
-_CHALLENGE_PARAM = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
+# The lookbehind lets a parameter start only at a word boundary, so a long run of word
+# characters with no `="..."` after it is scanned once, not re-scanned from every position;
+# the possessive quantifiers keep each attempt from backtracking. A probed server sets this
+# header, so its length is not ours to trust.
+_CHALLENGE_PARAM = re.compile(r'(?<!\w)(\w++)\s*+=\s*+"([^"]*+)"')
 _SESSION_SAMPLES = 3
 _HTTP_ERROR = 400
 _ABSENT = frozenset({404, 410})

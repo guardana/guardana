@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adopt Guardana in your project — Guardana documentation</title>
+<meta name="description" content="add Guardana to your repository and CI, select a policy, review waivers and keep verification evidence">
+<link rel="canonical" href="https://guardana.dev/docs/adopt-guardana">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html" aria-current="page">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Adopt Guardana in your project</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html" aria-current="page">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Adopt Guardana in your project</h1><p class="lede">add Guardana to your repository and CI, select a policy, review waivers and keep verification evidence</p><p>You can add Guardana to an existing repository and pipeline in the order below. Choose the check that matches what you ship, then commit the policy and keep the evidence you use to gate changes.</p>
+<h2 id="which-check-fits">Which check fits</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>You have</th>
+<th>Start with</th>
+<th>Maturity</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model files, notebooks, training or loading code you ship</td>
+<td><code>guardana scan PATH</code></td>
+<td>stable</td>
+<td><a href="recipe-local-scan.html">Scan your own project</a></td>
+</tr>
+<tr>
+<td>A chatbot or RAG application behind an HTTP endpoint</td>
+<td><code>guardana probe --url URL --model MODEL</code>, with <code>--fixtures</code> for seeded retrieval checks</td>
+<td>beta</td>
+<td><a href="recipe-real-application.html">Check a real application</a>, <a href="usage-fixtures.html">Fixtures</a></td>
+</tr>
+<tr>
+<td>An MCP server</td>
+<td><code>guardana probe --mcp URL</code>; reads its manifest and authorization metadata and never calls a tool</td>
+<td>beta</td>
+<td><a href="usage-probe.html">Probe</a></td>
+</tr>
+<tr>
+<td>Answers your application already gave, or exchanges a probe kept</td>
+<td><code>guardana grade RECORDING --rules rules/</code></td>
+<td>beta</td>
+<td><a href="recipe-recorded-answers.html">Grade recorded answers</a></td>
+</tr>
+<tr>
+<td>A recorded agent execution in OpenTelemetry GenAI spans or Guardana's native trace</td>
+<td><code>guardana analyze-trace TRACE</code></td>
+<td>beta</td>
+<td><a href="usage-analyze-trace.html">Analyze a trace</a></td>
+</tr>
+<tr>
+<td>Evidence for a release decision</td>
+<td>Save runs with <code>--format json --output run.json</code> and compare with <code>guardana diff</code></td>
+<td>stable</td>
+<td><a href="usage-diff.html">Compare runs</a></td>
+</tr>
+<tr>
+<td>Scheduled re-verification of a live endpoint</td>
+<td><code>guardana monitor</code></td>
+<td>beta</td>
+<td><a href="usage-monitor.html">Monitor</a></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="1-install">1. Install</h2>
+<p>You need Python <code>3.11</code>, <code>3.12</code> or <code>3.13</code>. The distribution is <code>guardana-cli</code>; the command is <code>guardana</code>. Pick one launcher and use it for every later command. The examples below use <code>guardana</code> from an active environment; in a uv project, use <code>uv run guardana</code>. Without installing, keep the full <code>uvx --from guardana-cli guardana</code> prefix because it leaves <code>guardana</code> off <code>PATH</code>.</p>
+<pre><code class="language-bash"># In an active environment:
+pip install guardana-cli
+guardana --version
+
+# Alternatively, in a uv project:
+# uv add guardana-cli
+# uv run guardana --version
+
+# Alternatively, without installing:
+# uvx --from guardana-cli guardana --version
+</code></pre>
+<p>More: <a href="install.html">Install</a></p>
+<h2 id="2-get-a-first-result">2. Get a first result</h2>
+<p>Plan the scan to see which rules run and which are skipped, then scan your project offline without loading or executing its files. Exit codes are <code>0</code> for a pass, <code>1</code> for a finding at or above the policy's severity, <code>2</code> for an indeterminate result, and <code>3</code> for invalid usage or configuration. An indeterminate result means, for example, that a check cannot run or that no rule reads a model file. A model file Guardana cannot read is listed as <code>UNVERIFIED</code>, never clean. Exclude files with <code>.guardanaignore</code> or <code>rules.paths_exclude</code>.</p>
+<pre><code class="language-bash">guardana plan scan path/to/project
+guardana scan path/to/project
+</code></pre>
+<p>More: <a href="recipe-local-scan.html">Scan your own project</a>, <a href="exit-codes.html">Exit codes</a></p>
+<h2 id="3-commit-a-profile-and-select-it-explicitly">3. Commit a profile and select it explicitly</h2>
+<p>Run <code>guardana init</code> to write <code>guardana.yaml</code>, then review and commit it. Guardana reads this file only when you name it with <code>--profile guardana.yaml</code>. Without <code>--profile</code> or <code>--preset</code>, every command uses the built-in default profile. Validate the file and print the effective policy before scanning. A preset selected with <code>--preset</code> (<code>ci</code>, <code>pre-training</code>, <code>monitor</code> or <code>release</code>) is an alternative to a profile file, not an addition to it.</p>
+<pre><code class="language-bash">guardana init
+guardana config validate --profile guardana.yaml
+guardana config explain --profile guardana.yaml
+guardana scan path/to/project --profile guardana.yaml
+</code></pre>
+<p>More: <a href="profiles.html">Profiles</a>, <a href="usage-init.html">Initialize a profile</a></p>
+<h2 id="4-accept-the-existing-backlog-deliberately">4. Accept the existing backlog deliberately</h2>
+<p>Create <code>guardana-baseline.yaml</code> to record one waiver per current finding. Each waiver contains placeholder text for its reason and approver; you must replace both before the file is usable. Waivers can carry an expiry, and verification fails while a placeholder or an expired waiver remains; an expired waiver stops waiving. Gate scans with the reviewed baseline so you can accept the backlog deliberately. Run <code>guardana baseline update</code> to remove only waivers whose findings are confirmed gone; it never adds a waiver.</p>
+<pre><code class="language-bash">guardana baseline create path/to/project --profile guardana.yaml
+# Replace each placeholder reason and approver before continuing.
+guardana baseline verify guardana-baseline.yaml
+guardana scan path/to/project --profile guardana.yaml --baseline guardana-baseline.yaml
+guardana baseline update path/to/project --profile guardana.yaml
+</code></pre>
+<p>More: <a href="usage-baseline.html">Baselines</a></p>
+<h2 id="5-gate-every-pull-request">5. Gate every pull request</h2>
+<p>Use the GitHub Action to run the same scan on each pull request; its inputs are <code>path</code>, <code>args</code>, <code>version</code>, <code>sarif-file</code>, <code>upload-sarif</code> and <code>fail-on-findings</code>. Set <code>args</code> to <code>--profile guardana.yaml --baseline guardana-baseline.yaml --plugins builtins</code>; the <code>--plugins builtins</code> flag prevents a pull request that changes <code>guardana.yaml</code> from widening plugin trust. Use the <a href="integrations.html">integration examples</a> for the Action tag, version and container image tag; other CI systems run the image or CLI, with templates for GitLab, Jenkins and Azure DevOps. Run baseline verification in CI too. For a local pre-push check, add the pre-commit hook from the <a href="integrations.html#pre-commit">hook guide</a>, install it and run it once by hand.</p>
+<pre><code class="language-bash">guardana baseline verify guardana-baseline.yaml
+guardana scan path/to/project --profile guardana.yaml --baseline guardana-baseline.yaml --plugins builtins
+pre-commit install --hook-type pre-push
+pre-commit run --hook-stage pre-push --all-files
+</code></pre>
+<p>More: <a href="integrations.html#github-action">GitHub Action</a>, <a href="integrations.html#pre-commit">Pre-commit</a></p>
+<h2 id="6-run-the-same-checks-in-pytest">6. Run the same checks in pytest</h2>
+<p>Use <code>assert_secure</code> in a pytest test to fail the test with the findings. <code>assert_secure</code> takes no baseline, so waived findings fail again there. Test a scope with no accepted findings, or use the Python API's <code>Verifier</code>, which accepts a baseline.</p>
+<pre><code class="language-python">from pathlib import Path
+
+from guardana.testing import assert_secure
+
+
+def test_models_pass_the_policy() -&gt; None:
+    assert_secure(&quot;models&quot;, profile=Path(&quot;guardana.yaml&quot;))
+</code></pre>
+<p>More: <a href="usage-testing.html">Testing</a>, <a href="python-api.html">Python API</a></p>
+<h2 id="7-probe-a-staging-deployment-within-limits-beta">7. Probe a staging deployment within limits (beta)</h2>
+<p>Before any request, get authorization for the target, use synthetic data and isolate tools that have side effects. Set <code>budgets:</code> in the profile with <code>max_requests</code>, <code>max_duration</code> and <code>max_requests_per_minute</code>; a retry is a request, and each judge keeps its own meter under the same ceilings. <code>guardana plan probe</code> prices the run and sends nothing; it needs no key and has no <code>--api-key-env</code>. Inspect what the target supports before you probe it. Exit <code>6</code> means a budget stops the run: the result is incomplete, never a pass.</p>
+<pre><code class="language-bash">guardana plan probe --url URL --model MODEL --profile guardana.yaml
+guardana target inspect --url URL --model MODEL --api-key-env STAGING_API_KEY
+guardana probe --url URL --model MODEL --api-key-env STAGING_API_KEY --profile guardana.yaml --format json --output run.json
+</code></pre>
+<p>More: <a href="safe-testing.html">Safe testing</a>, <a href="usage-plan.html">Plan a run</a>, <a href="usage-target.html">Inspect a target</a>, <a href="usage-probe.html">Probe</a></p>
+<h2 id="8-test-what-is-specific-to-your-application-beta">8. Test what is specific to your application (beta)</h2>
+<p>For a RAG application, declare synthetic documents in <code>guardana-fixtures.yaml</code>, render them to <code>seed/documents.jsonl</code> and ingest them with your own pipeline before probing with <code>--fixtures</code>. The probe checks tenant-boundary markers and poisoned-document instructions that reach replies. For an MCP server, probe its manifest and authorization metadata without calling a tool. For a recorded agent execution, inspect the trace before you analyze it. To grade answers your application already gives, use <code>guardana grade</code>, which sends nothing to the application.</p>
+<pre><code class="language-bash">guardana fixtures render guardana-fixtures.yaml --out seed/
+# Ingest seed/documents.jsonl with your own pipeline before probing.
+guardana probe --url URL --model MODEL --fixtures guardana-fixtures.yaml --profile guardana.yaml
+guardana probe --mcp URL
+guardana trace inspect TRACE
+guardana analyze-trace TRACE
+guardana grade RECORDING --rules rules/ --profile guardana.yaml
+</code></pre>
+<p>More: <a href="usage-fixtures.html">Fixtures</a>, <a href="usage-probe.html">Probe</a>, <a href="usage-analyze-trace.html">Analyze a trace</a>, <a href="recipe-recorded-answers.html">Grade recorded answers</a></p>
+<h2 id="9-keep-evidence-and-gate-regressions">9. Keep evidence and gate regressions</h2>
+<p>Save a reviewed run as <code>accepted-run.json</code> and keep it in your repository or CI artifact store. After a change, save <code>run.json</code> the same way, inspect it and compare the runs. <code>guardana diff</code> exits <code>0</code> when nothing is worse at the policy's bars, <code>1</code> when something is worse, and <code>2</code> when the runs cannot be compared. Read the coverage lines too: fewer findings do not necessarily mean better coverage. A waiver baseline in YAML silences reviewed findings; an accepted run in JSON is the reference for comparing a later run.</p>
+<pre><code class="language-bash">guardana scan path/to/project --profile guardana.yaml --baseline guardana-baseline.yaml --format json --output accepted-run.json
+# After a change:
+guardana scan path/to/project --profile guardana.yaml --baseline guardana-baseline.yaml --format json --output run.json
+guardana run inspect run.json
+guardana diff accepted-run.json run.json
+</code></pre>
+<p>More: <a href="usage-run.html">Inspect a run</a>, <a href="usage-diff.html">Compare runs</a>, <a href="reading-results.html">Read results</a></p>
+<h2 id="10-re-verify-on-a-schedule-beta">10. Re-verify on a schedule (beta)</h2>
+<p>Use <code>guardana monitor</code> to run active checks every interval. It alerts when a cycle fails the gate, when more checks cannot run than in its first cycle, or when a cycle is worse than the first by the rules <code>guardana diff</code> applies. It does not inspect traffic passively. It writes no saved run per cycle and has no <code>--output</code> or <code>--format</code>; use <code>--reporter</code> to forward alerts to a collector. It does not select <code>--preset monitor</code> by itself, so pass the policy you want. Budgets apply to each cycle.</p>
+<pre><code class="language-bash">guardana monitor --url URL --model MODEL --profile guardana.yaml --interval 300 --max-cycles 3
+</code></pre>
+<p>More: <a href="usage-monitor.html">Monitor</a></p>
+<h2 id="11-collect-results-centrally-optional-beta">11. Collect results centrally (optional, beta)</h2>
+<p>Use the collector for central results; local verification never depends on it. Set <code>GUARDANA_DATABASE_URL</code> to a PostgreSQL database before migration; bootstrap prints an API key once. Put that key in <code>GUARDANA_COLLECTOR_TOKEN</code> where you run verification, and label reported results with <code>--ai-system NAME</code> and <code>--environment NAME</code>. The collector keeps a reduced envelope, not the whole saved run, so keep the JSON run as evidence. Put TLS in front, scope keys and back up the database.</p>
+<pre><code class="language-bash">pip install &quot;guardana-server[serve]&quot;
+# Set GUARDANA_DATABASE_URL to a PostgreSQL database.
+guardana-collector migrate
+guardana-collector bootstrap --org acme --project web
+guardana-collector serve
+
+# In your verification environment, set GUARDANA_COLLECTOR_TOKEN.
+guardana scan path/to/project --profile guardana.yaml --baseline guardana-baseline.yaml --format json --output run.json --reporter server://URL --ai-system NAME --environment NAME
+</code></pre>
+<p>More: <a href="usage-collector.html">Collector</a>, <a href="deployment.html">Deployment</a>, <a href="reading-results.html#what-the-collector-keeps">What the collector keeps</a></p>
+<h2 id="what-a-pass-means">What a pass means</h2>
+<p>A pass covers the checks that run and the evidence they see. It is not a certification. Read the skipped, unverified and coverage lines, and the <a href="product-status.html#known-limitations">known limitations</a>, before you trust a green result.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/adopt-guardana.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

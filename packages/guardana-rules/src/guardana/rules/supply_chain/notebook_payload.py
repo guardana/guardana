@@ -308,7 +308,10 @@ class NotebookPayloadRule(ArtifactRule):
                 yield self._finding(
                     path, where, Severity.HIGH, "shell escape pipes a download into a shell"
                 )
-            scan.scripts.extend(local_scripts(line))
+            scripts, read = local_scripts(line)
+            scan.scripts.extend(scripts)
+            if not read:
+                yield self._unread(scan, where, "a shell line that cannot be tokenised")
         for label in dict.fromkeys(cell.unread):
             yield self._unread(scan, where, label)
         tree = yield from self._parse(scan, where, cell)

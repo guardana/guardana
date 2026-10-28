@@ -11,6 +11,7 @@ could not check is the same defect wearing a different hat, so every way of bein
 to check — no `gh`, no run to look at, a signature that does not verify — stops before the tag.
 """
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -443,6 +444,265 @@ def test_a_failed_required_check_stops_before_the_merge(
         release._await_required_checks("190", _HEAD)
 
     assert stopped.value.code == 1
+
+
+_DROPPED = subprocess.CalledProcessError(1, ["gh"])
+_CHECKS_WATCH = ("gh", "pr", "checks", "190", "--required", "--watch", "--fail-fast")
+_CHECKS_READ = ("gh", "pr", "checks", "190", "--required", "--json", "name,bucket")
+_RUN_WATCH = ("gh", "run", "watch", "42", "--exit-status")
+_RUN_READ = ("gh", "run", "view", "42", "--json", "status,conclusion")
+
+
+def _checks(*buckets: str) -> str:
+    return json.dumps([{"name": f"check-{i}", "bucket": b} for i, b in enumerate(buckets)])
+
+
+def _run_state(status: str, conclusion: str) -> str:
+    return json.dumps({"status": status, "conclusion": conclusion})
+
+
+def _scripted(
+    monkeypatch: pytest.MonkeyPatch, script: dict[tuple[str, ...], list[str | Exception]]
+) -> list[list[str]]:
+    """Fake `_run` answering by command prefix from a queue whose last answer repeats."""
+    calls: list[list[str]] = []
+
+    def _fake(cmd: list[str], **_: bool) -> str:
+        calls.append(cmd)
+        for prefix, answers in script.items():
+            if tuple(cmd[: len(prefix)]) == prefix:
+                answer = answers.pop(0) if len(answers) > 1 else answers[0]
+                if isinstance(answer, Exception):
+                    raise answer
+                return answer
+        return ""
+
+    monkeypatch.setattr(release, "_run", _fake)
+    return calls
+
+
+def _publish_world(
+    monkeypatch: pytest.MonkeyPatch, script: dict[tuple[str, ...], list[str | Exception]]
+) -> list[list[str]]:
+    """Script `_publish` up to the waits: a pushed branch, pull request #190, a clean merge."""
+    return _scripted(
+        monkeypatch,
+        {
+            ("git", "rev-parse", "HEAD"): [f"{_HEAD}\n"],
+            ("git", "rev-parse"): ["same-tree\n"],
+            ("gh", "pr", "create"): [_PR_URL],
+            ("gh", "run", "list"): ["42\n"],
+            ("gh", "pr", "view"): [f"MERGED\n{_MERGED}\n"],
+            **script,
+        },
+    )
+
+
+def _count(calls: list[list[str]], prefix: tuple[str, ...]) -> int:
+    return sum(tuple(cmd[: len(prefix)]) == prefix for cmd in calls)
+
+
+def test_a_dropped_checks_watch_goes_on_when_every_required_check_reads_passed(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    """A watch that lost its connection says nothing; the state read afterwards does."""
+    calls = _scripted(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): ["77\n"],
+            _CHECKS_WATCH: [_DROPPED],
+            _CHECKS_READ: [_checks("pass", "pass")],
+        },
+    )
+
+    release._await_required_checks("190", _HEAD)
+
+    assert _count(calls, _CHECKS_WATCH) == 1
+    assert _count(calls, _CHECKS_READ) == 1
+
+
+@pytest.mark.parametrize("bucket", ["fail", "cancel"])
+def test_a_dropped_checks_watch_stops_as_failed_when_a_required_check_reads_failed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], clock: _Clock, bucket: str
+) -> None:
+    calls = _scripted(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): ["77\n"],
+            _CHECKS_WATCH: [_DROPPED],
+            _CHECKS_READ: [_checks("pass", bucket, "pending")],
+        },
+    )
+
+    with pytest.raises(SystemExit):
+        release._await_required_checks("190", _HEAD)
+
+    assert "the required checks of pull request #190 did not pass" in capsys.readouterr().err
+    assert _count(calls, _CHECKS_WATCH) == 1
+
+
+_UNSHOWN_CHECKS: list[str | Exception] = [
+    _checks("pass", "pending"),
+    _checks("pass", "skipping"),
+    _checks(),
+    "",
+    "not json",
+    '{"bucket": "pass"}',
+    '["pass"]',
+    '[{"name": "check-0"}]',
+    _DROPPED,
+]
+
+
+@pytest.mark.parametrize(
+    "state",
+    _UNSHOWN_CHECKS,
+    ids=[
+        "pending",
+        "skipping",
+        "empty-list",
+        "empty",
+        "not-json",
+        "object",
+        "strings",
+        "no-bucket",
+        "read-failed",
+    ],
+)
+def test_a_checks_watch_dropped_twice_on_an_unshown_state_stops_without_merging(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    clock: _Clock,
+    state: str | Exception,
+) -> None:
+    """Checks never shown to pass are not called passed, nor called failed."""
+    calls = _publish_world(monkeypatch, {_CHECKS_WATCH: [_DROPPED], _CHECKS_READ: [state]})
+
+    with pytest.raises(SystemExit):
+        release._publish("release/v0.1.1", "v0.1.1", "0.1.1")
+
+    err = capsys.readouterr().err
+    assert "the required checks of pull request #190 could not be watched to the end" in err
+    assert "were not shown to pass" in err
+    assert "did not pass" not in err
+    assert _count(calls, _CHECKS_WATCH) == 2
+    assert not [
+        cmd for cmd in calls if cmd[:3] == ["gh", "pr", "merge"] or cmd[:2] == ["git", "tag"]
+    ]
+
+
+def test_a_checks_watch_dropped_once_goes_on_when_the_retry_finishes(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    calls = _scripted(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): ["77\n"],
+            _CHECKS_WATCH: [_DROPPED, ""],
+            _CHECKS_READ: [_checks("pass", "pending")],
+        },
+    )
+
+    release._await_required_checks("190", _HEAD)
+
+    assert _count(calls, _CHECKS_WATCH) == 2
+    assert calls[-1] == list(_CHECKS_WATCH)
+
+
+def test_a_dropped_ci_watch_goes_on_when_the_run_reads_green(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    calls = _scripted(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): ["42\n"],
+            _RUN_WATCH: [_DROPPED],
+            _RUN_READ: [_run_state("completed", "success")],
+        },
+    )
+
+    release._await_green_ci(_COMMIT)
+
+    assert _count(calls, _RUN_WATCH) == 1
+    assert _count(calls, _RUN_READ) == 1
+
+
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled", "timed_out", ""])
+def test_a_dropped_ci_watch_stops_as_red_when_the_run_reads_concluded_otherwise(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    clock: _Clock,
+    conclusion: str,
+) -> None:
+    calls = _scripted(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): ["42\n"],
+            _RUN_WATCH: [_DROPPED],
+            _RUN_READ: [_run_state("completed", conclusion)],
+        },
+    )
+
+    with pytest.raises(SystemExit):
+        release._await_green_ci(_COMMIT)
+
+    assert "CI run 42 is not green" in capsys.readouterr().err
+    assert _count(calls, _RUN_WATCH) == 1
+
+
+_UNSHOWN_RUNS: list[str | Exception] = [
+    _run_state("in_progress", ""),
+    _run_state("queued", ""),
+    '{"conclusion": "success"}',
+    "",
+    "not json",
+    "[]",
+    _DROPPED,
+]
+
+
+@pytest.mark.parametrize(
+    "state",
+    _UNSHOWN_RUNS,
+    ids=["in-progress", "queued", "no-status", "empty", "not-json", "list", "read-failed"],
+)
+def test_a_ci_watch_dropped_twice_on_an_unshown_state_stops_without_a_tag(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    clock: _Clock,
+    state: str | Exception,
+) -> None:
+    """A run never shown to be green is not called green, nor called red."""
+    calls = _publish_world(monkeypatch, {_RUN_WATCH: [_DROPPED], _RUN_READ: [state]})
+
+    with pytest.raises(SystemExit):
+        release._publish("release/v0.1.1", "v0.1.1", "0.1.1")
+
+    err = capsys.readouterr().err
+    assert "CI run 42 could not be watched to the end; it was not shown to be green" in err
+    assert "is not green" not in err
+    assert _count(calls, ("gh", "pr", "merge")) == 1
+    assert _count(calls, _RUN_WATCH) == 2
+    assert not [cmd for cmd in calls if cmd[:2] == ["git", "tag"]]
+    assert _TAG_PUSH not in calls
+
+
+def test_a_ci_watch_dropped_once_goes_on_when_the_retry_finishes(
+    monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    calls = _scripted(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): ["42\n"],
+            _RUN_WATCH: [_DROPPED, ""],
+            _RUN_READ: [_run_state("in_progress", "")],
+        },
+    )
+
+    release._await_green_ci(_COMMIT)
+
+    assert _count(calls, _RUN_WATCH) == 2
+    assert calls[-1] == list(_RUN_WATCH)
 
 
 @pytest.mark.parametrize("answer", ["", "OPEN\n\n"], ids=["unreadable", "open"])

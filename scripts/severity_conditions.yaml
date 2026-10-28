@@ -1,0 +1,142 @@
+# When a built-in rule's finding carries a severity other than the rule's default.
+#
+# Read by scripts/generate_docs.py into the "Other finding severities" section of
+# docs/generated/rule-catalog.md; scripts/tests/test_severity_conditions.py fails when
+# this file and the rule code disagree. One key per rule id, entries by severity
+# descending. A rule whose findings always carry its default severity has no key.
+
+guardana.a2a.caller_identity:
+  - severity: LOW
+    when: the card declares no security scheme, the agent answers a caller with no credential, and the card's host is a loopback or private address
+
+guardana.agent.mcp_server_manifest:
+  - severity: CRITICAL
+    when: a pinned tool's live declaration differs from the digest approved by the pin
+
+guardana.mcp.registry_entry:
+  - severity: LOW
+    when: the version the server reports differs from the version in its registry entry
+
+guardana.mcp.scope_breadth:
+  - severity: LOW
+    when: the anonymous authorization challenge has no `scope` parameter
+
+guardana.mcp.session_binding:
+  - severity: CRITICAL
+    when: a request carrying only the session id, with the credential removed, returns the tool manifest
+  - severity: CRITICAL
+    when: the server issues the same session id to more than one handshake
+  - severity: CRITICAL
+    when: session ids differ only by an increasing number after a shared prefix
+
+guardana.mcp.unauthenticated_access:
+  - severity: LOW
+    when: the manifest is returned to an anonymous caller and the server is on a loopback or private address
+
+guardana.prompt.hidden_instructions:
+  - severity: LOW
+    when: invisible characters are present but are not shaped like an instruction payload
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.prompt.mcp_tool_poisoning:
+  - severity: MEDIUM
+    when: a tool description contains a base64 blob of 48 or more characters
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.chat_template:
+  - severity: HIGH
+    when: only an `include`, `extends`, `import` or `from` tag matches, with no dunder access, `attr` filter, Jinja global or code sink
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.code_execution:
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.dependency_risk:
+  - severity: MEDIUM
+    when: a `yaml.load` call uses `Loader=FullLoader`
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.hallucinated_package:
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.hardcoded_secret:
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.insecure_transport:
+  - severity: MEDIUM
+    when: a fetch call uses a plaintext `http://` URL
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.keras_lambda:
+  - severity: MEDIUM
+    when: a `StringLookup`, `IntegerLookup` or `TextVectorization` layer reads its vocabulary from a file outside the model
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.malicious_dependency:
+  - severity: MEDIUM
+    when: a `setup.py` file fetches from the network at install time
+  - severity: MEDIUM
+    when: a pin matches a bundled vulnerable-loader advisory; the finding takes the advisory's severity (`medium` for every bundled advisory)
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.model_format:
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.notebook_payload:
+  - severity: LOW
+    when: a cell runs local scripts whose code the rule does not read
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.onnx_graph:
+  - severity: MEDIUM
+    when: a node or opset uses a domain outside the standard ONNX domains
+  - severity: MEDIUM
+    when: a `metadata_props` value looks like code, such as `exec`, `eval`, `subprocess` or `b64decode`
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.pickle_opcode:
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.provenance:
+  - severity: LOW
+    when: the model card names AGPL, non-commercial or no-redistribution terms
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.remote_code:
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.remote_code_config:
+  - severity: CRITICAL
+    when: a Hub kernel reference is set through the private key `_attn_implementation_internal` or `_attn_implementation`
+  - severity: MEDIUM
+    when: a Hub kernel reference is set through the public key `attn_implementation`
+  - severity: MEDIUM
+    when: an `auto_map` or `custom_pipelines` pointer names a module that is not present beside the config
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.supply_chain.saved_model_ops:
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive
+
+guardana.training.dataset_integrity:
+  - severity: LOW
+    when: a `load_dataset(...)` call omits `revision=` or sets it to a value other than a literal commit SHA
+  - severity: LOW
+    when: the input cannot be read whole (unreadable, truncated, over the read bound or unparseable); the finding is inconclusive

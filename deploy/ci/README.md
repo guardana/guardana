@@ -17,7 +17,7 @@ GitHub Actions has a first-class action instead — see
 ## The generic container pipeline
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.41 \
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0 \
   scan /work --format junit > guardana-junit.xml
 ```
 
@@ -63,14 +63,21 @@ line, where it lands in shell history and in most CI logs:
 ```bash
 docker run --rm -v "$PWD:/work" \
   -e GUARDANA_COLLECTOR_TOKEN \
-  ghcr.io/guardana/guardana:0.41 \
+  -e GITHUB_SHA -e CI_COMMIT_SHA -e GIT_COMMIT -e BUILD_SOURCEVERSION \
+  -e GITHUB_ACTIONS -e GITLAB_CI -e JENKINS_URL -e TF_BUILD -e CI \
+  ghcr.io/guardana/guardana:1.0 \
   scan /work --ai-system support-agent --environment production \
     --reporter server://https://collector.example.com
 ```
 
 The commit is read from whatever CI this is (`GITHUB_SHA`, `CI_COMMIT_SHA`,
-`GIT_COMMIT`, `BUILD_SOURCEVERSION`). The AI system and the environment are never
-guessed — a branch is not an environment — so they are flags you pass.
+`GIT_COMMIT`, `BUILD_SOURCEVERSION`). The CI provider is read from
+`GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `TF_BUILD` or `CI`. Inside
+`docker run`, only variables passed with `-e` exist. Passing `-e NAME` for an
+unset variable sets nothing. Without forwarding the commit and CI provider
+variables, the run records no commit and a `local` source. The AI system and the
+environment are never guessed — a branch is not an environment — so they are
+flags you pass.
 
 ## Wanting the human report in the log too
 
@@ -79,7 +86,7 @@ view wants and not what a person reading a failed job wants. Add a second,
 non-gating pass if your team reads logs:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.41 scan /work || true
+docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:1.0 scan /work || true
 ```
 
 Static scans are cheap enough for this. Do **not** do it for `probe` or

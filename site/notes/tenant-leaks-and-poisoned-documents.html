@@ -27,9 +27,9 @@
 <h2 id="the-setup">The setup</h2>
 <p>The <a href="https://github.com/guardana/guardana/tree/main/examples/retrieval_pilot">reference application</a> serves an OpenAI-compatible chat endpoint. Its “model” is a deterministic stand-in. A keyword index reads rendered documents, while <code>lookup_order</code> uses <code>guardana.core.doubles</code>. The tenant comes from the request’s bearer key. The normal index filters documents by that tenant, and the order lookup runs under the same tenant identity.</p>
 <p>The fixtures are synthetic: two tenants, <code>acme</code> and <code>globex</code>; three documents, including one poisoned document; and two order records. The selected checks are <code>guardana.tenancy.cross_tenant_answer</code> and <code>guardana.retrieval.poisoned_document</code>. Rendering the fixtures writes <code>seed/documents.jsonl</code> for the application to index. The run uses local keys and <code>127.0.0.1:8000</code>; no model or third-party endpoint was called.</p>
-<p>A <a href="https://guardana.dev/docs/usage-recipe">recipe</a> records the application connection, profile, fixtures, deployment label and output directory. Here, <code>guardana recipe lock</code> wrote <code>guardana-recipe.lock.yaml</code>. It pins the recipe, profile, both rules, the fixtures digest and installed source files. The lock check returned this output:</p>
+<p>A <a href="https://guardana.dev/docs/usage-recipe">recipe</a> records the application connection, profile, fixtures, deployment label and output directory. Here, <code>guardana recipe lock</code> wrote <code>guardana-recipe.lock.yaml</code>. It pins the recipe, profile, both rules and the fixtures digest. It pins source files only for a distribution installed from a directory or a URL. The lock check returned this output:</p>
 <pre><code class="language-text">$ guardana recipe lock
-wrote guardana-recipe.lock.yaml: 2 rule(s), 0 evaluator(s), 0 configured skip(s), 2 source pin(s)
+wrote guardana-recipe.lock.yaml: 2 rule(s), 0 evaluator(s), 0 configured skip(s)
 $ guardana recipe lock --check
 every pin in guardana-recipe.lock.yaml holds
 </code></pre>
@@ -69,6 +69,52 @@ Trials
 <h2 id="diff-between-runs">Diff between runs</h2>
 <p>Save comparable runs as JSON, for example with <code>--format json --output fixed.json</code>. The <a href="https://guardana.dev/docs/usage-diff">diff command</a> takes the older run first. Comparing <code>fixed.json</code> with <code>broken-filter.json</code> exited 1 and marked the CRITICAL tenant check <code>APPEARED</code>. Comparing <code>broken-filter.json</code> with the later <code>fixed-after.json</code> exited 0 and marked it <code>RESOLVED</code>. Comparing <code>fixed.json</code> with <code>partial.json</code> exited 2 and marked the tenant check <code>BLINDED</code>: it could no longer grade three cases.</p>
 <p>Order matters. <code>guardana diff broken-filter.json fixed.json</code> was refused with exit 2 because the first file was newer. A fixed result must be saved after the failing one to show a resolution. The saved recipe artifacts can be compared in the same way; the broken-filter artifact followed by the fixed artifact reported <code>RESOLVED</code>.</p>
+<h2 id="how-this-was-run">How this was run</h2>
+<p>The 2026-10-24 re-run used <code>guardana-cli==1.0.0rc5</code>, <code>guardana-core==1.0.0rc5</code>, <code>guardana-rules==1.0.0rc5</code> and <code>guardana-report==1.0.0rc5</code> from PyPI. <code>guardana --version</code> reported version <code>1.0.0rc5</code>. The reference application, <code>examples/retrieval_pilot</code>, was exported from tag <code>v1.0.0rc5</code>, commit <code>91196fd688f97941d05d6ab4f2a1fd1da79e50b4</code>, and installed in the same environment. The platform was macOS arm64 with CPython 3.12.14 and uv 0.12.9. Every output above reproduced on that run except the source-pin count corrected in the recipe section. These commands ran from the example directory:</p>
+<pre><code class="language-bash">export ACME_KEY=acme-local-key GLOBEX_KEY=globex-local-key
+guardana --version
+guardana fixtures render guardana-fixtures.yaml --out seed/
+
+# Start the application in a separate terminal with the same environment variables.
+# Use a fresh trace file for each start; replace &lt;file&gt; with its path.
+# Add --break-tenant-filter or --obey-documents for the two broken modes.
+# For the incomplete index, point --documents at a copy without globex’s document.
+retrieval-pilot --fixtures guardana-fixtures.yaml --documents seed/documents.jsonl --trace &lt;file&gt; --port 8000
+
+guardana probe --url http://127.0.0.1:8000 --model reference --fixtures guardana-fixtures.yaml --profile guardana.yaml
+
+# Save fixed.json in normal mode, then broken-filter.json with --break-tenant-filter,
+# fixed-after.json in normal mode again, and partial.json with the incomplete index.
+# Restart the application in the matching mode before each run.
+# Replace &lt;file&gt; with the corresponding JSON filename.
+guardana probe --url http://127.0.0.1:8000 --model reference --fixtures guardana-fixtures.yaml --profile guardana.yaml --format json --output &lt;file&gt;
+
+guardana recipe lock
+guardana recipe lock --check
+guardana recipe run
+
+guardana diff fixed.json broken-filter.json
+guardana diff broken-filter.json fixed-after.json
+guardana diff fixed.json partial.json
+guardana diff broken-filter.json fixed.json
+</code></pre>
+<p>The recipe file, <code>guardana-recipe.yaml</code>:</p>
+<pre><code class="language-yaml">schema_version: 2
+name: retrieval-pilot
+profile: guardana.yaml
+subject:
+  kind: application
+  connection:
+    url: http://127.0.0.1:8000
+    model: reference
+  fixtures: guardana-fixtures.yaml
+deployment:
+  ai_system: retrieval-pilot
+  environment: local
+output:
+  directory: guardana-artifact
+  exchanges: false
+</code></pre>
 <h2 id="what-this-does-not-show">What this does not show</h2>
 <p>This was a stand-in application with a keyword index and doubles. It had no vector store, embedding model or LLM. The shipped part demonstrated here is checks on a reference application. A clean run proves only that no marker reached a reply, not that retrieval is filtered. A document could enter context and still be withheld from the answer. The pilot’s own trace did not record retrieval, so it cannot establish what the index returned.</p>
 <p>The poisoned check covered one document and one instruction shape. Each case had one trial: five tenant cases and one poisoned case. The clean run reported <code>ASR@1 ≤ 45.1% (95%)</code> for the tenant check and <code>ASR@1 ≤ 95% (95%)</code> for the poisoned check. These bounds describe this reference run. No adaptive attacker ran.</p>

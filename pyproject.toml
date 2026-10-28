@@ -157,12 +157,19 @@ mypy_path = [
     # Same reason as pytest's `pythonpath` below: the round-trip helpers are imported
     # by gates in several suites, so the type checker has to resolve them too.
     "packages/guardana-core/tests",
+    # The fuzz targets import their shared helper as a top-level module, as Atheris runs them.
+    "fuzz",
 ]
 # Deliberately-insecure demo inputs: not project source, and not type-checked.
 exclude = ["examples/vulnerable-model"]
 
 [[tool.mypy.overrides]]
 module = "defusedxml.*"
+ignore_missing_imports = true
+
+# Installed only by the `fuzz` dependency group, which most environments cannot install.
+[[tool.mypy.overrides]]
+module = "atheris"
 ignore_missing_imports = true
 
 # The reference webhook verifier, installed only in the output example's isolated suite.
@@ -179,7 +186,12 @@ addopts = "-q -ra --strict-markers --strict-config"
 # `conftest.py`: two files named `conftest` in one repository is a duplicate module
 # for mypy, and the helper has to sit beside the tests that import it.
 # The output example's doubles sit in their own directory for the same reason.
-pythonpath = ["packages/guardana-core/tests", "scripts", "examples/output_pack/tests/doubles"]
+pythonpath = [
+    "packages/guardana-core/tests",
+    "scripts",
+    "examples/output_pack/tests/doubles",
+    "fuzz",
+]
 # The example plugin is deliberately NOT collected here: installing it would put
 # its `acme.*` rules into every `Registry.discover()` call and make the dogfood
 # scan non-representative. CI runs its tests in a dedicated job instead, which is
@@ -209,6 +221,11 @@ filterwarnings = [
 default-groups = ["dev", "docs", "conformance"]
 
 [dependency-groups]
+# Coverage-guided fuzzing of the readers of hostile input (artifacts, traces, profiles) in
+# `fuzz/`, run by `.github/workflows/fuzz.yml`. Not a default group and never a package
+# dependency: Atheris publishes wheels for Linux x86_64 on CPython 3.12 and later only, so
+# the marker keeps every other development environment able to resolve the lock.
+fuzz = ["atheris==3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version >= '3.12'"]
 # The build backend of every package, locked so the container images build the local
 # packages without build isolation and with hashes, like their dependencies. Not a
 # default group: nothing in the development environment imports it.
@@ -233,7 +250,7 @@ conformance = [
     # `packages/*/src` may import `mcp` or `a2a` (the import-linter contract below),
     # and the clean-install check and the isolated example suites never install it.
     "mcp==2.3.0",
-    "a2a-sdk[http-server]==1.2.2",
+    "a2a-sdk[http-server]==1.2.3",
     "uvicorn",
 ]
 dev = [
@@ -242,7 +259,7 @@ dev = [
     # model named "no fuzzing of the binary parsers" as an open gap for four
     # releases, and an example-based test proves the case its author thought of —
     # which is never the length field that is one byte short of the file.
-    "hypothesis>=6.168.5",
+    "hypothesis>=6.170.9",
     "import-linter>=2.14",
     # Test-only, and deliberately not a runtime dependency of any distribution:
     # `schemas/run-v2.schema.json` is a published contract, and a schema
@@ -252,10 +269,10 @@ dev = [
     "jsonschema>=4.23",
     "types-jsonschema>=4.26.0.20261006",
     "mypy>=2.4.0",
-    "pre-commit>=4.6.2",
+    "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
-    "ruff>=0.16.10",
+    "ruff>=0.17.2",
 ]
 
 [tool.coverage.run]

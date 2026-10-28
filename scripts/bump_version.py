@@ -64,9 +64,9 @@ _IMAGE_PIN_RE = re.compile(r"(ghcr\.io/guardana/guardana(?:-collector)?:)\d+\.\d
 _REQUIRED_ACTION_PIN = (Path("README.md"), Path("docs/integrations.md"))
 _REQUIRED_IMAGE_PIN = (Path("docs/install.md"), Path("deploy/docker/README.md"))
 # Exempt from both the rewrite and the staleness gate, each for its own reason:
-# the changelog records what past releases said, and a test fixture that feeds an
-# *old* pin to the rewriter has to stay old to be a test at all.
-_PIN_EXEMPT = ("CHANGELOG.md", "/tests/")
+# the changelog and the notes record what was run against a past release, and a
+# test fixture that feeds an *old* pin to the rewriter has to stay old to be a test.
+_PIN_EXEMPT = ("CHANGELOG.md", "/notes/", "/tests/")
 
 
 def _tracked_text_files() -> tuple[Path, ...]:
