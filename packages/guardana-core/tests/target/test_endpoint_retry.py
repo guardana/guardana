@@ -283,6 +283,19 @@ def test_an_error_status_the_retries_did_not_clear_reaches_the_caller_unread(
     raised.value.close()
 
 
+class _BrokenCloseBody(io.BytesIO):
+    """A reply body whose first `close()` fails with an error that is not about I/O."""
+
+    failed = False
+
+    def close(self) -> None:
+        if not self.failed:
+            self.failed = True
+            raise RuntimeError("the transport is in a bad state")
+        super().close()
+
+
 def test_closing_an_error_reply_never_raises() -> None:
     close_http_error(_error(500, _UnclosableBody(b"gone")))
+    close_http_error(_error(500, _BrokenCloseBody(b"gone")))
     close_http_error(ValueError("no reply to close"))

@@ -137,11 +137,11 @@ def open_unredirected(request: Request, *, timeout: float) -> HTTPResponse:
 def close_http_error(exc: BaseException) -> None:
     """Close the reply `exc` carries when it is an `HTTPError`; any other error holds none.
 
-    Never raises: a reply that fails to close must not replace the outcome its caller
-    is reporting.
+    Never raises an `Exception`: a reply that fails to close, however it fails, must not
+    replace the outcome its caller is reporting.
     """
     if isinstance(exc, HTTPError):
-        with contextlib.suppress(OSError, ValueError):
+        with contextlib.suppress(Exception):
             exc.close()
 
 
