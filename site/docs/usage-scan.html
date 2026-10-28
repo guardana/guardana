@@ -702,6 +702,20 @@ files via <code>ast.parse</code>; it also reads every <code>requirements*.txt</c
 <code>[project].optional-dependencies</code>, <code>[tool.poetry].dependencies</code>). It does not
 flag an import whose normalized name is declared there. It does not read
 lockfiles, <code>setup.py</code>, <code>setup.cfg</code> or <code>Pipfile</code>.</p>
+<p><code>malicious_dependency</code> matches exact pins (<code>==</code>, <code>===</code> and lockfile versions)
+against its advisories. It reads every <code>.txt</code>, <code>.in</code> and <code>.lock</code> file whole,
+as well as <code>Pipfile</code>, <code>environment.yml</code>, <code>environment.yaml</code>, <code>conda.yml</code> and
+<code>conda.yaml</code>. In a <code>.toml</code> or <code>.cfg</code> file it reads every value the file sets,
+inline tables and commands such as <code>pip install</code> included, except the text
+values of prose keys: <code>comment</code>, <code>comments</code>, <code>description</code>, <code>details</code>,
+<code>explanation</code>, <code>help</code>, <code>hint</code>, <code>justification</code>, <code>long_description</code>,
+<code>message</code>, <code>note</code>, <code>notes</code>, <code>rationale</code>, <code>reason</code>, <code>summary</code>, <code>text</code>, <code>title</code>
+and <code>why</code>. A prose key is still read when its value is a table or a list, or
+when a table on its path names a command, dependency, environment, extra,
+feature, group, override, package, requirement, script or task, since an
+extra or a task may carry such a name. Comments in those files are not read.
+A <code>.toml</code> or <code>.cfg</code> file that does not parse is read whole. It also reads <code>setup.py</code> for install-time
+network fetches.</p>
 <p><code>pickle_opcode</code> reports one finding per file. Its summary names every non-allowlisted
 callable the file imports, sorted and each once, after a digest of that set
 (<code>unpickling imports 2 non-allowlisted callable(s) (set 9a0cd5b778d9): builtins.eval, os.system</code>). Its detail names the archive member each was found in

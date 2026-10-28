@@ -418,6 +418,21 @@ files via `ast.parse`; it also reads every `requirements*.txt` and
 flag an import whose normalized name is declared there. It does not read
 lockfiles, `setup.py`, `setup.cfg` or `Pipfile`.
 
+`malicious_dependency` matches exact pins (`==`, `===` and lockfile versions)
+against its advisories. It reads every `.txt`, `.in` and `.lock` file whole,
+as well as `Pipfile`, `environment.yml`, `environment.yaml`, `conda.yml` and
+`conda.yaml`. In a `.toml` or `.cfg` file it reads every value the file sets,
+inline tables and commands such as `pip install` included, except the text
+values of prose keys: `comment`, `comments`, `description`, `details`,
+`explanation`, `help`, `hint`, `justification`, `long_description`,
+`message`, `note`, `notes`, `rationale`, `reason`, `summary`, `text`, `title`
+and `why`. A prose key is still read when its value is a table or a list, or
+when a table on its path names a command, dependency, environment, extra,
+feature, group, override, package, requirement, script or task, since an
+extra or a task may carry such a name. Comments in those files are not read.
+A `.toml` or `.cfg` file that does not parse is read whole. It also reads `setup.py` for install-time
+network fetches.
+
 `pickle_opcode` reports one finding per file. Its summary names every non-allowlisted
 callable the file imports, sorted and each once, after a digest of that set
 (`unpickling imports 2 non-allowlisted callable(s) (set 9a0cd5b778d9): builtins.eval,

@@ -1,6 +1,8 @@
 import ast
+import configparser
 import json
 import re
+import tomllib
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import NamedTuple
@@ -58,12 +60,121 @@ _TOML_PIN = re.compile(
 # a resolved dependency, and that a same-line-only scan misses entirely.
 _LOCK_NAME = re.compile(r"""^\s*name\s*=\s*["']([^"']+)["']""")
 _LOCK_VERSION = re.compile(r"""^\s*version\s*=\s*["']([^"']+)["']""")
+# Keys whose text value is prose about a project or a setting, such as an ignore list's
+# reason. An extra, a dependency group, an environment or a task may carry the same name,
+# so a key is prose only for a text value outside a table whose path names an install
+# context (`_INSTALL_CONTEXT`).
+_PROSE_KEYS = frozenset(
+    {
+        "comment",
+        "comments",
+        "description",
+        "details",
+        "explanation",
+        "help",
+        "hint",
+        "justification",
+        "long_description",
+        "message",
+        "note",
+        "notes",
+        "rationale",
+        "reason",
+        "summary",
+        "text",
+        "title",
+        "why",
+    }
+)
+# A table path part names an install context when one of its words, split at `-`, `_` and
+# `.`, is one of these, so `optional-dependencies` and `env_run_base` count and an
+# ignore list's `PackageOverrides` does not.
+_INSTALL_CONTEXT = re.compile(
+    r"command|commands|depend\w*|deps|envs?|extras?|features?|groups?|overrides?|packages?"
+    r"|requires?|requirements?|scripts?|tasks?"
+)
 _PAST_THE_BOUND = f"only the first {MAX_SCAN_BYTES} bytes were read (the read bound)"
 _SETUP_UNSCANNED = "setup.py not scanned"
 
 
 def _is_manifest(path: Path) -> bool:
     return path.suffix.lower() in _MANIFEST_SUFFIXES or path.name.lower() in _MANIFEST_NAMES
+
+
+def _declared(path: Path, text: str) -> str:
+    """Return what a manifest sets, one value per line, without a configuration file's prose.
+
+    A TOML or `.cfg` file is read as every value it sets except under a key in `_PROSE_KEYS`;
+    a TOML string also as the `key = "value"` line it was written as, and a table as its key,
+    so a package named only by a table key is still seen. A file that does not parse is
+    returned whole and read line by line, so a parse error never hides a pin.
+    """
+    suffix = path.suffix.lower()
+    if suffix == ".toml":
+        try:
+            document = tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return text
+        return "\n".join(_toml_lines(document))
+    if suffix == ".cfg":
+        return _cfg_lines(text)
+    return text
+
+
+def _is_prose(key: str, path: tuple[str, ...]) -> bool:
+    """Whether a text value under `key`, in the table at `path`, is prose rather than a spec."""
+    words = (word for part in path for word in re.split(r"[-_.]", part.lower()))
+    return key.lower() in _PROSE_KEYS and not any(_INSTALL_CONTEXT.fullmatch(w) for w in words)
+
+
+def _toml_lines(table: dict[str, object], path: tuple[str, ...] = ()) -> Iterator[str]:
+    """Yield every value a parsed TOML table sets, as lines, but text under a prose key."""
+    name, version = table.get("name"), table.get("version")
+    if isinstance(name, str) and isinstance(version, str):
+        # A lock table pairs its name and version wherever the two keys sit.
+        yield f"{name}=={version}"
+    for key, value in table.items():
+        if not (isinstance(value, str) and _is_prose(key, path)):
+            yield from _toml_value(key, value, path)
+
+
+def _toml_value(key: str, value: object, path: tuple[str, ...]) -> Iterator[str]:
+    """Yield one TOML value as lines: a string as written, a table under its key's name."""
+    if isinstance(value, str):
+        yield f'{key} = "{value}"'
+        yield from value.splitlines()
+    elif isinstance(value, dict):
+        yield _table_line(key, value)
+        yield from _toml_lines(value, (*path, key))
+    elif isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                yield _table_line(key, item)
+                yield from _toml_lines(item, (*path, key))
+            else:
+                yield from _toml_value(key, item, path)
+
+
+def _table_line(key: str, table: dict[str, object]) -> str:
+    """Spell a table under `key` as a dependency line: `key = "version"` when it has one."""
+    version = table.get("version")
+    return f'{key} = "{version}"' if isinstance(version, str) else key
+
+
+def _cfg_lines(text: str) -> str:
+    """Return every option of a `.cfg` file as `key = value` lines but prose, or the text."""
+    parser = configparser.ConfigParser(interpolation=None, strict=False)
+    try:
+        parser.read_string(text)
+    except configparser.Error:
+        return text
+    lines: list[str] = []
+    for section in parser.sections():
+        for key, value in parser.items(section, raw=True):
+            if not _is_prose(key, (section,)):
+                lines.append(f"{key} = {value}")
+                lines.extend(value.splitlines())
+    return "\n".join(lines)
 
 
 class _Pin(NamedTuple):
@@ -228,9 +339,10 @@ class MaliciousDependencyRule(ArtifactRule):
             )
             return
         text, truncated = prefix
-        pins = _exact_pins(text)
+        declared = _declared(path, text)
+        pins = _exact_pins(declared)
         for advisory in self._advisories:
-            pinned = self._affected_pin(advisory, text, pins)
+            pinned = self._affected_pin(advisory, declared, pins)
             if pinned is not None:
                 yield self._finding(path, advisory, pinned)
         if truncated:

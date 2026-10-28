@@ -309,7 +309,7 @@ does not.</p>
 <tbody>
 <tr>
 <td>Patch</td>
-<td>A compatible correction, including a false-green fix within documented behaviour. The changelog states which gates may now fail.</td>
+<td>A compatible correction, including a false-green fix within documented behaviour. The changelog states which gates may now fail. A compatible correction that removes false findings without changing a severity is also a patch (a rule that stops reading configuration prose as dependency pins). Its changelog states which gates may now pass.</td>
 </tr>
 <tr>
 <td>Minor</td>
@@ -329,11 +329,13 @@ release. The criteria for the first stable release are in
 <h3 id="severity">Severity</h3>
 <p>A finding's severity is documented behaviour; the
 <a href="generated/rule-catalog.html">rule catalog</a> lists each rule's default severity
-and every condition under which a finding carries another severity, higher
-or lower. Raising a default or conditional severity is an intentionally
-stricter default and requires a major release. Restoring the documented
-severity is a patch. Lowering a severity requires a minor release whose
-changelog names the gates that may now pass.</p>
+and every condition under which a finding carries another severity, higher or
+lower. Raising a default or conditional severity is an intentionally stricter
+default and requires a major release. Restoring the documented severity is a
+patch. Lowering a severity requires a minor release whose changelog names the
+gates that may now pass. Removing findings that should never have been
+reported, without changing the severity of any finding that remains, is not a
+lowering; it is a patch, and its changelog names the gates that may now pass.</p>
 <h3 id="merging-and-publishing">Merging and publishing</h3>
 <p>Documentation-only, test-only and maintainer-tooling-only changes need no
 package release. A maintainer squash-merges a pull request after review and

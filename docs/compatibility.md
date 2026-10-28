@@ -78,7 +78,7 @@ does not.
 
 | Version part | Change |
 |---|---|
-| Patch | A compatible correction, including a false-green fix within documented behaviour. The changelog states which gates may now fail. |
+| Patch | A compatible correction, including a false-green fix within documented behaviour. The changelog states which gates may now fail. A compatible correction that removes false findings without changing a severity is also a patch (a rule that stops reading configuration prose as dependency pins). Its changelog states which gates may now pass. |
 | Minor | Compatible opt-in functionality, a new opt-in check, or a deprecation. |
 | Major | A contract break, a removal, dropping a reader for an older persisted document, a check enabled by default that can fail a previously passing build, or an intentionally stricter default. |
 
@@ -92,11 +92,13 @@ release. The criteria for the first stable release are in
 
 A finding's severity is documented behaviour; the
 [rule catalog](generated/rule-catalog.md) lists each rule's default severity
-and every condition under which a finding carries another severity, higher
-or lower. Raising a default or conditional severity is an intentionally
-stricter default and requires a major release. Restoring the documented
-severity is a patch. Lowering a severity requires a minor release whose
-changelog names the gates that may now pass.
+and every condition under which a finding carries another severity, higher or
+lower. Raising a default or conditional severity is an intentionally stricter
+default and requires a major release. Restoring the documented severity is a
+patch. Lowering a severity requires a minor release whose changelog names the
+gates that may now pass. Removing findings that should never have been
+reported, without changing the severity of any finding that remains, is not a
+lowering; it is a patch, and its changelog names the gates that may now pass.
 
 ### Merging and publishing
 

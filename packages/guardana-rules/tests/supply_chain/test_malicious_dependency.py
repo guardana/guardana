@@ -302,3 +302,191 @@ def test_a_wildcard_advisory_matches_a_name_spelled_with_other_separators(tmp_pa
     findings = list(rule.run(ArtifactTarget(tmp_path), RuleContext()))
 
     assert [f.severity for f in findings] == [Severity.CRITICAL]
+
+
+_COMPROMISED = "ultralytics==8.3.41"
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    [
+        (
+            "osv-scanner.toml",
+            f'[[IgnoredVulns]]\nid = "PYSEC-0"\nreason = "{_COMPROMISED} is a fixture"\n',
+        ),
+        ("ruff.toml", f'[lint]\nexplanation = "we once shipped {_COMPROMISED}"\n'),
+        ("pyproject.toml", f'[project]\nname = "demo"\ndescription = "moved off {_COMPROMISED}"\n'),
+        ("pyproject.toml", f'[tool.notes]\ntext = """\n{_COMPROMISED}\n"""\n'),
+        ("setup.cfg", f"[metadata]\nname = demo\ndescription = moved off {_COMPROMISED}\n"),
+        ("setup.cfg", f"[flake8]\n# {_COMPROMISED}\nmax-line-length = 100\n"),
+    ],
+)
+def test_a_pin_in_configuration_prose_installs_nothing_and_is_clean(
+    tmp_path: Path, name: str, text: str
+) -> None:
+    assert _summaries(tmp_path, name, text) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    [
+        ("pyproject.toml", f'[project]\ndependencies = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[project.optional-dependencies]\nexport = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[dependency-groups]\ndev = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[build-system]\nrequires = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", '[tool.poetry.group.dev.dependencies]\nultralytics = "8.3.41"\n'),
+        ("pyproject.toml", f'[tool.uv]\nconstraint-dependencies = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[tool.pdm.dev-dependencies]\ntest = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[tool.hatch.envs.default]\nextra-dependencies = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[tool.tox.env_run_base]\ndeps = ["{_COMPROMISED}"]\n'),
+        ("uv.toml", f'override-dependencies = ["{_COMPROMISED}"]\n'),
+        ("pylock.toml", '[[packages]]\nname = "ultralytics"\nversion = "8.3.41"\n'),
+        ("setup.cfg", f"[options]\ninstall_requires =\n    numpy\n    {_COMPROMISED}\n"),
+        ("setup.cfg", f"[options.extras_require]\nexport = {_COMPROMISED}\n"),
+    ],
+)
+def test_a_pin_in_a_dependency_table_is_still_found(tmp_path: Path, name: str, text: str) -> None:
+    found = _summaries(tmp_path, name, text)
+
+    assert len(found) == 1
+    assert found[0].startswith(f"{_COMPROMISED}:")
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    [
+        ("pyproject.toml", f'[project]\ndependencies = ["{_COMPROMISED}"\n'),
+        ("setup.cfg", f"{_COMPROMISED}\n"),
+    ],
+)
+def test_a_manifest_that_does_not_parse_is_still_read_line_by_line(
+    tmp_path: Path, name: str, text: str
+) -> None:
+    assert len(_summaries(tmp_path, name, text)) == 1
+
+
+def test_a_wildcard_package_counts_only_where_a_dependency_table_names_it(tmp_path: Path) -> None:
+    declared = tmp_path / "declared"
+    declared.mkdir()
+    prose = tmp_path / "prose"
+    prose.mkdir()
+
+    found = _summaries(declared, "pyproject.toml", '[project]\ndependencies = ["torchtriton"]\n')
+    ignored = _summaries(
+        prose, "osv-scanner.toml", '[[IgnoredVulns]]\nreason = """\ntorchtriton\n"""\n'
+    )
+
+    assert len(found) == 1
+    assert "torchtriton" in found[0]
+    assert ignored == []
+
+
+_CONDA_PIP = f"name: demo\ndependencies:\n  - pip:\n      - {_COMPROMISED}\n"
+_LOCK_BLOCK = '[[package]]\nname = "ultralytics"\nversion = "8.3.41"\n'
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    [
+        ("requirements.txt", f"{_COMPROMISED}\n"),
+        ("constraints.txt", f"{_COMPROMISED}\n"),
+        ("requirements.in", f"{_COMPROMISED}\n"),
+        ("uv.lock", _LOCK_BLOCK),
+        ("poetry.lock", _LOCK_BLOCK),
+        ("pdm.lock", _LOCK_BLOCK),
+        ("Pipfile", '[packages]\nultralytics = "==8.3.41"\n'),
+        ("environment.yml", _CONDA_PIP),
+        ("environment.yaml", _CONDA_PIP),
+        ("conda.yml", _CONDA_PIP),
+        ("conda.yaml", _CONDA_PIP),
+        ("pyproject.toml", f'[project]\ndependencies = ["{_COMPROMISED}"]\n'),
+        ("setup.cfg", f"[options]\ninstall_requires = {_COMPROMISED}\n"),
+    ],
+)
+def test_control_every_file_the_rule_reads_for_pins_finds_a_compromised_one(
+    tmp_path: Path, name: str, text: str
+) -> None:
+    assert len(_summaries(tmp_path, name, text)) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    [
+        (
+            "pyproject.toml",
+            '[tool.poetry.dependencies]\ntorchtriton = { version = "^2.0", source = "x" }\n',
+        ),
+        (
+            "pyproject.toml",
+            '[tool.poetry.dependencies]\ntorchtriton = [{version = "2.0"}, {version = "2.1"}]\n',
+        ),
+        (
+            "pixi.toml",
+            '[pypi-dependencies]\ntorchtriton = { version = ">=2", index = "https://x.invalid" }\n',
+        ),
+        ("pyproject.toml", '[tool.pdm.resolution.overrides]\nultralytics = "8.3.41"\n'),
+        ("pyproject.toml", '[tool.pdm.resolution]\noverrides = { ultralytics = "8.3.41" }\n'),
+        (
+            "pyproject.toml",
+            f'[tool.flit.metadata]\nrequires-extra = {{ test = ["{_COMPROMISED}"] }}\n',
+        ),
+        (
+            "pyproject.toml",
+            f'[tool.hatch.envs.default]\npre-install-commands = ["pip install {_COMPROMISED}"]\n',
+        ),
+        (
+            "pyproject.toml",
+            f'[tool.tox.env_run_base]\ncommands = [["pip", "install", "{_COMPROMISED}"]]\n',
+        ),
+        ("pyproject.toml", f'[tool.cibuildwheel]\nbefore-build = "pip install {_COMPROMISED}"\n'),
+        (
+            "pyproject.toml",
+            f'[[tool.uv.dependency-metadata]]\nname = "x"\nrequires-dist = ["{_COMPROMISED}"]\n',
+        ),
+        (
+            "pyproject.toml",
+            '[tool.poetry.dependencies]\nultralytics = { version = "8.3.41", extras = ["x"] }\n',
+        ),
+        ("pyproject.toml", '[tool.poetry.dependencies.ultralytics]\nversion = "8.3.41"\n'),
+        ("setup.cfg", f"[options]\ninstall-requires =\n    {_COMPROMISED}\n"),
+        ("setup.cfg", f"[tox:tox]\nenvlist = py\n[testenv]\ndeps =\n    {_COMPROMISED}\n"),
+        ("buildout.cfg", f"[buildout]\neggs = {_COMPROMISED}\n"),
+    ],
+)
+def test_a_dependency_in_any_table_or_command_a_tool_reads_is_found(
+    tmp_path: Path, name: str, text: str
+) -> None:
+    """Every value a configuration sets is read but prose; a tool can install from any of them."""
+    assert len(_summaries(tmp_path, name, text)) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    [
+        ("pyproject.toml", f'[project.optional-dependencies]\ntext = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[dependency-groups]\nnotes = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", '[tool.poetry.group.text.dependencies]\nultralytics = "8.3.41"\n'),
+        ("pyproject.toml", f'[tool.hatch.envs.text]\ndependencies = ["{_COMPROMISED}"]\n'),
+        ("pyproject.toml", f'[tool.pdm.dev-dependencies]\nhelp = ["{_COMPROMISED}"]\n'),
+        ("pixi.toml", '[feature.text.pypi-dependencies]\nultralytics = "==8.3.41"\n'),
+        ("pixi.toml", f'[tasks]\nhelp = "pip install {_COMPROMISED}"\n'),
+        ("tox.toml", f'[env.text]\ndeps = ["{_COMPROMISED}"]\n'),
+        ("setup.cfg", f"[options.extras_require]\ntext = {_COMPROMISED}\n"),
+        ("pylock.toml", '[[packages]]\nversion = "8.3.41"\nname = "ultralytics"\n'),
+    ],
+)
+def test_a_dependency_under_a_name_that_is_also_a_prose_key_is_found(
+    tmp_path: Path, name: str, text: str
+) -> None:
+    """An extra, a group, an environment or a task may be called `text` or `help`."""
+    assert len(_summaries(tmp_path, name, text)) == 1
+
+
+def test_a_wildcard_package_named_by_a_cfg_key_is_found(tmp_path: Path) -> None:
+    assert len(_summaries(tmp_path, "buildout.cfg", "[versions]\ntorchtriton = 2.0.0\n")) == 1
+
+
+def test_a_reason_in_an_osv_scanner_package_override_is_prose(tmp_path: Path) -> None:
+    text = f'[[PackageOverrides]]\nname = "torch"\nreason = "{_COMPROMISED} is a fixture"\n'
+
+    assert _summaries(tmp_path, "osv-scanner.toml", text) == []
