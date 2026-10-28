@@ -272,7 +272,7 @@ Inside `run`:
 | `guardana` | which software produced it |
 | `target` | what was examined, with a fingerprint, the fields that fingerprint covers, and the digest of the document the run read |
 | `deployment` | which deployment of which AI system this verifies |
-| `configuration` | which settings produced it, **by digest**: `profile_digest` covers every setting of the resolved profile except its name, where it was read from and its `plugins:`; `plugins` is the trust in force, `{mode, allowed}`; `provider` is the provider wire the run spoke to its target, `null` when it reached none, reached it through an adapter or did not record it; `adapter_digest` is the SHA-256 of the adapter file as written, and `system_prompt_digest` of the operator's `--system-prompt-file`, never of a planted canary, so two runs of one configuration record the same digests |
+| `configuration` | which settings produced it, **by digest**: `profile_digest` covers every setting of the resolved profile except its name, where it was read from, its `plugins:` and `delivery.required`; `plugins` is the trust in force, `{mode, allowed}`; `provider` is the provider wire the run spoke to its target, `null` when it reached none, reached it through an adapter or did not record it; `adapter_digest` is the SHA-256 of the adapter file as written, and `system_prompt_digest` of the operator's `--system-prompt-file`, never of a planted canary, so two runs of one configuration record the same digests |
 | `execution` | what limits it ran under, and `trials`: the attempts per case the run asked for |
 | `usage` | what it actually consumed, the configured judges on their own meters |
 | `rules` / `evaluators` | what did the checking, with digests, declared request counts, a `trial_summary` for each rule that repeated, a `suite` summary for each quality suite, calibration, `judge`: the identity a judge states (its model, endpoint and samples per verdict), `null` for a deterministic evaluator or when unstated, and `deterministic`. A suite the budget stopped or that raised is listed with its declined summary, though not in `result_summary.rules_run` |
@@ -385,7 +385,7 @@ system improved, the test got weaker, or the sample changed.
 
 | Field | What it is |
 |---|---|
-| `case_id` | the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It does not carry the text it was built from, but its 12-hex digest can confirm a guess at a low-entropy value or private dataset prompt; `hash_identifiers: false` writes a bare label instead of a digest |
+| `case_id` | the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It is always `<rule id>#<12 hex characters>`, using an unsalted SHA-256 digest truncated to 12 hex characters. It does not carry the text it was built from, but its 12-hex digest can confirm a guess at a low-entropy value or private dataset prompt; `hash_identifiers` changes only redaction placeholders and never `case_id`, so no setting removes the case digest |
 | `assessor` | what produced the verdict — an evaluator id, or a rule grading in its own code |
 | `status` | `measured`, `inconclusive`, `error` or `skipped`. The last three are statuses, never zeros, and are excluded from the denominator |
 | `passed` | the boolean reading, or `null` when nothing could be graded. Never `false` for a case that was not measured |

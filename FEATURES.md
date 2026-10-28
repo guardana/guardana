@@ -33,9 +33,11 @@ To join a pilot or contribute, read [Community](docs/community.md).
 | Run verification from Python | `guardana.core.verify.Verifier(trust=...)` | the run `scan` or `probe` writes, as typed data, failed and stopped runs included |
 | Keep and read results over HTTP | `--reporter server://URL`; `GET /findings`; `GET /trend` (optional collector) | Stored runs read back per project with a `read` key; `/openapi.json` describes routes and permissions. No route starts a scan or probe. |
 
-`probe`, `plan probe`, `target inspect`, `monitor` and every judge read one connection —
+`probe`, `target inspect`, `monitor` and every judge read one connection —
 `--url`, `--model`, `--provider`, `--api-key-env`, `--adapter` — and refuse one they cannot
-honour before the first request.
+honour before the first request. `plan probe` reads the same connection except
+`--api-key-env`: it has no such option and reads no key variable. It also refuses
+a connection it cannot honour before the first request.
 [Providers](docs/providers.md) lists what each provider and adapter carries and retries; one
 conformance suite holds them to it. An adapter file maps a guarded application: `declines:`
 names the replies its guard sends when it declines a request, read by the evaluator as a

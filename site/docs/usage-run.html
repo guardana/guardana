@@ -29,6 +29,7 @@
 <li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
 <li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
 <li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
@@ -119,6 +120,7 @@
 <li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
 <li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
 <li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
@@ -470,7 +472,7 @@ inside directories every scan skips.</p>
 </tr>
 <tr>
 <td><code>configuration</code></td>
-<td>which settings produced it, <strong>by digest</strong>: <code>profile_digest</code> covers every setting of the resolved profile except its name, where it was read from and its <code>plugins:</code>; <code>plugins</code> is the trust in force, <code>{mode, allowed}</code>; <code>provider</code> is the provider wire the run spoke to its target, <code>null</code> when it reached none, reached it through an adapter or did not record it; <code>adapter_digest</code> is the SHA-256 of the adapter file as written, and <code>system_prompt_digest</code> of the operator's <code>--system-prompt-file</code>, never of a planted canary, so two runs of one configuration record the same digests</td>
+<td>which settings produced it, <strong>by digest</strong>: <code>profile_digest</code> covers every setting of the resolved profile except its name, where it was read from, its <code>plugins:</code> and <code>delivery.required</code>; <code>plugins</code> is the trust in force, <code>{mode, allowed}</code>; <code>provider</code> is the provider wire the run spoke to its target, <code>null</code> when it reached none, reached it through an adapter or did not record it; <code>adapter_digest</code> is the SHA-256 of the adapter file as written, and <code>system_prompt_digest</code> of the operator's <code>--system-prompt-file</code>, never of a planted canary, so two runs of one configuration record the same digests</td>
 </tr>
 <tr>
 <td><code>execution</code></td>
@@ -678,7 +680,7 @@ system improved, the test got weaker, or the sample changed.</p>
 <tbody>
 <tr>
 <td><code>case_id</code></td>
-<td>the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It does not carry the text it was built from, but its 12-hex digest can confirm a guess at a low-entropy value or private dataset prompt; <code>hash_identifiers: false</code> writes a bare label instead of a digest</td>
+<td>the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It is always <code>&lt;rule id&gt;#&lt;12 hex characters&gt;</code>, using an unsalted SHA-256 digest truncated to 12 hex characters. It does not carry the text it was built from, but its 12-hex digest can confirm a guess at a low-entropy value or private dataset prompt; <code>hash_identifiers</code> changes only redaction placeholders and never <code>case_id</code>, so no setting removes the case digest</td>
 </tr>
 <tr>
 <td><code>assessor</code></td>
