@@ -71,31 +71,33 @@ def test_an_undocumented_trace_reader_exception_is_a_crash(monkeypatch: pytest.M
         fuzz_trace.one_input(b"anything")
 
 
-@pytest.mark.parametrize(
-    "refusal",
-    [ProfileError("invalid profile"), UnicodeDecodeError("utf-8", b"\xe9", 0, 1, "invalid")],
-    ids=["profile-error", "not-utf-8"],
-)
-def test_a_profile_the_loader_refuses_is_not_a_crash(
-    monkeypatch: pytest.MonkeyPatch, refusal: Exception
-) -> None:
+def test_a_profile_the_loader_refuses_is_not_a_crash(monkeypatch: pytest.MonkeyPatch) -> None:
     def _refuse(path: Path) -> None:
-        raise refusal
+        raise ProfileError("invalid profile")
 
     monkeypatch.setattr(fuzz_profile, "load_profile", _refuse)
 
     fuzz_profile.one_input(b"anything")
 
 
+def test_a_profile_that_is_not_utf8_is_refused_not_a_crash() -> None:
+    fuzz_profile.one_input(b"\xe9fail_on: high\n")
+
+
+@pytest.mark.parametrize(
+    "escape",
+    [KeyError("guardana.yaml"), UnicodeDecodeError("utf-8", b"\xe9", 0, 1, "invalid")],
+    ids=["key-error", "not-utf-8"],
+)
 def test_an_undocumented_profile_loader_exception_is_a_crash(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, escape: Exception
 ) -> None:
     def _break(path: Path) -> None:
-        raise KeyError(str(path))
+        raise escape
 
     monkeypatch.setattr(fuzz_profile, "load_profile", _break)
 
-    with pytest.raises(KeyError):
+    with pytest.raises(type(escape)):
         fuzz_profile.one_input(b"anything")
 
 
