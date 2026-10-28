@@ -27,6 +27,11 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(deps):"
+    # The images run a Python the packages support: the newest version in CI's test
+    # matrix. A newer base image arrives together with that matrix entry.
+    ignore:
+      - dependency-name: "python"
+        versions: [">= 3.14"]
 
   # Dependabot supports uv workspaces natively (resolves the root
   # pyproject.toml + uv.lock across all packages/* members). If a Dependabot

@@ -300,7 +300,9 @@ the jobs of the release workflow run that triggered it or, when started by hand,
 latest successful release run for tag <code>v&lt;version&gt;</code>. If that run's
 <code>publish-reference-pack</code> job succeeded, it passes <code>--pack-published</code> to
 <code>scripts/reproduce_release.py</code>. With this flag, a reference pack version PyPI does
-not list is <code>NOT CHECKED</code> with exit status <code>2</code>, never <code>NOT PUBLISHED</code>. Without the
+not list is <code>NOT CHECKED</code> with exit status <code>2</code>, never <code>NOT PUBLISHED</code>. A release whose
+reference pack PyPI already serves with the same sha256 skips that job; PyPI lists the
+pack, so its files are still compared. Without the
 flag, it stays <code>NOT PUBLISHED</code> and does not change the exit status. If the release
 run's jobs cannot be read, the check stops. If no release run exists for the tag,
 the reference pack stays optional. The workflow writes nowhere. It does not run

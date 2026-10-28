@@ -79,3 +79,67 @@ def test_a_file_that_differs_after_one_that_went_unchecked_keeps_the_unchecked_o
     assert min(built, odd) == odd, "the unchecked file has to be read first"
 
     assert check_pypi_digests.check([odd, built], _serving(_WHEEL, b"wheel")) == 2
+
+
+def _classified(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
+    code = check_pypi_digests.main(["--classify", str(tmp_path)])
+    (result,) = [line for line in capsys.readouterr().out.splitlines() if line.startswith("RESULT")]
+    return code, result
+
+
+@pytest.mark.parametrize(
+    ("served", "expected"),
+    [
+        ({_WHEEL: b"wheel", "guardana_core-1.0.0rc4.tar.gz": b"sdist"}, (3, "RESULT identical")),
+        ({_WHEEL: b"wheel"}, (0, "RESULT new")),
+        ({}, (0, "RESULT new")),
+        ({_WHEEL: b"other", "guardana_core-1.0.0rc4.tar.gz": b"sdist"}, (1, "RESULT differ")),
+    ],
+)
+def test_classify_names_what_an_upload_would_do(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    served: dict[str, bytes],
+    expected: tuple[int, str],
+) -> None:
+    _built(tmp_path, _WHEEL, b"wheel")
+    _built(tmp_path, "guardana_core-1.0.0rc4.tar.gz", b"sdist")
+
+    def fetch(url: str) -> dict[str, object] | None:
+        urls = [
+            {"filename": name, "digests": {"sha256": hashlib.sha256(body).hexdigest()}}
+            for name, body in served.items()
+        ]
+        return {"urls": urls} if urls else None
+
+    real = check_pypi_digests.compare
+    monkeypatch.setattr(check_pypi_digests, "compare", lambda files: real(files, fetch))
+
+    assert _classified(tmp_path, capsys) == expected
+
+
+def test_classify_never_reads_unreadable_pypi_as_identical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _built(tmp_path, _WHEEL, b"wheel")
+
+    def fetch(url: str) -> dict[str, object] | None:
+        raise OSError("connection reset")
+
+    real = check_pypi_digests.compare
+    monkeypatch.setattr(check_pypi_digests, "compare", lambda files: real(files, fetch))
+
+    assert _classified(tmp_path, capsys) == (2, "RESULT unreadable")
+
+
+def test_classify_reads_an_empty_directory_as_unreadable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _classified(tmp_path, capsys) == (2, "RESULT unreadable")
+
+
+def test_a_differing_file_outranks_one_that_could_not_be_checked() -> None:
+    assert check_pypi_digests.classify(["unreadable", "differ", "identical"]) == "differ"
+    assert check_pypi_digests.classify(["identical", "unreadable", "new"]) == "unreadable"
+    assert check_pypi_digests.classify(["identical", "new"]) == "new"

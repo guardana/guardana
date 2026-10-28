@@ -21,8 +21,10 @@ paths:
   CI and the clean-install check in `publish` build and check the reference pack before
   anything is published, so a broken pack stops the release there. Its own build, attestation
   and upload to the Release run afterwards in `reference-pack` (after `publish`);
-  `publish-reference-pack` (after it) puts the pack on PyPI only while
-  `vars.REFERENCE_PACK_PYPI` is `true`, and the images wait on neither. The moving `vX.Y` tag is for the Marketplace Action and never
+  `reference-pack-on-pypi` compares its digests with PyPI outside the `pypi` environment, and
+  `publish-reference-pack` (after both) asks for approval and uploads only while
+  `vars.REFERENCE_PACK_PYPI` is `true` and a file is new or PyPI could not be read; differing
+  bytes stop the release. The images wait on none of them. The moving `vX.Y` tag is for the Marketplace Action and never
   re-triggers a publish.
 - **A squash merge is not a release.** CI runs on the PR and on main; a maintainer groups
   completed issues, chooses the version under `docs/compatibility.md#versioning`, and uses
