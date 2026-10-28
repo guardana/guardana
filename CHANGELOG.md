@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Limit Dependabot base image proposals to Python `3.13`, the newest version CI tests.** `.github/dependabot.yml` ignores `python` image versions `>= 3.14` for `deploy/docker`; digest updates still arrive (#240). Previously, Dependabot proposed `python:3.15-slim-bookworm` (#217).
+
 ### Documentation
 
 - **You can now rely on the documented rule inputs, waiver updates, digest behaviour, recording support and verification limits.** The hallucinated-package rule also reads `requirements*.txt` and `pyproject.toml`, not lockfiles. `guardana baseline update` can remove waivers on a `--target` run. `profile_digest` also excludes `delivery.required`. Setting `hash_identifiers: false` changes redaction placeholders but never a `case_id`'s digest. Exchanges are kept for `EndpointTarget` subclasses and `SeededTarget`; `RecordedTarget` keeps none. A YAML rule's `requires` must include `chat`. Reaching a bound turns a pass into inconclusive and leaves an established failure standing. The `guardana.core.formats` readers are outside the supported surface. `guardana plan probe` has no `--api-key-env`. Regrading reuses replies only for rule ids and messages a recording holds. Container CI examples forward the commit and CI provider variables. The bundled example in `README.md` requires a source checkout, and its SARIF scan names `--profile guardana.yaml`. No behaviour changes.
