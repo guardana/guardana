@@ -333,10 +333,11 @@ skip it (recording it under `rules_skipped`) if the target can't satisfy
 `errors` channel, so one bad rule can't abort the whole scan and the gate fails on
 it by default ([when a rule raises](writing-rules.md#what-happens-when-your-rule-raises)). Findings whose verdict is
 `inconclusive` are partitioned onto the result's `unverified` channel rather
-than counted as confirmed findings — or dropped. `gate(result, policy)` is
-the free function that turns a `ScanResult` into the pass/fail boolean CLI
-commands use for their exit code (see [`profiles.md`](profiles.md#the-gate));
-`fail_on_inconclusive: true` makes the unverified channel gate too.
+than counted as confirmed findings — or dropped. `gate_outcome(result, policy)`
+turns a `ScanResult` into `pass`, `fail` or `indeterminate`, which CLI commands
+exit with as `0`, `1` or `2` (see [`profiles.md`](profiles.md#the-gate)), and
+`gate(result, policy)` is its boolean form, true for anything that is not a pass.
+`fail_on_inconclusive: true` makes an unverified result leave the run `indeterminate`.
 
 ## The core↔server boundary
 

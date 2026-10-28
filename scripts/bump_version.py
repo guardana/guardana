@@ -15,6 +15,7 @@ rolls the changelog, commits, pushes and tags.
 """
 
 import argparse
+import datetime
 import re
 import string
 import subprocess
@@ -156,6 +157,9 @@ _CORE_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
 # marker (`1.0.0rc1`, `1.0.0b2`, `1.0.0.post1`, `1.0.0.dev3`).
 _EXPLICIT_RE = re.compile(rf"^\d+\.\d+\.\d+{_SUFFIX}$")
 _FINAL_RE = re.compile(r"^\d+\.\d+\.\d+$")
+# The citation names the release a reader ran and the day it was released.
+_CITATION_VERSION_RE = re.compile(rf"^(version: )\d+\.\d+\.\d+{_SUFFIX}$", re.MULTILINE)
+_CITATION_DATE_RE = re.compile(r"^(date-released: ')\d{4}-\d{2}-\d{2}(')$", re.MULTILINE)
 _BUMPS = frozenset({"major", "minor", "patch"})
 
 
@@ -217,6 +221,8 @@ _VERSION_MARKERS: tuple[tuple[Path, re.Pattern[str]], ...] = (
     (Path("docs/integrations.md"), _PIN_PROSE_RE),
     (Path("action.yml"), _ACTION_CLI_RE),
     (Path("ROADMAP.md"), _ROADMAP_SHIPS_RE),
+    (Path("CITATION.cff"), _CITATION_VERSION_RE),
+    (Path("CITATION.cff"), _CITATION_DATE_RE),
 )
 
 
@@ -238,6 +244,8 @@ def _documented_versions(new: str) -> tuple[tuple[Path, re.Pattern[str], str], .
         kept if prerelease else rf"\g<1>{major}.{minor}\g<2>",
         rf"\g<1>{new}\g<2>",
         rf"\g<1>{new}\g<2>",
+        rf"\g<1>{new}",
+        rf"\g<1>{datetime.datetime.now(tz=datetime.UTC).date().isoformat()}\g<2>",
     )
     return tuple(
         (path, pattern, replacement)

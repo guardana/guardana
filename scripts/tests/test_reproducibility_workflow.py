@@ -7,6 +7,7 @@ exercises the shell the runner executes, not a description of it.
 """
 
 import os
+import re
 import stat
 import subprocess
 from pathlib import Path
@@ -149,3 +150,23 @@ def test_the_rebuild_requires_the_pack_only_when_it_was_published(
     (invocation,) = [line for line in calls.splitlines() if line.startswith("uv ")]
     assert "reproduce_release.py 1.0.0 --source release" in invocation
     assert ("--pack-published" in invocation) is flagged
+
+
+def _uv_versions(name: str) -> list[object]:
+    jobs = _workflow(name)["jobs"]
+    assert isinstance(jobs, dict)
+    return [
+        step.get("with", {}).get("version")
+        for job in jobs.values()
+        for step in job["steps"]
+        if str(step.get("uses", "")).startswith("astral-sh/setup-uv@")
+    ]
+
+
+def test_the_rebuild_uses_the_exact_uv_the_release_builds_with() -> None:
+    release, rebuild = _uv_versions("release.yml"), _uv_versions("reproducibility.yml")
+
+    assert release
+    assert rebuild
+    assert len(set(release + rebuild)) == 1
+    assert re.fullmatch(r"\d+\.\d+\.\d+", str(release[0]))

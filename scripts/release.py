@@ -10,10 +10,13 @@ administrators too. The tag follows as a separate step, signed, verified and cre
 merge commit only after CI is green on it: pushing both at once races CI against the publish,
 and a red run then costs a second approval click and leaves a cancelled release in the history.
 
-    uv run python scripts/release.py patch            # 0.1.0 -> 0.1.1
-    uv run python scripts/release.py minor            # 0.1.0 -> 0.2.0
-    uv run python scripts/release.py 0.1.0            # release the current version (first release)
-    uv run python scripts/release.py patch --dry-run  # show the plan, change nothing
+    uv run python scripts/release.py patch --title "..."            # 0.1.0 -> 0.1.1
+    uv run python scripts/release.py minor --title "..."            # 0.1.0 -> 0.2.0
+    uv run python scripts/release.py 0.1.0 --title "..."            # the current version (first)
+    uv run python scripts/release.py patch --title "..." --dry-run  # show the plan, change nothing
+
+The title is the one line the changelog heading carries after the date:
+`## [X.Y.Z] - DATE — <title>`.
 
 Run it from a clean `main` that matches `origin/main`. It writes the release branch, the pull
 request, the squash merge and the tag. It needs `gh` with write access, and git configured to sign
@@ -163,16 +166,17 @@ def _gate() -> None:
         _run(cmd)
 
 
-def _roll_changelog(version: str, dry_run: bool) -> None:
+def _roll_changelog(version: str, title: str, dry_run: bool) -> None:
     text = _CHANGELOG.read_text(encoding="utf-8")
     match = _UNRELEASED_RE.search(text)
     if match is None:
         _fail("CHANGELOG.md has no '## [...] - Unreleased' section to release")
     today = datetime.datetime.now(tz=datetime.UTC).date().isoformat()
-    replacement = f"## [Unreleased]\n\n## [{version}] - {today}"
+    heading = f"## [{version}] - {today} — {title}"
+    replacement = f"## [Unreleased]\n\n{heading}"
     updated = text[: match.start()] + replacement + text[match.end() :]
     if dry_run:
-        print(f"  would set changelog: {match.group(0)!r} -> '## [{version}] - {today}'")
+        print(f"  would set changelog: {match.group(0)!r} -> {heading!r}")
         return
     _CHANGELOG.write_text(updated, encoding="utf-8")
 
@@ -190,6 +194,11 @@ def _parser() -> argparse.ArgumentParser:
         metavar="patch|minor|major|X.Y.Z",
         help="the part to bump, or an explicit version (the current one for a first release)",
     )
+    parser.add_argument(
+        "--title",
+        required=True,
+        help="one line for the released changelog heading, e.g. 'the first stable release'",
+    )
     parser.add_argument("--dry-run", action="store_true", help="show the plan, change nothing")
     return parser
 
@@ -199,6 +208,9 @@ def main(argv: list[str]) -> None:
     args = _parser().parse_args(argv)
     dry_run: bool = args.dry_run
     part: str = args.part
+    title = str(args.title).strip()
+    if not title or "\n" in title or "\r" in title:
+        _fail("--title must be one non-empty line")
 
     current = _current_version()
     version = _target_version(part, current)
@@ -245,7 +257,7 @@ def main(argv: list[str]) -> None:
     # dated to the previous release.
     _run(["uv", "run", "python", "scripts/build_site.py", *(["--check"] if dry_run else [])])
 
-    _roll_changelog(version, dry_run)
+    _roll_changelog(version, title, dry_run)
 
     if dry_run:
         print(

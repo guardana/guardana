@@ -121,6 +121,8 @@ def test_an_unknown_flag_is_refused_before_anything_runs(
     """A misspelled flag is an error, never a default run with the typo ignored."""
     takes_a_positional = module in {release, reproduce_release, check_pypi_digests}
     argv = ["patch", "--no-such-flag"] if takes_a_positional else ["--no-such-flag"]
+    if module is release:
+        argv = ["patch", "--title", "a title", "--no-such-flag"]
     with pytest.raises(SystemExit) as exit_info:
         _call_main(module, argv)
 
@@ -134,10 +136,10 @@ def test_release_takes_its_part_and_dry_run_in_either_order() -> None:
     """A part and `--dry-run` parse to the same plan in either order."""
     parser = release._parser()
 
-    for argv in (["patch", "--dry-run"], ["--dry-run", "patch"]):
+    for argv in (["patch", "--dry-run", "--title", "t"], ["--title", "t", "--dry-run", "patch"]):
         parsed = parser.parse_args(argv)
         assert (parsed.part, parsed.dry_run) == ("patch", True)
-    parsed = parser.parse_args(["0.1.0"])
+    parsed = parser.parse_args(["0.1.0", "--title", "t"])
     assert (parsed.part, parsed.dry_run) == ("0.1.0", False)
 
 

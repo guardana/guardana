@@ -264,11 +264,11 @@ def _cut(  # noqa: PLR0913 — each keyword is one answer the fake world gives
     monkeypatch.setattr(release, "_preflight", lambda branch: calls.append(["<preflight>", branch]))
     monkeypatch.setattr(release, "_gate", lambda: None)
     monkeypatch.setattr(release, "_check_reference_pack", lambda: None)
-    monkeypatch.setattr(release, "_roll_changelog", lambda version, dry_run: None)
+    monkeypatch.setattr(release, "_roll_changelog", lambda version, title, dry_run: None)
     monkeypatch.setattr(release, "_await_required_checks", _checks)
     monkeypatch.setattr(release, "_await_green_ci", _ci)
     monkeypatch.setattr(release, "_move_marketplace_tag", lambda version, tag: None)
-    release.main(["patch"])
+    release.main(["patch", "--title", "fixes"])
 
 
 def _position(calls: list[list[str]], head: list[str]) -> int:
@@ -1162,7 +1162,7 @@ def test_the_surface_check_runs_before_the_gate(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(release, "_gate", _gate)
 
     with pytest.raises(SystemExit):
-        release.main(["1.0.0rc2"])
+        release.main(["1.0.0rc2", "--title", "a candidate"])
 
     assert order == ["preflight", "1.0.0rc2", "gate"]
 
@@ -1278,7 +1278,7 @@ def test_the_pre_1_0_statement_refuses_a_dry_run_before_the_gate(
     monkeypatch.setattr(release, "_gate", lambda: ran.append("gate"))
 
     with pytest.raises(SystemExit) as refused:
-        release.main(["1.0.0", "--dry-run"])
+        release.main(["1.0.0", "--title", "stable", "--dry-run"])
 
     assert f"{_POLICY_PAGE}:6" in str(refused.value.code)
     assert ran == []
@@ -1396,7 +1396,7 @@ def test_the_reference_pack_check_runs_before_the_gate(monkeypatch: pytest.Monke
     monkeypatch.setattr(release, "_gate", _gate)
 
     with pytest.raises(SystemExit):
-        release.main(["patch"])
+        release.main(["patch", "--title", "fixes"])
 
     assert order == ["pack", "gate"]
 
@@ -1439,3 +1439,60 @@ def test_every_dogfood_run_passes_the_dogfood_profile() -> None:
     source = (root / "scripts" / "release.py").read_text(encoding="utf-8")
     assert source.count('"scan", "packages"') == 1
     assert (root / release.DOGFOOD_PROFILE).is_file()
+
+
+def _changelog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(
+        "# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- A fix.\n\n"
+        "## [1.0.0] - 2026-10-27 — stable\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(release, "_CHANGELOG", changelog)
+    return changelog
+
+
+def test_the_released_heading_carries_the_title(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    changelog = _changelog(tmp_path, monkeypatch)
+
+    release._roll_changelog("1.0.1", "fixes for the scanner", dry_run=False)
+
+    lines = changelog.read_text(encoding="utf-8").splitlines()
+    assert lines[2] == "## [Unreleased]"
+    assert lines[4].startswith("## [1.0.1] - ")
+    assert lines[4].endswith(" — fixes for the scanner")
+    assert lines[6] == "### Fixed"
+
+
+def test_a_dry_run_shows_the_titled_heading_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    changelog = _changelog(tmp_path, monkeypatch)
+    before = changelog.read_text(encoding="utf-8")
+
+    release._roll_changelog("1.0.1", "fixes for the scanner", dry_run=True)
+
+    assert changelog.read_text(encoding="utf-8") == before
+    assert " — fixes for the scanner" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "argv", [["patch"], ["patch", "--title", "  "], ["patch", "--title", "a\nb"]]
+)
+def test_a_release_without_a_one_line_title_stops_before_anything_runs(
+    monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> None:
+    calls: list[str] = []
+
+    def _version() -> str:
+        calls.append("version")
+        return "1.0.0"
+
+    monkeypatch.setattr(release, "_current_version", _version)
+
+    with pytest.raises(SystemExit):
+        release.main(argv)
+
+    assert calls == []

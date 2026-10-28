@@ -506,10 +506,11 @@ skip it (recording it under <code>rules_skipped</code>) if the target can't sati
 <code>errors</code> channel, so one bad rule can't abort the whole scan and the gate fails on
 it by default (<a href="writing-rules.html#what-happens-when-your-rule-raises">when a rule raises</a>). Findings whose verdict is
 <code>inconclusive</code> are partitioned onto the result's <code>unverified</code> channel rather
-than counted as confirmed findings — or dropped. <code>gate(result, policy)</code> is
-the free function that turns a <code>ScanResult</code> into the pass/fail boolean CLI
-commands use for their exit code (see <a href="profiles.html#the-gate"><code>profiles.md</code></a>);
-<code>fail_on_inconclusive: true</code> makes the unverified channel gate too.</p>
+than counted as confirmed findings — or dropped. <code>gate_outcome(result, policy)</code>
+turns a <code>ScanResult</code> into <code>pass</code>, <code>fail</code> or <code>indeterminate</code>, which CLI commands
+exit with as <code>0</code>, <code>1</code> or <code>2</code> (see <a href="profiles.html#the-gate"><code>profiles.md</code></a>), and
+<code>gate(result, policy)</code> is its boolean form, true for anything that is not a pass.
+<code>fail_on_inconclusive: true</code> makes an unverified result leave the run <code>indeterminate</code>.</p>
 <h2 id="the-coreserver-boundary">The core↔server boundary</h2>
 <p><strong>Hard rule: <code>guardana-core</code> never imports <code>guardana-server</code>, directly or
 transitively.</strong> The only connection is one-directional and data-only:</p>

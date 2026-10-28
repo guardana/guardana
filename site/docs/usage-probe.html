@@ -1099,8 +1099,8 @@ Trials
 <p>A check that ran but could not reach a verdict — an empty model reply, a
 judge reply that could not be read — is reported separately as
 <code>? [UNVERIFIED]</code> (the <code>unverified</code> key in JSON), never silently counted as a
-pass; set <code>fail_on_inconclusive: true</code> in your profile to make it fail the
-gate. A judge configured under <code>evaluators:</code> that cannot be reached stops the
+pass; set <code>fail_on_inconclusive: true</code> in your profile to leave the run
+<code>indeterminate</code> (exit <code>2</code>) when one occurs. A judge configured under <code>evaluators:</code> that cannot be reached stops the
 probe with exit <code>4</code> and writes no run, with <code>--url</code>, <code>--target</code>, <code>--mcp</code> and <code>--a2a</code>
 alike (<a href="exit-codes.html">exit codes</a>).</p>
 <h2 id="rules-graded-by-an-llm-judge">Rules graded by an LLM judge</h2>
