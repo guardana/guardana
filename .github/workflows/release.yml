@@ -1,7 +1,8 @@
 # Publishes all five packages to PyPI on a version tag push (v0.1.0, v0.1.1, ...).
 # The reference pack (`examples/reference_pack`, versioned on its own) is built in a job
 # of its own after that publish and attached to every GitHub Release, and published to
-# PyPI by a further job only once the repository variable REFERENCE_PACK_PYPI is `true`.
+# PyPI by a further job only once the repository variable REFERENCE_PACK_PYPI is `true`
+# and PyPI does not already serve the same files.
 #
 # Steady-state: this builds all five packages and uploads them via OIDC trusted
 # publishing behind the "pypi" environment's approval gate — no API token in CI.
@@ -269,14 +270,58 @@ jobs:
           cp "$BUNDLE" "guardana-reference-pack-$version.sigstore.json"
           gh release upload "$TAG" "guardana-reference-pack-$version.sigstore.json" --clobber
 
-  # The reference pack on PyPI, from the files the reference-pack job built and
-  # attested, so what PyPI receives is what was attested. Off until the owner registers the pending
-  # trusted publisher for `guardana-reference-pack` and sets REFERENCE_PACK_PYPI; the
-  # pack's version moves only when its content does, so a release that did not bump it
-  # is skipped rather than failed.
-  publish-reference-pack:
+  # Whether PyPI already serves the attested reference pack, decided outside the `pypi`
+  # environment: the pack's version moves only when its content does, so most releases
+  # upload nothing and need no approval for it. Differing bytes stop the release here.
+  reference-pack-on-pypi:
     needs: reference-pack
     if: vars.REFERENCE_PACK_PYPI == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read       # check out the digest check
+    outputs:
+      result: ${{ steps.compare.outputs.result }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Take the attested reference pack
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: reference-pack-dist
+          path: dist-reference
+
+      - name: Compare the attested reference pack with PyPI
+        id: compare
+        run: |
+          set +e
+          python3 scripts/check_pypi_digests.py --classify dist-reference/
+          code=$?
+          set -e
+          case $code in
+            0) result=new ;;
+            3) result=identical ;;
+            1) result=differ ;;
+            *) result=unreadable ;;
+          esac
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          if [[ $result == differ ]]; then
+            echo "::error::PyPI serves a reference pack file with other bytes; nothing is published."
+            exit 1
+          fi
+
+  # The reference pack on PyPI, from the files the reference-pack job built and
+  # attested, so what PyPI receives is what was attested. Off until the owner registers the pending
+  # trusted publisher for `guardana-reference-pack` and sets REFERENCE_PACK_PYPI. It asks
+  # for approval when a file is new to PyPI or PyPI could not be read; the digest check
+  # inside it runs again, so an unreadable PyPI still uploads nothing.
+  publish-reference-pack:
+    needs: [reference-pack, reference-pack-on-pypi]
+    if: >-
+      vars.REFERENCE_PACK_PYPI == 'true' &&
+      (needs.reference-pack-on-pypi.outputs.result == 'new' ||
+      needs.reference-pack-on-pypi.outputs.result == 'unreadable')
     runs-on: ubuntu-24.04
     environment: pypi
     permissions:

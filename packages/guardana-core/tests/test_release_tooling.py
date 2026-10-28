@@ -291,9 +291,10 @@ def test_the_reference_pack_reaches_pypi_only_when_the_owner_turns_it_on() -> No
     steps = _steps(_workflow("release.yml"), name)
     publish = steps[_index_of(steps, "pypa/gh-action-pypi-publish")]
 
-    assert job["needs"] == "reference-pack"
+    assert job["needs"] == ["reference-pack", "reference-pack-on-pypi"]
     assert job["environment"] == "pypi"
-    assert job["if"] == "vars.REFERENCE_PACK_PYPI == 'true'"
+    assert str(job["if"]).startswith("vars.REFERENCE_PACK_PYPI == 'true' && ")
+    assert jobs["reference-pack-on-pypi"]["if"] == "vars.REFERENCE_PACK_PYPI == 'true'"
     assert job["permissions"]["id-token"] == "write"
     assert isinstance(publish["with"], dict)
     assert publish["with"]["packages-dir"] == "dist-reference/"
