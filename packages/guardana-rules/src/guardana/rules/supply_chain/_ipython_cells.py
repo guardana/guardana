@@ -1141,7 +1141,9 @@ def local_scripts(command: str, depth: int = 0) -> ShellReading:
     """
     tokens, read, exact = _shell_words(command)
     reading = ShellReading(untokenised=not read)
-    inline = _Inline(shell=list(_substitutions(command)))
+    # A line past the bound is already reported unread, so its substitutions are not
+    # scanned character by character either.
+    inline = _Inline(shell=_substitutions(command) if len(command) <= _MAX_SHELL_CHARS else [])
     for raw, stdin in _simple_commands(tokens):
         words = _unwrapped(raw)
         if words:
