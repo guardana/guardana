@@ -2,7 +2,7 @@
 title: "guardana analyze-trace"
 nav_order: 80
 summary: "`guardana analyze-trace`: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect"
-status: stable
+status: beta
 ---
 
 # `guardana analyze-trace` — grade an execution that already happened

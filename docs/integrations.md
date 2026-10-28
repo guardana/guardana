@@ -46,7 +46,7 @@ jobs:
       security-events: write   # required to upload SARIF
     steps:
       - uses: actions/checkout@v7
-      - uses: guardana/guardana@v0.41   # moving tag; pins to the latest 0.41.x
+      - uses: guardana/guardana@v1.0   # moving tag; pins to the latest 1.0.x
         with:
           path: .
           # args: --preset ci --baseline guardana-baseline.yaml
@@ -83,12 +83,12 @@ user: the image's default user cannot write to a checkout it does not own:
       - name: Scan and save this run
         # exit 1 is a finding the comparison will judge; 2 and above still stop the job
         run: >
-          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/guardana/guardana:0.41
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/guardana/guardana:1.0
           scan /work --format json --output /work/current.json || test $? -eq 1
 
       - name: Compare against the last accepted run
         run: >
-          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.41
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0
           diff /work/accepted.json /work/current.json --preset ci
 ```
 
@@ -105,7 +105,7 @@ copied. The shortest form, which is also what the Jenkins and Azure templates
 run:
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.41 \
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0 \
   scan /work --format junit > guardana-junit.xml
 ```
 
@@ -119,7 +119,7 @@ GitLab can include the job rather than copy it:
 
 ```yaml
 include:
-  - remote: "https://raw.githubusercontent.com/guardana/guardana/v0.41/deploy/ci/gitlab-ci.yml"
+  - remote: "https://raw.githubusercontent.com/guardana/guardana/v1.0/deploy/ci/gitlab-ci.yml"
 
 guardana:
   variables:

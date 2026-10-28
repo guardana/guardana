@@ -21,10 +21,10 @@ inputs:
   version:
     description: >-
       guardana-cli version to run. Defaults to the version this Action tag ships,
-      so a workflow pinned to `guardana/guardana@v0.41` keeps running the CLI that
+      so a workflow pinned to `guardana/guardana@v1.0` keeps running the CLI that
       tag was released with. Pass `latest` to always take the newest release.
     required: false
-    default: "1.0.0rc5"
+    default: "1.0.0"
   sarif-file:
     description: "Where to write the SARIF report."
     required: false

@@ -67,10 +67,10 @@ which is also why the declaration is not `[tool.guardana]` in `pyproject.toml`.
 
 This is the field worth understanding before you pin anything.
 
-Before 1.0, a minor release of Guardana may contain a documented breaking change. The
-`1.0.0rcN` candidates carry fixes only ([compatibility](compatibility.md#versioning)). A pack
-pinned to one minor version of the product needs a new release for every minor version, even
-when nothing it uses has changed. **`extension_api` moves only when `Rule`,
+Guardana's minor version moves for new opt-in checks, features and deprecations
+([compatibility](compatibility.md#versioning)), even when the extension contract stays the
+same. A pack pinned to one product minor version needs a new release for every minor
+version, even when nothing it uses changes. **`extension_api` moves only when `Rule`,
 `Evaluator`, `Target` or `Finding` actually change shape**, so a pack can bind to it. API 2
 adds CLI target locators. Guardana retains API 1 alongside it, so a rule/evaluator pack
 declaring `>=1,<2` continues to load. A pack using `Target.scheme` and `from_locator` declares

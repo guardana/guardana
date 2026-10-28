@@ -14,17 +14,16 @@ def one_input(data: bytes) -> None:
     with scratch_file("guardana.yaml", data) as path:
         try:
             load_profile(path)
-        # Bytes that are not UTF-8 fail in the decoder before YAML sees them. That escapes
-        # the loader's documented refusal; accepted here so the fuzzer keeps looking.
-        except (ProfileError, UnicodeDecodeError):
+        except ProfileError:
             return
 
 
 def seeds() -> Iterable[bytes]:
-    """Yield profiles covering policy, privacy, non-text keys and malformed scalars."""
+    """Yield profiles covering policy, privacy, non-UTF-8 bytes, non-text keys, bad scalars."""
     yield b"fail_on:\n  severity: high\n  fail_on_inconclusive: true\n"
     yield b"rules:\n  select: ['guardana.supply_chain.*']\n"
     yield b"privacy:\n  mode: redacted\n"
+    yield b"\xe9fail_on:\n  severity: high\n"
     yield b"1: x\n"
     yield b"1: x\nunrecognised: x\n"
     yield b"rules:\n  1: x\n"

@@ -2,7 +2,7 @@
 title: "Reproducible builds"
 nav_order: 325
 summary: "rebuild a release from its tag and compare every file with PyPI byte for byte"
-status: beta
+status: stable
 ---
 
 # Reproducible builds

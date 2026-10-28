@@ -10,7 +10,7 @@ truth are the [rule summary](docs/generated/rule-summary.md),
 [taxonomy coverage](docs/generated/taxonomy-coverage.md).
 
 For maturity and known gaps, read [Product status](docs/product-status.md).
-To try a candidate, join a pilot or contribute, read [Community](docs/community.md).
+To join a pilot or contribute, read [Community](docs/community.md).
 
 ## Core workflows
 
@@ -33,9 +33,11 @@ To try a candidate, join a pilot or contribute, read [Community](docs/community.
 | Run verification from Python | `guardana.core.verify.Verifier(trust=...)` | the run `scan` or `probe` writes, as typed data, failed and stopped runs included |
 | Keep and read results over HTTP | `--reporter server://URL`; `GET /findings`; `GET /trend` (optional collector) | Stored runs read back per project with a `read` key; `/openapi.json` describes routes and permissions. No route starts a scan or probe. |
 
-`probe`, `plan probe`, `target inspect`, `monitor` and every judge read one connection —
+`probe`, `target inspect`, `monitor` and every judge read one connection —
 `--url`, `--model`, `--provider`, `--api-key-env`, `--adapter` — and refuse one they cannot
-honour before the first request.
+honour before the first request. `plan probe` reads the same connection except
+`--api-key-env`: it has no such option and reads no key variable. It also refuses
+a connection it cannot honour before the first request.
 [Providers](docs/providers.md) lists what each provider and adapter carries and retries; one
 conformance suite holds them to it. An adapter file maps a guarded application: `declines:`
 names the replies its guard sends when it declines a request, read by the evaluator as a
@@ -245,7 +247,7 @@ incomplete implementation. [`docs/conformance-kit.md`](docs/conformance-kit.md) 
 
 All 58 built-in rules have finding, clean and inconclusive samples of their own. `guardana rule test 'guardana.*'` runs them and generates the summary count. A sample whose target cannot read a file is inconclusive. [`examples/reference_pack`](examples/reference_pack) is `guardana-reference-pack`, published on PyPI. Its wheel and sdist are also attached to each GitHub Release, and CI installs it in isolation. It includes YAML and Python rules, an evaluator, a conforming target, a taxonomy, `reference-summary`, `reference-file`, a schema-3 manifest and a committed lock.
 
-The extension API is beta and frozen at 1.0 under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
+The extension API is stable under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
 
 ## Optional collector
 

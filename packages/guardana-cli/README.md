@@ -6,7 +6,7 @@ Start with these commands:
 
 ```bash
 uvx --from guardana-cli guardana scan .
-guardana init --starter first-run
+uvx --from guardana-cli guardana init --starter first-run
 ```
 
 Part of **[Guardana](https://github.com/guardana/guardana)** — security

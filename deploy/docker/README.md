@@ -4,8 +4,8 @@ Two images, published to the GitHub Container Registry on every release:
 
 | Image | What it is | Entrypoint |
 |---|---|---|
-| `ghcr.io/guardana/guardana:0.41` | the CLI — `scan`, `probe`, `monitor`, `diff` and the rest | `guardana` |
-| `ghcr.io/guardana/guardana-collector:0.41` | the optional collector | `guardana-collector` |
+| `ghcr.io/guardana/guardana:1.0` | the CLI — `scan`, `probe`, `monitor`, `diff` and the rest | `guardana` |
+| `ghcr.io/guardana/guardana-collector:1.0` | the optional collector | `guardana-collector` |
 
 Three tags: the exact version, the moving minor (what the table above pins), and
 `latest`. Pin the **moving minor** in a pipeline — it picks up fixes without changing which rules
@@ -30,7 +30,7 @@ provenance attestation attached in the registry.
 ## The CLI
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.41 scan /work
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0 scan /work
 ```
 
 `/work` is the working directory inside the image; mounting read-only is enough,
@@ -42,7 +42,7 @@ command.
 Writing a report out needs a writable mount:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.41 \
+docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:1.0 \
   scan /work --format sarif --output /work/guardana.sarif
 ```
 
@@ -58,7 +58,7 @@ Run it as yourself and it reads what you can read:
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" \
-  ghcr.io/guardana/guardana:0.41 scan /work
+  ghcr.io/guardana/guardana:1.0 scan /work
 ```
 
 ## The collector
@@ -66,11 +66,11 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" \
 ```bash
 docker run --rm \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:...@db:5432/guardana" \
-  ghcr.io/guardana/guardana-collector:0.41 migrate
+  ghcr.io/guardana/guardana-collector:1.0 migrate
 
 docker run -d --name guardana-collector -p 8000:8000 \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:...@db:5432/guardana" \
-  ghcr.io/guardana/guardana-collector:0.41
+  ghcr.io/guardana/guardana-collector:1.0
 ```
 
 The default command is `serve --host 0.0.0.0 --port 8000`. Binding every

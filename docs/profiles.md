@@ -13,6 +13,10 @@ fail. Every command that runs the engine (`scan`, `probe`, `grade`,
 via `--profile PATH`; without it, a built-in default profile applies
 (`include: ["*"]`, `fail_on.severity: high`, `fail_on.min_confidence: 0.0`).
 
+Profile files must be UTF-8. If one contains invalid bytes, commands including
+`scan --profile`, `recipe lock` and `recipe run` refuse it with exit `3`, name the
+profile file, and start no run.
+
 Generate a starter file:
 
 ```bash
