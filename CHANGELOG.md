@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-29 — the first patch release
+
 ### Changed
 
 - **Limit Dependabot base image proposals to Python `3.13`, the newest version CI tests.** `.github/dependabot.yml` ignores `python` image versions `>= 3.14` for `deploy/docker`; digest updates still arrive (#240). Previously, Dependabot proposed `python:3.15-slim-bookworm` (#217).

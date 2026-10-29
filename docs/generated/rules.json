@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_by": "scripts/generate_docs.py from the installed registry \u2014 do not edit by hand",
-  "guardana_version": "1.0.0",
+  "guardana_version": "1.0.1",
   "rules": [
     {
       "id": "guardana.a2a.agent_card",
