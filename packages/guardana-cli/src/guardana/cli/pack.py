@@ -29,6 +29,7 @@ from guardana.cli._plugins import (
 )
 from guardana.cli._profile import resolve_profile
 from guardana.cli.exit_codes import ExitCode
+from guardana.core._yaml import load_yaml
 from guardana.core.entrypoints import RENDERER_GROUP, REPORTER_GROUP
 from guardana.core.output import OutputDiscovery, discover_outputs
 from guardana.core.pack import (
@@ -158,6 +159,14 @@ def _write_lock(path: Path, present: Lock) -> None:
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
 
 
+def _read_lock(path: Path) -> Lock:
+    """Read the lock at `path`; text that is not a YAML document is a `PackError` naming it."""
+    try:
+        return lock_from_dict(load_yaml(path.read_text(encoding="utf-8")), str(path))
+    except (UnicodeDecodeError, yaml.YAMLError) as exc:
+        raise PackError(f"invalid lock file {path}: {exc}") from exc
+
+
 @pack_app.command("lock")
 def lock(
     path: Annotated[
@@ -218,8 +227,8 @@ def lock(
         raise typer.Exit(code=ExitCode.OK)
 
     try:
-        locked = lock_from_dict(yaml.safe_load(path.read_text(encoding="utf-8")), str(path))
-    except (PackError, OSError, yaml.YAMLError) as exc:
+        locked = _read_lock(path)
+    except (PackError, OSError) as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
 

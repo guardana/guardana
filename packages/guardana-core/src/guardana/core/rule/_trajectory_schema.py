@@ -81,6 +81,13 @@ def parse_trajectory(raw: dict[str, Any], path: Path) -> TrajectoryRule:
             f"session can only repeat the first"
         )
     expectation = parse_expectation(raw.get("expect"), path)
+    if expectation.canary is not None and not isinstance(expectation.canary, str):
+        # Unlike a probe-planted canary, this marker is looked up verbatim in the
+        # rule's own tool descriptions and canned results, so it must be text.
+        raise RuleLoadError(
+            f"invalid rule in {path}: 'expect.canary' must be a string, "
+            f"got {type(expectation.canary).__name__}"
+        )
     # The rule, not the evaluator, reads the delivery fields; `TrajectoryRule` checks them.
     check_evaluator_expectations(
         meta,

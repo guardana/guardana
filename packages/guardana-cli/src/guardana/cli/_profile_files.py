@@ -17,6 +17,7 @@ from guardana.cli._contracts import (
     read_contracts,
 )
 from guardana.cli._rules_loading import rule_path_problems
+from guardana.core._yaml import load_yaml
 from guardana.core.dataset import DatasetError, resolve_dataset_path
 from guardana.core.manifest.build import ProfileCalibrations, read_profile_calibrations
 from guardana.core.profile import Profile, ProfileError
@@ -141,7 +142,7 @@ def _datasets(rule_file: Path) -> tuple[Path, ...]:
     here, because the load refuses it before anything is read or written.
     """
     try:
-        raw = yaml.safe_load(rule_file.read_text(encoding="utf-8"))
+        raw = load_yaml(rule_file.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return ()
     declared = raw if isinstance(raw, list) else [raw]
