@@ -462,13 +462,14 @@ class Runner:
 
         Deliberately hand-rolled rather than a `ThreadPoolExecutor`. That pool's
         workers are non-daemon and CPython joins them at interpreter exit, so a
-        probe that hit an unreachable endpoint — or a Ctrl-C — printed its error
-        and then sat there until every in-flight rule had finished its network
-        work. Daemon threads let the process leave when the caller decides to.
+        Ctrl-C would end the run and then wait until every in-flight rule had
+        finished its network work. Daemon threads let the process leave when the
+        caller decides to.
 
         Once a rule reports the endpoint itself is gone, no further rule is
         started: they would all fail identically, and continuing to send prompts
-        to a dead or rate-limited model is pure harm.
+        to a dead or rate-limited model is pure harm. Rules already in flight
+        finish, so each records what the failure did to it.
         """
         outcomes = self._run_pool(plan, target, limit)
         # Rule order, not completion order: two runs of the same probe must
