@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Refuse malformed rule and lock files with file-specific diagnostics.** Tagged scalars PyYAML cannot build, read through `--rules` or a profile's `rules.paths`, now produce a warning naming the rule file and a recorded rule load error; scans end `indeterminate` with exit `2` instead of exit `5`. (#246) Agent-run rules with a non-string `expect.canary`, such as `canary: on`, are now refused at load; these previously made `guardana rules --rules <dir>` and `guardana scan <tree> --rules <dir>` exit `5`. Prompt and scenario rules still accept any `canary` value because the probe replaces it with the planted token; verdicts for rules that load are unchanged. `guardana pack lock --check <lock>` now refuses unbuildable tagged scalars and invalid UTF-8 with exit `3` instead of exit `5`, and its YAML syntax errors also name the file. Gate impact: a scan that stopped with exit `5` on such a rule file now ends `indeterminate` (exit `2`), and `guardana pack lock --check` on such a lock file exits `3`; a gate that failed still fails.
+
 ## [1.0.1] - 2026-10-29 — the first patch release
 
 ### Changed

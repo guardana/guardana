@@ -131,3 +131,12 @@ def test_the_delivery_checks_hold_whichever_evaluator_grades(tmp_path: Path) -> 
             meta=replace(rule.meta, evaluator="acme.grader"),
             expectation=Expectation(fields={"delivered_by": "recall"}),
         )
+
+
+@pytest.mark.parametrize("canary", ["on", "7", "[MARKER_1]"])
+def test_an_agent_run_canary_that_is_not_text_is_refused_at_load(
+    tmp_path: Path, canary: str
+) -> None:
+    with pytest.raises(RuleLoadError, match=r"'expect\.canary' must be a string") as refused:
+        _load(tmp_path, f"canary: {canary}")
+    assert str(tmp_path / "rule.yaml") in str(refused.value)

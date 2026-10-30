@@ -263,6 +263,23 @@ def test_an_unreadable_lock_is_refused_rather_than_treated_as_empty(tmp_path: Pa
     assert "regenerate it" in result.output
 
 
+@pytest.mark.parametrize(
+    "content",
+    [b"schema_version: !!int high\npacks: []\n", b"\xff\xfeschema_version: 2\n"],
+    ids=["unbuildable-scalar", "not-utf-8"],
+)
+def test_a_lock_that_is_not_a_yaml_document_is_refused_naming_it(
+    tmp_path: Path, content: bytes
+) -> None:
+    path = tmp_path / "guardana-lock.yaml"
+    path.write_bytes(content)
+
+    result = runner.invoke(app, ["pack", "lock", str(path), "--check"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid lock file {path}:" in " ".join(result.output.split())
+
+
 def test_a_lock_from_a_newer_guardana_is_refused_with_upgrade_not_regenerate(
     tmp_path: Path,
 ) -> None:

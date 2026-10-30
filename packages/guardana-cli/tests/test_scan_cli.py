@@ -602,3 +602,36 @@ def test_unbuildable_profile_scalars_exit_invalid_usage(
     assert f"invalid profile {profile}:" in text
     assert token in text.replace(str(profile), "")
     assert "Traceback" not in text
+
+
+@pytest.mark.parametrize(("scalar", "token"), UNBUILDABLE_SCALARS)
+def test_an_unbuildable_scalar_in_a_rules_flag_file_is_a_rule_load_error(
+    tmp_path: Path, scalar: str, token: str
+) -> None:
+    tree, _, _ = _scan_inputs(tmp_path)
+    rules = tmp_path / "rules"
+    rules.mkdir()
+    rule = rules / "rule.yaml"
+    rule.write_text(_ENDPOINT_RULE.replace("severity: high", f"severity: {scalar}"))
+    result = runner.invoke(app, ["scan", str(tree), "--rules", str(rules)])
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.output).split())
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+    assert f"could not load rule — {rule}" in text
+    assert token in text.replace(str(rule), "")
+    assert "internal error" not in text
+
+
+def test_an_unbuildable_scalar_in_a_profile_rules_path_is_a_rule_load_error(
+    tmp_path: Path,
+) -> None:
+    tree, profile, _ = _scan_inputs(tmp_path)
+    rules = tmp_path / "rules"
+    rules.mkdir()
+    rule = rules / "rule.yaml"
+    rule.write_text(_ENDPOINT_RULE.replace("severity: high", "severity: !!int high"))
+    profile.write_text(f"name: audit\nrules:\n  paths: [{rules}]\n", encoding="utf-8")
+    result = runner.invoke(app, ["scan", str(tree), "--profile", str(profile)])
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.output).split())
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+    assert f"could not load rule — {rule}" in text
+    assert "internal error" not in text
