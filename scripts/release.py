@@ -20,15 +20,18 @@ The title is the one line the changelog heading carries after the date:
 
 Run it from a clean `main` that matches `origin/main`. It writes the release branch, the pull
 request, the squash merge and the tag. It needs `gh` with write access, and git configured to sign
-tags with a key `git tag -v` can verify (`gpg.ssh.allowedSignersFile` for an SSH key). Only a
-maintainer (repo admin) can push the resulting `v*` tag — enforced by a tag protection ruleset —
-so a release is a deliberate act.
+tags with a key `git tag -v` can verify (`gpg.ssh.allowedSignersFile` for an SSH key). The gate
+needs Docker, to start the collector's test PostgreSQL from `deploy/docker-compose.dev.yml`, and
+`pg_dump` and `pg_restore` on PATH. Only a maintainer (repo admin) can push the resulting `v*`
+tag — enforced by a tag protection ruleset — so a release is a deliberate act.
 """
 
 import argparse
 import datetime
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -94,7 +97,7 @@ _PACK_PYPROJECT = _ROOT / _PACK / "pyproject.toml"
 
 
 def _run(cmd: list[str], *, capture: bool = False) -> str:
-    # S603: every command here is a fixed literal (git / uv), never user input.
+    # S603: every command here is a fixed literal (git / uv / docker), never user input.
     result = subprocess.run(  # noqa: S603
         cmd, cwd=_ROOT, check=True, text=True, capture_output=capture
     )
@@ -151,8 +154,38 @@ DOGFOOD_PROFILE = "scripts/dogfood.yaml"
 _DOGFOOD = ["uv", "run", "guardana", "scan", "packages", "--profile", DOGFOOD_PROFILE]
 
 
+_TEST_DATABASE_COMPOSE = "deploy/docker-compose.dev.yml"
+_TEST_DATABASE_URL = "postgresql://guardana:guardana@127.0.0.1:55439/guardana_test"
+_PG_TOOLS = ("pg_dump", "pg_restore")
+
+
+def _require_test_database() -> None:
+    """Start the collector's test PostgreSQL and make every pytest run fail rather than skip it.
+
+    Without a database or the client tools each collector test skips, and the gate reads green
+    over code it never ran; CI refuses that skip, so the release gate refuses it too.
+    """
+    missing = [tool for tool in _PG_TOOLS if shutil.which(tool) is None]
+    if missing:
+        _fail(f"{', '.join(missing)} not on PATH; the collector's backup and restore tests need it")
+    try:
+        _run(
+            ["docker", "compose", "-f", _TEST_DATABASE_COMPOSE, "up", "-d", "--wait"], capture=True
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        reason = getattr(exc, "stderr", None) or str(exc)
+        _fail(f"the collector's test database did not start: {reason.strip()}")
+    os.environ["GUARDANA_TEST_DATABASE_URL"] = _TEST_DATABASE_URL
+    os.environ["GUARDANA_REQUIRE_POSTGRES"] = "1"
+    os.environ["GUARDANA_REQUIRE_PG_TOOLS"] = "1"
+
+
 def _gate() -> None:
-    print("running the gate (ruff, format, mypy, lint-imports, pytest, dogfood, clean install)…")
+    print(
+        "running the gate (ruff, format, mypy, lint-imports, pytest with PostgreSQL, dogfood, "
+        "clean install)…"
+    )
+    _require_test_database()
     for cmd in (
         ["uv", "run", "ruff", "check", "."],
         ["uv", "run", "ruff", "format", "--check", "."],
