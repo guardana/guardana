@@ -12,6 +12,8 @@ to check — no `gh`, no run to look at, a signature that does not verify — st
 """
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -856,6 +858,96 @@ def test_a_free_release_branch_passes_the_preflight(monkeypatch: pytest.MonkeyPa
     )
 
     release._preflight("release/v0.1.1")
+
+
+_DATABASE_VARIABLES = (
+    "GUARDANA_TEST_DATABASE_URL",
+    "GUARDANA_REQUIRE_POSTGRES",
+    "GUARDANA_REQUIRE_PG_TOOLS",
+)
+
+
+def _gate_world(
+    monkeypatch: pytest.MonkeyPatch, *, docker: Exception | None = None, missing: str = ""
+) -> list[list[str]]:
+    """Record the gate's commands; `docker` is what starting the database raises."""
+    calls: list[list[str]] = []
+    for name in _DATABASE_VARIABLES:
+        # Set first so the monkeypatch puts back whatever the gate writes.
+        monkeypatch.setenv(name, "")
+
+    def _fake(cmd: list[str], **_: bool) -> str:
+        calls.append(cmd)
+        if cmd[0] == "docker" and docker is not None:
+            raise docker
+        return ""
+
+    monkeypatch.setattr(release, "_run", _fake)
+    monkeypatch.setattr(shutil, "which", lambda tool: None if tool == missing else f"/bin/{tool}")
+    return calls
+
+
+def test_the_gate_starts_the_test_database_and_refuses_its_skip_before_any_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With no database every collector test skips; CI refuses that skip and so does the release."""
+    calls = _gate_world(monkeypatch)
+
+    release._gate()
+
+    assert calls[0] == [
+        "docker",
+        "compose",
+        "-f",
+        "deploy/docker-compose.dev.yml",
+        "up",
+        "-d",
+        "--wait",
+    ]
+    assert ["uv", "run", "pytest", "-q"] in calls
+    assert os.environ["GUARDANA_REQUIRE_POSTGRES"] == "1"
+    assert os.environ["GUARDANA_REQUIRE_PG_TOOLS"] == "1"
+    assert os.environ["GUARDANA_TEST_DATABASE_URL"].endswith("@127.0.0.1:55439/guardana_test")
+
+
+@pytest.mark.parametrize(
+    ("raised", "reason"),
+    [
+        (
+            subprocess.CalledProcessError(
+                1, ["docker"], stderr="Cannot connect to the Docker daemon\n"
+            ),
+            "Cannot connect to the Docker daemon",
+        ),
+        (FileNotFoundError(2, "No such file or directory", "docker"), "No such file"),
+    ],
+)
+def test_a_test_database_that_does_not_start_stops_the_release_before_any_check(
+    monkeypatch: pytest.MonkeyPatch, raised: Exception, reason: str
+) -> None:
+    calls = _gate_world(monkeypatch, docker=raised)
+
+    with pytest.raises(SystemExit) as refused:
+        release._gate()
+
+    assert "test database did not start" in str(refused.value.code)
+    assert reason in str(refused.value.code)
+    assert [cmd[0] for cmd in calls] == ["docker"]
+    assert os.environ["GUARDANA_REQUIRE_POSTGRES"] == ""
+
+
+@pytest.mark.parametrize("tool", ["pg_dump", "pg_restore"])
+def test_missing_postgresql_client_tools_stop_the_release_before_any_check(
+    monkeypatch: pytest.MonkeyPatch, tool: str
+) -> None:
+    """Without them the backup and restore tests skip, which CI refuses as well."""
+    calls = _gate_world(monkeypatch, missing=tool)
+
+    with pytest.raises(SystemExit) as refused:
+        release._gate()
+
+    assert f"{tool} not on PATH" in str(refused.value.code)
+    assert calls == []
 
 
 def test_the_release_stages_exactly_the_paths_it_wrote(monkeypatch: pytest.MonkeyPatch) -> None:

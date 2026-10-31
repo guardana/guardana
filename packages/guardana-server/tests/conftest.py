@@ -49,7 +49,7 @@ def _unavailable(reason: str) -> None:
     """Skip, or fail if this environment promised a database."""
     message = (
         f"no PostgreSQL at {_admin_url()}: {reason}. Start one with "
-        f"`docker run -d -p 55432:5432 -e POSTGRES_PASSWORD=guardana "
+        f"`docker run -d -p 55439:5432 -e POSTGRES_PASSWORD=guardana "
         f"-e POSTGRES_USER=guardana -e POSTGRES_DB=guardana_test postgres:16-alpine`, "
         f"or point {URL_VARIABLE} at your own"
     )
