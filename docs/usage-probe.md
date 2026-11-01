@@ -152,13 +152,14 @@ Four consequences worth knowing:
   discovery lists no older revision, the checks that need it send one `initialize` over
   the `2025-11-25` wire, with your token when you gave one. A result naming `2025-11-25`
   makes the server dual-era, graded over that revision; JSON-RPC `-32601`, a `-32022` that
-  names no older revision, or a `400`, `404` or `405` carrying no JSON-RPC error, makes it
-  modern-only. A `-32022` naming an older handshake revision leaves its sessions
-  unexamined, and `session_binding` reports `inconclusive` naming that revision. A `401` or `403`
+  names no older revision, or a `400`, `404` or `405` read whole whose body is plain text
+  (including empty) or a JSON object without an `error` member, makes it modern-only.
+  A `-32022` naming an older handshake revision leaves its sessions unexamined, and
+  `session_binding` reports `inconclusive` naming that revision. A `401` or `403`
   leaves it unknown, and `session_binding` reports `inconclusive` naming `--mcp-token-env`;
-  so does any other answer — a timeout, a rate limit, a server error, another JSON-RPC
-  error — naming what came back, because one failed request does not show which revisions
-  a server offers.
+  so does any other answer — a `400`, `404` or `405` whose body could not be read whole
+  or parsed, a timeout, a rate limit, a server error, another JSON-RPC error — naming
+  what came back, because one failed request does not show which revisions a server offers.
 - **No revision in common is an outcome, never a pass.** The authorization checks
   report `inconclusive` naming both version lists, and the manifest checks
   report the same sentence as an error, so the run is indeterminate under the default

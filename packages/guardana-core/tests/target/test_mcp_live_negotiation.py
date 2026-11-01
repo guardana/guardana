@@ -26,7 +26,7 @@ from guardana.core.target import (
     TargetChanged,
     TargetKind,
 )
-from guardana.core.target._mcp_http import RawReply, RedirectRefusedError
+from guardana.core.target._mcp_http import MAX_RESPONSE_BYTES, RawReply, RedirectRefusedError
 from guardana.core.target._mcp_wire import INITIALIZED, LATEST_VERSION, LEGACY_VERSION, LEGACY_WIRE
 from guardana.core.testing import ScriptedMcpServer
 
@@ -401,6 +401,88 @@ def test_a_legacy_probe_that_failed_leaves_the_era_unknown(
     assert offer.unsettled is not None
     assert said in offer.unsettled
     assert view.sessions.no_protocol_sessions is None
+
+
+class _AnswersInitializeWith(ScriptedMcpServer):
+    """A dual-era server whose legacy `initialize` gets the reply the test hands it."""
+
+    def __init__(self, url: str, *, reply: RawReply, **settings: object) -> None:
+        super().__init__(url, **settings)  # type: ignore[arg-type]
+        self.reply = reply
+
+    def __call__(self, url: str, **kwargs: object) -> RawReply:
+        body, _ = _sent(kwargs)
+        if body.get("method") != "initialize":
+            return super().__call__(url, **kwargs)  # type: ignore[arg-type]
+        self.bodies.append(body)
+        return self.reply
+
+
+_INTERNAL_ERROR = json.dumps(
+    {"jsonrpc": "2.0", "id": 1, "error": {"code": -32603, "message": "Internal error"}}
+).encode()
+_EVENT = b"event: message\ndata: " + _INTERNAL_ERROR + b"\n\n"
+
+
+_STREAM = {"Content-Type": "text/event-stream"}
+
+
+@pytest.mark.parametrize("status", [400, 404, 405])
+@pytest.mark.parametrize(
+    ("body", "headers", "read_failed"),
+    [
+        pytest.param(_INTERNAL_ERROR + b" " * MAX_RESPONSE_BYTES, {}, False, id="past-the-ceiling"),
+        pytest.param(b" " * (MAX_RESPONSE_BYTES + 1), {}, False, id="cut-at-the-ceiling"),
+        pytest.param(_EVENT.removesuffix(b"\n"), {}, False, id="unterminated-event"),
+        pytest.param(_EVENT + _EVENT, {}, False, id="two-responses"),
+        pytest.param(_INTERNAL_ERROR[:-9], {}, False, id="cut-json"),
+        pytest.param(b"", {}, True, id="body-lost"),
+        pytest.param(b'{"error": null}', {}, False, id="error-member-null"),
+        pytest.param(
+            _INTERNAL_ERROR.replace(b"-32603", b'"-32603"'), {}, False, id="error-code-a-string"
+        ),
+        pytest.param(b"x: metadata\n" + _EVENT, _STREAM, False, id="declared-event-stream"),
+        pytest.param(b"", _STREAM, False, id="declared-event-stream-empty"),
+        pytest.param(b"\xef\xbb\xbf" + _INTERNAL_ERROR[:-9], {}, False, id="json-after-a-bom"),
+    ],
+)
+def test_a_refusal_not_read_whole_or_not_parsed_leaves_the_era_unknown(
+    status: int, body: bytes, headers: dict[str, str], read_failed: bool
+) -> None:
+    server = _AnswersInitializeWith(
+        ROUTABLE,
+        reply=RawReply(status, headers, body, read_failed=read_failed),
+        tools=TOOLS,
+        protocol_versions=[LATEST_VERSION, LEGACY_VERSION],
+        discovers=[LATEST_VERSION],
+    )
+    view = _target(server).authorization()
+
+    offer = view.legacy_offer
+
+    assert not offer.modern_only
+    assert offer.wire is None
+    assert offer.unsettled is not None
+    assert f"HTTP {status}" in offer.unsettled
+    assert view.sessions.no_protocol_sessions is None
+
+
+@pytest.mark.parametrize("status", [400, 404, 405])
+def test_a_refusal_whose_body_is_a_json_object_without_an_error_is_modern_only(
+    status: int,
+) -> None:
+    server = _AnswersInitializeWith(
+        ROUTABLE,
+        reply=RawReply(status, {}, b'{"detail": "Not Found"}'),
+        tools=TOOLS,
+        protocol_versions=[LATEST_VERSION, LEGACY_VERSION],
+        discovers=[LATEST_VERSION],
+    )
+
+    offer = _target(server).authorization().legacy_offer
+
+    assert offer.modern_only
+    assert offer.unsettled is None
 
 
 def test_a_listed_legacy_revision_guardana_does_not_speak_is_named_without_asking() -> None:

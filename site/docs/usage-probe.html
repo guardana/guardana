@@ -483,13 +483,14 @@ only the new revision in <code>server/discover</code> and still answer <code>ini
 discovery lists no older revision, the checks that need it send one <code>initialize</code> over
 the <code>2025-11-25</code> wire, with your token when you gave one. A result naming <code>2025-11-25</code>
 makes the server dual-era, graded over that revision; JSON-RPC <code>-32601</code>, a <code>-32022</code> that
-names no older revision, or a <code>400</code>, <code>404</code> or <code>405</code> carrying no JSON-RPC error, makes it
-modern-only. A <code>-32022</code> naming an older handshake revision leaves its sessions
-unexamined, and <code>session_binding</code> reports <code>inconclusive</code> naming that revision. A <code>401</code> or <code>403</code>
+names no older revision, or a <code>400</code>, <code>404</code> or <code>405</code> read whole whose body is plain text
+(including empty) or a JSON object without an <code>error</code> member, makes it modern-only.
+A <code>-32022</code> naming an older handshake revision leaves its sessions unexamined, and
+<code>session_binding</code> reports <code>inconclusive</code> naming that revision. A <code>401</code> or <code>403</code>
 leaves it unknown, and <code>session_binding</code> reports <code>inconclusive</code> naming <code>--mcp-token-env</code>;
-so does any other answer — a timeout, a rate limit, a server error, another JSON-RPC
-error — naming what came back, because one failed request does not show which revisions
-a server offers.</li>
+so does any other answer — a <code>400</code>, <code>404</code> or <code>405</code> whose body could not be read whole
+or parsed, a timeout, a rate limit, a server error, another JSON-RPC error — naming
+what came back, because one failed request does not show which revisions a server offers.</li>
 <li><strong>No revision in common is an outcome, never a pass.</strong> The authorization checks
 report <code>inconclusive</code> naming both version lists, and the manifest checks
 report the same sentence as an error, so the run is indeterminate under the default

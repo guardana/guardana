@@ -785,10 +785,11 @@ class _Probe:
 
         One handshake over the `2025-11-25` wire, with the operator's credential when
         one is configured: a result naming that revision is a dual-era server; JSON-RPC
-        `-32601` or `-32022` at any status, or `400`, `404` or `405` carrying no JSON-RPC
-        error, is a modern-only one. A refusal says who may ask, not which era answers,
-        and any other answer — a timeout, a rate limit, a server error, another JSON-RPC
-        error — is a failure of this one request; both leave it unknown.
+        `-32601` or `-32022` at any status, or a `400`, `404` or `405` read whole with no
+        JSON-RPC error in it, is a modern-only one. A refusal says who may ask, not
+        which era answers, and any other answer — a timeout, a rate limit, a server
+        error, another JSON-RPC error — is a failure of this one request; both leave it
+        unknown.
         """
         negotiation = self._negotiation()
         if negotiation.legacy_wire is not None:
@@ -816,7 +817,9 @@ class _Probe:
         older = _older_handshake(error)
         if older is not None:
             return older
-        if code in _NOT_THE_ERA_CODES or (error is None and reply.status in _NOT_THE_ERA):
+        if code in _NOT_THE_ERA_CODES or (
+            reply.status in _NOT_THE_ERA and _no_json_rpc_error(reply, payload)
+        ):
             return LegacyOffer(modern_only=True)
         result = payload.get("result") if payload is not None and error is None else None
         if reply.status in _SUCCESS and isinstance(result, dict):

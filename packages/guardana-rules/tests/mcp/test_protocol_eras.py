@@ -12,7 +12,7 @@ from _offline import refuse_name_lookups
 from guardana.core.rule import RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import McpServerTarget
-from guardana.core.target._mcp_http import RawReply
+from guardana.core.target._mcp_http import MAX_RESPONSE_BYTES, RawReply
 from guardana.core.target._mcp_wire import LATEST_VERSION, LEGACY_VERSION
 from guardana.core.testing import ScriptedMcpServer
 from guardana.rules.mcp import McpSessionBindingRule, McpUnauthenticatedAccessRule
@@ -126,6 +126,32 @@ def test_a_handshake_era_answered_in_a_revision_guardana_does_not_speak_is_incon
 
     assert outcomes(reported) == ["inconclusive"]
     assert f"answered initialize with {OLDER}" in summaries(reported)[0]
+
+
+class _RefusingTheHandshakeAtLength(ScriptedMcpServer):
+    """A server whose `initialize` answers `404` with a body past the response ceiling."""
+
+    def __call__(self, url: str, **kwargs: object) -> RawReply:
+        reply = super().__call__(url, **kwargs)  # type: ignore[arg-type]
+        if self.bodies and self.bodies[-1].get("method") == "initialize":
+            return RawReply(404, {}, b"Not Found" + b" " * MAX_RESPONSE_BYTES)
+        return reply
+
+
+def test_a_handshake_refusal_too_long_to_read_whole_is_inconclusive_never_silent() -> None:
+    server = _RefusingTheHandshakeAtLength(
+        ROUTABLE,
+        tools=[],
+        credential=CREDENTIAL,
+        session_ids=_FOUR,
+        protocol_versions=[LATEST_VERSION, LEGACY_VERSION],
+        discovers=[LATEST_VERSION],
+    )
+
+    reported = findings(RULE, server, credential=CREDENTIAL)
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "HTTP 404" in summaries(reported)[0]
 
 
 def test_a_modern_server_whose_handshake_era_could_not_be_asked_is_inconclusive() -> None:
