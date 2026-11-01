@@ -868,9 +868,16 @@ _DATABASE_VARIABLES = (
 
 
 def _gate_world(
-    monkeypatch: pytest.MonkeyPatch, *, docker: Exception | None = None, missing: str = ""
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    docker: Exception | None = None,
+    missing: str = "",
+    environments: list[dict[str, str]] | None = None,
 ) -> list[list[str]]:
-    """Record the gate's commands; `docker` is what starting the database raises."""
+    """Record the gate's commands, and into `environments` the database variables each saw.
+
+    `docker` is what starting the database raises.
+    """
     calls: list[list[str]] = []
     for name in _DATABASE_VARIABLES:
         # Set first so the monkeypatch puts back whatever the gate writes.
@@ -878,6 +885,8 @@ def _gate_world(
 
     def _fake(cmd: list[str], **_: bool) -> str:
         calls.append(cmd)
+        if environments is not None:
+            environments.append({name: os.environ[name] for name in _DATABASE_VARIABLES})
         if cmd[0] == "docker" and docker is not None:
             raise docker
         return ""
@@ -891,7 +900,8 @@ def test_the_gate_starts_the_test_database_and_refuses_its_skip_before_any_check
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """With no database every collector test skips; CI refuses that skip and so does the release."""
-    calls = _gate_world(monkeypatch)
+    environments: list[dict[str, str]] = []
+    calls = _gate_world(monkeypatch, environments=environments)
 
     release._gate()
 
@@ -904,10 +914,10 @@ def test_the_gate_starts_the_test_database_and_refuses_its_skip_before_any_check
         "-d",
         "--wait",
     ]
-    assert ["uv", "run", "pytest", "-q"] in calls
-    assert os.environ["GUARDANA_REQUIRE_POSTGRES"] == "1"
-    assert os.environ["GUARDANA_REQUIRE_PG_TOOLS"] == "1"
-    assert os.environ["GUARDANA_TEST_DATABASE_URL"].endswith("@127.0.0.1:55439/guardana_test")
+    seen_by_pytest = environments[calls.index(["uv", "run", "pytest", "-q"])]
+    assert seen_by_pytest["GUARDANA_REQUIRE_POSTGRES"] == "1"
+    assert seen_by_pytest["GUARDANA_REQUIRE_PG_TOOLS"] == "1"
+    assert seen_by_pytest["GUARDANA_TEST_DATABASE_URL"].endswith("@127.0.0.1:55439/guardana_test")
 
 
 @pytest.mark.parametrize(
