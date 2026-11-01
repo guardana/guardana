@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Skip servers that declare no tasks when `tasks/list` returns HTTP `400` without a JSON-RPC error.** `guardana.mcp.task_identity` now treats this as an unknown method and reports `not_offered` with a coverage gap instead of `inconclusive` (#212); JSON-RPC `-32601` behaves as before, while a `400` carrying another JSON-RPC error, `404`, `405`, a `5xx`, any other answer, or a declared `tasks.list` answered `400` stays `inconclusive`. May now pass: with `fail_on_inconclusive` on and `fail_on_skipped` off, a probe of such a server that ended `indeterminate` over this check no longer does. May now fail: with `fail_on_skipped` on, the same probe now ends `indeterminate` over the coverage gap.
+- **Skip servers that declare no tasks when `tasks/list` returns HTTP `400` without a JSON-RPC error.** `guardana.mcp.task_identity` now treats this as an unknown method and reports `not_offered` with a coverage gap instead of `inconclusive` (#212), provided the body was read whole and is plain text (including empty) or a JSON object without an `error` member; JSON-RPC `-32601` behaves as before, while a `400` carrying another JSON-RPC error or whose body could not be read whole or parsed, `404`, `405`, a `5xx`, any other answer, or a declared `tasks.list` answered `400` stays `inconclusive`. May now pass: with `fail_on_inconclusive` on and `fail_on_skipped` off, a probe of such a server that ended `indeterminate` over this check no longer does. May now fail: with `fail_on_skipped` on, the same probe now ends `indeterminate` over the coverage gap.
 
 ### Fixed
 

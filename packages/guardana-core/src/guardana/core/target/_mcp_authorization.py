@@ -31,7 +31,6 @@ from guardana.core.target._mcp_client import (
     opening_in,
 )
 from guardana.core.target._mcp_http import (
-    MAX_RESPONSE_BYTES,
     AddressRefusedError,
     DiscoveryScope,
     DiscoverySender,
@@ -120,7 +119,7 @@ class TaskAnswer(StrEnum):
     REFUSED = "refused"
     """HTTP `401` or `403`."""
     UNKNOWN_METHOD = "unknown_method"
-    """JSON-RPC `-32601` whatever the status, or an HTTP `400` read whole with no JSON-RPC error."""
+    """JSON-RPC `-32601` at any status, or an HTTP `400` read whole with no JSON-RPC error in it."""
     OTHER = "other"
     """Anything else; `Tasks.detail` names the status."""
 
@@ -1134,10 +1133,13 @@ def _task_listing(reply: RawReply) -> Tasks:
     error = error_member(payload)
     if error is not None and error.get("code") == _METHOD_NOT_FOUND:
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
-    if error is None and reply.status == _BAD_REQUEST and len(reply.body) <= MAX_RESPONSE_BYTES:
+    if (
+        error is None
+        and reply.status == _BAD_REQUEST
+        and (payload is not None or reply.plain_text())
+    ):
         # How a server that rejects every method it lacks says so, as the revision
-        # probe reads the same answer to a handshake it does not implement. A body cut
-        # at the ceiling may still hold another JSON-RPC error, so it is not read so.
+        # probe reads the same answer to a handshake it does not implement.
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
     if reply.status in REFUSAL_STATUSES:
         return Tasks(answer=TaskAnswer.REFUSED, status=reply.status)

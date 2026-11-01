@@ -338,9 +338,41 @@ def test_any_other_refusal_of_the_listing_stays_inconclusive(status: int, body: 
     assert f"HTTP {status}" in summaries(reported)[0]
 
 
-def test_a_400_too_long_to_read_whole_is_inconclusive_not_an_unknown_method() -> None:
-    oversized = _INVALID_REQUEST + b" " * MAX_RESPONSE_BYTES
-    target = _listing_answered(_open(), RawReply(400, {}, oversized))
+def test_a_400_whose_body_is_a_json_object_without_an_error_does_not_offer_tasks() -> None:
+    target = _listing_answered(_open(), RawReply(400, {}, b'{"detail": "Bad Request"}'))
+
+    with pytest.raises(NotOffered):
+        list(RULE.run(target, RuleContext()))
+
+    assert target.authorization().tasks.answer is TaskAnswer.UNKNOWN_METHOD
+
+
+_EVENT = b"event: message\ndata: " + _INVALID_REQUEST + b"\n\n"
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        RawReply(400, {}, _INVALID_REQUEST + b" " * MAX_RESPONSE_BYTES),
+        RawReply(400, {}, b" " * (MAX_RESPONSE_BYTES + 1)),
+        RawReply(400, {}, _EVENT.removesuffix(b"\n")),
+        RawReply(400, {}, _EVENT + _EVENT),
+        RawReply(400, {}, _INVALID_REQUEST[:-9]),
+        RawReply(400, {}, b"", read_failed=True),
+    ],
+    ids=[
+        "past-the-ceiling",
+        "cut-at-the-ceiling-before-the-json",
+        "unterminated-event",
+        "two-responses",
+        "cut-json",
+        "body-lost",
+    ],
+)
+def test_a_400_not_read_whole_or_not_parsed_is_inconclusive_not_an_unknown_method(
+    reply: RawReply,
+) -> None:
+    target = _listing_answered(_open(), reply)
 
     reported = list(RULE.run(target, RuleContext()))
 

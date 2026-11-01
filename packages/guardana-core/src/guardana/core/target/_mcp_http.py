@@ -97,6 +97,19 @@ class RawReply:
     status: int
     headers: Mapping[str, str]
     body: bytes
+    read_failed: bool = False
+    """The connection failed while the body was read, so `body` holds none of it."""
+
+    def plain_text(self) -> bool:
+        """Whether the body arrived whole and is neither JSON nor an event stream.
+
+        Only such a body is known to carry no JSON-RPC error without being parsed; one
+        cut off, lost, or shaped as JSON or SSE that `json_object` could not read may.
+        """
+        if self.read_failed or len(self.body) > MAX_RESPONSE_BYTES:
+            return False
+        text = self.body.decode("utf-8", errors="replace").lstrip()
+        return not text.startswith(("{", "[", *_SSE_STARTS))
 
     def header(self, name: str) -> str | None:
         """Read one header case-insensitively, or None when it is absent."""
@@ -503,15 +516,7 @@ def _send(  # noqa: PLR0913 — the `Sender` keywords and the peer recorder
                 body=response.read(MAX_RESPONSE_BYTES + 1),
             )
     except HTTPError as error:
-        # An error status is an answer. Reading the body may fail on a server that
-        # sent headers and hung up; an empty body still leaves the status usable.
-        try:
-            payload = error.read(MAX_RESPONSE_BYTES + 1)
-        except OSError:  # pragma: no cover — depends on the peer hanging up mid-body
-            payload = b""
-        finally:
-            close_http_error(error)
-        return RawReply(status=error.code, headers=dict(error.headers.items()), body=payload)
+        return _error_reply(error)
     except (URLError, OSError) as exc:
         raise McpError(f"could not reach {display_url(url)}: {exc}") from exc
     except (InvalidURL, ValueError) as exc:
@@ -523,6 +528,19 @@ def _send(  # noqa: PLR0913 — the `Sender` keywords and the peer recorder
         raise McpError(
             f"{display_url(url)} sent a reply that could not be read ({type(exc).__name__})"
         ) from exc
+
+
+def _error_reply(error: HTTPError) -> RawReply:
+    """Keep an error status as the answer it is, marking a body the connection lost."""
+    headers = dict(error.headers.items())
+    try:
+        body = error.read(MAX_RESPONSE_BYTES + 1)
+    except OSError:
+        # The status still answers; the flag keeps a lost body from reading as an empty one.
+        return RawReply(status=error.code, headers=headers, body=b"", read_failed=True)
+    finally:
+        close_http_error(error)
+    return RawReply(status=error.code, headers=headers, body=body)
 
 
 class _Route:
