@@ -1133,11 +1133,7 @@ def _task_listing(reply: RawReply) -> Tasks:
     error = error_member(payload)
     if error is not None and error.get("code") == _METHOD_NOT_FOUND:
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
-    if (
-        error is None
-        and reply.status == _BAD_REQUEST
-        and (payload is not None or reply.plain_text())
-    ):
+    if reply.status == _BAD_REQUEST and _no_json_rpc_error(reply, payload):
         # How a server that rejects every method it lacks says so, as the revision
         # probe reads the same answer to a handshake it does not implement.
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
@@ -1169,6 +1165,15 @@ def _task_listing(reply: RawReply) -> Tasks:
     if error is not None:
         detail = f"{detail} carrying JSON-RPC error {error.get('code')}"
     return Tasks(answer=TaskAnswer.OTHER, status=reply.status, detail=detail)
+
+
+def _no_json_rpc_error(reply: RawReply, payload: Mapping[str, object] | None) -> bool:
+    """Whether a reply read whole is known to hold no JSON-RPC error.
+
+    An `error` member of any shape counts as one, since a malformed member is still a
+    server saying something failed.
+    """
+    return "error" not in payload if payload is not None else reply.plain_text()
 
 
 def _offer_in(

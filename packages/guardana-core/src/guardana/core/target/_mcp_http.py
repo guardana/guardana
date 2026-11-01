@@ -59,6 +59,7 @@ TIMEOUT_SECONDS = 30
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 _SSE_STARTS = ("event:", "data:", "id:", "retry:", ":")
+_EVENT_STREAM = "text/event-stream"
 _SSE_LINE_END = re.compile(r"\r\n|\r|\n")
 
 _SAFE_SCHEMES = frozenset({"http", "https"})
@@ -98,17 +99,22 @@ class RawReply:
     headers: Mapping[str, str]
     body: bytes
     read_failed: bool = False
-    """The connection failed while the body was read, so `body` holds none of it."""
+    """The body was lost or cut short while it was read, so `body` holds none of it."""
 
     def plain_text(self) -> bool:
         """Whether the body arrived whole and is neither JSON nor an event stream.
 
         Only such a body is known to carry no JSON-RPC error without being parsed; one
-        cut off, lost, or shaped as JSON or SSE that `json_object` could not read may.
+        cut off, lost, declared an event stream, or shaped as JSON or SSE that
+        `json_object` could not read may.
         """
         if self.read_failed or len(self.body) > MAX_RESPONSE_BYTES:
             return False
-        text = self.body.decode("utf-8", errors="replace").lstrip()
+        media = (self.header("Content-Type") or "").partition(";")[0].strip().lower()
+        if media == _EVENT_STREAM:
+            # An event stream may open with any field, so its first line proves nothing.
+            return False
+        text = self.body.decode("utf-8-sig", errors="replace").lstrip()
         return not text.startswith(("{", "[", *_SSE_STARTS))
 
     def header(self, name: str) -> str | None:
@@ -531,16 +537,33 @@ def _send(  # noqa: PLR0913 — the `Sender` keywords and the peer recorder
 
 
 def _error_reply(error: HTTPError) -> RawReply:
-    """Keep an error status as the answer it is, marking a body the connection lost."""
+    """Keep an error status as the answer it is, marking a body the connection lost or cut."""
     headers = dict(error.headers.items())
+    body: bytes | None
     try:
         body = error.read(MAX_RESPONSE_BYTES + 1)
-    except OSError:
-        # The status still answers; the flag keeps a lost body from reading as an empty one.
-        return RawReply(status=error.code, headers=headers, body=b"", read_failed=True)
+    except (OSError, HTTPException):
+        body = None
     finally:
         close_http_error(error)
+    if body is None or _cut_short(body, error.headers.get("Content-Length")):
+        # The status still answers; the flag keeps a lost body from reading as an empty one.
+        return RawReply(status=error.code, headers=headers, body=b"", read_failed=True)
     return RawReply(status=error.code, headers=headers, body=body)
+
+
+def _cut_short(body: bytes, declared: str | None) -> bool:
+    """Whether a body ended before its declared length, short of the response ceiling.
+
+    A bounded read returns what arrived when the connection closes early, without raising.
+    """
+    if declared is None:
+        return False
+    try:
+        length = int(declared)
+    except ValueError:
+        return False
+    return len(body) < min(length, MAX_RESPONSE_BYTES + 1)
 
 
 class _Route:

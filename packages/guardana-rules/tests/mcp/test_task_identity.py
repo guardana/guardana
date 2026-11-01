@@ -359,6 +359,11 @@ _EVENT = b"event: message\ndata: " + _INVALID_REQUEST + b"\n\n"
         RawReply(400, {}, _EVENT + _EVENT),
         RawReply(400, {}, _INVALID_REQUEST[:-9]),
         RawReply(400, {}, b"", read_failed=True),
+        RawReply(400, {}, b'{"jsonrpc": "2.0", "id": 1, "error": null}'),
+        RawReply(400, {}, _INVALID_REQUEST.replace(b"-32600", b'"-32600"')),
+        RawReply(400, {"Content-Type": "text/event-stream"}, b"x: metadata\n" + _EVENT),
+        RawReply(400, {"content-type": "Text/Event-Stream; charset=utf-8"}, b""),
+        RawReply(400, {}, b"\xef\xbb\xbf" + _INVALID_REQUEST[:-9]),
     ],
     ids=[
         "past-the-ceiling",
@@ -367,6 +372,11 @@ _EVENT = b"event: message\ndata: " + _INVALID_REQUEST + b"\n\n"
         "two-responses",
         "cut-json",
         "body-lost",
+        "error-member-null",
+        "error-code-a-string",
+        "declared-event-stream-opening-with-another-field",
+        "declared-event-stream-empty",
+        "json-after-a-byte-order-mark",
     ],
 )
 def test_a_400_not_read_whole_or_not_parsed_is_inconclusive_not_an_unknown_method(
