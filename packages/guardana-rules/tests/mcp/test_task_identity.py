@@ -11,7 +11,7 @@ from guardana.core.rule.fixture import FixtureOutcome
 from guardana.core.rule.verify import FixtureVerdict, verify_rule
 from guardana.core.severity import Severity
 from guardana.core.target import McpServerTarget, TaskAnswer, TaskOffer
-from guardana.core.target._mcp_http import RawReply
+from guardana.core.target._mcp_http import MAX_RESPONSE_BYTES, RawReply
 from guardana.core.testing import ScriptedMcpServer
 from guardana.rules.mcp import McpTaskIdentityRule
 from mcp_fixtures import CREDENTIAL, ROUTABLE, TOOLS, findings, guarded, outcomes, summaries
@@ -336,6 +336,17 @@ def test_any_other_refusal_of_the_listing_stays_inconclusive(status: int, body: 
 
     assert outcomes(reported) == ["inconclusive"]
     assert f"HTTP {status}" in summaries(reported)[0]
+
+
+def test_a_400_too_long_to_read_whole_is_inconclusive_not_an_unknown_method() -> None:
+    oversized = _INVALID_REQUEST + b" " * MAX_RESPONSE_BYTES
+    target = _listing_answered(_open(), RawReply(400, {}, oversized))
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert target.authorization().tasks.answer is TaskAnswer.OTHER
+    assert outcomes(reported) == ["inconclusive"]
+    assert "HTTP 400" in summaries(reported)[0]
 
 
 def test_a_plain_400_to_a_declared_listing_is_inconclusive() -> None:
