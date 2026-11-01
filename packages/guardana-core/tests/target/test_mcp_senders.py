@@ -5,9 +5,13 @@ server chose, silently. With two seams a supplied sender is never handed discove
 supplying one without the other is refused before anything is sent.
 """
 
+import io
 import socket
 import threading
 from collections.abc import Mapping
+from email.message import Message
+from http.client import IncompleteRead
+from urllib.error import HTTPError
 
 import pytest
 from _offline import refuse_name_lookups
@@ -19,7 +23,12 @@ from guardana.core.target import (
     Sender,
     send,
 )
-from guardana.core.target._mcp_http import HttpSender, RawReply
+from guardana.core.target._mcp_http import (
+    MAX_RESPONSE_BYTES,
+    HttpSender,
+    RawReply,
+    _error_reply,
+)
 from guardana.core.testing import ScriptedMcpServer
 
 pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
@@ -141,3 +150,88 @@ def test_the_built_in_sender_reports_a_reply_it_cannot_parse_as_no_answer() -> N
         ):
             send(f"http://127.0.0.1:{port}/mcp", method="POST", body=b"{}")
         serving.join(timeout=5)
+
+
+class _HungUp:
+    """A reply body whose connection drops on the first read."""
+
+    def read(self, *_: object) -> bytes:
+        raise ConnectionResetError
+
+    def close(self) -> None:
+        """Nothing to release."""
+
+
+def test_an_error_status_whose_body_was_lost_is_kept_and_marked_unread() -> None:
+    error = HTTPError("http://127.0.0.1/mcp", 400, "Bad Request", Message(), _HungUp())  # type: ignore[arg-type]
+
+    reply = _error_reply(error)
+
+    assert reply.status == 400
+    assert reply.read_failed
+    assert not reply.plain_text()
+
+
+class _CutMidChunk:
+    """A chunked reply body whose connection closes inside a chunk."""
+
+    def read(self, *_: object) -> bytes:
+        raise IncompleteRead(b"no")
+
+    def close(self) -> None:
+        """Nothing to release."""
+
+
+def test_an_error_status_whose_chunked_body_was_cut_is_marked_unread() -> None:
+    error = HTTPError("http://127.0.0.1/mcp", 400, "Bad Request", Message(), _CutMidChunk())  # type: ignore[arg-type]
+
+    reply = _error_reply(error)
+
+    assert reply.status == 400
+    assert reply.read_failed
+    assert not reply.plain_text()
+
+
+def _headers(**fields: str) -> Message:
+    message = Message()
+    for name, value in fields.items():
+        message[name.replace("_", "-")] = value
+    return message
+
+
+def test_an_error_status_closed_before_its_declared_length_is_marked_unread() -> None:
+    headers = _headers(Content_Length="64")
+    error = HTTPError("http://127.0.0.1/mcp", 400, "Bad Request", headers, io.BytesIO(b"no"))
+
+    reply = _error_reply(error)
+
+    assert reply.body == b""
+    assert reply.read_failed
+    assert not reply.plain_text()
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [_headers(), _headers(Content_Length="2"), _headers(Content_Length="not a number")],
+    ids=["no-length", "its-length", "unreadable-length"],
+)
+def test_an_error_status_read_in_full_is_plain_text_when_it_is(headers: Message) -> None:
+    error = HTTPError("http://127.0.0.1/mcp", 400, "Bad Request", headers, io.BytesIO(b"no"))
+
+    reply = _error_reply(error)
+
+    assert reply.body == b"no"
+    assert not reply.read_failed
+    assert reply.plain_text()
+
+
+def test_a_body_past_the_ceiling_is_kept_to_the_ceiling_and_not_marked_unread() -> None:
+    headers = _headers(Content_Length=str(MAX_RESPONSE_BYTES * 2))
+    body = io.BytesIO(b"x" * (MAX_RESPONSE_BYTES * 2))
+    error = HTTPError("http://127.0.0.1/mcp", 400, "Bad Request", headers, body)
+
+    reply = _error_reply(error)
+
+    assert len(reply.body) == MAX_RESPONSE_BYTES + 1
+    assert not reply.read_failed
+    assert not reply.plain_text()

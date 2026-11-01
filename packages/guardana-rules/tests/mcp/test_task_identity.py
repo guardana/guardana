@@ -11,7 +11,7 @@ from guardana.core.rule.fixture import FixtureOutcome
 from guardana.core.rule.verify import FixtureVerdict, verify_rule
 from guardana.core.severity import Severity
 from guardana.core.target import McpServerTarget, TaskAnswer, TaskOffer
-from guardana.core.target._mcp_http import RawReply
+from guardana.core.target._mcp_http import MAX_RESPONSE_BYTES, RawReply
 from guardana.core.testing import ScriptedMcpServer
 from guardana.rules.mcp import McpTaskIdentityRule
 from mcp_fixtures import CREDENTIAL, ROUTABLE, TOOLS, findings, guarded, outcomes, summaries
@@ -295,6 +295,110 @@ def test_a_server_declaring_no_tasks_and_not_knowing_the_method_does_not_offer_t
         findings(RULE, _open())
 
     assert raised.value.missing == ("tasks",)
+
+
+def _listing_answered(server: ScriptedMcpServer, reply: RawReply) -> McpServerTarget:
+    """A target whose every `tasks/list` gets `reply`; everything else is `server`'s."""
+
+    def answer(url: str, **kwargs: object) -> RawReply:
+        body = kwargs.get("body")
+        if isinstance(body, bytes) and json.loads(body).get("method") == "tasks/list":
+            return reply
+        return server(url, **kwargs)  # type: ignore[arg-type]
+
+    return McpServerTarget(server.url, sender=answer, discovery_sender=server)
+
+
+def test_a_plain_400_to_the_listing_from_a_server_declaring_no_tasks_does_not_offer_them() -> None:
+    target = _listing_answered(_open(), RawReply(400, {}, b"Bad Request: unknown method"))
+
+    with pytest.raises(NotOffered) as raised:
+        list(RULE.run(target, RuleContext()))
+
+    assert raised.value.missing == ("tasks",)
+    assert target.authorization().tasks.answer is TaskAnswer.UNKNOWN_METHOD
+
+
+_INVALID_REQUEST = json.dumps(
+    {"jsonrpc": "2.0", "id": 1, "error": {"code": -32600, "message": "Invalid Request"}}
+).encode()
+
+
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [(400, _INVALID_REQUEST), (404, b"Not Found"), (405, b""), (500, b"oops")],
+    ids=["400-other-json-rpc-error", "404", "405", "500"],
+)
+def test_any_other_refusal_of_the_listing_stays_inconclusive(status: int, body: bytes) -> None:
+    target = _listing_answered(_open(), RawReply(status, {}, body))
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status}" in summaries(reported)[0]
+
+
+def test_a_400_whose_body_is_a_json_object_without_an_error_does_not_offer_tasks() -> None:
+    target = _listing_answered(_open(), RawReply(400, {}, b'{"detail": "Bad Request"}'))
+
+    with pytest.raises(NotOffered):
+        list(RULE.run(target, RuleContext()))
+
+    assert target.authorization().tasks.answer is TaskAnswer.UNKNOWN_METHOD
+
+
+_EVENT = b"event: message\ndata: " + _INVALID_REQUEST + b"\n\n"
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        RawReply(400, {}, _INVALID_REQUEST + b" " * MAX_RESPONSE_BYTES),
+        RawReply(400, {}, b" " * (MAX_RESPONSE_BYTES + 1)),
+        RawReply(400, {}, _EVENT.removesuffix(b"\n")),
+        RawReply(400, {}, _EVENT + _EVENT),
+        RawReply(400, {}, _INVALID_REQUEST[:-9]),
+        RawReply(400, {}, b"", read_failed=True),
+        RawReply(400, {}, b'{"jsonrpc": "2.0", "id": 1, "error": null}'),
+        RawReply(400, {}, _INVALID_REQUEST.replace(b"-32600", b'"-32600"')),
+        RawReply(400, {"Content-Type": "text/event-stream"}, b"x: metadata\n" + _EVENT),
+        RawReply(400, {"content-type": "Text/Event-Stream; charset=utf-8"}, b""),
+        RawReply(400, {}, b"\xef\xbb\xbf" + _INVALID_REQUEST[:-9]),
+    ],
+    ids=[
+        "past-the-ceiling",
+        "cut-at-the-ceiling-before-the-json",
+        "unterminated-event",
+        "two-responses",
+        "cut-json",
+        "body-lost",
+        "error-member-null",
+        "error-code-a-string",
+        "declared-event-stream-opening-with-another-field",
+        "declared-event-stream-empty",
+        "json-after-a-byte-order-mark",
+    ],
+)
+def test_a_400_not_read_whole_or_not_parsed_is_inconclusive_not_an_unknown_method(
+    reply: RawReply,
+) -> None:
+    target = _listing_answered(_open(), reply)
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert target.authorization().tasks.answer is TaskAnswer.OTHER
+    assert outcomes(reported) == ["inconclusive"]
+    assert "HTTP 400" in summaries(reported)[0]
+
+
+def test_a_plain_400_to_a_declared_listing_is_inconclusive() -> None:
+    server = _open(task_declaration="listing")
+    target = _listing_answered(server, RawReply(400, {}, b"Bad Request"))
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "declares tasks.list" in summaries(reported)[0]
 
 
 class _RefusesDiscoveryToAnyone(ScriptedMcpServer):
