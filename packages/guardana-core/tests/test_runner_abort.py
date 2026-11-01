@@ -139,3 +139,4 @@ def test_ctrl_c_ends_the_process_without_waiting_for_in_flight_rules() -> None:
     assert elapsed < _EXIT_BUDGET_SECONDS, (
         f"process took {elapsed:.2f}s to exit after Ctrl-C — it is waiting for in-flight rules"
     )
+    assert child.returncode != 0, "Ctrl-C must stop the run, not let it end as if it finished"
