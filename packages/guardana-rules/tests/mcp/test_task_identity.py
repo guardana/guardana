@@ -297,6 +297,57 @@ def test_a_server_declaring_no_tasks_and_not_knowing_the_method_does_not_offer_t
     assert raised.value.missing == ("tasks",)
 
 
+def _listing_answered(server: ScriptedMcpServer, reply: RawReply) -> McpServerTarget:
+    """A target whose every `tasks/list` gets `reply`; everything else is `server`'s."""
+
+    def answer(url: str, **kwargs: object) -> RawReply:
+        body = kwargs.get("body")
+        if isinstance(body, bytes) and json.loads(body).get("method") == "tasks/list":
+            return reply
+        return server(url, **kwargs)  # type: ignore[arg-type]
+
+    return McpServerTarget(server.url, sender=answer, discovery_sender=server)
+
+
+def test_a_plain_400_to_the_listing_from_a_server_declaring_no_tasks_does_not_offer_them() -> None:
+    target = _listing_answered(_open(), RawReply(400, {}, b"Bad Request: unknown method"))
+
+    with pytest.raises(NotOffered) as raised:
+        list(RULE.run(target, RuleContext()))
+
+    assert raised.value.missing == ("tasks",)
+    assert target.authorization().tasks.answer is TaskAnswer.UNKNOWN_METHOD
+
+
+_INVALID_REQUEST = json.dumps(
+    {"jsonrpc": "2.0", "id": 1, "error": {"code": -32600, "message": "Invalid Request"}}
+).encode()
+
+
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [(400, _INVALID_REQUEST), (404, b"Not Found"), (405, b""), (500, b"oops")],
+    ids=["400-other-json-rpc-error", "404", "405", "500"],
+)
+def test_any_other_refusal_of_the_listing_stays_inconclusive(status: int, body: bytes) -> None:
+    target = _listing_answered(_open(), RawReply(status, {}, body))
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status}" in summaries(reported)[0]
+
+
+def test_a_plain_400_to_a_declared_listing_is_inconclusive() -> None:
+    server = _open(task_declaration="listing")
+    target = _listing_answered(server, RawReply(400, {}, b"Bad Request"))
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "declares tasks.list" in summaries(reported)[0]
+
+
 class _RefusesDiscoveryToAnyone(ScriptedMcpServer):
     """A modern server whose `server/discover` answers `401`, so its declarations go unread."""
 

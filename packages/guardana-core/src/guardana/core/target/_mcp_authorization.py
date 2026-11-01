@@ -66,6 +66,7 @@ _CLIENT = {"name": "guardana", "version": "0"}
 _CHALLENGE_PARAM = re.compile(r'(?<!\w)(\w++)\s*+=\s*+"([^"]*+)"')
 _SESSION_SAMPLES = 3
 _HTTP_ERROR = 400
+_BAD_REQUEST = 400
 _ABSENT = frozenset({404, 410})
 """The statuses that say a metadata document does not exist; any other error leaves it unread."""
 _NOT_OPENABLE = "the address is not a URL a client may open"
@@ -118,7 +119,7 @@ class TaskAnswer(StrEnum):
     REFUSED = "refused"
     """HTTP `401` or `403`."""
     UNKNOWN_METHOD = "unknown_method"
-    """JSON-RPC `-32601`, whatever the status."""
+    """JSON-RPC `-32601` whatever the status, or HTTP `400` carrying no JSON-RPC error."""
     OTHER = "other"
     """Anything else; `Tasks.detail` names the status."""
 
@@ -1131,6 +1132,10 @@ def _task_listing(reply: RawReply) -> Tasks:
     payload = reply.json_object()
     error = error_member(payload)
     if error is not None and error.get("code") == _METHOD_NOT_FOUND:
+        return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
+    if error is None and reply.status == _BAD_REQUEST:
+        # How a server that rejects every method it lacks says so, as the revision
+        # probe reads the same answer to a handshake it does not implement.
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
     if reply.status in REFUSAL_STATUSES:
         return Tasks(answer=TaskAnswer.REFUSED, status=reply.status)
