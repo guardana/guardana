@@ -22,10 +22,14 @@ class ScalarSafeLoader(yaml.SafeLoader):
         return value
 
 
-def load_yaml(text: str) -> object:
-    """Read one safe YAML document, raising YAML errors for malformed scalars."""
-    loader = ScalarSafeLoader(text)
+def load_yaml(text: str, loader_class: type[ScalarSafeLoader] = ScalarSafeLoader) -> object:
+    """Read one safe YAML document, raising YAML errors for malformed scalars and deep nesting."""
+    loader = loader_class(text)
     try:
         return loader.get_single_data()
+    except RecursionError as exc:
+        # PyYAML composes and constructs recursively, so nesting depth is bounded by the
+        # interpreter's stack rather than by the reader; callers already refuse YAMLError.
+        raise yaml.YAMLError("the document nests deeper than a YAML reader can follow") from exc
     finally:
         loader.dispose()

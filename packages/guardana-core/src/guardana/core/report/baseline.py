@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.report.result import ScanResult
 
 if TYPE_CHECKING:  # imported lazily below; the report package is downstream of redaction
@@ -137,10 +138,10 @@ def read_baseline(path: Path) -> Baseline:
     strict rather than lenient.
     """
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = load_yaml(path.read_text(encoding="utf-8"))
     except OSError as exc:
         raise BaselineError(f"cannot read baseline {path}: {exc}") from exc
-    except yaml.YAMLError as exc:
+    except (UnicodeDecodeError, yaml.YAMLError) as exc:
         raise BaselineError(f"invalid baseline {path}: {exc}") from exc
     if raw is None:
         return Baseline(version=BASELINE_VERSION)

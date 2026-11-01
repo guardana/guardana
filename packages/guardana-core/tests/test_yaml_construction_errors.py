@@ -4,13 +4,17 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from _yaml_input_cases import UNBUILDABLE_BLOCK_SCALARS, UNBUILDABLE_SCALARS
+from _yaml_input_cases import DEEPLY_NESTED, UNBUILDABLE_BLOCK_SCALARS, UNBUILDABLE_SCALARS
 from guardana.core.contract import ContractError, load_contract
 from guardana.core.fixtures import FixturesError, load_fixtures
 from guardana.core.pack import PackError, load_manifest
+from guardana.core.promotion import PromotionRefusedError, open_suite
 from guardana.core.recipe import RecipeError, load_recipe
+from guardana.core.report.baseline import BaselineError, read_baseline
 from guardana.core.rule import RuleLoadError, load_yaml_rules
 from guardana.core.target.connection import ConnectionConfigError, load_adapter
+from guardana.core.taxonomy import TaxonomyError
+from guardana.core.taxonomy._catalog import load_catalog
 
 
 def _load_adapter(path: Path) -> object:
@@ -41,6 +45,18 @@ _READERS = [
     pytest.param(
         (_load_adapter, ConnectionConfigError, "invalid adapter"),
         id="adapter",
+    ),
+    pytest.param(
+        (read_baseline, BaselineError, "invalid baseline"),
+        id="baseline",
+    ),
+    pytest.param(
+        (open_suite, PromotionRefusedError, "{path} could not be read as YAML"),
+        id="suite",
+    ),
+    pytest.param(
+        (load_catalog, TaxonomyError, "cannot read taxonomy catalogue"),
+        id="taxonomy",
     ),
 ]
 
@@ -117,3 +133,20 @@ def test_yaml_syntax_and_unhashable_keys_keep_the_documented_error(
     message = str(caught.value)
     assert message.startswith(prefix.format(path=path))
     assert str(path) in message
+
+
+@pytest.mark.parametrize("reader", _READERS)
+def test_a_document_nested_past_the_stack_keeps_the_documented_error(
+    tmp_path: Path,
+    reader: tuple[Callable[[Path], object], type[Exception], str],
+) -> None:
+    load, error, prefix = reader
+    path = tmp_path / "input.yaml"
+    path.write_text(DEEPLY_NESTED, encoding="utf-8")
+
+    with pytest.raises(error) as caught:
+        load(path)
+
+    message = str(caught.value)
+    assert message.startswith(prefix.format(path=path))
+    assert "nests deeper" in message

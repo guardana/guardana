@@ -88,6 +88,10 @@ def parse_trajectory(raw: dict[str, Any], path: Path) -> TrajectoryRule:
             f"invalid rule in {path}: 'expect.canary' must be a string, "
             f"got {type(expectation.canary).__name__}"
         )
+    if expectation.canary is not None and not expectation.canary.strip():
+        # Blank text occurs everywhere, so swapping it for the planted token would
+        # scatter the token through every description the model is handed.
+        raise RuleLoadError(f"invalid rule in {path}: 'expect.canary' must not be blank")
     # The rule, not the evaluator, reads the delivery fields; `TrajectoryRule` checks them.
     check_evaluator_expectations(
         meta,

@@ -284,7 +284,8 @@ refused at load when `delivered_by` names a tool that is not declared or a `memo
 `memory: read` tool without a `payload_marker` or with one that also appears in the
 `task` or `then` text, when the marker appears in no fixed `returns:` text, or when
 the marker overlaps the canary (the canary is replaced on every run). Name text that
-only the payload carries, such as the attacker's address.
+only the payload carries, such as the attacker's address. An agent-run rule is also
+refused at load when `expect.canary` is not a string or is blank.
 
 A run that hits a bound — steps, per-step tool calls, byte budget, or the 120 s
 deadline — is `inconclusive` if its evaluator grades it as a pass; an established

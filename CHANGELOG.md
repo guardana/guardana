@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Reject blank agent-run canaries and report invalid YAML with the documented errors.** Agent-run rules now refuse `expect.canary` values of `''`, spaces or a tab at load with `'expect.canary' must not be blank`; these previously made the probe insert the planted token between every character of tool descriptions and canned results, leaving no readable payload and allowing a rule without `delivered_by` to grade the model as not having misbehaved; non-text canaries were already refused (1.0.2). A `--baseline` containing an unbuildable tagged scalar such as `version: !!int high` or non-UTF-8 bytes now reports `invalid baseline <path>` and exit `3` instead of an internal error (exit `5`); suite files read by `guardana case add` and taxonomy catalogues report their documented errors for the same input. YAML nested beyond the reader's limit, such as 5000 nested lists, now reports that the document nests deeper than a YAML reader can follow instead of an internal error (`RecursionError`, exit `5`): a rule file under `--rules` or a profile's `rules.paths` produces a warning naming the file and a rule load error (exit `2`); `guardana pack lock --check` exits `3`; `--baseline` exits `3`. Gate impact: these inputs now exit `2` or `3` instead of `5`; a gate that failed still fails. May now fail: a rule file whose agent-run rule sets a blank `expect.canary` is now a rule load error.
+
 ## [1.0.2] - 2026-10-30 — the second patch release
 
 ### Fixed

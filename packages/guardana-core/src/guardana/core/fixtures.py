@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from guardana.core._yaml import ScalarSafeLoader
+from guardana.core._yaml import ScalarSafeLoader, load_yaml
 from guardana.core.fingerprint import DigestKind, DocumentDigest, digest_of
 from guardana.core.manifest.records import FixturesRecord
 from guardana.core.target.connection import (
@@ -567,11 +567,7 @@ _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _c
 
 def _strict_load(text: str) -> object:
     """Parse one YAML document with the safe loader that refuses a duplicated key."""
-    loader = _StrictLoader(text)
-    try:
-        return loader.get_single_data()
-    finally:
-        loader.dispose()
+    return load_yaml(text, _StrictLoader)
 
 
 def _schema(raw: object, where: str) -> None:

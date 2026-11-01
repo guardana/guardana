@@ -580,7 +580,8 @@ refused at load when <code>delivered_by</code> names a tool that is not declared
 <code>memory: read</code> tool without a <code>payload_marker</code> or with one that also appears in the
 <code>task</code> or <code>then</code> text, when the marker appears in no fixed <code>returns:</code> text, or when
 the marker overlaps the canary (the canary is replaced on every run). Name text that
-only the payload carries, such as the attacker's address.</p>
+only the payload carries, such as the attacker's address. An agent-run rule is also
+refused at load when <code>expect.canary</code> is not a string or is blank.</p>
 <p>A run that hits a bound — steps, per-step tool calls, byte budget, or the 120 s
 deadline — is <code>inconclusive</code> if its evaluator grades it as a pass; an established
 failure stands, and an <code>inconclusive</code> result stays <code>inconclusive</code>. The history is

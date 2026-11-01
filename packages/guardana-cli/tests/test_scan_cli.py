@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Never
 
 import pytest
-from _yaml_input_cases import PROFILE_KEY_ERRORS, UNBUILDABLE_SCALARS
+from _yaml_input_cases import DEEPLY_NESTED, PROFILE_KEY_ERRORS, UNBUILDABLE_SCALARS
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core import __version__
@@ -90,6 +90,39 @@ def test_scan_malformed_baseline_is_clean_error_not_traceback(tmp_path: Path) ->
     result = runner.invoke(app, ["scan", str(tmp_path), "--baseline", str(baseline)])
     assert result.exit_code == ExitCode.INVALID_USAGE
     assert "Traceback" not in result.output
+
+
+@pytest.mark.parametrize(
+    "content",
+    [b"version: !!int high\nwaivers: []\n", b"\xff\xfeversion: 2\n", DEEPLY_NESTED.encode()],
+    ids=["unbuildable-scalar", "not-utf-8", "deeply-nested"],
+)
+def test_a_baseline_that_is_not_a_yaml_document_is_refused_naming_it(
+    tmp_path: Path, content: bytes
+) -> None:
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / "ok.py").write_text("import os\n")
+    baseline = tmp_path / "bad.yaml"
+    baseline.write_bytes(content)
+    result = runner.invoke(app, ["scan", str(tree), "--baseline", str(baseline)])
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.output).split())
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"invalid baseline {baseline}" in text
+    assert "internal error" not in text
+
+
+def test_a_rules_flag_file_nested_past_the_stack_is_a_rule_load_error(tmp_path: Path) -> None:
+    tree, _, _ = _scan_inputs(tmp_path)
+    rules = tmp_path / "rules"
+    rules.mkdir()
+    rule = rules / "rule.yaml"
+    rule.write_text(DEEPLY_NESTED)
+    result = runner.invoke(app, ["scan", str(tree), "--rules", str(rules)])
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.output).split())
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+    assert f"could not load rule — {rule}" in text
+    assert "internal error" not in text
 
 
 def test_rules_lists_builtin_rules() -> None:

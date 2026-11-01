@@ -12,6 +12,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.dataset import (
     REGRESSION_TAG,
     Dataset,
@@ -92,7 +93,7 @@ def open_suite(path: Path) -> SuiteFile:
     """
     try:
         source = path.read_text(encoding="utf-8")
-        raw = yaml.safe_load(source)
+        raw = load_yaml(source)
     except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
         raise PromotionRefusedError(f"{path} could not be read as YAML: {exc}") from exc
     if not isinstance(raw, dict):
