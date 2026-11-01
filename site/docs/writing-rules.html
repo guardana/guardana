@@ -760,7 +760,7 @@ by the scanning interpreter surfaces in the run's <code>errors</code>, so it fai
 rather than disappearing. Bytes are decoded the way the interpreter runs them, so
 a UTF-8 byte order mark or a PEP 263 coding line is honoured. Call <code>read_source()</code>
 instead of <code>python_source()</code> if your rule wants the reason in its own hands — it
-returns <code>PythonSource | UnreadSource</code>. <code>read_source()</code> is outside <a href="compatibility.html#the-supported-surface">the supported surface</a>; a pack that imports it pins <code>guardana-core</code>.</p>
+returns <code>PythonSource | UnreadSource</code>. <code>read_source()</code> is part of <a href="compatibility.html#the-supported-surface">the supported surface</a>.</p>
 <p><strong>Worth copying as a pattern:</strong> the AST-based supply-chain rules are written to
 be read. Each is one short file that pulls its nodes off the shared index,
 yields <code>(line, why)</code> tuples from a small module-level <code>_sinks</code> helper, and

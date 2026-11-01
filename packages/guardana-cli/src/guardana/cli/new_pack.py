@@ -75,7 +75,7 @@ class _Names:
 
 
 def _core_range(version: str) -> tuple[str, str]:
-    """Return the `guardana-core` this pack is made with and the next minor it stops before.
+    """Return the `guardana-core` this pack is made with and the next major it stops before.
 
     The local label is dropped: a requirement may not name one.
     """
@@ -83,7 +83,7 @@ def _core_range(version: str) -> tuple[str, str]:
     release = re.match(r"(\d+)\.(\d+)", public)
     if release is None:
         raise ValueError(f"guardana-core reports a version that is not PEP 440: {version!r}")
-    return public, f"{release[1]}.{int(release[2]) + 1}"
+    return public, str(int(release[1]) + 1)
 
 
 def _refuse(message: str) -> typer.Exit:

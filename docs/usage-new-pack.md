@@ -47,7 +47,7 @@ you ever see is about your own change.
 
 | path | what it is |
 |---|---|
-| `pyproject.toml` | the four entry-point groups Guardana discovers, and `guardana-core` as the only dependency, pinned from the version that wrote the pack up to, but excluding, the next minor because the generated target uses `read_source` outside the supported surface |
+| `pyproject.toml` | the four entry-point groups Guardana discovers, and `guardana-core` as the only dependency, pinned from the version that wrote the pack up to, but excluding, the next major because everything the generated pack imports is in the supported surface |
 | `src/acme_rules/guardana-pack.yaml` | the manifest: what the pack promises, checked against what it registers |
 | `src/acme_rules/catalog/` | one YAML file per rule, each with its finding, clean and inconclusive samples |
 | `src/acme_rules/target.py` | a target, reachable as `--target acme-rules://some/directory` |

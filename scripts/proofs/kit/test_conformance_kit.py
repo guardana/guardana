@@ -64,8 +64,10 @@ WHOLE = (
     "guardana.core.testing",
 )
 LISTED = {
-    "guardana.core.target": {"WireProtocol"},
-    "guardana.core.source": {"PythonSource", "UnreadSource"},
+    "guardana.core.plugins": {"PluginMode", "PluginTrust"},
+    "guardana.core.profile": {"load_profile"},
+    "guardana.core.target": {"WireProtocol", "display_url"},
+    "guardana.core.source": {"PythonSource", "UnreadSource", "read_source"},
     "guardana.core.report.shortfall": {"CoverageShortfall", "ShortfallKind"},
     "guardana.core.rule.fixture": {
         "RuleFixture",

@@ -6623,6 +6623,27 @@
       "kind": "dataclass",
       "methods": {}
     },
+    "guardana.core.source.read_source": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.source",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "Path",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "path"
+        },
+        {
+          "annotation": "int",
+          "has_default": true,
+          "kind": "keyword_only",
+          "name": "limit"
+        }
+      ],
+      "returns": "PythonSource | UnreadSource"
+    },
     "guardana.core.target.WireProtocol": {
       "bases": [
         "StrEnum"
@@ -6646,6 +6667,21 @@
         }
       ],
       "methods": {}
+    },
+    "guardana.core.target.display_url": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.target._url",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "str",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "url"
+        }
+      ],
+      "returns": "str"
     },
     "guardana.core.target.protocols.A2aInspector": {
       "bases": [
@@ -7363,6 +7399,105 @@
         }
       ],
       "returns": "Doubles"
+    },
+    "guardana.core.plugins.PluginMode": {
+      "bases": [
+        "StrEnum"
+      ],
+      "decorators": [],
+      "defined_in": "guardana.core.plugins",
+      "fields": [],
+      "kind": "enum",
+      "members": [
+        {
+          "name": "ALL",
+          "value": "'all'"
+        },
+        {
+          "name": "BUILTINS",
+          "value": "'builtins'"
+        },
+        {
+          "name": "ALLOWLIST",
+          "value": "'allowlist'"
+        },
+        {
+          "name": "DISABLED",
+          "value": "'disabled'"
+        }
+      ],
+      "methods": {}
+    },
+    "guardana.core.plugins.PluginTrust": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.plugins",
+      "fields": [
+        {
+          "annotation": "PluginMode",
+          "has_default": false,
+          "name": "mode"
+        },
+        {
+          "annotation": "frozenset[str]",
+          "has_default": true,
+          "name": "allowed"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {
+        "allows": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "str | None",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "distribution"
+            }
+          ],
+          "returns": "bool"
+        },
+        "describe": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "str"
+        }
+      }
+    },
+    "guardana.core.profile.load_profile": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.profile.loader",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "Path",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "path"
+        }
+      ],
+      "returns": "Profile"
     },
     "guardana.core.verify.CalibrationError": {
       "bases": [

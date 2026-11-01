@@ -6,6 +6,7 @@ name it cannot describe has to stop the script rather than drop out of the docum
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -216,6 +217,21 @@ def test_the_snapshot_holds_every_surface_and_leaves_the_runner_out(
     assert "guardana.core.Runner" not in snapshot["extension"]
     assert "guardana.core.verify.Verifier" in snapshot["facade"]
     assert "guardana.testing.assert_target_conforms" in snapshot["kit"]
+
+
+def test_the_names_the_python_api_example_imports_are_all_supported(
+    snapshot: dict[str, Any],
+) -> None:
+    page = (api_surface._REPO / "docs" / "python-api.md").read_text(encoding="utf-8")
+    example = re.findall(r"```python\n(.*?)```", page, re.DOTALL)[0]
+    statements = re.findall(r"^from (guardana[\w.]*) import (.+)$", example, re.MULTILINE)
+    imported = {
+        f"{module}.{name.strip()}" for module, names in statements for name in names.split(",")
+    }
+    supported = set(snapshot["facade"]) | set(snapshot["extension"])
+
+    assert "guardana.core.verify.Verifier" in imported
+    assert imported - supported == set()
 
 
 def test_the_command_line_is_recorded_without_help_text(snapshot: dict[str, Any]) -> None:

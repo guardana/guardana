@@ -822,7 +822,7 @@ def test_a_pack_installed_at_another_version_than_pinned_is_named(tmp_path: Path
         "from guardana.core.rule.verify import verify_rule",
         "import guardana.core.trace",
         "from guardana.core import Runner",
-        "from guardana.core.plugins import PluginTrust",
+        "from guardana.core.plugins import normalize_distribution",
     ],
 )
 def test_the_kit_refuses_an_import_outside_the_supported_surface(source: str) -> None:
@@ -832,7 +832,9 @@ def test_the_kit_refuses_an_import_outside_the_supported_surface(source: str) ->
 def test_the_kit_accepts_the_names_the_surface_lists() -> None:
     source = (
         "from guardana.core.testing import files_target\n"
-        "from guardana.core.target import WireProtocol\n"
+        "from guardana.core.target import WireProtocol, display_url\n"
+        "from guardana.core.plugins import PluginTrust\n"
+        "from guardana.core.source import read_source\n"
         "from guardana.core.rule.fixture import materialise\n"
         "from guardana.testing import assert_target_conforms\n"
     )

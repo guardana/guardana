@@ -64,6 +64,10 @@ def test_the_scaffold_imports_only_the_surface_or_pins_core(scaffold: Path) -> N
     assert not outside or _BOUNDED.match(requirement), (outside, requirement)
 
 
+def test_the_scaffold_imports_nothing_outside_the_surface(scaffold: Path) -> None:
+    assert _outside_the_surface(scaffold / "src") == []
+
+
 def test_the_scaffold_rules_and_taxonomies_load_through_the_surface(scaffold: Path) -> None:
     outside = _outside_the_surface(scaffold / "src")
 

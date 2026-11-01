@@ -55,8 +55,10 @@ def supported_surface() -> Mapping[str, frozenset[str]]:
         name: _exported(importlib.import_module(name)) - {n for m, n in _INTERNAL if m == name}
         for name in _EXPORTING
     }
-    surface["guardana.core.target"] = frozenset({"WireProtocol"})
-    surface["guardana.core.source"] = frozenset({"PythonSource", "UnreadSource"})
+    surface["guardana.core.plugins"] = frozenset({"PluginMode", "PluginTrust"})
+    surface["guardana.core.profile"] = frozenset({"load_profile"})
+    surface["guardana.core.target"] = frozenset({"WireProtocol", "display_url"})
+    surface["guardana.core.source"] = frozenset({"PythonSource", "UnreadSource", "read_source"})
     surface["guardana.core.report.shortfall"] = frozenset({"CoverageShortfall", "ShortfallKind"})
     surface["guardana.core.rule.fixture"] = _defined_in(
         importlib.import_module("guardana.core.rule.fixture")
@@ -131,7 +133,7 @@ def test_every_guardana_import_in_the_pack_is_on_the_supported_surface() -> None
         "from guardana.core.runner import Runner\n",
         "from guardana.core.rule.yaml_rule import load_yaml_rules\n",
         "import guardana.core\n",
-        "def later():\n    from guardana.core.source import read_source\n",
+        "def later():\n    from guardana.core.plugins import normalize_distribution\n",
     ],
 )
 def test_an_import_off_the_surface_is_refused(source: str) -> None:

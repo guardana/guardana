@@ -31,6 +31,11 @@ SOURCE_ROOTS = tuple(sorted((_REPO / "packages").glob("*/src")))
 SURFACE_SCHEMA_VERSION = 1
 
 _FACADE = ("guardana.core.verify", "guardana.core.doubles")
+_FACADE_NAMES = {
+    "guardana.core.plugins": ("PluginMode", "PluginTrust"),
+    "guardana.core.profile": ("load_profile",),
+}
+"""What building a `Verifier` needs beyond the facade modules themselves."""
 _EXTENSION = ("guardana.core", "guardana.core.target.protocols")
 _EXTENSION_NAMES = {
     "guardana.core.rule.fixture": (
@@ -40,8 +45,8 @@ _EXTENSION_NAMES = {
         "RuleFixture",
         "materialise",
     ),
-    "guardana.core.target": ("WireProtocol",),
-    "guardana.core.source": ("PythonSource", "UnreadSource"),
+    "guardana.core.target": ("WireProtocol", "display_url"),
+    "guardana.core.source": ("PythonSource", "UnreadSource", "read_source"),
     "guardana.core.report.shortfall": ("CoverageShortfall", "ShortfallKind"),
 }
 _INTERNAL = frozenset({"guardana.core.Runner"})
@@ -531,13 +536,16 @@ def _cli() -> dict[str, Any]:
 def build(roots: Sequence[Path] = SOURCE_ROOTS) -> dict[str, Any]:
     """Describe the whole supported surface as one JSON-ready mapping."""
     tree = SourceTree(roots)
+    facade = _names(tree, _FACADE)
+    for module, names in _FACADE_NAMES.items():
+        facade.update({f"{module}.{name}": describe(tree, module, name) for name in names})
     extension = _names(tree, _EXTENSION)
     for module, names in _EXTENSION_NAMES.items():
         extension.update({f"{module}.{name}": describe(tree, module, name) for name in names})
     return {
         "schema_version": SURFACE_SCHEMA_VERSION,
         "generated_by": "scripts/api_surface.py from source — do not edit by hand",
-        "facade": _names(tree, _FACADE),
+        "facade": facade,
         "extension": extension,
         "outputs": _names(tree, _OUTPUTS),
         "kit": _names(tree, _KIT),

@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Add the names needed to build a `Verifier` to the supported surface.** The Python facade includes `PluginTrust` and `PluginMode` from `guardana.core.plugins` and `load_profile` from `guardana.core.profile`; the extension contract includes `read_source` from `guardana.core.source` and `display_url` from `guardana.core.target` (#213). Their signatures are recorded in `docs/generated/api-surface.json` and pinned by compatibility tests, so incompatible changes require a major release. A test checks that every name the first `docs/python-api.md` example imports is in the supported surface.
+
 ### Changed
 
 - **Skip servers that declare no tasks when `tasks/list` returns HTTP `400` without a JSON-RPC error.** `guardana.mcp.task_identity` now treats this as an unknown method and reports `not_offered` with a coverage gap instead of `inconclusive` (#212), provided the body was read whole and is plain text (including empty) or a JSON object without an `error` member; JSON-RPC `-32601` behaves as before, while a `400` carrying another JSON-RPC error or whose body could not be read whole or parsed, `404`, `405`, a `5xx`, any other answer, or a declared `tasks.list` answered `400` stays `inconclusive`. May now pass: with `fail_on_inconclusive` on and `fail_on_skipped` off, a probe of such a server that ended `indeterminate` over this check no longer does. May now fail: with `fail_on_skipped` on, the same probe now ends `indeterminate` over the coverage gap.
+- **Pin new packs up to the next major release.** `guardana new-pack` now writes `guardana-core>=<version>,<2`, from the version that wrote the pack up to the next major instead of the next minor (#213). The generated target imports only supported names now that `read_source` is part of the supported surface. Gate impact: none; packs written earlier keep their own pin.
+- **The reference pack `guardana-reference-pack` is now version `0.1.4`.** Its supported-surface test (`examples/reference_pack/tests/test_reference_surface.py`) lists the names this release adds: `PluginMode`, `PluginTrust`, `load_profile`, `read_source` and `display_url` (#213). This changes its archives, so the pack moves from `0.1.3`; each changed pack gets a new version so different archives never share a version.
 
 ### Fixed
 

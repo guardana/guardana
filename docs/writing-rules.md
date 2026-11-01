@@ -494,7 +494,7 @@ by the scanning interpreter surfaces in the run's `errors`, so it fails the gate
 rather than disappearing. Bytes are decoded the way the interpreter runs them, so
 a UTF-8 byte order mark or a PEP 263 coding line is honoured. Call `read_source()`
 instead of `python_source()` if your rule wants the reason in its own hands — it
-returns `PythonSource | UnreadSource`. `read_source()` is outside [the supported surface](compatibility.md#the-supported-surface); a pack that imports it pins `guardana-core`.
+returns `PythonSource | UnreadSource`. `read_source()` is part of [the supported surface](compatibility.md#the-supported-surface).
 
 **Worth copying as a pattern:** the AST-based supply-chain rules are written to
 be read. Each is one short file that pulls its nodes off the shared index,

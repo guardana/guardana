@@ -599,7 +599,7 @@ when a ref contains a URL, build it with <code>guardana.core.target.display_url<
 drops userinfo and the fragment and replaces a query with a digest placeholder, and
 never put a credential in it any other way. The digest keeps two targets that differ
 only by a query apart; it does not hide a short or guessable value.</p>
-<p><code>read_source</code> and <code>display_url</code> sit outside the <a href="compatibility.html#the-supported-surface">supported surface</a>, unlike <code>PythonSource</code> and <code>UnreadSource</code>: a minor release may change them, so pin <code>guardana-core</code> to a minor while your target imports them.</p>
+<p><code>read_source</code> and <code>display_url</code> are part of the <a href="compatibility.html#the-supported-surface">supported surface</a>, like <code>PythonSource</code> and <code>UnreadSource</code>.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>

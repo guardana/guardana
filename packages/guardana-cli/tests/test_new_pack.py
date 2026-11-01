@@ -218,10 +218,12 @@ def test_a_rule_citing_the_packs_own_taxonomy_loads_once_its_taxonomies_are_regi
     assert "ZH-02" in cited
 
 
-def test_the_pack_pins_the_core_minor_it_was_made_with(tmp_path: Path) -> None:
-    """The target reads sources through a name outside the surface, so a minor may move it."""
+def test_the_pack_requires_the_core_it_was_made_with_up_to_the_next_major(
+    tmp_path: Path,
+) -> None:
+    """Everything the scaffold imports is in the supported surface, which a minor keeps."""
     runner.invoke(app, ["new-pack", "acme-rules", "--dir", str(tmp_path)])
     project = tomllib.loads((tmp_path / "pyproject.toml").read_text())["project"]
-    major, minor = (int(part) for part in __version__.split(".")[:2])
+    major = int(__version__.split(".")[0])
 
-    assert project["dependencies"] == [f"guardana-core>={__version__},<{major}.{minor + 1}"]
+    assert project["dependencies"] == [f"guardana-core>={__version__},<{major + 1}"]
