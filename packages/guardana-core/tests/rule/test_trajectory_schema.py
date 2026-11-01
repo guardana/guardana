@@ -140,3 +140,10 @@ def test_an_agent_run_canary_that_is_not_text_is_refused_at_load(
     with pytest.raises(RuleLoadError, match=r"'expect\.canary' must be a string") as refused:
         _load(tmp_path, f"canary: {canary}")
     assert str(tmp_path / "rule.yaml") in str(refused.value)
+
+
+@pytest.mark.parametrize("canary", ["''", "' '", '"\\t"'], ids=["empty", "space", "tab"])
+def test_an_agent_run_canary_that_is_blank_is_refused_at_load(tmp_path: Path, canary: str) -> None:
+    with pytest.raises(RuleLoadError, match=r"'expect\.canary' must not be blank") as refused:
+        _load(tmp_path, f"canary: {canary}")
+    assert str(tmp_path / "rule.yaml") in str(refused.value)

@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from _yaml_input_cases import DEEPLY_NESTED
 from guardana.cli import pack as pack_command
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
@@ -265,8 +266,12 @@ def test_an_unreadable_lock_is_refused_rather_than_treated_as_empty(tmp_path: Pa
 
 @pytest.mark.parametrize(
     "content",
-    [b"schema_version: !!int high\npacks: []\n", b"\xff\xfeschema_version: 2\n"],
-    ids=["unbuildable-scalar", "not-utf-8"],
+    [
+        b"schema_version: !!int high\npacks: []\n",
+        b"\xff\xfeschema_version: 2\n",
+        DEEPLY_NESTED.encode(),
+    ],
+    ids=["unbuildable-scalar", "not-utf-8", "deeply-nested"],
 )
 def test_a_lock_that_is_not_a_yaml_document_is_refused_naming_it(
     tmp_path: Path, content: bytes

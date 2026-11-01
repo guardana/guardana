@@ -12,6 +12,9 @@ NON_TEXT_KEYS = [
     pytest.param('!!binary "dGVzdA=="', "b'test'", id="binary"),
 ]
 
+DEEPLY_NESTED = "name: " + "[" * 5000 + "]" * 5000 + "\n"
+"""Deeper than PyYAML's recursive composer can follow within the interpreter's stack."""
+
 UNBUILDABLE_SCALARS = [
     pytest.param("!!int not-an-integer", "not-an-integer", id="bad-int"),
     pytest.param("!!int", "!!int", id="empty-int"),

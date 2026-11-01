@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.fingerprint import digest_of
 from guardana.core.taxonomy._ref import Relation, TaxonomyError, TaxonomyRef
 
@@ -79,7 +80,7 @@ class TaxonomyCatalog:
 def load_catalog(path: Path) -> TaxonomyCatalog:
     """Read one catalogue file, refusing anything it cannot read exactly."""
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = load_yaml(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         raise TaxonomyError(f"cannot read taxonomy catalogue {path}: {exc}") from exc
     if not isinstance(raw, dict):
