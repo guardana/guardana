@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Iterator, Sequence
 
 from guardana.core.report import Finding
-from guardana.core.rule import RuleMeta
+from guardana.core.rule import NotApplicable, RuleMeta
 from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
 from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
@@ -38,15 +38,16 @@ class McpSessionBindingRule(McpAuthorizationRule):
     invented from them would be worse than none — it looks for structure: the same
     id handed to everybody, a counter, or an id short enough to enumerate.
 
-    **Silent against a server observed to offer no revision with sessions in it.**
+    **Not applicable to a server observed to offer no revision with sessions in it.**
     MCP `2026-07-28` removed protocol sessions, so a server implementing only modern
-    revisions has none to mint, none to guess and none to authenticate with: the
-    invariant holds, and silence is what this codebase says when it does. Observed,
-    not read: a server whose discovery lists only modern revisions is asked whether
-    it still answers the `2025-11-25` handshake, and a refusal that says who may ask
-    rather than which era answers, or a legacy revision guardana does not speak, is
-    inconclusive. Which revision was negotiated is recorded in `coverage.protocols`,
-    where a `diff` reads it as the reach changing rather than as the system changing.
+    revisions has none to mint, none to guess and none to authenticate with. The run
+    records the rule as skipped `not_applicable`, naming the revision, rather than as a
+    check that found nothing. Observed, not read: a server whose discovery lists only
+    modern revisions is asked whether it still answers the `2025-11-25` handshake, and
+    a refusal that says who may ask rather than which era answers, or a legacy revision
+    guardana does not speak, is inconclusive. Which revision was negotiated is recorded
+    in `coverage.protocols`, where a `diff` reads it as the reach changing rather than
+    as the system changing.
 
     A **dual-era** server is graded exactly as before, whichever era the run
     negotiated. It still hands a session to every legacy client it serves, and a
@@ -80,7 +81,7 @@ class McpSessionBindingRule(McpAuthorizationRule):
         return 9
 
     def fixtures(self) -> Iterable[RuleFixture]:
-        """Sample a session that authenticates, one that does not, and no session to open."""
+        """Sample a session that authenticates, one that does not, none to open, none issued."""
         return materialise(
             (
                 _samples.sample(
@@ -106,6 +107,17 @@ class McpSessionBindingRule(McpAuthorizationRule):
                     FixtureOutcome.INCONCLUSIVE,
                     lambda: _samples.target(_samples.gated_server(session_ids=_UNSTRUCTURED)),
                 ),
+                _samples.sample(
+                    "a gated server offering only a revision without protocol sessions",
+                    FixtureOutcome.NOT_APPLICABLE,
+                    lambda: _samples.target(
+                        _samples.gated_server(
+                            session_ids=_UNSTRUCTURED,
+                            protocol_versions=(_samples.MODERN_REVISION,),
+                        ),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
             )
         )
 
@@ -117,7 +129,10 @@ class McpSessionBindingRule(McpAuthorizationRule):
             return
         sessions = view.sessions
         if sessions.no_protocol_sessions is not None:
-            return
+            raise NotApplicable(
+                f"the server negotiated MCP {sessions.no_protocol_sessions} and offers no "
+                f"earlier revision with protocol sessions, so it issues no session id"
+            )
         if sessions.unsettled_offer is not None:
             yield self.unverified(
                 view,

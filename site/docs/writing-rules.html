@@ -732,6 +732,16 @@ anything. The run records it as skipped <code>not_offered</code>, a coverage gap
 <code>not_offered</code>. Inconclusive means &quot;I asked and could not tell&quot;; <code>NotOffered</code> means &quot;this
 target has none of what I examine&quot;. Raised after the rule yielded a finding or recorded a
 measurement, it is an error of the rule.</p>
+<p><strong>Say when the target holds nothing of the kind you grade.</strong> A rule that finds, while it
+runs, that the target holds nothing of the kind it grades — an MCP revision without the
+field it reads, a server that issues no sessions — raises <code>NotApplicable(detail)</code> from
+<code>guardana.core.rule</code> before it yields anything. The run records it as skipped
+<code>not_applicable</code>, as for a rule whose <code>not_applicable_to</code> returns a reason: not a coverage
+gap, so <code>fail_on_skipped</code> and <code>--preset release</code> do not refuse it; <code>rule test</code> reports the
+sample as <code>not_applicable</code>, never <code>clean</code>. <code>NotOffered</code> means the target lacks what the
+check needs and somebody may want that coverage; <code>NotApplicable</code> means there is nothing
+of that kind on this target to grade. Raised after the rule reported, it is an error of
+the rule.</p>
 <p><strong>Price and skip against the target.</strong> A rule whose request count depends on what the
 target holds overrides <code>estimated_requests_for(target)</code>, which <code>plan</code> reads; it defaults to
 <code>estimated_requests</code>. A rule with nothing to check on a target returns the reason, a

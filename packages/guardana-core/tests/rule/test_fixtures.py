@@ -21,6 +21,7 @@ from guardana.core.report import Evidence, Finding
 from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
 from guardana.core.rule import (
     FixtureOutcome,
+    NotApplicable,
     NotOffered,
     Rule,
     RuleContext,
@@ -387,6 +388,66 @@ def test_not_offered_after_a_finding_errors_the_sample() -> None:
 
     assert result.verdict is FixtureVerdict.ERRORED
     assert result.detail == "raised NotOffered after reporting"
+
+
+class _NothingToGrade(_Rule):
+    """A rule that finds nothing of the kind it grades on the sample `c`."""
+
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        reply = getattr(getattr(target, "transport", None), "scripted", ("",))[0]
+        if reply == "c":
+            raise NotApplicable("the sample holds nothing this rule grades")
+        yield from super().run(target, ctx)
+
+
+def test_a_rule_that_raised_not_applicable_is_observed_as_not_applicable() -> None:
+    rule = _NothingToGrade(
+        [_finding()], [RuleFixture("nothing", _endpoint("c"), FixtureOutcome.NOT_APPLICABLE)]
+    )
+
+    (result,) = verify_rule(rule).results
+
+    assert result.observed is FixtureOutcome.NOT_APPLICABLE
+    assert result.verdict is FixtureVerdict.PASSED
+
+
+@pytest.mark.parametrize("declared", [FixtureOutcome.CLEAN, FixtureOutcome.NOT_OFFERED])
+def test_not_applicable_is_never_read_as_clean_or_as_not_offered(
+    declared: FixtureOutcome,
+) -> None:
+    rule = _NothingToGrade([_finding()], [RuleFixture("nothing", _endpoint("c"), declared)])
+
+    (result,) = verify_rule(rule).results
+
+    assert result.verdict is FixtureVerdict.FAILED
+    assert result.observed is FixtureOutcome.NOT_APPLICABLE
+
+
+def test_not_applicable_after_a_finding_errors_the_sample() -> None:
+    class _Late(_Rule):
+        def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+            yield _finding()
+            raise NotApplicable("too late")
+
+    (result,) = verify_rule(
+        _Late([], [RuleFixture("late", _endpoint("a"), FixtureOutcome.NOT_APPLICABLE)])
+    ).results
+
+    assert result.verdict is FixtureVerdict.ERRORED
+    assert result.detail == "raised NotApplicable after reporting"
+
+
+def test_a_not_applicable_sample_does_not_stand_in_for_a_demanded_outcome() -> None:
+    samples = [
+        RuleFixture("fires", _endpoint("a"), FixtureOutcome.FINDING),
+        RuleFixture("nothing", _endpoint("c"), FixtureOutcome.NOT_APPLICABLE),
+        RuleFixture("declines", _endpoint(""), FixtureOutcome.INCONCLUSIVE),
+    ]
+
+    verification = verify_rule(_NothingToGrade([_finding()], samples))
+
+    assert not verification.is_proven
+    assert "declares no clean fixture" in verification.gaps[0]
 
 
 def test_a_rule_need_not_declare_a_not_offered_sample() -> None:

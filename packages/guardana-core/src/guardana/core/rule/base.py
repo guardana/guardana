@@ -39,6 +39,26 @@ NOT_OFFERED_AFTER_REPORTING = "raised NotOffered after reporting"
 """The error a rule records when it raised `NotOffered` after reporting something."""
 
 
+class NotApplicable(Exception):  # noqa: N818 — named for what the target is
+    """Raised by a rule, before it reports anything, when the target holds nothing it grades.
+
+    The run records the rule as skipped `not_applicable`, as it does a rule whose
+    `not_applicable_to` names a reason: not a coverage gap, and not a check that ran.
+    It means "I looked, and this target holds nothing I grade", such as a protocol
+    revision that carries no field the rule reads. `NotOffered` means the target lacks
+    what the check needs; an inconclusive verdict means "I asked and could not tell".
+    Raised after the rule reported a finding or a measurement, it is an error of the rule.
+    """
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail
+
+
+NOT_APPLICABLE_AFTER_REPORTING = "raised NotApplicable after reporting"
+"""The error a rule records when it raised `NotApplicable` after reporting something."""
+
+
 @dataclass(frozen=True, slots=True)
 class RuleMeta:
     """Everything the engine knows about a rule before running it.
@@ -384,7 +404,8 @@ class Rule(ABC):
         """Check `target` and yield a finding per problem found.
 
         Yield nothing when the target is clean. Raise `NotOffered`, before yielding
-        anything, when the target does not offer what the rule examines. Raise
+        anything, when the target does not offer what the rule examines, and
+        `NotApplicable` when it holds nothing of the kind the rule grades. Raise
         `RuleError` when the rule cannot run at all — the runner records it as an
         error instead of failing the whole scan.
         """

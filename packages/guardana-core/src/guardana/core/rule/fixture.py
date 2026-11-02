@@ -53,6 +53,13 @@ class FixtureOutcome(StrEnum):
     never read as `inconclusive`.
     """
 
+    NOT_APPLICABLE = "not_applicable"
+    """The rule must raise `NotApplicable`: the sample holds nothing of the kind it grades.
+
+    Optional, like `not_offered`, and never read as `clean`: a rule that grades nothing
+    has not shown that the thing it grades is sound.
+    """
+
 
 DEMANDED_OUTCOMES = (FixtureOutcome.FINDING, FixtureOutcome.CLEAN, FixtureOutcome.INCONCLUSIVE)
 """The outcomes every rule must declare a sample of before its fixtures prove anything."""

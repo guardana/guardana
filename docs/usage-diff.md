@@ -77,7 +77,7 @@ the rule itself — which is why swapping `llama3` for `llama4` still compares.
 | `proven` | A check that could not grade now proves a problem. Not a new flaw — new evidence for an old one. |
 | `blinded` | A check that used to reach a verdict no longer can. **The finding count falls here**, which is exactly why a comparison that counted would call going blind an improvement. |
 | `escalated` | Same check, higher severity. |
-| `coverage_lost` | A rule that ran before did not run this time. Whatever it would have found is unknown, not absent. |
+| `coverage_lost` | A rule that ran before did not run this time. Whatever it would have found is unknown, not absent. A rule with no finding, unverified result, waived finding, measured case or suite conclusion in the first run that was skipped `not_applicable` in the second is not counted, and the diff names it in a note with the skip's detail. |
 | `left_scan` | The file that held a problem, or a check that could not grade, is not among the files the second run listed. Printed as `LEFT THE SCAN`. |
 
 And the other direction, reported but never failing the build: `resolved`,

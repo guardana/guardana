@@ -4,7 +4,7 @@ from contextlib import suppress
 
 import pytest
 from _offline import refuse_name_lookups
-from guardana.core.rule import NotOffered, Rule, RuleContext
+from guardana.core.rule import NotApplicable, NotOffered, Rule, RuleContext
 from guardana.core.rule.fixture import DEMANDED_OUTCOMES
 from guardana.core.rule.verify import FixtureVerdict, verify_rule
 from guardana.core.target import McpServerTarget
@@ -44,7 +44,7 @@ def test_no_sample_spends_more_than_the_rule_declares(rule: Rule) -> None:
         subject = fixture.rule or rule
         declared = subject.estimated_requests
         assert declared is not None
-        with suppress(NotOffered):
+        with suppress(NotOffered, NotApplicable):
             list(subject.run(target, RuleContext()))
         assert target.usage().requests <= declared, fixture.name
 

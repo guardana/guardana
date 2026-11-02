@@ -470,14 +470,23 @@ manifest — a coverage claim about a revision that server has never heard of.</
 <li><strong>The negotiated revision is in the run manifest</strong>, so <a href="usage-diff.html"><code>guardana diff</code></a>
 reports a server that moved between revisions as <em>the reach changed</em>, not as the
 system behaving differently.</li>
-<li><strong><code>guardana.mcp.session_binding</code> is silent on a server with no sessions.</strong> A
-conforming <code>2026-07-28</code> server mints none, so there is nothing to guess and
-nothing to authenticate with. A server that still offers an older revision
-alongside the new one is graded over that older one, because it is still handing
-sessions to every client that asks for them.</li>
-<li><strong><code>guardana.mcp.cache_scope</code> is silent on a <code>2025-11-25</code> conversation.</strong>
-<code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare nothing on the older
-revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there.</li>
+<li><strong><code>guardana.mcp.session_binding</code> does not apply on a server with no sessions
+(skipped <code>not_applicable</code>).</strong> A conforming <code>2026-07-28</code> server mints none, so there
+is nothing to guess and nothing to authenticate with. A server that still offers an
+older revision alongside the new one is graded over that older one, because it is
+still handing sessions to every client that asks for them. The skip's detail names
+the revision. <code>not_applicable</code> is not a coverage gap, so it does not fail a run while
+another selected rule reaches a conclusion; a run in which no rule reached one ends
+<code>indeterminate</code>.</li>
+<li><strong><code>guardana.mcp.cache_scope</code> does not apply on a <code>2025-11-25</code> conversation with a
+server that gates its tool listing behind a credential (skipped <code>not_applicable</code>).</strong>
+The skip's detail names the revision. When the server also lists a modern revision
+guardana does not speak, the result is inconclusive instead, naming that revision,
+because what it declares to modern clients was not read. <code>not_applicable</code> is not a
+coverage gap, so it does not fail a run while another selected rule reaches a conclusion;
+a run in which no rule reached one ends <code>indeterminate</code>. <code>cacheScope</code> and <code>ttlMs</code>
+arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even
+<code>cacheScope: &quot;public&quot;</code> produces no finding there.</li>
 <li><strong>Whether a server still offers <code>2025-11-25</code> is asked, not read.</strong> Some servers list
 only the new revision in <code>server/discover</code> and still answer <code>initialize</code>. When
 discovery lists no older revision, the checks that need it send one <code>initialize</code> over
@@ -572,7 +581,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.session_binding</code></td>
-<td>Session ids are not a counter, are not shared, and do not authenticate a request on their own</td>
+<td>Session ids are not a counter, are not shared, and do not authenticate a request on their own. On a server that negotiated <code>2026-07-28</code> and offers no earlier revision, which has no protocol sessions, the check is skipped <code>not_applicable</code>, naming the revision.</td>
 </tr>
 <tr>
 <td><code>guardana.mcp.scope_breadth</code></td>
@@ -588,7 +597,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.cache_scope</code></td>
-<td>A tool listing the server gates behind a credential is not also declared <code>cacheScope: &quot;public&quot;</code>, which would invite any shared gateway to serve it to a caller the server would have refused. The check is silent on a <code>2025-11-25</code> conversation: <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there</td>
+<td>A tool listing the server gates behind a credential is not also declared <code>cacheScope: &quot;public&quot;</code>, which would invite any shared gateway to serve it to a caller the server would have refused. On a <code>2025-11-25</code> conversation with a server that gates its tool listing behind a credential, the check is skipped <code>not_applicable</code>, naming the revision, because <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there. When the server also lists a modern revision guardana does not speak, the result is inconclusive instead, naming that revision, because what the server declares to modern clients was not read. On a server open to callers with no credential the check reports nothing.</td>
 </tr>
 <tr>
 <td><code>guardana.mcp.task_identity</code></td>

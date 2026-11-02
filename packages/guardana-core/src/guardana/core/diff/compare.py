@@ -15,7 +15,14 @@ from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.measurement import measure
 from guardana.core.diff.model import Change, ChangeKind, CheckState, Outcome, RunDiff
 from guardana.core.redaction import is_redaction_of
-from guardana.core.report import Finding, ScanResult, StopReason, split_ref
+from guardana.core.report import (
+    Finding,
+    ScanResult,
+    SkippedRule,
+    SkipReason,
+    StopReason,
+    split_ref,
+)
 
 _NO_VERDICT_CONFIDENCE = 1.0
 
@@ -193,7 +200,8 @@ def compare(
                 rule_changed=_rule_changed(rule_id, digests_before, digests_after),
             )
         )
-    changes.extend(_coverage_changes(ran_before, ran_after))
+    stopped_applying = _stopped_applying(before, after, ran_before - ran_after)
+    changes.extend(_coverage_changes(ran_before - stopped_applying.keys(), ran_after))
     measurement = measure(
         [a for a in before.assessments if a.rule_id not in excluded],
         [a for a in after.assessments if a.rule_id not in excluded],
@@ -205,6 +213,11 @@ def compare(
         unchanged=unchanged,
         notes=(
             *_notes(shared, before_context, after_context),
+            *(
+                f"{rule_id} reported nothing in the first run and did not apply in the "
+                f"second, so it is not counted as coverage lost: {skip.detail}"
+                for rule_id, skip in sorted(stopped_applying.items())
+            ),
             *measurement.notes(),
         ),
         measurement=measurement,
@@ -571,6 +584,34 @@ def _new_here(was: CheckState, now: CheckState) -> str | None:
             f"run did not report, though the count stayed {now.count}"
         )
     return None
+
+
+def _stopped_applying(
+    before: ScanResult, after: ScanResult, dropped: frozenset[str]
+) -> dict[str, SkippedRule]:
+    """Return the rules of `dropped` that reported nothing before and did not apply after.
+
+    Such a rule has nothing to grade on the second target, and the first run held no
+    problem it could hide. One that reported anything before, a measured case or a suite
+    conclusion included, stays coverage lost: what it said disappearing because the rule
+    stopped applying is not a fix.
+    """
+    reported = {
+        *(
+            finding.rule_id
+            for channel in (before.findings, before.unverified, before.waived)
+            for finding in channel
+        ),
+        *(assessment.rule_id for assessment in before.assessments),
+        *before.suites,
+    }
+    return {
+        skip.rule_id: skip
+        for skip in after.rules_skipped
+        if skip.reason is SkipReason.NOT_APPLICABLE
+        and skip.rule_id in dropped
+        and skip.rule_id not in reported
+    }
 
 
 def _coverage_changes(before: frozenset[str], after: frozenset[str]) -> list[Change]:

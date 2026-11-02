@@ -310,6 +310,10 @@ only for a rule that grades in its own code and stamps verdicts with its own id,
 <td>From <code>guardana.core.rule</code>: the rule found, while it ran, that the target does not offer what it examines. Raised before the rule yields anything, the run records it as skipped <code>not_offered</code>, a coverage gap <code>fail_on_skipped</code> refuses, and <code>rule test</code> reports the sample as <code>not_offered</code>; raised after, it is an error of the rule. See <a href="writing-rules.html">writing rules</a>.</td>
 </tr>
 <tr>
+<td><code>raise NotApplicable(detail)</code></td>
+<td>From <code>guardana.core.rule</code>: the rule found, while it ran, that the target holds nothing of the kind it grades, such as a protocol revision without the field the rule reads. Raised before the rule yields anything, the run records it as skipped <code>not_applicable</code>, as for <code>not_applicable_to</code>: not a coverage gap, so <code>fail_on_skipped</code> does not refuse it; <code>rule test</code> reports the sample as <code>not_applicable</code>; raised after, it is an error of the rule. See <a href="writing-rules.html">writing rules</a>.</td>
+</tr>
+<tr>
 <td><code>RuleFixture.rule</code></td>
 <td>Use the variant of the declaring rule that a sample runs.</td>
 </tr>

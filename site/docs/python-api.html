@@ -330,7 +330,7 @@ agent = A2aAgentTarget(&quot;https://agent.example.com&quot;, credential=alice, 
 <tbody>
 <tr>
 <td><code>result</code></td>
-<td>The <code>ScanResult</code>: findings, unverified results, waived findings, errors, observations, coverage shortfalls, assessments, the file listing (<code>scope</code>), the skipped rules and why a run stopped. A rule that found the target does not offer what it examines is skipped <code>not_offered</code> (<code>NotOffered</code>, from <code>guardana.core.rule</code>), a coverage gap. Redacted under the profile's privacy policy.</td>
+<td>The <code>ScanResult</code>: findings, unverified results, waived findings, errors, observations, coverage shortfalls, assessments, the file listing (<code>scope</code>), the skipped rules and why a run stopped. A rule that found the target does not offer what it examines is skipped <code>not_offered</code> (<code>NotOffered</code>, from <code>guardana.core.rule</code>), a coverage gap. A rule that found nothing of the kind it grades is skipped <code>not_applicable</code> (<code>NotApplicable</code>, from <code>guardana.core.rule</code>), which is not a coverage gap. Redacted under the profile's privacy policy.</td>
 </tr>
 <tr>
 <td><code>manifest</code></td>

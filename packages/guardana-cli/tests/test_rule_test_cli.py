@@ -183,6 +183,24 @@ def test_a_not_offered_sample_carries_no_label(tmp_path: Path) -> None:
     assert "1 not offered (the sample lacks what the rule examines)" in result.output
 
 
+def test_a_not_applicable_sample_carries_no_label(tmp_path: Path) -> None:
+    """A sample that holds nothing the rule grades says nothing about a reply's verdict."""
+    corpus = tmp_path / "mine.jsonl"
+    nothing = '  - name: nothing\n    reply: "no tools here"\n    outcome: not_applicable\n'
+
+    result = _run(
+        "acme.*",
+        "--rules",
+        str(_rules_dir(tmp_path, _ALL_THREE + nothing)),
+        "--write-corpus",
+        str(corpus),
+    )
+
+    lines = [line for line in corpus.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(lines) == 2, result.output
+    assert "1 not applicable (the sample holds nothing the rule grades)" in _plain(result.output)
+
+
 def test_a_row_carries_the_prompt_the_rule_sent(tmp_path: Path) -> None:
     """`guardana calibrate` reads these files, and grades the exchange a row carries.
 
