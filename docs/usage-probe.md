@@ -139,14 +139,23 @@ Four consequences worth knowing:
 - **The negotiated revision is in the run manifest**, so [`guardana diff`](usage-diff.md)
   reports a server that moved between revisions as *the reach changed*, not as the
   system behaving differently.
-- **`guardana.mcp.session_binding` is silent on a server with no sessions.** A
-  conforming `2026-07-28` server mints none, so there is nothing to guess and
-  nothing to authenticate with. A server that still offers an older revision
-  alongside the new one is graded over that older one, because it is still handing
-  sessions to every client that asks for them.
-- **`guardana.mcp.cache_scope` is silent on a `2025-11-25` conversation.**
-  `cacheScope` and `ttlMs` arrive with `2026-07-28` and declare nothing on the older
-  revision, so even `cacheScope: "public"` produces no finding there.
+- **`guardana.mcp.session_binding` does not apply on a server with no sessions
+  (skipped `not_applicable`).** A conforming `2026-07-28` server mints none, so there
+  is nothing to guess and nothing to authenticate with. A server that still offers an
+  older revision alongside the new one is graded over that older one, because it is
+  still handing sessions to every client that asks for them. The skip's detail names
+  the revision. `not_applicable` is not a coverage gap, so it does not fail a run while
+  another selected rule reaches a conclusion; a run in which no rule reached one ends
+  `indeterminate`.
+- **`guardana.mcp.cache_scope` does not apply on a `2025-11-25` conversation with a
+  server that gates its tool listing behind a credential (skipped `not_applicable`).**
+  The skip's detail names the revision. When the server also lists a modern revision
+  guardana does not speak, the result is inconclusive instead, naming that revision,
+  because what it declares to modern clients was not read. `not_applicable` is not a
+  coverage gap, so it does not fail a run while another selected rule reaches a conclusion;
+  a run in which no rule reached one ends `indeterminate`. `cacheScope` and `ttlMs`
+  arrive with `2026-07-28` and declare nothing on the older revision, so even
+  `cacheScope: "public"` produces no finding there.
 - **Whether a server still offers `2025-11-25` is asked, not read.** Some servers list
   only the new revision in `server/discover` and still answer `initialize`. When
   discovery lists no older revision, the checks that need it send one `initialize` over
@@ -235,11 +244,11 @@ saying plainly when it could not reach a verdict:
 | `guardana.mcp.unauthenticated_access` | The server answers a tool listing with no credential. `low` on a loopback or private address, `high` elsewhere |
 | `guardana.mcp.authorization_discovery` | A protected server publishes Protected Resource Metadata (RFC 9728) naming an authorization server, identifies *this* origin as its resource, and points at an authorization server whose metadata names the `issuer` it was fetched for (absent or different, a client must not use it — RFC 8414) and advertises PKCE; only the first server's metadata is fetched, so `authorization_discovery` and `issuer_identification` are `inconclusive` for each later server |
 | `guardana.mcp.token_audience` | The server refuses a bearer token it could not have issued |
-| `guardana.mcp.session_binding` | Session ids are not a counter, are not shared, and do not authenticate a request on their own |
+| `guardana.mcp.session_binding` | Session ids are not a counter, are not shared, and do not authenticate a request on their own. On a server that negotiated `2026-07-28` and offers no earlier revision, which has no protocol sessions, the check is skipped `not_applicable`, naming the revision. |
 | `guardana.mcp.scope_breadth` | The advertised scopes can express least privilege, and the challenge names the scope a request needs |
 | `guardana.mcp.discovery_target` | Every discovery address the server advertises is one a client may follow; every advertised authorization server is checked against the address guard, but only the first is fetched. A refused later address is a finding; an unfetched one that passes the guard is `inconclusive` |
 | `guardana.mcp.issuer_identification` | The authorization server advertises `authorization_response_iss_parameter_supported`, without which a client cannot detect an authorization-server mix-up (RFC 9207) |
-| `guardana.mcp.cache_scope` | A tool listing the server gates behind a credential is not also declared `cacheScope: "public"`, which would invite any shared gateway to serve it to a caller the server would have refused. The check is silent on a `2025-11-25` conversation: `cacheScope` and `ttlMs` arrive with `2026-07-28` and declare nothing on the older revision, so even `cacheScope: "public"` produces no finding there |
+| `guardana.mcp.cache_scope` | A tool listing the server gates behind a credential is not also declared `cacheScope: "public"`, which would invite any shared gateway to serve it to a caller the server would have refused. On a `2025-11-25` conversation with a server that gates its tool listing behind a credential, the check is skipped `not_applicable`, naming the revision, because `cacheScope` and `ttlMs` arrive with `2026-07-28` and declare nothing on the older revision, so even `cacheScope: "public"` produces no finding there. When the server also lists a modern revision guardana does not speak, the result is inconclusive instead, naming that revision, because what the server declares to modern clients was not read. On a server open to callers with no credential the check reports nothing. |
 | `guardana.mcp.task_identity` | One `tasks/list` sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without `--mcp-token-env`, or with no task to show, the check is `inconclusive`. Only the first page of the listing is read, so an empty one that names a further page is `inconclusive` too. An operator's session refused with `401` or `403` is `inconclusive` too. A server that declares no tasks and answers `tasks/list` as an unknown method is skipped `not_offered`, a coverage gap; when what it declares could not be read at all, the check is `inconclusive` instead. JSON-RPC `-32601` at any status, or an HTTP `400` read whole whose body is plain text (including empty) or a JSON object without an `error` member, counts as an unknown method. Any other answer, such as a `400` carrying another JSON-RPC error or whose body could not be read whole or parsed, `404`, `405` or a `5xx`, is `inconclusive` |
 
 On a server that answers an anonymous caller, `authorization_discovery`, `scope_breadth`,

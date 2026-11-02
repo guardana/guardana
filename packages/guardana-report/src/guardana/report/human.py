@@ -353,6 +353,11 @@ def _summary(result: ScanResult, run: RunManifest | None) -> str:
             for skip in not_offered
         )
         summary += f" Not offered by the target: {named}."
+    not_applicable = [
+        skip.rule_id for skip in result.rules_skipped if skip.reason is SkipReason.NOT_APPLICABLE
+    ]
+    if not_applicable:
+        summary += f" Not applicable to the target: {'; '.join(not_applicable)}."
     if result.unverified:
         summary += f" {len(result.unverified)} unverified."
     if result.waived:

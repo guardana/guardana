@@ -129,6 +129,13 @@ _GATED = [
 ]
 
 
+_NOTHING_TO_GRADE: dict[Factory, tuple[str, str]] = {
+    mcp.legacy_only_gated: ("guardana.mcp.cache_scope", mcp.LEGACY_REVISION),
+    mcp.modern_only_gated: ("guardana.mcp.session_binding", _MODERN),
+}
+"""The rule each gated fixture's revision leaves nothing to grade, and that revision."""
+
+
 @pytest.mark.parametrize(("factory", "answered"), _GATED)
 def test_a_gated_server_probed_with_its_token_is_graded_in_the_revision_it_answered(
     factory: Factory, answered: dict[str, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -138,6 +145,7 @@ def test_a_gated_server_probed_with_its_token_is_graded_in_the_revision_it_answe
     assert run.code == 0, run.stderr
     assert run.protocols == answered
     assert run.finding_rules == _SDK_DEFAULTS
+    not_applicable, revision = _NOTHING_TO_GRADE.get(factory, ("", ""))
     for rule_id in (
         "guardana.mcp.unauthenticated_access",
         "guardana.mcp.authorization_discovery",
@@ -146,7 +154,13 @@ def test_a_gated_server_probed_with_its_token_is_graded_in_the_revision_it_answe
         "guardana.mcp.discovery_target",
         "guardana.mcp.cache_scope",
     ):
-        assert run.silent(rule_id), (rule_id, run.summaries(rule_id))
+        if rule_id == not_applicable:
+            (skip,) = run.skipped(rule_id)
+            assert skip["reason"] == "not_applicable"
+            assert revision in skip["detail"]
+            assert not run.ran(rule_id)
+        else:
+            assert run.silent(rule_id), (rule_id, run.summaries(rule_id))
     # The anonymous tasks/list is refused like every anonymous request here, and a
     # refused listing shows nobody's tasks: silent, never not offered.
     assert run.silent(_TASKS), run.summaries(_TASKS)
@@ -238,7 +252,7 @@ def test_a_public_cache_hint_on_a_gated_listing_fires_only_where_the_revision_ca
     cache = run.findings("guardana.mcp.cache_scope")
     assert [f["severity"] for f in cache] == (["MEDIUM"] if fires else [])
     if not fires:
-        assert run.silent("guardana.mcp.cache_scope")
+        assert [s["reason"] for s in run.skipped("guardana.mcp.cache_scope")] == ["not_applicable"]
 
 
 def test_an_owner_bound_task_listing_refused_to_an_anonymous_caller_is_silent(

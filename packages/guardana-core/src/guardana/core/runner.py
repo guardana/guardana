@@ -23,7 +23,14 @@ from guardana.core.report import CheckError, Finding, ScanResult, StopReason, sp
 from guardana.core.report.check_error import bounded_reason
 from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
 from guardana.core.report.skipped import SkippedRule, SkipReason
-from guardana.core.rule.base import NOT_OFFERED_AFTER_REPORTING, NotOffered, Rule, RuleContext
+from guardana.core.rule.base import (
+    NOT_APPLICABLE_AFTER_REPORTING,
+    NOT_OFFERED_AFTER_REPORTING,
+    NotApplicable,
+    NotOffered,
+    Rule,
+    RuleContext,
+)
 from guardana.core.rule.suite_rule import SuiteRule
 from guardana.core.safety import permits
 from guardana.core.source import UnreadSource
@@ -174,7 +181,7 @@ class _RuleOutcome:
     """The coverage this rule reported it could not get, through `RuleContext.shortfall`."""
 
     skipped: SkippedRule | None = None
-    """Set when the rule raised `NotOffered` before reporting anything; it did not run."""
+    """Set when the rule raised `NotOffered` or `NotApplicable` before reporting anything."""
 
     stopped_by: StopReason | None = None
     """Set when the run ran out of budget, or its target failed, part-way through this rule.
@@ -572,8 +579,8 @@ class Runner:
             # A judge is not the target under test: its failure says nothing about the
             # target, so it ends the run rather than being recorded as the target's.
             raise
-        except NotOffered as exc:
-            return _not_offered(rule, target, ctx, exc, (findings, unverified))
+        except (NotOffered, NotApplicable) as exc:
+            return _not_run(rule, target, ctx, exc, (findings, unverified))
         except (URLError, EndpointError) as exc:
             # Narrowed to connection failures on purpose — a rule that merely opens a
             # missing local file raises OSError too, and reporting a healthy endpoint
@@ -660,40 +667,53 @@ class Runner:
         )
 
 
-def _not_offered(
+def _not_run(
     rule: Rule,
     target: Target,
     ctx: RuleContext,
-    exc: NotOffered,
+    exc: NotOffered | NotApplicable,
     produced: tuple[list[Finding], list[Finding]],
 ) -> _RuleOutcome:
-    """Record a rule the target does not offer as a skip, or as an error once it reported.
+    """Record a rule that found nothing to run on as a skip, or as an error once it reported.
 
     A rule that already yielded a finding or recorded a measurement, a shortfall or a
-    suite's conclusion has examined something, so its claim that the target offers
-    nothing is its error, and what it reported is kept.
+    suite's conclusion has examined something, so its claim that there was nothing to
+    examine is its error, and what it reported is kept.
     """
     findings, unverified = produced
     if findings or unverified or ctx.recorded() or ctx.shortfalls() or ctx.concluded():
+        reason = (
+            NOT_OFFERED_AFTER_REPORTING
+            if isinstance(exc, NotOffered)
+            else NOT_APPLICABLE_AFTER_REPORTING
+        )
         return _RuleOutcome(
             rule.meta.id,
             tuple(findings),
             tuple(unverified),
             ctx.recorded(),
-            error=CheckError(source=rule.meta.id, stage="run", reason=NOT_OFFERED_AFTER_REPORTING),
+            error=CheckError(source=rule.meta.id, stage="run", reason=reason),
             suite=ctx.concluded(),
             raised=type(exc),
             shortfalls=ctx.shortfalls(),
         )
-    return _RuleOutcome(
-        rule.meta.id,
-        skipped=SkippedRule(
+    if isinstance(exc, NotOffered):
+        skip = SkippedRule(
             rule_id=rule.meta.id,
             reason=SkipReason.NOT_OFFERED,
             missing=exc.missing,
             detail=bounded_reason(f"{target.ref}: {exc.detail}"),
-        ),
-    )
+        )
+    else:
+        skip = SkippedRule(
+            rule_id=rule.meta.id,
+            reason=SkipReason.NOT_APPLICABLE,
+            missing=(),
+            detail=bounded_reason(
+                f"{rule.meta.id} has nothing to check on {target.ref}: {exc.detail}"
+            ),
+        )
+    return _RuleOutcome(rule.meta.id, skipped=skip)
 
 
 def _target_stop(exc: URLError | EndpointError) -> StopReason:

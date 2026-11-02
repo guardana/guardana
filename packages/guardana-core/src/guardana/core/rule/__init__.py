@@ -1,4 +1,4 @@
-from guardana.core.rule.base import NotOffered, Rule, RuleContext, RuleMeta
+from guardana.core.rule.base import NotApplicable, NotOffered, Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.rule.fixture import FixtureOutcome, RuleFixture
 from guardana.core.rule.trajectory_rule import TrajectoryRule
@@ -6,6 +6,7 @@ from guardana.core.rule.yaml_rule import YamlRule, load_yaml_rules
 
 __all__ = [
     "FixtureOutcome",
+    "NotApplicable",
     "NotOffered",
     "Rule",
     "RuleContext",
