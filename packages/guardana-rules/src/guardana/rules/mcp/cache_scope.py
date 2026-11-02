@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Iterator
 
 from guardana.core.report import Finding
-from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule import NotApplicable, RuleContext, RuleMeta
 from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
 from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
@@ -13,6 +13,7 @@ from guardana.core.target import (
     McpConversation,
     Target,
     TargetKind,
+    era_of,
 )
 from guardana.core.target.protocols import AuthorizationInspector
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP07_2025, OWASP_MCP10_2025
@@ -44,10 +45,14 @@ class McpCacheScopeRule(McpReporting):
     declaration is the defect: it is the instruction every cache on the path is
     entitled to follow.
 
-    Three silences, each one a case where nothing was declared to anyone:
+    **Not applicable to a legacy server**: the fields arrived with `2026-07-28`, and a
+    revision without them tells a cache nothing. The run records the rule as skipped
+    `not_applicable`, naming the revision, rather than as a check that found nothing. A
+    server that also lists a modern revision this client does not speak is inconclusive
+    instead: what it declares to modern clients was not read.
 
-    - a **legacy** server, because the fields arrived with `2026-07-28` and a
-      revision without them tells a cache nothing;
+    Two silences, each one a case where nothing was declared to anyone:
+
     - a **missing** `cacheScope`, because only `"public"` authorises sharing. An
       absent field is not an instruction to share with anyone, whatever `ttlMs`
       says: a client may hold the answer for itself, which is the same privacy
@@ -83,7 +88,7 @@ class McpCacheScopeRule(McpReporting):
         return 6 + MAX_LISTING_PAGES + 3
 
     def fixtures(self) -> Iterable[RuleFixture]:
-        """Sample a gated listing declared public, one declared private, and an unread server."""
+        """Sample a gated listing declared public or private, an unread server, a legacy one."""
 
         def gated(scope: str) -> Target:
             return _samples.target(
@@ -112,6 +117,14 @@ class McpCacheScopeRule(McpReporting):
                     FixtureOutcome.INCONCLUSIVE,
                     lambda: _samples.target(_samples.unspoken_server()),
                 ),
+                _samples.sample(
+                    "a gated legacy server, whose revision carries no cacheScope",
+                    FixtureOutcome.NOT_APPLICABLE,
+                    lambda: _samples.target(
+                        _samples.gated_server(cache_scope=_PUBLIC, ttl_ms=300_000),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
             )
         )
 
@@ -137,8 +150,24 @@ class McpCacheScopeRule(McpReporting):
     def _declared(
         self, view: McpAuthorizationView, conversation: McpConversation
     ) -> Iterator[Finding]:
-        if conversation.negotiation.era is Era.LEGACY:
-            return
+        negotiation = conversation.negotiation
+        if negotiation.era is Era.LEGACY:
+            unspoken = [v for v in negotiation.supported_versions if era_of(v) is Era.MODERN]
+            if unspoken:
+                # What the server declares to a modern client was not read, which is not
+                # the same as there being nothing to declare.
+                yield self.unverified(
+                    view,
+                    f"the server lists MCP {', '.join(unspoken)}, which carries cacheScope, "
+                    f"but shares only an earlier revision with this client, so what it "
+                    f"declares to modern clients was not read",
+                )
+                return
+            revision = negotiation.agreed or negotiation.wire.version
+            raise NotApplicable(
+                f"the server answered in MCP {revision}, which carries no cacheScope, so it "
+                f"declared nothing to any cache"
+            )
         if conversation.cache.scope != _PUBLIC:
             return
         yield self.finding(

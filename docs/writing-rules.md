@@ -461,6 +461,17 @@ anything. The run records it as skipped `not_offered`, a coverage gap that
 target has none of what I examine". Raised after the rule yielded a finding or recorded a
 measurement, it is an error of the rule.
 
+**Say when the target holds nothing of the kind you grade.** A rule that finds, while it
+runs, that the target holds nothing of the kind it grades — an MCP revision without the
+field it reads, a server that issues no sessions — raises `NotApplicable(detail)` from
+`guardana.core.rule` before it yields anything. The run records it as skipped
+`not_applicable`, as for a rule whose `not_applicable_to` returns a reason: not a coverage
+gap, so `fail_on_skipped` and `--preset release` do not refuse it; `rule test` reports the
+sample as `not_applicable`, never `clean`. `NotOffered` means the target lacks what the
+check needs and somebody may want that coverage; `NotApplicable` means there is nothing
+of that kind on this target to grade. Raised after the rule reported, it is an error of
+the rule.
+
 **Price and skip against the target.** A rule whose request count depends on what the
 target holds overrides `estimated_requests_for(target)`, which `plan` reads; it defaults to
 `estimated_requests`. A rule with nothing to check on a target returns the reason, a

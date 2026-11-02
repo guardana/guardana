@@ -1,9 +1,11 @@
 """Eight rules, one purchase — the reason the observation lives on the target."""
 
+from contextlib import suppress
+
 import pytest
 from _offline import refuse_name_lookups
-from guardana.core.rule import Rule, RuleContext
-from guardana.core.target import McpServerTarget
+from guardana.core.rule import NotApplicable, Rule, RuleContext
+from guardana.core.target import McpServerTarget, Target
 from guardana.rules.mcp import (
     McpAuthorizationDiscoveryRule,
     McpCacheScopeRule,
@@ -30,6 +32,12 @@ EVERY_MCP_RULE: list[Rule] = [
 ]
 
 
+def _spend(rule: Rule, target: Target) -> None:
+    """Run `rule` for what it sends; a rule with nothing to grade here has still sent it."""
+    with suppress(NotApplicable):
+        list(rule.run(target, RuleContext()))
+
+
 def test_running_every_rule_costs_no_more_than_running_them_one_at_a_time() -> None:
     server = guarded()
     target = McpServerTarget(
@@ -37,17 +45,14 @@ def test_running_every_rule_costs_no_more_than_running_them_one_at_a_time() -> N
     )
 
     for rule in EVERY_MCP_RULE:
-        list(rule.run(target, RuleContext()))
+        _spend(rule, target)
     together = len(server.requests)
 
     apart = 0
     for rule in EVERY_MCP_RULE:
         one = guarded()
-        list(
-            rule.run(
-                McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=one, discovery_sender=one),
-                RuleContext(),
-            )
+        _spend(
+            rule, McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=one, discovery_sender=one)
         )
         apart += len(one.requests)
 
@@ -63,7 +68,7 @@ def test_no_rule_spends_more_than_it_declared() -> None:
             ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
         )
 
-        list(rule.run(target, RuleContext()))
+        _spend(rule, target)
 
         declared = rule.estimated_requests
         assert declared is not None

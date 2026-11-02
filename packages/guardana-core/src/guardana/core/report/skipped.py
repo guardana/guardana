@@ -25,7 +25,9 @@ class SkipReason(StrEnum):
     `not_applicable_to` names a reason has nothing to check on this target. Nothing is
     missing, so it is not a coverage gap — but it is also not a pass, which is why it is
     recorded and printed rather than dropped. A contract layer where *nothing* applied
-    is a `CoverageShortfall`, not a pile of these.
+    is a `CoverageShortfall`, not a pile of these. A rule that finds, while it runs, that
+    the target holds nothing of the kind it grades raises `NotApplicable` before it
+    reports anything, and is recorded the same way.
     """
 
     NOT_RECORDED = "not_recorded"

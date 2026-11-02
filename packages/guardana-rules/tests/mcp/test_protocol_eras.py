@@ -1,15 +1,21 @@
 """What the session rules say about a server that is correct under a newer specification.
 
 MCP `2026-07-28` removed protocol sessions. A rule that grades how a session is
-minted has to stay silent about a server that mints none — and must not go silent
-about a dual-era server that still mints one for every legacy client it serves.
+minted has nothing to grade on a server that mints none, and says so as
+`not_applicable` — and must not go silent about a dual-era server that still mints one
+for every legacy client it serves.
 """
 
 import json
 
 import pytest
 from _offline import refuse_name_lookups
-from guardana.core.rule import RuleContext
+from guardana.core.gate import GateOutcome, gate_outcome
+from guardana.core.profile.presets import preset
+from guardana.core.registry import Registry
+from guardana.core.report import SkipReason
+from guardana.core.rule import NotApplicable, RuleContext
+from guardana.core.runner import Runner
 from guardana.core.severity import Severity
 from guardana.core.target import McpServerTarget
 from guardana.core.target._mcp_http import MAX_RESPONSE_BYTES, RawReply
@@ -25,12 +31,36 @@ _COUNTER = ["mcp-session-1000", "mcp-session-1001", "mcp-session-1002"]
 
 
 def test_a_modern_only_server_has_no_session_to_grade_and_is_not_accused() -> None:
-    # The same server one revision earlier is a critical finding — see the test
+    # The same server one revision earlier is a critical finding — see the tests
     # below. Reporting `inconclusive` here would fail the build of the team that
     # upgraded correctly, which is an accusation rather than a verdict.
     server = guarded(session_ids=_COUNTER, protocol_versions=[LATEST_VERSION])
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
 
-    assert findings(RULE, server, credential=CREDENTIAL) == []
+    with pytest.raises(NotApplicable, match=f"negotiated MCP {LATEST_VERSION}") as raised:
+        list(RULE.run(target, RuleContext()))
+    assert "issues no session id" in raised.value.detail
+
+
+def test_a_run_over_a_modern_only_server_records_the_rule_as_not_applicable() -> None:
+    server = guarded(session_ids=_COUNTER, protocol_versions=[LATEST_VERSION])
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+    registry = Registry()
+    registry.register_rule(RULE)
+    registry.register_rule(McpUnauthenticatedAccessRule())
+    release = preset("release")
+
+    result = Runner(registry=registry, profile=release).run(target)
+
+    (skip,) = result.rules_skipped
+    assert (skip.rule_id, skip.reason) == (RULE.meta.id, SkipReason.NOT_APPLICABLE)
+    assert LATEST_VERSION in skip.detail
+    assert result.unverified == ()
+    assert gate_outcome(result, release.policy) is GateOutcome.PASS
 
 
 def test_the_same_server_on_the_handshake_era_is_still_a_critical_finding() -> None:

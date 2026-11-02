@@ -6520,6 +6520,10 @@
         {
           "name": "NOT_OFFERED",
           "value": "'not_offered'"
+        },
+        {
+          "name": "NOT_APPLICABLE",
+          "value": "'not_applicable'"
         }
       ],
       "methods": {}

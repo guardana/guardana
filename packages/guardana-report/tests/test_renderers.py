@@ -112,6 +112,21 @@ def test_the_human_report_names_a_check_the_target_did_not_offer() -> None:
     assert "guardana.chat.c0" not in rendered
 
 
+def test_the_human_report_names_a_check_that_did_not_apply() -> None:
+    from guardana.core.report import SkippedRule, SkipReason  # noqa: PLC0415
+
+    skip = SkippedRule(
+        "guardana.mcp.cache_scope",
+        SkipReason.NOT_APPLICABLE,
+        (),
+        "the server answered in MCP 2025-11-25, which carries no cacheScope",
+    )
+    summary = get_renderer("human").render(ScanResult((), (), (skip,))).splitlines()[-1]
+
+    assert "0 rule(s) run, 1 skipped." in summary
+    assert "Not applicable to the target: guardana.mcp.cache_scope." in summary
+
+
 def test_the_human_report_still_ticks_over_capability_skips_alone() -> None:
     from guardana.core.report import SkippedRule, SkipReason  # noqa: PLC0415
 

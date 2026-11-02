@@ -75,6 +75,7 @@ from guardana.core.target.mcp import (
     McpServerTarget,
     McpTool,
     Opening,
+    era_of,
 )
 from guardana.core.target.protocols import (
     A2aInspector,
@@ -172,6 +173,7 @@ __all__ = [
     "challenge_parameters",
     "dimensions_of",
     "display_url",
+    "era_of",
     "examined_by_rules_only",
     "forged_token",
     "private_url_parts",

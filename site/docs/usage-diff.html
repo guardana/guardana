@@ -299,7 +299,7 @@ the rule itself — which is why swapping <code>llama3</code> for <code>llama4</
 </tr>
 <tr>
 <td><code>coverage_lost</code></td>
-<td>A rule that ran before did not run this time. Whatever it would have found is unknown, not absent.</td>
+<td>A rule that ran before did not run this time. Whatever it would have found is unknown, not absent. A rule with no finding, unverified result, waived finding, measured case or suite conclusion in the first run that was skipped <code>not_applicable</code> in the second is not counted, and the diff names it in a note with the skip's detail.</td>
 </tr>
 <tr>
 <td><code>left_scan</code></td>

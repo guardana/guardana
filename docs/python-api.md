@@ -99,7 +99,7 @@ A target runs once. Reusing the same object, starting a second run while the fir
 
 | Field | What it holds |
 |---|---|
-| `result` | The `ScanResult`: findings, unverified results, waived findings, errors, observations, coverage shortfalls, assessments, the file listing (`scope`), the skipped rules and why a run stopped. A rule that found the target does not offer what it examines is skipped `not_offered` (`NotOffered`, from `guardana.core.rule`), a coverage gap. Redacted under the profile's privacy policy. |
+| `result` | The `ScanResult`: findings, unverified results, waived findings, errors, observations, coverage shortfalls, assessments, the file listing (`scope`), the skipped rules and why a run stopped. A rule that found the target does not offer what it examines is skipped `not_offered` (`NotOffered`, from `guardana.core.rule`), a coverage gap. A rule that found nothing of the kind it grades is skipped `not_applicable` (`NotApplicable`, from `guardana.core.rule`), which is not a coverage gap. Redacted under the profile's privacy policy. |
 | `manifest` | The `RunManifest` a saved run carries. |
 | `gate` | `GateOutcome.PASS`, `FAIL` or `INDETERMINATE`. |
 | `exit_code` | The code `guardana` gives this result: `0`, `1`, `2`, `4` when its target stopped it (`target_unavailable` or `target_changed`), `6` when its budget did, or `7` when the run was interrupted, which only a saved run read back with `load_verification` records. `3`, `5` and `8` describe a command with no result or a failed installed output, never a `Verification` ([exit codes](exit-codes.md)). |

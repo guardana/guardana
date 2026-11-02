@@ -4,9 +4,13 @@ The two that carry the whole design: a check that stopped being gradable is a
 regression, and a finding somebody waived is not a finding somebody fixed.
 """
 
+from dataclasses import replace
+
+import pytest
+from guardana.core.assessment import Assessment
 from guardana.core.diff import ChangeKind, RunContext, compare
 from guardana.core.evaluator.base import Verdict
-from guardana.core.report import Evidence, Finding, ScanResult
+from guardana.core.report import Evidence, Finding, ScanResult, SkippedRule, SkipReason
 from guardana.core.severity import Severity
 
 _RULE = "guardana.prompt.injection"
@@ -107,6 +111,55 @@ def test_a_rule_that_stopped_running_is_lost_coverage() -> None:
     assert [c.kind for c in changes] == [ChangeKind.COVERAGE_LOST]
     assert changes[0].rule_id == _OTHER
     assert changes[0].kind.is_regression
+
+
+def _did_not_apply(rule_id: str = _OTHER) -> ScanResult:
+    skip = SkippedRule(
+        rule_id, SkipReason.NOT_APPLICABLE, (), f"{rule_id} has nothing to check: no sessions"
+    )
+    return replace(_run(ran=(_RULE,)), rules_skipped=(skip,))
+
+
+def test_a_rule_that_reported_nothing_and_then_did_not_apply_is_not_lost_coverage() -> None:
+    diff = compare(_run(), _did_not_apply(), before_context=_CTX, after_context=_CTX)
+
+    assert diff.changes == ()
+    assert diff.regressions == ()
+    assert any(
+        _OTHER in note and "did not apply" in note and "no sessions" in note for note in diff.notes
+    ), diff.notes
+
+
+@pytest.mark.parametrize("channel", ["findings", "unverified", "waived"])
+def test_a_rule_that_reported_and_then_did_not_apply_is_still_lost_coverage(channel: str) -> None:
+    reported = _finding(_OTHER, outcome="inconclusive" if channel == "unverified" else "fail")
+    before = _run(**{channel: (reported,)})  # type: ignore[arg-type]
+
+    diff = compare(before, _did_not_apply(), before_context=_CTX, after_context=_CTX)
+
+    assert [(c.kind, c.rule_id) for c in diff.changes] == [(ChangeKind.COVERAGE_LOST, _OTHER)]
+    assert not any("did not apply" in note for note in diff.notes)
+
+
+def test_a_rule_that_measured_cases_and_then_did_not_apply_is_still_lost_coverage() -> None:
+    measured = Assessment(
+        case_id="case-1", assessor="exact", subject_ref="answer-1", rule_id=_OTHER, passed=True
+    )
+    before = replace(_run(), assessments=(measured,))
+
+    diff = compare(before, _did_not_apply(), before_context=_CTX, after_context=_CTX)
+
+    assert [(c.kind, c.rule_id) for c in diff.changes] == [(ChangeKind.COVERAGE_LOST, _OTHER)]
+    assert not any("did not apply" in note for note in diff.notes)
+
+
+def test_a_rule_skipped_for_another_reason_is_still_lost_coverage() -> None:
+    skip = SkippedRule(_OTHER, SkipReason.NOT_OFFERED, ("tasks",), "the server lists no tasks")
+    after = replace(_run(ran=(_RULE,)), rules_skipped=(skip,))
+
+    changes = compare(_run(), after, before_context=_CTX, after_context=_CTX).changes
+
+    assert [(c.kind, c.rule_id) for c in changes] == [(ChangeKind.COVERAGE_LOST, _OTHER)]
 
 
 def test_a_rule_that_started_running_is_gained_coverage() -> None:

@@ -240,8 +240,7 @@ class Sessions:
     sessions at all. It is not a gap in the evidence and it is not a reason nobody
     could look: MCP `2026-07-28` removed protocol sessions, so a server offering
     only modern revisions has none to mint, none to guess, and none to authenticate
-    with. The rule reading this stays silent, which here means what silence always
-    means — the invariant holds.
+    with. The rule reading this has nothing to grade and says so as `not_applicable`.
     """
 
     ids: tuple[str, ...] = ()

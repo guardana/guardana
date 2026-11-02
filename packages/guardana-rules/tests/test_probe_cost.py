@@ -24,7 +24,7 @@ from guardana.core.exchange import Exchange
 from guardana.core.fixtures import DOCUMENTS_CHANNEL, parse_fixtures
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
-from guardana.core.rule import NotOffered, Rule, RuleContext, RuleError
+from guardana.core.rule import NotApplicable, NotOffered, Rule, RuleContext, RuleError
 from guardana.core.rule.trajectory_rule import TrajectoryRule
 from guardana.core.target import (
     MAX_LISTING_PAGES,
@@ -365,7 +365,7 @@ def test_an_mcp_probe_has_a_knowable_ceiling_and_actually_spends_far_less() -> N
 
     target = _mcp_target(_mcp_server())
     for rule in _mcp_rules():
-        with suppress(NotOffered):
+        with suppress(NotOffered, NotApplicable):
             list(rule.run(target, _CTX))
 
     spent = target.usage().requests
@@ -439,7 +439,7 @@ def _mcp_target(server: "ScriptedMcpServer") -> "McpServerTarget":
 def test_no_mcp_rule_spends_more_than_it_declared(era: dict[str, object]) -> None:
     for rule in _mcp_rules():
         target = _mcp_target(_mcp_server(**era))
-        with suppress(NotOffered):
+        with suppress(NotOffered, NotApplicable):
             list(rule.run(target, _CTX))
         declared = rule.estimated_requests
         assert declared is not None

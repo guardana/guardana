@@ -214,6 +214,7 @@ _LEFT_OUT = (
     "from a suite (its outcome is a pass rate, not one reply's label)",
     "inconclusive (no measurable label)",
     "not offered (the sample lacks what the rule examines)",
+    "not applicable (the sample holds nothing the rule grades)",
     "artifact or trace sample(s) (the corpus holds model replies only)",
     "from a rule that declares no expectation or more than one",
     "not a single scripted reply (a conversation or an agent run)",
@@ -224,6 +225,7 @@ _LEFT_OUT = (
     _SUITE,
     _INCONCLUSIVE,
     _NOT_OFFERED,
+    _NOT_APPLICABLE,
     _NO_REPLY_KIND,
     _NOT_ONE_EXPECTATION,
     _NOT_ONE_REPLY,
@@ -231,6 +233,12 @@ _LEFT_OUT = (
     _NOTHING_SENT,
 ) = _LEFT_OUT
 _NO_REPLY_KINDS = frozenset({TargetKind.ARTIFACT, TargetKind.TRACE})
+_NO_LABEL = {
+    FixtureOutcome.INCONCLUSIVE: _INCONCLUSIVE,
+    FixtureOutcome.NOT_OFFERED: _NOT_OFFERED,
+    FixtureOutcome.NOT_APPLICABLE: _NOT_APPLICABLE,
+}
+"""The declared outcomes no measurable label follows from."""
 
 
 def _write_corpus(
@@ -293,10 +301,9 @@ def _unlabelled(rule: Rule, fixture: RuleFixture, expectations: tuple[object, ..
     """Why this fixture cannot become a corpus row, or None when it still might."""
     if isinstance(rule, SuiteRule):
         return _SUITE
-    if fixture.outcome is FixtureOutcome.INCONCLUSIVE:
-        return _INCONCLUSIVE
-    if fixture.outcome is FixtureOutcome.NOT_OFFERED:
-        return _NOT_OFFERED
+    unlabelled = _NO_LABEL.get(fixture.outcome)
+    if unlabelled is not None:
+        return unlabelled
     if fixture.target.kind in _NO_REPLY_KINDS:
         return _NO_REPLY_KIND
     if len(expectations) != 1:

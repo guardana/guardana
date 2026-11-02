@@ -27,7 +27,7 @@ from guardana.core.target._mcp_client import (
 )
 from guardana.core.target._mcp_http import DiscoverySender, HttpSender, McpError, RawReply, Sender
 from guardana.core.target._mcp_registry import RegistryEntry, ReportedServer
-from guardana.core.target._mcp_wire import Era
+from guardana.core.target._mcp_wire import Era, era_of
 from guardana.core.target._url import display_url
 from guardana.core.target.base import Capability, Target, TargetKind, WireProtocol
 from guardana.core.usage import TargetUsage, UsageMeter
@@ -42,6 +42,7 @@ __all__ = [
     "McpServerTarget",
     "McpTool",
     "Opening",
+    "era_of",
 ]
 
 _EXEC_REFUSED = (

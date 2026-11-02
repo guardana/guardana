@@ -904,7 +904,7 @@ print("contract ready")
 """
 
 _MCP_ERAS_SCRIPT = """
-from guardana.core.rule import RuleContext
+from guardana.core.rule import NotApplicable, RuleContext
 from guardana.core.target import McpServerTarget
 from guardana.core.testing import ScriptedMcpServer
 from guardana.rules.mcp import McpSessionBindingRule
@@ -917,15 +917,18 @@ COUNTER = ["mcp-session-1000", "mcp-session-1001", "mcp-session-1002"]
 def probe(**settings):
     server = ScriptedMcpServer(URL, tools=TOOLS, credential="t", session_ids=COUNTER, **settings)
     target = McpServerTarget(URL, credential="t", sender=server, discovery_sender=server)
-    reported = list(McpSessionBindingRule().run(target, RuleContext()))
+    try:
+        reported = list(McpSessionBindingRule().run(target, RuleContext()))
+    except NotApplicable:
+        reported = None
     target.list_tools()
     return target.protocols(), reported
 
 
-modern, silent = probe(protocol_versions=["2026-07-28"])
+modern, graded = probe(protocol_versions=["2026-07-28"])
 print("modern", modern["mcp"])
-if silent:
-    raise SystemExit(f"a server with no sessions was accused: {silent[0].evidence.summary}")
+if graded is not None:
+    raise SystemExit(f"a server with no sessions was graded instead of not applicable: {graded}")
 
 legacy, reported = probe()
 print("legacy", legacy["mcp"])

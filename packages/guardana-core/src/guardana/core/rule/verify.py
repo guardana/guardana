@@ -15,7 +15,14 @@ from enum import StrEnum
 
 from guardana.core.manifest.records import SuiteOutcome
 from guardana.core.regression import Breach, Regraded, UnprovableError, regrade
-from guardana.core.rule.base import NOT_OFFERED_AFTER_REPORTING, NotOffered, Rule, RuleContext
+from guardana.core.rule.base import (
+    NOT_APPLICABLE_AFTER_REPORTING,
+    NOT_OFFERED_AFTER_REPORTING,
+    NotApplicable,
+    NotOffered,
+    Rule,
+    RuleContext,
+)
 from guardana.core.rule.fixture import DEMANDED_OUTCOMES, FixtureOutcome, RuleFixture
 from guardana.core.rule.suite_rule import SuiteRule
 from guardana.core.runner import ungraded_cases
@@ -120,8 +127,9 @@ def verify_rule(rule: Rule, ctx: RuleContext | None = None) -> RuleVerification:
     reported never counts in another. A fixture is classified as a run reads it: a
     finding is `finding`; a coverage shortfall, recorded cases none of which were graded,
     a suite that declined to conclude, a file the target could not read or an
-    inconclusive verdict without one is `inconclusive`; and `NotOffered` raised before
-    anything was reported is `not_offered`. No rule is asked to declare a `not_offered` sample.
+    inconclusive verdict without one is `inconclusive`; and `NotOffered` or `NotApplicable`
+    raised before anything was reported is `not_offered` or `not_applicable`. No rule is
+    asked to declare a sample of either.
 
     A suite's regression pairs are regraded with the context's evaluators, sending
     nothing; a suite whose evaluator cannot do that says so in `unprovable`.
@@ -167,7 +175,8 @@ def _run_fixture(rule: Rule, fixture: RuleFixture, ctx: RuleContext) -> FixtureR
     findings: list[object] = []
     try:
         findings.extend(subject.run(fixture.target, ctx))
-    except NotOffered:
+    except (NotOffered, NotApplicable) as exc:
+        offered = isinstance(exc, NotOffered)
         if findings or ctx.recorded() or ctx.shortfalls() or ctx.concluded():
             return FixtureResult(
                 rule.meta.id,
@@ -175,9 +184,10 @@ def _run_fixture(rule: Rule, fixture: RuleFixture, ctx: RuleContext) -> FixtureR
                 fixture.outcome,
                 None,
                 FixtureVerdict.ERRORED,
-                NOT_OFFERED_AFTER_REPORTING,
+                NOT_OFFERED_AFTER_REPORTING if offered else NOT_APPLICABLE_AFTER_REPORTING,
             )
-        return _judged(rule, fixture, FixtureOutcome.NOT_OFFERED)
+        observed = FixtureOutcome.NOT_OFFERED if offered else FixtureOutcome.NOT_APPLICABLE
+        return _judged(rule, fixture, observed)
     except (Exception, SystemExit) as exc:  # a rule's bug, its `sys.exit()`, a silent target
         return FixtureResult(
             rule.meta.id,
