@@ -5,6 +5,7 @@ import re
 import tomllib
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 import pytest
 from guardana.cli.main import app
@@ -17,12 +18,37 @@ runner = CliRunner()
 _SECTIONS = ("facade", "extension", "outputs", "kit")
 _REFERENCE_PACK = api_surface._REPO / "examples" / "reference_pack"
 _BOUNDED = re.compile(r"^guardana-core\s*(==|~=|>=[^,]+,\s*<)")
+_READ_FROM_RESULTS = {
+    "guardana.core.pack.PackCheck": {"ok", "problems"},
+    "guardana.core.rule.verify.RuleVerification": {
+        "errored",
+        "failed",
+        "gaps",
+        "is_proven",
+        "rule_id",
+    },
+    "guardana.core.rule.verify.FixtureResult": {"fixture"},
+}
+"""What the scaffold's tests read from the results `check_pack` and `verify_rules` return."""
+
+
+@cache
+def _document() -> dict[str, Any]:
+    return api_surface.build()
 
 
 @cache
 def _supported() -> frozenset[str]:
-    document = api_surface.build()
-    return frozenset(name for section in _SECTIONS for name in document[section])
+    return frozenset(name for section in _SECTIONS for name in _document()[section])
+
+
+def _attributes_read(root: Path) -> set[str]:
+    return {
+        node.attr
+        for path in root.rglob("*.py")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Attribute)
+    }
 
 
 def _outside_the_surface(root: Path) -> list[str]:
@@ -81,3 +107,16 @@ def test_the_scaffold_rules_and_taxonomies_load_through_the_surface(scaffold: Pa
     outside = _outside_the_surface(scaffold / "src")
 
     assert [name for name in outside if name.startswith("__init__.py")] == [], outside
+
+
+def test_what_the_scaffold_tests_read_from_a_result_is_recorded_in_the_kit(scaffold: Path) -> None:
+    kit = _document()["kit"]
+    unrecorded = {
+        name: sorted(members - {f["name"] for f in kit[name]["fields"]} - set(kit[name]["methods"]))
+        if name in kit
+        else "not recorded"
+        for name, members in _READ_FROM_RESULTS.items()
+    }
+
+    assert {name: gap for name, gap in unrecorded.items() if gap} == {}
+    assert set().union(*_READ_FROM_RESULTS.values()) <= _attributes_read(scaffold / "tests")

@@ -8011,6 +8011,44 @@
       "kind": "constant",
       "value": "2"
     },
+    "guardana.core.pack.PackCheck": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.pack.discover",
+      "fields": [
+        {
+          "annotation": "PackManifest",
+          "has_default": false,
+          "name": "manifest"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "problems"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {
+        "ok": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "bool"
+        }
+      }
+    },
     "guardana.core.pack.PackManifest": {
       "bases": [],
       "decorators": [
@@ -8267,6 +8305,164 @@
         }
       ],
       "returns": "PackManifest"
+    },
+    "guardana.core.rule.verify.FixtureResult": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.rule.verify",
+      "fields": [
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "rule_id"
+        },
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "fixture"
+        },
+        {
+          "annotation": "FixtureOutcome",
+          "has_default": false,
+          "name": "expected"
+        },
+        {
+          "annotation": "FixtureOutcome | None",
+          "has_default": false,
+          "name": "observed"
+        },
+        {
+          "annotation": "FixtureVerdict",
+          "has_default": false,
+          "name": "verdict"
+        },
+        {
+          "annotation": "str",
+          "has_default": true,
+          "name": "detail"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {}
+    },
+    "guardana.core.rule.verify.RuleVerification": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.rule.verify",
+      "fields": [
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "rule_id"
+        },
+        {
+          "annotation": "tuple[FixtureResult, ...]",
+          "has_default": false,
+          "name": "results"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "gaps"
+        },
+        {
+          "annotation": "tuple[Regraded, ...]",
+          "has_default": true,
+          "name": "regressions"
+        },
+        {
+          "annotation": "str | None",
+          "has_default": true,
+          "name": "unprovable"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {
+        "broken": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "tuple[Regraded, ...]"
+        },
+        "errored": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "tuple[FixtureResult, ...]"
+        },
+        "failed": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "tuple[FixtureResult, ...]"
+        },
+        "is_proven": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "bool"
+        },
+        "wrong_way": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "tuple[Regraded, ...]"
+        }
+      }
     },
     "guardana.core.rule.verify.verify_rules": {
       "async": false,

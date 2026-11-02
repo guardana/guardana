@@ -71,13 +71,14 @@ LISTED = {
     "guardana.core.report.shortfall": {"CoverageShortfall", "ShortfallKind"},
     "guardana.core.pack": {
         "EXTENSION_API_VERSION",
+        "PackCheck",
         "PackManifest",
         "Registered",
         "check_pack",
         "installed_manifests",
         "load_manifest",
     },
-    "guardana.core.rule.verify": {"verify_rules"},
+    "guardana.core.rule.verify": {"FixtureResult", "RuleVerification", "verify_rules"},
     "guardana.core.taxonomy": {"register_all"},
     "guardana.core.rule.fixture": {
         "RuleFixture",

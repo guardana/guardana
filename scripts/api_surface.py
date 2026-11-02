@@ -57,16 +57,17 @@ _KIT = ("guardana.testing", "guardana.core.testing")
 _KIT_NAMES = {
     "guardana.core.pack": (
         "EXTENSION_API_VERSION",
+        "PackCheck",
         "PackManifest",
         "Registered",
         "check_pack",
         "installed_manifests",
         "load_manifest",
     ),
-    "guardana.core.rule.verify": ("verify_rules",),
+    "guardana.core.rule.verify": ("FixtureResult", "RuleVerification", "verify_rules"),
     "guardana.core.taxonomy": ("register_all",),
 }
-"""What the tests `guardana new-pack` writes import, as the pack is pinned below the next major."""
+"""What the tests `guardana new-pack` writes import or read; the pack pins below the next major."""
 
 _CONSTANTS = (
     ("guardana.core.entrypoints", "TAXONOMY_GROUP"),

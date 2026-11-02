@@ -63,6 +63,7 @@ def supported_surface() -> Mapping[str, frozenset[str]]:
     surface["guardana.core.pack"] = frozenset(
         {
             "EXTENSION_API_VERSION",
+            "PackCheck",
             "PackManifest",
             "Registered",
             "check_pack",
@@ -70,7 +71,9 @@ def supported_surface() -> Mapping[str, frozenset[str]]:
             "load_manifest",
         }
     )
-    surface["guardana.core.rule.verify"] = frozenset({"verify_rules"})
+    surface["guardana.core.rule.verify"] = frozenset(
+        {"FixtureResult", "RuleVerification", "verify_rules"}
+    )
     surface["guardana.core.taxonomy"] = frozenset({"register_all"})
     surface["guardana.core.rule.fixture"] = _defined_in(
         importlib.import_module("guardana.core.rule.fixture")
