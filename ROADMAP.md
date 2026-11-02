@@ -7,7 +7,7 @@ with a usable CLI and optional collection, outside the production request path.
 
 [GitHub Issues](https://github.com/guardana/guardana/issues) are the live work queue.
 [Milestones](https://github.com/guardana/guardana/milestones) group release scope.
-The `1.0.1` milestone holds compatible corrections to package code that a patch can carry, `1.1.0` holds behaviour, report-shape and supported-surface changes for the next minor release that a patch cannot carry, and `next` holds documentation, evidence and process work that ships without a package release. A milestone is a
+A patch milestone holds compatible corrections to package code that a patch can carry, the next minor milestone holds behaviour, report-shape and supported-surface changes that a patch cannot carry, and `next` holds documentation, evidence and process work that ships without a package release. A milestone is a
 scope, not a date.
 Ideas without a reproducible problem or acceptance test start in
 [Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
