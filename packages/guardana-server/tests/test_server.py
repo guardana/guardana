@@ -77,6 +77,7 @@ def test_collector_accepts_the_envelope_the_reporter_actually_sends() -> None:
         "status": "ok",
         "duplicate": False,
         "stored": 2,
+        "compared": None,
         "accepted_by": None,
         "project": None,
     }

@@ -114,6 +114,11 @@ since a run records the number and not what it derived.
 """
 
 NOT_A_DOCUMENT: dict[str, str] = {
+    "guardana.server.store.CONTENT_DIGEST_VERSION": (
+        "the form of the digest the collector keeps in one column to compare a retried run; "
+        "the column is versioned by the collector's migrations, and a digest of another form "
+        "is never compared"
+    ),
     "guardana.core.pack.model.EXTENSION_API_VERSION": (
         "the version of the Rule/Evaluator/Target contract this build implements — a "
         "property of the code, not of a file anybody keeps"

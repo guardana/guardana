@@ -13,7 +13,7 @@ from conftest import Scoped, _clock, _submission
 from guardana.server.db.migrations import apply_pending
 from guardana.server.envelope import EvidenceIn, FindingIn, RunIn
 from guardana.server.postgres_store import PostgresStore
-from guardana.server.store import InMemoryStore, Store
+from guardana.server.store import Added, InMemoryStore, Store
 from guardana.server.tenancy import TenantScope, create_organization, create_project
 from pydantic import ValidationError
 
@@ -224,16 +224,16 @@ def test_a_store_says_whether_it_actually_stored(scoped: Scoped) -> None:
     """One contract, both stores: a duplicate is reported, not silently dropped."""
     store, scope = scoped
 
-    assert store.add(scope, _submission(run=_run(run_id="once"))) is True
-    assert store.add(scope, _submission(run=_run(run_id="once"))) is False
+    assert store.add(scope, _submission(run=_run(run_id="once"))) is Added.STORED
+    assert store.add(scope, _submission(run=_run(run_id="once"))) is Added.DUPLICATE
     assert len(store.submissions(scope)) == 1
 
 
 def test_a_run_with_no_id_is_always_new(scoped: Scoped) -> None:
     store, scope = scoped
 
-    assert store.add(scope, _submission(run=_run(run_id=None))) is True
-    assert store.add(scope, _submission(run=_run(run_id=None))) is True
+    assert store.add(scope, _submission(run=_run(run_id=None))) is Added.STORED
+    assert store.add(scope, _submission(run=_run(run_id=None))) is Added.STORED
 
 
 @pytest.mark.parametrize("implementation", ["memory", "postgres"])
@@ -247,8 +247,8 @@ def test_one_run_id_in_two_projects_is_two_runs(database_url: str, implementatio
     """
     store, one, two = _two_scopes(database_url, implementation)
 
-    assert store.add(one, _submission(run=_run(run_id="r"))) is True
-    assert store.add(two, _submission(run=_run(run_id="r"))) is True
+    assert store.add(one, _submission(run=_run(run_id="r"))) is Added.STORED
+    assert store.add(two, _submission(run=_run(run_id="r"), findings=[])) is Added.STORED
     assert len(store.submissions(one)) == 1
     assert len(store.submissions(two)) == 1
 

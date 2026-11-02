@@ -165,11 +165,16 @@ and the identity is the rule plus the path — so counting rows would answer "ho
 often was this printed" while the column claims to answer the other question. A
 finding a single scan reported three times reads `1 runs`.
 
-**A retried job is stored once.** The same run id in the same project and environment is accepted
-with `200` and `"duplicate": true`, keeping the first submission whatever the retry
-holds: a retry is not a failure and must not turn a pipeline red, and counting it twice
-would make a regression answer from a duplicate. An agent older than 0.9 sends no run id,
-identifies nothing, and is stored every time — which is honest, not clever.
+**A retried job is stored once.** A retry with the same run id in the same project and
+environment whose content matches the stored run is accepted with `200`,
+`"duplicate": true` and `"compared": true`: a retry is not a failure and must not turn a
+pipeline red, and counting it twice would make a regression answer from a duplicate.
+A retry whose content differs is refused with `409`, with the detail naming the run,
+and nothing is stored. Content is compared as stored: after redaction and environment
+labelling. A run stored before the collector kept content digests (migration `0009`)
+cannot be compared: its retry is accepted as a duplicate with `"compared": false`.
+An agent older than 0.9 sends no run id, identifies nothing, and is stored every time —
+which is honest, not clever.
 
 ## Triage: what somebody decided about a finding
 
@@ -577,7 +582,7 @@ toy configuration and none for the real one.
 
 The optional collector stores and serves results submitted by Guardana runs. It starts no scan, probe or other job. Runs execute where Guardana runs (the CLI, CI, the Python API), and the CLI submits them with `--reporter server://<collector URL>`.
 
-`/openapi.json` lists routes, key permissions and refusals: `401` for a missing or unaccepted key, `403` for insufficient permission, and `503` when the database cannot be reached to check the key.
+`/openapi.json` lists routes, key permissions and refusals: `401` for a missing or unaccepted key, `403` for insufficient permission, `409` when `POST /findings` names a run already stored, in that project and environment, with different content, and `503` when the database cannot be reached to check the key.
 
 The collector serves no interactive API viewer because FastAPI's default viewers load scripts, styles and fonts from third-party hosts. `/docs`, `/redoc` and `/docs/oauth2-redirect` return `404`. To browse the API, download the document (`curl --fail --show-error "$COLLECTOR_URL/openapi.json" -o openapi.json`) and open it in an OpenAPI viewer installed on your machine.
 
@@ -735,9 +740,11 @@ page, no database, no organization and no key.
 
 A submission counts as delivered only when the collector answers with its own
 acknowledgement — a JSON object whose `status` is `ok`, with an integer `stored` and a
-boolean `duplicate`, which every collector that accepts envelope 8 sends. Any other `2xx`,
-from a proxy, a health check or another service at the collector's address, is
-`could not submit to reporter: the response was not a collector acknowledgement`.
+boolean `duplicate`, which every collector that accepts envelope 8 sends. The
+acknowledgement also carries `compared`, `true` when a duplicate's content matched the
+stored run, `false` when the stored run predates content digests, and `null` for a new
+run; delivery does not depend on it. Any other `2xx`, from a proxy, a health check or
+another service at the collector's address, is `could not submit to reporter: the response was not a collector acknowledgement`.
 
 By default a collector that is unreachable or does not acknowledge never changes a gate's
 exit code — the scan already ran and its verdict stands on its own. A collector that
