@@ -576,19 +576,23 @@ def test_an_unexpected_error_exits_as_not_checked(
 def test_pypi_answering_404_is_not_published_and_a_bad_address_is_not_checked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def not_found(url: str, timeout: float) -> NoReturn:
-        raise urllib.error.HTTPError(url, 404, "Not Found", Message(), None)
+    address = "https://pypi.org/pypi/x/1/json"
 
-    monkeypatch.setattr(urllib.request, "urlopen", not_found)
-    with pytest.raises(NotPublishedError):
-        reproduce_release.fetch_url("https://pypi.org/pypi/x/1/json")
+    with urllib.error.HTTPError(address, 404, "Not Found", Message(), None) as missing:
+
+        def not_found(url: str, timeout: float) -> NoReturn:
+            raise missing
+
+        monkeypatch.setattr(urllib.request, "urlopen", not_found)
+        with pytest.raises(NotPublishedError):
+            reproduce_release.fetch_url(address)
 
     def malformed(url: str, timeout: float) -> NoReturn:
         raise ValueError("unknown url type")
 
     monkeypatch.setattr(urllib.request, "urlopen", malformed)
     with pytest.raises(NotCheckedError) as raised:
-        reproduce_release.fetch_url("https://pypi.org/pypi/x/1/json")
+        reproduce_release.fetch_url(address)
     assert not isinstance(raised.value, NotPublishedError)
 
 

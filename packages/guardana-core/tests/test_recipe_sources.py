@@ -5,6 +5,7 @@ Each test installs a fake distribution into a directory of its own on `sys.path`
 `RECORD`. The pins are then read through `importlib.metadata`, as `recipe lock` reads them.
 """
 
+import ast
 import base64
 import dis
 import hashlib
@@ -2113,6 +2114,19 @@ def test_an_editable_finder_mapping_a_relative_path_leaves_it_unpinned(
     )
 
 
+def _parses(statement: str) -> bool:
+    """Whether this interpreter parses `statement`.
+
+    How deep a statement may nest is the interpreter's own limit: from 3.14 it is measured
+    against the C stack, which reads attribute chains earlier versions refuse as too deep.
+    """
+    try:
+        ast.parse(statement)
+    except (SyntaxError, MemoryError, RecursionError):
+        return False
+    return True
+
+
 @pytest.mark.parametrize(
     "statement",
     ["x = " + "-" * 20_000 + "1", "x = a" + ".b" * 20_000],
@@ -2122,10 +2136,13 @@ def test_an_editable_finder_too_deep_to_parse_leaves_it_unpinned(
     tmp_path: Path, site: Path, statement: str
 ) -> None:
     root = _source_tree(tmp_path / "acme-pack")
-
-    assert _with_finder(site, root, statement + "\n") == (
-        f"its {_FINDER}.py maps its packages in a way Guardana cannot read"
+    why = (
+        "is not a setuptools finder template Guardana knows"
+        if _parses(statement)
+        else "maps its packages in a way Guardana cannot read"
     )
+
+    assert _with_finder(site, root, statement + "\n") == f"its {_FINDER}.py {why}"
 
 
 @pytest.mark.parametrize(
@@ -2138,9 +2155,10 @@ def test_a_path_file_line_too_deep_to_parse_leaves_it_unpinned(
 ) -> None:
     root = _source_tree(tmp_path / "acme-pack")
     _editable_with(site, root, {"_acme_pack.pth": f"import acme_hook; {statement}\n"})
+    runs = "acme_hook" if _parses(statement) else "a line that is not Python"
 
     assert pin_distribution_source("acme-pack") == (
-        "its _acme_pack.pth runs a line that is not Python, which Guardana cannot read"
+        f"its _acme_pack.pth runs {runs}, which Guardana cannot read"
     )
 
 
