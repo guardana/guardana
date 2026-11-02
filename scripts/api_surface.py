@@ -48,6 +48,8 @@ _EXTENSION_NAMES = {
     "guardana.core.target": ("WireProtocol", "display_url"),
     "guardana.core.source": ("PythonSource", "UnreadSource", "read_source"),
     "guardana.core.report.shortfall": ("CoverageShortfall", "ShortfallKind"),
+    "guardana.core.registry": ("RuleDirLoad",),
+    "guardana.core.report": ("CheckError",),
 }
 _INTERNAL = frozenset({"guardana.core.Runner"})
 """Exported for the CLI, documented as internal in `docs/python-api.md`, so not frozen."""

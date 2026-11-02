@@ -6287,6 +6287,88 @@
       "defined_in": "guardana.core",
       "kind": "constant"
     },
+    "guardana.core.registry.RuleDirLoad": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.registry",
+      "fields": [
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": false,
+          "name": "loaded"
+        },
+        {
+          "annotation": "tuple[CheckError, ...]",
+          "has_default": false,
+          "name": "errors"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {}
+    },
+    "guardana.core.report.CheckError": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.report.check_error",
+      "fields": [
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "source"
+        },
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "stage"
+        },
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "reason"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {
+        "from_exception": {
+          "async": false,
+          "decorators": [
+            "classmethod"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "cls"
+            },
+            {
+              "annotation": "str",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "source"
+            },
+            {
+              "annotation": "str",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "stage"
+            },
+            {
+              "annotation": "BaseException",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "exc"
+            }
+          ],
+          "returns": "'CheckError'"
+        }
+      }
+    },
     "guardana.core.report.shortfall.CoverageShortfall": {
       "bases": [],
       "decorators": [

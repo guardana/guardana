@@ -69,6 +69,8 @@ LISTED = {
     "guardana.core.target": {"WireProtocol", "display_url"},
     "guardana.core.source": {"PythonSource", "UnreadSource", "read_source"},
     "guardana.core.report.shortfall": {"CoverageShortfall", "ShortfallKind"},
+    "guardana.core.registry": {"RuleDirLoad"},
+    "guardana.core.report": {"CheckError"},
     "guardana.core.pack": {
         "EXTENSION_API_VERSION",
         "PackCheck",

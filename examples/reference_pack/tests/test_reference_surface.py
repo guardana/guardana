@@ -60,6 +60,8 @@ def supported_surface() -> Mapping[str, frozenset[str]]:
     surface["guardana.core.target"] = frozenset({"WireProtocol", "display_url"})
     surface["guardana.core.source"] = frozenset({"PythonSource", "UnreadSource", "read_source"})
     surface["guardana.core.report.shortfall"] = frozenset({"CoverageShortfall", "ShortfallKind"})
+    surface["guardana.core.registry"] = frozenset({"RuleDirLoad"})
+    surface["guardana.core.report"] = frozenset({"CheckError"})
     surface["guardana.core.pack"] = frozenset(
         {
             "EXTENSION_API_VERSION",

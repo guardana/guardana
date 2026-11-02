@@ -19,6 +19,8 @@ _SECTIONS = ("facade", "extension", "outputs", "kit")
 _REFERENCE_PACK = api_surface._REPO / "examples" / "reference_pack"
 _BOUNDED = re.compile(r"^guardana-core\s*(==|~=|>=[^,]+,\s*<)")
 _READ_FROM_RESULTS = {
+    "guardana.core.registry.RuleDirLoad": {"errors"},
+    "guardana.core.report.CheckError": {"reason", "source"},
     "guardana.core.pack.PackCheck": {"ok", "problems"},
     "guardana.core.rule.verify.RuleVerification": {
         "errored",
@@ -29,7 +31,7 @@ _READ_FROM_RESULTS = {
     },
     "guardana.core.rule.verify.FixtureResult": {"fixture"},
 }
-"""What the scaffold's tests read from the results `check_pack` and `verify_rules` return."""
+"""What the scaffold reads from the results its calls into Guardana return."""
 
 
 @cache
@@ -109,14 +111,16 @@ def test_the_scaffold_rules_and_taxonomies_load_through_the_surface(scaffold: Pa
     assert [name for name in outside if name.startswith("__init__.py")] == [], outside
 
 
-def test_what_the_scaffold_tests_read_from_a_result_is_recorded_in_the_kit(scaffold: Path) -> None:
-    kit = _document()["kit"]
+def test_what_the_scaffold_reads_from_a_result_is_recorded(scaffold: Path) -> None:
+    recorded = {name: d for section in _SECTIONS for name, d in _document()[section].items()}
     unrecorded = {
-        name: sorted(members - {f["name"] for f in kit[name]["fields"]} - set(kit[name]["methods"]))
-        if name in kit
+        name: sorted(
+            members - {f["name"] for f in recorded[name]["fields"]} - set(recorded[name]["methods"])
+        )
+        if name in recorded
         else "not recorded"
         for name, members in _READ_FROM_RESULTS.items()
     }
 
     assert {name: gap for name, gap in unrecorded.items() if gap} == {}
-    assert set().union(*_READ_FROM_RESULTS.values()) <= _attributes_read(scaffold / "tests")
+    assert set().union(*_READ_FROM_RESULTS.values()) <= _attributes_read(scaffold)
