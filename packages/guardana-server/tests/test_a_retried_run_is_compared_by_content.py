@@ -290,7 +290,7 @@ class _RowGone:
     """A cursor whose read finds no row, as when retention removed the run meanwhile."""
 
     def execute(self, query: str, params: object) -> None:
-        del query, params
+        """Accept the read; the row it would return is already gone."""
 
     def fetchone(self) -> None:
         return None
