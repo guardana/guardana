@@ -28,9 +28,7 @@ for finding in verification.result.findings:
 verification.save(Path("run.json"))  # the document `--format json --output` writes
 ```
 
-`PluginTrust`, `PluginMode` and `load_profile` are needed to build a `Verifier` but are outside
-the [supported surface](compatibility.md#the-supported-surface). They are subject to change in
-any release. While your code imports them, pin the exact `guardana-core` version you tested.
+`PluginTrust`, `PluginMode` and `load_profile` are part of the [supported surface](compatibility.md#the-supported-surface).
 
 A run that fails, stays indeterminate, or is stopped by its budget or by its target failing part-way is returned like one that passed. Read `verification.gate`, `verification.exit_code` or `verification.open_questions`; nothing is raised for an outcome.
 
@@ -75,7 +73,7 @@ verification = verifier.grade(path, source=None, deployment=None)
 
 ### Protocol targets
 
-Both live in `guardana.core.target` and send nothing until a rule reads them.
+Both live in `guardana.core.target` and send nothing until a rule reads them. `McpServerTarget`, `A2aAgentTarget` and `RegistryEntry` are outside the [supported surface](compatibility.md#the-supported-surface) and may change in a minor release; pin `guardana-core` to a minor while your code imports them.
 
 ```python
 from guardana.core.target import A2aAgentTarget, McpServerTarget, RegistryEntry
@@ -146,6 +144,6 @@ A profile that does not load raises `ProfileError` from `guardana.core.profile`.
 
 ## What is supported
 
-The supported surface is `guardana.core.verify.__all__`: `Verifier`, `Verification`, `EndpointBuilder`, `exchanges_path`, `load_verification` and the errors above, with the argument and field names on this page; and `guardana.core.doubles.__all__`: `open_doubles`, `Doubles`, `DoublesError`, `PRODUCER` and `INSTRUMENTED`. Their signatures are recorded with the rest of the supported surface in [`api-surface.json`](generated/api-surface.json), generated from source, and a test pins them. The output contract in `guardana.core.output` is versioned by its own `OUTPUT_API_VERSION` ([installed outputs](outputs.md#write-your-own)). Everything else is internal and may change in any release: the `Runner`, the registry's load state, `guardana.cli.*`, and every module or name that starts with `_`.
+The supported surface is `guardana.core.verify.__all__`: `Verifier`, `Verification`, `EndpointBuilder`, `exchanges_path`, `load_verification` and the errors above, with the argument and field names on this page; and `guardana.core.doubles.__all__`: `open_doubles`, `Doubles`, `DoublesError`, `PRODUCER` and `INSTRUMENTED`. `PluginTrust` and `PluginMode` from `guardana.core.plugins` and `load_profile` from `guardana.core.profile` are part of it too. Their signatures are recorded with the rest of the supported surface in [`api-surface.json`](generated/api-surface.json), generated from source, and a test pins them. The output contract in `guardana.core.output` is versioned by its own `OUTPUT_API_VERSION` ([installed outputs](outputs.md#write-your-own)). Everything else is internal and may change in any release: the `Runner`, the registry's load state, `guardana.cli.*`, and every module or name that starts with `_`.
 
 How a supported name is deprecated and removed, and which documents an upgrade keeps reading, is on the [compatibility page](compatibility.md). Not covered yet: `monitor`, `baseline create`, trace analysis and the import of observations run only from the command line, and a run whose judge failed mid-run keeps no partial result.

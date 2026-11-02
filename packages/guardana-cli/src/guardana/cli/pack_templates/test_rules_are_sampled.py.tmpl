@@ -6,9 +6,8 @@ tool is built around. `guardana rule test "__PREFIX__.*" --plugins allowlist
 """
 
 import __MODULE__
+from guardana.core import Registry, RuleContext
 from guardana.core.plugins import PluginMode, PluginTrust
-from guardana.core.registry import Registry
-from guardana.core.rule import RuleContext
 from guardana.core.rule.verify import verify_rules
 from guardana.core.taxonomy import register_all
 

@@ -5,12 +5,11 @@ description = "Guardana rules and a target for __DIST__."
 requires-python = ">=3.11"
 classifiers = ["Typing :: Typed"]
 # `guardana-core` is all a pack imports: the evaluators its rules name and the
-# taxonomy catalogues their references resolve against live there. It is held to
-# the minor release this pack was made with, because `target.py` reads sources
-# with `read_source`, which is outside the supported surface; widen the range once
-# the pack's tests pass on a newer minor. The commands that verify this pack ship
-# in `guardana-cli`, which is the `guardana` you already run — a tool, not
-# something this package imports.
+# taxonomy catalogues their references resolve against live there. It is held from
+# the release this pack was made with up to the next major, because everything the
+# pack imports is in the supported surface, which changes incompatibly only in a
+# major release. The commands that verify this pack ship in `guardana-cli`, which
+# is the `guardana` you already run — a tool, not something this package imports.
 dependencies = ["guardana-core>=__CORE_FLOOR__,<__CORE_CEILING__"]
 
 [project.entry-points."guardana.rules"]

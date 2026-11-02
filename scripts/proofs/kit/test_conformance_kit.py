@@ -53,7 +53,7 @@ SERVED_BY_THE_DOUBLES = {
 TRACE_KIND = "trace"
 
 # Modules the surface covers by their whole `__all__`, and the names it lists one by one
-# (the "Extension contract" row of docs/compatibility.md).
+# (the rows of docs/compatibility.md).
 WHOLE = (
     "guardana.core",
     "guardana.core.verify",
@@ -64,9 +64,24 @@ WHOLE = (
     "guardana.core.testing",
 )
 LISTED = {
-    "guardana.core.target": {"WireProtocol"},
-    "guardana.core.source": {"PythonSource", "UnreadSource"},
+    "guardana.core.plugins": {"PluginMode", "PluginTrust"},
+    "guardana.core.profile": {"load_profile"},
+    "guardana.core.target": {"WireProtocol", "display_url"},
+    "guardana.core.source": {"PythonSource", "UnreadSource", "read_source"},
     "guardana.core.report.shortfall": {"CoverageShortfall", "ShortfallKind"},
+    "guardana.core.registry": {"RuleDirLoad"},
+    "guardana.core.report": {"CheckError"},
+    "guardana.core.pack": {
+        "EXTENSION_API_VERSION",
+        "PackCheck",
+        "PackManifest",
+        "Registered",
+        "check_pack",
+        "installed_manifests",
+        "load_manifest",
+    },
+    "guardana.core.rule.verify": {"FixtureResult", "RuleVerification", "verify_rules"},
+    "guardana.core.taxonomy": {"register_all"},
     "guardana.core.rule.fixture": {
         "RuleFixture",
         "DeclaredFixture",

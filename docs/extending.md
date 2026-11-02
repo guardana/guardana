@@ -435,7 +435,7 @@ drops userinfo and the fragment and replaces a query with a digest placeholder, 
 never put a credential in it any other way. The digest keeps two targets that differ
 only by a query apart; it does not hide a short or guessable value.
 
-`read_source` and `display_url` sit outside the [supported surface](compatibility.md#the-supported-surface), unlike `PythonSource` and `UnreadSource`: a minor release may change them, so pin `guardana-core` to a minor while your target imports them.
+`read_source` and `display_url` are part of the [supported surface](compatibility.md#the-supported-surface), like `PythonSource` and `UnreadSource`.
 
 | Protocol | Capability | Methods |
 |---|---|---|

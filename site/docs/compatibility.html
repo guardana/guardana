@@ -218,11 +218,11 @@ API versions each release writes is in the <a href="generated/compatibility-matr
 <tbody>
 <tr>
 <td>Python facade</td>
-<td><code>guardana.core.verify.__all__</code> and <code>guardana.core.doubles.__all__</code> (<a href="python-api.html">Python API</a>)</td>
+<td><code>guardana.core.verify.__all__</code> and <code>guardana.core.doubles.__all__</code>, plus <code>PluginTrust</code> and <code>PluginMode</code> from <code>guardana.core.plugins</code> and <code>load_profile</code> from <code>guardana.core.profile</code> (what building a <code>Verifier</code> needs) (<a href="python-api.html">Python API</a>)</td>
 </tr>
 <tr>
 <td>Extension contract</td>
-<td><code>guardana.core.__all__</code> except <code>Runner</code>, <code>guardana.core.target.protocols.__all__</code>, <code>guardana.core.target.WireProtocol</code>, <code>PythonSource</code> and <code>UnreadSource</code> from <code>guardana.core.source</code> (the types a <code>FileReader</code> returns), <code>CoverageShortfall</code> and <code>ShortfallKind</code> from <code>guardana.core.report.shortfall</code> (how a rule records what it could not cover), and from <code>guardana.core.rule.fixture</code>: <code>RuleFixture</code>, <code>DeclaredFixture</code>, <code>FixtureOutcome</code>, <code>DEMANDED_OUTCOMES</code>, <code>materialise</code> (<a href="extending.html">extending</a>)</td>
+<td><code>guardana.core.__all__</code> except <code>Runner</code>, <code>guardana.core.target.protocols.__all__</code>, <code>guardana.core.target.WireProtocol</code> and <code>display_url</code> from <code>guardana.core.target</code>, <code>read_source</code>, and <code>PythonSource</code> and <code>UnreadSource</code> (the types a <code>FileReader</code> returns), from <code>guardana.core.source</code>, <code>CoverageShortfall</code> and <code>ShortfallKind</code> from <code>guardana.core.report.shortfall</code> (how a rule records what it could not cover), <code>RuleDirLoad</code> from <code>guardana.core.registry</code> and <code>CheckError</code> from <code>guardana.core.report</code> (what <code>Registry.load_yaml_rule_dirs</code> returns), and from <code>guardana.core.rule.fixture</code>: <code>RuleFixture</code>, <code>DeclaredFixture</code>, <code>FixtureOutcome</code>, <code>DEMANDED_OUTCOMES</code>, <code>materialise</code> (<a href="extending.html">extending</a>)</td>
 </tr>
 <tr>
 <td>Output contract</td>
@@ -230,7 +230,7 @@ API versions each release writes is in the <a href="generated/compatibility-matr
 </tr>
 <tr>
 <td>Conformance kit</td>
-<td><code>guardana.testing.__all__</code> and <code>guardana.core.testing.__all__</code> (<a href="conformance-kit.html">conformance kit</a>)</td>
+<td><code>guardana.testing.__all__</code> and <code>guardana.core.testing.__all__</code>, plus <code>EXTENSION_API_VERSION</code>, <code>PackManifest</code>, <code>Registered</code>, <code>PackCheck</code>, <code>check_pack</code>, <code>installed_manifests</code> and <code>load_manifest</code> from <code>guardana.core.pack</code>, <code>FixtureResult</code>, <code>RuleVerification</code> and <code>verify_rules</code> from <code>guardana.core.rule.verify</code> and <code>register_all</code> from <code>guardana.core.taxonomy</code> (what the tests <code>guardana new-pack</code> writes import or read) (<a href="conformance-kit.html">conformance kit</a>)</td>
 </tr>
 <tr>
 <td>Versions</td>

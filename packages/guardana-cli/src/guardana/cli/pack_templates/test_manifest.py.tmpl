@@ -15,8 +15,8 @@ from guardana.core.pack import (
     installed_manifests,
     load_manifest,
 )
+from guardana.core import Registry
 from guardana.core.plugins import PluginMode, PluginTrust
-from guardana.core.registry import Registry
 from guardana.core.taxonomy import register_all
 
 _THIS_PACK = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"__DIST__"}))

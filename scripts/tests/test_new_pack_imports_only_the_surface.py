@@ -5,6 +5,7 @@ import re
 import tomllib
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 import pytest
 from guardana.cli.main import app
@@ -17,17 +18,44 @@ runner = CliRunner()
 _SECTIONS = ("facade", "extension", "outputs", "kit")
 _REFERENCE_PACK = api_surface._REPO / "examples" / "reference_pack"
 _BOUNDED = re.compile(r"^guardana-core\s*(==|~=|>=[^,]+,\s*<)")
+_READ_FROM_RESULTS = {
+    "guardana.core.registry.RuleDirLoad": {"errors"},
+    "guardana.core.report.CheckError": {"reason", "source"},
+    "guardana.core.pack.PackCheck": {"ok", "problems"},
+    "guardana.core.rule.verify.RuleVerification": {
+        "errored",
+        "failed",
+        "gaps",
+        "is_proven",
+        "rule_id",
+    },
+    "guardana.core.rule.verify.FixtureResult": {"fixture"},
+}
+"""What the scaffold reads from the results its calls into Guardana return."""
+
+
+@cache
+def _document() -> dict[str, Any]:
+    return api_surface.build()
 
 
 @cache
 def _supported() -> frozenset[str]:
-    document = api_surface.build()
-    return frozenset(name for section in _SECTIONS for name in document[section])
+    return frozenset(name for section in _SECTIONS for name in _document()[section])
 
 
-def _outside_the_surface(src: Path) -> list[str]:
+def _attributes_read(root: Path) -> set[str]:
+    return {
+        node.attr
+        for path in root.rglob("*.py")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Attribute)
+    }
+
+
+def _outside_the_surface(root: Path) -> list[str]:
     outside = []
-    for path in sorted(src.rglob("*.py")):
+    for path in sorted(root.rglob("*.py")):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("guardana."):
                 outside += [
@@ -55,16 +83,44 @@ def scaffold(tmp_path: Path) -> Path:
 def test_control_the_reference_pack_imports_only_the_surface() -> None:
     assert _supported(), "the surface snapshot came back empty"
     assert _outside_the_surface(_REFERENCE_PACK / "src") == []
+    assert _outside_the_surface(_REFERENCE_PACK / "tests") == []
 
 
 def test_the_scaffold_imports_only_the_surface_or_pins_core(scaffold: Path) -> None:
-    outside = _outside_the_surface(scaffold / "src")
+    outside = _outside_the_surface(scaffold)
     requirement = _core_requirement(scaffold)
 
     assert not outside or _BOUNDED.match(requirement), (outside, requirement)
+
+
+def test_the_scaffold_imports_nothing_outside_the_surface(scaffold: Path) -> None:
+    assert _outside_the_surface(scaffold) == []
+
+
+def test_the_scaffold_tests_import_nothing_outside_the_surface(scaffold: Path) -> None:
+    tests = scaffold / "tests"
+    if not any(tests.rglob("test_*.py")):
+        raise RuntimeError("precondition: new-pack should write tests")
+
+    assert _outside_the_surface(tests) == []
 
 
 def test_the_scaffold_rules_and_taxonomies_load_through_the_surface(scaffold: Path) -> None:
     outside = _outside_the_surface(scaffold / "src")
 
     assert [name for name in outside if name.startswith("__init__.py")] == [], outside
+
+
+def test_what_the_scaffold_reads_from_a_result_is_recorded(scaffold: Path) -> None:
+    recorded = {name: d for section in _SECTIONS for name, d in _document()[section].items()}
+    unrecorded = {
+        name: sorted(
+            members - {f["name"] for f in recorded[name]["fields"]} - set(recorded[name]["methods"])
+        )
+        if name in recorded
+        else "not recorded"
+        for name, members in _READ_FROM_RESULTS.items()
+    }
+
+    assert {name: gap for name, gap in unrecorded.items() if gap} == {}
+    assert set().union(*_READ_FROM_RESULTS.values()) <= _attributes_read(scaffold)
