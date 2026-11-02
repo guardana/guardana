@@ -29,17 +29,20 @@ def _status(code: int, body: bytes = b"") -> HTTPError:
 
 @pytest.mark.parametrize("code", [400, 402, 405, 409, 413, 415, 422, 451, 499])
 def test_a_4xx_about_the_request_is_the_request_s_failure(code: int) -> None:
-    assert failure_scope(_status(code)) is FailureScope.REQUEST
+    with _status(code) as error:
+        assert failure_scope(error) is FailureScope.REQUEST
 
 
 @pytest.mark.parametrize("code", [401, 403, 404, 407, 408, 425, 429])
 def test_credentials_an_address_a_timeout_and_a_rate_limit_are_the_target_s(code: int) -> None:
-    assert failure_scope(_status(code)) is FailureScope.TARGET
+    with _status(code) as error:
+        assert failure_scope(error) is FailureScope.TARGET
 
 
 @pytest.mark.parametrize("code", [500, 502, 503, 504, 599, 302])
 def test_a_server_error_or_any_other_status_is_the_target_s(code: int) -> None:
-    assert failure_scope(_status(code)) is FailureScope.TARGET
+    with _status(code) as error:
+        assert failure_scope(error) is FailureScope.TARGET
 
 
 @pytest.mark.parametrize(

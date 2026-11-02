@@ -512,10 +512,11 @@ def test_the_guard_is_named_by_its_own_block(
 def test_a_judge_endpoint_carrying_credentials_is_refused_without_them(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _judge_fails_with(monkeypatch, _rejected())
     profile = _judge_profile(tmp_path, endpoint="http://user:hunter2@judge.test:8080/v1?key=s3cr3t")
 
-    result = runner.invoke(app, ["calibrate", "--profile", str(profile)])
+    with _rejected() as rejected:
+        _judge_fails_with(monkeypatch, rejected)
+        result = runner.invoke(app, ["calibrate", "--profile", str(profile)])
 
     assert result.exit_code == ExitCode.INVALID_USAGE, result.output
     line = _one_error_line(result)

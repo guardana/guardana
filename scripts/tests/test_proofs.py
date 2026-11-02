@@ -523,10 +523,11 @@ def test_an_install_that_is_not_the_published_build_in_the_project_is_named(
 
 
 def test_an_environment_on_another_python_is_named(tmp_path: Path) -> None:
-    document = {**_installed(tmp_path), "python": "3.14.0"}
+    other = f"{sys.version_info.major}.{sys.version_info.minor + 1}.0"
+    document = {**_installed(tmp_path), "python": other}
 
     assert install.provenance_problems(document, tmp_path, "1.0.0") == [
-        f"the environment runs Python 3.14.0, not the {sys.version.split()[0]} asked for"
+        f"the environment runs Python {other}, not the {sys.version.split()[0]} asked for"
     ]
 
 

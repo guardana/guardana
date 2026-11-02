@@ -85,18 +85,22 @@ def test_retries_are_bounded_and_the_failure_still_surfaces(
 ) -> None:
     # Exhausting the retries must raise, never return a made-up "empty" reply:
     # a rule that got silence here would grade a model it never reached.
-    calls = _install(monkeypatch, [_rate_limited() for _ in range(10)])
+    refusals = [_rate_limited() for _ in range(10)]
+    calls = _install(monkeypatch, list(refusals))
     with pytest.raises(HTTPError):
         post_json("http://x", {}, None, "ref")
     assert 1 < len(calls) <= 4
+    for refusal in refusals:
+        refusal.close()
 
 
 def test_a_client_error_is_not_retried(monkeypatch: pytest.MonkeyPatch, slept: list[float]) -> None:
     # A 400 means the request is wrong; repeating it wastes the run and hides the
     # cause behind a delay.
-    calls = _install(monkeypatch, [HTTPError("http://x", 400, "Bad Request", {}, None)])  # type: ignore[arg-type]
-    with pytest.raises(HTTPError):
-        post_json("http://x", {}, None, "ref")
+    with HTTPError("http://x", 400, "Bad Request", {}, None) as refusal:  # type: ignore[arg-type]
+        calls = _install(monkeypatch, [refusal])
+        with pytest.raises(HTTPError):
+            post_json("http://x", {}, None, "ref")
     assert len(calls) == 1
     assert not slept
 

@@ -12,6 +12,7 @@ import io
 import lzma
 import pickle
 import struct
+import sys
 import tarfile
 import zipfile
 import zlib
@@ -99,25 +100,32 @@ def _tar(*members: tuple[str, bytes]) -> bytes:
     return buffer.getvalue()
 
 
-# INT, LONG, FLOAT and GET arguments CPython reads and `pickletools.genops` refuses.
+# CPython reads a hex INT or LONG argument before 3.14 and refuses it from 3.14 on; such a
+# stream still has to be reported, since an older loader reaches its import.
+_HEX_LOADS = sys.version_info < (3, 14)
+
+# INT, LONG, FLOAT and GET arguments CPython reads and `pickletools.genops` refuses, each with
+# whether this interpreter reads past it to the import.
 _DIFFERENTIAL_PREFIXES = {
-    "int-hex": b"I0x10\n0",
-    "long-hex": b"L0x10L\n0",
-    "int-nul": b"I16\x00zz\n0",
-    "long-nul": b"L16\x00zzL\n0",
-    "float-nul": b"F1.0\x00zz\n0",
-    "get-nul": b"Np1\n0g1\x00zz\n0",
-    "string-utf8": b"S'\xc3\xa9'\n0",
+    "int-hex": (b"I0x10\n0", _HEX_LOADS),
+    "long-hex": (b"L0x10L\n0", _HEX_LOADS),
+    "int-nul": (b"I16\x00zz\n0", True),
+    "long-nul": (b"L16\x00zzL\n0", True),
+    "float-nul": (b"F1.0\x00zz\n0", True),
+    "get-nul": (b"Np1\n0g1\x00zz\n0", True),
+    "string-utf8": (b"S'\xc3\xa9'\n0", True),
 }
 _CONTROL_PREFIX = b"I16\n0"
 
 
-@pytest.mark.parametrize("prefix", _DIFFERENTIAL_PREFIXES.values(), ids=_DIFFERENTIAL_PREFIXES)
+@pytest.mark.parametrize(
+    ("prefix", "loads"), _DIFFERENTIAL_PREFIXES.values(), ids=_DIFFERENTIAL_PREFIXES
+)
 def test_a_stream_cpython_reads_past_an_argument_reports_the_import_after_it(
-    tmp_path: Path, prefix: bytes
+    tmp_path: Path, prefix: bytes, loads: bool
 ) -> None:
     stream = _HEADER + prefix + _CALL
-    assert _reaches_find_class(stream)
+    assert _reaches_find_class(stream) is loads
 
     findings, _ctx = _run(tmp_path, "model.pkl", stream)
 
@@ -131,21 +139,26 @@ def test_the_decimal_control_is_flagged(tmp_path: Path) -> None:
 
 
 _DIFFERENTIAL_STREAMS = {
-    **{label: _HEADER + prefix + _CALL for label, prefix in _DIFFERENTIAL_PREFIXES.items()},
-    "headerless-int-hex": b"I0x10\n0" + _CALL,
-    "global-bad-escape": _HEADER + b"cbuilt\\x\nlen\n0" + _CALL,
-    "int-octal": _HEADER + b"I010\n0" + _CALL,
-    "int-underscore": _HEADER + b"I1_0\n0" + _CALL,
-    "put-get-whitespace": _HEADER + b"Np 1 \n0g1 \n0" + _CALL,
-    "control": _HEADER + _CONTROL_PREFIX + _CALL,
+    **{
+        label: (_HEADER + prefix + _CALL, loads)
+        for label, (prefix, loads) in _DIFFERENTIAL_PREFIXES.items()
+    },
+    "headerless-int-hex": (b"I0x10\n0" + _CALL, _HEX_LOADS),
+    "global-bad-escape": (_HEADER + b"cbuilt\\x\nlen\n0" + _CALL, True),
+    "int-octal": (_HEADER + b"I010\n0" + _CALL, True),
+    "int-underscore": (_HEADER + b"I1_0\n0" + _CALL, True),
+    "put-get-whitespace": (_HEADER + b"Np 1 \n0g1 \n0" + _CALL, True),
+    "control": (_HEADER + _CONTROL_PREFIX + _CALL, True),
 }
 
 
-@pytest.mark.parametrize("stream", _DIFFERENTIAL_STREAMS.values(), ids=_DIFFERENTIAL_STREAMS)
+@pytest.mark.parametrize(
+    ("stream", "loads"), _DIFFERENTIAL_STREAMS.values(), ids=_DIFFERENTIAL_STREAMS
+)
 def test_no_stream_that_reaches_an_import_in_cpython_is_reported_clean(
-    tmp_path: Path, stream: bytes
+    tmp_path: Path, stream: bytes, loads: bool
 ) -> None:
-    assert _reaches_find_class(stream)
+    assert _reaches_find_class(stream) is loads
 
     findings, ctx = _run(tmp_path, "model.pt", _torch_zip(stream))
 

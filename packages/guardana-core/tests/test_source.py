@@ -188,7 +188,7 @@ def test_a_byte_order_mark_is_not_part_of_the_text(tmp_path: Path) -> None:
         (b"# coding: no-such-codec\nx = 1\n", "encoding"),
         (b"\xef\xbb\xbf# coding: latin-1\nx = 1\n", "encoding"),
         (b"def (:\n", "cannot be parsed"),
-        (b"x = 1\x00\n", "cannot be parsed"),
+        (b"x = 1\x00\n", "cannot contain null bytes"),
     ],
 )
 def test_bytes_the_interpreter_would_refuse_are_unread_not_nothing(
