@@ -8005,6 +8005,305 @@
   },
   "generated_by": "scripts/api_surface.py from source — do not edit by hand",
   "kit": {
+    "guardana.core.pack.EXTENSION_API_VERSION": {
+      "annotation": null,
+      "defined_in": "guardana.core.pack.model",
+      "kind": "constant",
+      "value": "2"
+    },
+    "guardana.core.pack.PackManifest": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.pack.model",
+      "fields": [
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "name"
+        },
+        {
+          "annotation": "ApiRange",
+          "has_default": false,
+          "name": "extension_api"
+        },
+        {
+          "annotation": "str",
+          "has_default": false,
+          "name": "source"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "rules"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "evaluators"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "targets"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "taxonomies"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "renderers"
+        },
+        {
+          "annotation": "tuple[str, ...]",
+          "has_default": true,
+          "name": "reporters"
+        },
+        {
+          "annotation": "ApiRange | None",
+          "has_default": true,
+          "name": "output_api"
+        },
+        {
+          "annotation": "str",
+          "has_default": true,
+          "name": "description"
+        },
+        {
+          "annotation": "int",
+          "has_default": true,
+          "name": "schema_version"
+        },
+        {
+          "annotation": "int | None",
+          "has_default": true,
+          "name": "migrated_from"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {
+        "declares_outputs": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "bool"
+        },
+        "loadable_by": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "int | Iterable[int]",
+              "has_default": true,
+              "kind": "positional_or_keyword",
+              "name": "apis"
+            }
+          ],
+          "returns": "bool"
+        },
+        "outputs_loadable_by": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "Iterable[int]",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "apis"
+            }
+          ],
+          "returns": "bool"
+        },
+        "provides": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "tuple[str, ...]"
+        }
+      }
+    },
+    "guardana.core.pack.Registered": {
+      "bases": [],
+      "decorators": [
+        "dataclass(frozen=True, slots=True)"
+      ],
+      "defined_in": "guardana.core.pack.discover",
+      "fields": [
+        {
+          "annotation": "Mapping[str, str | None]",
+          "has_default": true,
+          "name": "rules"
+        },
+        {
+          "annotation": "Mapping[str, str | None]",
+          "has_default": true,
+          "name": "evaluators"
+        },
+        {
+          "annotation": "Mapping[str, str | None]",
+          "has_default": true,
+          "name": "targets"
+        },
+        {
+          "annotation": "Mapping[str, str | None]",
+          "has_default": true,
+          "name": "taxonomies"
+        },
+        {
+          "annotation": "Mapping[str, frozenset[str]]",
+          "has_default": true,
+          "name": "taxonomy_owners"
+        },
+        {
+          "annotation": "Mapping[str, str | None]",
+          "has_default": true,
+          "name": "renderers"
+        },
+        {
+          "annotation": "Mapping[str, str | None]",
+          "has_default": true,
+          "name": "reporters"
+        },
+        {
+          "annotation": "Mapping[str, tuple[str, ...]]",
+          "has_default": true,
+          "name": "output_collisions"
+        }
+      ],
+      "kind": "dataclass",
+      "methods": {}
+    },
+    "guardana.core.pack.check_pack": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.pack.discover",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "PackManifest",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "manifest"
+        },
+        {
+          "annotation": "Registered",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "registered"
+        },
+        {
+          "annotation": "str | None",
+          "has_default": true,
+          "kind": "positional_or_keyword",
+          "name": "distribution"
+        }
+      ],
+      "returns": "PackCheck"
+    },
+    "guardana.core.pack.installed_manifests": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.pack.discover",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "PluginTrust",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "trust"
+        }
+      ],
+      "returns": "list[PackManifest]"
+    },
+    "guardana.core.pack.load_manifest": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.pack.load",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "Path",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "path"
+        }
+      ],
+      "returns": "PackManifest"
+    },
+    "guardana.core.rule.verify.verify_rules": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.rule.verify",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "Iterable[Rule]",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "rules"
+        },
+        {
+          "annotation": "RuleContext | None",
+          "has_default": true,
+          "kind": "positional_or_keyword",
+          "name": "ctx"
+        }
+      ],
+      "returns": "tuple[RuleVerification, ...]"
+    },
+    "guardana.core.taxonomy.register_all": {
+      "async": false,
+      "decorators": [],
+      "defined_in": "guardana.core.taxonomy",
+      "kind": "function",
+      "parameters": [
+        {
+          "annotation": "Iterable[TaxonomyRef]",
+          "has_default": false,
+          "kind": "positional_or_keyword",
+          "name": "refs"
+        }
+      ],
+      "returns": "None"
+    },
     "guardana.core.testing.EchoingTransport": {
       "bases": [],
       "decorators": [],

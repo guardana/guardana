@@ -60,6 +60,18 @@ def supported_surface() -> Mapping[str, frozenset[str]]:
     surface["guardana.core.target"] = frozenset({"WireProtocol", "display_url"})
     surface["guardana.core.source"] = frozenset({"PythonSource", "UnreadSource", "read_source"})
     surface["guardana.core.report.shortfall"] = frozenset({"CoverageShortfall", "ShortfallKind"})
+    surface["guardana.core.pack"] = frozenset(
+        {
+            "EXTENSION_API_VERSION",
+            "PackManifest",
+            "Registered",
+            "check_pack",
+            "installed_manifests",
+            "load_manifest",
+        }
+    )
+    surface["guardana.core.rule.verify"] = frozenset({"verify_rules"})
+    surface["guardana.core.taxonomy"] = frozenset({"register_all"})
     surface["guardana.core.rule.fixture"] = _defined_in(
         importlib.import_module("guardana.core.rule.fixture")
     )

@@ -53,7 +53,7 @@ SERVED_BY_THE_DOUBLES = {
 TRACE_KIND = "trace"
 
 # Modules the surface covers by their whole `__all__`, and the names it lists one by one
-# (the "Extension contract" row of docs/compatibility.md).
+# (the rows of docs/compatibility.md).
 WHOLE = (
     "guardana.core",
     "guardana.core.verify",
@@ -69,6 +69,16 @@ LISTED = {
     "guardana.core.target": {"WireProtocol", "display_url"},
     "guardana.core.source": {"PythonSource", "UnreadSource", "read_source"},
     "guardana.core.report.shortfall": {"CoverageShortfall", "ShortfallKind"},
+    "guardana.core.pack": {
+        "EXTENSION_API_VERSION",
+        "PackManifest",
+        "Registered",
+        "check_pack",
+        "installed_manifests",
+        "load_manifest",
+    },
+    "guardana.core.rule.verify": {"verify_rules"},
+    "guardana.core.taxonomy": {"register_all"},
     "guardana.core.rule.fixture": {
         "RuleFixture",
         "DeclaredFixture",

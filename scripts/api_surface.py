@@ -54,6 +54,19 @@ _INTERNAL = frozenset({"guardana.core.Runner"})
 
 _OUTPUTS = ("guardana.core.output",)
 _KIT = ("guardana.testing", "guardana.core.testing")
+_KIT_NAMES = {
+    "guardana.core.pack": (
+        "EXTENSION_API_VERSION",
+        "PackManifest",
+        "Registered",
+        "check_pack",
+        "installed_manifests",
+        "load_manifest",
+    ),
+    "guardana.core.rule.verify": ("verify_rules",),
+    "guardana.core.taxonomy": ("register_all",),
+}
+"""What the tests `guardana new-pack` writes import, as the pack is pinned below the next major."""
 
 _CONSTANTS = (
     ("guardana.core.entrypoints", "TAXONOMY_GROUP"),
@@ -542,13 +555,16 @@ def build(roots: Sequence[Path] = SOURCE_ROOTS) -> dict[str, Any]:
     extension = _names(tree, _EXTENSION)
     for module, names in _EXTENSION_NAMES.items():
         extension.update({f"{module}.{name}": describe(tree, module, name) for name in names})
+    kit = _names(tree, _KIT)
+    for module, names in _KIT_NAMES.items():
+        kit.update({f"{module}.{name}": describe(tree, module, name) for name in names})
     return {
         "schema_version": SURFACE_SCHEMA_VERSION,
         "generated_by": "scripts/api_surface.py from source — do not edit by hand",
         "facade": facade,
         "extension": extension,
         "outputs": _names(tree, _OUTPUTS),
-        "kit": _names(tree, _KIT),
+        "kit": kit,
         "constants": _constants(tree, _CONSTANTS),
         "cli": _cli(),
         "exit_codes": _exit_codes(tree),

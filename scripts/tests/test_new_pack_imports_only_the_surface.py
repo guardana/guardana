@@ -25,9 +25,9 @@ def _supported() -> frozenset[str]:
     return frozenset(name for section in _SECTIONS for name in document[section])
 
 
-def _outside_the_surface(src: Path) -> list[str]:
+def _outside_the_surface(root: Path) -> list[str]:
     outside = []
-    for path in sorted(src.rglob("*.py")):
+    for path in sorted(root.rglob("*.py")):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("guardana."):
                 outside += [
@@ -55,17 +55,26 @@ def scaffold(tmp_path: Path) -> Path:
 def test_control_the_reference_pack_imports_only_the_surface() -> None:
     assert _supported(), "the surface snapshot came back empty"
     assert _outside_the_surface(_REFERENCE_PACK / "src") == []
+    assert _outside_the_surface(_REFERENCE_PACK / "tests") == []
 
 
 def test_the_scaffold_imports_only_the_surface_or_pins_core(scaffold: Path) -> None:
-    outside = _outside_the_surface(scaffold / "src")
+    outside = _outside_the_surface(scaffold)
     requirement = _core_requirement(scaffold)
 
     assert not outside or _BOUNDED.match(requirement), (outside, requirement)
 
 
 def test_the_scaffold_imports_nothing_outside_the_surface(scaffold: Path) -> None:
-    assert _outside_the_surface(scaffold / "src") == []
+    assert _outside_the_surface(scaffold) == []
+
+
+def test_the_scaffold_tests_import_nothing_outside_the_surface(scaffold: Path) -> None:
+    tests = scaffold / "tests"
+    if not any(tests.rglob("test_*.py")):
+        raise RuntimeError("precondition: new-pack should write tests")
+
+    assert _outside_the_surface(tests) == []
 
 
 def test_the_scaffold_rules_and_taxonomies_load_through_the_surface(scaffold: Path) -> None:
