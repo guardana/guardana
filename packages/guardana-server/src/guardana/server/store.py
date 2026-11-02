@@ -1,8 +1,11 @@
+import hashlib
+import json
 import threading
 import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Protocol
 
 from guardana.server.deployment import labelled_for
@@ -27,6 +30,65 @@ class StoredSubmission:
 
     received_at: float
     submission: Submission
+    content_digest: str | None = None
+    """What `content_digest` returned for the submission as stored; None when not recorded."""
+
+
+class Added(StrEnum):
+    """What `Store.add` did with one submission."""
+
+    STORED = "stored"
+    """The run was new and is held from now on."""
+
+    DUPLICATE = "duplicate"
+    """The run is already held with the same content, so nothing was stored."""
+
+    NOT_COMPARED = "not_compared"
+    """The run is already held, stored before content digests, so nothing was stored and
+    whether the content matches is unknown."""
+
+
+class ConflictingRunError(Exception):
+    """A submission names a run this tenant already holds with different content."""
+
+    def __init__(self, run_id: str) -> None:
+        super().__init__(
+            f"run {run_id} is already stored with different content; nothing was stored"
+        )
+        self.run_id = run_id
+
+
+CONTENT_DIGEST_VERSION = "v1"
+"""The form `content_digest` computes; a held digest of another form is never compared."""
+
+
+def content_digest(submission: Submission) -> str:
+    """Return a digest of everything `submission` carries, in canonical JSON.
+
+    Taken from the submission as the store keeps it, redacted and labelled, so a secret
+    sent raw and the same secret already redacted by the agent give one digest.
+    """
+    canonical = json.dumps(
+        submission.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"{CONTENT_DIGEST_VERSION}:sha256:{digest}"
+
+
+def held_again(held: str | None, digest: str, run_id: str) -> Added:
+    """Answer a submission of a run already held, whose stored digest is `held`.
+
+    Raises `ConflictingRunError` when the two contents differ. A run stored without a
+    digest, or with one of another form, cannot be compared, and says so.
+    """
+    if held is None or not held.startswith(f"{CONTENT_DIGEST_VERSION}:"):
+        return Added.NOT_COMPARED
+    if held != digest:
+        raise ConflictingRunError(run_id)
+    return Added.DUPLICATE
 
 
 class Store(Protocol):
@@ -42,13 +104,15 @@ class Store(Protocol):
     without one sees red.
     """
 
-    def add(self, scope: TenantScope, submission: Submission) -> bool:
-        """Store one submission for one tenant, and say whether it was new.
+    def add(self, scope: TenantScope, submission: Submission) -> Added:
+        """Store one submission for one tenant, and say what became of it.
 
-        `False` means this run is already held: a retried pipeline job re-sends its
-        run, and storing it twice would make "production got worse" answer from a
-        duplicate. Reported rather than silent, so the pipeline's own log does not
-        say "stored 12 findings" about a run it stored nothing for.
+        Anything but `STORED` means this run is already held: a retried pipeline job
+        re-sends its run, and storing it twice would make "production got worse"
+        answer from a duplicate. Reported rather than silent, so the pipeline's own log
+        does not say "stored 12 findings" about a run it stored nothing for. Raises
+        `ConflictingRunError` when the held run's content differs from this one's,
+        compared only within the tenant and environment the run is stored under.
         """
         raise NotImplementedError
 
@@ -102,26 +166,36 @@ class InMemoryStore:
         self._lock = threading.Lock()
         self._clock = clock
 
-    def add(self, scope: TenantScope, submission: Submission) -> bool:
+    def add(self, scope: TenantScope, submission: Submission) -> Added:
         """Store one submission unless this run is already held; evict the oldest when full."""
+        labelled = labelled_for(scope, submission)
+        digest = content_digest(labelled)
         record = StoredSubmission(
-            received_at=self._clock(), submission=labelled_for(scope, submission)
+            received_at=self._clock(), submission=labelled, content_digest=digest
         )
         run_id = submission.run.run_id if submission.run else None
         with self._lock:
-            if run_id is not None and self._holds(scope, _environment_of(record), run_id):
-                return False
+            if run_id is not None:
+                held = self._held(scope, _environment_of(record), run_id)
+                if held is not None:
+                    return held_again(held.content_digest, digest, run_id)
             self._records.append((scope, record))
-        return True
+        return Added.STORED
 
-    def _holds(self, scope: TenantScope, environment: str | None, run_id: str) -> bool:
-        """Whether this project already has that run in that environment. Called under the lock."""
-        return any(
-            held_scope.project_id == scope.project_id
-            and _environment_of(held) == environment
-            and held.submission.run is not None
-            and held.submission.run.run_id == run_id
-            for held_scope, held in self._records
+    def _held(
+        self, scope: TenantScope, environment: str | None, run_id: str
+    ) -> StoredSubmission | None:
+        """Return this project's record of that run in that environment. Called under the lock."""
+        return next(
+            (
+                held
+                for held_scope, held in self._records
+                if held_scope.project_id == scope.project_id
+                and _environment_of(held) == environment
+                and held.submission.run is not None
+                and held.submission.run.run_id == run_id
+            ),
+            None,
         )
 
     def submissions(

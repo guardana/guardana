@@ -352,8 +352,6 @@ again. <code>grade</code> sends nothing to the collector.</p>
 <p><code>--preset release</code> fails when a selected check has a coverage gap or reaches no verdict. MCP and A2A rules on a chat endpoint are <code>not_applicable</code>, not coverage gaps; a chat rule missing tools or seeded fixtures can still leave <code>probe --preset release</code> <code>indeterminate</code>. A rule demanded by id remains a <code>demanded_check</code> shortfall even when its protocol is inapplicable. A profile can select rules the endpoint serves (<a href="profiles.html#release-complete-coverage-or-no-pass">profiles</a>). A <code>scan</code> of a path that holds no file other than <code>.guardanaignore</code> files is <code>indeterminate</code> (exit <code>2</code>) under every preset, and <code>plan scan</code> refuses it. A scan cannot tell a directory holding the wrong files from the one the build meant to produce.</p>
 <h3 id="some-unreadable-files-stay-unverified">Some unreadable files stay unverified</h3>
 <p>The secret scan and the MCP manifest scan report a text or JSON file over the 16 MiB read bound as unverified, not as a coverage gap.</p>
-<h3 id="collector-retries-keep-the-first-submission">Collector retries keep the first submission</h3>
-<p>The collector treats a second submission with the same run id in the same project and environment as a duplicate and keeps the first, whatever the second holds.</p>
 <h3 id="protocol-coverage-is-narrow-on-purpose">Protocol coverage is narrow on purpose</h3>
 <p>MCP is spoken in <code>2026-07-28</code> and <code>2025-11-25</code>; a server answering in an older revision is
 reported as sharing no revision, never graded in one Guardana does not speak. Task ids are

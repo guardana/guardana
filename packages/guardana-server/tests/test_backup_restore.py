@@ -30,7 +30,9 @@ import psycopg
 import pytest
 from conftest import DbConnection, _submission
 from guardana.server.db.migrations import apply_pending, read_state
+from guardana.server.envelope import RunIn
 from guardana.server.postgres_store import PostgresStore
+from guardana.server.store import Added, ConflictingRunError
 from guardana.server.tenancy import TenantScope, create_organization, create_project
 
 REQUIRE_TOOLS_VARIABLE = "GUARDANA_REQUIRE_PG_TOOLS"
@@ -245,3 +247,24 @@ def test_missing_client_tools_only_skip_where_they_were_not(
 )
 def test_the_client_version_is_read_whatever_the_packager_appends(reported: str) -> None:
     assert _major_of(reported) == 16
+
+
+def test_a_restored_collector_still_compares_a_retried_run_by_content(
+    usable_client_tools: None,
+    collector_with_data: tuple[str, TenantScope],
+    empty_database: str,
+    tmp_path: Path,
+) -> None:
+    """The digest is restored with the run, so a retry is not answered as one never compared."""
+    source_url, scope = collector_with_data
+    run = RunIn(run_id="5d2c8e1a-7b3f-4c6d-9e0a-1f2b3c4d5e6f")
+    PostgresStore(source_url).add(scope, _submission(source="app", run=run))
+    dump = tmp_path / "guardana-backup.dump"
+    back_up(source_url, dump)
+    restore(empty_database, dump)
+
+    store = PostgresStore(empty_database)
+
+    assert store.add(scope, _submission(source="app", run=run)) is Added.DUPLICATE
+    with pytest.raises(ConflictingRunError):
+        store.add(scope, _submission(source="app", run=run, findings=[]))

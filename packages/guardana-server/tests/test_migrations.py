@@ -703,4 +703,46 @@ def test_rolling_back_run_identity_per_environment_keeps_both_runs(
         row = cursor.fetchone()
     assert row is not None
     assert row[0] == 2
-    assert read_state(connection).pending == ()
+    assert 8 in {migration.version for migration in read_state(connection).applied}
+
+
+def test_the_content_digest_arrives_empty_so_a_stored_run_is_answered_as_not_compared(
+    connection: DbConnection,
+) -> None:
+    """A digest backfilled from the stored columns would not be the digest of what was sent."""
+    _apply_through(connection, 8)
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id, run_id) "
+            "values (now(), 'before', 8, %s, 'run-1')",
+            (project.id,),
+        )
+    connection.commit()
+
+    apply_pending(connection)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select source, run_id, content_digest from submissions")
+        assert cursor.fetchall() == [("before", "run-1", None)]
+
+
+def test_rolling_back_the_content_digest_keeps_the_submissions(connection: DbConnection) -> None:
+    apply_pending(connection)
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "insert into submissions (received_at, source, schema_version, project_id, run_id, "
+            "content_digest) values (now(), 'kept', 8, %s, 'run-1', 'v1:sha256:00')",
+            (project.id,),
+        )
+    connection.commit()
+
+    _roll_back_through(connection, 9)
+
+    with connection.cursor() as cursor:
+        cursor.execute("select source, run_id from submissions")
+        assert cursor.fetchall() == [("kept", "run-1")]
+    assert "content_digest" not in _columns(connection, "submissions")

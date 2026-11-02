@@ -34,7 +34,7 @@ from guardana.server.security import (
     require_authentication,
 )
 from guardana.server.stats import STATS_WINDOW, compute_stats
-from guardana.server.store import InMemoryStore, Store
+from guardana.server.store import Added, ConflictingRunError, InMemoryStore, Store
 from guardana.server.tenancy import TenantScope, UnscopedQueryError
 from pydantic import BaseModel
 
@@ -45,6 +45,7 @@ _BODYLESS = frozenset({"GET", "HEAD", "OPTIONS"})
 _NO_CONTENT = 204
 _UNAUTHORIZED = 401
 _FORBIDDEN = 403
+_CONFLICT = 409
 _UNAVAILABLE = 503
 _SERVER_ERROR = 500
 _TRUTHY = {"1", "true", "yes", "on"}
@@ -140,13 +141,14 @@ def create_app(
         Authenticated | None, Depends(_noting_acceptance(guard(database_url, Scope.READ)))
     ]
     ingest_docs = _documented(database_url, Scope.INGEST)
+    ingest_docs["responses"] = {**ingest_docs.get("responses", {}), **_CONFLICT_DOCS}
     read_docs = _documented(database_url, Scope.READ)
 
     @app.post("/findings", **ingest_docs)
     def post_findings(submission: Submission, identity: ingesting) -> dict[str, object]:
         redacted = _admissible(submission)
         try:
-            stored = active_store.add(_scope_of(identity), redacted)
+            added = active_store.add(_scope_of(identity), redacted)
         except EnvironmentMismatchError as exc:
             # `403`, like a missing scope: the caller *is* somebody, and that
             # somebody may not write here. A `422` would read as "your envelope is
@@ -154,6 +156,9 @@ def create_app(
             # correct. The refusal itself belongs to the store, where no future
             # caller can route around it.
             raise HTTPException(status_code=_FORBIDDEN, detail=str(exc)) from exc
+        except ConflictingRunError as exc:
+            raise HTTPException(status_code=_CONFLICT, detail=str(exc)) from exc
+        stored = added is Added.STORED
         return {
             "status": "ok",
             # `False` when this run was already held: a retried job is not a
@@ -161,6 +166,9 @@ def create_app(
             # nothing for is a log that double-counts.
             "duplicate": not stored,
             "stored": len(submission.findings) if stored else 0,
+            # Whether a duplicate's content was compared with the held run's; `False`
+            # for a run stored before the collector kept content digests.
+            "compared": None if stored else added is Added.DUPLICATE,
             # Echoed so a pipeline's log records which credential wrote the run and
             # into which tenant — the first thing anyone asks of an audit trail.
             "accepted_by": identity.name if identity is not None else None,
@@ -210,6 +218,16 @@ def _installed_version() -> str:
         return version("guardana-server")
     except PackageNotFoundError:
         return "unknown"
+
+
+_CONFLICT_DOCS: dict[int | str, dict[str, Any]] = {
+    _CONFLICT: {
+        "description": (
+            "This tenant already holds the run this submission names, in the same "
+            "environment, with different content. Nothing is stored; the detail names the run."
+        )
+    }
+}
 
 
 def _documented(database_url: str | None, scope: Scope) -> dict[str, Any]:

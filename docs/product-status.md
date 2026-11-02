@@ -137,10 +137,6 @@ again. `grade` sends nothing to the collector.
 
 The secret scan and the MCP manifest scan report a text or JSON file over the 16 MiB read bound as unverified, not as a coverage gap.
 
-### Collector retries keep the first submission
-
-The collector treats a second submission with the same run id in the same project and environment as a duplicate and keeps the first, whatever the second holds.
-
 ### Protocol coverage is narrow on purpose
 
 MCP is spoken in `2026-07-28` and `2025-11-25`; a server answering in an older revision is

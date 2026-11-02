@@ -27,7 +27,7 @@ from guardana.server.envelope import (
     VerdictIn,
 )
 from guardana.server.lifecycle import record_sighting
-from guardana.server.store import StoredSubmission
+from guardana.server.store import Added, StoredSubmission, content_digest, held_again
 from guardana.server.tenancy import TenantScope
 from psycopg import Connection, Cursor, IsolationLevel
 
@@ -163,7 +163,7 @@ class PostgresStore:
         with connect(self._url) as connection:
             yield connection
 
-    def add(self, scope: TenantScope, submission: Submission) -> bool:
+    def add(self, scope: TenantScope, submission: Submission) -> Added:
         """Store one submission and every finding it carries, in one transaction.
 
         One transaction because a submission whose findings were half written is a
@@ -176,6 +176,7 @@ class PostgresStore:
         """
         project = scope.require_project()
         submission = labelled_for(scope, submission)
+        digest = content_digest(submission)
         summary = submission.summary
         with (
             self._connection() as connection,
@@ -191,11 +192,11 @@ class PostgresStore:
                     model_digest, model_name, model_revision,
                     run_id, started_at, completed_at, tool_version, gate, evidence_mode,
                     requests, input_tokens, output_tokens, wall_time_seconds,
-                    api_key_id
+                    api_key_id, content_digest
                 ) values (%s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s,
                           %s, %s, %s, %s, %s, %s, %s, %s,
                           %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                          %s)
+                          %s, %s)
                 on conflict (project_id, (coalesce(environment, '')), run_id)
                     where run_id is not null do nothing
                 returning id
@@ -217,6 +218,7 @@ class PostgresStore:
                     *_label_values(submission.deployment),
                     *_run_values(submission.run),
                     scope.api_key_id,
+                    digest,
                 ),
             )
             row = cursor.fetchone()
@@ -224,7 +226,7 @@ class PostgresStore:
                 # The run is already stored. A retried pipeline job is not a failure
                 # and must not become one, and storing it twice would make
                 # "production got worse" answer from a duplicate.
-                return False
+                return self._held_again(cursor, project, submission, digest)
             submission_id = int(row[0])
             self._insert_findings(cursor, submission_id, _FINDINGS, submission.findings)
             self._insert_findings(cursor, submission_id, _UNVERIFIED, submission.unverified)
@@ -239,7 +241,35 @@ class PostgresStore:
             # a second source of time here makes old rows and new rows mean
             # different things.
             self._track(connection, project, submission.findings, self._seen_at())
-        return True
+        return Added.STORED
+
+    @staticmethod
+    def _held_again(
+        cursor: Cursor[tuple[Any, ...]], project: int, submission: Submission, digest: str
+    ) -> Added:
+        """Compare a submission whose run this project already holds in its environment.
+
+        Read by the same key the unique index enforces, so the comparison never reads a
+        run of another project or another environment.
+        """
+        run_id = submission.run.run_id if submission.run else None
+        if run_id is None:
+            return Added.NOT_COMPARED
+        environment = submission.deployment.environment if submission.deployment else None
+        cursor.execute(
+            """
+            select content_digest from submissions
+            where project_id = %s and coalesce(environment, '') = coalesce(%s, '')
+                and run_id = %s
+            """,
+            (project, environment, run_id),
+        )
+        held = cursor.fetchone()
+        if held is None:
+            # Retention removed the run after the insert met it, so nothing is held: an
+            # acknowledgement here would tell the agent a run is stored that is not.
+            raise RuntimeError(f"run {run_id} was removed while a retry was compared")
+        return held_again(held[0], digest, run_id)
 
     def _seen_at(self) -> datetime:
         """When this submission arrived, as a moment rather than an epoch."""
