@@ -188,7 +188,7 @@ def test_a_byte_order_mark_is_not_part_of_the_text(tmp_path: Path) -> None:
         (b"# coding: no-such-codec\nx = 1\n", "encoding"),
         (b"\xef\xbb\xbf# coding: latin-1\nx = 1\n", "encoding"),
         (b"def (:\n", "cannot be parsed"),
-        (b"x = 1\x00\n", "cannot contain null bytes"),
+        (b"x = 1\x00\n", "cannot be parsed as Python: source code cannot contain null bytes"),
     ],
 )
 def test_bytes_the_interpreter_would_refuse_are_unread_not_nothing(
@@ -228,6 +228,27 @@ def test_a_parser_recursion_failure_is_unread_and_parsed_once_per_target(
     assert len(calls) == 1
     assert [u.path for u in target.unread_sources()] == [path]
     assert "RecursionError" in target.unread_sources()[0].reason
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        pytest.param(b"x = 1\x00\n", id="first-line"),
+        pytest.param(b"a = 1\nb = 2\nc = 3\x00\n", id="past-the-coding-lines"),
+        pytest.param(b"# coding: no-such-codec\nx = 1\x00\n", id="beside-an-unusable-coding-line"),
+        pytest.param("x = 1\n".encode("utf-16"), id="utf-16-with-a-byte-order-mark"),
+    ],
+)
+def test_a_null_byte_reads_the_same_wherever_it_sits_and_on_every_interpreter(
+    tmp_path: Path, raw: bytes
+) -> None:
+    path = tmp_path / "null.py"
+    path.write_bytes(raw)
+    result = read_source(path)
+    assert isinstance(result, UnreadSource)
+    assert (
+        result.reason == "null.py cannot be parsed as Python: source code cannot contain null bytes"
+    )
 
 
 def test_a_null_byte_reason_names_no_missing_line(tmp_path: Path) -> None:

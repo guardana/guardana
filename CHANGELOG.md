@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Report source null bytes as Python parse problems on every interpreter.** Wherever the byte sits, including beside an unusable coding line or in a UTF-16 file, the message is `cannot be parsed as Python: source code cannot contain null bytes` (#287). Previously, `tokenize.detect_encoding` on Python `3.14` led to `declares an encoding that cannot be used` for a null byte in the first two lines; Python `3.11` to `3.13` reported a parse problem for most such files but an encoding problem beside an unusable coding line or in a UTF-16 file. The file stays unread, so only the message changes and no verdict changes.
+
 ## [1.1.0] - 2026-11-02 — the first minor release
 
 ### Added
