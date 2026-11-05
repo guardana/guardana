@@ -71,13 +71,22 @@ class McpProtocolError(McpError):
     The code is the whole point. `-32022` on a probe means *this server speaks a
     modern revision and not the one you asked for*, which is a different
     instruction from any other failure: retry with a version it named, rather than
-    fall back to the handshake it removed.
+    fall back to the handshake it removed. `status` is the HTTP status it came with, None
+    on a transport that has none.
     """
 
-    def __init__(self, message: str, *, code: int | None = None, data: object = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: int | None = None,
+        data: object = None,
+        status: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.data = data
+        self.status = status
 
     def supported_versions(self) -> tuple[str, ...]:
         """Read the versions an `UnsupportedProtocolVersionError` said it does support."""
@@ -240,13 +249,13 @@ def completed(result: Mapping[str, object], ref: str) -> Mapping[str, object]:
     raise McpError(f"MCP server at {ref} returned an unrecognised resultType {kind!r}")
 
 
-def error_from(message: str, error: object) -> McpError:
-    """Build the exception for a JSON-RPC error object, keeping its code and data."""
+def error_from(message: str, error: object, *, status: int | None = None) -> McpError:
+    """Build the exception for a JSON-RPC error object, keeping its code, data and HTTP status."""
     if not isinstance(error, Mapping):
         return McpError(message)
     code = error.get("code")
     return McpProtocolError(
-        message, code=code if isinstance(code, int) else None, data=error.get("data")
+        message, code=code if isinstance(code, int) else None, data=error.get("data"), status=status
     )
 
 

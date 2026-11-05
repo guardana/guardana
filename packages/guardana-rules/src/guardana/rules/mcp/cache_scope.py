@@ -49,7 +49,8 @@ class McpCacheScopeRule(McpReporting):
     revision without them tells a cache nothing. The run records the rule as skipped
     `not_applicable`, naming the revision, rather than as a check that found nothing. A
     server that also lists a modern revision this client does not speak is inconclusive
-    instead: what it declares to modern clients was not read.
+    instead: what it declares to modern clients was not read. So is one whose `server/discover`
+    failed, since a server answering the handshake may still serve modern clients.
 
     Two silences, each one a case where nothing was declared to anyone:
 
@@ -88,7 +89,7 @@ class McpCacheScopeRule(McpReporting):
         return 6 + MAX_LISTING_PAGES + 3
 
     def fixtures(self) -> Iterable[RuleFixture]:
-        """Sample a gated listing declared public or private, an unread server, a legacy one."""
+        """Sample a gated listing declared public or private, unread servers, a legacy one."""
 
         def gated(scope: str) -> Target:
             return _samples.target(
@@ -116,6 +117,15 @@ class McpCacheScopeRule(McpReporting):
                     "a server speaking only a revision guardana does not",
                     FixtureOutcome.INCONCLUSIVE,
                     lambda: _samples.target(_samples.unspoken_server()),
+                ),
+                _samples.sample(
+                    "a gated server whose discovery failed, so what it tells modern clients is "
+                    "unread",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(
+                        _samples.gated_server(discover_status=503),
+                        credential=_samples.CREDENTIAL,
+                    ),
                 ),
                 _samples.sample(
                     "a gated legacy server, whose revision carries no cacheScope",
@@ -164,6 +174,14 @@ class McpCacheScopeRule(McpReporting):
                 )
                 return
             revision = negotiation.agreed or negotiation.wire.version
+            fallback = negotiation.fallback
+            if fallback is not None and fallback.failed:
+                yield self.unverified(
+                    view,
+                    f"server/discover failed ({fallback.reason}) and the server answered in MCP "
+                    f"{revision}, so what it declares to modern clients was not read",
+                )
+                return
             raise NotApplicable(
                 f"the server answered in MCP {revision}, which carries no cacheScope, so it "
                 f"declared nothing to any cache"

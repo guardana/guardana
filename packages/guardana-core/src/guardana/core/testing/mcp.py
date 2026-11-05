@@ -62,7 +62,8 @@ class ScriptedMcpServer:
 
     `discovers` is what `server/discover` lists when it differs from what the server
     answers: a server listing only modern revisions while still answering `initialize`
-    is dual-era, and only the legacy handshake tells.
+    is dual-era, and only the legacy handshake tells. `discover_status` answers
+    `server/discover` with that HTTP status and no body, as a discovery that failed does.
 
     `tasks` are the task ids `tasks/list` answers with; left unset, the method is unknown.
     `tasks_owner_bound` shows them only to a caller presenting `credential`, and
@@ -104,6 +105,7 @@ class ScriptedMcpServer:
         cache_scope: str | None = None,
         ttl_ms: int | None = None,
         discovers: Sequence[str] | None = None,
+        discover_status: int | None = None,
         tasks: Sequence[str] | None = None,
         tasks_owner_bound: bool = False,
         tasks_unguarded: bool = False,
@@ -129,6 +131,7 @@ class ScriptedMcpServer:
         self.cache_scope = cache_scope
         self.ttl_ms = ttl_ms
         self.discovers = list(discovers) if discovers is not None else None
+        self.discover_status = discover_status
         self.tasks = list(tasks) if tasks is not None else None
         self.tasks_owner_bound = tasks_owner_bound
         self.tasks_unguarded = tasks_unguarded
@@ -224,6 +227,8 @@ class ScriptedMcpServer:
         if method == "tasks/list":
             return self._task_listing(headers, era)
         if method == "server/discover":
+            if self.discover_status is not None:
+                return RawReply(status=self.discover_status, headers={}, body=b"")
             if self.protocol_versions is None:
                 return _error(200, _METHOD_NOT_FOUND, "Method not found", None)
             return _reply(200, self._discovery(), era=Era.MODERN)

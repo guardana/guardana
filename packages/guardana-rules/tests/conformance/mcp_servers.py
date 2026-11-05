@@ -456,6 +456,47 @@ def dual_era_failing_first_handshake(origin: Origin) -> ASGIApp:
     return _FailFirstHandshake(dual_era_gated(origin))
 
 
+class _AnswersDiscovery:
+    """Give `server/discover` a fixed status and JSON-RPC error; serve everything else."""
+
+    def __init__(self, app: ASGIApp, *, status: int, code: int, reply_id: object = 1) -> None:
+        self._app = app
+        self._status = status
+        self._code = code
+        self._reply_id = reply_id
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] != "POST":
+            await self._app(scope, receive, send)
+            return
+        body, replay = await _body_of(receive)
+        if _method_of(body) != "server/discover":
+            await self._app(scope, replay, send)
+            return
+        error = {"code": self._code, "message": "answered by the fixture"}
+        response = JSONResponse(
+            {"jsonrpc": "2.0", "id": self._reply_id, "error": error}, status_code=self._status
+        )
+        await response(scope, replay, send)
+
+
+def legacy_failing_discovery(origin: Origin) -> ASGIApp:
+    """Only the handshake era, gated, whose `server/discover` fails with `503` and `-32603`."""
+    return _AnswersDiscovery(legacy_only_gated(origin), status=503, code=types.INTERNAL_ERROR)
+
+
+def legacy_refusing_discovery_python(origin: Origin) -> ASGIApp:
+    """Only the handshake era, gated, refusing `server/discover` as the Python SDK does."""
+    return _AnswersDiscovery(
+        legacy_only_gated(origin), status=400, code=-32600, reply_id="server-error"
+    )
+
+
+def legacy_refusing_discovery_typescript(origin: Origin) -> ASGIApp:
+    """Only the handshake era, gated, refusing `server/discover` as the TypeScript SDK does."""
+    return _AnswersDiscovery(legacy_only_gated(origin), status=400, code=-32000, reply_id=None)
+
+
 NOW_SUPPORTED = (LEGACY_REVISION,)
 """What the changing server offers once it has answered `server/discover`."""
 

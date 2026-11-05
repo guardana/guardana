@@ -194,6 +194,36 @@ def test_a_dual_era_server_whose_legacy_probe_failed_leaves_its_sessions_inconcl
     assert "HTTP 503 carrying JSON-RPC error -32603" in said["evidence"]["summary"]
 
 
+def test_a_gated_legacy_server_whose_discovery_failed_leaves_the_cache_hint_inconclusive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _probe(mcp.legacy_failing_discovery, tmp_path, monkeypatch, credential=True)
+
+    assert run.code == 0, run.stderr
+    assert run.protocols == {"mcp": mcp.LEGACY_REVISION}
+    assert not run.skipped("guardana.mcp.cache_scope")
+    (said,) = run.unverified("guardana.mcp.cache_scope")
+    assert "HTTP 503 carrying JSON-RPC error -32603" in said["evidence"]["summary"]
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        pytest.param(mcp.legacy_refusing_discovery_python, id="python-sdk"),
+        pytest.param(mcp.legacy_refusing_discovery_typescript, id="typescript-sdk"),
+    ],
+)
+def test_a_gated_legacy_server_refusing_discovery_leaves_the_cache_hint_not_applicable(
+    factory: Factory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = _probe(factory, tmp_path, monkeypatch, credential=True)
+
+    assert run.code == 0, run.stderr
+    assert run.protocols == {"mcp": mcp.LEGACY_REVISION}
+    assert [s["reason"] for s in run.skipped("guardana.mcp.cache_scope")] == ["not_applicable"]
+    assert not run.unverified("guardana.mcp.cache_scope")
+
+
 def test_a_rule_that_raised_is_never_read_as_silent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

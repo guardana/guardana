@@ -6,13 +6,15 @@ guessed would be wrong half the time and would write the guess into a run
 manifest, so the guess is what these tests are about.
 """
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
 import pytest
 from _offline import refuse_name_lookups
 from guardana.core.target import McpError, McpServerTarget
-from guardana.core.target._mcp_http import RawReply
+from guardana.core.target._mcp_client import Fallback, HttpMcpTransport, negotiate
+from guardana.core.target._mcp_http import MAX_RESPONSE_BYTES, RawReply
 from guardana.core.target._mcp_wire import (
     INITIALIZED,
     LATEST_VERSION,
@@ -251,3 +253,215 @@ def test_a_challenge_on_the_probe_leaves_the_era_open_and_the_handshake_settles_
 
     assert target.protocols() == {"mcp": LATEST_VERSION}
     assert _methods(server) == ["server/discover", "initialize", "tools/list"]
+
+
+def _discover_answered(reply: RawReply, *, credential: str | None = None) -> Fallback | None:
+    """Negotiate with a server that gives `reply` to `server/discover`, the real transport."""
+
+    def sender(url: str, **_: object) -> RawReply:
+        return reply
+
+    transport = HttpMcpTransport(ROUTABLE, credential=credential, send=sender)
+    return negotiate(transport).fallback
+
+
+def _json_rpc_error(status: int, code: int) -> RawReply:
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "error": {"code": code, "message": "no"}})
+    return RawReply(status=status, headers={}, body=body.encode("utf-8"))
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        pytest.param(_json_rpc_error(200, -32601), id="unknown-method"),
+        pytest.param(_json_rpc_error(404, -32601), id="unknown-method-at-any-status"),
+        pytest.param(_json_rpc_error(400, -32600), id="python-sdk-without-a-session"),
+        pytest.param(_json_rpc_error(400, -32000), id="typescript-sdk-without-a-session"),
+        pytest.param(
+            _json_rpc_error(200, -32602), id="invalid-params-inside-a-session-free-server"
+        ),
+        pytest.param(RawReply(status=400, headers={}, body=b""), id="400-empty"),
+        pytest.param(RawReply(status=404, headers={}, body=b"not found"), id="404-plain-text"),
+        pytest.param(RawReply(status=405, headers={}, body=b"{}"), id="405-object-without-error"),
+    ],
+)
+def test_the_answer_a_server_without_the_method_gives_is_a_legacy_answer(reply: RawReply) -> None:
+    fallback = _discover_answered(reply)
+
+    assert fallback is not None
+    assert not fallback.failed
+
+
+def test_a_reply_that_is_no_discovery_result_is_a_legacy_answer() -> None:
+    body = b'{"jsonrpc":"2.0","id":1,"result":{}}'
+
+    fallback = _discover_answered(RawReply(status=200, headers={}, body=body))
+
+    assert fallback == Fallback("the reply is not a discovery result", failed=False)
+
+
+@pytest.mark.parametrize(
+    ("reply", "said"),
+    [
+        pytest.param(RawReply(status=500, headers={}, body=b""), "HTTP 500", id="500"),
+        pytest.param(RawReply(status=502, headers={}, body=b"bad"), "HTTP 502", id="502"),
+        pytest.param(RawReply(status=503, headers={}, body=b""), "HTTP 503", id="503"),
+        pytest.param(RawReply(status=408, headers={}, body=b""), "HTTP 408", id="408"),
+        pytest.param(RawReply(status=425, headers={}, body=b""), "HTTP 425", id="425"),
+        pytest.param(RawReply(status=429, headers={}, body=b""), "HTTP 429", id="429"),
+        pytest.param(RawReply(status=410, headers={}, body=b""), "HTTP 410", id="410"),
+        pytest.param(
+            _json_rpc_error(503, -32603), "HTTP 503 carrying JSON-RPC error -32603", id="503-rpc"
+        ),
+        pytest.param(
+            _json_rpc_error(503, -32600), "HTTP 503 carrying JSON-RPC error -32600", id="503-reject"
+        ),
+        pytest.param(
+            _json_rpc_error(200, -32603), "HTTP 200 carrying JSON-RPC error -32603", id="200-rpc"
+        ),
+        pytest.param(
+            _json_rpc_error(400, -32603), "HTTP 400 carrying JSON-RPC error -32603", id="400-rpc"
+        ),
+        pytest.param(
+            _json_rpc_error(404, -32000), "HTTP 404 carrying JSON-RPC error -32000", id="404-rpc"
+        ),
+        pytest.param(
+            _json_rpc_error(200, -32000), "HTTP 200 carrying JSON-RPC error -32000", id="200-server"
+        ),
+        pytest.param(
+            _json_rpc_error(400, -32022), "HTTP 400 carrying JSON-RPC error -32022", id="400-modern"
+        ),
+        pytest.param(
+            _json_rpc_error(400, -32001), "HTTP 400 carrying JSON-RPC error -32001", id="400-other"
+        ),
+        pytest.param(
+            _json_rpc_error(400, 1234), "HTTP 400 carrying JSON-RPC error 1234", id="400-app-code"
+        ),
+        pytest.param(
+            _json_rpc_error(503, -32601),
+            "HTTP 503 carrying JSON-RPC error -32601",
+            id="503-unknown",
+        ),
+        pytest.param(
+            _json_rpc_error(429, -32601),
+            "HTTP 429 carrying JSON-RPC error -32601",
+            id="429-unknown",
+        ),
+        pytest.param(
+            _json_rpc_error(401, -32601), "HTTP 401 carrying JSON-RPC error -32601", id="401-rpc"
+        ),
+        pytest.param(
+            RawReply(status=400, headers={}, body=b'{"error":"overloaded"}'),
+            "HTTP 400",
+            id="400-malformed-error-member",
+        ),
+    ],
+)
+def test_a_discovery_that_failed_says_so_and_names_the_failure(reply: RawReply, said: str) -> None:
+    fallback = _discover_answered(reply)
+
+    assert fallback == Fallback(said, failed=True)
+
+
+@pytest.mark.parametrize("status", [401, 403, 407])
+def test_a_credential_refused_on_discovery_says_nothing_about_the_era(status: int) -> None:
+    fallback = _discover_answered(RawReply(status=status, headers={}, body=b""), credential="t")
+
+    assert fallback == Fallback(f"HTTP {status}", failed=True)
+
+
+def test_a_challenge_without_a_credential_says_nothing_about_the_era() -> None:
+    fallback = _discover_answered(RawReply(status=401, headers={}, body=b""))
+
+    assert fallback == Fallback("HTTP 401", failed=True)
+
+
+def test_a_404_cut_short_at_the_ceiling_is_not_read_as_a_legacy_answer() -> None:
+    body = b'{"error": "x"' + b" " * (MAX_RESPONSE_BYTES + 1)
+
+    fallback = _discover_answered(RawReply(status=404, headers={}, body=body))
+
+    assert fallback == Fallback("HTTP 404", failed=True)
+
+
+def test_a_discovery_that_timed_out_says_so_and_a_reply_it_never_got_is_not_quoted() -> None:
+    def times_out(url: str, **_: object) -> RawReply:
+        raise McpError("timed out")
+
+    fallback = negotiate(HttpMcpTransport(ROUTABLE, send=times_out)).fallback
+
+    assert fallback is not None
+    assert fallback.failed
+    assert "timed out" in fallback.reason
+    assert ROUTABLE in fallback.reason
+
+
+def test_a_reply_at_a_success_status_that_is_not_json_rpc_is_a_failure() -> None:
+    fallback = _discover_answered(RawReply(status=200, headers={}, body=b"<html>"))
+
+    assert fallback is not None
+    assert fallback.failed
+    assert "not JSON-RPC" in fallback.reason
+    assert "<html>" not in fallback.reason
+
+
+@pytest.mark.parametrize(
+    "result",
+    [{"supportedVersions": []}, {"supportedVersions": "2026-07-28"}],
+    ids=["empty-list", "not-a-list"],
+)
+def test_a_result_with_the_discovery_key_and_no_revision_is_a_failure(
+    result: dict[str, object],
+) -> None:
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "result": result}).encode("utf-8")
+
+    fallback = _discover_answered(RawReply(status=200, headers={}, body=body))
+
+    assert fallback == Fallback("the result lists no revision", failed=True)
+
+
+def test_an_unusable_result_is_a_failure_that_does_not_quote_it() -> None:
+    body = b'{"jsonrpc":"2.0","id":1,"result":{"resultType":"token=hunter2"}}'
+
+    fallback = _discover_answered(RawReply(status=200, headers={}, body=body))
+
+    assert fallback == Fallback("the server's answer could not be used", failed=True)
+
+
+def test_the_reason_carries_no_text_the_server_wrote() -> None:
+    body = json.dumps(
+        {"jsonrpc": "2.0", "id": 1, "error": {"code": -32603, "message": "token=hunter2"}}
+    ).encode("utf-8")
+
+    fallback = _discover_answered(RawReply(status=500, headers={}, body=body))
+
+    assert fallback == Fallback("HTTP 500 carrying JSON-RPC error -32603", failed=True)
+
+
+def test_the_handshake_that_follows_keeps_why_the_conversation_fell_back() -> None:
+    server = ScriptedMcpServer(ROUTABLE, tools=TOOLS, discover_status=503)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
+
+    conversation = target.conversation()
+
+    assert conversation.negotiation.agreed == LEGACY_VERSION
+    assert conversation.negotiation.fallback == Fallback("HTTP 503", failed=True)
+
+
+def test_a_modern_server_settled_by_a_failed_probe_and_its_handshake_carries_no_fallback() -> None:
+    server = ScriptedMcpServer(
+        ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION], discover_status=503
+    )
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
+
+    conversation = target.conversation()
+
+    assert conversation.negotiation.agreed == LATEST_VERSION
+    assert conversation.negotiation.fallback is None
+
+
+def test_a_server_that_answered_discovery_carries_no_fallback() -> None:
+    server = ScriptedMcpServer(ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION])
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
+
+    assert target.conversation().negotiation.fallback is None
