@@ -144,7 +144,15 @@ def _why(exc: Exception) -> str:
 
 
 def _decoded(path: Path, raw: bytes) -> str | UnreadSource:
-    """Decode `raw` in the encoding its byte order mark or coding line declares."""
+    """Decode `raw` in the encoding its byte order mark or coding line declares.
+
+    A null byte is refused first, because which step meets one, and what it says, depends
+    on the interpreter.
+    """
+    if b"\x00" in raw:
+        return UnreadSource(
+            path, f"{path.name} cannot be parsed as Python: source code cannot contain null bytes"
+        )
     try:
         encoding, _ = tokenize.detect_encoding(io.BytesIO(raw).readline)
     except SyntaxError as exc:
