@@ -214,6 +214,8 @@ def test_the_snapshot_holds_every_surface_and_leaves_the_runner_out(
     } <= set(snapshot)
     assert "guardana.core.Rule" in snapshot["extension"]
     assert "guardana.core.rule.fixture.FixtureOutcome" in snapshot["extension"]
+    assert "guardana.core.rule.NotApplicable" in snapshot["extension"]
+    assert "guardana.core.rule.NotOffered" in snapshot["extension"]
     assert "guardana.core.Runner" not in snapshot["extension"]
     assert "guardana.core.verify.Verifier" in snapshot["facade"]
     assert "guardana.testing.assert_target_conforms" in snapshot["kit"]

@@ -66,6 +66,7 @@ WHOLE = (
 LISTED = {
     "guardana.core.plugins": {"PluginMode", "PluginTrust"},
     "guardana.core.profile": {"load_profile"},
+    "guardana.core.rule": {"NotApplicable", "NotOffered"},
     "guardana.core.target": {"WireProtocol", "display_url"},
     "guardana.core.source": {"PythonSource", "UnreadSource", "read_source"},
     "guardana.core.report.shortfall": {"CoverageShortfall", "ShortfallKind"},

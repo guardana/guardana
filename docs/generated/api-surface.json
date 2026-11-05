@@ -6439,6 +6439,74 @@
       ],
       "methods": {}
     },
+    "guardana.core.rule.NotApplicable": {
+      "bases": [
+        "Exception"
+      ],
+      "decorators": [],
+      "defined_in": "guardana.core.rule.base",
+      "fields": [],
+      "kind": "class",
+      "methods": {
+        "__init__": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "str",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "detail"
+            }
+          ],
+          "returns": "None"
+        }
+      }
+    },
+    "guardana.core.rule.NotOffered": {
+      "bases": [
+        "Exception"
+      ],
+      "decorators": [],
+      "defined_in": "guardana.core.rule.base",
+      "fields": [],
+      "kind": "class",
+      "methods": {
+        "__init__": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "str",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "detail"
+            },
+            {
+              "annotation": "tuple[str, ...]",
+              "has_default": true,
+              "kind": "keyword_only",
+              "name": "missing"
+            }
+          ],
+          "returns": "None"
+        }
+      }
+    },
     "guardana.core.rule.fixture.DEMANDED_OUTCOMES": {
       "annotation": null,
       "defined_in": "guardana.core.rule.fixture",

@@ -836,6 +836,7 @@ def test_the_kit_accepts_the_names_the_surface_lists() -> None:
         "from guardana.core.target import WireProtocol, display_url\n"
         "from guardana.core.plugins import PluginTrust\n"
         "from guardana.core.source import read_source\n"
+        "from guardana.core.rule import NotApplicable, NotOffered\n"
         "from guardana.core.rule.fixture import materialise\n"
         "from guardana.testing import assert_target_conforms\n"
     )
