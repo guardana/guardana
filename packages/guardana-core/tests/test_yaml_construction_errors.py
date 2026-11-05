@@ -1,5 +1,6 @@
 """Public YAML readers retain their documented refusal and diagnostic prefix."""
 
+import gc
 from collections.abc import Callable
 from pathlib import Path
 
@@ -144,8 +145,14 @@ def test_a_document_nested_past_the_stack_keeps_the_documented_error(
     path = tmp_path / "input.yaml"
     path.write_text(DEEPLY_NESTED, encoding="utf-8")
 
-    with pytest.raises(error) as caught:
-        load(path)
+    # A collection at the recursion limit runs finalizers left by earlier tests, and pytest's
+    # unraisable hook then hits the limit itself, failing this test for no reason of the reader's.
+    gc.disable()
+    try:
+        with pytest.raises(error) as caught:
+            load(path)
+    finally:
+        gc.enable()
 
     message = str(caught.value)
     assert message.startswith(prefix.format(path=path))
