@@ -173,6 +173,7 @@ A retry whose content differs is refused with `409`, with the detail naming the 
 and nothing is stored. Content is compared as stored: after redaction and environment
 labelling. A run stored before the collector kept content digests (migration `0009`)
 cannot be compared: its retry is accepted as a duplicate with `"compared": false`.
+The CLI warns, naming the run, and the submission counts as delivered.
 An agent older than 0.9 sends no run id, identifies nothing, and is stored every time —
 which is honest, not clever.
 
@@ -743,7 +744,9 @@ acknowledgement — a JSON object whose `status` is `ok`, with an integer `store
 boolean `duplicate`, which every collector that accepts envelope 8 sends. The
 acknowledgement also carries `compared`, `true` when a duplicate's content matched the
 stored run, `false` when the stored run predates content digests, and `null` for a new
-run; delivery does not depend on it. Any other `2xx`, from a proxy, a health check or
+run; delivery does not depend on it. Only `false` on a duplicate produces a warning.
+An acknowledgement without the field, from an older collector, produces none.
+Any other `2xx`, from a proxy, a health check or
 another service at the collector's address, is `could not submit to reporter: the response was not a collector acknowledgement`.
 
 By default a collector that is unreachable or does not acknowledge never changes a gate's

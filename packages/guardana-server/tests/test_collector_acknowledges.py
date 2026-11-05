@@ -7,7 +7,7 @@ requires into a failure.
 
 from fastapi.testclient import TestClient
 from guardana.core.report import ScanResult
-from guardana.core.reporter import HttpReporter, _acknowledged
+from guardana.core.reporter import HttpReporter, _acknowledgement
 from guardana.server import create_app
 from guardana.server.store import InMemoryStore
 
@@ -34,11 +34,11 @@ def test_the_collectors_answer_to_a_stored_and_a_repeated_run_is_an_acknowledgem
     reporter.submit(ScanResult((), (), ()), source="ci")
 
     assert len(answers) == 2
-    assert all(_acknowledged(answer) for answer in answers)
+    assert all(_acknowledgement(answer) is not None for answer in answers)
 
 
 def test_the_collectors_refusal_is_not_an_acknowledgement() -> None:
     response = _client().post("/findings", json={"schema_version": 999, "source": "ci"})
 
     assert response.status_code == _UNPROCESSABLE
-    assert not _acknowledged(response.content)
+    assert _acknowledgement(response.content) is None

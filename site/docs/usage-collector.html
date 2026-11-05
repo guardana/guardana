@@ -329,6 +329,7 @@ A retry whose content differs is refused with <code>409</code>, with the detail 
 and nothing is stored. Content is compared as stored: after redaction and environment
 labelling. A run stored before the collector kept content digests (migration <code>0009</code>)
 cannot be compared: its retry is accepted as a duplicate with <code>&quot;compared&quot;: false</code>.
+The CLI warns, naming the run, and the submission counts as delivered.
 An agent older than 0.9 sends no run id, identifies nothing, and is stored every time —
 which is honest, not clever.</p>
 <h2 id="triage-what-somebody-decided-about-a-finding">Triage: what somebody decided about a finding</h2>
@@ -952,7 +953,9 @@ acknowledgement — a JSON object whose <code>status</code> is <code>ok</code>, 
 boolean <code>duplicate</code>, which every collector that accepts envelope 8 sends. The
 acknowledgement also carries <code>compared</code>, <code>true</code> when a duplicate's content matched the
 stored run, <code>false</code> when the stored run predates content digests, and <code>null</code> for a new
-run; delivery does not depend on it. Any other <code>2xx</code>, from a proxy, a health check or
+run; delivery does not depend on it. Only <code>false</code> on a duplicate produces a warning.
+An acknowledgement without the field, from an older collector, produces none.
+Any other <code>2xx</code>, from a proxy, a health check or
 another service at the collector's address, is <code>could not submit to reporter: the response was not a collector acknowledgement</code>.</p>
 <p>By default a collector that is unreachable or does not acknowledge never changes a gate's
 exit code — the scan already ran and its verdict stands on its own. A collector that

@@ -44,6 +44,62 @@ def test_the_collectors_acknowledgement_is_a_delivery(body: bytes) -> None:
 
 
 @pytest.mark.parametrize(
+    ("answer", "uncompared"),
+    [
+        pytest.param({"duplicate": True, "compared": False}, True, id="retry-not-compared"),
+        pytest.param({"duplicate": True, "compared": True}, False, id="retry-compared"),
+        pytest.param({"duplicate": False, "compared": None}, False, id="new-run"),
+        pytest.param({"duplicate": True}, False, id="older-collector-retry"),
+        pytest.param({"duplicate": False}, False, id="older-collector-new-run"),
+        pytest.param({"duplicate": True, "compared": None}, False, id="retry-compared-null"),
+        pytest.param({"duplicate": True, "compared": 0}, False, id="retry-compared-zero"),
+        pytest.param({"duplicate": True, "compared": "false"}, False, id="retry-compared-text"),
+        pytest.param({"duplicate": False, "compared": False}, False, id="new-run-compared-false"),
+    ],
+)
+def test_only_a_retry_answered_compared_false_was_accepted_uncompared(
+    answer: dict[str, object], uncompared: bool
+) -> None:
+    body = json.dumps({"status": "ok", "stored": 0, **answer}).encode()
+
+    with answering(200, body) as collector:
+        reporter = HttpReporter(collector.url)
+        reporter.submit(_EMPTY, source="ci")
+
+    assert collector.heard == ["/findings"]
+    assert reporter.accepted_uncompared is uncompared
+
+
+def test_the_next_submission_of_a_reporter_says_again_what_became_of_it() -> None:
+    answers = iter([True, None])
+    reporter = HttpReporter("http://collector", transport=lambda _url, _body: next(answers))
+
+    reporter.submit(_EMPTY, source="ci")
+    assert reporter.accepted_uncompared is True
+
+    reporter.submit(_EMPTY, source="ci")
+    assert reporter.accepted_uncompared is False
+
+
+def test_a_submission_that_failed_says_nothing_about_the_one_before() -> None:
+    answers = [True]
+
+    def fails_the_second_time(_url: str, _body: bytes) -> bool:
+        if answers:
+            return answers.pop()
+        raise UnacknowledgedSubmissionError
+
+    reporter = HttpReporter("http://collector", transport=fails_the_second_time)
+
+    reporter.submit(_EMPTY, source="ci")
+    assert reporter.accepted_uncompared is True
+
+    with pytest.raises(UnacknowledgedSubmissionError):
+        reporter.submit(_EMPTY, source="ci")
+    assert reporter.accepted_uncompared is False
+
+
+@pytest.mark.parametrize(
     ("status", "body"),
     [
         (200, json.dumps({"choices": [{"message": {"content": "hello"}}]}).encode()),

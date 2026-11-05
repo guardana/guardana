@@ -259,6 +259,8 @@ class _Collector:
     ) -> None:
         _Collector.urls.append(url)
 
+    accepted_uncompared = False
+
     def submit(self, result: ScanResult, *, source: str) -> None:
         """Accept the submission."""
 

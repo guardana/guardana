@@ -11,6 +11,7 @@ import psycopg
 import pytest
 from conftest import Scoped, _clock, _submission
 from fastapi.testclient import TestClient
+from guardana.core.reporter import _accepted_uncompared
 from guardana.core.testing import fake_aws_key
 from guardana.server import create_app
 from guardana.server.db.migrations import apply_pending
@@ -257,6 +258,7 @@ def test_the_acknowledgement_says_a_duplicate_was_not_compared() -> None:
         "stored": 0,
         "compared": False,
     }
+    assert _accepted_uncompared(again.json())
 
 
 @pytest.mark.parametrize("authenticated", [False, True])

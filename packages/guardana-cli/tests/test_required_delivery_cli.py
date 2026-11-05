@@ -24,6 +24,7 @@ from _documents import run_manifest, scan_result
 from _fake_distribution import FakeModule, FakeSite
 from guardana.cli._formats import OutputFormat
 from guardana.cli._outputs import RunOutputs
+from guardana.cli._reporting import submit_safely
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.cli.monitor import AlertDeliveries, _exit_with_worst
@@ -241,6 +242,87 @@ def test_an_acknowledged_delivery_keeps_the_verdicts_code(
     assert required.exit_code == unrequired.exit_code != ExitCode.OUTPUT_FAILED, required.output
     assert collector.heard == ["/findings", "/findings"]
     assert not any("could not submit" in line for line in _lines(required.output))
+
+
+_RETRY = {"status": "ok", "duplicate": True, "stored": 0}
+
+
+def _retry_warnings(result: Result) -> list[str]:
+    return [line for line in _lines(result.output) if "without comparing" in line]
+
+
+@pytest.mark.usefixtures("clean_tree")
+def test_a_retry_accepted_without_comparison_warns_naming_the_run_and_still_counts(
+    tmp_path: Path, requiring: Path
+) -> None:
+    saved = tmp_path / "run.json"
+    answer = json.dumps({**_RETRY, "compared": False}).encode()
+
+    with answering(200, answer) as collector:
+        result = runner.invoke(
+            app,
+            [
+                "scan",
+                str(tmp_path / "tree"),
+                "--profile",
+                str(requiring),
+                "--reporter",
+                collector.url,
+                "--format",
+                "json",
+                "--output",
+                str(saved),
+            ],
+        )
+
+    assert result.exit_code == ExitCode.OK, result.output
+    run_id = json.loads(saved.read_text(encoding="utf-8"))["run"]["run_id"]
+    (warning,) = _retry_warnings(result)
+    assert warning.startswith(f"warning: the collector accepted run {run_id} as a retry")
+    assert not any("could not submit" in line for line in _lines(result.output))
+
+
+@pytest.mark.usefixtures("clean_tree")
+@pytest.mark.parametrize(
+    "answer",
+    [
+        pytest.param({**_RETRY, "compared": True}, id="retry-compared"),
+        pytest.param({**_RETRY, "duplicate": False, "stored": 1, "compared": None}, id="new-run"),
+        pytest.param(_RETRY, id="older-collector"),
+    ],
+)
+def test_an_answer_that_says_nothing_went_uncompared_warns_of_nothing(
+    tmp_path: Path, requiring: Path, answer: dict[str, object]
+) -> None:
+    with answering(200, json.dumps(answer).encode()) as collector:
+        result = runner.invoke(
+            app,
+            [
+                "scan",
+                str(tmp_path / "tree"),
+                "--profile",
+                str(requiring),
+                "--reporter",
+                collector.url,
+            ],
+        )
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert collector.heard == ["/findings"]
+    assert _retry_warnings(result) == []
+    assert not any("could not submit" in line for line in _lines(result.output))
+
+
+def test_a_retry_with_no_saved_run_to_name_warns_about_this_run(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    answer = json.dumps({**_RETRY, "compared": False}).encode()
+
+    with answering(200, answer) as collector:
+        delivered = submit_safely(collector.url, scan_result(), source="ci")
+
+    assert delivered
+    assert "warning: the collector accepted this run as a retry" in capsys.readouterr().err
 
 
 def test_a_failing_scan_turns_from_1_into_8(

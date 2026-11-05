@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Support `NotApplicable` and `NotOffered` from `guardana.core.rule` in the extension contract.** `docs/extending.md`, `docs/writing-rules.md` and `docs/python-api.md` already told rule authors to raise them, but they were outside the supported surface (#288). `docs/generated/api-surface.json` lists them and compatibility tests pin them.
+- **Warn when a collector accepts a retry without comparing its content.** `--reporter` runs name the run when the acknowledgement says `"compared": false`, because runs stored before migration `0009` accept retries with different content without comparison (#289). The submission still counts as delivered and no exit code changes. An acknowledgement with `"compared": true`, with `null` for a new run, or without the field from an older collector produces no warning.
 
 ### Changed
 

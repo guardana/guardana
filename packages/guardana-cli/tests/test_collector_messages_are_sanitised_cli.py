@@ -75,6 +75,8 @@ class _FailingReporter:
     ) -> None:
         self.api_key = api_key
 
+    accepted_uncompared = False
+
     def submit(self, result: ScanResult, *, source: str) -> None:
         raise ConnectionError(f"refused for {self.api_key} {_HOSTILE}")
 
@@ -99,6 +101,8 @@ class _RejectingReporter:
 
     def __init__(self, error: HTTPError) -> None:
         self.error = error
+
+    accepted_uncompared = False
 
     def submit(self, result: ScanResult, *, source: str) -> None:
         raise self.error
