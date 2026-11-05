@@ -160,6 +160,20 @@ null` and `file: null` on every exclude: no earlier schema recorded kept or skip
 or where a pattern came from. A scan that wrote schema 17 kept no file its target's
 `.guardanaignore` matched, hence `[]`, and did not search the skipped directories, hence `null`.
 
+A schema-18 run whose target is a file or a trace migrates to schema 19 with every
+relative file path containing `\` and no `/` rewritten with `/`: finding channels' `target_ref`, `observations[].ref`,
+the paths `scope` lists, the `name` of a path-named coverage shortfall and
+`run.target.ref`. The migration recomputes `run.target.fingerprint` over the rewritten
+ref only when it is the digest of the recorded kind and ref; otherwise it keeps the
+recorded fingerprint. A drive-absolute path, a rooted or UNC path, an endpoint and a path
+already written with `/` keep their form. Any other target's ref is a label and keeps
+its form. Schema 18 uses `\` on Windows where other
+platforms use `/`, and fingerprints and comparisons read the path as written.
+A run does not record which platform wrote it, so on Linux or macOS a relative file
+name holding `\` and no `/`, such as `foo\bar.pkl`, is read the same way and is named
+`foo/bar.pkl` once migrated; `guardana diff` against a new run of the unchanged tree
+reports that file's findings as gone and new and exits `1`.
+
 One thing *is* recovered: the **title** of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
 catalogue for the exact `(framework, id)` pair the document already carries, so
@@ -202,8 +216,8 @@ of the evidence. `run migrate` reads the migrated document back before writing; 
 ## The document
 
 The saved-run schema lives at
-[`schemas/run-v18.schema.json`](../schemas/run-v18.schema.json), identified by
-`https://guardana.dev/schemas/run/v18.schema.json`, and the site serves every schema
+[`schemas/run-v19.schema.json`](../schemas/run-v19.schema.json), identified by
+`https://guardana.dev/schemas/run/v19.schema.json`, and the site serves every schema
 at the URL its identifier names. The version is in the identifier,
 so a consumer can tell which contract it is holding before parsing anything; it
 changes whenever the change is not backwards-compatible. A test validates what
@@ -255,8 +269,8 @@ Top level:
 
 | Key | What it is |
 |---|---|
-| `schema_version` | `18`. Stated once, for the whole document. |
-| `$schema` | the identifier of the schema the document follows, `https://guardana.dev/schemas/run/v18.schema.json` |
+| `schema_version` | `19`. Stated once, for the whole document. |
+| `$schema` | the identifier of the schema the document follows, `https://guardana.dev/schemas/run/v19.schema.json` |
 | `run` | the manifest — everything below |
 | `findings` / `unverified` / `waived` / `errors` / `observations` | the problem, evidence and inventory channels — see [the finding channels](#the-finding-channels) |
 | `assessments` | what the run *measured*, pass included — see [assessments](#assessments) |

@@ -322,6 +322,19 @@ earlier schema recorded a request rate, so the migration represents the run as s
 <p>A schema-17 run migrates to schema 18 with <code>scope.kept_models: []</code>, <code>scope.skipped_models: null</code> and <code>file: null</code> on every exclude: no earlier schema recorded kept or skipped models
 or where a pattern came from. A scan that wrote schema 17 kept no file its target's
 <code>.guardanaignore</code> matched, hence <code>[]</code>, and did not search the skipped directories, hence <code>null</code>.</p>
+<p>A schema-18 run whose target is a file or a trace migrates to schema 19 with every
+relative file path containing <code>\</code> and no <code>/</code> rewritten with <code>/</code>: finding channels' <code>target_ref</code>, <code>observations[].ref</code>,
+the paths <code>scope</code> lists, the <code>name</code> of a path-named coverage shortfall and
+<code>run.target.ref</code>. The migration recomputes <code>run.target.fingerprint</code> over the rewritten
+ref only when it is the digest of the recorded kind and ref; otherwise it keeps the
+recorded fingerprint. A drive-absolute path, a rooted or UNC path, an endpoint and a path
+already written with <code>/</code> keep their form. Any other target's ref is a label and keeps
+its form. Schema 18 uses <code>\</code> on Windows where other
+platforms use <code>/</code>, and fingerprints and comparisons read the path as written.
+A run does not record which platform wrote it, so on Linux or macOS a relative file
+name holding <code>\</code> and no <code>/</code>, such as <code>foo\bar.pkl</code>, is read the same way and is named
+<code>foo/bar.pkl</code> once migrated; <code>guardana diff</code> against a new run of the unchanged tree
+reports that file's findings as gone and new and exits <code>1</code>.</p>
 <p>One thing <em>is</em> recovered: the <strong>title</strong> of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
 catalogue for the exact <code>(framework, id)</code> pair the document already carries, so
@@ -355,8 +368,8 @@ destination is the file itself, so a half-done migration would overwrite the onl
 of the evidence. <code>run migrate</code> reads the migrated document back before writing; if it would not load, the command exits <code>3</code> and writes nothing.</p>
 <h2 id="the-document">The document</h2>
 <p>The saved-run schema lives at
-<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v18.schema.json"><code>schemas/run-v18.schema.json</code></a>, identified by
-<code>https://guardana.dev/schemas/run/v18.schema.json</code>, and the site serves every schema
+<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v19.schema.json"><code>schemas/run-v19.schema.json</code></a>, identified by
+<code>https://guardana.dev/schemas/run/v19.schema.json</code>, and the site serves every schema
 at the URL its identifier names. The version is in the identifier,
 so a consumer can tell which contract it is holding before parsing anything; it
 changes whenever the change is not backwards-compatible. A test validates what
@@ -413,11 +426,11 @@ inside directories every scan skips.</p>
 <tbody>
 <tr>
 <td><code>schema_version</code></td>
-<td><code>18</code>. Stated once, for the whole document.</td>
+<td><code>19</code>. Stated once, for the whole document.</td>
 </tr>
 <tr>
 <td><code>$schema</code></td>
-<td>the identifier of the schema the document follows, <code>https://guardana.dev/schemas/run/v18.schema.json</code></td>
+<td>the identifier of the schema the document follows, <code>https://guardana.dev/schemas/run/v19.schema.json</code></td>
 </tr>
 <tr>
 <td><code>run</code></td>

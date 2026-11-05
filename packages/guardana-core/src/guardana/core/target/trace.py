@@ -1,3 +1,4 @@
+from guardana.core._path_spelling import portable_ref
 from guardana.core.budget import BudgetExhausted, Budgets
 from guardana.core.observation import Observation, ObservationKind
 from guardana.core.target.base import Capability, Target, TargetKind
@@ -83,7 +84,7 @@ class TraceTarget(Target):
         trace id is the producer's random string, and two runs over the same file
         should read as the same target.
         """
-        return f"{self._trace.provenance.source}#{self._trace.trace_id}"
+        return portable_ref(f"{self._trace.provenance.source}#{self._trace.trace_id}")
 
     def capabilities(self) -> set[Capability]:
         """Declare what this trace can actually answer, dimension by dimension."""

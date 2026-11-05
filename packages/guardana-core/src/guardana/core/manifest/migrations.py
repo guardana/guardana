@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from guardana.core._path_spelling import posix_ref
 from guardana.core.manifest.fingerprint import digest_of
 from guardana.core.manifest.identity import SourceKind
 from guardana.core.manifest.load import (
@@ -23,6 +24,7 @@ from guardana.core.manifest.load import (
 )
 from guardana.core.manifest.serialize import schema_url
 from guardana.core.manifest.settings import EvidenceMode
+from guardana.core.report.location import _NAMED_BY_PATH
 from guardana.core.report.skipped import SkipReason
 from guardana.core.taxonomy import resolve_recorded
 
@@ -456,6 +458,123 @@ def migrate_v17(document: Mapping[str, Any]) -> dict[str, Any]:
             "skipped_models": None,
         },
     }
+
+
+_NAMES_FILES = frozenset({"artifact", "trace"})
+"""The target kinds whose refs name files, spelled as a saved run records them."""
+
+
+def migrate_v18(document: Mapping[str, Any]) -> dict[str, Any]:
+    r"""Rewrite a schema-18 saved run as a schema-19 one, spelling every file path with `/`.
+
+    A version-18 build on Windows wrote a relative file path with `\`. Such a ref (a
+    `\`, no `/`, not anchored) is rewritten with `/` wherever a run names a file: every
+    finding channel's `target_ref`, `observations[].ref`, the paths `scope` lists, the
+    name of a path-named coverage shortfall and `run.target.ref`. An anchored ref, an
+    endpoint and a ref already spelled with `/` keep their form, and so does every ref
+    of a run whose target is not a file or a trace: there a `\` is part of a label.
+    `run.target.fingerprint` is recomputed over the new ref only when it is the digest of
+    the old kind and ref this build would have written; any other fingerprint is kept as
+    recorded.
+    """
+    run = _mapping(document.get("run"), "run")
+    if _mapping(run.get("target"), "run.target").get("type") not in _NAMES_FILES:
+        return {**document, "schema_version": 19, "$schema": schema_url(19)}
+    migrated: dict[str, Any] = {
+        **document,
+        "schema_version": 19,
+        "$schema": schema_url(19),
+        "run": {**run, "target": _posix_target(run.get("target"))},
+    }
+    for channel in ("findings", "unverified", "waived"):
+        if channel in document:
+            migrated[channel] = [
+                _posix_key(_mapping(entry, f"{channel}[]"), "target_ref")
+                for entry in _entries(document[channel], channel)
+            ]
+    if "observations" in document:
+        migrated["observations"] = [
+            _posix_key(_mapping(entry, "observations[]"), "ref")
+            for entry in _entries(document["observations"], "observations")
+        ]
+    coverage = run.get("coverage")
+    if coverage is not None:
+        coverage = _mapping(coverage, "run.coverage")
+        migrated["run"]["coverage"] = {
+            **coverage,
+            "shortfall": [
+                _posix_shortfall(_mapping(gap, "run.coverage.shortfall[]"))
+                for gap in _entries(coverage.get("shortfall"), "run.coverage.shortfall")
+            ],
+        }
+    scope = document.get("scope")
+    if scope is not None:
+        migrated["scope"] = _posix_scope(_mapping(scope, "scope"))
+    return migrated
+
+
+def _entries(raw: object, what: str) -> list[object]:
+    if not isinstance(raw, list):
+        raise ManifestLoadError(f"{what} must be a list")
+    return raw
+
+
+def _posix_key(entry: dict[str, Any], key: str) -> dict[str, Any]:
+    value = entry.get(key)
+    return {**entry, key: posix_ref(value)} if isinstance(value, str) else entry
+
+
+def _posix_shortfall(gap: dict[str, Any]) -> dict[str, Any]:
+    return _posix_key(gap, "name") if gap.get("kind") in _NAMED_BY_PATH else gap
+
+
+def _posix_scope(scope: dict[str, Any]) -> dict[str, Any]:
+    excludes = scope.get("excludes")
+    skipped = scope.get("skipped_models")
+    migrated = {
+        **scope,
+        "files": [
+            posix_ref(f) if isinstance(f, str) else f
+            for f in _entries(scope.get("files"), "scope.files")
+        ],
+        "excludes": None
+        if excludes is None
+        else [
+            _posix_key(_mapping(entry, "scope.excludes[]"), "file")
+            for entry in _entries(excludes, "scope.excludes")
+        ],
+        "kept_models": [
+            _posix_key(_mapping(entry, "scope.kept_models[]"), "path")
+            for entry in _entries(scope.get("kept_models"), "scope.kept_models")
+        ],
+    }
+    if skipped is not None:
+        skipped = _mapping(skipped, "scope.skipped_models")
+        migrated["skipped_models"] = {
+            **skipped,
+            "directories": [
+                _posix_key(_mapping(entry, "scope.skipped_models.directories[]"), "path")
+                for entry in _entries(
+                    skipped.get("directories"), "scope.skipped_models.directories"
+                )
+            ],
+        }
+    return migrated
+
+
+def _posix_target(raw: object) -> dict[str, Any]:
+    target = _mapping(raw, "run.target")
+    kind, ref = target.get("type"), target.get("ref")
+    if not isinstance(kind, str) or not isinstance(ref, str) or posix_ref(ref) == ref:
+        return target
+    rewritten = posix_ref(ref)
+    fingerprint = target.get("fingerprint")
+    if fingerprint == digest_of(kind, ref) and target.get("fingerprint_inputs") == [
+        "kind",
+        "ref",
+    ]:
+        fingerprint = digest_of(kind, rewritten)
+    return {**target, "ref": rewritten, "fingerprint": fingerprint}
 
 
 _PER_CLASS_CALIBRATION = (

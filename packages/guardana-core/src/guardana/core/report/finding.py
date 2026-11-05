@@ -48,5 +48,10 @@ class Finding:
         is the same issue already triaged, not a new one.
         """
         path, _line = split_ref(self.target_ref)
-        key = f"{self.rule_id}\x00{path}\x00{self.evidence.summary}"
-        return hashlib.sha256(key.encode()).hexdigest()[:16]
+        return fingerprint_of(self.rule_id, path, self.evidence.summary)
+
+
+def fingerprint_of(rule_id: str, path: str, summary: str) -> str:
+    """Hash a finding's rule id, file path and evidence summary into its short fingerprint."""
+    key = f"{rule_id}\x00{path}\x00{summary}"
+    return hashlib.sha256(key.encode()).hexdigest()[:16]

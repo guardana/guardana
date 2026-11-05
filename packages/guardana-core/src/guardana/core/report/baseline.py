@@ -16,7 +16,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
+from guardana.core._path_spelling import is_legacy_windows_ref
 from guardana.core._yaml import load_yaml
+from guardana.core.report._ref import split_ref
+from guardana.core.report.finding import Finding, fingerprint_of
 from guardana.core.report.result import ScanResult
 
 if TYPE_CHECKING:  # imported lazily below; the report package is downstream of redaction
@@ -35,13 +38,17 @@ the *key* reaches the same permanent waiver a letter earlier, and reading around
 is how `expries:` turned a lapsed acceptance into one with no end — reported as
 "still active" by the command whose job is to say otherwise.
 """
-BASELINE_VERSION = 2
-"""Version 2 adds an approver and an expiry to each waiver.
+BASELINE_VERSION = 3
+r"""Version 3 fingerprints a file path with `/` on every platform.
 
-Version 1 files still load: their waivers have no expiry and are reported as
-such, so a team is told what they are carrying rather than being broken by an
-upgrade.
+Version 2 adds an approver and an expiry to each waiver. Version 1 files still
+load: their waivers have no expiry and are reported as such, so a team is told
+what they are carrying rather than being broken by an upgrade. A waiver an older
+version wrote on Windows hashed its path with `\` and still waives the same finding.
 """
+
+_APPROVER_SINCE = 2
+"""The first version with an approver field."""
 
 
 class BaselineError(Exception):
@@ -58,6 +65,8 @@ class Waiver:
     reason: str = ""
     approved_by: str = ""
     expires: date | None = None
+    legacy_path: bool = False
+    r"""Whether a version-1 or -2 file wrote this waiver on Windows, its path hashed with `\`."""
 
     def is_expired(self, today: date) -> bool:
         """Whether this waiver has lapsed. A waiver with no expiry never lapses."""
@@ -104,6 +113,16 @@ class Baseline:
         now = today if today is not None else datetime.now(UTC).date()
         return frozenset(w.fingerprint for w in self.waivers if not w.is_expired(now))
 
+    def active_legacy(self, today: date | None = None) -> frozenset[str]:
+        r"""Fingerprints still waived today by waivers whose path was hashed with `\`.
+
+        A finding matches one of these through `windows_fingerprint`, never its own.
+        """
+        now = today if today is not None else datetime.now(UTC).date()
+        return frozenset(
+            w.fingerprint for w in self.waivers if w.legacy_path and not w.is_expired(now)
+        )
+
     def expired(self, today: date | None = None) -> tuple[Waiver, ...]:
         """Waivers that have lapsed, so a command can say so rather than just re-failing."""
         now = today if today is not None else datetime.now(UTC).date()
@@ -115,7 +134,7 @@ class Baseline:
 
         Version 1 had no approver field, so a waiver read from it is asked only for its reason.
         """
-        required = self.version >= BASELINE_VERSION
+        required = self.version >= _APPROVER_SINCE
         return tuple(w for w in self.waivers if w.lacks_review(approver_required=required))
 
 
@@ -162,7 +181,9 @@ def read_baseline(path: Path) -> Baseline:
             f"({BASELINE_VERSION}) — upgrade Guardana rather than ignoring waivers it "
             f"cannot understand"
         )
-    return Baseline(waivers=tuple(_waiver(entry, path) for entry in entries), version=version)
+    return Baseline(
+        waivers=tuple(_waiver(entry, path, version) for entry in entries), version=version
+    )
 
 
 def _refuse_unknown(
@@ -183,17 +204,20 @@ def _refuse_unknown(
         )
 
 
-def _waiver(entry: object, path: Path) -> Waiver:
+def _waiver(entry: object, path: Path, version: int) -> Waiver:
     if not isinstance(entry, dict) or not isinstance(entry.get("fingerprint"), str):
         raise BaselineError(f"invalid baseline {path}: every waiver needs a string 'fingerprint'")
     _refuse_unknown(entry.keys(), _WAIVER_KEYS, "waiver", path)
+    location = str(entry.get("location") or "")
     return Waiver(
         fingerprint=entry["fingerprint"],
         rule=str(entry.get("rule") or ""),
-        location=str(entry.get("location") or ""),
+        location=location,
         reason=str(entry.get("reason") or ""),
         approved_by=str(entry.get("approved_by") or ""),
         expires=_expiry(entry.get("expires"), path),
+        legacy_path=version < BASELINE_VERSION
+        and (not location or is_legacy_windows_ref(split_ref(location)[0])),
     )
 
 
@@ -217,10 +241,41 @@ def _expiry(raw: object, path: Path) -> date | None:
         ) from exc
 
 
-def apply_baseline(result: ScanResult, waived_fingerprints: frozenset[str]) -> ScanResult:
-    """Return a copy of `result` with baselined findings moved to the `waived` channel."""
-    kept = tuple(f for f in result.findings if f.fingerprint not in waived_fingerprints)
-    newly_waived = tuple(f for f in result.findings if f.fingerprint in waived_fingerprints)
+def windows_fingerprint(finding: Finding) -> str | None:
+    """Return the fingerprint a Windows build wrote for `finding` before `/` was the separator.
+
+    None for a URL and for a path with no `/`, whose fingerprint never differed.
+    """
+    if "://" in finding.target_ref:
+        return None
+    path, _line = split_ref(finding.target_ref)
+    if "/" not in path:
+        return None
+    return fingerprint_of(finding.rule_id, path.replace("/", "\\"), finding.evidence.summary)
+
+
+def apply_baseline(
+    result: ScanResult,
+    waived_fingerprints: frozenset[str],
+    legacy: frozenset[str] = frozenset(),
+) -> ScanResult:
+    r"""Return a copy of `result` with baselined findings moved to the `waived` channel.
+
+    `legacy` holds the fingerprints of waivers an older baseline wrote on Windows; a
+    finding whose `windows_fingerprint` is among them is waived as well, unless a finding
+    carries that fingerprint itself: then the `\` is part of a file name on Linux or
+    macOS, and the waiver says nothing about the path with a `/`.
+    """
+    spelled_with_a_backslash = legacy - {f.fingerprint for f in result.findings}
+
+    def waived(finding: Finding) -> bool:
+        return finding.fingerprint in waived_fingerprints or (
+            bool(spelled_with_a_backslash)
+            and windows_fingerprint(finding) in spelled_with_a_backslash
+        )
+
+    kept = tuple(f for f in result.findings if not waived(f))
+    newly_waived = tuple(f for f in result.findings if waived(f))
     # `replace` rather than a fresh ScanResult: a waiver decides which *findings*
     # are accepted, and must never quietly drop a channel it says nothing about.
     # Rebuilding field by field is how `errors` used to vanish the moment anyone

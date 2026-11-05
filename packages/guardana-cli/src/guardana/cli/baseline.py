@@ -34,7 +34,14 @@ from guardana.core.report import (
     serialize_baseline,
     split_ref,
 )
-from guardana.core.report.baseline import Baseline, Waiver, read_baseline
+from guardana.core.report.baseline import (
+    BASELINE_VERSION,
+    Baseline,
+    Waiver,
+    apply_baseline,
+    read_baseline,
+    windows_fingerprint,
+)
 from guardana.core.report.load import ReportLoadError, load_report
 from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget, TargetKind
@@ -334,20 +341,30 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
     # waiver together with the reason and the approver a person wrote.
     refuse_an_incomplete_baseline(result, prof.policy, file)
     current = {f.fingerprint for f in result.findings}
+    waivers, merged = _one_per_finding(baseline.waivers, result, current)
     unexamined = {
         w.fingerprint: why
-        for w in baseline.waivers
+        for w in waivers
         if w.fingerprint not in current and (why := _not_examined(w, result, path)) is not None
     }
-    kept = [w for w in baseline.waivers if w.fingerprint in current or w.fingerprint in unexamined]
-    dropped = [w for w in baseline.waivers if w not in kept]
-    _write_waivers(file, kept)
+    kept = [w for w in waivers if w.fingerprint in current or w.fingerprint in unexamined]
+    dropped = [w for w in waivers if w not in kept]
+    _write_waivers(
+        file,
+        kept,
+        baseline.version if any(w.legacy_path for w in kept) else BASELINE_VERSION,
+    )
     for waiver in kept:
         if waiver.fingerprint in unexamined:
             typer.echo(
                 f"kept: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) — "
                 f"{unexamined[waiver.fingerprint]}, so whether it is fixed is unknown"
             )
+    for waiver in merged:
+        typer.echo(
+            f"removed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) waives a finding "
+            f"another waiver in this file already waives"
+        )
     for waiver in dropped:
         gone = _deleted_from(waiver, path)
         typer.echo(
@@ -356,12 +373,80 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
             if gone is not None
             else f"removed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) is fixed"
         )
-    waived_now = replace(baseline, waivers=tuple(kept)).active()
-    unwaived = [f for f in result.findings if f.fingerprint not in waived_now]
+    remaining = replace(baseline, waivers=tuple(kept))
+    unwaived = apply_baseline(result, remaining.active(), remaining.active_legacy()).findings
     typer.echo(
-        f"{len(kept)} waiver(s) kept, {len(dropped)} removed, {len(unexamined)} of the kept "
+        f"{len(kept)} waiver(s) kept, {len(dropped) + len(merged)} removed, "
+        f"{len(unexamined)} of the kept "
         f"not re-examined. {len(unwaived)} finding(s) are not waived by this file."
     )
+
+
+def _one_per_finding(
+    waivers: Sequence[Waiver], result: ScanResult, current: set[str]
+) -> tuple[list[Waiver], list[Waiver]]:
+    """Rewrite each Windows waiver, and set aside one that lands on a finding already waived.
+
+    A file used on two platforms can hold a waiver for one finding from each. Only a
+    rewritten waiver can be set aside, and only for one still active, so a merge never
+    starts failing a waived finding and never touches what was written for that finding.
+    """
+    today = datetime.now(UTC).date()
+    pairs = [(waiver, _respelled(waiver, result, current)) for waiver in waivers]
+    active: set[str] = set()
+    landed: dict[str, tuple[Waiver, Waiver]] = {}
+    for pair in pairs:
+        waiver, rewritten = pair
+        if rewritten.fingerprint == waiver.fingerprint:
+            if not rewritten.is_expired(today):
+                active.add(rewritten.fingerprint)
+            continue
+        held = landed.get(rewritten.fingerprint)
+        if held is None or (held[1].is_expired(today) and not rewritten.is_expired(today)):
+            landed[rewritten.fingerprint] = pair
+    kept: list[Waiver] = []
+    merged: list[Waiver] = []
+    for pair in pairs:
+        waiver, rewritten = pair
+        fingerprint = rewritten.fingerprint
+        if fingerprint == waiver.fingerprint or (
+            landed[fingerprint] is pair and fingerprint not in active
+        ):
+            kept.append(rewritten)
+        else:
+            merged.append(waiver)
+    return kept, merged
+
+
+def _respelled(waiver: Waiver, result: ScanResult, current: set[str]) -> Waiver:
+    r"""Rewrite a Windows waiver an older version wrote with the finding it still waives.
+
+    The finding's own fingerprint and location replace the ones hashed over `\`, so the
+    file can be written as the current version; the reason, approver and expiry stay. A
+    finding carrying the waiver's own fingerprint means no rewrite is needed: its `\` is
+    part of a file name on Linux or macOS.
+    """
+    if not waiver.legacy_path:
+        return waiver
+    if waiver.fingerprint in current:
+        return replace(waiver, legacy_path=False)
+    match = next((f for f in result.findings if windows_fingerprint(f) == waiver.fingerprint), None)
+    if match is None:
+        return waiver
+    return replace(
+        waiver, fingerprint=match.fingerprint, location=match.target_ref, legacy_path=False
+    )
+
+
+def _locations(waiver: Waiver) -> list[str]:
+    r"""Return where `waiver` may point: as written, and with `/` when Windows may have written it.
+
+    The spelling with `/` comes first, the one a report names. On Linux or macOS a `\` can
+    be part of the file's name, so the location as written is still a candidate.
+    """
+    if not waiver.legacy_path:
+        return [waiver.location]
+    return [waiver.location.replace("\\", "/"), waiver.location]
 
 
 def _not_examined(waiver: Waiver, result: ScanResult, root: Path | None) -> str | None:
@@ -375,14 +460,13 @@ def _not_examined(waiver: Waiver, result: ScanResult, root: Path | None) -> str 
         return f"{waiver.rule} did not run"
     if result.scope is None or not waiver.location:
         return None
-    path, _line = split_ref(waiver.location)
-    head = path.split("#", 1)[0]
+    heads = [split_ref(location)[0].split("#", 1)[0] for location in _locations(waiver)]
     listed = set(result.scope.files)
-    if head in listed or head.rsplit(":", 1)[0] in listed:
+    if any(head in listed or head.rsplit(":", 1)[0] in listed for head in heads):
         return None
     if _deleted_from(waiver, root) is not None:
         return None
-    return f"this run did not list {head}"
+    return f"this run did not list {heads[0]}"
 
 
 def _deleted_from(waiver: Waiver, root: Path | None) -> str | None:
@@ -395,20 +479,21 @@ def _deleted_from(waiver: Waiver, root: Path | None) -> str | None:
     """
     if root is None or not waiver.location or "#" in waiver.location:
         return None
-    path, _line = split_ref(waiver.location)
     try:
         base = Path.cwd().resolve()
         top = root.resolve()
     except (OSError, RuntimeError):
         return None
-    # An archive member is spelled `archive:member`, so the archive must be gone too.
-    outer = path.rsplit(":", 1)[0]
-    if not _directory_under((base / outer).parent, top):
+    for location in _locations(waiver):
+        path, _line = split_ref(location)
+        # An archive member is spelled `archive:member`, so the archive must be gone too.
+        outer = path.rsplit(":", 1)[0]
         # Without the directory the location may be spelled from another working
         # directory than `create` ran in, so a missing candidate proves nothing.
-        return None
-    if all(_missing_under(base / spelled, top) for spelled in {path, outer}):
-        return path
+        if _directory_under((base / outer).parent, top) and all(
+            _missing_under(base / spelled, top) for spelled in {path, outer}
+        ):
+            return path
     return None
 
 
@@ -440,9 +525,13 @@ def _missing_under(candidate: Path, top: Path) -> bool:
     return False
 
 
-def _write_waivers(file: Path, waivers: Sequence[Waiver]) -> None:
+def _write_waivers(file: Path, waivers: Sequence[Waiver], version: int) -> None:
+    r"""Write `waivers` as a baseline of `version`.
+
+    A waiver Windows wrote with `\` that could not be rewritten keeps its file's own
+    version, since only a version before 3 reads its fingerprint the Windows way.
+    """
     import yaml  # noqa: PLC0415
-    from guardana.core.report.baseline import BASELINE_VERSION  # noqa: PLC0415
 
     body = [
         {
@@ -456,7 +545,7 @@ def _write_waivers(file: Path, waivers: Sequence[Waiver]) -> None:
         for w in waivers
     ]
     _write_whole_or_exit(
-        file, yaml.safe_dump({"version": BASELINE_VERSION, "waivers": body}, sort_keys=False)
+        file, yaml.safe_dump({"version": version, "waivers": body}, sort_keys=False)
     )
 
 

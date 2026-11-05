@@ -167,7 +167,7 @@ def test_migrate_in_place_leaves_an_older_run_that_would_not_load_untouched(
     tmp_path: Path,
 ) -> None:
     hollow = tmp_path / "hollow.json"
-    original = json.dumps({"schema_version": REPORT_SCHEMA_VERSION - 1, "run": {}})
+    original = json.dumps({"schema_version": REPORT_SCHEMA_VERSION - 1, "run": {"target": {}}})
     hollow.write_text(original, encoding="utf-8")
 
     result = runner.invoke(app, ["run", "migrate", str(hollow)])

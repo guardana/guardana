@@ -3806,7 +3806,7 @@
     "guardana.core.entrypoints.TARGET_GROUP": "guardana.targets",
     "guardana.core.entrypoints.TAXONOMY_GROUP": "guardana.taxonomies",
     "guardana.core.fixtures.FIXTURES_SCHEMA_VERSION": 1,
-    "guardana.core.manifest.model.MANIFEST_SCHEMA_VERSION": 18,
+    "guardana.core.manifest.model.MANIFEST_SCHEMA_VERSION": 19,
     "guardana.core.output.OUTPUT_API_VERSION": 1,
     "guardana.core.output.SUPPORTED_OUTPUT_API_VERSIONS": [
       1
@@ -3827,7 +3827,7 @@
       3
     ],
     "guardana.core.recording.RECORDING_FORMAT": 3,
-    "guardana.core.report.baseline.BASELINE_VERSION": 2,
+    "guardana.core.report.baseline.BASELINE_VERSION": 3,
     "guardana.core.report.load.MIGRATABLE_VERSIONS": [
       1,
       2,
@@ -3845,7 +3845,8 @@
       14,
       15,
       16,
-      17
+      17,
+      18
     ],
     "guardana.core.reporter.ENVELOPE_SCHEMA_VERSION": 8,
     "guardana.core.trace.observations.OBSERVATIONS_SCHEMA_VERSION": 1,
