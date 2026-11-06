@@ -9391,6 +9391,12 @@
               "name": "discovers"
             },
             {
+              "annotation": "int | None",
+              "has_default": true,
+              "kind": "keyword_only",
+              "name": "discover_status"
+            },
+            {
               "annotation": "Sequence[str] | None",
               "has_default": true,
               "kind": "keyword_only",

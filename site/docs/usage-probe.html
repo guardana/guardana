@@ -482,7 +482,17 @@ another selected rule reaches a conclusion; a run in which no rule reached one e
 server that gates its tool listing behind a credential (skipped <code>not_applicable</code>).</strong>
 The skip's detail names the revision. When the server also lists a modern revision
 guardana does not speak, the result is inconclusive instead, naming that revision,
-because what it declares to modern clients was not read. <code>not_applicable</code> is not a
+because what it declares to modern clients was not read. The result is also
+inconclusive, naming the failure, when <code>server/discover</code> failed: a timeout, a
+refusal (<code>401</code>, <code>403</code>), a rate limit, a server error, a reply that is not JSON-RPC,
+a result whose <code>supportedVersions</code> names no revision, or another JSON-RPC error
+such as <code>-32603</code>. These are not such failures, but how a server without the method
+answers: JSON-RPC <code>-32601</code>, <code>-32600</code> or <code>-32602</code> at a <code>2xx</code> or <code>400</code>, <code>-32000</code> at a
+<code>400</code> (how the Python and TypeScript SDKs of the older revision turn away a request
+without a session), a <code>400</code>, <code>404</code> or <code>405</code> read whole with no JSON-RPC error, or a
+result without <code>supportedVersions</code>. A failing server that answers in one of those
+ways, such as a proxy's plain <code>404</code>, cannot be told apart and reads <code>not_applicable</code>.
+<code>not_applicable</code> is not a
 coverage gap, so it does not fail a run while another selected rule reaches a conclusion;
 a run in which no rule reached one ends <code>indeterminate</code>. <code>cacheScope</code> and <code>ttlMs</code>
 arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even
@@ -597,7 +607,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.cache_scope</code></td>
-<td>A tool listing the server gates behind a credential is not also declared <code>cacheScope: &quot;public&quot;</code>, which would invite any shared gateway to serve it to a caller the server would have refused. On a <code>2025-11-25</code> conversation with a server that gates its tool listing behind a credential, the check is skipped <code>not_applicable</code>, naming the revision, because <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there. When the server also lists a modern revision guardana does not speak, the result is inconclusive instead, naming that revision, because what the server declares to modern clients was not read. On a server open to callers with no credential the check reports nothing.</td>
+<td>A tool listing the server gates behind a credential is not also declared <code>cacheScope: &quot;public&quot;</code>, which would invite any shared gateway to serve it to a caller the server would have refused. On a <code>2025-11-25</code> conversation with a server that gates its tool listing behind a credential, the check is skipped <code>not_applicable</code>, naming the revision, because <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there. When the server also lists a modern revision guardana does not speak, the result is inconclusive instead, naming that revision, because what the server declares to modern clients was not read. When <code>server/discover</code> failed rather than answering as a server without the method does, the result is inconclusive too, naming the failure. On a server open to callers with no credential the check reports nothing.</td>
 </tr>
 <tr>
 <td><code>guardana.mcp.task_identity</code></td>

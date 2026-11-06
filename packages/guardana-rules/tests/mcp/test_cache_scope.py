@@ -1,5 +1,8 @@
 """What a server declares about who may hold a copy of a manifest it will not give away."""
 
+import json
+from typing import cast
+
 import pytest
 from _offline import refuse_name_lookups
 from guardana.core.gate import GateOutcome, gate_outcome
@@ -8,7 +11,8 @@ from guardana.core.registry import Registry
 from guardana.core.report import SkipReason
 from guardana.core.rule import NotApplicable, RuleContext
 from guardana.core.runner import Runner
-from guardana.core.target import McpServerTarget, TargetChanged
+from guardana.core.target import McpError, McpServerTarget, TargetChanged
+from guardana.core.target._mcp_http import RawReply
 from guardana.core.target._mcp_wire import LATEST_VERSION, LEGACY_VERSION
 from guardana.core.testing import ScriptedMcpServer
 from guardana.rules.mcp import McpCacheScopeRule, McpUnauthenticatedAccessRule
@@ -17,6 +21,7 @@ from mcp_fixtures import CREDENTIAL, ROUTABLE, findings, guarded, outcomes, summ
 pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 RULE = McpCacheScopeRule()
+TOOLS = [{"name": "read_file", "description": "Read a file."}]
 
 
 def _modern(**overrides: object) -> ScriptedMcpServer:
@@ -95,6 +100,86 @@ def test_a_server_listing_a_modern_revision_this_client_does_not_speak_is_inconc
     assert outcomes(reported) == ["inconclusive"]
     assert "2031-01-01" in summaries(reported)[0]
     assert "not read" in summaries(reported)[0]
+
+
+@pytest.mark.parametrize("status", [500, 502, 503, 429])
+def test_a_gated_server_whose_discovery_failed_is_inconclusive_naming_the_failure(
+    status: int,
+) -> None:
+    server = guarded(discover_status=status, cache_scope="public", ttl_ms=1000)
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status}" in summaries(reported)[0]
+    assert LEGACY_VERSION in summaries(reported)[0]
+    assert "not read" in summaries(reported)[0]
+
+
+class _DiscoveryTimesOut(ScriptedMcpServer):
+    """A credential-gated legacy server whose `server/discover` never gets an answer."""
+
+    def __call__(self, url: str, **kwargs: object) -> RawReply:
+        if b"server/discover" in cast("bytes", kwargs.get("body") or b""):
+            raise McpError("timed out")
+        return super().__call__(url, **kwargs)  # type: ignore[arg-type]
+
+
+def test_a_gated_server_whose_discovery_timed_out_is_inconclusive_naming_the_failure() -> None:
+    server = _DiscoveryTimesOut(ROUTABLE, tools=TOOLS, credential=CREDENTIAL, cache_scope="public")
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "timed out" in summaries(reported)[0]
+
+
+def test_a_failed_discovery_stays_an_open_question_a_run_can_refuse() -> None:
+    server = guarded(discover_status=503)
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+    registry = Registry()
+    registry.register_rule(RULE)
+    registry.register_rule(McpUnauthenticatedAccessRule())
+    release = preset("release")
+
+    result = Runner(registry=registry, profile=release).run(target)
+
+    assert not [s for s in result.rules_skipped if s.rule_id == RULE.meta.id]
+    assert [u.rule_id for u in result.unverified] == [RULE.meta.id]
+    assert gate_outcome(result, release.policy) is GateOutcome.INDETERMINATE
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        pytest.param(200, -32601, id="unknown-method"),
+        pytest.param(400, -32600, id="python-sdk-without-a-session"),
+        pytest.param(400, -32000, id="typescript-sdk-without-a-session"),
+    ],
+)
+def test_a_legacy_server_refusing_discovery_stays_not_applicable(status: int, code: int) -> None:
+    class _Refuses(ScriptedMcpServer):
+        def __call__(self, url: str, **kwargs: object) -> RawReply:
+            if b"server/discover" not in cast("bytes", kwargs.get("body") or b""):
+                return super().__call__(url, **kwargs)  # type: ignore[arg-type]
+            body = {"jsonrpc": "2.0", "id": None, "error": {"code": code, "message": "no"}}
+            return RawReply(status=status, headers={}, body=json.dumps(body).encode("utf-8"))
+
+    server = _Refuses(ROUTABLE, tools=TOOLS, credential=CREDENTIAL, cache_scope="public")
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+
+    with pytest.raises(NotApplicable, match=f"MCP {LEGACY_VERSION}, which carries no cacheScope"):
+        list(RULE.run(target, RuleContext()))
 
 
 def test_a_server_sharing_no_revision_is_inconclusive_rather_than_clean() -> None:

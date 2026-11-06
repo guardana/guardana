@@ -23,11 +23,13 @@ from urllib.error import HTTPError
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from guardana.core.target._mcp_client import (
+    NOT_THE_ERA_STATUSES,
     REFUSAL_STATUSES,
     Negotiation,
     Opening,
     carries_tools,
     changed,
+    no_json_rpc_error,
     opening_in,
 )
 from guardana.core.target._mcp_http import (
@@ -71,8 +73,6 @@ _ABSENT = frozenset({404, 410})
 """The statuses that say a metadata document does not exist; any other error leaves it unread."""
 _NOT_OPENABLE = "the address is not a URL a client may open"
 _SUCCESS = range(200, 300)
-_NOT_THE_ERA = frozenset({400, 404, 405})
-"""Statuses a server gives a handshake it does not implement, when no JSON-RPC error says more."""
 _METHOD_NOT_FOUND = -32601
 _NOT_THE_ERA_CODES = (_METHOD_NOT_FOUND, UNSUPPORTED_PROTOCOL_VERSION)
 """JSON-RPC errors that refuse the handshake era itself, whatever the status."""
@@ -817,7 +817,7 @@ class _Probe:
         if older is not None:
             return older
         if code in _NOT_THE_ERA_CODES or (
-            reply.status in _NOT_THE_ERA and _no_json_rpc_error(reply, payload)
+            reply.status in NOT_THE_ERA_STATUSES and no_json_rpc_error(reply, payload)
         ):
             return LegacyOffer(modern_only=True)
         result = payload.get("result") if payload is not None and error is None else None
@@ -1135,7 +1135,7 @@ def _task_listing(reply: RawReply) -> Tasks:
     error = error_member(payload)
     if error is not None and error.get("code") == _METHOD_NOT_FOUND:
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
-    if reply.status == _BAD_REQUEST and _no_json_rpc_error(reply, payload):
+    if reply.status == _BAD_REQUEST and no_json_rpc_error(reply, payload):
         # How a server that rejects every method it lacks says so, as the revision
         # probe reads the same answer to a handshake it does not implement.
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
@@ -1167,15 +1167,6 @@ def _task_listing(reply: RawReply) -> Tasks:
     if error is not None:
         detail = f"{detail} carrying JSON-RPC error {error.get('code')}"
     return Tasks(answer=TaskAnswer.OTHER, status=reply.status, detail=detail)
-
-
-def _no_json_rpc_error(reply: RawReply, payload: Mapping[str, object] | None) -> bool:
-    """Whether a reply read whole is known to hold no JSON-RPC error.
-
-    An `error` member of any shape counts as one, since a malformed member is still a
-    server saying something failed.
-    """
-    return "error" not in payload if payload is not None else reply.plain_text()
 
 
 def _offer_in(

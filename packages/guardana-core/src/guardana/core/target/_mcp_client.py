@@ -68,6 +68,7 @@ from guardana.core.target.endpoint import (
 from guardana.core.usage import UsageMeter
 
 _DISCOVER = "server/discover"
+_SUPPORTED_VERSIONS = "supportedVersions"
 _READ_CHUNK = 64 * 1024
 _QUOTED_BODY_BYTES = 4096
 _STALE_LINES = 16
@@ -89,6 +90,10 @@ The answer repeats the id, so an unbounded one would make every answer as large 
 server chose.
 """
 _METHOD_NOT_FOUND = -32601
+_REQUEST_REJECTED = frozenset({-32600, -32602})
+"""JSON-RPC's codes for a request refused as such, which is not a server failing."""
+_NO_SESSION = -32000
+"""What the TypeScript SDK sends with a `400` to a request without a session."""
 _HTTP_REQUEST_ID = 1
 """The id of every HTTP request: each is its own exchange, and its reply is read by this id."""
 
@@ -101,11 +106,16 @@ MAX_LISTING_BYTES = MAX_RESPONSE_BYTES
 REFUSAL_STATUSES = frozenset({401, 403})
 """The statuses that mean a server decided this caller may not ask; no other status does."""
 
+NOT_THE_ERA_STATUSES = frozenset({400, 404, 405})
+"""Statuses a server gives a method it does not implement, when no JSON-RPC error says more."""
+
 _SHAREABLE_SCOPE = "public"
 
 _CREDENTIAL_STATUSES = frozenset({401, 403, 407})
 _TARGET_STATUSES = frozenset({404, 408, 425, 429})
+_BUSY_STATUSES = frozenset({408, 425, 429})
 _NOT_FOUND = 404
+_BAD_REQUEST = 400
 _CLIENT_ERROR = 400
 _SERVER_ERROR = 500
 _SUCCESS = range(200, 300)
@@ -131,15 +141,27 @@ class McpTransport(Protocol):
         raise NotImplementedError
 
 
-class ConversationRefused(HTTPError):  # noqa: N818 — named for what the run meets
-    """A status the server gave this one request: not the target's failure, and not retried.
+class ChallengedError(McpError):
+    """A `401` or `403` to a caller presenting no credential: who may ask, not what failed."""
 
-    It keeps the reply, so a later reader is handed the same failure without a second request.
-    """
+    def __init__(self, ref: str, status: int) -> None:
+        super().__init__(f"MCP server at {ref} answered HTTP {status}")
+        self.status = status
+
+
+class HttpFailure(HTTPError):  # noqa: N818 — named for what the run meets
+    """An error status, keeping the reply it came in for whoever has to read it whole."""
 
     def __init__(self, reply: RawReply, ref: str) -> None:
         super().__init__(ref, reply.status, _reason(reply.status), _message(reply), _quoted(reply))
         self.reply = reply
+
+
+class ConversationRefused(HttpFailure):
+    """A status the server gave this one request: not the target's failure, and not retried.
+
+    It keeps the reply, so a later reader is handed the same failure without a second request.
+    """
 
 
 class IncompleteListing(McpError):  # noqa: N818 — named for what the run meets
@@ -234,6 +256,19 @@ class CacheHints:
 
 
 @dataclass(frozen=True, slots=True)
+class Fallback:
+    """Why `server/discover` left a conversation on the handshake.
+
+    `failed` means the answer says nothing about the era: a timeout, a refusal, a server
+    error. Otherwise it is the answer a server without the method gives, which makes the
+    server a legacy one. Only a failed one leaves open what the server tells modern clients.
+    """
+
+    reason: str
+    failed: bool
+
+
+@dataclass(frozen=True, slots=True)
 class Negotiation:
     """Which revision of MCP this conversation is in, and what the server said about itself.
 
@@ -250,6 +285,8 @@ class Negotiation:
     capabilities: Mapping[str, object] | None = None
     unsupported: str | None = None
     """Why there is no conversation to have, when client and server share no revision."""
+    fallback: Fallback | None = None
+    """Why the conversation fell back to the handshake, when it did."""
 
     @property
     def era(self) -> Era:
@@ -393,9 +430,9 @@ class HttpMcpTransport:
                 message = f"MCP server at {self._ref} returned an error: {dict(error)!r}"
             else:
                 message = f"MCP server at {self._ref} answered HTTP {status}"
-            raise error_from(message, error)
+            raise error_from(message, error, status=status)
         if status in REFUSAL_STATUSES:
-            raise McpError(f"MCP server at {self._ref} answered HTTP {status}")
+            raise ChallengedError(self._ref, status)
         if status == _NOT_FOUND and self._session is not None and not self._reopened:
             self._reopened = True
             self._session = None
@@ -708,24 +745,30 @@ def negotiate(transport: McpTransport) -> Negotiation:
     record `2026-07-28` in the run manifest. One request is cheaper than a coverage
     claim no server agreed to.
 
-    Whatever else the probe meets falls back to the handshake, which asks again; a
-    spent budget is not caught, because it stops the run rather than answering.
+    Whatever else the probe meets falls back to the handshake, which asks again, and
+    `Negotiation.fallback` says why; a spent budget is not caught, because it stops the
+    run rather than answering.
     """
     transport.speak(PROBE_WIRE)
     try:
         discovered = transport.request(_DISCOVER, {})
     except McpProtocolError as exc:
         offered = exc.supported_versions()
-        return modern(transport, offered, None) if offered else _fall_back(transport)
+        if offered:
+            return modern(transport, offered, None)
+        return _fall_back(transport, _fallback_for(exc))
     except (McpError, EndpointError, URLError, OSError) as exc:
         close_http_error(exc)
-        return _fall_back(transport)
+        return _fall_back(transport, _fallback_for(exc))
     offered = _versions_in(discovered)
     if not offered:
         # A reply that is not a discovery result at all: a legacy server whose
         # framework answers unknown methods with an empty object rather than an
-        # error. Fall back on the shape, not on a status code.
-        return _fall_back(transport)
+        # error. Fall back on the shape, not on a status code. A reply using the
+        # result's own key but naming no revision has not said it lacks the method.
+        if _SUPPORTED_VERSIONS in discovered:
+            return _fall_back(transport, Fallback("the result lists no revision", failed=True))
+        return _fall_back(transport, Fallback("the reply is not a discovery result", failed=False))
     return modern(transport, offered, discovered)
 
 
@@ -755,7 +798,57 @@ def modern(
     )
 
 
-def _fall_back(transport: McpTransport) -> Negotiation:
+def _fallback_for(exc: Exception) -> Fallback:
+    """Say what a `server/discover` that raised means for the era, quoting no server text."""
+    if isinstance(exc, McpProtocolError):
+        code = f"JSON-RPC error {exc.code}"
+        said = code if exc.status is None else f"HTTP {exc.status} carrying {code}"
+        return Fallback(said, failed=not _refuses_the_method(exc))
+    if isinstance(exc, HttpFailure):
+        whole = exc.reply.json_object(_HTTP_REQUEST_ID)
+        unknown = exc.code in NOT_THE_ERA_STATUSES and no_json_rpc_error(exc.reply, whole)
+        return Fallback(f"HTTP {exc.code}", failed=not unknown)
+    if isinstance(exc, HTTPError):
+        return Fallback(f"HTTP {exc.code}", failed=True)
+    if isinstance(exc, ChallengedError):
+        return Fallback(f"HTTP {exc.status}", failed=True)
+    # These name the endpoint and a reply's size; any other `McpError` may quote the reply.
+    if isinstance(exc, EndpointError | URLError | OSError):
+        return Fallback(str(exc), failed=True)
+    return Fallback("the server's answer could not be used", failed=True)
+
+
+def _refuses_the_method(exc: McpProtocolError) -> bool:
+    """Whether a JSON-RPC error is what a server of the handshake era answers `server/discover`.
+
+    Handshake-era SDKs reach their method table only inside a session, so a request with
+    none is turned away as a `400` carrying `-32600` or `-32000` rather than `-32601`. A
+    refusal says who may ask, not which era answers, and a busy or server status means the
+    server failed whatever the error says. `-32000` is any server's own code, so only a
+    `400` makes it a rejection; a failing server sending just that cannot be told apart.
+    """
+    status = exc.status
+    if status is not None and (
+        status in REFUSAL_STATUSES or status in _BUSY_STATUSES or status >= _SERVER_ERROR
+    ):
+        return False
+    if exc.code == _METHOD_NOT_FOUND:
+        return True
+    if exc.code in _REQUEST_REJECTED:
+        return status is None or status in _SUCCESS or status == _BAD_REQUEST
+    return status == _BAD_REQUEST and exc.code == _NO_SESSION
+
+
+def no_json_rpc_error(reply: RawReply, payload: Mapping[str, object] | None) -> bool:
+    """Whether a reply read whole is known to hold no JSON-RPC error.
+
+    An `error` member of any shape counts as one, since a malformed member is still a
+    server saying something failed.
+    """
+    return "error" not in payload if payload is not None else reply.plain_text()
+
+
+def _fall_back(transport: McpTransport, fallback: Fallback) -> Negotiation:
     """Adopt the era that opens with `initialize`, without opening anything yet.
 
     Nothing is sent here. An authorization challenge is not an era signal — a `401`
@@ -765,7 +858,7 @@ def _fall_back(transport: McpTransport) -> Negotiation:
     agreed until a server actually agrees to one.
     """
     transport.speak(LEGACY_WIRE)
-    return Negotiation(wire=LEGACY_WIRE)
+    return Negotiation(wire=LEGACY_WIRE, fallback=fallback)
 
 
 def open_era(
@@ -926,7 +1019,7 @@ def _no_common(offered: tuple[str, ...]) -> str:
 
 
 def _versions_in(result: Mapping[str, object]) -> tuple[str, ...]:
-    listed = result.get("supportedVersions")
+    listed = result.get(_SUPPORTED_VERSIONS)
     if not isinstance(listed, list):
         return ()
     return tuple(entry for entry in listed if isinstance(entry, str) and entry)
@@ -1132,7 +1225,7 @@ def http_failure(reply: RawReply, ref: str) -> HTTPError:
     The body is kept, cut short, so a message can quote where the server said what
     it refused; the headers travel as an `HTTPMessage`, as urllib's own would.
     """
-    return HTTPError(ref, reply.status, _reason(reply.status), _message(reply), _quoted(reply))
+    return HttpFailure(reply, ref)
 
 
 def unreadable(reply: RawReply, ref: str) -> UnreadableReply:
