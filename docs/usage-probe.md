@@ -153,7 +153,7 @@ Four consequences worth knowing:
   guardana does not speak, the result is inconclusive instead, naming that revision,
   because what it declares to modern clients was not read. The result is also
   inconclusive, naming the failure, when `server/discover` failed: a timeout, a
-  refusal (`401`, `403`), a rate limit, a server error, a reply that is not JSON-RPC,
+  refusal (`401`, `403`, `407`), a rate limit, a server error, a reply that is not JSON-RPC,
   a result whose `supportedVersions` names no revision, or another JSON-RPC error
   such as `-32603`. These are not such failures, but how a server without the method
   answers: JSON-RPC `-32601`, `-32600` or `-32602` at a `2xx` or `400`, `-32000` at a
