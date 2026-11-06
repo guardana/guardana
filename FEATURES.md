@@ -257,7 +257,7 @@ The extension API is stable under [`docs/compatibility.md`](docs/compatibility.m
 - organization/project tenancy, with optional environment-pinned keys;
 - scoped, hashed, revocable, and expiring API keys;
 - run and finding history, lifecycle states, expiring waivers, and audit events;
-- a retried run stored once, and a retry under the same run id with different content refused with `409` naming the run;
+- a retried run stored once, and a retry under the same run id with different content refused with `409` naming the run; a retry the collector could not compare is accepted and the CLI warns, naming the run;
 - retention and deletion commands, backup/restore checks, health, and readiness;
 - a read-only dashboard authenticated with a read-scoped session, which shows skipped checks and indeterminate gates next to the findings.
 

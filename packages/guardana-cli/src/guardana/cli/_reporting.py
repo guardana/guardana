@@ -133,7 +133,8 @@ def submit_safely(  # noqa: PLR0913 — a destination, a run, and whether it mus
     with what it said sanitised: the collector token withheld, secrets redacted, control
     characters dropped;
     the caller decides the exit, since the scan already ran and its verdict stands on its
-    own. A bad `--reporter` URL or a bug in serialization is not an outage; those
+    own. A retry the collector accepted without comparing it is delivered, and said as a
+    warning. A bad `--reporter` URL or a bug in serialization is not an outage; those
     propagate so the user actually learns their findings are not being collected.
     """
     level, suffix = (
@@ -143,8 +144,9 @@ def submit_safely(  # noqa: PLR0913 — a destination, a run, and whether it mus
     # sent or carry escape sequences, so it is printed only once sanitised.
     token = os.environ.get(TOKEN_VARIABLE)
     secrets = (token,) if token else ()
+    reporter = reporter_from_url(url, deployment, run)
     try:
-        reporter_from_url(url, deployment, run).submit(result, source=source)
+        reporter.submit(result, source=source)
     except HTTPError as exc:
         # A rejected envelope is not an outage — swallowing it as "unreachable" is
         # how a whole fleet can stop reporting while the dashboard keeps showing
@@ -165,4 +167,11 @@ def submit_safely(  # noqa: PLR0913 — a destination, a run, and whether it mus
             err=True,
         )
         return False
+    if reporter.accepted_uncompared:
+        named = f"run {run.run_id}" if run is not None else "this run"
+        typer.echo(
+            f"warning: the collector accepted {named} as a retry without comparing it: the run "
+            f"it holds predates content digests, so different content would not be noticed",
+            err=True,
+        )
     return True

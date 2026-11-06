@@ -375,6 +375,8 @@ def test_an_mcp_query_never_reaches_the_collector_as_the_source(
         ) -> None:
             pass
 
+        accepted_uncompared = False
+
         def submit(self, result: ScanResult, *, source: str) -> None:
             sources.append(source)
 

@@ -32,6 +32,8 @@ class _FakeReporter:
         self.calls: list[tuple[ScanResult, str]] = []
         _FakeReporter.instances.append(self)
 
+    accepted_uncompared = False
+
     def submit(self, result: ScanResult, *, source: str) -> None:
         self.calls.append((result, source))
 
@@ -48,6 +50,8 @@ class _ExplodingReporter:
         run: object | None = None,
     ) -> None:
         pass
+
+    accepted_uncompared = False
 
     def submit(self, result: ScanResult, *, source: str) -> None:
         raise ConnectionError("collector unreachable")

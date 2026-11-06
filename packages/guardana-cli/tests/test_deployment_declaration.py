@@ -145,6 +145,8 @@ def test_scan_forwards_the_declaration_to_the_collector(
         ) -> None:
             self.deployment = deployment
 
+        accepted_uncompared = False
+
         def submit(self, result: object, *, source: str) -> None:
             captured.append(json.dumps({"deployment": self.deployment is not None}).encode())
 
@@ -189,6 +191,8 @@ def test_a_refused_submission_repeats_the_collectors_own_reason(
             run: object | None = None,
         ) -> None:
             pass
+
+        accepted_uncompared = False
 
         def submit(self, result: object, *, source: str) -> None:
             raise HTTPError(

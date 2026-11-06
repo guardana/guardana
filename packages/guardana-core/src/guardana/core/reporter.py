@@ -1,7 +1,7 @@
 import json
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Protocol
 from urllib.parse import SplitResult, urlsplit, urlunsplit
@@ -262,34 +262,45 @@ class UnacknowledgedSubmissionError(Exception):
         super().__init__("the response was not a collector acknowledgement")
 
 
-def _acknowledged(body: bytes) -> bool:
-    """Whether `body` is a collector's answer to an accepted envelope.
+def _acknowledgement(body: bytes) -> Mapping[str, object] | None:
+    """Return a collector's answer to an accepted envelope, or None when `body` is not one.
 
     An object whose `status` is `ok`, with an integer `stored` and a boolean `duplicate`:
     a bare `{"status": "ok"}` is what most health checks answer, the collector's own
     included, so it says nothing was stored.
     """
     if len(body) > _MAX_ACKNOWLEDGEMENT_BYTES:
-        return False
+        return None
     try:
         answer = json.loads(body)
     except (ValueError, RecursionError):
-        return False
+        return None
     if not isinstance(answer, dict):
-        return False
+        return None
     stored = answer.get("stored")
-    return (
+    acknowledged = (
         answer.get("status") == "ok"
         and isinstance(stored, int)
         and not isinstance(stored, bool)
         and isinstance(answer.get("duplicate"), bool)
     )
+    return answer if acknowledged else None
 
 
-def _urllib_transport(url: str, payload: bytes, *, api_key: str | None) -> None:
+def _accepted_uncompared(answer: Mapping[str, object]) -> bool:
+    """Whether the collector took a retry without comparing it with the run it holds.
+
+    Only `"compared": false` on a duplicate says so: a new run answers null, and a collector
+    older than the field leaves it out.
+    """
+    return answer.get("duplicate") is True and answer.get("compared") is False
+
+
+def _urllib_transport(url: str, payload: bytes, *, api_key: str | None) -> bool:
     """POST `payload` to `url`, raising unless the collector acknowledges it.
 
-    A 2xx alone is not enough: anything at the collector's address can answer one.
+    A 2xx alone is not enough: anything at the collector's address can answer one. Returns
+    whether the collector accepted it as a retry it did not compare.
     """
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -298,8 +309,10 @@ def _urllib_transport(url: str, payload: bytes, *, api_key: str | None) -> None:
     request = Request(url, data=payload, headers=headers, method="POST")  # noqa: S310
     with open_unredirected(request, timeout=_TIMEOUT_SECONDS) as response:
         body = response.read(_MAX_ACKNOWLEDGEMENT_BYTES + 1)
-    if not _acknowledged(body):
+    answer = _acknowledgement(body)
+    if answer is None:
         raise UnacknowledgedSubmissionError
+    return _accepted_uncompared(answer)
 
 
 class HttpReporter:
@@ -312,7 +325,7 @@ class HttpReporter:
         api_key: str | None = None,
         deployment: DeploymentRef | None = None,
         run: RunManifest | None = None,
-        transport: Callable[[str, bytes], None] | None = None,
+        transport: Callable[[str, bytes], bool | None] | None = None,
         redactor: EvidenceRedactor | None = None,
     ) -> None:
         check_collector_url(url)
@@ -331,6 +344,8 @@ class HttpReporter:
         self._deployment = run.deployment if run is not None else deployment
         self._run = run
         self._transport = transport if transport is not None else self._default_transport
+        self.accepted_uncompared = False
+        """Whether the collector accepted the last submission as a retry it did not compare."""
         # Applied here rather than by the caller: this is the path that leaves the
         # machine, and it must not depend on whoever wired the reporter up.
         self._redactor = redactor if redactor is not None else EvidenceRedactor()
@@ -343,8 +358,8 @@ class HttpReporter:
             else self._redactor
         )
 
-    def _default_transport(self, url: str, payload: bytes) -> None:
-        _urllib_transport(url, payload, api_key=self._api_key)
+    def _default_transport(self, url: str, payload: bytes) -> bool:
+        return _urllib_transport(url, payload, api_key=self._api_key)
 
     def submit(self, result: ScanResult, *, source: str) -> None:
         """POST the normalized envelope to the collector, its source redacted like its findings.
@@ -360,4 +375,5 @@ class HttpReporter:
             deployment=self._deployment,
             run=self._run,
         )
-        self._transport(self._url, payload)
+        self.accepted_uncompared = False
+        self.accepted_uncompared = self._transport(self._url, payload) is True

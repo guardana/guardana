@@ -146,6 +146,8 @@ def test_a_dead_collector_does_not_kill_the_monitor(monkeypatch: pytest.MonkeyPa
         ) -> None:
             pass
 
+        accepted_uncompared = False
+
         def submit(self, result: object, *, source: str) -> None:
             raise ConnectionRefusedError("collector down")
 
@@ -188,6 +190,8 @@ def test_monitor_command_forwards_alerts_to_reporter(monkeypatch: pytest.MonkeyP
             run: object | None = None,
         ) -> None:
             self.url = url
+
+        accepted_uncompared = False
 
         def submit(self, result: object, *, source: str) -> None:
             submitted.append(source)
