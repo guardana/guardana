@@ -87,15 +87,15 @@
     "environment": "staging"
   },
   "run": {
-    "run_id": "733856dc-5127-4f94-80e1-98ebfb94b1a2",
-    "started_at": "2026-10-04T14:08:00.690041+00:00",
-    "completed_at": "2026-10-04T14:08:00.799489+00:00",
+    "run_id": "6826eeb7-24cb-4636-a23e-654f7b2dbc57",
+    "started_at": "2026-11-06T15:43:29.036802+00:00",
+    "completed_at": "2026-11-06T15:43:29.066970+00:00",
     "tool_version": "0.13.0",
     "gate": "fail",
     "evidence_mode": "redacted",
     "requests": 0,
     "input_tokens": null,
     "output_tokens": null,
-    "wall_time_seconds": 0.109448
+    "wall_time_seconds": 0.030168
   }
 }

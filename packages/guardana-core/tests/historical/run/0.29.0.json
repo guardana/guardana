@@ -2,10 +2,10 @@
   "schema_version": 9,
   "$schema": "https://guardana.dev/schemas/run/v9.schema.json",
   "run": {
-    "run_id": "134eaaeb-0bc4-4f6c-833b-ded8ff4187e5",
-    "created_at": "2026-10-04T14:12:17.314913Z",
-    "started_at": "2026-10-04T14:12:17.297800Z",
-    "completed_at": "2026-10-04T14:12:17.314913Z",
+    "run_id": "754fcdc9-80ee-44d7-affc-18bfb44a5461",
+    "created_at": "2026-11-06T15:49:53.415401Z",
+    "started_at": "2026-11-06T15:49:53.401002Z",
+    "completed_at": "2026-11-06T15:49:53.415401Z",
     "migrated_from": null,
     "source": {
       "kind": "local",
@@ -65,7 +65,7 @@
       "output_tokens": null,
       "requests_missing_token_counts": 0,
       "estimated_cost": null,
-      "wall_time_seconds": 0.017113
+      "wall_time_seconds": 0.014399
     },
     "rules": [
       {

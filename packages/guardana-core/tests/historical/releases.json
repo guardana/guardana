@@ -6453,5 +6453,790 @@
       "3.12",
       "3.13"
     ]
+  },
+  "1.0.0": {
+    "exclude_newer": "2026-10-27T15:15:54Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.0",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.0",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.0",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.0",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.0",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.0",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.0",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.0",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.0",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.0",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.0",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 8,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.0.1": {
+    "exclude_newer": "2026-10-29T18:19:38Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.1",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.1",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.1",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.1",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.1",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.1",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.1",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.1",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.1",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.1",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.1",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 8,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.0.2": {
+    "exclude_newer": "2026-10-30T17:05:21Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.0.2",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.0.2",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.0.2",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.0.2",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.0.2",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.0.2",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.0.2",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.0.2",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.0.2",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.0.2",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.0.2",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 8,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.1.0": {
+    "exclude_newer": "2026-11-02T22:30:52Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 18,
+        "stored": null
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.1.0",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.1.0",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.1.0",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.1.0",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.1.0",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.1.0",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.1.0",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.1.0",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.1.0",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.1.0",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.1.0",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 9,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
+  },
+  "1.2.0": {
+    "exclude_newer": "2026-11-06T15:20:41Z",
+    "extras": [],
+    "kinds": {
+      "run": {
+        "produced": true,
+        "schema_version": 19,
+        "stored": "run/1.2.0.json"
+      },
+      "probe-run": {
+        "produced": true,
+        "schema_version": 19,
+        "stored": "probe-run/1.2.0.json"
+      },
+      "envelope": {
+        "produced": true,
+        "schema_version": 8,
+        "stored": null
+      },
+      "profile": {
+        "produced": true,
+        "schema_version": null,
+        "stored": null
+      },
+      "pack-manifest": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "pack-lock": {
+        "produced": true,
+        "schema_version": 2,
+        "stored": null
+      },
+      "dataset": {
+        "produced": true,
+        "schema_version": [
+          1,
+          2
+        ],
+        "refused": {},
+        "stored": null
+      }
+    },
+    "profile_examples": {
+      "tried": true,
+      "examples": [
+        {
+          "n": 1,
+          "tag": "v1.2.0",
+          "doc": "docs/privacy.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 2,
+          "tag": "v1.2.0",
+          "doc": "docs/profiles.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 3,
+          "tag": "v1.2.0",
+          "doc": "docs/profiles.md",
+          "block": 2,
+          "loaded": null,
+          "why": "names ./team-rules, which the capture does not provide; scan: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'; probe: exit 3: warning: could not load rule \u2014 team-rules: RuleLoadError: invalid rule file team-rules: [Errno 2] No such file or directory: 'team-rules'"
+        },
+        {
+          "n": 4,
+          "tag": "v1.2.0",
+          "doc": "docs/profiles.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 5,
+          "tag": "v1.2.0",
+          "doc": "docs/profiles.md",
+          "block": 4,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 6,
+          "tag": "v1.2.0",
+          "doc": "docs/profiles.md",
+          "block": 5,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 7,
+          "tag": "v1.2.0",
+          "doc": "docs/profiles.md",
+          "block": 6,
+          "loaded": true,
+          "loaded_by": "probe",
+          "stored": null
+        },
+        {
+          "n": 8,
+          "tag": "v1.2.0",
+          "doc": "docs/usage-calibrate.md",
+          "block": 1,
+          "loaded": null,
+          "why": "names ./calibrations.json, which the capture does not provide; scan: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded; probe: exit 3: error: calibrations.json does not exist, so the calibrations it names cannot be recorded"
+        },
+        {
+          "n": 9,
+          "tag": "v1.2.0",
+          "doc": "docs/usage-contracts.md",
+          "block": 3,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 10,
+          "tag": "v1.2.0",
+          "doc": "docs/usage-target.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        },
+        {
+          "n": 11,
+          "tag": "v1.2.0",
+          "doc": "docs/usage-trace-inspect.md",
+          "block": 1,
+          "loaded": true,
+          "loaded_by": "scan",
+          "stored": null
+        }
+      ]
+    },
+    "extension_api_version": 2,
+    "output_api_version": 1,
+    "pack_schema_version": 3,
+    "collector_migrations": 9,
+    "requires_python": ">=3.11",
+    "python_classifiers": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ]
   }
 }
