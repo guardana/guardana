@@ -292,11 +292,8 @@ def test_a_file_name_holding_a_backslash_is_not_read_as_a_windows_path(
     assert "1 finding(s) are not waived" in said, said
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="a file name cannot hold a backslash there")
-@pytest.mark.parametrize("how", ["fixed", "deleted"])
-def test_an_update_clears_a_waiver_for_a_file_named_with_a_backslash_once_it_is_gone(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, how: str
-) -> None:
+def _named_with_a_backslash(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    """Scan a tree holding one sink in `pkg\\run.py`; return that file and a version-2 baseline."""
     tree = tmp_path / "tree"
     tree.mkdir()
     named = tree / "pkg\\run.py"
@@ -316,10 +313,15 @@ def test_an_update_clears_a_waiver_for_a_file_named_with_a_backslash_once_it_is_
         "expires": "2099-12-31",
     }
     baseline.write_text(yaml.safe_dump({"version": 2, "waivers": [waiver]}), encoding="utf-8")
-    if how == "fixed":
-        named.write_text("print('fixed')\n", encoding="utf-8")
-    else:
-        named.unlink()
+    return named, baseline
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a file name cannot hold a backslash there")
+def test_an_update_clears_a_waiver_for_a_file_named_with_a_backslash_once_it_is_fixed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    named, baseline = _named_with_a_backslash(tmp_path, monkeypatch)
+    named.write_text("print('fixed')\n", encoding="utf-8")
 
     updated = runner.invoke(app, ["baseline", "update", ".", "--file", str(baseline)])
 
@@ -328,3 +330,65 @@ def test_an_update_clears_a_waiver_for_a_file_named_with_a_backslash_once_it_is_
     written = yaml.safe_load(baseline.read_text(encoding="utf-8"))
     assert written["waivers"] == [], said
     assert written["version"] == 3, said
+    assert "is fixed" in said, said
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a file name cannot hold a backslash there")
+def test_an_update_keeps_a_waiver_for_a_deleted_file_named_with_a_backslash_as_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    named, baseline = _named_with_a_backslash(tmp_path, monkeypatch)
+    named.unlink()
+
+    updated = runner.invoke(app, ["baseline", "update", ".", "--file", str(baseline)])
+
+    said = " ".join(updated.output.split())
+    assert updated.exit_code == ExitCode.OK, said
+    assert len(yaml.safe_load(baseline.read_text(encoding="utf-8"))["waivers"]) == 1, said
+    assert "this run did not list pkg/run.py" in said, said
+
+
+def test_an_update_keeps_a_windows_waiver_for_a_present_file_the_run_did_not_list(
+    tmp_path: Path,
+) -> None:
+    baseline = _windows_baseline(tmp_path, _finding(tmp_path))
+    narrow = tmp_path / "narrow.yaml"
+    narrow.write_text("rules:\n  paths_exclude: ['src/run.py']\n", encoding="utf-8")
+
+    updated = runner.invoke(
+        app, ["baseline", "update", ".", "--file", str(baseline), "--profile", str(narrow)]
+    )
+
+    said = " ".join(updated.output.split())
+    assert updated.exit_code == ExitCode.OK, said
+    assert len(yaml.safe_load(baseline.read_text(encoding="utf-8"))["waivers"]) == 1, said
+    assert "this run did not list src/run.py" in said, said
+    assert "no longer in the scanned tree" not in said, said
+
+
+def test_an_update_from_another_directory_keeps_a_windows_waiver_it_cannot_place(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = _windows_baseline(tmp_path, _finding(tmp_path))
+    monkeypatch.chdir(tmp_path / "src")
+
+    updated = runner.invoke(app, ["baseline", "update", ".", "--file", str(baseline)])
+
+    said = " ".join(updated.output.split())
+    assert updated.exit_code == ExitCode.OK, said
+    assert len(yaml.safe_load(baseline.read_text(encoding="utf-8"))["waivers"]) == 1, said
+    assert "no longer in the scanned tree" not in said, said
+
+
+def test_an_update_of_a_fixed_file_under_the_working_directory_says_it_is_fixed(
+    tmp_path: Path,
+) -> None:
+    baseline = _windows_baseline(tmp_path, _finding(tmp_path))
+    (tmp_path / "src" / "run.py").write_text("print('fixed')\n", encoding="utf-8")
+
+    updated = runner.invoke(app, ["baseline", "update", ".", "--file", str(baseline)])
+
+    said = " ".join(updated.output.split())
+    assert updated.exit_code == ExitCode.OK, said
+    assert "is fixed" in said, said
+    assert "no longer in the scanned tree" not in said, said

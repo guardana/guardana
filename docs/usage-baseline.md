@@ -134,7 +134,7 @@ A baseline does not record which platform wrote it, so on Linux or macOS a versi
 or version-2 waiver for a file named with `\` and no `/`, such as `foo\bar.pkl`, is
 read the same way; while a finding carries the waiver's own fingerprint nothing
 else matches it; while none does it can waive the same rule's same evidence at
-`foo/bar.pkl`, and `update` removes it once the file is fixed or deleted.
+`foo/bar.pkl`, and `update` removes it once the file is fixed.
 A file from a *newer* version
 is refused rather than read optimistically: honouring waivers whose conditions this
 build cannot evaluate is the fail-open the strictness exists to prevent. A `version`

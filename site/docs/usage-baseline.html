@@ -343,7 +343,7 @@ A baseline does not record which platform wrote it, so on Linux or macOS a versi
 or version-2 waiver for a file named with <code>\</code> and no <code>/</code>, such as <code>foo\bar.pkl</code>, is
 read the same way; while a finding carries the waiver's own fingerprint nothing
 else matches it; while none does it can waive the same rule's same evidence at
-<code>foo/bar.pkl</code>, and <code>update</code> removes it once the file is fixed or deleted.
+<code>foo/bar.pkl</code>, and <code>update</code> removes it once the file is fixed.
 A file from a <em>newer</em> version
 is refused rather than read optimistically: honouring waivers whose conditions this
 build cannot evaluate is the fail-open the strictness exists to prevent. A <code>version</code>

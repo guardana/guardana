@@ -479,21 +479,22 @@ def _deleted_from(waiver: Waiver, root: Path | None) -> str | None:
     """
     if root is None or not waiver.location or "#" in waiver.location:
         return None
+    # Only the first spelling can prove a file gone: where `\\` is no separator, the name a
+    # Windows build wrote is missing whether or not the file it means is there.
+    path, _line = split_ref(_locations(waiver)[0])
     try:
         base = Path.cwd().resolve()
         top = root.resolve()
     except (OSError, RuntimeError):
         return None
-    for location in _locations(waiver):
-        path, _line = split_ref(location)
-        # An archive member is spelled `archive:member`, so the archive must be gone too.
-        outer = path.rsplit(":", 1)[0]
+    # An archive member is spelled `archive:member`, so the archive must be gone too.
+    outer = path.rsplit(":", 1)[0]
+    if not _directory_under((base / outer).parent, top):
         # Without the directory the location may be spelled from another working
         # directory than `create` ran in, so a missing candidate proves nothing.
-        if _directory_under((base / outer).parent, top) and all(
-            _missing_under(base / spelled, top) for spelled in {path, outer}
-        ):
-            return path
+        return None
+    if all(_missing_under(base / spelled, top) for spelled in {path, outer}):
+        return path
     return None
 
 
