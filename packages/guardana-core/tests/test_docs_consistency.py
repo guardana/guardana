@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 from _release_series import stable_series
 from guardana.core import __version__
+from guardana.core.manifest.model import MANIFEST_SCHEMA_VERSION
 
 _MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 _FENCED_BLOCK = re.compile(r"```.*?```", re.DOTALL)
@@ -425,3 +426,10 @@ def test_every_list_of_presets_names_every_preset() -> None:
         and not all(name in line for name in PRESET_NAMES)
     ]
     assert not stale, f"preset lists missing one of {PRESET_NAMES}:\n  " + "\n  ".join(stale)
+
+
+def test_the_documented_reader_script_expects_the_schema_this_build_writes() -> None:
+    page = (_repo() / "docs" / "reading-results.md").read_text(encoding="utf-8")
+
+    assert re.findall(r'"\$version" != (\d+)', page) == [str(MANIFEST_SCHEMA_VERSION)]
+    assert re.findall(r"this reader expects (\d+)", page) == [str(MANIFEST_SCHEMA_VERSION)]

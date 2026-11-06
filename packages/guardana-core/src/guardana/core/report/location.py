@@ -12,6 +12,7 @@ import re
 from dataclasses import replace
 from pathlib import Path, PurePath
 
+from guardana.core._path_spelling import portable_ref
 from guardana.core.report._ref import split_ref
 from guardana.core.report.finding import Finding
 from guardana.core.report.result import ScanResult
@@ -22,19 +23,24 @@ _NAMED_BY_PATH = frozenset({ShortfallKind.UNEXAMINED_COMPONENT, ShortfallKind.EM
 """Shortfall kinds whose name may be a file or a target path rather than a label."""
 
 
-def relativize(ref: str, base: Path) -> str:
-    """Rewrite a file ref's path relative to `base`; leave endpoint refs and outside paths."""
-    if "#" in ref:  # an endpoint "url#model", not a file
-        return ref
+def relativize(ref: str, base: Path | None) -> str:
+    """Rewrite a file ref's path relative to `base` with `/`; leave what is not under it.
+
+    The separator is `/` on every platform, because the baseline fingerprint and every
+    comparison between saved runs hash or match the path as written. An endpoint, a path
+    outside `base` and, with no `base`, every ref are only spelled by `portable_ref`.
+    """
+    if base is None or "#" in ref:
+        return portable_ref(ref)
     path_str, line = split_ref(ref)
     try:
         rel = Path(path_str).resolve().relative_to(base.resolve())
     except (ValueError, OSError):
-        return ref
-    return f"{rel}:{line}" if line is not None else str(rel)
+        return portable_ref(ref)
+    return f"{rel.as_posix()}:{line}" if line is not None else rel.as_posix()
 
 
-def _relativize_shortfall(gap: CoverageShortfall, base: Path) -> CoverageShortfall:
+def _relativize_shortfall(gap: CoverageShortfall, base: Path | None) -> CoverageShortfall:
     """Rewrite a path-named shortfall relative to `base`, and drop `base` from its detail.
 
     A bare name — a model format such as `pickle` — is a label, not a location, and
@@ -45,7 +51,8 @@ def _relativize_shortfall(gap: CoverageShortfall, base: Path) -> CoverageShortfa
     name = gap.name
     if PurePath(name).is_absolute() or len(PurePath(name).parts) > 1:
         name = relativize(name, base)
-    return replace(gap, name=name, detail=_without_root(gap.detail, base))
+    detail = gap.detail if base is None else _without_root(gap.detail, base)
+    return replace(gap, name=name, detail=detail)
 
 
 _PATH_START = r"(?<![^\s,(\'\"])"
@@ -71,7 +78,7 @@ def _without_root(text: str, base: Path) -> str:
     return text
 
 
-def _relativize_scope(scope: FileScope, base: Path) -> FileScope:
+def _relativize_scope(scope: FileScope, base: Path | None) -> FileScope:
     """Rewrite every path a file scope names relative to `base`, as its listing is."""
     skipped = scope.skipped_models
     return replace(
@@ -97,12 +104,13 @@ def _relativize_scope(scope: FileScope, base: Path) -> FileScope:
     )
 
 
-def relativize_findings(result: ScanResult, base: Path) -> ScanResult:
+def relativize_findings(result: ScanResult, base: Path | None) -> ScanResult:
     """Return a copy of `result` with every file location made relative to `base`.
 
     Applied once before rendering and baselining, so both the SARIF `uri` and the
     baseline fingerprint use a portable, repo-relative path instead of the absolute
-    checkout path (which differs between a dev machine and CI).
+    checkout path (which differs between a dev machine and CI). With no `base` the
+    locations stay where they are and are only spelled the portable way.
     """
 
     def rel(findings: tuple[Finding, ...]) -> tuple[Finding, ...]:

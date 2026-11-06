@@ -31,14 +31,18 @@ from guardana.core.severity import Severity
 
 
 def _accepted() -> Waiver:
-    """One waiver with every field carrying something a reader could lose."""
+    """One waiver with every field carrying something a reader could lose.
+
+    Its location is a version-2 Windows path, which is what sets `legacy_path`.
+    """
     return Waiver(
         fingerprint="705c242957abe403",
         rule="guardana.supply_chain.insecure_transport",
-        location="app.py:2",
+        location="app\\main.py:2",
         reason="internal tool, no traffic leaves the cluster",
         approved_by="security@example.com",
         expires=date(2026, 12, 31),
+        legacy_path=True,
     )
 
 

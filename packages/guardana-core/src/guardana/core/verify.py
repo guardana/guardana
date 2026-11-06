@@ -479,13 +479,14 @@ class Verifier:
 
         `relative_to` rewrites file paths in findings, observations and the listing
         relative to that directory, as the CLI does against its working directory; left
-        out, they stay as given. A path that does not exist raises `FileNotFoundError`:
+        out, they stay where they are, a relative one spelled with `/`. A path that does
+        not exist raises `FileNotFoundError`:
         a scan of a typo would find nothing and pass.
         """
         if not path.exists():
             raise FileNotFoundError(f"{path} does not exist, so there is nothing to scan")
         target = ArtifactTarget(path, excludes=self.profile.path_excludes)
-        reference = target.ref if relative_to is None else relativize(target.ref, relative_to)
+        reference = relativize(target.ref, relative_to)
         return self._verify(
             target,
             reference=reference,
@@ -786,15 +787,14 @@ class Verifier:
         """
         stop_messages = target_failures(result)
         stopped = result.stopped_by
-        if relative_to is not None:
-            result = relativize_findings(result, relative_to)
+        result = relativize_findings(result, relative_to)
         redactor = EvidenceRedactor(self.profile.privacy, secrets=withheld)
         try:
             result = redactor.redact_result(result)
         except RedactionBoundError as exc:
             raise _after_stop(exc, stopped) from exc
         if baseline is not None:
-            result = apply_baseline(result, baseline.active())
+            result = apply_baseline(result, baseline.active(), baseline.active_legacy())
         result = replace(
             result,
             coverage_shortfall=(

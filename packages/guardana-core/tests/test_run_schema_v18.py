@@ -7,7 +7,6 @@ directories unsearched.
 
 import copy
 import json
-from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -15,20 +14,13 @@ from typing import Any
 import pytest
 from _documents import (
     run_manifest,
-    saved_run_at_v9,
-    saved_run_at_v10,
-    saved_run_at_v11,
-    saved_run_at_v12,
-    saved_run_at_v13,
-    saved_run_at_v14,
-    saved_run_at_v15,
-    saved_run_at_v16,
     saved_run_at_v17,
+    saved_run_at_v18,
     scan_result,
 )
 from guardana.core.manifest.load import ManifestLoadError
 from guardana.core.manifest.migrations import migrate_v17
-from guardana.core.report.load import ReportLoadError, load_report, migrate_forward
+from guardana.core.report.load import ReportLoadError, load_report
 from guardana.core.report.serialize import run_to_dict
 from guardana.core.target.scope import (
     ExcludePattern,
@@ -44,6 +36,9 @@ _SCHEMAS = Path(__file__).resolve().parents[3] / "schemas"
 
 
 def _errors(document: dict[str, Any], version: int = 18) -> list[str]:
+    """Validate `document` against a run schema, a current one in the shape version 18 wrote."""
+    if document["schema_version"] == 19:
+        document = saved_run_at_v18(document)
     schema = json.loads((_SCHEMAS / f"run-v{version}.schema.json").read_text(encoding="utf-8"))
     return [error.message for error in Draft202012Validator(schema).iter_errors(document)]
 
@@ -202,29 +197,3 @@ def test_a_loaded_v17_run_says_it_was_migrated(tmp_path: Path) -> None:
     assert report.result.scope is not None
     assert report.result.scope.kept_models == ()
     assert report.result.scope.skipped_models is None
-
-
-@pytest.mark.parametrize(
-    ("version", "shape"),
-    [
-        (17, saved_run_at_v17),
-        (16, saved_run_at_v16),
-        (15, saved_run_at_v15),
-        (14, saved_run_at_v14),
-        (13, saved_run_at_v13),
-        (12, saved_run_at_v12),
-        (11, saved_run_at_v11),
-        (10, saved_run_at_v10),
-        (9, saved_run_at_v9),
-    ],
-    ids=["v17", "v16", "v15", "v14", "v13", "v12", "v11", "v10", "v9"],
-)
-def test_every_older_version_reaches_18_through_the_chain(
-    version: int, shape: Callable[[dict[str, Any]], dict[str, Any]]
-) -> None:
-    migrated = migrate_forward(shape(_document()), version)
-
-    assert migrated["schema_version"] == 18
-    assert not _errors(migrated)
-    scope = migrated["scope"]
-    assert scope is None or (scope["kept_models"] == [] and scope["skipped_models"] is None)

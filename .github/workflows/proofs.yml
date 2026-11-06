@@ -2,7 +2,8 @@
 # (`scripts/proofs/`). No Guardana package is built from this checkout: it supplies the proof
 # scripts, the reference retrieval application under test and the collector's deployment
 # files, the last two compared with the version's tag. Every Guardana package comes from
-# pypi.org and the collector image from ghcr.io, at the version dispatched. Where a proof
+# pypi.org and the collector image from ghcr.io, at the version dispatched. The scripts judge
+# what the tree they come from promises, so dispatch an older release from its own tag. Where a proof
 # claims to run offline, the network is cut after the install and a canary inside the
 # isolation shows it. Every record is uploaded, passed or not, and the summary passes only
 # when every expected record passed.
@@ -169,8 +170,7 @@ jobs:
           retention-days: 90
 
   # #138 on Windows: the firewall blocks outbound traffic of the interpreter and the venv
-  # launchers. A README line whose location Windows displays with its directory holds as a
-  # recorded known difference, never silently.
+  # launchers.
   first-run-windows:
     needs: inputs
     runs-on: windows-2025

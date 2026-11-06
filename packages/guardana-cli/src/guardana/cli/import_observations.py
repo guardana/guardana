@@ -29,6 +29,7 @@ from guardana.cli._sidecar import (
     refuse_writing_over_named_inputs,
 )
 from guardana.cli.exit_codes import ExitCode
+from guardana.core._path_spelling import portable_ref
 from guardana.core.gate import gate_outcome
 from guardana.core.manifest import SourceKind, TargetIdentity
 from guardana.core.plugins import PluginMode, PluginTrust
@@ -99,7 +100,7 @@ def import_observations(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI 
     warn_without_a_reporter(prof.delivery_required, reporter)
     read = _read_or_exit(results, producer)
     started_at = datetime.now(UTC)
-    reference = target or f"{read.provenance.producer}:{results}"
+    reference = target or f"{read.provenance.producer}:{portable_ref(str(results))}"
     result = ScanResult(
         findings=(),
         rules_run=(),

@@ -489,6 +489,18 @@ def scan_result() -> ScanResult:
     )
 
 
+def saved_run_at_v18(document: dict[str, Any]) -> dict[str, Any]:
+    """Relabel a document this build wrote as version 18, whose shape it shares.
+
+    Version 19 changed how a path is spelled, not where it is kept.
+    """
+    return {
+        **document,
+        "schema_version": 18,
+        "$schema": "https://guardana.dev/schemas/run/v18.schema.json",
+    }
+
+
 def saved_run_at_v17(document: dict[str, Any]) -> dict[str, Any]:
     """Rewrite a document this build wrote into the shape a version-17 build wrote."""
     scope = document.get("scope")

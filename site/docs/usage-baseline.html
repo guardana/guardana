@@ -210,7 +210,7 @@ guardana baseline verify                    # expired or unreviewed waivers?
 guardana baseline update .                  # drop waivers for findings that are fixed
 </code></pre>
 <h2 id="the-file">The file</h2>
-<pre><code class="language-yaml">version: 2
+<pre><code class="language-yaml">version: 3
 waivers:
   - fingerprint: 705c242957abe403
     rule: guardana.supply_chain.insecure_transport
@@ -330,7 +330,21 @@ catch — while the parser beside it already refused an unreadable <em>date</em>
 that reason.</p>
 <h2 id="versions">Versions</h2>
 <p>Version 1 baselines still load — their waivers have no expiry and are reported as
-such, and a file without <code>version</code> is read as version 1. A file from a <em>newer</em> version
+such, and a file without <code>version</code> is read as version 1. Version 3 fingerprints a file
+path with <code>/</code> on every platform (version 2 added the approver and the expiry).
+A version-1 or version-2 waiver written on Windows, whose location has <code>\</code> and no
+<code>/</code>, or that has no location, still waives the finding whose path spelled with <code>\</code> gives its fingerprint,
+and <code>guardana baseline update</code> rewrites it with the finding's current fingerprint
+and location, keeping the reason, approver and expiry. A file holding such a waiver
+that <code>update</code> cannot rewrite, for example because its rule did not run, keeps its
+version. When a rewritten waiver lands on a finding another active waiver in the file
+already waives, <code>update</code> removes it and says so, and the other waiver stays.
+A baseline does not record which platform wrote it, so on Linux or macOS a version-1
+or version-2 waiver for a file named with <code>\</code> and no <code>/</code>, such as <code>foo\bar.pkl</code>, is
+read the same way; while a finding carries the waiver's own fingerprint nothing
+else matches it; while none does it can waive the same rule's same evidence at
+<code>foo/bar.pkl</code>, and <code>update</code> removes it once the file is fixed.
+A file from a <em>newer</em> version
 is refused rather than read optimistically: honouring waivers whose conditions this
 build cannot evaluate is the fail-open the strictness exists to prevent. A <code>version</code>
 that is not a whole number (<code>true</code>, <code>&quot;2&quot;</code>, <code>2.0</code>) is refused as <code>version must be an integer</code>, and one below 1 as <code>version 0 does not exist</code>, with exit <code>3</code> like any other

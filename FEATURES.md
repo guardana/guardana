@@ -192,7 +192,7 @@ A regression case carries the reply it was promoted from and a correct reply wri
 required evidence, and redaction. Built-in presets cover CI, pre-training,
 monitoring and release gates; `release` also fails when a selected check is skipped or
 reaches no verdict. Baselines are explicit, fingerprinted, and can expire; comparisons
-refuse changes that make the evidence incomparable. A baseline `version` must be an integer of at least 1; an absent value means 1. A profile may declare `schema_version`; absent means 1, invalid values and higher versions are refused, and writers omit it at 1. [`schemas/profile-v1.schema.json`](schemas/profile-v1.schema.json) describes every accepted profile key.
+refuse changes that make the evidence incomparable. Relative file paths in saved runs, SARIF and baselines are spelled with `/` on every platform, so a fingerprint taken on Windows matches one taken on Linux or macOS for the same tree; an absolute path keeps its form. A baseline `version` must be an integer of at least 1; an absent value means 1. A profile may declare `schema_version`; absent means 1, invalid values and higher versions are refused, and writers omit it at 1. [`schemas/profile-v1.schema.json`](schemas/profile-v1.schema.json) describes every accepted profile key.
 
 Rules map to versioned OWASP LLM, OWASP Agentic, OWASP MCP, OWASP ML, MITRE ATLAS,
 and NIST AML references. `guardana taxonomy` resolves editions and crosswalks

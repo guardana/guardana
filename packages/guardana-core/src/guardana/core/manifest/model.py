@@ -15,7 +15,7 @@ from guardana.core.manifest.records import (
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-MANIFEST_SCHEMA_VERSION = 18
+MANIFEST_SCHEMA_VERSION = 19
 """Version of the run document, moved independently of the CLI.
 
 A run written by 0.7.3 and one written by 0.9.0 are the same document if the
@@ -81,6 +81,9 @@ Version 18 records the file each exclude pattern was read from (`scope.excludes[
 the model files the scanned target's ignore file matched and the scan read anyway
 (`scope.kept_models`) and the model files named inside the directories every scan skips
 (`scope.skipped_models`).
+
+Version 19 spells every relative file path with `/` on every platform, so a run written on
+Windows names, fingerprints and compares a file as one written elsewhere does.
 """
 
 

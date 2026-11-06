@@ -102,8 +102,8 @@ Save this as `read_run.sh` and run it beside `run.json`:
 ```bash
 run=run.json
 version=$(jq '.schema_version' "$run")
-if [ "$version" != 18 ]; then
-  echo "run schema $version: this reader expects 18" >&2
+if [ "$version" != 19 ]; then
+  echo "run schema $version: this reader expects 19" >&2
   exit 3
 fi
 gate=$(jq -r '.run.result_summary.gate' "$run")
@@ -119,7 +119,7 @@ jq -r '.run.result_summary.rules_skipped[] | "skipped: \(.rule_id) (\(.reason))"
 jq -r '.run.coverage.shortfall[] | "shortfall: \(.kind) \(.name): \(.detail)"' "$run"
 ```
 
-The script reads schema 18 only. [`guardana run migrate`](usage-run.md) converts an older run
+The script reads schema 19 only. [`guardana run migrate`](usage-run.md) converts an older run
 to the current schema. To list only the skips that are coverage gaps, add
 `select(.reason != "not_applicable")` to the `rules_skipped` filter.
 

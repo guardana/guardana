@@ -18,7 +18,7 @@ guardana baseline update .                  # drop waivers for findings that are
 ## The file
 
 ```yaml
-version: 2
+version: 3
 waivers:
   - fingerprint: 705c242957abe403
     rule: guardana.supply_chain.insecure_transport
@@ -121,7 +121,21 @@ that reason.
 ## Versions
 
 Version 1 baselines still load — their waivers have no expiry and are reported as
-such, and a file without `version` is read as version 1. A file from a *newer* version
+such, and a file without `version` is read as version 1. Version 3 fingerprints a file
+path with `/` on every platform (version 2 added the approver and the expiry).
+A version-1 or version-2 waiver written on Windows, whose location has `\` and no
+`/`, or that has no location, still waives the finding whose path spelled with `\` gives its fingerprint,
+and `guardana baseline update` rewrites it with the finding's current fingerprint
+and location, keeping the reason, approver and expiry. A file holding such a waiver
+that `update` cannot rewrite, for example because its rule did not run, keeps its
+version. When a rewritten waiver lands on a finding another active waiver in the file
+already waives, `update` removes it and says so, and the other waiver stays.
+A baseline does not record which platform wrote it, so on Linux or macOS a version-1
+or version-2 waiver for a file named with `\` and no `/`, such as `foo\bar.pkl`, is
+read the same way; while a finding carries the waiver's own fingerprint nothing
+else matches it; while none does it can waive the same rule's same evidence at
+`foo/bar.pkl`, and `update` removes it once the file is fixed.
+A file from a *newer* version
 is refused rather than read optimistically: honouring waivers whose conditions this
 build cannot evaluate is the fail-open the strictness exists to prevent. A `version`
 that is not a whole number (`true`, `"2"`, `2.0`) is refused as `version must be an
