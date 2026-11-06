@@ -160,12 +160,15 @@ def run(  # noqa: PLR0913 — the step, the command and how to run it
     cwd: Path,
     environment: dict[str, str],
     expect_lines: tuple[str, ...] = (),
+    expect_fragments: tuple[str, ...] = (),
     timeout: int = COMMAND_TIMEOUT,
 ) -> str:
     """Run `argv`, fill `step` with what happened, and return the combined output.
 
-    Output is decoded as UTF-8 with replacement, so a byte the runner's encoding produced
-    is recorded rather than raised here; the command's own exit code is what is judged.
+    Each of `expect_lines` must be a whole output line and each of `expect_fragments` must
+    appear anywhere in the output, both compared after `plain`. Output is decoded as UTF-8
+    with replacement, so a byte the runner's encoding produced is recorded rather than
+    raised here; the command's own exit code is what is judged.
     """
     started = time.monotonic()
     try:
@@ -192,10 +195,12 @@ def run(  # noqa: PLR0913 — the step, the command and how to run it
     step.excerpt = excerpt(output)
     if step.expected_exit is not None and finished.returncode != step.expected_exit:
         step.problems.append(f"exit {finished.returncode}, expected {step.expected_exit}")
+    shown = {plain(line) for line in output.splitlines()}
+    step.problems += [f"output lacks: {line}" for line in expect_lines if plain(line) not in shown]
     flat = plain(output)
-    for line in expect_lines:
-        if plain(line) not in flat:
-            step.problems.append(f"output lacks: {line}")
+    step.problems += [
+        f"output lacks: {fragment}" for fragment in expect_fragments if plain(fragment) not in flat
+    ]
     return output
 
 
