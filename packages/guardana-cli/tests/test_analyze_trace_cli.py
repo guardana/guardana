@@ -16,11 +16,12 @@ shape of false green this project has.
 import errno
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
+from guardana.core import _path_spelling
 from guardana.core.manifest import SourceKind
 from guardana.core.trace import TRACE_SCHEMA_VERSION
 from typer.testing import CliRunner, Result
@@ -101,6 +102,26 @@ def test_an_unreadable_record_lands_in_the_errors_channel_of_the_saved_run(
     assert len(document["errors"]) == 1
     assert document["errors"][0]["stage"] == "load"
     assert document["run"]["result_summary"]["gate"] == "indeterminate"
+
+
+def test_an_unreadable_record_names_a_windows_relative_trace_with_slashes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The error names the file the way the run's target does, whichever platform ran."""
+    monkeypatch.setattr(_path_spelling, "PurePath", PureWindowsPath)
+    monkeypatch.chdir(tmp_path)
+    # One file name on POSIX; what a relative path given on Windows looks like.
+    name = "runs\\t.jsonl"
+    (tmp_path / name).parent.mkdir(exist_ok=True)
+    oversized = {"span_id": "s2", "name": "x" * (1024 * 1024 + 10)}
+    _write(tmp_path, _HEADER, _CLEAN_SPAN, oversized, name=name)
+    output = tmp_path / "run.json"
+
+    _run(name, "--format", "json", "--output", str(output))
+
+    document = json.loads(output.read_text(encoding="utf-8"))
+    assert document["run"]["target"]["ref"] == "runs/t.jsonl#t-1"
+    assert [e["source"] for e in document["errors"]] == ["runs/t.jsonl:3"]
 
 
 def test_a_saved_run_over_a_trace_says_it_came_from_a_trace(tmp_path: Path) -> None:

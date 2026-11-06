@@ -369,6 +369,23 @@ def exchanges_path(run: Path) -> Path:
     return run.with_name(f"{stem}.exchanges.jsonl")
 
 
+def _subjects_named_as(result: ScanResult, ref: str, reference: str) -> ScanResult:
+    """Name the target in every assessment the way the manifest names it.
+
+    A rule records the target's own ref, which for a scanned tree is the path as given, while
+    the manifest names the tree relative to the checkout and spelled with `/`.
+    """
+    if ref == reference:
+        return result
+    return replace(
+        result,
+        assessments=tuple(
+            replace(a, subject_ref=reference) if a.subject_ref == ref else a
+            for a in result.assessments
+        ),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class Verifier:
     """What a run is configured with; one `Verifier` can run several targets in turn.
@@ -787,7 +804,7 @@ class Verifier:
         """
         stop_messages = target_failures(result)
         stopped = result.stopped_by
-        result = relativize_findings(result, relative_to)
+        result = _subjects_named_as(relativize_findings(result, relative_to), target.ref, reference)
         redactor = EvidenceRedactor(self.profile.privacy, secrets=withheld)
         try:
             result = redactor.redact_result(result)
