@@ -57,6 +57,7 @@ def supported_surface() -> Mapping[str, frozenset[str]]:
     }
     surface["guardana.core.plugins"] = frozenset({"PluginMode", "PluginTrust"})
     surface["guardana.core.profile"] = frozenset({"load_profile"})
+    surface["guardana.core.rule"] = frozenset({"NotApplicable", "NotOffered"})
     surface["guardana.core.target"] = frozenset({"WireProtocol", "display_url"})
     surface["guardana.core.source"] = frozenset({"PythonSource", "UnreadSource", "read_source"})
     surface["guardana.core.report.shortfall"] = frozenset({"CoverageShortfall", "ShortfallKind"})

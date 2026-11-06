@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Support `NotApplicable` and `NotOffered` from `guardana.core.rule` in the extension contract.** `docs/extending.md`, `docs/writing-rules.md` and `docs/python-api.md` already told rule authors to raise them, but they were outside the supported surface (#288). `docs/generated/api-surface.json` lists them and compatibility tests pin them.
+
+### Changed
+
+- **The reference pack `guardana-reference-pack` is now version `0.1.5`.** Its supported-surface test (`examples/reference_pack/tests/test_reference_surface.py`) lists `NotApplicable` and `NotOffered` (#288).
+
 ### Fixed
 
 - **Report source null bytes as Python parse problems on every interpreter.** Wherever the byte sits, including beside an unusable coding line or in a UTF-16 file, the message is `cannot be parsed as Python: source code cannot contain null bytes` (#287). Previously, `tokenize.detect_encoding` on Python `3.14` led to `declares an encoding that cannot be used` for a null byte in the first two lines; Python `3.11` to `3.13` reported a parse problem for most such files but an encoding problem beside an unusable coding line or in a UTF-16 file. The file stays unread, so only the message changes and no verdict changes.

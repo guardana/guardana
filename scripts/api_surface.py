@@ -45,6 +45,7 @@ _EXTENSION_NAMES = {
         "RuleFixture",
         "materialise",
     ),
+    "guardana.core.rule": ("NotApplicable", "NotOffered"),
     "guardana.core.target": ("WireProtocol", "display_url"),
     "guardana.core.source": ("PythonSource", "UnreadSource", "read_source"),
     "guardana.core.report.shortfall": ("CoverageShortfall", "ShortfallKind"),
