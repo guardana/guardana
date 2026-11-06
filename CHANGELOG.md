@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-06 — the second minor release
+
 ### Added
 
 - **Support `NotApplicable` and `NotOffered` from `guardana.core.rule` in the extension contract.** `docs/extending.md`, `docs/writing-rules.md` and `docs/python-api.md` already told rule authors to raise them, but they were outside the supported surface (#288). `docs/generated/api-surface.json` lists them and compatibility tests pin them.
