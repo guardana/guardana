@@ -16,7 +16,7 @@ Ideas without a reproducible problem or acceptance test start in
 
 The current release carries the stable compatibility promise for its supported surface; [Product status](docs/product-status.md) lists maturity by component.
 It scans model and code artifacts offline, probes live endpoints, MCP servers and A2A agents, grades recordings, compares runs and gates CI.
-Historical documents from 0.2.0 through 1.0.0rc5 are read by current tests.
+Historical documents from 0.2.0 through 1.2.0 are read by current tests.
 See [FEATURES.md](FEATURES.md) for shipped behaviour, [Product status](docs/product-status.md) for limits, and the [generated rule summary](docs/generated/rule-summary.md) and [rule catalog](docs/generated/rule-catalog.md) for coverage.
 
 ## The 1.0 promise
