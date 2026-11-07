@@ -1,15 +1,15 @@
 ---
 title: "Customization through published extension points (#141)"
-date: 2026-10-20
+date: 2026-11-06
 summary: "The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut."
 ---
-The maintainer ran this proof with Guardana 1.0.0rc5 from PyPI, using proof scripts at commit `91196fd6`. The [workflow run](https://github.com/guardana/guardana/actions/runs/39424046832) records the results.
+The maintainer ran this proof with Guardana 1.2.0 from PyPI, using proof scripts at commit `8714c59c`. The [workflow run](https://github.com/guardana/guardana/actions/runs/42243442503) records the results.
 
 ## Environment and packages
 
 The proof used `.github/workflows/proofs.yml`, with one job on ubuntu-24.04 in a `python:3.13-slim` container.
 
-A fresh environment outside the repository contained `guardana-cli==1.0.0rc5`, `guardana-reference-pack` 0.1.3 and pytest, installed from PyPI. The reference pack depends only on `guardana-core`.
+A fresh environment outside the repository contained `guardana-cli==1.2.0`, `guardana-reference-pack` 0.1.5 and pytest, installed from PyPI. The reference pack depends only on `guardana-core`.
 
 Before the network cut, the pack's sdist was downloaded from PyPI and its sha256 checked against PyPI's JSON API. The proof then ran with `--network none`. The network canary was refused.
 
@@ -46,7 +46,7 @@ $ guardana pack validate --plugins allowlist --allow-plugin guardana-reference-p
 Validation exited with code 0 and reported:
 
 ```text
-2 pack(s) checked, 0 with problems
+2 pack(s) checked, 0 with problems.
 ```
 
 The proof wrote and checked a lock file:
@@ -78,7 +78,7 @@ Three kit rows were recorded as not applicable to this pack. Each decision came 
 - No pack rule needs what the MCP and A2A doubles serve, so the row for running a rule against those doubles was not applicable.
 - No pack rule reads a trace, so the row using a `Trace` in a `TraceTarget` was not applicable.
 
-The kit page names those helpers without saying they are outside the supported surface. This was recorded in #145 on 2026-10-14 as a documentation correction.
+The kit page marks those helpers as outside the supported surface, consistent with the record's `not_applicable` reasons.
 
 ## Result
 
