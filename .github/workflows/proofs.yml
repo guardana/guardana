@@ -6,7 +6,7 @@
 # what the tree they come from promises, so dispatch an older release from its own tag. Where a proof
 # claims to run offline, the network is cut after the install and a canary inside the
 # isolation shows it. Every record is uploaded, passed or not, and the summary passes only
-# when every expected record passed.
+# when every expected record passed and every first-run cell saved the same runs.
 
 name: Proofs
 
@@ -442,7 +442,7 @@ jobs:
 
       # The first-run count is the matrix sizes above: 2 × 2 cells each on Linux, macOS and
       # Windows. The pilot and the regression loop each compare the pilot with the tag.
-      - name: Every expected record passed
+      - name: Every expected record passed and the cells agree
         working-directory: scripts
         env:
           NEEDS: ${{ toJSON(needs) }}

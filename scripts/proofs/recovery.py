@@ -468,7 +468,9 @@ class _Proof:
     ) -> tuple[Step, str]:
         """Run one command as a step; the output comes back unredacted for parsing only."""
         step = Step(name=name, command=shown or shlex.join(argv), expected_exit=expected)
-        output = run(step, argv, cwd=cwd or self.work, environment=environment, expect_lines=lines)
+        output = run(
+            step, argv, cwd=cwd or self.work, environment=environment, expect_fragments=lines
+        )
         if output:
             step.excerpt = excerpt(redact(output, self.hidden))
         self.add(step)

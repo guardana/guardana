@@ -16,6 +16,8 @@ from typing import Any
 
 import pytest
 import yaml
+from guardana.core.report.finding import Evidence, Finding
+from guardana.core.severity import Severity
 
 from proofs import __main__ as proofs_cli
 from proofs import container, customization, first_run, install, record, summary
@@ -125,7 +127,13 @@ def test_the_first_run_walks_this_build_and_is_incomplete_without_isolation(tmp_
     assert document["verdict"] == "incomplete"
     exits = [s["exit_code"] for s in document["steps"] if s["command"].startswith("guardana ")]
     assert exits[2:] == [1, 0, 1, 0, 0, 0]
-    assert (written.parent / "first-run-after.json").is_file()
+    kept = [json.loads((written.parent / n).read_text("utf-8")) for n in first_run.KEPT_RUNS]
+    before, after = (summary.saved_run(document) for document in kept)
+    assert before["findings"] == [
+        ("guardana.supply_chain.pickle_opcode", "model/weights.pkl", "90a4da10f97b7a5a")
+    ]
+    assert after["findings"] == []
+    assert before["run.target.ref"] == after["run.target.ref"] == "model"
 
 
 def test_a_failed_step_does_not_hide_the_steps_after_it(
@@ -200,11 +208,47 @@ def test_a_readme_line_shown_with_a_directory_is_a_problem(tmp_path: Path, shown
     assert not step.held
 
 
-def test_the_readme_line_itself_holds(tmp_path: Path) -> None:
-    step = _shown(tmp_path, _README_LINE)
+@pytest.mark.parametrize(
+    "shown",
+    [
+        f"{_README_LINE}.bak",
+        f"{_README_LINE} and more",
+        f"before {_README_LINE}",
+    ],
+    ids=["longer-name", "text-after", "text-before"],
+)
+def test_a_readme_line_is_matched_as_a_whole_output_line(tmp_path: Path, shown: str) -> None:
+    step = _shown(tmp_path, shown)
+
+    assert step.problems == [f"output lacks: {_README_LINE}"]
+
+
+@pytest.mark.parametrize(
+    "shown",
+    [_README_LINE, f"{_README_LINE}   ", f"other output\n  {_README_LINE}\t\nmore output"],
+    ids=["itself", "trailing-whitespace", "among-other-lines"],
+)
+def test_the_readme_line_itself_holds(tmp_path: Path, shown: str) -> None:
+    step = _shown(tmp_path, shown)
 
     assert step.problems == []
     assert step.held
+
+
+def test_a_fragment_is_matched_anywhere_in_a_line_and_a_missing_one_is_named(
+    tmp_path: Path,
+) -> None:
+    step = record.Step(name="n", command="c", expected_exit=0)
+
+    record.run(
+        step,
+        [sys.executable, "-c", "print('migration 0009 rolled back in 2 s')"],
+        cwd=tmp_path,
+        environment=record.clean_environment(None),
+        expect_fragments=("rolled back", "refusing"),
+    )
+
+    assert step.problems == ["output lacks: refusing"]
 
 
 def test_a_command_that_hangs_is_stopped_and_recorded(tmp_path: Path) -> None:
@@ -968,6 +1012,194 @@ def test_a_summary_reads_records_by_artifact_and_ignores_other_json(tmp_path: Pa
     ]
 
 
+# The saved runs, compared across cells.
+
+_LINUX = "proof-first-run-linux-3.13-uv"
+_MACOS = "proof-first-run-macOS-3.13-uv"
+_WINDOWS_CELL = "proof-first-run-Windows-3.13-uv"
+_PICKLE = "guardana.supply_chain.pickle_opcode"
+
+
+def _saved_run(  # noqa: PLR0913 — one keyword per field a cell could spell differently
+    *,
+    target_ref: str = "model",
+    target_fingerprint: str = "sha256:0d4b",
+    finding_ref: str | None = "model/weights.pkl",
+    summary_text: str = "unpickling imports builtins.print",
+    observed: str = "model/weights.pkl",
+    listed: str = "model/weights.pkl",
+) -> dict[str, Any]:
+    finding = {
+        "rule_id": _PICKLE,
+        "severity": "CRITICAL",
+        "target_ref": finding_ref,
+        "evidence": {"summary": summary_text, "detail": ""},
+    }
+    return {
+        "schema_version": 19,
+        "run": {
+            "target": {"type": "artifact", "ref": target_ref, "fingerprint": target_fingerprint}
+        },
+        "scope": {"files": [listed]},
+        "observations": [{"kind": "model", "ref": observed}],
+        "findings": [] if finding_ref is None else [finding],
+    }
+
+
+def _cell(
+    records: Path,
+    cell: str,
+    before: dict[str, Any] | None = None,
+    after: dict[str, Any] | None = None,
+) -> None:
+    """Write one first-run cell: its passing record and the two runs it kept."""
+    proof = record.Record(
+        proof="first-run", version="1", isolation="x", steps=[record.Step(record.NETWORK_CUT, "c")]
+    )
+    proof.write(records / cell / "first-run.json")
+    for name, document in zip(first_run.KEPT_RUNS, (before, after), strict=True):
+        if document is not None:
+            (records / cell / name).write_text(json.dumps(document), encoding="utf-8")
+
+
+def _compared(records: Path, report_only: dict[str, str] | None = None) -> list[str]:
+    return summary.compare_saved_runs(records, summary.collect(records), report_only)
+
+
+def _three_cells(records: Path, **windows: Any) -> None:  # noqa: ANN401 — the fields to change
+    same = _saved_run()
+    clean = _saved_run(finding_ref=None, observed="model/weights.safetensors")
+    _cell(records, _LINUX, same, clean)
+    _cell(records, _MACOS, same, clean)
+    _cell(records, _WINDOWS_CELL, _saved_run(**windows), clean)
+
+
+def test_cells_that_kept_the_same_refs_and_fingerprints_compare_clean(tmp_path: Path) -> None:
+    _three_cells(tmp_path)
+
+    assert _compared(tmp_path) == []
+    out = tmp_path / "out"
+    assert summary.summarise(tmp_path, out, {}, {"first-run": 3}) == 0
+
+
+@pytest.mark.parametrize(
+    ("windows", "field", "theirs", "ours"),
+    [
+        (
+            {"summary_text": "unpickling imports builtins.exec"},
+            "findings",
+            summary.fingerprint(_PICKLE, "model/weights.pkl", "unpickling imports builtins.exec"),
+            summary.fingerprint(_PICKLE, "model/weights.pkl", "unpickling imports builtins.print"),
+        ),
+        ({"finding_ref": "model\\weights.pkl"}, "findings", "model\\\\weights.pkl", "model/"),
+        ({"target_ref": "model\\"}, "run.target.ref", "'model\\\\'", "'model'"),
+        ({"target_fingerprint": "sha256:ffff"}, "run.target.fingerprint", "ffff", "0d4b"),
+        ({"observed": "model\\weights.pkl"}, "observations", "model\\\\weights.pkl", "model/"),
+        ({"listed": "model\\weights.pkl"}, "scope.files", "model\\\\weights.pkl", "model/"),
+    ],
+    ids=["fingerprint", "finding-ref", "target-ref", "target-fingerprint", "observed", "listed"],
+)
+def test_a_cell_whose_saved_run_differs_names_both_cells_and_the_difference(
+    tmp_path: Path, windows: dict[str, str], field: str, theirs: str, ours: str
+) -> None:
+    _three_cells(tmp_path, **windows)
+
+    (reason,) = _compared(tmp_path)
+
+    assert reason.startswith(f"first-run-before.json: {_WINDOWS_CELL} differs from {_LINUX} ")
+    assert f" in {field}: " in reason
+    head, _, tail = reason.partition(f", {_LINUX} has ")
+    assert theirs in head
+    assert ours in tail
+    assert summary.summarise(tmp_path, tmp_path / "out", {}, {"first-run": 3}) == 1
+
+
+def test_a_cell_that_kept_no_saved_run_is_a_problem_not_a_skip(tmp_path: Path) -> None:
+    _cell(tmp_path, _LINUX, _saved_run(), _saved_run())
+    _cell(tmp_path, _WINDOWS_CELL, _saved_run(), None)
+
+    assert _compared(tmp_path) == [f"{_WINDOWS_CELL}: first-run left no first-run-after.json"]
+
+
+def test_a_single_cell_that_kept_nothing_is_a_problem(tmp_path: Path) -> None:
+    _cell(tmp_path, _LINUX)
+
+    assert _compared(tmp_path) == [
+        f"{_LINUX}: first-run left no first-run-before.json",
+        f"{_LINUX}: first-run left no first-run-after.json",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("written", "says"),
+    [
+        ("{", "is not JSON"),
+        ("[]", "holds no run"),
+        (json.dumps({**_saved_run(), "run": {"target": {}}}), "holds no run.target.ref"),
+        (json.dumps({**_saved_run(), "findings": [{"rule_id": _PICKLE}]}), "target_ref"),
+        (json.dumps({**_saved_run(), "observations": [{"kind": "model"}]}), "holds no ref"),
+        (json.dumps({**_saved_run(), "scope": {"files": [1]}}), "scope.files"),
+        (json.dumps({**_saved_run(), "run": {"target": {"ref": None}}}), "is not a string"),
+        (json.dumps({**_saved_run(), "findings": {}}), "its findings is not a list"),
+    ],
+    ids=[
+        "broken",
+        "not-an-object",
+        "no-target-ref",
+        "finding-no-ref",
+        "no-observed-ref",
+        "listing",
+        "null-target-ref",
+        "findings-not-a-list",
+    ],
+)
+def test_a_saved_run_the_summary_cannot_read_is_a_problem(
+    tmp_path: Path, written: str, says: str
+) -> None:
+    _cell(tmp_path, _LINUX, _saved_run(), _saved_run())
+    _cell(tmp_path, _WINDOWS_CELL, _saved_run(), _saved_run())
+    (tmp_path / _WINDOWS_CELL / "first-run-before.json").write_text(written, encoding="utf-8")
+
+    (reason,) = _compared(tmp_path)
+
+    assert reason.startswith(f"{_WINDOWS_CELL}: first-run-before.json cannot be compared: ")
+    assert says in reason
+
+
+def test_a_saved_run_that_cannot_be_opened_is_a_problem(tmp_path: Path) -> None:
+    _cell(tmp_path, _LINUX, _saved_run(), _saved_run())
+    _cell(tmp_path, _WINDOWS_CELL, None, _saved_run())
+    found = summary.collect(tmp_path)
+    (tmp_path / _WINDOWS_CELL / "first-run-before.json").mkdir()
+
+    (reason,) = summary.compare_saved_runs(tmp_path, found)
+
+    assert reason.startswith(f"{_WINDOWS_CELL}: first-run-before.json cannot be compared: ")
+    assert "cannot be read" in reason
+
+
+def test_a_reported_cell_is_left_out_of_the_comparison(tmp_path: Path) -> None:
+    _three_cells(tmp_path, target_ref="elsewhere")
+    (tmp_path / _WINDOWS_CELL / "first-run-after.json").unlink()
+
+    assert _compared(tmp_path, _WINDOWS) == []
+    assert len(_compared(tmp_path)) == 2
+
+
+def test_the_recomputed_fingerprint_is_the_one_guardana_derives() -> None:
+    for ref in ("model/weights.pkl", "src/app.py:12"):
+        finding = Finding(
+            rule_id=_PICKLE,
+            severity=Severity.CRITICAL,
+            title="t",
+            taxonomy=(),
+            target_ref=ref,
+            evidence=Evidence(summary="unpickling imports builtins.print"),
+        )
+
+        assert summary.fingerprint(_PICKLE, ref, finding.evidence.summary) == finding.fingerprint
+
+
 # The command line.
 
 _OFFLINE = ["--venv", "v", "--project", "p", "--version", "1", "--record", "r"]
@@ -1089,6 +1321,26 @@ def test_every_proof_job_uploads_its_records_whatever_happened() -> None:
         assert uploads[0]["with"]["if-no-files-found"] == "error", name
         assert str(uploads[0]["with"]["name"]).startswith("proof-"), name
         assert job.get("strategy", {}).get("fail-fast", False) is False, name
+
+
+def test_the_summary_receives_each_cells_saved_runs_in_a_directory_of_its_own() -> None:
+    jobs = _workflow()["jobs"]
+    (download,) = [s for s in jobs["summary"]["steps"] if "download" in str(s.get("uses"))]
+
+    assert download["with"]["pattern"] == "proof-*"
+    assert "merge-multiple" not in download["with"]
+    # The saved runs are kept beside the record, so the uploaded directory must hold it:
+    # the container writes it under `<out>/records`, the other runners where `--record` says.
+    writes = {
+        "first-run-linux": '--proof first-run --python "$PY" --installer "$INSTALLER"',
+        "first-run-macos": '--record "$RUNNER_TEMP/proof/records/first-run.json"',
+        "first-run-windows": '--record "$RUNNER_TEMP/proof/records/first-run.json"',
+    }
+    for name, written in writes.items():
+        (upload,) = [s for s in jobs[name]["steps"] if "upload" in str(s.get("uses"))]
+        assert upload["with"]["path"] == "${{ runner.temp }}/proof/records", name
+        assert written in str(jobs[name]["steps"]), name
+    assert '--out "$RUNNER_TEMP/proof"' in str(jobs["first-run-linux"]["steps"])
 
 
 def test_the_pilot_jobs_prove_even_when_the_tag_comparison_fails() -> None:

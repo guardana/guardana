@@ -269,7 +269,7 @@ class _Loop:
             [str(venv_executable(self.venv, "guardana")), *args],
             cwd=self.work,
             environment=self.environment,
-            expect_lines=lines,
+            expect_fragments=lines,
         )
         self.record.steps.append(step)
         return step, output

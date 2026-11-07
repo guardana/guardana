@@ -34,6 +34,8 @@ _EDIT_BLOCKS = 2
 # The sequence #138 names. A README that parsed to fewer commands would otherwise pass
 # for having run nothing.
 EXPECTED_SHAPE = {"scan": 2, "diff": 1, "doctor": 1, "rule test": 2, "edit": 1}
+# The two saved runs the README writes, kept beside the record under these names.
+KEPT_RUNS = ("first-run-before.json", "first-run-after.json")
 
 
 @dataclass(frozen=True)
@@ -280,6 +282,7 @@ def first_run(
 def _keep_evidence(starter: Path, records: Path) -> None:
     """Copy the two saved runs beside the record, so the artifact holds what was checked."""
     records.mkdir(parents=True, exist_ok=True)
-    for name in ("before.json", "after.json"):
+    for kept in KEPT_RUNS:
+        name = kept.removeprefix("first-run-")
         if (starter / name).is_file():
-            shutil.copy2(starter / name, records / f"first-run-{name}")
+            shutil.copy2(starter / name, records / kept)

@@ -219,7 +219,7 @@ def prepare(record: Record, venv: Path, application: Path, work: Path) -> dict[s
         [str(venv_executable(venv, "guardana")), "fixtures", "render", FIXTURES, "--out", "seed"],
         cwd=work,
         environment=environment,
-        expect_lines=("3 document(s), 1 poisoned, for 2 tenant(s)",),
+        expect_fragments=("3 document(s), 1 poisoned, for 2 tenant(s)",),
     )
     record.steps.append(render)
     return environment if render.held else None
@@ -409,7 +409,7 @@ def start_record(
         [str(venv_executable(venv, "guardana")), "--version"],
         cwd=project,
         environment=clean_environment(venv),
-        expect_lines=(f"guardana-cli {version}",),
+        expect_fragments=(f"guardana-cli {version}",),
     )
     record.steps.append(cli)
     step, record.environment["application_version"] = installed_version(venv, APPLICATION, project)

@@ -120,7 +120,7 @@ def _commands(record: Record, venv: Path, project: Path) -> None:
         name: str, args: list[str], expected: int, lines: tuple[str, ...] = (), cwd: Path = project
     ) -> Step:
         done = Step(name=name, command=" ".join(["guardana", *args]), expected_exit=expected)
-        run(done, [guardana, *args], cwd=cwd, environment=environment, expect_lines=lines)
+        run(done, [guardana, *args], cwd=cwd, environment=environment, expect_fragments=lines)
         record.steps.append(done)
         return done
 
