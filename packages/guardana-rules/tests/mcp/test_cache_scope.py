@@ -182,6 +182,28 @@ def test_a_legacy_server_refusing_discovery_stays_not_applicable(status: int, co
         list(RULE.run(target, RuleContext()))
 
 
+@pytest.mark.parametrize("status", [401, 403, 407])
+def test_a_gated_server_refusing_its_own_credential_at_discovery_is_inconclusive(
+    status: int,
+) -> None:
+    class _RefusesTheCaller(ScriptedMcpServer):
+        def __call__(self, url: str, **kwargs: object) -> RawReply:
+            if b"server/discover" not in cast("bytes", kwargs.get("body") or b""):
+                return super().__call__(url, **kwargs)  # type: ignore[arg-type]
+            body = {"jsonrpc": "2.0", "id": None, "error": {"code": -32601, "message": "no"}}
+            return RawReply(status=status, headers={}, body=json.dumps(body).encode("utf-8"))
+
+    server = _RefusesTheCaller(ROUTABLE, tools=TOOLS, credential=CREDENTIAL, cache_scope="public")
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"server/discover failed (HTTP {status})" in summaries(reported)[0]
+
+
 def test_a_server_sharing_no_revision_is_inconclusive_rather_than_clean() -> None:
     server = ScriptedMcpServer(ROUTABLE, protocol_versions=["2031-01-01"])
     target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)

@@ -112,6 +112,8 @@ NOT_THE_ERA_STATUSES = frozenset({400, 404, 405})
 _SHAREABLE_SCOPE = "public"
 
 _CREDENTIAL_STATUSES = frozenset({401, 403, 407})
+"""Statuses that answer who may ask, a proxy's `407` included, and never which revision answers."""
+
 _TARGET_STATUSES = frozenset({404, 408, 425, 429})
 _BUSY_STATUSES = frozenset({408, 425, 429})
 _NOT_FOUND = 404
@@ -823,13 +825,14 @@ def _refuses_the_method(exc: McpProtocolError) -> bool:
 
     Handshake-era SDKs reach their method table only inside a session, so a request with
     none is turned away as a `400` carrying `-32600` or `-32000` rather than `-32601`. A
-    refusal says who may ask, not which era answers, and a busy or server status means the
-    server failed whatever the error says. `-32000` is any server's own code, so only a
-    `400` makes it a rejection; a failing server sending just that cannot be told apart.
+    `401`, `403` or `407` says who may ask, not which era answers, and a busy or server
+    status means the server failed whatever the error says. `-32000` is any server's own
+    code, so only a `400` makes it a rejection; a failing server sending just that cannot
+    be told apart.
     """
     status = exc.status
     if status is not None and (
-        status in REFUSAL_STATUSES or status in _BUSY_STATUSES or status >= _SERVER_ERROR
+        status in _CREDENTIAL_STATUSES or status in _BUSY_STATUSES or status >= _SERVER_ERROR
     ):
         return False
     if exc.code == _METHOD_NOT_FOUND:

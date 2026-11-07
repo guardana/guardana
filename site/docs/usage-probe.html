@@ -484,7 +484,7 @@ The skip's detail names the revision. When the server also lists a modern revisi
 guardana does not speak, the result is inconclusive instead, naming that revision,
 because what it declares to modern clients was not read. The result is also
 inconclusive, naming the failure, when <code>server/discover</code> failed: a timeout, a
-refusal (<code>401</code>, <code>403</code>), a rate limit, a server error, a reply that is not JSON-RPC,
+refusal (<code>401</code>, <code>403</code>, <code>407</code>), a rate limit, a server error, a reply that is not JSON-RPC,
 a result whose <code>supportedVersions</code> names no revision, or another JSON-RPC error
 such as <code>-32603</code>. These are not such failures, but how a server without the method
 answers: JSON-RPC <code>-32601</code>, <code>-32600</code> or <code>-32602</code> at a <code>2xx</code> or <code>400</code>, <code>-32000</code> at a

@@ -351,6 +351,15 @@ def test_a_reply_that_is_no_discovery_result_is_a_legacy_answer() -> None:
             _json_rpc_error(401, -32601), "HTTP 401 carrying JSON-RPC error -32601", id="401-rpc"
         ),
         pytest.param(
+            _json_rpc_error(403, -32601), "HTTP 403 carrying JSON-RPC error -32601", id="403-rpc"
+        ),
+        pytest.param(
+            _json_rpc_error(407, -32601), "HTTP 407 carrying JSON-RPC error -32601", id="407-rpc"
+        ),
+        pytest.param(
+            _json_rpc_error(407, -32600), "HTTP 407 carrying JSON-RPC error -32600", id="407-reject"
+        ),
+        pytest.param(
             RawReply(status=400, headers={}, body=b'{"error":"overloaded"}'),
             "HTTP 400",
             id="400-malformed-error-member",
