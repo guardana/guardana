@@ -20,8 +20,17 @@ other way round). The reference pack reaches PyPI only when the release is told 
 publish it, so a pack version PyPI does not have is NOT PUBLISHED and changes nothing,
 unless `--pack-published` says the release published it: then it is NOT CHECKED.
 
-It needs `uv` and the network (pypi.org and the file host PyPI names), and writes only
-to a temporary directory it removes; the checkout is built from, not changed.
+PyPI can answer 404 for a version it accepted moments ago. When a version the release
+published (every package, and the pack under `--pack-published`) is answered 404, the
+check asks again, 20 seconds apart, up to 6 tries; one run waits at most 100 seconds in
+all, however many versions are missing. A version still missing after that is NOT
+CHECKED, and its reason says how often it was asked and how long the run waited. Any
+other failure, and a pack the release did not publish, is not asked again.
+
+It reads PyPI's JSON API and the files it lists, and the checkout it builds. It needs
+`uv` and the network (pypi.org and the file host PyPI names), and writes only to a
+temporary directory it removes; the checkout is built from, not changed. There is no
+dry run: it writes nothing that outlives it.
 
 Exit codes: 0 every published file reproduces, 1 any file differs, 2 any not checked and
 none differ, or the check could not run at all.
@@ -42,6 +51,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import tomllib
 import urllib.error
 import urllib.request
@@ -58,6 +68,10 @@ REFERENCE_PACK = "examples/reference_pack"
 BUILD_PYTHON = "3.12"
 """The interpreter `release.yml` installs before it builds; a test keeps the two equal."""
 PYPI_JSON = "https://pypi.org/pypi/{name}/{version}/json"
+PUBLISH_TRIES = 6
+"""How often one run asks PyPI for versions the release published before it gives up."""
+PUBLISH_WAIT_SECONDS = 20
+"""The pause between two of those tries."""
 
 EXIT_REPRODUCES = 0
 EXIT_DIFFERS = 1
@@ -152,6 +166,34 @@ Fetcher = Callable[[str], bytes]
 """Return the body served at a URL, or raise `NotCheckedError`."""
 Builder = Callable[[Path, str, Path], None]
 """Build one directory of a checkout into another directory, or raise `NotCheckedError`."""
+Sleeper = Callable[[float], None]
+"""Pause for a number of seconds."""
+
+
+def _sleep(seconds: float) -> None:
+    time.sleep(seconds)
+
+
+class Patience:
+    """The waits one run may still spend on published versions PyPI does not list yet.
+
+    Shared by every project of a run, so the run waits at most
+    `(PUBLISH_TRIES - 1) * PUBLISH_WAIT_SECONDS` seconds however many versions are missing.
+    """
+
+    def __init__(self, sleep: Sleeper) -> None:
+        self._sleep = sleep
+        self.waits_left = PUBLISH_TRIES - 1
+        self.waited = 0
+
+    def wait(self) -> bool:
+        """Pause before the next try, or return False once the run has waited all it may."""
+        if self.waits_left <= 0:
+            return False
+        self._sleep(PUBLISH_WAIT_SECONDS)
+        self.waits_left -= 1
+        self.waited += PUBLISH_WAIT_SECONDS
+        return True
 
 
 def fetch_url(url: str) -> bytes:
@@ -498,16 +540,18 @@ class Rebuild:
     fetch: Fetcher
     build: Builder
     projects: Sequence[Distribution]
+    sleep: Sleeper = _sleep
 
     def run(self) -> list[FileResult]:
         """Compare every file of every project the release builds."""
-        return [result for project in self.projects for result in self.check(project)]
+        patience = Patience(self.sleep)
+        return [result for project in self.projects for result in self.check(project, patience)]
 
-    def check(self, project: Distribution) -> list[FileResult]:
+    def check(self, project: Distribution, patience: Patience | None = None) -> list[FileResult]:
         """Compare every file PyPI publishes for one project, and any it does not."""
         label = f"{project.name} {project.version}"
         try:
-            published = published_files(project.name, project.version, self.fetch)
+            published = self._published(project, patience or Patience(self.sleep))
         except NotPublishedError as exc:
             if project.optional:
                 return [FileResult(label, Outcome.NOT_PUBLISHED, "this release did not publish it")]
@@ -528,6 +572,23 @@ class Rebuild:
             if name not in names
         ]
         return results
+
+    def _published(self, project: Distribution, patience: Patience) -> list[Published]:
+        """List a project's files, asking again while PyPI does not list a published version."""
+        tries = 1
+        while True:
+            try:
+                return published_files(project.name, project.version, self.fetch)
+            except NotPublishedError as exc:
+                if project.optional:
+                    raise
+                if not patience.wait():
+                    times = "once" if tries == 1 else f"{tries} times"
+                    raise NotPublishedError(
+                        f"{exc}; asked {times}, and this run waited {patience.waited} s "
+                        "for PyPI to list it"
+                    ) from exc
+                tries += 1
 
     def _check_file(self, published: Published, rebuilt: dict[str, Path]) -> FileResult:
         if published.filename not in rebuilt:

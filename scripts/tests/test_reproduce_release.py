@@ -1,7 +1,8 @@
 """A rebuilt release is compared with PyPI's files member by member, and never passes unseen.
 
 The archives are built here in memory, PyPI is a dictionary of URLs and the build
-writes prepared bytes, so nothing reaches the network or runs `uv`.
+writes prepared bytes, so nothing reaches the network or runs `uv`; the pause between
+two tries is recorded, never slept.
 """
 
 import gzip
@@ -9,9 +10,11 @@ import hashlib
 import io
 import json
 import tarfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
+from collections import Counter
 from collections.abc import Callable, Mapping
 from email.message import Message
 from pathlib import Path
@@ -44,6 +47,14 @@ _PROJECTS = [Distribution(name, f"packages/{name}/", _VERSION) for name in _PACK
 _PACK = Distribution("guardana-reference-pack", "examples/reference_pack", "0.1.0", optional=True)
 _ROOT = Path(__file__).resolve().parents[2]
 _EPOCH = (2020, 2, 2, 0, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(seconds: float) -> NoReturn:
+        raise AssertionError(f"slept {seconds} s for real")
+
+    monkeypatch.setattr(time, "sleep", refuse)
 
 
 def _wheel(
@@ -117,10 +128,40 @@ class _PyPI:
             return json.dumps(document).encode()
         return self._body(url)
 
+    def sleep(self, seconds: float) -> NoReturn:
+        raise AssertionError(f"waited {seconds} s for a PyPI that answered at once")
+
     def _body(self, url: str) -> bytes:
         if url not in self.bodies:
             raise NotPublishedError(f"404 for {url}")
         return self.bodies[url]
+
+
+class _Lagging:
+    """A PyPI whose JSON for some versions answers 404 a number of times before it lists them.
+
+    It counts every request and records every pause the check takes between two of them.
+    """
+
+    def __init__(self, pypi: _PyPI, misses: Mapping[str, int] | None = None) -> None:
+        self.pypi = pypi
+        self.misses = dict(misses or {})
+        self.asked: Counter[str] = Counter()
+        self.waits: list[float] = []
+
+    def sleep(self, seconds: float) -> None:
+        self.waits.append(seconds)
+
+    def fetch(self, url: str) -> bytes:
+        self.asked[url] += 1
+        if self.misses.get(url, 0) > 0:
+            self.misses[url] -= 1
+            raise NotPublishedError(f"404 for {url}")
+        return self.pypi.fetch(url)
+
+
+def _json(project: Distribution) -> str:
+    return reproduce_release.PYPI_JSON.format(name=project.name, version=project.version)
 
 
 def _builder(rebuilt: Mapping[str, Mapping[str, bytes]]) -> Callable[[Path, str, Path], None]:
@@ -143,11 +184,13 @@ def _run(
     tmp_path: Path,
     published: Mapping[str, Mapping[str, bytes]],
     rebuilt: Mapping[str, Mapping[str, bytes]],
-    pypi: _PyPI | None = None,
+    pypi: _PyPI | _Lagging | None = None,
     projects: list[Distribution] = _PROJECTS,
 ) -> list[FileResult]:
-    fetch = (pypi or _PyPI(published)).fetch
-    return Rebuild(tmp_path, tmp_path / "work", fetch, _builder(rebuilt), projects).run()
+    pypi = pypi or _PyPI(published)
+    return Rebuild(
+        tmp_path, tmp_path / "work", pypi.fetch, _builder(rebuilt), projects, pypi.sleep
+    ).run()
 
 
 def _only(results: list[FileResult], suffix: str) -> FileResult:
@@ -244,7 +287,7 @@ def test_a_release_pypi_does_not_list_is_not_checked(tmp_path: Path) -> None:
     pypi = _PyPI(release)
     del pypi.bodies[reproduce_release.PYPI_JSON.format(name="guardana-server", version=_VERSION)]
 
-    results = _run(tmp_path, release, release, pypi)
+    results = _run(tmp_path, release, release, _Lagging(pypi))
 
     server = _only(results, f"guardana-server {_VERSION}")
     assert server.outcome is Outcome.NOT_CHECKED
@@ -461,7 +504,9 @@ def test_a_release_pypi_does_not_have_yet_is_not_checked_and_never_built(tmp_pat
     def build(source: Path, path: str, out_dir: Path) -> None:
         built.append(path)
 
-    results = Rebuild(tmp_path, tmp_path / "work", _PyPI({}).fetch, build, _PROJECTS).run()
+    pypi = _Lagging(_PyPI({}))
+
+    results = Rebuild(tmp_path, tmp_path / "work", pypi.fetch, build, _PROJECTS, pypi.sleep).run()
 
     assert [result.outcome for result in results] == [Outcome.NOT_CHECKED] * len(_PACKAGES)
     assert built == []
@@ -486,7 +531,9 @@ def test_a_reference_pack_the_release_published_but_pypi_does_not_list_is_not_ch
     release = _release()
     published_pack = Distribution(_PACK.name, _PACK.path, _PACK.version)
 
-    results = _run(tmp_path, release, release, projects=[*_PROJECTS, published_pack])
+    pypi = _Lagging(_PyPI(release))
+
+    results = _run(tmp_path, release, release, pypi, projects=[*_PROJECTS, published_pack])
 
     pack = _only(results, "guardana-reference-pack 0.1.0")
     assert pack.outcome is Outcome.NOT_CHECKED
@@ -609,3 +656,122 @@ def test_the_rebuild_runs_the_build_commands_the_release_runs() -> None:
     )
     assert f"uv build {reproduce_release.REFERENCE_PACK} --out-dir dist-reference/" in pack
     assert "SOURCE_DATE_EPOCH" not in text
+
+
+_PUBLISHED_PACK = Distribution(_PACK.name, _PACK.path, _PACK.version)
+
+
+def _with_pack() -> dict[str, dict[str, bytes]]:
+    return {**_release(), _PACK.name: _files(_PACK.name, _PACK.version)}
+
+
+def test_a_published_version_pypi_lists_on_the_third_try_reproduces(tmp_path: Path) -> None:
+    """PyPI answers 404 for a version it accepted moments ago, and lists it shortly after."""
+    release = _with_pack()
+    pypi = _Lagging(_PyPI(release), {_json(_PUBLISHED_PACK): 2})
+
+    results = _run(tmp_path, release, release, pypi, [*_PROJECTS, _PUBLISHED_PACK])
+
+    pack = [result for result in results if result.filename.startswith("guardana_reference_pack")]
+    assert [result.outcome for result in pack] == [Outcome.REPRODUCES] * 2
+    assert pypi.asked[_json(_PUBLISHED_PACK)] == 3
+    assert pypi.waits == [reproduce_release.PUBLISH_WAIT_SECONDS] * 2
+    assert exit_code(results) == reproduce_release.EXIT_REPRODUCES
+
+
+def test_a_published_version_pypi_never_lists_is_not_checked_after_every_try(
+    tmp_path: Path,
+) -> None:
+    release = _release()
+    pypi = _Lagging(_PyPI(release), {_json(_PUBLISHED_PACK): 1_000})
+
+    results = _run(tmp_path, release, release, pypi, [*_PROJECTS, _PUBLISHED_PACK])
+
+    tries = reproduce_release.PUBLISH_TRIES
+    waited = (tries - 1) * reproduce_release.PUBLISH_WAIT_SECONDS
+    pack = _only(results, f"{_PACK.name} {_PACK.version}")
+    assert pack.outcome is Outcome.NOT_CHECKED
+    assert pack.reason.startswith("404 for ")
+    assert f"asked {tries} times, and this run waited {waited} s" in pack.reason
+    assert pypi.asked[_json(_PUBLISHED_PACK)] == tries
+    assert len(pypi.waits) == tries - 1
+    assert exit_code(results) == reproduce_release.EXIT_NOT_CHECKED
+
+
+def test_a_pypi_error_other_than_404_is_not_asked_again(tmp_path: Path) -> None:
+    release = _release()
+    pypi = _PyPI(release)
+    core_json = _json(_PROJECTS[0])
+    asked: list[str] = []
+
+    def fetch(url: str) -> bytes:
+        asked.append(url)
+        if url == core_json:
+            raise NotCheckedError(f"could not fetch {url}: HTTP Error 500")
+        return pypi.fetch(url)
+
+    results = Rebuild(
+        tmp_path, tmp_path / "work", fetch, _builder(release), _PROJECTS, pypi.sleep
+    ).run()
+
+    core = _only(results, f"guardana-core {_VERSION}")
+    assert (core.outcome, core.reason) == (
+        Outcome.NOT_CHECKED,
+        f"could not fetch {core_json}: HTTP Error 500",
+    )
+    assert asked.count(core_json) == 1
+    assert exit_code(results) == reproduce_release.EXIT_NOT_CHECKED
+
+
+def test_a_reference_pack_the_release_did_not_publish_is_asked_for_once(tmp_path: Path) -> None:
+    release = _release()
+    pypi = _Lagging(_PyPI(release))
+
+    results = _run(tmp_path, release, release, pypi, [*_PROJECTS, _PACK])
+
+    assert _only(results, f"{_PACK.name} {_PACK.version}").outcome is Outcome.NOT_PUBLISHED
+    assert pypi.asked[_json(_PACK)] == 1
+    assert pypi.waits == []
+
+
+def test_the_run_waits_no_longer_than_its_bound_however_many_versions_are_missing(
+    tmp_path: Path,
+) -> None:
+    pypi = _Lagging(_PyPI({}))
+
+    results = _run(tmp_path, {}, {}, pypi, [*_PROJECTS, _PUBLISHED_PACK])
+
+    tries = reproduce_release.PUBLISH_TRIES
+    waited = (tries - 1) * reproduce_release.PUBLISH_WAIT_SECONDS
+    assert sum(pypi.waits) == waited
+    assert sum(pypi.asked.values()) == tries + len(_PACKAGES)
+    assert [result.outcome for result in results] == [Outcome.NOT_CHECKED] * (len(_PACKAGES) + 1)
+    assert f"asked once, and this run waited {waited} s" in results[-1].reason
+    assert exit_code(results) == reproduce_release.EXIT_NOT_CHECKED
+
+
+def test_the_documented_wait_is_the_one_the_check_applies() -> None:
+    wait = reproduce_release.PUBLISH_WAIT_SECONDS
+    bound = (reproduce_release.PUBLISH_TRIES - 1) * wait
+    page = " ".join((_ROOT / "docs" / "reproducible-builds.md").read_text().split())
+    module = " ".join((reproduce_release.__doc__ or "").split())
+
+    assert f"asks again every {wait} seconds, waiting at most {bound} seconds in one run" in page
+    assert f"{wait} seconds apart, up to {reproduce_release.PUBLISH_TRIES} tries" in module
+    assert f"one run waits at most {bound} seconds" in module
+
+
+def test_by_default_the_pause_between_tries_is_a_real_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    release = _with_pack()
+    pypi = _Lagging(_PyPI(release), {_json(_PUBLISHED_PACK): 1})
+    slept: list[float] = []
+    monkeypatch.setattr(time, "sleep", slept.append)
+
+    results = Rebuild(
+        tmp_path, tmp_path / "work", pypi.fetch, _builder(release), [_PUBLISHED_PACK]
+    ).run()
+
+    assert {result.outcome for result in results} == {Outcome.REPRODUCES}
+    assert slept == [reproduce_release.PUBLISH_WAIT_SECONDS]
