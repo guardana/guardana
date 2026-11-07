@@ -110,8 +110,9 @@ flag, it stays `NOT PUBLISHED` and does not change the exit status. If the relea
 run's jobs cannot be read, the check stops. If no release run exists for the tag,
 the reference pack stays optional. The workflow writes nowhere. It does not run
 on a push because PyPI has no files for a version until its release publishes them.
-If the check runs before PyPI lists the version, each package is `NOT CHECKED` and
-the job fails with exit status `2`. Run it again by hand once the files are on PyPI.
+If the check runs before PyPI lists a published version, it asks again every 20 seconds,
+waiting at most 100 seconds in one run before reporting a version still missing as
+`NOT CHECKED` with exit status `2`. Run it again by hand once the files are on PyPI.
 
 The [1.0.0rc5 Reproducibility run](https://github.com/guardana/guardana/actions/runs/39418407720)
 rebuilt every published file: a wheel and an sdist for each of the five packages and the
