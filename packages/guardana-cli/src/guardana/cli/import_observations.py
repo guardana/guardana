@@ -107,7 +107,7 @@ def import_observations(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI 
         rules_skipped=(),
         unverified=claims_of(read, reference),
         errors=tuple(
-            CheckError(source=str(results), stage="load", reason=reason)
+            CheckError(source=portable_ref(str(results)), stage="load", reason=reason)
             for reason in read.unreadable
         ),
     )

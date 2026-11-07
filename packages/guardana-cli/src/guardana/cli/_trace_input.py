@@ -10,6 +10,7 @@ from pathlib import Path
 
 import typer
 from guardana.cli.exit_codes import ExitCode
+from guardana.core._path_spelling import portable_ref
 from guardana.core.report import CheckError, ScanResult
 from guardana.core.target import TraceTarget
 from guardana.core.trace import Dialect, TraceLoadError, TraceRead, read_trace
@@ -64,7 +65,7 @@ def record_errors(result: ScanResult, read: TraceRead) -> ScanResult:
         return result
     errors = tuple(
         CheckError(
-            source=f"{read.trace.provenance.source}:{record.line}",
+            source=f"{portable_ref(read.trace.provenance.source)}:{record.line}",
             stage=_LOAD_STAGE,
             reason=record.reason,
         )

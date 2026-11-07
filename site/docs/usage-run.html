@@ -323,7 +323,7 @@ earlier schema recorded a request rate, so the migration represents the run as s
 or where a pattern came from. A scan that wrote schema 17 kept no file its target's
 <code>.guardanaignore</code> matched, hence <code>[]</code>, and did not search the skipped directories, hence <code>null</code>.</p>
 <p>A schema-18 run whose target is a file or a trace migrates to schema 19 with every
-relative file path containing <code>\</code> and no <code>/</code> rewritten with <code>/</code>: finding channels' <code>target_ref</code>, <code>observations[].ref</code>,
+relative file path containing <code>\</code> and no <code>/</code> rewritten with <code>/</code>: finding channels' <code>target_ref</code>, <code>observations[].ref</code>, <code>assessments[].subject_ref</code>,
 the paths <code>scope</code> lists, the <code>name</code> of a path-named coverage shortfall and
 <code>run.target.ref</code>. The migration recomputes <code>run.target.fingerprint</code> over the rewritten
 ref only when it is the digest of the recorded kind and ref; otherwise it keeps the

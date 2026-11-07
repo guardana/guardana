@@ -246,12 +246,15 @@ def test_only_a_run_over_files_or_a_trace_is_rewritten(
     )
     v18 = _windows_run(target)
     v18["findings"][0]["target_ref"] = ref
+    v18["assessments"][0]["subject_ref"] = ref
 
     migrated = migrate_v18(v18)
 
     assert migrated["schema_version"] == 19
     assert migrated["run"]["target"]["ref"] == rewritten
     assert migrated["findings"][0]["target_ref"] == rewritten
+    assert migrated["assessments"][0]["subject_ref"] == rewritten
+    assert migrated["assessments"][1]["subject_ref"] == "http://localhost:11434"
 
 
 def test_a_rooted_ref_keeps_its_form() -> None:

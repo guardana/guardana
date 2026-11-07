@@ -469,10 +469,11 @@ def migrate_v18(document: Mapping[str, Any]) -> dict[str, Any]:
 
     A version-18 build on Windows wrote a relative file path with `\`. Such a ref (a
     `\`, no `/`, not anchored) is rewritten with `/` wherever a run names a file: every
-    finding channel's `target_ref`, `observations[].ref`, the paths `scope` lists, the
-    name of a path-named coverage shortfall and `run.target.ref`. An anchored ref, an
-    endpoint and a ref already spelled with `/` keep their form, and so does every ref
-    of a run whose target is not a file or a trace: there a `\` is part of a label.
+    finding channel's `target_ref`, `observations[].ref`, `assessments[].subject_ref`, the
+    paths `scope` lists, the name of a path-named coverage shortfall and `run.target.ref`.
+    An anchored ref, an endpoint and a ref already spelled with `/` keep their form, and so
+    does every ref of a run whose target is not a file or a trace: there a `\` is part of
+    a label.
     `run.target.fingerprint` is recomputed over the new ref only when it is the digest of
     the old kind and ref this build would have written; any other fingerprint is kept as
     recorded.
@@ -496,6 +497,11 @@ def migrate_v18(document: Mapping[str, Any]) -> dict[str, Any]:
         migrated["observations"] = [
             _posix_key(_mapping(entry, "observations[]"), "ref")
             for entry in _entries(document["observations"], "observations")
+        ]
+    if "assessments" in document:
+        migrated["assessments"] = [
+            _posix_key(_mapping(entry, "assessments[]"), "subject_ref")
+            for entry in _entries(document["assessments"], "assessments")
         ]
     coverage = run.get("coverage")
     if coverage is not None:

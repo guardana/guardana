@@ -161,7 +161,7 @@ or where a pattern came from. A scan that wrote schema 17 kept no file its targe
 `.guardanaignore` matched, hence `[]`, and did not search the skipped directories, hence `null`.
 
 A schema-18 run whose target is a file or a trace migrates to schema 19 with every
-relative file path containing `\` and no `/` rewritten with `/`: finding channels' `target_ref`, `observations[].ref`,
+relative file path containing `\` and no `/` rewritten with `/`: finding channels' `target_ref`, `observations[].ref`, `assessments[].subject_ref`,
 the paths `scope` lists, the `name` of a path-named coverage shortfall and
 `run.target.ref`. The migration recomputes `run.target.fingerprint` over the rewritten
 ref only when it is the digest of the recorded kind and ref; otherwise it keeps the

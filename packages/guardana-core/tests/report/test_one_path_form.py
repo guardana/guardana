@@ -7,6 +7,7 @@ that finding, and nothing else.
 
 import ntpath
 import sys
+from collections.abc import Iterable
 from datetime import date
 from pathlib import Path, PureWindowsPath
 from typing import cast
@@ -15,6 +16,8 @@ import pytest
 import yaml
 from guardana.core import _path_spelling
 from guardana.core._path_spelling import is_legacy_windows_ref, posix_ref
+from guardana.core.assessment import Assessment
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.report import location
 from guardana.core.report.baseline import (
     BASELINE_VERSION,
@@ -25,11 +28,13 @@ from guardana.core.report.baseline import (
     windows_fingerprint,
 )
 from guardana.core.report.finding import Evidence, Finding, fingerprint_of
-from guardana.core.report.location import relativize
+from guardana.core.report.location import relativize, relativize_findings
 from guardana.core.report.result import ScanResult
+from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
-from guardana.core.target import TraceTarget
+from guardana.core.target import Capability, Target, TargetKind, TraceTarget
 from guardana.core.trace import Provenance, Span, SpanKind, Trace
+from guardana.core.verify import Verifier
 
 _RULE = "guardana.supply-chain.pickle-exec"
 _SUMMARY = "pickle calls os.system"
@@ -211,18 +216,86 @@ def test_only_a_relative_ref_with_a_backslash_reads_as_windows(ref: str, legacy:
     assert is_legacy_windows_ref(ref) is legacy
 
 
+def _assessed(*subjects: str) -> ScanResult:
+    return ScanResult(
+        findings=(),
+        rules_run=("acme.suite",),
+        rules_skipped=(),
+        assessments=tuple(
+            Assessment(case_id=f"acme.suite#{n:012x}", assessor="acme", subject_ref=subject)
+            for n, subject in enumerate(subjects)
+        ),
+    )
+
+
+def _trace_read_from(source: str) -> TraceTarget:
+    return TraceTarget(
+        Trace(
+            trace_id="abc",
+            spans=(Span(span_id="s", kind=SpanKind.TOOL_EXECUTION, name="s"),),
+            provenance=Provenance(producer="acme", source=source, dialect="guardana"),
+            instrumented=frozenset(),
+        )
+    )
+
+
 def test_a_trace_read_from_a_relative_file_is_named_with_slashes_on_windows(
     windows_base: Path,
 ) -> None:
-    trace = Trace(
-        trace_id="abc",
-        spans=(Span(span_id="s", kind=SpanKind.TOOL_EXECUTION, name="s"),),
-        provenance=Provenance(producer="acme", source="runs\\t.jsonl", dialect="guardana"),
-        instrumented=frozenset(),
+    target = _trace_read_from("runs\\t.jsonl")
+
+    assert target.ref == "runs/t.jsonl#abc"
+    assert relativize(target.ref, windows_base) == "runs/t.jsonl#abc"
+
+
+@pytest.mark.parametrize("base", ["windows", "none"])
+def test_an_assessment_subject_is_the_targets_own_ref_on_windows(
+    windows_base: Path, base: str
+) -> None:
+    subjects = (_trace_read_from("runs\\t.jsonl").ref, "recording:corp\\svc", "http://h#m")
+
+    written = relativize_findings(_assessed(*subjects), windows_base if base == "windows" else None)
+
+    assert [a.subject_ref for a in written.assessments] == [
+        "runs/t.jsonl#abc",
+        "recording:corp\\svc",
+        "http://h#m",
+    ]
+
+
+class _MeasuresTheTree(Rule):
+    """Records one measurement over the tree it is handed, naming it as rules do."""
+
+    meta = RuleMeta(
+        id="acme.measures_the_tree",
+        title="measures the tree",
+        severity=Severity.LOW,
+        target_kind=TargetKind.ARTIFACT,
+        required_capabilities=frozenset({Capability.READ_FILES}),
     )
 
-    assert TraceTarget(trace).ref == "runs/t.jsonl#abc"
-    assert relativize(TraceTarget(trace).ref, windows_base) == "runs/t.jsonl#abc"
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        ctx.record(
+            Assessment(
+                case_id="acme.measures_the_tree#000000000000",
+                assessor="acme",
+                subject_ref=target.ref,
+                rule_id=self.meta.id,
+            )
+        )
+        return ()
+
+
+def test_an_assessment_names_a_scanned_tree_as_the_run_does(tmp_path: Path) -> None:
+    tree = tmp_path / "models"
+    tree.mkdir()
+    (tree / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    verifier = Verifier(trust=PluginTrust(mode=PluginMode.DISABLED), rules=(_MeasuresTheTree(),))
+
+    verification = verifier.scan(tree, relative_to=tmp_path)
+
+    assert verification.manifest.target.ref == "models"
+    assert [a.subject_ref for a in verification.result.assessments] == ["models"]
 
 
 def test_the_baseline_version_is_three() -> None:

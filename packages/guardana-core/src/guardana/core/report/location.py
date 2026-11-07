@@ -110,7 +110,9 @@ def relativize_findings(result: ScanResult, base: Path | None) -> ScanResult:
     Applied once before rendering and baselining, so both the SARIF `uri` and the
     baseline fingerprint use a portable, repo-relative path instead of the absolute
     checkout path (which differs between a dev machine and CI). With no `base` the
-    locations stay where they are and are only spelled the portable way.
+    locations stay where they are and are only spelled the portable way. An assessment's
+    subject passes unchanged: it names the target, which the caller spells as it spells the
+    run's target, and a recording's subject is a label in which a backslash is not a separator.
     """
 
     def rel(findings: tuple[Finding, ...]) -> tuple[Finding, ...]:

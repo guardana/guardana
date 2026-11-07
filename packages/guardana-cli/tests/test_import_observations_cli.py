@@ -12,10 +12,12 @@ the whole file.
 
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
+import pytest
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
+from guardana.core import _path_spelling
 from typer.testing import CliRunner, Result
 
 runner = CliRunner()
@@ -154,6 +156,25 @@ def test_an_unreadable_record_is_reported_rather_than_dropped(tmp_path: Path) ->
     assert "could not be read" in result.output
     document = json.loads(output.read_text(encoding="utf-8"))
     assert len(document["errors"]) == 1
+
+
+def test_an_unreadable_record_names_a_windows_relative_file_with_slashes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The error names the file the way the claims beside it do, whichever platform ran."""
+    monkeypatch.setattr(_path_spelling, "PurePath", PureWindowsPath)
+    monkeypatch.chdir(tmp_path)
+    # One file name on POSIX; what a relative path given on Windows looks like.
+    name = "garak\\report.jsonl"
+    (tmp_path / name).parent.mkdir(exist_ok=True)
+    _jsonl(tmp_path, [*_GARAK, {"entry_type": "verdict_v2"}], name=name)
+    output = tmp_path / "run.json"
+
+    _run(name, "--format", "json", "--output", str(output))
+
+    document = json.loads(output.read_text(encoding="utf-8"))
+    assert [e["source"] for e in document["errors"]] == ["garak/report.jsonl"]
+    assert document["unverified"][0]["target_ref"].startswith("garak:garak/report.jsonl")
 
 
 def test_the_saved_run_records_the_digest_of_the_imported_document(tmp_path: Path) -> None:
