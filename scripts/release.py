@@ -82,8 +82,9 @@ _TAG_BY_HAND = (
 # A run is listed a few seconds after the push that starts it; longer than this, nothing is coming.
 _CI_APPEARS_WITHIN_S = 600
 _CI_POLL_S = 10
-# A dropped connection ends a watch early; one more watch rides out a blip, not an outage.
-_WATCH_ATTEMPTS = 2
+# After a watch drops, the state is read again until it is final, for as long as CI may take.
+_STATE_FINAL_WITHIN_S = 3600
+_STATE_POLL_S = 30
 # What a plain read of the state shows: passed, failed, or None when it shows neither.
 _Outcome = Literal["pass", "fail"] | None
 # Two lines: the state, then the merge commit (empty until merged).
@@ -610,27 +611,31 @@ def _watch_to_the_end(
     failed: str,
     unshown: str,
 ) -> None:
-    """Run a `gh` watch, deciding from a plain re-read of the state when the watch fails.
+    """Run a `gh` watch, deciding from plain re-reads of the state when the watch fails.
 
     A watch exits non-zero both for a red result and for a dropped connection, so only the state
-    read afterwards tells them apart. A state that is unreadable or not final is watched once
-    more, and never counts as passed.
+    read afterwards tells them apart. A state that is unreadable or not final is read again every
+    `_STATE_POLL_S` seconds until it is final or `_STATE_FINAL_WITHIN_S` has passed, and never
+    counts as passed.
     """
-    for _attempt in range(_WATCH_ATTEMPTS):
-        try:
-            _run(watch)
-        except FileNotFoundError:
-            stop(unshown)
-        except subprocess.CalledProcessError:
-            pass
-        else:
-            return
+    try:
+        _run(watch)
+    except FileNotFoundError:
+        stop(unshown)
+    except subprocess.CalledProcessError:
+        pass
+    else:
+        return
+    deadline = _monotonic() + _STATE_FINAL_WITHIN_S
+    while True:
         outcome = read()
         if outcome == "pass":
             return
         if outcome == "fail":
             stop(failed)
-    stop(unshown)
+        if _monotonic() >= deadline:
+            stop(unshown)
+        _sleep(_STATE_POLL_S)
 
 
 def _read_json(cmd: list[str]) -> object:

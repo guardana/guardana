@@ -571,13 +571,13 @@ _UNSHOWN_CHECKS: list[str | Exception] = [
         "read-failed",
     ],
 )
-def test_a_checks_watch_dropped_twice_on_an_unshown_state_stops_without_merging(
+def test_a_dropped_checks_watch_on_a_state_never_shown_final_stops_without_merging(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     clock: _Clock,
     state: str | Exception,
 ) -> None:
-    """Checks never shown to pass are not called passed, nor called failed."""
+    """Checks never shown to pass are not called passed, nor called failed, and the wait ends."""
     calls = _publish_world(monkeypatch, {_CHECKS_WATCH: [_DROPPED], _CHECKS_READ: [state]})
 
     with pytest.raises(SystemExit):
@@ -587,28 +587,67 @@ def test_a_checks_watch_dropped_twice_on_an_unshown_state_stops_without_merging(
     assert "the required checks of pull request #190 could not be watched to the end" in err
     assert "were not shown to pass" in err
     assert "did not pass" not in err
-    assert _count(calls, _CHECKS_WATCH) == 2
+    assert _count(calls, _CHECKS_WATCH) == 1
+    assert _count(calls, _CHECKS_READ) == release._STATE_FINAL_WITHIN_S // release._STATE_POLL_S + 1
     assert not [
         cmd for cmd in calls if cmd[:3] == ["gh", "pr", "merge"] or cmd[:2] == ["git", "tag"]
     ]
 
 
-def test_a_checks_watch_dropped_once_goes_on_when_the_retry_finishes(
+def test_a_checks_watch_that_cannot_start_stops_without_merging(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], clock: _Clock
+) -> None:
+    """A missing `gh` showed nothing, so the checks are not read as passed, however they stand."""
+    calls = _publish_world(
+        monkeypatch,
+        {_CHECKS_WATCH: [FileNotFoundError("gh")], _CHECKS_READ: [_checks("pass", "pass")]},
+    )
+
+    with pytest.raises(SystemExit):
+        release._publish("release/v0.1.1", "v0.1.1", "0.1.1")
+
+    assert "could not be watched to the end" in capsys.readouterr().err
+    assert _count(calls, _CHECKS_READ) == 0
+    assert not [
+        cmd for cmd in calls if cmd[:3] == ["gh", "pr", "merge"] or cmd[:2] == ["git", "tag"]
+    ]
+
+
+def test_a_dropped_checks_watch_goes_on_once_the_pending_checks_read_passed(
     monkeypatch: pytest.MonkeyPatch, clock: _Clock
 ) -> None:
     calls = _scripted(
         monkeypatch,
         {
             ("gh", "run", "list"): ["77\n"],
-            _CHECKS_WATCH: [_DROPPED, ""],
-            _CHECKS_READ: [_checks("pass", "pending")],
+            _CHECKS_WATCH: [_DROPPED],
+            _CHECKS_READ: [_checks("pass", "pending"), _DROPPED, _checks("pass", "pass")],
         },
     )
 
     release._await_required_checks("190", _HEAD)
 
-    assert _count(calls, _CHECKS_WATCH) == 2
-    assert calls[-1] == list(_CHECKS_WATCH)
+    assert _count(calls, _CHECKS_WATCH) == 1
+    assert _count(calls, _CHECKS_READ) == 3
+    assert clock.slept[-2:] == [release._STATE_POLL_S] * 2
+
+
+def test_a_dropped_checks_watch_stops_as_failed_when_pending_checks_then_fail(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], clock: _Clock
+) -> None:
+    _scripted(
+        monkeypatch,
+        {
+            ("gh", "run", "list"): ["77\n"],
+            _CHECKS_WATCH: [_DROPPED],
+            _CHECKS_READ: [_checks("pass", "pending"), _checks("pass", "fail")],
+        },
+    )
+
+    with pytest.raises(SystemExit):
+        release._await_required_checks("190", _HEAD)
+
+    assert "the required checks of pull request #190 did not pass" in capsys.readouterr().err
 
 
 def test_a_dropped_ci_watch_goes_on_when_the_run_reads_green(
@@ -668,13 +707,13 @@ _UNSHOWN_RUNS: list[str | Exception] = [
     _UNSHOWN_RUNS,
     ids=["in-progress", "queued", "no-status", "empty", "not-json", "list", "read-failed"],
 )
-def test_a_ci_watch_dropped_twice_on_an_unshown_state_stops_without_a_tag(
+def test_a_dropped_ci_watch_on_a_run_never_shown_final_stops_without_a_tag(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     clock: _Clock,
     state: str | Exception,
 ) -> None:
-    """A run never shown to be green is not called green, nor called red."""
+    """A run never shown to be green is not called green, nor called red, and the wait ends."""
     calls = _publish_world(monkeypatch, {_RUN_WATCH: [_DROPPED], _RUN_READ: [state]})
 
     with pytest.raises(SystemExit):
@@ -684,27 +723,28 @@ def test_a_ci_watch_dropped_twice_on_an_unshown_state_stops_without_a_tag(
     assert "CI run 42 could not be watched to the end; it was not shown to be green" in err
     assert "is not green" not in err
     assert _count(calls, ("gh", "pr", "merge")) == 1
-    assert _count(calls, _RUN_WATCH) == 2
+    assert _count(calls, _RUN_WATCH) == 1
+    assert _count(calls, _RUN_READ) == release._STATE_FINAL_WITHIN_S // release._STATE_POLL_S + 1
     assert not [cmd for cmd in calls if cmd[:2] == ["git", "tag"]]
     assert _TAG_PUSH not in calls
 
 
-def test_a_ci_watch_dropped_once_goes_on_when_the_retry_finishes(
+def test_a_dropped_ci_watch_goes_on_once_the_running_run_reads_green(
     monkeypatch: pytest.MonkeyPatch, clock: _Clock
 ) -> None:
     calls = _scripted(
         monkeypatch,
         {
             ("gh", "run", "list"): ["42\n"],
-            _RUN_WATCH: [_DROPPED, ""],
-            _RUN_READ: [_run_state("in_progress", "")],
+            _RUN_WATCH: [_DROPPED],
+            _RUN_READ: [_run_state("in_progress", ""), _run_state("completed", "success")],
         },
     )
 
     release._await_green_ci(_COMMIT)
 
-    assert _count(calls, _RUN_WATCH) == 2
-    assert calls[-1] == list(_RUN_WATCH)
+    assert _count(calls, _RUN_WATCH) == 1
+    assert _count(calls, _RUN_READ) == 2
 
 
 @pytest.mark.parametrize("answer", ["", "OPEN\n\n"], ids=["unreadable", "open"])
