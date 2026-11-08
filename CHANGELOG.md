@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-08 — the third patch release
+
 ### Changed
 
 - **Update build, container and development dependencies without changing package behaviour.** `hatchling` moves from `1.32.4` to `1.33.0` for `guardana-core`, `guardana-rules`, `guardana-cli`, `guardana-report`, `guardana-server`, the examples and the container image build. `guardana-reference-pack` moves from `0.1.5` to `0.1.6` because its archives change with the build backend; each changed pack gets a new version so different archives never share a version. The collector image's `anyio` moves from `4.14.2` to `4.16.0` and `starlette` from `1.3.1` to `1.10.0` in `deploy/docker/collector-requirements.txt`, regenerated from `uv.lock`; `starlette` releases before `1.7.0` import an `anyio` name that `4.15` deprecates. Both images' base `python:3.13-slim-bookworm` moves to a new digest. Installing from PyPI is unchanged: no package's runtime requirements changed. Development updates include the test dependency `a2a-sdk[http-server]` from `1.2.3` to `1.3.0`, hypothesis, mypy `2.4.1`, pytest `9.2.0` and ruff `0.17.3`; workflows and the composite action use `astral-sh/setup-uv` `v10.3.3` and `actions/download-artifact` `v8.0.2`. These updates came from Dependabot pull requests #271–#279. Gate impact: none.
