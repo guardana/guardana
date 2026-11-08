@@ -1,9 +1,9 @@
 ---
 title: "Clean-install offline first run (#138)"
-date: 2026-10-20
+date: 2026-11-06
 summary: "The offline first-run proof passed all 12 cells across Linux, macOS and Windows, each with 14 of 14 steps."
 ---
-The maintainer ran this proof with Guardana 1.0.0rc5 from PyPI, using proof scripts at commit `91196fd6`. The [workflow run](https://github.com/guardana/guardana/actions/runs/39424046832) records the results.
+The maintainer ran this proof with Guardana 1.2.0 from PyPI, using proof scripts at commit `8714c59c`. The [workflow run](https://github.com/guardana/guardana/actions/runs/42243442503) records the results.
 
 ## Installation and platforms
 
@@ -15,18 +15,18 @@ The twelve cells covered Python 3.11 and 3.13, each with pip and uv, on three pl
 - macOS 15 on arm64.
 - Windows Server 2025.
 
-The installation followed `docs/install.md` for a candidate release. With pip:
+The installation followed `docs/install.md`. With pip:
 
 ```console
 $ python -m venv .venv
-$ .venv/bin/python -m pip install --pre guardana-cli==1.0.0rc5
+$ .venv/bin/python -m pip install guardana-cli==1.2.0
 ```
 
 With uv:
 
 ```console
 $ uv init --bare
-$ uv add --prerelease allow guardana-cli==1.0.0rc5
+$ uv add guardana-cli==1.2.0
 ```
 
 Both installers named pypi.org. Each installer's own report showed that every file came from files.pythonhosted.org, with a sha256.
@@ -84,7 +84,7 @@ It exited with code 0 and reported:
 1 rule(s); 4 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
 ```
 
-## Results and Windows limitations
+## Results
 
 ```text
 Linux:   4 of 4 cells passed; 14 of 14 steps each
@@ -92,9 +92,7 @@ macOS:   4 of 4 cells passed; 14 of 14 steps each
 Windows: 4 of 4 cells passed; 14 of 14 steps each
 ```
 
-On Windows, with output going to a pipe in the ANSI code page, cp1252, `guardana diff` and `guardana doctor` no longer end with exit 5. Since 1.0.0rc4 Guardana writes UTF-8 when the output stream cannot carry a character. Every Windows step now exits with the code the starter README states. The comparison holds with a recorded known difference: `guardana diff before.json after.json` exits `1` as the README states, but names the file `model\weights.pkl` where the README shows `weights.pkl`. The other steps passed with the network cut. The workflow requires the Windows cells to pass.
-
-Runs written on Windows record `model\weights.pkl`, where Linux and macOS record `model/weights.pkl`. A finding's fingerprint follows that path, so baselines do not carry between Windows and the other platforms. This known difference is tracked in #167.
+Every Windows step exited with the code the starter README states. The `guardana diff` and `guardana doctor` output included non-ASCII characters, and the commands exited with codes 1 and 0. The steps passed with the network cut by Windows Firewall.
 
 ## Saved evidence
 

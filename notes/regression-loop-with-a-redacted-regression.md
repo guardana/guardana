@@ -1,13 +1,13 @@
 ---
 title: "Regression loop with a redacted regression (#140)"
-date: 2026-10-23
+date: 2026-11-06
 summary: "A redacted recording retained the regression, failed regrading and the CI comparison, and supplied a regression pair after the question was rewritten."
 ---
-The maintainer ran this proof with Guardana 1.0.0rc5 from PyPI, using proof scripts at commit `5b02b59e`. The [workflow run](https://github.com/guardana/guardana/actions/runs/40005613709) records the results.
+The maintainer ran this proof with Guardana 1.2.0 from PyPI, using proof scripts at commit `8714c59c`. The [workflow run](https://github.com/guardana/guardana/actions/runs/42243442503) records the results.
 
 ## Application and profile
 
-The proof installed the published CLI beside `guardana-retrieval-pilot` 0.1.0 from checkout commit `5b02b59e310fcfaed2e6991bfedb0eb956515b8e`. The pilot files matched `v1.0.0rc5`. It ran on ubuntu-24.04 in a `python:3.13-slim` container. After installation, `docker run --network none` blocked connections to pypi.org:443 and 151.101.0.223:443.
+The proof installed the published CLI beside `guardana-retrieval-pilot` 0.1.0 from checkout commit `8714c59cfe6ca6239027ae5976d24abec89dd90e`. The pilot files matched `v1.2.0`. It ran on ubuntu-24.04 in a `python:3.13-slim` container. After installation, `docker run --network none` blocked connections to pypi.org:443 and 151.101.0.223:443.
 
 The [retrieval pilot note](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter) records the installation and mode checks.
 
@@ -20,7 +20,7 @@ The run's own connection sent no tenant key. The fixed application withheld the 
 ## Save a pass, a failure and an incomplete run
 
 ```console
-$ guardana probe --url http://127.0.0.1:40909 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output fixed.json
+$ guardana probe --url http://127.0.0.1:35639 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output fixed.json
 ```
 
 Against the fixed application, the probe exited 0 and kept two exchanges. The gate passed. Tenancy failed 0/5 cases, poisoned-document 0/1 and the team suite 0/2.
@@ -28,7 +28,7 @@ Against the fixed application, the probe exited 0 and kept two exchanges. The ga
 The failed run used the application started as `retrieval-pilot … --break-tenant-filter`:
 
 ```console
-$ guardana probe --url http://127.0.0.1:40909 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output broken.json
+$ guardana probe --url http://127.0.0.1:35639 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output broken.json
 ```
 
 It exited 1 and kept two exchanges. The gate failed with six findings: tenancy failed 5/5 cases, poisoned-document 0/1 and the team suite 2/2.
@@ -36,7 +36,7 @@ It exited 1 and kept two exchanges. The gate failed with six findings: tenancy f
 The incomplete run used the fixed application over an index seeded without globex:
 
 ```console
-$ guardana probe --url http://127.0.0.1:40909 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --format json --output partial.json
+$ guardana probe --url http://127.0.0.1:35639 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --format json --output partial.json
 ```
 
 It exited 2. The gate was indeterminate with no failing findings. The case counts were tenancy 0/5 failed, poisoned-document 0/1 and team suite 0/2.
@@ -130,8 +130,8 @@ Both exited 0:
 ## Run the promoted suite
 
 ```console
-$ guardana probe --url http://127.0.0.1:40909 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output gate-fixed.json
-$ guardana probe --url http://127.0.0.1:40909 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output gate-broken.json
+$ guardana probe --url http://127.0.0.1:35639 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output gate-fixed.json
+$ guardana probe --url http://127.0.0.1:35639 --model reference --fixtures guardana-fixtures.yaml --profile loop.yaml --keep-exchanges --format json --output gate-broken.json
 ```
 
 Each probe kept three exchanges. Against the fixed application, the probe exited 0: tenancy failed 0/5, poisoned-document 0/1 and team suite 0/3. Against the broken tenant filter, it exited 1 with six findings: tenancy failed 5/5, poisoned-document 0/1 and team suite 3/3.

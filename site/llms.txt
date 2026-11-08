@@ -104,13 +104,13 @@ This file is generated from the documentation map; do not edit it by hand.
 
 ## Notes
 
-- [1.0.0 release gate evidence for engineering criteria (#144)](https://guardana.dev/notes/release-gate-evidence-1-0-0): The engineering tests passed on fb9ab309 for 1.0.0; items without their own tests are tracked in #215.
-- [Security runbook drill (#142)](https://guardana.dev/notes/security-runbook-drill): The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.
 - [Retrieval pilot: poisoned document and tenant filter (#139)](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter): The fixed pilot passed; a broken tenant filter failed the tenancy check, and a model obeying a document failed the poisoned-document check.
 - [Regression loop with a redacted regression (#140)](https://guardana.dev/notes/regression-loop-with-a-redacted-regression): A redacted recording retained the regression, failed regrading and the CI comparison, and supplied a regression pair after the question was rewritten.
-- [Collector recovery runbooks (#143)](https://guardana.dev/notes/collector-recovery-runbooks): The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.
 - [Customization through published extension points (#141)](https://guardana.dev/notes/customization-through-published-extension-points): The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut.
+- [Collector recovery runbooks (#143)](https://guardana.dev/notes/collector-recovery-runbooks): The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.
 - [Clean-install offline first run (#138)](https://guardana.dev/notes/clean-install-offline-first-run): The offline first-run proof passed all 12 cells across Linux, macOS and Windows, each with 14 of 14 steps.
+- [1.0.0 release gate evidence for engineering criteria (#144)](https://guardana.dev/notes/release-gate-evidence-1-0-0): The engineering tests passed on fb9ab309 for 1.0.0; items without their own tests are tracked in #215.
+- [Security runbook drill (#142)](https://guardana.dev/notes/security-runbook-drill): The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.
 - [Catching tenant leaks and poisoned documents before release](https://guardana.dev/notes/tenant-leaks-and-poisoned-documents): A reference retrieval app shows how to check tenant answers and document instructions, save the result, and rerun it with clear coverage limits.
 
 ## Schemas
