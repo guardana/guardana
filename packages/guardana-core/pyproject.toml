@@ -57,5 +57,5 @@ packages = ["src/guardana"]
 
 [dependency-groups]
 dev = [
-    "types-pyyaml>=6.0.12.20260815",
+    "types-pyyaml>=6.0.12.20261103",
 ]
