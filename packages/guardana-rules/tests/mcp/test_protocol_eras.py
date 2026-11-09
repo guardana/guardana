@@ -184,6 +184,68 @@ def test_a_handshake_refusal_too_long_to_read_whole_is_inconclusive_never_silent
     assert "HTTP 404" in summaries(reported)[0]
 
 
+class _AnswersTheHandshakeWithAnError(ScriptedMcpServer):
+    """A server whose `initialize` gets the test's status and JSON-RPC error code."""
+
+    def __init__(self, url: str, *, status: int, code: int, **settings: object) -> None:
+        super().__init__(url, **settings)  # type: ignore[arg-type]
+        self.status = status
+        self.code = code
+
+    def __call__(self, url: str, **kwargs: object) -> RawReply:
+        reply = super().__call__(url, **kwargs)  # type: ignore[arg-type]
+        if self.bodies and self.bodies[-1].get("method") == "initialize":
+            error = {"code": self.code, "message": "Method not found"}
+            body = json.dumps({"jsonrpc": "2.0", "id": 1, "error": error}).encode()
+            return RawReply(self.status, {}, body)
+        return reply
+
+
+def _answering_the_handshake(status: int, code: int) -> ScriptedMcpServer:
+    return _AnswersTheHandshakeWithAnError(
+        ROUTABLE,
+        status=status,
+        code=code,
+        tools=[],
+        credential=CREDENTIAL,
+        session_ids=_FOUR,
+        protocol_versions=[LATEST_VERSION, LEGACY_VERSION],
+        discovers=[LATEST_VERSION],
+    )
+
+
+@pytest.mark.parametrize("status", [407, 429, 503])
+def test_a_method_not_found_beside_a_failure_status_leaves_the_era_inconclusive(
+    status: int,
+) -> None:
+    reported = findings(RULE, _answering_the_handshake(status, -32601), credential=CREDENTIAL)
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status} carrying JSON-RPC error -32601" in summaries(reported)[0]
+
+
+@pytest.mark.parametrize("status", [200, 401, 407, 429, 503])
+def test_an_invalid_request_to_the_handshake_is_inconclusive_at_any_status(status: int) -> None:
+    reported = findings(RULE, _answering_the_handshake(status, -32600), credential=CREDENTIAL)
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status}" in summaries(reported)[0]
+
+
+def test_a_method_not_found_refused_with_401_is_inconclusive_not_modern_only() -> None:
+    reported = findings(RULE, _answering_the_handshake(401, -32601), credential=CREDENTIAL)
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "refused with HTTP 401" in summaries(reported)[0]
+
+
+def test_a_method_not_found_at_200_still_means_no_earlier_revision() -> None:
+    server = _answering_the_handshake(200, -32601)
+
+    with pytest.raises(NotApplicable, match="offers no earlier revision"):
+        findings(RULE, server, credential=CREDENTIAL)
+
+
 def test_a_modern_server_whose_handshake_era_could_not_be_asked_is_inconclusive() -> None:
     server = guarded(protocol_versions=[LATEST_VERSION, LEGACY_VERSION], discovers=[LATEST_VERSION])
 

@@ -379,6 +379,19 @@ def test_a_legacy_probe_refused_as_an_unknown_era_is_modern_only(
         pytest.param(429, None, "HTTP 429", id="429"),
         pytest.param(500, None, "HTTP 500", id="500"),
         pytest.param(503, None, "HTTP 503", id="503"),
+        pytest.param(407, -32601, "HTTP 407 carrying JSON-RPC error -32601", id="407-not-found"),
+        pytest.param(408, -32601, "HTTP 408 carrying JSON-RPC error -32601", id="408-not-found"),
+        pytest.param(425, -32601, "HTTP 425 carrying JSON-RPC error -32601", id="425-not-found"),
+        pytest.param(429, -32601, "HTTP 429 carrying JSON-RPC error -32601", id="429-not-found"),
+        pytest.param(500, -32601, "HTTP 500 carrying JSON-RPC error -32601", id="500-not-found"),
+        pytest.param(503, -32601, "HTTP 503 carrying JSON-RPC error -32601", id="503-not-found"),
+        pytest.param(407, -32022, "HTTP 407 carrying JSON-RPC error -32022", id="407-unsupported"),
+        pytest.param(429, -32022, "HTTP 429 carrying JSON-RPC error -32022", id="429-unsupported"),
+        pytest.param(503, -32022, "HTTP 503 carrying JSON-RPC error -32022", id="503-unsupported"),
+        pytest.param(200, -32600, "HTTP 200 carrying JSON-RPC error -32600", id="200-invalid"),
+        pytest.param(407, -32600, "HTTP 407 carrying JSON-RPC error -32600", id="407-invalid"),
+        pytest.param(429, -32600, "HTTP 429 carrying JSON-RPC error -32600", id="429-invalid"),
+        pytest.param(503, -32600, "HTTP 503 carrying JSON-RPC error -32600", id="503-invalid"),
     ],
 )
 def test_a_legacy_probe_that_failed_leaves_the_era_unknown(
@@ -401,6 +414,24 @@ def test_a_legacy_probe_that_failed_leaves_the_era_unknown(
     assert offer.unsettled is not None
     assert said in offer.unsettled
     assert view.sessions.no_protocol_sessions is None
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_a_refused_legacy_probe_stays_a_refusal_whatever_error_it_carries(status: int) -> None:
+    server = _AnswersTheLegacyProbe(
+        ROUTABLE,
+        status=status,
+        error=-32601,
+        tools=TOOLS,
+        protocol_versions=[LATEST_VERSION, LEGACY_VERSION],
+        discovers=[LATEST_VERSION],
+    )
+
+    offer = _target(server).authorization().legacy_offer
+
+    assert not offer.modern_only
+    assert offer.unsettled is not None
+    assert f"refused with HTTP {status}" in offer.unsettled
 
 
 class _AnswersInitializeWith(ScriptedMcpServer):

@@ -147,38 +147,40 @@ Four consequences worth knowing:
   the revision. `not_applicable` is not a coverage gap, so it does not fail a run while
   another selected rule reaches a conclusion; a run in which no rule reached one ends
   `indeterminate`.
-- **`guardana.mcp.cache_scope` does not apply on a `2025-11-25` conversation with a
-  server that gates its tool listing behind a credential (skipped `not_applicable`).**
-  The skip's detail names the revision. When the server also lists a modern revision
-  guardana does not speak, the result is inconclusive instead, naming that revision,
-  because what it declares to modern clients was not read. The result is also
-  inconclusive, naming the failure, when `server/discover` failed: a timeout, a
-  refusal (`401`, `403`, `407`), a rate limit, a server error, a reply that is not JSON-RPC,
-  a result whose `supportedVersions` names no revision, or another JSON-RPC error
-  such as `-32603`. These are not such failures, but how a server without the method
-  answers: JSON-RPC `-32601`, `-32600` or `-32602` at a `2xx` or `400`, `-32000` at a
-  `400` (how the Python and TypeScript SDKs of the older revision turn away a request
-  without a session), a `400`, `404` or `405` read whole with no JSON-RPC error, or a
-  result without `supportedVersions`. A failing server that answers in one of those
-  ways, such as a proxy's plain `404`, cannot be told apart and reads `not_applicable`.
-  `not_applicable` is not a
-  coverage gap, so it does not fail a run while another selected rule reaches a conclusion;
-  a run in which no rule reached one ends `indeterminate`. `cacheScope` and `ttlMs`
-  arrive with `2026-07-28` and declare nothing on the older revision, so even
-  `cacheScope: "public"` produces no finding there.
+- **`guardana.mcp.cache_scope` does not apply on a `2025-11-25` conversation with a server
+  that gates its tool listing behind a credential (skipped `not_applicable`).** The skip's
+  detail names the revision. When the server also lists a modern revision guardana does
+  not speak, the result is inconclusive instead, naming that revision, because what it
+  declares to modern clients was not read. The result is also inconclusive, naming the
+  failure, when `server/discover` failed: a timeout, a refusal (`401`, `403`, `407`), a
+  rate limit, a server error, a reply that is not JSON-RPC, a result whose
+  `supportedVersions` names no revision, or another JSON-RPC error such as `-32603`. These
+  are not such failures, but how a server without the method answers: JSON-RPC `-32601` at
+  any status except `401`, `403`, `407`, `408`, `425`, `429` and a `5xx`, `-32600` or
+  `-32602` at a `2xx` or `400`, `-32000` at a `400` (how the Python and TypeScript SDKs of
+  the older revision turn away a request without a session), a `400`, `404` or `405` read
+  whole with no JSON-RPC error, or a result without `supportedVersions`. A failing server
+  that answers in one of those ways, such as a proxy's plain `404`, cannot be told apart
+  and reads `not_applicable`. `not_applicable` is not a coverage gap, so it does not fail
+  a run while another selected rule reaches a conclusion; a run in which no rule reached
+  one ends `indeterminate`. `cacheScope` and `ttlMs` arrive with `2026-07-28` and declare
+  nothing on the older revision, so even `cacheScope: "public"` produces no finding there.
 - **Whether a server still offers `2025-11-25` is asked, not read.** Some servers list
-  only the new revision in `server/discover` and still answer `initialize`. When
-  discovery lists no older revision, the checks that need it send one `initialize` over
-  the `2025-11-25` wire, with your token when you gave one. A result naming `2025-11-25`
-  makes the server dual-era, graded over that revision; JSON-RPC `-32601`, a `-32022` that
-  names no older revision, or a `400`, `404` or `405` read whole whose body is plain text
-  (including empty) or a JSON object without an `error` member, makes it modern-only.
-  A `-32022` naming an older handshake revision leaves its sessions unexamined, and
-  `session_binding` reports `inconclusive` naming that revision. A `401` or `403`
-  leaves it unknown, and `session_binding` reports `inconclusive` naming `--mcp-token-env`;
-  so does any other answer — a `400`, `404` or `405` whose body could not be read whole
-  or parsed, a timeout, a rate limit, a server error, another JSON-RPC error — naming
-  what came back, because one failed request does not show which revisions a server offers.
+  only the new revision in `server/discover` and still answer `initialize`. When discovery
+  lists no older revision, the checks that need it send one `initialize` over the
+  `2025-11-25` wire, with your token when you gave one. A result naming `2025-11-25` makes
+  the server dual-era, graded over that revision; JSON-RPC `-32601` or a `-32022` that
+  names no older revision makes it modern-only only at a status other than `401`, `403`,
+  `407`, `408`, `425`, `429` and a `5xx`. A `400`, `404` or `405` read whole whose body is
+  plain text (including empty) or a JSON object without an `error` member makes it
+  modern-only. A `-32022` naming an older handshake revision leaves its sessions
+  unexamined, and `session_binding` reports `inconclusive` naming that revision. A `401`
+  or `403` leaves it unknown, and `session_binding` reports `inconclusive` naming
+  `--mcp-token-env`; so does any other answer — a `407`, `408`, `425`, `429` or a `5xx`
+  whatever JSON-RPC error its body carries, a `400`, `404` or `405` whose body could not
+  be read whole or parsed, a timeout, a rate limit, a server error, another JSON-RPC error
+  — naming what came back, because one failed request does not show which revisions a
+  server offers.
 - **No revision in common is an outcome, never a pass.** The authorization checks
   report `inconclusive` naming both version lists, and the manifest checks
   report the same sentence as an error, so the run is indeterminate under the default
@@ -259,7 +261,7 @@ saying plainly when it could not reach a verdict:
 | `guardana.mcp.discovery_target` | Every discovery address the server advertises is one a client may follow; every advertised authorization server is checked against the address guard, but only the first is fetched. A refused later address is a finding; an unfetched one that passes the guard is `inconclusive` |
 | `guardana.mcp.issuer_identification` | The authorization server advertises `authorization_response_iss_parameter_supported`, without which a client cannot detect an authorization-server mix-up (RFC 9207) |
 | `guardana.mcp.cache_scope` | A tool listing the server gates behind a credential is not also declared `cacheScope: "public"`, which would invite any shared gateway to serve it to a caller the server would have refused. On a `2025-11-25` conversation with a server that gates its tool listing behind a credential, the check is skipped `not_applicable`, naming the revision, because `cacheScope` and `ttlMs` arrive with `2026-07-28` and declare nothing on the older revision, so even `cacheScope: "public"` produces no finding there. When the server also lists a modern revision guardana does not speak, the result is inconclusive instead, naming that revision, because what the server declares to modern clients was not read. When `server/discover` failed rather than answering as a server without the method does, the result is inconclusive too, naming the failure. On a server open to callers with no credential the check reports nothing. |
-| `guardana.mcp.task_identity` | One `tasks/list` sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without `--mcp-token-env`, or with no task to show, the check is `inconclusive`. Only the first page of the listing is read, so an empty one that names a further page is `inconclusive` too. An operator's session refused with `401` or `403` is `inconclusive` too. A server that declares no tasks and answers `tasks/list` as an unknown method is skipped `not_offered`, a coverage gap; when what it declares could not be read at all, the check is `inconclusive` instead. JSON-RPC `-32601` at any status, or an HTTP `400` read whole whose body is plain text (including empty) or a JSON object without an `error` member, counts as an unknown method. Any other answer, such as a `400` carrying another JSON-RPC error or whose body could not be read whole or parsed, `404`, `405` or a `5xx`, is `inconclusive` |
+| `guardana.mcp.task_identity` | One `tasks/list` sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without `--mcp-token-env`, or with no task to show, the check is `inconclusive`. Only the first page of the listing is read, so an empty one that names a further page is `inconclusive` too. An operator's session refused with `401` or `403` is `inconclusive` too. A server that declares no tasks and answers `tasks/list` as an unknown method is skipped `not_offered`, a coverage gap; when what it declares could not be read at all, the check is `inconclusive` instead. A `tasks/list` answered `401` or `403` is refused whatever its body carries; JSON-RPC `-32601` at any status except `401`, `403`, `407`, `408`, `425`, `429` and a `5xx`, or an HTTP `400` read whole whose body is plain text (including empty) or a JSON object without an `error` member, counts as an unknown method. Any other answer, such as a `400` carrying another JSON-RPC error or whose body could not be read whole or parsed, `404`, `405`, a `5xx`, or `-32601` at `407`, `408`, `425`, `429` or a `5xx`, is `inconclusive` |
 
 On a server that answers an anonymous caller, `authorization_discovery`, `scope_breadth`,
 `issuer_identification` and `discovery_target` are `inconclusive`: no credential was asked
