@@ -323,18 +323,33 @@ earlier schema recorded a request rate, so the migration represents the run as s
 or where a pattern came from. A scan that wrote schema 17 kept no file its target's
 <code>.guardanaignore</code> matched, hence <code>[]</code>, and did not search the skipped directories, hence <code>null</code>.</p>
 <p>A schema-18 run whose target is a file or a trace migrates to schema 19 with every
-relative file path containing <code>\</code> and no <code>/</code> rewritten with <code>/</code>: finding channels' <code>target_ref</code>, <code>observations[].ref</code>, <code>assessments[].subject_ref</code>,
-the paths <code>scope</code> lists, the <code>name</code> of a path-named coverage shortfall and
-<code>run.target.ref</code>. The migration recomputes <code>run.target.fingerprint</code> over the rewritten
-ref only when it is the digest of the recorded kind and ref; otherwise it keeps the
-recorded fingerprint. A drive-absolute path, a rooted or UNC path, an endpoint and a path
-already written with <code>/</code> keep their form. Any other target's ref is a label and keeps
-its form. Schema 18 uses <code>\</code> on Windows where other
-platforms use <code>/</code>, and fingerprints and comparisons read the path as written.
-A run does not record which platform wrote it, so on Linux or macOS a relative file
-name holding <code>\</code> and no <code>/</code>, such as <code>foo\bar.pkl</code>, is read the same way and is named
-<code>foo/bar.pkl</code> once migrated; <code>guardana diff</code> against a new run of the unchanged tree
-reports that file's findings as gone and new and exits <code>1</code>.</p>
+relative file path containing <code>\</code> and no <code>/</code> rewritten with <code>/</code>: finding channels'
+<code>target_ref</code>, <code>observations[].ref</code>, <code>assessments[].subject_ref</code>, the paths <code>scope</code> lists,
+the <code>name</code> of a path-named coverage shortfall and <code>run.target.ref</code>. The migration
+recomputes <code>run.target.fingerprint</code> over the rewritten ref only when it is the digest of
+the recorded kind and ref; otherwise it keeps the recorded fingerprint. A drive-absolute
+path, a rooted or UNC path, an endpoint and a path already written with <code>/</code> keep their
+form. Any other target's ref is a label and keeps its form. A run saved by
+<code>guardana import-observations</code> records target type <code>endpoint</code>, so its migration keeps
+every ref as recorded, even a ref naming a file with <code>\</code>. The migration keeps
+<code>errors[].source</code> as recorded: a Windows schema-18 <code>guardana analyze-trace</code> run keeps
+<code>runs\t.jsonl:3</code>, where a schema-19 build writes <code>runs/t.jsonl:3</code>. When Guardana saves a
+new run, an assessment's <code>subject_ref</code> is rewritten to the run's own name for its target
+only when it names the target itself; for a scanned tree, a subject naming a file inside
+it keeps the form the rule recorded. Only a Python rule can record such a subject; no
+built-in rule does. Each claim a <code>guardana import-observations</code> run records names that
+run's ref, for example <code>garak:runs\r.jsonl</code>, as its target unless the observation names
+its own, and its fingerprint is computed over that ref. A migrated Windows import's claims
+therefore keep fingerprints computed over <code>\</code>, while importing the same file again with a
+schema-19 build gives fingerprints over <code>/</code>. No gate or comparison reads those
+fingerprints across the two: an import run executes no rules and takes no baseline, and
+<code>guardana diff</code> refuses a run that executed no rules. Neither <code>errors[].source</code> nor an
+assessment's <code>subject_ref</code> enters a finding fingerprint, a baseline or a <code>guardana diff</code>
+identity. Schema 18 uses <code>\</code> on Windows where other platforms use <code>/</code>, and fingerprints
+and comparisons read the path as written. A run does not record which platform wrote it,
+so on Linux or macOS a relative file name holding <code>\</code> and no <code>/</code>, such as <code>foo\bar.pkl</code>,
+is read the same way and is named <code>foo/bar.pkl</code> once migrated; <code>guardana diff</code> against a
+new run of the unchanged tree reports that file's findings as gone and new and exits <code>1</code>.</p>
 <p>One thing <em>is</em> recovered: the <strong>title</strong> of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
 catalogue for the exact <code>(framework, id)</code> pair the document already carries, so
