@@ -161,18 +161,33 @@ or where a pattern came from. A scan that wrote schema 17 kept no file its targe
 `.guardanaignore` matched, hence `[]`, and did not search the skipped directories, hence `null`.
 
 A schema-18 run whose target is a file or a trace migrates to schema 19 with every
-relative file path containing `\` and no `/` rewritten with `/`: finding channels' `target_ref`, `observations[].ref`, `assessments[].subject_ref`,
-the paths `scope` lists, the `name` of a path-named coverage shortfall and
-`run.target.ref`. The migration recomputes `run.target.fingerprint` over the rewritten
-ref only when it is the digest of the recorded kind and ref; otherwise it keeps the
-recorded fingerprint. A drive-absolute path, a rooted or UNC path, an endpoint and a path
-already written with `/` keep their form. Any other target's ref is a label and keeps
-its form. Schema 18 uses `\` on Windows where other
-platforms use `/`, and fingerprints and comparisons read the path as written.
-A run does not record which platform wrote it, so on Linux or macOS a relative file
-name holding `\` and no `/`, such as `foo\bar.pkl`, is read the same way and is named
-`foo/bar.pkl` once migrated; `guardana diff` against a new run of the unchanged tree
-reports that file's findings as gone and new and exits `1`.
+relative file path containing `\` and no `/` rewritten with `/`: finding channels'
+`target_ref`, `observations[].ref`, `assessments[].subject_ref`, the paths `scope` lists,
+the `name` of a path-named coverage shortfall and `run.target.ref`. The migration
+recomputes `run.target.fingerprint` over the rewritten ref only when it is the digest of
+the recorded kind and ref; otherwise it keeps the recorded fingerprint. A drive-absolute
+path, a rooted or UNC path, an endpoint and a path already written with `/` keep their
+form. Any other target's ref is a label and keeps its form. A run saved by
+`guardana import-observations` records target type `endpoint`, so its migration keeps
+every ref as recorded, even a ref naming a file with `\`. The migration keeps
+`errors[].source` as recorded: a Windows schema-18 `guardana analyze-trace` run keeps
+`runs\t.jsonl:3`, where a schema-19 build writes `runs/t.jsonl:3`. When Guardana saves a
+new run, an assessment's `subject_ref` is rewritten to the run's own name for its target
+only when it names the target itself; for a scanned tree, a subject naming a file inside
+it keeps the form the rule recorded. Only a Python rule can record such a subject; no
+built-in rule does. Each claim a `guardana import-observations` run records names that
+run's ref, for example `garak:runs\r.jsonl`, as its target unless the observation names
+its own, and its fingerprint is computed over that ref. A migrated Windows import's claims
+therefore keep fingerprints computed over `\`, while importing the same file again with a
+schema-19 build gives fingerprints over `/`. No gate or comparison reads those
+fingerprints across the two: an import run executes no rules and takes no baseline, and
+`guardana diff` refuses a run that executed no rules. Neither `errors[].source` nor an
+assessment's `subject_ref` enters a finding fingerprint, a baseline or a `guardana diff`
+identity. Schema 18 uses `\` on Windows where other platforms use `/`, and fingerprints
+and comparisons read the path as written. A run does not record which platform wrote it,
+so on Linux or macOS a relative file name holding `\` and no `/`, such as `foo\bar.pkl`,
+is read the same way and is named `foo/bar.pkl` once migrated; `guardana diff` against a
+new run of the unchanged tree reports that file's findings as gone and new and exits `1`.
 
 One thing *is* recovered: the **title** of a framework reference, which version 3
 onward records beside its framework and id. It is looked up from the installed
