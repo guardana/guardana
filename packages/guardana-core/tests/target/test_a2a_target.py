@@ -377,6 +377,7 @@ def test_a_card_answered_with_a_target_wide_status_stops_the_run(status: int) ->
     with pytest.raises(HTTPError) as raised:
         view.card  # noqa: B018 — the read fetches the card
     assert raised.value.code == status
+    raised.value.close()
 
 
 def test_another_client_error_on_the_card_is_a_card_error() -> None:
@@ -407,6 +408,7 @@ def test_the_first_callers_credential_refused_stops_the_run(status: int) -> None
     with pytest.raises(HTTPError) as raised:
         view.callers  # noqa: B018 — the read buys every section
     assert raised.value.code == status
+    raised.value.close()
 
 
 def test_a_request_scoped_refusal_of_the_first_caller_is_sent_once_and_remembered() -> None:
@@ -420,6 +422,7 @@ def test_a_request_scoped_refusal_of_the_first_caller_is_sent_once_and_remembere
             view.callers  # noqa: B018 — the read buys the section
         assert raised.value.code == 400
         assert raised.value.read() == b'{"error": "scripted"}'
+        raised.value.close()
 
     assert [call[0] for call in agent.calls].count("ListTasks") == 2
 
