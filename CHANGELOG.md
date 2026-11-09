@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Update collector, development and workflow dependencies without changing package behaviour.** The collector's `pydantic` moves from `2.14.1` to `2.14.3` (`pydantic-core` from `2.50.1` to `2.50.4`) and `psycopg[binary]` from `3.3.6` to `3.3.8` in `uv.lock` and the collector image's `deploy/docker/collector-requirements.txt`, regenerated from `uv.lock`. `guardana-server` requires `pydantic>=2.14.3`, up from `>=2.14.0`, and `psycopg[binary]>=3.3.8`, up from `>=3.3.6`. Development-only type stubs `types-pyyaml` move to `6.0.12.20261103`. The release workflow uses `docker/login-action` `4.8.0`; the CodeQL and Scorecard workflows and the composite action's SARIF upload in `action.yml` use `github/codeql-action` `4.39.3`. The composite action's inputs are unchanged. These updates came from Dependabot pull requests #310–#314. Gate impact: none.
+
 ## [1.2.1] - 2026-11-08 — the third patch release
 
 ### Changed
