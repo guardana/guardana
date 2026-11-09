@@ -11,13 +11,12 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
-from guardana.core.report.finding import Evidence, Finding
-from guardana.core.severity import Severity
 
 from proofs import __main__ as proofs_cli
 from proofs import container, customization, first_run, install, record, summary
@@ -129,11 +128,11 @@ def test_the_first_run_walks_this_build_and_is_incomplete_without_isolation(tmp_
     assert exits[2:] == [1, 0, 1, 0, 0, 0]
     kept = [json.loads((written.parent / n).read_text("utf-8")) for n in first_run.KEPT_RUNS]
     before, after = (summary.saved_run(document) for document in kept)
-    assert before["findings"] == [
-        ("guardana.supply_chain.pickle_opcode", "model/weights.pkl", "90a4da10f97b7a5a")
-    ]
-    assert after["findings"] == []
-    assert before["run.target.ref"] == after["run.target.ref"] == "model"
+    assert before["findings[0].rule_id"] == '"guardana.supply_chain.pickle_opcode"'
+    assert before["findings[0].target_ref"] == '"model/weights.pkl"'
+    assert after["findings"] == "[]"
+    assert before["run.target.ref"] == after["run.target.ref"] == '"model"'
+    assert not [path for path in before if path.startswith(tuple(summary.VARYING))]
 
 
 def test_a_failed_step_does_not_hide_the_steps_after_it(
@@ -813,6 +812,71 @@ def test_a_pack_installed_at_another_version_than_pinned_is_named(tmp_path: Path
     assert problems == ["guardana-reference-pack is 0.1.1, not 0.1.2"]
 
 
+def _printing(outputs: dict[str, str]) -> Callable[..., str]:
+    """Run each step as a command that prints the output named for it and exits as expected."""
+
+    def fake_run(step: record.Step, argv: list[str], **kwargs: Any) -> str:  # noqa: ANN401
+        shown = outputs.get(step.name, "").encode()
+        code = f"import sys; sys.stdout.buffer.write({shown!r}); sys.exit({step.expected_exit})"
+        return record.run(step, [sys.executable, "-c", code], **kwargs)
+
+    return fake_run
+
+
+_SAMPLED = (
+    "{} rule(s); 6 fixture(s) passed, 0 failed, 0 could not run. {} rule(s) not fully sampled.\n"
+)
+_SCAN = "the pack's target, format and reporter in a scan"
+_SUMMARY = (
+    "# Guardana run r\n\n## Findings (1)\n\n| Severity | Rule | Title | Location | Evidence |\n"
+    "| {} | reference.supply\\_chain.unpinned\\_requirement "
+    "| A requirement is not pinned to one version | requirements.txt "
+    "| 'requests\\>=2.31' is not pinned: it admits more than one version |\n"
+    "delivery: delivered — reference-file to summaries ({})\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("name", "output", "held"),
+    [
+        ("version", "guardana 1.2.0\n  guardana-cli     1.2.0\n  guardana-core  1.2.0\n", True),
+        ("version", "guardana 1.2.0rc1\n  guardana-cli     1.2.0rc1\n", False),
+        ("the manifest holds", "a\n\n2 pack(s) checked, 0 with problems.\n", True),
+        ("the manifest holds", "a\n\n2 pack(s) checked, 10 with problems.\n", False),
+        ("the manifest holds", "a\n\n12 pack(s) checked, 0 with problems.\n", False),
+        ("every pack rule proves its three samples", _SAMPLED.format(2, 0), True),
+        ("every pack rule proves its three samples", _SAMPLED.format(12, 0), False),
+        ("every pack rule proves its three samples", _SAMPLED.format(2, 10), False),
+        (_SCAN, _SUMMARY.format("MEDIUM", "1 attempt"), True),
+        (_SCAN, _SUMMARY.format("LOW", "1 attempt"), False),
+        (_SCAN, _SUMMARY.format("MEDIUM", "1 attempt, then lost"), False),
+    ],
+    ids=[
+        "version",
+        "candidate",
+        "manifest",
+        "ten-problems",
+        "twelve-packs",
+        "sampled",
+        "twelve-rules",
+        "ten-unsampled",
+        "scan",
+        "another-severity",
+        "delivered-then-lost",
+    ],
+)
+def test_the_customization_expects_its_counts_and_version_as_whole_lines(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, output: str, held: bool
+) -> None:
+    monkeypatch.setattr(customization, "run", _printing({name: output}))
+    proof = record.Record(proof="customization", version="1.2.0")
+
+    customization._commands(proof, tmp_path / "venv", tmp_path)
+
+    (step,) = [s for s in proof.steps if s.name == name]
+    assert bool([p for p in step.problems if p.startswith("output lacks: ")]) is not held
+
+
 @pytest.mark.parametrize(
     "source",
     [
@@ -1038,11 +1102,19 @@ def _saved_run(  # noqa: PLR0913 — one keyword per field a cell could spell di
     return {
         "schema_version": 19,
         "run": {
-            "target": {"type": "artifact", "ref": target_ref, "fingerprint": target_fingerprint}
+            "run_id": "00000000-0000-4000-8000-000000000001",
+            "created_at": "2026-01-01T00:00:01Z",
+            "started_at": "2026-01-01T00:00:00Z",
+            "completed_at": "2026-01-01T00:00:01Z",
+            "source": {"kind": "local", "provider": "local", "run_url": None},
+            "deployment": {"commit_sha": None, "model_name": None},
+            "usage": {"requests": 0, "wall_time_seconds": 0.1},
+            "target": {"type": "artifact", "ref": target_ref, "fingerprint": target_fingerprint},
         },
         "scope": {"files": [listed]},
         "observations": [{"kind": "model", "ref": observed}],
         "findings": [] if finding_ref is None else [finding],
+        "errors": [],
     }
 
 
@@ -1087,17 +1159,22 @@ def test_cells_that_kept_the_same_refs_and_fingerprints_compare_clean(tmp_path: 
     [
         (
             {"summary_text": "unpickling imports builtins.exec"},
-            "findings",
-            summary.fingerprint(_PICKLE, "model/weights.pkl", "unpickling imports builtins.exec"),
-            summary.fingerprint(_PICKLE, "model/weights.pkl", "unpickling imports builtins.print"),
+            "findings[0].evidence.summary",
+            "builtins.exec",
+            "builtins.print",
         ),
-        ({"finding_ref": "model\\weights.pkl"}, "findings", "model\\\\weights.pkl", "model/"),
-        ({"target_ref": "model\\"}, "run.target.ref", "'model\\\\'", "'model'"),
+        (
+            {"finding_ref": "model\\weights.pkl"},
+            "findings[0].target_ref",
+            '"model\\\\weights.pkl"',
+            '"model/weights.pkl"',
+        ),
+        ({"target_ref": "model\\"}, "run.target.ref", '"model\\\\"', '"model"'),
         ({"target_fingerprint": "sha256:ffff"}, "run.target.fingerprint", "ffff", "0d4b"),
-        ({"observed": "model\\weights.pkl"}, "observations", "model\\\\weights.pkl", "model/"),
-        ({"listed": "model\\weights.pkl"}, "scope.files", "model\\\\weights.pkl", "model/"),
+        ({"observed": "model\\weights.pkl"}, "observations[0].ref", "model\\\\weights", "model/"),
+        ({"listed": "model\\weights.pkl"}, "scope.files[0]", "model\\\\weights.pkl", "model/"),
     ],
-    ids=["fingerprint", "finding-ref", "target-ref", "target-fingerprint", "observed", "listed"],
+    ids=["summary", "finding-ref", "target-ref", "target-fingerprint", "observed", "listed"],
 )
 def test_a_cell_whose_saved_run_differs_names_both_cells_and_the_difference(
     tmp_path: Path, windows: dict[str, str], field: str, theirs: str, ours: str
@@ -1112,6 +1189,154 @@ def test_a_cell_whose_saved_run_differs_names_both_cells_and_the_difference(
     assert theirs in head
     assert ours in tail
     assert summary.summarise(tmp_path, tmp_path / "out", {}, {"first-run": 3}) == 1
+
+
+def _usage_spelled_as_one_key(document: dict[str, Any]) -> None:
+    del document["run"]["usage"]
+    document["run"]["usage.requests"] = 0
+
+
+def _schema_version_under_an_empty_key(document: dict[str, Any]) -> None:
+    document[""] = {"schema_version": document.pop("schema_version")}
+
+
+@pytest.mark.parametrize(
+    ("change", "field", "theirs", "ours"),
+    [
+        (
+            lambda d: d["findings"][0].update(verdict="unverified"),
+            "findings[0].verdict",
+            '"unverified"',
+            "nothing",
+        ),
+        (
+            lambda d: d.update(waived=[{"rule_id": _PICKLE}]),
+            "waived[0].rule_id",
+            _PICKLE,
+            "nothing",
+        ),
+        (lambda d: d.pop("errors"), "errors", "nothing", "[]"),
+        (lambda d: d["run"]["usage"].update(requests=3), "run.usage.requests", "3", "0"),
+        (lambda d: d["run"]["usage"].update(requests=False), "run.usage.requests", "false", "0"),
+        (
+            lambda d: d["run"]["deployment"].update(model_name="m"),
+            "run.deployment.model_name",
+            '"m"',
+            "null",
+        ),
+        (_usage_spelled_as_one_key, "run.usage.requests", "nothing", "0"),
+        (_schema_version_under_an_empty_key, "schema_version", "nothing", "19"),
+    ],
+    ids=[
+        "new-key-in-one-cell",
+        "new-section-in-one-cell",
+        "key-left-out",
+        "beside-a-timing",
+        "false-is-not-zero",
+        "beside-the-commit",
+        "dotted-key-is-not-a-path",
+        "empty-key-is-not-the-top-level",
+    ],
+)
+def test_any_key_a_cell_holds_differently_is_named_with_its_path(
+    tmp_path: Path, change: Callable[[dict[str, Any]], object], field: str, theirs: str, ours: str
+) -> None:
+    windows = _saved_run()
+    change(windows)
+    _cell(tmp_path, _LINUX, _saved_run(), _saved_run())
+    _cell(tmp_path, _MACOS, _saved_run(), _saved_run())
+    _cell(tmp_path, _WINDOWS_CELL, windows, _saved_run())
+
+    (reason,) = _compared(tmp_path)
+
+    assert reason.startswith(f"first-run-before.json: {_WINDOWS_CELL} differs from {_LINUX} ")
+    assert f" in {field}: " in reason
+    head, _, tail = reason.partition(f", {_LINUX} has ")
+    assert theirs in head.partition(f" in {field}: ")[2]
+    assert ours in tail
+
+
+def test_the_same_items_in_another_order_are_a_difference(tmp_path: Path) -> None:
+    files = ["model/a.pkl", "model/b.pkl"]
+    for cell, listed in ((_LINUX, files), (_MACOS, files), (_WINDOWS_CELL, files[::-1])):
+        document = _saved_run()
+        document["scope"]["files"] = listed
+        _cell(tmp_path, cell, document, _saved_run())
+
+    (reason,) = _compared(tmp_path)
+
+    assert reason.startswith(f"first-run-before.json: {_WINDOWS_CELL} differs from {_LINUX} ")
+    assert " in scope.files[0]: " in reason
+    assert reason.endswith("; 1 other key path(s) differ too")
+
+
+def test_a_cell_that_differs_in_several_key_paths_says_how_many_more(tmp_path: Path) -> None:
+    _three_cells(tmp_path, target_ref="elsewhere", observed="model\\weights.pkl")
+
+    (reason,) = _compared(tmp_path)
+
+    assert " in run.target.ref: " in reason
+    assert reason.endswith('has "model"; 1 other key path(s) differ too')
+
+
+def test_keys_that_vary_from_cell_to_cell_by_design_are_not_compared(tmp_path: Path) -> None:
+    for n, cell in enumerate((_LINUX, _MACOS, _WINDOWS_CELL)):
+        document = _saved_run()
+        document["run"].update(
+            run_id=f"00000000-0000-4000-8000-00000000000{n}",
+            created_at=f"2026-01-0{n + 1}T00:00:01Z",
+            started_at=f"2026-01-0{n + 1}T00:00:00Z",
+            completed_at=f"2026-01-0{n + 1}T00:00:01Z",
+        )
+        document["run"]["usage"]["wall_time_seconds"] = n + 0.5
+        if n:
+            document["run"]["source"] = {"kind": "ci", "provider": "github", "run_url": f"u{n}"}
+            document["run"]["deployment"]["commit_sha"] = "0" * 40
+        _cell(tmp_path, cell, document, document)
+
+    assert _compared(tmp_path) == []
+    assert sorted(summary.VARYING) == [
+        "run.completed_at",
+        "run.created_at",
+        "run.deployment.commit_sha",
+        "run.run_id",
+        "run.source",
+        "run.started_at",
+        "run.usage.wall_time_seconds",
+    ]
+
+
+@pytest.mark.parametrize("key", ["source_kind", "run_id_note", "started_at_offset"])
+def test_a_key_named_like_a_varying_one_is_still_compared(tmp_path: Path, key: str) -> None:
+    for n, cell in enumerate((_LINUX, _MACOS, _WINDOWS_CELL)):
+        document = _saved_run()
+        document["run"][key] = "ci" if n else "local"
+        _cell(tmp_path, cell, document, document)
+
+    assert any(f"run.{key}" in problem for problem in _compared(tmp_path))
+
+
+def test_a_directory_named_like_a_record_is_a_problem_naming_its_cell(tmp_path: Path) -> None:
+    _three_cells(tmp_path)
+    (tmp_path / _MACOS / "notes.json").mkdir()
+    out = tmp_path / "out"
+
+    assert len(summary.collect(tmp_path)) == 3
+    assert summary.summarise(tmp_path, out, {}, {"first-run": 3}) == 1
+    written = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    assert written["problems"] == [f"{_MACOS}: notes.json is a directory, not a file"]
+    assert written["passed"] is False
+
+
+def test_a_directory_named_like_a_saved_run_is_named_once(tmp_path: Path) -> None:
+    _three_cells(tmp_path)
+    (tmp_path / _MACOS / "first-run-before.json").unlink()
+    (tmp_path / _MACOS / "first-run-before.json").mkdir()
+    out = tmp_path / "out"
+
+    assert summary.summarise(tmp_path, out, {}, {"first-run": 3}) == 1
+    written = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    assert written["problems"] == [f"{_MACOS}: first-run-before.json is a directory, not a file"]
 
 
 def test_a_cell_that_kept_no_saved_run_is_a_problem_not_a_skip(tmp_path: Path) -> None:
@@ -1184,20 +1409,6 @@ def test_a_reported_cell_is_left_out_of_the_comparison(tmp_path: Path) -> None:
 
     assert _compared(tmp_path, _WINDOWS) == []
     assert len(_compared(tmp_path)) == 2
-
-
-def test_the_recomputed_fingerprint_is_the_one_guardana_derives() -> None:
-    for ref in ("model/weights.pkl", "src/app.py:12"):
-        finding = Finding(
-            rule_id=_PICKLE,
-            severity=Severity.CRITICAL,
-            title="t",
-            taxonomy=(),
-            target_ref=ref,
-            evidence=Evidence(summary="unpickling imports builtins.print"),
-        )
-
-        assert summary.fingerprint(_PICKLE, ref, finding.evidence.summary) == finding.fingerprint
 
 
 # The command line.

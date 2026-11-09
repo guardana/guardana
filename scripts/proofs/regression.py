@@ -269,7 +269,7 @@ class _Loop:
             [str(venv_executable(self.venv, "guardana")), *args],
             cwd=self.work,
             environment=self.environment,
-            expect_fragments=lines,
+            expect_lines=lines,
         )
         self.record.steps.append(step)
         return step, output
@@ -380,7 +380,7 @@ def _regrade_and_gate(loop: _Loop, runs: dict[str, dict[str, Any] | None]) -> No
         "gate the regression in CI",
         pair,
         1,
-        (f"[APPEARED · HIGH] {SUITE}", "1 worse"),
+        (f"✖ [APPEARED · HIGH] {SUITE}", "1 change(s); 0 check(s) unchanged, 1 worse."),
     )
     step, output = loop.guardana("the gate's changes", [*pair, "--format", "json"], 1)
     try:
@@ -391,7 +391,7 @@ def _regrade_and_gate(loop: _Loop, runs: dict[str, dict[str, Any] | None]) -> No
         "an incomplete run is never read as no regression",
         ["diff", "fixed.json", "partial.json"],
         2,
-        ("This comparison is incomplete", f"[BLINDED · CRITICAL] {TENANCY}"),
+        ("⚠ This comparison is incomplete", f"✖ [BLINDED · CRITICAL] {TENANCY}"),
     )
 
 
@@ -413,7 +413,10 @@ def _promote(loop: _Loop) -> None:
         "a redacted question is not promoted as asked",
         [*add, *rest],
         3,
-        ("the input holds a redaction placeholder",),
+        (
+            f"error: line {exchange['line']}: the input holds a redaction placeholder, so the "
+            "case would ask another question; give the question with --input-file",
+        ),
     )
     rewritten = [*add, "--input-file", "question.txt", *rest]
     before = _digest(loop.work / DATASET)
@@ -421,7 +424,10 @@ def _promote(loop: _Loop) -> None:
         "prove the promoted pair before writing it",
         rewritten,
         0,
-        ("proof: observed graded fail, accepted graded pass", "dry run: nothing was written"),
+        (
+            "proof: observed graded fail, accepted graded pass",
+            "dry run: nothing was written; run again with --write to add the case",
+        ),
     )
     if _digest(loop.work / DATASET) != before:
         step.problems.append("the dry run changed the dataset")
@@ -431,7 +437,10 @@ def _promote(loop: _Loop) -> None:
         "regrade the promoted pair",
         ["rule", "test", SUITE, "--rules", str(RULES)],
         0,
-        ("3 fixture(s) passed, 0 failed", "1 of 1 regression pair(s) hold"),
+        (
+            "1 rule(s); 3 fixture(s) passed, 0 failed, 0 could not run. "
+            "0 rule(s) not fully sampled. 1 of 1 regression pair(s) hold.",
+        ),
     )
 
 

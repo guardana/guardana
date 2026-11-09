@@ -116,29 +116,53 @@ def _commands(record: Record, venv: Path, project: Path) -> None:
     environment = clean_environment(venv)
     guardana = str(venv_executable(venv, "guardana"))
 
-    def step(
-        name: str, args: list[str], expected: int, lines: tuple[str, ...] = (), cwd: Path = project
+    def step(  # noqa: PLR0913 — the command, its exit and what its output must hold
+        name: str,
+        args: list[str],
+        expected: int,
+        *,
+        lines: tuple[str, ...] = (),
+        fragments: tuple[str, ...] = (),
+        cwd: Path = project,
     ) -> Step:
         done = Step(name=name, command=" ".join(["guardana", *args]), expected_exit=expected)
-        run(done, [guardana, *args], cwd=cwd, environment=environment, expect_fragments=lines)
+        run(
+            done,
+            [guardana, *args],
+            cwd=cwd,
+            environment=environment,
+            expect_lines=lines,
+            expect_fragments=fragments,
+        )
         record.steps.append(done)
         return done
 
     lock = "guardana-lock.yaml"
-    step("version", ["--version"], 0, (f"guardana-cli {record.version}",))
-    step("doctor lists the installed pack", ["doctor"], 0, (PACK,))
-    step("an installed pack is refused until admitted", ["rule", "test", "reference.*"], 3, (PACK,))
+    step("version", ["--version"], 0, lines=(f"guardana-cli {record.version}",))
+    # The pack's name is only part of the line that lists or refuses it.
+    step("doctor lists the installed pack", ["doctor"], 0, fragments=(PACK,))
+    step(
+        "an installed pack is refused until admitted",
+        ["rule", "test", "reference.*"],
+        3,
+        fragments=(PACK,),
+    )
     sampled = (
-        "2 rule(s); 6 fixture(s) passed, 0 failed, 0 could not run.",
-        "0 rule(s) not fully sampled",
+        "2 rule(s); 6 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled."
     )
     step(
         "every pack rule proves its three samples",
         ["rule", "test", "reference.*", *ADMIT],
         0,
-        sampled,
+        lines=(sampled,),
     )
-    step("the manifest holds", ["pack", "validate", *ADMIT], 0, ("0 with problems",))
+    # The built-in rules count as a pack beside the reference pack.
+    step(
+        "the manifest holds",
+        ["pack", "validate", *ADMIT],
+        0,
+        lines=("2 pack(s) checked, 0 with problems.",),
+    )
     step("lock what is installed", ["pack", "lock", lock, *ADMIT], 0)
     step("the build matches the lock", ["pack", "lock", lock, "--check", *ADMIT], 0)
 
@@ -153,7 +177,13 @@ def _commands(record: Record, venv: Path, project: Path) -> None:
         ["scan", "--target", "reference-requirements://.", *ADMIT,
          "--format", "reference-summary", "--reporter", "reference-file://summaries"],
         0,
-        ("## Findings (1)", "A requirement is not pinned to one version", "delivery: delivered"),
+        lines=(
+            "## Findings (1)",
+            "| MEDIUM | reference.supply\\_chain.unpinned\\_requirement "
+            "| A requirement is not pinned to one version | requirements.txt "
+            "| 'requests\\>=2.31' is not pinned: it admits more than one version |",
+            "delivery: delivered — reference-file to summaries (1 attempt)",
+        ),
         cwd=requirements,
     )  # fmt: skip
     written = sorted((requirements / "summaries").glob("guardana-*.md"))

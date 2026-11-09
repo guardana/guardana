@@ -7,13 +7,14 @@ findings is a problem in the record rather than a quiet pass.
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from proofs import recovery
-from proofs.record import Step
+from proofs.record import Record, Step, clean_environment
 
 _ROOT = Path(__file__).resolve().parents[2]
 _TAKE = """set -a; . deploy/.env; set +a
@@ -453,3 +454,47 @@ def test_a_proof_that_stops_early_writes_a_record_that_does_not_pass(
     document = json.loads(written.read_text(encoding="utf-8"))
     assert document["verdict"] == "failed"
     assert document["steps"][-1]["problems"] == ["stopped: RuntimeError('docker went away')"]
+
+
+_BOOTSTRAPPED = "created organization acme\ncreated project {}\n\ngdn_[redacted]\n"
+
+
+@pytest.mark.parametrize(
+    ("output", "held"),
+    [
+        (_BOOTSTRAPPED.format("acme/web"), True),
+        (_BOOTSTRAPPED.format("acme/web-staging"), False),
+        ("  created project acme/web  \n", True),
+    ],
+    ids=["the-project", "a-longer-project", "padded"],
+)
+def test_a_bootstrap_is_held_to_its_whole_created_line(
+    tmp_path: Path, output: str, held: bool
+) -> None:
+    proof = recovery._Proof(record=Record(proof="recovery", version="1"), work=tmp_path)
+    code = f"import sys; sys.stdout.buffer.write({output.encode()!r})"
+
+    step, _ = proof.command(
+        "bootstrap acme/web",
+        [sys.executable, "-c", code],
+        expected=0,
+        environment=clean_environment(None),
+        lines=("created project acme/web",),
+    )
+
+    assert step.held is held
+
+
+def test_a_fragment_is_still_found_inside_its_line(tmp_path: Path) -> None:
+    proof = recovery._Proof(record=Record(proof="recovery", version="1"), work=tmp_path)
+    code = "print('rolled back  0009 run_content_digest')"
+
+    step, _ = proof.command(
+        "rollback",
+        [sys.executable, "-c", code],
+        expected=0,
+        environment=clean_environment(None),
+        fragments=("rolled back ",),
+    )
+
+    assert step.held

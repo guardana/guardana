@@ -8,19 +8,19 @@ matrix that ran fewer cells, leaves nothing to read, so neither the records nor 
 results alone decide.
 
 The saved runs (`first-run-before.json`, `first-run-after.json`) are compared across cells
-by the run's target ref and fingerprint, the scope listing, the observed refs and each
-finding's rule id, location ref and fingerprint: the same starter must give the same answer
-on every platform, whatever the output displayed. A cell that kept no saved run, or one
-that cannot be read, is a problem. A job and its cells named with `--report-only` are shown
-without being required or compared, but must still leave their records.
+key path by key path, the whole document but the keys in `VARYING`: the same starter must
+give the same answer on every platform, whatever the output displayed, and a key one cell
+holds and another lacks is a difference too. A cell that kept no saved run, or one that
+cannot be read, is a problem, and so is any `*.json` entry that is not a readable file. A
+job and its cells named with `--report-only` are shown without being required or compared,
+but must still leave their records.
 
 Writes `<out>/summary.json` and `<out>/summary.md`; reads only the directory it is given and
 needs no Guardana install.
 """
 
-import hashlib
 import json
-import re
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +30,19 @@ from proofs.record import FAILED, INCOMPLETE, NETWORK_CUT, PASSED
 _PROOFS = {"first-run", "customization", "pilot", "regression", "recovery", "same-as-tag"}
 # The saved runs a proof keeps beside its record, compared across that proof's cells.
 SAVED_RUNS = {"first-run": KEPT_RUNS}
-_LINE = re.compile(r"^(?P<path>.*):\d+$")
+# Key paths of a saved run that differ between cells by design, never because the answer did;
+# each is left out of the comparison with everything below it.
+VARYING = frozenset(
+    {
+        "run.run_id",  # a fresh identifier for every run
+        "run.created_at",  # the clock of the runner
+        "run.started_at",
+        "run.completed_at",
+        "run.usage.wall_time_seconds",  # the speed of the runner
+        "run.source",  # hosted runners are detected as CI; a container cell sees no CI variable
+        "run.deployment.commit_sha",  # read from `GITHUB_SHA`, which only hosted runners set
+    }
+)
 
 
 class IncomparableRunError(ValueError):
@@ -38,16 +50,37 @@ class IncomparableRunError(ValueError):
 
 
 def collect(records: Path) -> list[dict[str, Any]]:
-    """Every proof record under `records`, with the directory it came from."""
+    """Every proof record under `records`, with the directory it came from.
+
+    An entry that cannot be read is passed over here; `unreadable` names it.
+    """
     found: list[dict[str, Any]] = []
     for path in sorted(records.rglob("*.json")):
         try:
             document = json.loads(path.read_text(encoding="utf-8"))
-        except ValueError:
+        except (OSError, ValueError):
             continue
         if isinstance(document, dict) and document.get("proof") in _PROOFS:
             found.append({"cell": path.parent.name, **document})
     return found
+
+
+def unreadable(records: Path) -> dict[Path, str]:
+    """Name every `*.json` entry under `records` that is not a file the summary can read.
+
+    Such an entry may stand where a record was meant to be, so it is a problem, unlike a
+    readable file that holds some other JSON.
+    """
+    reasons: dict[Path, str] = {}
+    for path in sorted(records.rglob("*.json")):
+        if path.is_dir():
+            reasons[path] = f"{path.parent.name}: {path.name} is a directory, not a file"
+            continue
+        try:
+            path.read_bytes()
+        except OSError as error:
+            reasons[path] = f"{path.parent.name}: {path.name} cannot be read: {error}"
+    return reasons
 
 
 def recomputed(document: dict[str, Any]) -> str:
@@ -111,17 +144,6 @@ def problems(
     return reasons
 
 
-def fingerprint(rule_id: str, target_ref: str, summary: str) -> str:
-    """Return the fingerprint Guardana derives for a finding: rule, file without line, summary.
-
-    Recomputed here because a saved run does not store it and the summary job runs with
-    only the proof scripts checked out.
-    """
-    line = _LINE.match(target_ref)
-    path = line.group("path") if line else target_ref
-    return hashlib.sha256(f"{rule_id}\x00{path}\x00{summary}".encode()).hexdigest()[:16]
-
-
 def _at(document: Any, *keys: str) -> Any:  # noqa: ANN401 — JSON values
     value = document
     for key in keys:
@@ -145,27 +167,53 @@ def _items(document: Any, *keys: str) -> list[Any]:  # noqa: ANN401 — JSON val
     return value
 
 
-def saved_run(document: Any) -> dict[str, Any]:  # noqa: ANN401 — JSON values
-    """Return what a saved run must hold alike on every platform; raise when it lacks any."""
-    target_ref = _text(document, "run", "target", "ref")
+def saved_run(document: Any) -> dict[str, str]:  # noqa: ANN401 — JSON values
+    """Return every key path of a saved run outside `VARYING`, each with its JSON value.
+
+    Raises when the document is not a run, so cells that all kept the same document that is
+    not a run are not read as agreeing.
+    """
+    _text(document, "run", "target", "ref")
+    _at(document, "run", "target", "fingerprint")
     listed = _items(document, "scope", "files")
     if not all(isinstance(name, str) for name in listed):
         raise IncomparableRunError("its scope.files is not a list of strings")
-    return {
-        "run.target.ref": target_ref,
-        "run.target.fingerprint": _at(document, "run", "target", "fingerprint"),
-        "scope.files": sorted(listed),
-        "observations": sorted(_text(o, "ref") for o in _items(document, "observations")),
-        "findings": sorted(_finding(f) for f in _items(document, "findings")),
-    }
+    for observation in _items(document, "observations"):
+        _text(observation, "ref")
+    for finding in _items(document, "findings"):
+        _text(finding, "rule_id")
+        _text(finding, "target_ref")
+        _text(finding, "evidence", "summary")
+    return _leaves(document, "")
 
 
-def _finding(finding: Any) -> tuple[str, str, str]:  # noqa: ANN401 — JSON values
-    rule_id, ref = _text(finding, "rule_id"), _text(finding, "target_ref")
-    return rule_id, ref, fingerprint(rule_id, ref, _text(finding, "evidence", "summary"))
+def _leaves(value: Any, path: str) -> dict[str, str]:  # noqa: ANN401 — JSON values
+    """Map each key path under `value` to the JSON text of the scalar or empty container there.
+
+    JSON text keeps `false`, `0` and `0.0` apart, which Python equality does not.
+    """
+    if isinstance(value, dict) and value:
+        children = [(_key(path, str(key)), item) for key, item in value.items()]
+    elif isinstance(value, list) and value:
+        children = [(f"{path}[{index}]", item) for index, item in enumerate(value)]
+    else:
+        return {path: json.dumps(value, ensure_ascii=False, sort_keys=True)}
+    leaves: dict[str, str] = {}
+    for child, item in children:
+        if child not in VARYING:
+            leaves.update(_leaves(item, child))
+    return leaves
 
 
-def _read_saved_run(path: Path) -> dict[str, Any]:
+def _key(path: str, key: str) -> str:
+    # An empty key, or one that holds a dot or a bracket, is quoted, so it never spells another
+    # key's path.
+    if not key or "." in key or "[" in key:
+        return f"{path}[{json.dumps(key, ensure_ascii=False)}]"
+    return f"{path}.{key}" if path else key
+
+
+def _read_saved_run(path: Path) -> dict[str, str]:
     """Read and reduce one saved run; raise `IncomparableRunError` saying why it cannot be."""
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
@@ -177,13 +225,18 @@ def _read_saved_run(path: Path) -> dict[str, Any]:
 
 
 def compare_saved_runs(
-    records: Path, found: list[dict[str, Any]], report_only: dict[str, str] | None = None
+    records: Path,
+    found: list[dict[str, Any]],
+    report_only: dict[str, str] | None = None,
+    *,
+    named: Collection[Path] = (),
 ) -> list[str]:
     """Name every required cell whose saved run is missing, unreadable or unlike the others'.
 
     Each cell is compared with the saved run most cells hold, so the one platform that
     answers differently is the one named. With no majority, the first cell in name order is
-    the reference and every cell unlike it is named.
+    the reference and every cell unlike it is named. A saved run among `named`, a problem
+    already, is left out rather than named twice.
     """
     report_only = report_only or {}
     kept = {(p.parent.name, p.name): p for p in sorted(records.rglob("*.json"))}
@@ -197,11 +250,13 @@ def compare_saved_runs(
             }
         )
         for name in names:
-            seen: list[tuple[str, dict[str, Any]]] = []
+            seen: list[tuple[str, dict[str, str]]] = []
             for cell in cells:
                 path = kept.get((cell, name))
                 if path is None:
                     reasons.append(f"{cell}: {proof} left no {name}")
+                    continue
+                if path in named:
                     continue
                 try:
                     seen.append((cell, _read_saved_run(path)))
@@ -211,20 +266,27 @@ def compare_saved_runs(
     return reasons
 
 
-def _differences(name: str, seen: list[tuple[str, dict[str, Any]]]) -> list[str]:
-    """Compare each cell's saved run with the one most cells hold, naming the first field."""
+def _differences(name: str, seen: list[tuple[str, dict[str, str]]]) -> list[str]:
+    """Compare each cell's saved run with the one most cells hold, naming the first key path.
+
+    A key path one side lacks differs as much as one both hold with different values.
+    """
     if not seen:
         return []
     agreeing = [sum(other == mine for _, other in seen) for _, mine in seen]
     reference_cell, reference = seen[agreeing.index(max(agreeing))]
     reasons: list[str] = []
     for cell, mine in seen:
-        field = next((key for key in reference if mine[key] != reference[key]), None)
-        if field is not None:
-            reasons.append(
-                f"{name}: {cell} differs from {reference_cell} in {field}: "
-                f"{cell} has {mine[field]!r}, {reference_cell} has {reference[field]!r}"
-            )
+        paths = [p for p in {**reference, **mine} if mine.get(p) != reference.get(p)]
+        if not paths:
+            continue
+        first, more = paths[0], len(paths) - 1
+        reasons.append(
+            f"{name}: {cell} differs from {reference_cell} in {first}: "
+            f"{cell} has {mine.get(first, 'nothing')}, "
+            f"{reference_cell} has {reference.get(first, 'nothing')}"
+            + (f"; {more} other key path(s) differ too" if more else "")
+        )
     return reasons
 
 
@@ -260,7 +322,9 @@ def summarise(
     """Write both summaries and return the exit code."""
     found = collect(records)
     reasons = problems(found, needs, expected, report_only)
-    reasons += compare_saved_runs(records, found, report_only)
+    unread = unreadable(records)
+    reasons += unread.values()
+    reasons += compare_saved_runs(records, found, report_only, named=unread)
     out.mkdir(parents=True, exist_ok=True)
     document = {
         "schema": 1,
