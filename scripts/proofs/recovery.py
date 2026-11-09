@@ -465,11 +465,20 @@ class _Proof:
         cwd: Path | None = None,
         shown: str | None = None,
         lines: tuple[str, ...] = (),
+        fragments: tuple[str, ...] = (),
     ) -> tuple[Step, str]:
-        """Run one command as a step; the output comes back unredacted for parsing only."""
+        """Run one command as a step; the output comes back unredacted for parsing only.
+
+        Each of `lines` must be a whole output line and each of `fragments` part of one.
+        """
         step = Step(name=name, command=shown or shlex.join(argv), expected_exit=expected)
         output = run(
-            step, argv, cwd=cwd or self.work, environment=environment, expect_fragments=lines
+            step,
+            argv,
+            cwd=cwd or self.work,
+            environment=environment,
+            expect_lines=lines,
+            expect_fragments=fragments,
         )
         if output:
             step.excerpt = excerpt(redact(output, self.hidden))
@@ -770,7 +779,8 @@ def _old_release(proof: _Proof, upgrade: _Upgrade) -> bool:
         expected=4,
         environment={**clean_environment(upgrade.new), "GUARDANA_DATABASE_URL": unreachable},
         shown="guardana-collector status",
-        lines=("could not reach the database",),
+        # The rest of the line is the database driver's own message.
+        fragments=("error: could not reach the database:",),
     )
     migrated, _ = proof.command(
         f"{label}: migrate",
@@ -884,7 +894,8 @@ def _upgrade_steps(proof: _Proof, upgrade: _Upgrade) -> bool:
             expected=0,
             environment=upgrade.collector(new),
             shown="guardana-collector rollback",
-            lines=("rolled back",),
+            # The line goes on to name the newest migration, which a release may change.
+            fragments=("rolled back",),
         )
         proof.ready(f"{label}: /readyz is 503 after a rollback", server.base, _UNAVAILABLE)
         proof.command(
@@ -915,7 +926,11 @@ def _refused_rollback(proof: _Proof, upgrade: _Upgrade) -> None:
         expected=1,
         environment=upgrade.collector(new),
         shown=f"guardana-collector rollback --steps {steps}",
-        lines=("refusing to roll back tenancy",),
+        lines=(
+            f"error: could not roll back migration {TENANCY_MIGRATION} (tenancy): refusing to roll "
+            "back tenancy: this database holds data for more than one project, and dropping the "
+            "tenant column would merge them into one undifferentiated pile",
+        ),
     )
     after = _status(proof, f"{label}: status after the refused rollback keeps 0003", upgrade, new)
     if after is not None and TENANCY_MIGRATION not in after[2]:

@@ -8,13 +8,15 @@ import json
 import os
 import stat
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from proofs import pilot, regression
-from proofs.record import Record
+from proofs.record import Record, Step, clean_environment
+from proofs.record import run as run_step
 
 
 def _finding(
@@ -439,3 +441,136 @@ def test_without_a_kept_recording_every_regrade_and_gate_step_is_not_run(tmp_pat
         "an incomplete run is never read as no regression",
     ]
     assert not any(s.ran for s in record.steps[1:])
+
+
+@pytest.mark.parametrize(
+    ("output", "held"),
+    [
+        ("guardana 1.2.0\n  guardana-cli     1.2.0\n  guardana-core    1.2.0\n", True),
+        ("guardana 1.2.0rc1\n  guardana-cli     1.2.0rc1\n", False),
+        ("guardana-cli 1.2.0 is not installed\n", False),
+    ],
+    ids=["release", "candidate", "inside-a-sentence"],
+)
+def test_the_published_cli_is_its_version_line_not_a_prefix_of_another(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, output: str, held: bool
+) -> None:
+    monkeypatch.setattr(pilot, "run", _printing({"the published CLI": output}))
+
+    started = pilot.start_record("pilot", tmp_path / "venv", tmp_path, "1.2.0", None)
+
+    (cli,) = [s for s in started.steps if s.name == "the published CLI"]
+    assert cli.held is held
+    assert cli.problems == ([] if held else ["output lacks: guardana-cli 1.2.0"])
+
+
+def _printing(outputs: dict[str, str]) -> Callable[..., str]:
+    """Stand in for `run`: each step prints the output named for it and exits as expected."""
+
+    def fake_run(step: Step, argv: list[str], **kwargs: Any) -> str:  # noqa: ANN401
+        shown = outputs.get(step.name, "").encode()
+        code = f"import sys; sys.stdout.buffer.write({shown!r}); sys.exit({step.expected_exit})"
+        kwargs["environment"] = clean_environment(None)
+        return run_step(step, [sys.executable, "-c", code], **kwargs)
+
+    return fake_run
+
+
+def _lacking(steps: list[Step], name: str) -> list[str]:
+    (step,) = [s for s in steps if s.name == name]
+    return [p for p in step.problems if p.startswith("output lacks: ")]
+
+
+_SEED = (
+    "wrote seed/documents.jsonl: {} document(s), 1 poisoned, for 2 tenant(s); "
+    "seed them into the application's own index\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("output", "held"), [(_SEED.format(3), True), (_SEED.format(13), False)], ids=["3", "13"]
+)
+def test_the_seed_is_held_to_its_whole_line(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, output: str, held: bool
+) -> None:
+    application = tmp_path / "application"
+    application.mkdir()
+    (application / pilot.FIXTURES).write_text("acme: {api_key_env: ACME_KEY}\n", encoding="utf-8")
+    (application / pilot.PROFILE).write_text("name: p\n", encoding="utf-8")
+    monkeypatch.setattr(pilot, "run", _printing({"render the seed": output}))
+    record = Record(proof="pilot", version="1")
+
+    environment = pilot.prepare(record, tmp_path / "venv", application, tmp_path / "work")
+
+    assert (environment is not None) is held
+    assert bool(_lacking(record.steps, "render the seed")) is not held
+
+
+_GATE = "  ✖ [APPEARED · HIGH] {}\n\n{} change(s); 0 check(s) unchanged, {} worse.\n"
+_BLINDED = "⚠ This comparison is incomplete\n  ✖ [BLINDED · CRITICAL] {}\n"
+_GATED = "gate the regression in CI"
+_INCOMPLETE = "an incomplete run is never read as no regression"
+
+
+@pytest.mark.parametrize(
+    ("name", "output", "held"),
+    [
+        (_GATED, _GATE.format(regression.SUITE, 1, 1), True),
+        (_GATED, _GATE.format(regression.SUITE, 11, 11), False),
+        (_GATED, _GATE.format(f"{regression.SUITE}_v2", 1, 1), False),
+        (_INCOMPLETE, _BLINDED.format(pilot.TENANCY), True),
+        (_INCOMPLETE, _BLINDED.format(f"{pilot.TENANCY}_v2"), False),
+    ],
+    ids=["gate", "eleven-worse", "another-suite", "blinded", "another-rule"],
+)
+def test_the_regression_gate_is_held_to_whole_lines(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, output: str, held: bool
+) -> None:
+    _sidecar(tmp_path / "fixed.exchanges.jsonl", "I could not find order A-100.")
+    _sidecar(tmp_path / "broken.exchanges.jsonl", "Order A-100 totals 99 EUR.")
+    monkeypatch.setattr(regression, "run", _printing({name: output}))
+    record = Record(proof="regression", version="1")
+
+    regression._regrade_and_gate(regression._Loop(record, tmp_path, tmp_path, {}), {"broken": {}})
+
+    assert bool(_lacking(record.steps, name)) is not held
+
+
+_REFUSED = (
+    "error: line {}: the input holds a redaction placeholder, so the case would ask another "
+    "question; give the question with --input-file\n"
+)
+_PROVED = (
+    "proof: observed graded fail, accepted graded pass{}\n"
+    "dry run: nothing was written; run again with --write to add the case\n"
+)
+_PAIRS = (
+    "1 rule(s); {} fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled. "
+    "1 of 1 regression pair(s) hold.\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("name", "output", "held"),
+    [
+        ("a redacted question is not promoted as asked", _REFUSED.format(2), True),
+        ("a redacted question is not promoted as asked", _REFUSED.format(12), False),
+        ("prove the promoted pair before writing it", _PROVED.format(""), True),
+        ("prove the promoted pair before writing it", _PROVED.format(" on 0 trials"), False),
+        ("regrade the promoted pair", _PAIRS.format(3), True),
+        ("regrade the promoted pair", _PAIRS.format(13), False),
+    ],
+    ids=["refused", "another-line", "proved", "proved-on-nothing", "pairs", "thirteen-fixtures"],
+)
+def test_the_promotion_is_held_to_whole_lines(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, output: str, held: bool
+) -> None:
+    _sidecar(tmp_path / "broken.exchanges.jsonl", "Order A-100 totals 99 EUR.")
+    (tmp_path / regression.DATASET).parent.mkdir()
+    (tmp_path / regression.DATASET).write_text('{"version": 1}\n', encoding="utf-8")
+    monkeypatch.setattr(regression, "run", _printing({name: output}))
+    record = Record(proof="regression", version="1")
+
+    regression._promote(regression._Loop(record, tmp_path, tmp_path, {}))
+
+    assert bool(_lacking(record.steps, name)) is not held
