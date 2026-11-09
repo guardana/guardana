@@ -831,15 +831,25 @@ def _refuses_the_method(exc: McpProtocolError) -> bool:
     be told apart.
     """
     status = exc.status
-    if status is not None and (
-        status in _CREDENTIAL_STATUSES or status in _BUSY_STATUSES or status >= _SERVER_ERROR
-    ):
+    if says_nothing_of_the_method(status):
         return False
     if exc.code == _METHOD_NOT_FOUND:
         return True
     if exc.code in _REQUEST_REJECTED:
         return status is None or status in _SUCCESS or status == _BAD_REQUEST
     return status == _BAD_REQUEST and exc.code == _NO_SESSION
+
+
+def says_nothing_of_the_method(status: int | None) -> bool:
+    """Whether an HTTP status settles a reply whatever JSON-RPC error its body carries.
+
+    A `401`, `403` or `407` says who may ask, and a busy or server status says the server
+    failed; neither says which methods the server implements, so a `-32601` beside one
+    is no evidence that a method is missing.
+    """
+    return status is not None and (
+        status in _CREDENTIAL_STATUSES or status in _BUSY_STATUSES or status >= _SERVER_ERROR
+    )
 
 
 def no_json_rpc_error(reply: RawReply, payload: Mapping[str, object] | None) -> bool:

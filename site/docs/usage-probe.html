@@ -478,38 +478,40 @@ still handing sessions to every client that asks for them. The skip's detail nam
 the revision. <code>not_applicable</code> is not a coverage gap, so it does not fail a run while
 another selected rule reaches a conclusion; a run in which no rule reached one ends
 <code>indeterminate</code>.</li>
-<li><strong><code>guardana.mcp.cache_scope</code> does not apply on a <code>2025-11-25</code> conversation with a
-server that gates its tool listing behind a credential (skipped <code>not_applicable</code>).</strong>
-The skip's detail names the revision. When the server also lists a modern revision
-guardana does not speak, the result is inconclusive instead, naming that revision,
-because what it declares to modern clients was not read. The result is also
-inconclusive, naming the failure, when <code>server/discover</code> failed: a timeout, a
-refusal (<code>401</code>, <code>403</code>, <code>407</code>), a rate limit, a server error, a reply that is not JSON-RPC,
-a result whose <code>supportedVersions</code> names no revision, or another JSON-RPC error
-such as <code>-32603</code>. These are not such failures, but how a server without the method
-answers: JSON-RPC <code>-32601</code>, <code>-32600</code> or <code>-32602</code> at a <code>2xx</code> or <code>400</code>, <code>-32000</code> at a
-<code>400</code> (how the Python and TypeScript SDKs of the older revision turn away a request
-without a session), a <code>400</code>, <code>404</code> or <code>405</code> read whole with no JSON-RPC error, or a
-result without <code>supportedVersions</code>. A failing server that answers in one of those
-ways, such as a proxy's plain <code>404</code>, cannot be told apart and reads <code>not_applicable</code>.
-<code>not_applicable</code> is not a
-coverage gap, so it does not fail a run while another selected rule reaches a conclusion;
-a run in which no rule reached one ends <code>indeterminate</code>. <code>cacheScope</code> and <code>ttlMs</code>
-arrive with <code>2026-07-28</code> and declare nothing on the older revision, so even
-<code>cacheScope: &quot;public&quot;</code> produces no finding there.</li>
+<li><strong><code>guardana.mcp.cache_scope</code> does not apply on a <code>2025-11-25</code> conversation with a server
+that gates its tool listing behind a credential (skipped <code>not_applicable</code>).</strong> The skip's
+detail names the revision. When the server also lists a modern revision guardana does
+not speak, the result is inconclusive instead, naming that revision, because what it
+declares to modern clients was not read. The result is also inconclusive, naming the
+failure, when <code>server/discover</code> failed: a timeout, a refusal (<code>401</code>, <code>403</code>, <code>407</code>), a
+rate limit, a server error, a reply that is not JSON-RPC, a result whose
+<code>supportedVersions</code> names no revision, or another JSON-RPC error such as <code>-32603</code>. These
+are not such failures, but how a server without the method answers: JSON-RPC <code>-32601</code> at
+any status except <code>401</code>, <code>403</code>, <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> and a <code>5xx</code>, <code>-32600</code> or
+<code>-32602</code> at a <code>2xx</code> or <code>400</code>, <code>-32000</code> at a <code>400</code> (how the Python and TypeScript SDKs of
+the older revision turn away a request without a session), a <code>400</code>, <code>404</code> or <code>405</code> read
+whole with no JSON-RPC error, or a result without <code>supportedVersions</code>. A failing server
+that answers in one of those ways, such as a proxy's plain <code>404</code>, cannot be told apart
+and reads <code>not_applicable</code>. <code>not_applicable</code> is not a coverage gap, so it does not fail
+a run while another selected rule reaches a conclusion; a run in which no rule reached
+one ends <code>indeterminate</code>. <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare
+nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there.</li>
 <li><strong>Whether a server still offers <code>2025-11-25</code> is asked, not read.</strong> Some servers list
-only the new revision in <code>server/discover</code> and still answer <code>initialize</code>. When
-discovery lists no older revision, the checks that need it send one <code>initialize</code> over
-the <code>2025-11-25</code> wire, with your token when you gave one. A result naming <code>2025-11-25</code>
-makes the server dual-era, graded over that revision; JSON-RPC <code>-32601</code>, a <code>-32022</code> that
-names no older revision, or a <code>400</code>, <code>404</code> or <code>405</code> read whole whose body is plain text
-(including empty) or a JSON object without an <code>error</code> member, makes it modern-only.
-A <code>-32022</code> naming an older handshake revision leaves its sessions unexamined, and
-<code>session_binding</code> reports <code>inconclusive</code> naming that revision. A <code>401</code> or <code>403</code>
-leaves it unknown, and <code>session_binding</code> reports <code>inconclusive</code> naming <code>--mcp-token-env</code>;
-so does any other answer — a <code>400</code>, <code>404</code> or <code>405</code> whose body could not be read whole
-or parsed, a timeout, a rate limit, a server error, another JSON-RPC error — naming
-what came back, because one failed request does not show which revisions a server offers.</li>
+only the new revision in <code>server/discover</code> and still answer <code>initialize</code>. When discovery
+lists no older revision, the checks that need it send one <code>initialize</code> over the
+<code>2025-11-25</code> wire, with your token when you gave one. A result naming <code>2025-11-25</code> makes
+the server dual-era, graded over that revision; JSON-RPC <code>-32601</code> or a <code>-32022</code> that
+names no older revision makes it modern-only only at a status other than <code>401</code>, <code>403</code>,
+<code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> and a <code>5xx</code>. A <code>400</code>, <code>404</code> or <code>405</code> read whole whose body is
+plain text (including empty) or a JSON object without an <code>error</code> member makes it
+modern-only. A <code>-32022</code> naming an older handshake revision leaves its sessions
+unexamined, and <code>session_binding</code> reports <code>inconclusive</code> naming that revision. A <code>401</code>
+or <code>403</code> leaves it unknown, and <code>session_binding</code> reports <code>inconclusive</code> naming
+<code>--mcp-token-env</code>; so does any other answer — a <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> or a <code>5xx</code>
+whatever JSON-RPC error its body carries, a <code>400</code>, <code>404</code> or <code>405</code> whose body could not
+be read whole or parsed, a timeout, a rate limit, a server error, another JSON-RPC error
+— naming what came back, because one failed request does not show which revisions a
+server offers.</li>
 <li><strong>No revision in common is an outcome, never a pass.</strong> The authorization checks
 report <code>inconclusive</code> naming both version lists, and the manifest checks
 report the same sentence as an error, so the run is indeterminate under the default
@@ -611,7 +613,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.task_identity</code></td>
-<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. Only the first page of the listing is read, so an empty one that names a further page is <code>inconclusive</code> too. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. A server that declares no tasks and answers <code>tasks/list</code> as an unknown method is skipped <code>not_offered</code>, a coverage gap; when what it declares could not be read at all, the check is <code>inconclusive</code> instead. JSON-RPC <code>-32601</code> at any status, or an HTTP <code>400</code> read whole whose body is plain text (including empty) or a JSON object without an <code>error</code> member, counts as an unknown method. Any other answer, such as a <code>400</code> carrying another JSON-RPC error or whose body could not be read whole or parsed, <code>404</code>, <code>405</code> or a <code>5xx</code>, is <code>inconclusive</code></td>
+<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. Only the first page of the listing is read, so an empty one that names a further page is <code>inconclusive</code> too. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. A server that declares no tasks and answers <code>tasks/list</code> as an unknown method is skipped <code>not_offered</code>, a coverage gap; when what it declares could not be read at all, the check is <code>inconclusive</code> instead. A <code>tasks/list</code> answered <code>401</code> or <code>403</code> is refused whatever its body carries; JSON-RPC <code>-32601</code> at any status except <code>401</code>, <code>403</code>, <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> and a <code>5xx</code>, or an HTTP <code>400</code> read whole whose body is plain text (including empty) or a JSON object without an <code>error</code> member, counts as an unknown method. Any other answer, such as a <code>400</code> carrying another JSON-RPC error or whose body could not be read whole or parsed, <code>404</code>, <code>405</code>, a <code>5xx</code>, or <code>-32601</code> at <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> or a <code>5xx</code>, is <code>inconclusive</code></td>
 </tr>
 </tbody>
 </table></div>

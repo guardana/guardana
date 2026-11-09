@@ -338,6 +338,46 @@ def test_any_other_refusal_of_the_listing_stays_inconclusive(status: int, body: 
     assert f"HTTP {status}" in summaries(reported)[0]
 
 
+_METHOD_NOT_FOUND = json.dumps(
+    {"jsonrpc": "2.0", "id": 1, "error": {"code": -32601, "message": "Method not found"}}
+).encode()
+
+
+@pytest.mark.parametrize("status", [407, 408, 425, 429, 500, 503])
+def test_a_method_not_found_beside_a_failure_status_is_inconclusive_not_unoffered(
+    status: int,
+) -> None:
+    target = _listing_answered(_open(), RawReply(status, {}, _METHOD_NOT_FOUND))
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status} carrying JSON-RPC error -32601" in summaries(reported)[0]
+    assert target.authorization().tasks.answer is TaskAnswer.OTHER
+
+
+@pytest.mark.parametrize("declaration", [None, "listing"])
+@pytest.mark.parametrize("status", [401, 403])
+def test_a_refused_listing_is_a_refusal_whatever_error_it_carries(
+    status: int, declaration: str | None
+) -> None:
+    server = _open() if declaration is None else _open(task_declaration=declaration)
+    target = _listing_answered(server, RawReply(status, {}, _METHOD_NOT_FOUND))
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert reported == []
+    assert target.authorization().tasks.answer is TaskAnswer.REFUSED
+
+
+def test_a_method_not_found_at_200_from_a_server_declaring_no_tasks_does_not_offer_them() -> None:
+    target = _listing_answered(_open(), RawReply(200, {}, _METHOD_NOT_FOUND))
+
+    with pytest.raises(NotOffered):
+        list(RULE.run(target, RuleContext()))
+    assert target.authorization().tasks.answer is TaskAnswer.UNKNOWN_METHOD
+
+
 def test_a_400_whose_body_is_a_json_object_without_an_error_does_not_offer_tasks() -> None:
     target = _listing_answered(_open(), RawReply(400, {}, b'{"detail": "Bad Request"}'))
 
