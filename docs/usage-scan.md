@@ -151,7 +151,25 @@ named by its file: a pickle, archive or graph that does not parse, an archive me
 as a pickle (`data.pkl`, `*.pkl`, a legacy tar's `pickle`) that ends before its STOP, an
 NPY header whose `descr`, `shape` or `fortran_order` numpy would refuse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
-extension-registry code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
+extension-registry code (`EXT1`, `EXT2`, `EXT4`), a pickle holding a `numpy` dtype with
+fields or a subarray (including scikit-learn decision trees and random forests saved with
+`pickle`), a dtype state the scanner cannot read, an array whose state or items it cannot
+read (state given as a list, as an array, or as what a call returns, and items made by a
+call), state applied to what a call returns or to what a persistent id hands back when its kind
+is neither text nor what an import made (`torch` decodes a byte string, and a one-item
+text array equals its text) or it names a `torch.package` call, a call of what a call returns, a sparse tensor,
+a `torch._tensor._rebuild_from_type_v2` call whose arguments it cannot read, a
+`numpy.ndarray` call with unread arguments, an unread dtype, an offset other than 0 or
+strides over a buffer, or a buffer other than a byte string or `None`, a `_frombuffer` call
+over anything but a byte string or byte array (an out-of-band buffer included), a read-only
+view of an array, of what a call returned or of an object the scanner lost track of (an
+out-of-band buffer included), an allowlisted call
+that may keep views of an array (such as `list` or `collections.deque`, which iterate it)
+given an array, what a call returned or arguments it cannot read, state applied to an
+array that may already hold memory, which `numpy` frees while a view made any other way
+may still read it (the one state `numpy` writes for an empty array is read as clean), a
+model file
+that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file with a malformed header (including a tensor entry
 with a missing or mistyped `dtype`, `shape` or `data_offsets`, and tensors that do not
 describe the payload exactly), a GGUF file declaring an unsupported version, an ONNX
@@ -437,7 +455,18 @@ network fetches.
 callable the file imports, sorted and each once, after a digest of that set
 (`unpickling imports 2 non-allowlisted callable(s) (set 9a0cd5b778d9): builtins.eval,
 os.system`). Its detail names the archive member each was found in
-(`os.system in model.pt::archive/data.pkl`). A baseline fingerprint includes the
+(`os.system in model.pt::archive/data.pkl`). The summary also names the call that applies a
+state no `numpy` or Python pickler writes: `numpy.dtype.__setstate__` for forged dtype
+flags, byte order, item size or alignment, or an eight-item datetime or timedelta dtype
+state without its unit; `numpy.ndarray.__setstate__` for an object array given fewer items
+than its shape has elements; and `<module>.<class>.__setstate__` for a `BUILD` applied to an
+allowlisted class itself, such as `collections.Counter.__setstate__`, including one a
+`torch` legacy persistent id carries (the item after `"module"`, or a tar-format id's
+first item). It names
+`numpy.ndarray.__new__` for an object dtype or a negative offset over a buffer. The dtype,
+object-array item-count and buffer checks also cover what `_rebuild_from_type_v2` calls and
+the state it applies, and the dtype and object-array checks the dtypes and arrays
+a persistent id carries. A baseline fingerprint includes the
 summary, so a file that imports a different callable is a new finding, even when the
 listing is long enough to be cut by the evidence bound. Callables found in the members
 read before a member that failed are still reported. A pickle that imports a callable
@@ -446,9 +475,13 @@ code, or that is cut by a read bound, is reported both ways: the finding for wha
 found, and the file as unread. An extension code counts where a loader reads the bytes
 as a pickle: from the first byte of a file or member named as one (`*.pkl`, `*.pt`,
 `data.pkl`, an object array); in the four pickles that follow a first pickle returning the
-legacy `torch.save` magic number; in a file or member named `.bin`, `.sav`, `.p` or
-`.model` when its stream goes on to a clean STOP, calls what the code named, or imports a
-callable after the code;
+legacy `torch.save` magic number; in a file or member named `.bin`, `.sav`, `.p`, `.model`
+or `.dat`, or a file with no suffix (a member with no suffix is not read this way), when its
+stream after the code reaches a clean `STOP`, calls what the code named, imports a callable
+not on the allowlist under a dotted name, or applies state the rule cannot prove safe in a
+stream that also imports a callable under a dotted name, allowlisted or not (if
+the stream after the code first reaches a size or opcode bound, crosses the end of a frame
+or hides an import's operands, the file or member is reported unread);
 and wherever a pickle opens with a `PROTO` opcode of any protocol. It stays data in a
 tensor storage beside a checkpoint's `data.pkl`, a numeric array, everything after those
 four pickles in a file whose first pickle returns the magic number, whatever the file is

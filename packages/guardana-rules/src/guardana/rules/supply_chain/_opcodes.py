@@ -9,6 +9,7 @@ other argument reader are `pickletools`' own.
 
 import codecs
 import pickletools
+import re
 import warnings
 from collections.abc import Callable, Iterator
 from typing import IO
@@ -16,9 +17,22 @@ from typing import IO
 _NUL = b"\x00"
 _QUOTES = (b"'", b'"')
 _LONG_SUFFIX = b"L"
+_DECIMAL = re.compile(rb"-?(?:0|[1-9][0-9]*)")
 _OPCODES: dict[bytes, pickletools.OpcodeInfo] = {
     op.code.encode("latin-1"): op for op in pickletools.opcodes
 }
+
+
+class SpelledInt(int):
+    """An INT or LONG written so that unpicklers may read different numbers from it.
+
+    C reads `010` as octal where Python refuses it, and stops at a NUL Python reads past, so
+    only a plain decimal is a value every unpickler agrees on.
+    """
+
+
+def _agreed(text: bytes, value: int) -> int:
+    return value if _DECIMAL.fullmatch(text) else SpelledInt(value)
 
 
 def _line(stream: IO[bytes], *, final: bool = False) -> bytes:
@@ -61,8 +75,8 @@ def _read_decimalnl_short(stream: IO[bytes]) -> int:
     if text.startswith(_NUL):
         # strtol reads no digits before a NUL as 0; where the C library does not flag
         # that as an error, the unpickler accepts it.
-        return 0
-    return _as_int(text)
+        return SpelledInt(0)
+    return _agreed(text, _as_int(text))
 
 
 def _read_decimalnl_long(stream: IO[bytes]) -> int:
@@ -70,7 +84,7 @@ def _read_decimalnl_long(stream: IO[bytes]) -> int:
     candidates = (text[: -len(_LONG_SUFFIX)], text) if text.endswith(_LONG_SUFFIX) else (text,)
     for candidate in candidates:
         try:
-            return _as_int(candidate)
+            return _agreed(candidate, _as_int(candidate))
         except ValueError:
             continue
     raise ValueError(f"no unpickler reads an integer from {text[:32]!r}")

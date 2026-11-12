@@ -367,6 +367,14 @@ when listing it would cost more than listing a model. An archive of more than 10
 is reported not scanned (exit <code>2</code>) even when it holds no model, such as an image dataset.
 Exclude it with <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an
 archive), or scan the model's directory instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
+<h3 id="pickled-dtype-layouts-out-of-band-arrays-and-sparse-tensors-are-unverified">Pickled dtype layouts, out-of-band arrays and sparse tensors are unverified</h3>
+<p>Pickles holding <code>numpy</code> dtype fields or subarrays, arrays over out-of-band buffers, or
+sparse tensors, are unverified even when <code>numpy</code> or <code>torch</code> writes them (<code>indeterminate</code>,
+exit <code>2</code>, unless another finding fails the run). scikit-learn decision trees and random
+forests saved with <code>pickle</code> hold such a dtype and retain their <code>CRITICAL</code> import finding.
+Use a format that is not a pickle, such as <code>safetensors</code>, or exclude the file with
+<code>rules.paths_exclude</code>. Load untrusted pickles only with a loader that enforces its own
+allowlist, such as <code>torch.load(..., weights_only=True)</code>.</p>
 <h3 id="monitor-is-scheduled-not-passive"><code>monitor</code> is scheduled, not passive</h3>
 <p>It re-runs checks on an interval. It does not observe production traffic, cannot
 see what your real users are doing, and is not an inline control. Watching live

@@ -1,4 +1,5 @@
 import collections
+import dataclasses
 import hashlib
 import io
 import os
@@ -47,7 +48,20 @@ from guardana.rules.supply_chain._npy import (
     npy_header_span,
     read_npy_header,
 )
-from guardana.rules.supply_chain._opcodes import read_opcodes
+from guardana.rules.supply_chain._opcodes import SpelledInt, read_opcodes
+from guardana.rules.supply_chain._pickle_state import (
+    Global,
+    Items,
+    ListOf,
+    Literal,
+    Made,
+    Notes,
+    Tracked,
+    build,
+    call_result,
+    items_of,
+    readonly_view,
+)
 from guardana.rules.supply_chain._reading import (
     LFS_POINTER_REASON,
     is_lfs_pointer,
@@ -379,6 +393,9 @@ _MAGIC_SNIFF_BYTES = tarfile.BLOCKSIZE
 
 _RULE_ID = "guardana.supply_chain.pickle_opcode"
 _UNSCANNED_TITLE = "Unscanned model file"
+_UNPARSED_RATIONALE = "this member could not be parsed, so nothing in it was cleared"
+_UNPROVEN_RATIONALE = "this state cannot be verified, so this pickle is not proven safe to load"
+_UNPROVEN_SUFFIX = "; not proven safe to load"
 _CROSSED_FRAME_SUMMARY = (
     "pickle read that crosses the end of a frame, where unpicklers resume from different "
     "places; not scanned past it"
@@ -421,10 +438,27 @@ class _Tracked(Enum):
     """What an extension code named, pushed by a machine reading on past the code."""
 
 
-_Value = str | _Tracked | None
+_Value = str | _Tracked | Tracked | None
 # Where each call opcode finds what it calls, counted from the top of the stack; OBJ finds
 # its class right above its MARK, and INST names its class in its argument.
 _CALLABLE_DEPTH = {"REDUCE": 2, "NEWOBJ": 2, "NEWOBJ_EX": 3}
+_TUPLE_SIZES = {"EMPTY_TUPLE": 0, "TUPLE1": 1, "TUPLE2": 2, "TUPLE3": 3}
+_TUPLE_OPS = frozenset({*_TUPLE_SIZES, "TUPLE"})
+_LIST_OPS = frozenset({"EMPTY_LIST", "LIST", "APPEND", "APPENDS"})
+# Each leaves the object it fills on the stack, or for READONLY_BUFFER a read-only view of it.
+_IN_PLACE_OPS = frozenset({"BUILD", "SETITEM", "SETITEMS", "ADDITEMS", "READONLY_BUFFER"})
+_SETITEM_DEPTH = 3
+"""Where SETITEM finds the dict it fills, counted from the top: under its key and its value."""
+_BYTES_OPS = frozenset({"SHORT_BINBYTES", "BINBYTES", "BINBYTES8"})
+_LITERAL_OPS = frozenset(
+    {"NONE", "BYTEARRAY8", *_BOOL_OPS, *_BINARY_INT_OPS, *_TEXT_INT_OPS, *_BYTES_OPS}
+)
+_MAKING_CALLS = frozenset({*_CALLABLE_DEPTH, "OBJ", "INST"})
+_LITERAL_BITS = 64
+"""Bits an integer may have and still be tracked; numpy reads its states into C ints."""
+_BUILD_OPERANDS = 2
+_NONE = Literal(None)
+_BOOLS = {name: Literal(value) for name, value in _BOOL_OPS.items()}
 
 
 def _is_allowed(module: str, qualname: str) -> bool:
@@ -438,6 +472,38 @@ def _is_allowed(module: str, qualname: str) -> bool:
 def _maybe_dangerous(module: str, qualname: str) -> Iterator[str]:
     if not _is_allowed(module, qualname):
         yield f"{module}.{qualname}"
+
+
+_MODULE_ID = "module"
+_STORAGE_ID = "storage"
+_PACKAGE_CALL_ID = "reduce_package"
+
+
+def _persisted(saved_id: _Value) -> _Value:
+    """Return what a loader's `persistent_load` hands back for `saved_id`, as far as known.
+
+    torch's legacy loaders hand back an object the id itself carries: the item after a
+    `"module"` kind, or in the tar format the first item of any tuple. `torch.package` hands
+    back what a call the id names returns. A storage id stands for a storage, which no state
+    check follows. The loaders compare the kind with text, and only text, or what an import
+    made, compares as itself: torch decodes a byte string, an array compares item by item and
+    an object this reading lost may be anything, so an id of any other kind, like an id this
+    reading lost, may stand for any object. Text after a `"module"` kind is not kept, since
+    the tar loader hands back the kind itself instead.
+    """
+    if saved_id is None or saved_id is Made.DERIVED:
+        return Made.DERIVED
+    if not isinstance(saved_id, Items) or not saved_id.items:
+        return None
+    kind = saved_id.items[0]
+    if isinstance(kind, Global):
+        return kind
+    if not isinstance(kind, str) or kind == _PACKAGE_CALL_ID:
+        return Made.DERIVED
+    if kind == _MODULE_ID and len(saved_id.items) > 1:
+        carried = saved_id.items[1]
+        return carried if isinstance(carried, _Tracked | Tracked) else None
+    return None if kind == _STORAGE_ID else kind
 
 
 @dataclass(slots=True)
@@ -492,9 +558,9 @@ class _PickleMachine:
     Every opcode moves the stack by the effect `pickletools` declares for it, so
     STACK_GLOBAL takes the operands an unpickler would. `None` is an object whose
     value is not tracked; a string is kept only while it is the string an unpickler
-    holds, and a `_Tracked` object while it is the object it stands for. MARKs are
-    kept apart from the objects, as the C unpickler keeps them: a pop never reaches
-    below the newest one.
+    holds, a `_Tracked` object while it is the object it stands for, and a `Tracked` one
+    while a state applied to it can be judged. MARKs are kept apart from the objects, as
+    the C unpickler keeps them: a pop never reaches below the newest one.
     """
 
     refs: list[str]
@@ -502,11 +568,21 @@ class _PickleMachine:
     tentative: bool = False
     """Read on past an extension code, pushing an object of unknown value, instead of ending."""
 
+    unproven: list[str] = field(default_factory=list)
+    """Why a state it applies could not be proven safe; see `Notes`."""
+
+    setstates: dict[Global, str] = field(default_factory=dict)
+    """The `__setstate__` of each class a state was applied to; see `Notes`."""
+
     passed: bool = False
     """Whether it read on past an extension code."""
 
-    kept: tuple[int, int] | None = None
-    """The imports and embedded STOPs recorded before the first code it read on past."""
+    imported: bool = False
+    """Whether it imported a callable under a real dotted name, which data rarely spells."""
+
+    kept: tuple[int, int, int] | None = None
+    """The imports, unproven states and embedded STOPs recorded before the first code it
+    read on past."""
 
     returns_legacy_magic: bool = False
     """Whether the last STOP returned the legacy magic number, and nothing was left below it."""
@@ -523,14 +599,18 @@ class _PickleMachine:
         if name in _STRING_OPS:
             self.stack.append(arg if isinstance(arg, str) else None)
         elif name == "STACK_GLOBAL":
-            self._imports(*self._stack_global())
-            self.stack.append(None)
+            module, qualname = self._stack_global()
+            self._imports(module, qualname)
+            self.stack.append(Global(module, qualname, _is_allowed(module, qualname)))
         elif not (self._step_tracked(name, arg) or self._step_marks_and_memo(name, arg)):
             if name in _IMPORTS_BY_ARG and isinstance(arg, str):
                 module, _, qualname = arg.partition(" ")
                 self._imports(module, qualname)
             self._before_effect(name)
+            made = self._made(name, arg)
             self._apply_declared_effect(op)
+            if made is not None:
+                self.stack[-1] = made
 
     def _step_tracked(self, name: str, arg: object) -> bool:
         """Apply an opcode that pushes a `_Tracked` object; return False for any other."""
@@ -567,6 +647,7 @@ class _PickleMachine:
 
     def _imports(self, module: str, qualname: str) -> None:
         self.refs.extend(_maybe_dangerous(module, qualname))
+        self.imported = self.imported or bool(_IDENTIFIER.fullmatch(f"{module}.{qualname}"))
         if self.shape is not None:
             self.shape.named(module, qualname)
 
@@ -660,6 +741,131 @@ class _PickleMachine:
             raise _RefusedError("no container under the items")
         del self.stack[keep:]
 
+    def _above_fence(self, count: int) -> list[_Value] | None:
+        """Return the top `count` objects, when the newest MARK leaves that many to pop."""
+        if len(self.stack) - self._fence() < count:
+            return None
+        return self.stack[len(self.stack) - count :]
+
+    def _marked(self) -> list[_Value] | None:
+        """Return the objects above the newest MARK, when there is one."""
+        return self.stack[self.marks[-1] :] if self.marks else None
+
+    def _notes(self) -> Notes:
+        return Notes(self.refs, self.unproven, self.setstates)
+
+    def _made(self, name: str, arg: object) -> _Value:  # noqa: PLR0911 — one return per opcode kind
+        """Return what opcode `name` pushes, from its operands, when a state check needs it."""
+        if name in _LITERAL_OPS:
+            return self._literal(name, arg)
+        if name == "GLOBAL":
+            return self._global(arg)
+        if name in _TUPLE_OPS:
+            return self._tuple(name)
+        if name in _LIST_OPS:
+            return self._list(name)
+        if name in _MAKING_CALLS:
+            return self._call(name, arg)
+        if name == "BINPERSID":
+            return _persisted(self.stack[-1] if self.stack else None)
+        return self._changed_in_place(name) if name in _IN_PLACE_OPS else None
+
+    def _literal(self, name: str, arg: object) -> Tracked | None:
+        """Return a byte string, or an integer, bool or None every unpickler reads alike."""
+        if name in _BYTES_OPS:
+            return Made.BYTES
+        if name == "BYTEARRAY8":
+            return Made.BYTEARRAY
+        if name == "NONE":
+            return _NONE
+        if name in _BOOL_OPS:
+            return _BOOLS[name]
+        if isinstance(arg, int) and not isinstance(arg, SpelledInt):
+            return Literal(arg) if arg.bit_length() <= _LITERAL_BITS else None
+        return None
+
+    def _global(self, arg: object) -> Tracked | None:
+        if not isinstance(arg, str):
+            return None
+        module, _, qualname = arg.partition(" ")
+        return Global(module, qualname, _is_allowed(module, qualname))
+
+    def _tuple(self, name: str) -> Tracked | None:
+        size = _TUPLE_SIZES.get(name)
+        items = self._marked() if size is None else self._above_fence(size)
+        return None if items is None else items_of(items)
+
+    def _list(self, name: str) -> Tracked | None:
+        """Return a new list, or the list APPEND or APPENDS adds to, counting what they add.
+
+        Any other object they add to stays what it was.
+        """
+        if name == "EMPTY_LIST":
+            return ListOf()
+        mark = self.marks[-1] if self.marks else None
+        if name == "LIST":
+            return None if mark is None else ListOf(len(self.stack) - mark)
+        if name == "APPEND":
+            # The list under the item, reached past any MARK as for `_UNFENCED_OPS`.
+            target, added = (self.stack[-2], 1) if len(self.stack) >= _BUILD_OPERANDS else (None, 0)
+        else:
+            target, added = (self.stack[mark - 1], len(self.stack) - mark) if mark else (None, 0)
+        if not isinstance(target, ListOf):
+            return target if isinstance(target, Tracked) else None
+        target.count += added
+        return target
+
+    def _changed_in_place(self, name: str) -> Tracked | None:
+        """Return the object an `_IN_PLACE_OPS` opcode leaves on the stack, as what it was.
+
+        A state applied to it later is judged as one applied to that object.
+        """
+        if name == "BUILD":
+            return self._build()
+        if name == "READONLY_BUFFER":
+            operand = self._above_fence(1)
+            if operand is None:
+                # An unpickler refuses a view with no object above the newest MARK.
+                return None
+            target = operand[0]
+            readonly_view(target, self._notes())
+        elif name == "SETITEM":
+            # The dict under its key and value, reached past any MARK as for `_UNFENCED_OPS`.
+            target = self.stack[-_SETITEM_DEPTH] if len(self.stack) >= _SETITEM_DEPTH else None
+        else:
+            mark = self.marks[-1] if self.marks else 0
+            target = self.stack[mark - 1] if mark else None
+        return target if isinstance(target, Tracked) else None
+
+    def _call(self, name: str, arg: object) -> Tracked | None:
+        """Return what a call opcode makes, judging any state the call itself sets."""
+        func, args = self._callee(name, arg)
+        return call_result(func, args, self._notes(), keywords=name == "NEWOBJ_EX")
+
+    def _callee(self, name: str, arg: object) -> tuple[_Value, _Value]:
+        """Return what a call opcode calls and the tuple of arguments it passes, if tracked."""
+        depth = _CALLABLE_DEPTH.get(name)
+        if depth is not None:
+            operands = self._above_fence(depth)
+            return (operands[0], operands[1]) if operands else (None, None)
+        marked = self._marked()
+        # INST and OBJ take their operands from the newest MARK, and OBJ its class too: an
+        # unpickler refuses either without them before it calls anything.
+        if marked is None or (name == "OBJ" and not marked):
+            return None, None
+        if name == "INST":
+            return self._global(arg), items_of(marked)
+        return marked[0], items_of(marked[1:])
+
+    def _build(self) -> Tracked | None:
+        """Judge the state BUILD applies, and keep the object it applies it to."""
+        operands = self._above_fence(_BUILD_OPERANDS)
+        if operands is None:
+            return None
+        target, state = operands
+        build(target, state, self._notes())
+        return target if isinstance(target, Tracked) else None
+
 
 class _AsPickle(Enum):
     """Where an extension code in a byte stream is one an unpickler would resolve."""
@@ -734,22 +940,30 @@ _UNFOLLOWED_ENDS = frozenset({ParseEnd.UNRESOLVABLE, ParseEnd.CROSSED_FRAME, Par
 
 
 def _unproven_pickle(scan: "_OpcodeScan") -> bool:
-    """Whether a stream ended where a pickle hides an operand, crosses a frame or uses a code."""
-    return scan.end in {ParseEnd.CROSSED_FRAME, ParseEnd.EXTENSION} or (
-        scan.end is ParseEnd.UNRESOLVABLE and not scan.short_stack
+    """Whether a pickle hides an operand, crosses a frame, uses a code or applies a state.
+
+    The state is one this rule cannot prove safe.
+    """
+    return (
+        bool(scan.unproven)
+        or scan.end in {ParseEnd.CROSSED_FRAME, ParseEnd.EXTENSION}
+        or (scan.end is ParseEnd.UNRESOLVABLE and not scan.short_stack)
     )
 
 
 def _bin_verdict(head: bytes, scan: "_OpcodeScan", *, cut: bool) -> bool | None:
     """Whether a file of no known format is a pickle: True, False, or None to read on.
 
-    A pickle of protocol 2 to 5 says so in its first two bytes. One without that header is
-    taken for a pickle when it imports a callable with a real dotted name, or hides the
-    operands of an import, because a few random bytes in a thousand parse as some
-    opcode stream and those end on a short stack instead.
+    A pickle of protocol 2 to 5 says so in its first two bytes, and stays one when an
+    unpickler would refuse it past a flagged import or a state this rule cannot prove,
+    because a load runs those before it refuses. One without that header is taken for a
+    pickle when it imports a callable with a real dotted name, hides the operands of an
+    import, or applies such a state beside an import with a real dotted name, because a few
+    random bytes in a thousand parse as some opcode stream, and those end on a short stack
+    or apply a state without spelling an import.
     """
     if head.startswith(_PICKLE_HEADERS):
-        return scan.end is not ParseEnd.NOT_PICKLE or bool(scan.refs)
+        return scan.end is not ParseEnd.NOT_PICKLE or bool(scan.refs or scan.unproven)
     if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs) or _unproven_pickle(scan):
         return True
     if scan.end is ParseEnd.RAN_OUT and cut:
@@ -803,6 +1017,9 @@ class _OpcodeScan:
     short_stack: bool = False
     """Whether an `UNRESOLVABLE` end came from too few operands rather than hidden ones."""
 
+    unproven: tuple[str, ...] = ()
+    """Why a state a pickle in it applies could not be proven safe; see `Notes`."""
+
     @property
     def truncated(self) -> bool:
         """Whether the stream failed to end cleanly, for any reason."""
@@ -832,8 +1049,13 @@ def _scan_opcodes(
     magic number, and, but for
     `RAW` bytes and the storage bytes after those four, wherever a stream opens with a
     PROTO opcode. Elsewhere it is data.
+
+    A state this rule cannot prove safe counts from a pickle a loader reads (the first of a
+    stream named as one, and the four after the legacy magic number) and from one that opens
+    with a PROTO opcode; elsewhere only beside an import with a real dotted name.
     """
     refs: list[str] = []
+    unproven: list[str] = []
     stream = io.BytesIO(data)
     fork_budget = budget or _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + len(data))
     starts = _Starts(len(data))
@@ -856,6 +1078,10 @@ def _scan_opcodes(
             tentative=ordinal == 0 and as_pickle is _AsPickle.SNIFFED and not headed,
         )
         one = _scan_one(stream, machine, fork_budget if forked else budget)
+        if named or headed or machine.imported:
+            # Tensor values and other data can parse as a view or a state, but not as an
+            # import with a real dotted name.
+            unproven.extend(reason for reason in machine.unproven if reason not in unproven)
         if one.end is ParseEnd.EXTENSION and not (named or headed or machine.passed):
             one.end = ParseEnd.NOT_PICKLE
         if (
@@ -870,10 +1096,7 @@ def _scan_opcodes(
             # restarts there would.
             starts.add(stop, forked=True)
         if one.end is not ParseEnd.COMPLETE:
-            trailing_data = one.end is ParseEnd.NOT_PICKLE or (
-                one.end is ParseEnd.UNRESOLVABLE and one.short_stack
-            )
-            if not (after_complete and trailing_data):
+            if not (after_complete and _ends_as_data(one)):
                 starts.ended(one.end, short_stack=one.short_stack)
             continue
         after = stream.tell()
@@ -884,7 +1107,7 @@ def _scan_opcodes(
             # A STOP inside a frame: an unpickler that read the whole frame from the file
             # resumes at its end, one that buffers ahead resumes after the STOP.
             starts.frame(one.frame_end)
-    return _OpcodeScan(refs, starts.worst[0], short_stack=starts.worst[1])
+    return _OpcodeScan(refs, starts.worst[0], short_stack=starts.worst[1], unproven=tuple(unproven))
 
 
 @dataclass(slots=True)
@@ -962,6 +1185,11 @@ class _OneScan:
     """Where each STOP that ended a pickle read in the middle of this one falls."""
 
 
+def _ends_as_data(one: _OneScan) -> bool:
+    """Whether a read ended as bytes that are no pickle end: refused, or short of operands."""
+    return one.end is ParseEnd.NOT_PICKLE or (one.end is ParseEnd.UNRESOLVABLE and one.short_stack)
+
+
 def _step(
     machine: _PickleMachine, op: pickletools.OpcodeInfo, arg: object, *, stops: int
 ) -> _OneScan | None:
@@ -973,7 +1201,7 @@ def _step(
     try:
         machine.step(op, arg)
         if machine.passed and machine.kept is None:
-            machine.kept = (len(machine.refs), stops)
+            machine.kept = (len(machine.refs), len(machine.unproven), stops)
     except _ExtensionCodeError:
         return _OneScan(ParseEnd.EXTENSION)
     except _RefusedError:
@@ -997,9 +1225,11 @@ def _scan_one(
     With `embedded`, a STOP that leaves objects below it ends a pickle a loader read in the
     middle of this one, as joblib reads an object array, and this one is read on past it.
     A `tentative` machine that read on past an extension code ends `EXTENSION` when the
-    pickle reaches a clean STOP, calls what the code named, or imports a callable with a
-    real dotted name after the code; otherwise it ends where the code stood, as bytes that
-    are no pickle, and keeps nothing it read after it.
+    pickle reaches a clean STOP, calls what the code named, or after the code imports a
+    callable with a real dotted name, or applies a state it cannot prove safe in a pickle
+    that imports one. Otherwise it keeps nothing it read after the code, and ends where the
+    code stood, as bytes that are no pickle, when the read was refused or ran short of
+    operands as such bytes do; any other end stands.
     """
     one = _read_one(stream, machine, budget, embedded=embedded)
     if not machine.passed or machine.kept is None:
@@ -1009,13 +1239,20 @@ def _scan_one(
         # code named, which an unpickler does before whatever breaks the stream later.
         one.end = ParseEnd.EXTENSION
         return one
-    refs, stops = machine.kept
-    if any(_IDENTIFIER.fullmatch(ref) for ref in machine.refs[refs:]):
-        # An import with a real dotted name past the code is no accident of random bytes,
-        # and an unpickler imports it before it reaches whatever breaks the stream.
+    refs, unproven, stops = machine.kept
+    if (machine.imported and machine.unproven[unproven:]) or any(
+        _IDENTIFIER.fullmatch(ref) for ref in machine.refs[refs:]
+    ):
+        # An import with a real dotted name past the code, or a state it cannot prove safe in
+        # a pickle that imports one, is no accident of random bytes, and an unpickler
+        # reaches it before whatever breaks the stream.
         one.end = ParseEnd.EXTENSION
         return one
     del machine.refs[refs:]
+    if not _ends_as_data(one):
+        # A read that ran out, crossed a frame or met hidden operands may have stopped
+        # short of what shows the code was real.
+        return _OneScan(one.end, embedded=one.embedded[:stops])
     return _OneScan(ParseEnd.NOT_PICKLE, embedded=one.embedded[:stops])
 
 
@@ -1084,6 +1321,9 @@ class _LegacyWalk:
     cut: bool = False
     """Whether a pickle or raw region torch reads runs past the bytes read, which were cut."""
 
+    unproven: tuple[str, ...] = ()
+    """Why a state one of its pickles applies could not be proven safe; see `Notes`."""
+
 
 class _WalkEnd(Exception):  # noqa: N818 - ends a walk, carrying its result; not an error
     """Raised where the walk of a legacy member ends, with what it established."""
@@ -1107,6 +1347,7 @@ class _LegacyReader:
         self.budget = budget
         self.cut = cut
         self.refs: list[str] = []
+        self.unproven: list[str] = []
 
     def walk(self, *, storages: bool) -> None:
         """Read the member as torch does; raise `_WalkEnd` wherever that stops early."""
@@ -1129,7 +1370,8 @@ class _LegacyReader:
     def pickle(self) -> _Shape:
         """Read the next pickle and what it is; a pickle that does not end cleanly ends the walk."""
         shape = _Shape()
-        one = _scan_one(self.stream, _PickleMachine(self.refs, shape), self.budget, embedded=False)
+        machine = _PickleMachine(self.refs, shape, unproven=self.unproven)
+        one = _scan_one(self.stream, machine, self.budget, embedded=False)
         end, frame_end = one.end, one.frame_end
         if end is not ParseEnd.COMPLETE:
             raise _WalkEnd(_LegacyWalk(self.refs, end, cut=self.cut and end is ParseEnd.RAN_OUT))
@@ -1188,8 +1430,10 @@ def _walk_legacy(data: bytes, budget: _OpcodeBudget, *, storages: bool, cut: boo
     try:
         reader.walk(storages=storages)
     except _WalkEnd as end:
-        return end.walk
-    return _LegacyWalk(reader.refs)
+        walk = end.walk
+    else:
+        walk = _LegacyWalk(reader.refs)
+    return dataclasses.replace(walk, unproven=tuple(reader.unproven))
 
 
 def _member_suffix(member: str) -> str:
@@ -1448,7 +1692,14 @@ class _FileReport:
         """Keep the callables one stream imports."""
         self.imports.update((ref, member) for ref in refs)
 
-    def unscanned(self, summary: str) -> None:
+    def unproven(self, reasons: Iterable[str], member: str | None = None) -> None:
+        """Keep each state a stream applies that could not be proven safe, as unscanned."""
+        for reason in reasons:
+            where = "pickle" if member is None else f"{self.container} member"
+            named = "" if member is None else f" ({member})"
+            self.unscanned(f"{where} {reason}{named}{_UNPROVEN_SUFFIX}", _UNPROVEN_RATIONALE)
+
+    def unscanned(self, summary: str, rationale: str = _UNPARSED_RATIONALE) -> None:
         """Keep an inconclusive finding, and name the file as an unread component."""
         self.ctx.shortfall(unread_component(_RULE_ID, self.path, summary))
         self.unread.append(
@@ -1462,9 +1713,7 @@ class _FileReport:
                 ),
                 target_ref=str(self.path),
                 evidence=Evidence(summary=summary, detail=f"file={self.path.name}"),
-                verdict=unscanned_verdict(
-                    "this member could not be parsed, so nothing in it was cleared"
-                ),
+                verdict=unscanned_verdict(rationale),
             )
         )
 
@@ -1509,7 +1758,13 @@ class PickleOpcodeRule(ArtifactRule):
     and an opcode budget shared by its members, a plain zip's members not named as models
     are peeked at up to a count and a byte bound, and one that declares more entries, a
     larger zip central directory or larger tar extended headers than its bounds is refused
-    before it is opened. A file gets one finding naming every callable it imports.
+    before it is opened. Checks state applied by `BUILD` and torch's `_rebuild_from_type_v2`,
+    object-array item counts, and the dtype of an array `numpy.ndarray` lays over a buffer.
+    Reports a state numpy applies unchecked but never writes, or one set on an allowlisted
+    class, naming the call that applies it. State it cannot
+    judge, including dtype layouts with fields or subarrays and sparse tensors, becomes an
+    unverified result and a coverage shortfall; reading continues to find later callables.
+    A file gets one finding naming every callable it imports.
     Anything it cannot fully parse, or stops reading at a bound, becomes a visible
     unverified result and a coverage shortfall, never a silent clean.
     """
@@ -1979,6 +2234,7 @@ class PickleOpcodeRule(ArtifactRule):
         `cut_summary` describes the bound the stream was cut at, when it was.
         """
         report.found(scan.refs)
+        report.unproven(scan.unproven)
         # Callables found first do not clear what comes after them: an unpickler runs
         # every opcode up to the one it refuses, and an unread tail is never refused.
         if cut_summary is not None:
@@ -2325,6 +2581,7 @@ class PickleOpcodeRule(ArtifactRule):
             walk = _walk_legacy(member_data, budget, storages=layout, cut=cut)
             return self._report_legacy_member(report, name, scan, walk, budget)
         report.found(scan.refs, name)
+        report.unproven(scan.unproven, name)
         if scan.end is ParseEnd.OVER_BUDGET:
             report.unscanned(self._over_budget(report, budget, name))
         elif (
@@ -2404,6 +2661,7 @@ class PickleOpcodeRule(ArtifactRule):
         """
         report.found(scan.refs, name)
         report.found(walk.refs, name)
+        report.unproven(dict.fromkeys((*scan.unproven, *walk.unproven)), name)
         if ParseEnd.OVER_BUDGET in (scan.end, walk.end):
             report.unscanned(self._over_budget(report, budget, name))
             return True
@@ -2447,6 +2705,7 @@ class PickleOpcodeRule(ArtifactRule):
             return False
         scan = _scan_opcodes(data[header.data_offset :], budget, as_pickle=_AsPickle.NAMED)
         report.found(scan.refs, name)
+        report.unproven(scan.unproven, name)
         if scan.end is ParseEnd.OVER_BUDGET:
             report.unscanned(self._over_budget(report, budget, name))
             return True
