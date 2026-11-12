@@ -114,12 +114,13 @@ def test_a_refused_credential_stops_the_run_with_the_credential_remedy(status: i
     with pytest.raises(HTTPError) as raised:
         _conversation(_answering(status, b"no"), credential=CREDENTIAL)
 
-    assert raised.value.code == status
-    assert failure_scope(raised.value) is FailureScope.TARGET
-    said = describe_failure(
-        raised.value, ROUTABLE, MessageQuoting.of(RedactionPolicy()), FailureRemedies(auth="X")
-    )
-    assert said.endswith("X")
+    with raised.value as error:
+        assert error.code == status
+        assert failure_scope(error) is FailureScope.TARGET
+        said = describe_failure(
+            error, ROUTABLE, MessageQuoting.of(RedactionPolicy()), FailureRemedies(auth="X")
+        )
+        assert said.endswith("X")
 
 
 @pytest.mark.parametrize("status", [200, 400, 500])
@@ -144,9 +145,10 @@ def test_a_status_every_request_would_meet_stops_the_run(status: int) -> None:
     with pytest.raises(HTTPError) as raised:
         _conversation(_answering(status, b"busy"))
 
-    assert raised.value.code == status
-    assert failure_scope(raised.value) is FailureScope.TARGET
-    assert raised.value.read() == b"busy"
+    with raised.value as error:
+        assert error.code == status
+        assert failure_scope(error) is FailureScope.TARGET
+        assert error.read() == b"busy"
 
 
 @pytest.mark.parametrize("status", [400, 405, 409, 422])
@@ -154,8 +156,9 @@ def test_another_client_error_is_the_requests_failure(status: int) -> None:
     with pytest.raises(ConversationRefused) as raised:
         _conversation(_answering(status, b"bad request"))
 
-    assert raised.value.code == status
-    assert failure_scope(raised.value) is FailureScope.REQUEST
+    with raised.value as error:
+        assert error.code == status
+        assert failure_scope(error) is FailureScope.REQUEST
 
 
 @pytest.mark.parametrize(
@@ -192,7 +195,8 @@ def test_a_request_scoped_failure_is_remembered_rather_than_sent_again() -> None
     for _ in range(3):
         with pytest.raises(ConversationRefused) as raised:
             target.list_tools()
-        assert raised.value.read() == b"bad request"
+        with raised.value as error:
+            assert error.read() == b"bad request"
 
     assert sent == ["server/discover", "initialize"]
 
@@ -237,8 +241,9 @@ def test_a_second_expired_session_stops_the_run() -> None:
     with pytest.raises(HTTPError) as raised:
         target.list_tools()
 
-    assert raised.value.code == 404
-    assert failure_scope(raised.value) is FailureScope.TARGET
+    with raised.value as error:
+        assert error.code == 404
+        assert failure_scope(error) is FailureScope.TARGET
 
 
 # --- Negotiation falls back on whatever its probe meets, except a spent budget. ---
