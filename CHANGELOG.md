@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Support Python 3.14 across all five packages (#328).** MCP tests now close the HTTP error responses they inspect because Python 3.14 warns when an open response is reclaimed. CI tests Python 3.14, and the CLI and collector images use the matching Python base. The minimum Python version remains 3.11.
+
 ## [1.2.2] - 2026-11-09 — the fourth patch release
 
 ### Changed
