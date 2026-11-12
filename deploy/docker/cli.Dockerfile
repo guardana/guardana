@@ -9,7 +9,7 @@
 # Two stages so the shipped image carries no build tooling, and a non-root user
 # because a scanner reads other people's code and never needs to own it.
 
-FROM python:3.13-slim-bookworm@sha256:281d39ff02e3b389401586134ff9e6572954687822a58055ec07a60ded4e0b7f AS builder
+FROM python:3.14-slim-bookworm@sha256:3fe1a0b6c2d6b2ebb572906cdabeca75aeb558c0c17db5ffefbcf8094871c32b AS builder
 
 WORKDIR /src
 COPY deploy/docker/build-requirements.txt deploy/docker/cli-requirements.txt ./
@@ -44,7 +44,7 @@ RUN python -m venv /opt/build \
         -r /src/wheel-hashes.txt \
     && /opt/guardana/bin/pip check
 
-FROM python:3.13-slim-bookworm@sha256:281d39ff02e3b389401586134ff9e6572954687822a58055ec07a60ded4e0b7f
+FROM python:3.14-slim-bookworm@sha256:3fe1a0b6c2d6b2ebb572906cdabeca75aeb558c0c17db5ffefbcf8094871c32b
 
 ARG VERSION=0.0.0
 LABEL org.opencontainers.image.title="guardana" \

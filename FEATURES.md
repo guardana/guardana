@@ -200,7 +200,7 @@ without guessing from a short id.
 
 ## Integrations and packaging
 
-- Python 3.11–3.13 and five separately installable distributions.
+- Python 3.11–3.14 and five separately installable distributions.
 - A SHA-pinned GitHub Action and generic JSON, SARIF, JUnit, and human output.
 - CI examples for GitHub, GitLab, Jenkins, and Azure DevOps.
 - Multi-architecture CLI and collector containers. Their dependencies are the
@@ -211,7 +211,7 @@ without guessing from a short id.
 - JSON Schemas for saved runs, plans, comparisons, traces, recordings, suite datasets, recipes,
   recipe locks, recipe artifacts, fixtures files, pack manifests, pack locks, profiles and the collector envelope, served at the URL each
   `$id` names under `https://guardana.dev/schemas/`. The profile schema is [`schemas/profile-v1.schema.json`](schemas/profile-v1.schema.json); the envelope schema is [`schemas/collector-envelope-v8.schema.json`](schemas/collector-envelope-v8.schema.json).
-- [`docs/generated/api-surface.json`](docs/generated/api-surface.json) records the supported Python, CLI, output, locator, Action and `GUARDANA_*` surface. The docs check rejects drift, and the file is identical on Python 3.11, 3.12 and 3.13. [`docs/generated/compatibility-matrix.md`](docs/generated/compatibility-matrix.md) records what each published minor release carried. [`docs/compatibility.md`](docs/compatibility.md) states the 1.0 compatibility and deprecation policy; `scripts/release.py` rejects a release candidate with an unrecorded surface change.
+- [`docs/generated/api-surface.json`](docs/generated/api-surface.json) records the supported Python, CLI, output, locator, Action and `GUARDANA_*` surface. The docs check rejects drift, and the file is identical across the Python versions in CI. [`docs/generated/compatibility-matrix.md`](docs/generated/compatibility-matrix.md) records what each published minor release carried. [`docs/compatibility.md`](docs/compatibility.md) states the 1.0 compatibility and deprecation policy; `scripts/release.py` rejects a release candidate with an unrecorded surface change.
 - Stored documents from published releases 0.2.0 through 1.2.0 are read by current tests. They include runs, collector envelopes, profiles, pack manifests and locks, and datasets; `run migrate` and `diff` read the runs; `load_verification` reads every run except those of schema 1, which records no gate. [`scripts/capture_historical_documents.py`](scripts/capture_historical_documents.py) produces them, and [`historical/releases.json`](packages/guardana-core/tests/historical/releases.json) records their versions.
 
 ## Extension surface

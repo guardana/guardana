@@ -23,7 +23,7 @@ You can add Guardana to an existing repository and pipeline in the order below. 
 
 ## 1. Install
 
-You need Python `3.11`, `3.12` or `3.13`. The distribution is `guardana-cli`; the command is `guardana`. Pick one launcher and use it for every later command. The examples below use `guardana` from an active environment; in a uv project, use `uv run guardana`. Without installing, keep the full `uvx --from guardana-cli guardana` prefix because it leaves `guardana` off `PATH`.
+Use a [supported version of Python](install.md). The distribution is `guardana-cli`; the command is `guardana`. Pick one launcher and use it for every later command. The examples below use `guardana` from an active environment; in a uv project, use `uv run guardana`. Without installing, keep the full `uvx --from guardana-cli guardana` prefix because it leaves `guardana` off `PATH`.
 
 ```bash
 # In an active environment:

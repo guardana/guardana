@@ -19,7 +19,7 @@ updates:
           - "github/codeql-action*"
 
   # The images' base layer is a dependency like any other, and it is the one
-  # nobody remembers: a `python:3.13-slim-bookworm` pinned once ages quietly while
+  # nobody remembers: a `python:3.14-slim-bookworm` pinned once ages quietly while
   # every Python dependency around it stays current.
   - package-ecosystem: "docker"
     directory: "/deploy/docker"
@@ -31,7 +31,7 @@ updates:
     # matrix. A newer base image arrives together with that matrix entry.
     ignore:
       - dependency-name: "python"
-        versions: [">= 3.14"]
+        versions: [">= 3.15"]
 
   # Dependabot supports uv workspaces natively (resolves the root
   # pyproject.toml + uv.lock across all packages/* members). If a Dependabot

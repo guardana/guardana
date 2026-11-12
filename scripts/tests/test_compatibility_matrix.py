@@ -12,7 +12,7 @@ import pytest
 
 import generate_docs
 
-_THIS_TREE = "| this tree | 3.11, 3.12, 3.13 | "
+_THIS_TREE = "| this tree | 3.11, 3.12, 3.13, 3.14 | "
 
 
 def _kind(version: int | None, *, produced: bool = True) -> dict[str, object]:

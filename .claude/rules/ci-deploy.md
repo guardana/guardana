@@ -10,7 +10,7 @@ paths:
 - **Every action is pinned by commit SHA** with a version comment, and every workflow declares
   least-privilege `permissions`. A too-wide token never fails a build, which is why it is
   written down instead of defaulted.
-- **`ci.yml` runs on every push and PR**: the gate on three Python versions against a real
+- **`ci.yml` runs on every push and PR**: the gate on four Python versions against a real
   PostgreSQL (`GUARDANA_REQUIRE_POSTGRES=1` — the skip is a failure there), `uv audit`, the
   dogfood scan, the two container images, the clean-install check, the SBOM check and one
   isolated suite per example package. `scripts/ci_local.sh` mirrors it; keep them in step in the

@@ -22,7 +22,7 @@ docker run --rm ghcr.io/guardana/guardana:<version>@sha256:<digest> --version
 Keep the tag beside the digest so a reader still sees the version. Updating then means
 changing both in one review.
 
-Both are built from `python:3.13-slim-bookworm` in two stages, so the shipped
+Both are built from `python:3.14-slim-bookworm` in two stages, so the shipped
 image carries no build tooling, and both run as **uid 10001**, not root. Each
 release pushes `linux/amd64` and `linux/arm64`, with an SBOM and a signed
 provenance attestation attached in the registry.

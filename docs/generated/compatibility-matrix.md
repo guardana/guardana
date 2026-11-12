@@ -15,7 +15,7 @@ One row per minor release, from its newest patch, as that release wrote its docu
 
 | Release | Python | Run schema | Envelope | Pack manifest | Lock | Profile | Extension API | Output API |
 |---|---|---|---|---|---|---|---|---|
-| this tree | 3.11, 3.12, 3.13 | 19 | 8 | 3 | 3 | 1 | 2 | 1 |
+| this tree | 3.11, 3.12, 3.13, 3.14 | 19 | 8 | 3 | 3 | 1 | 2 | 1 |
 | 1.2.0 | 3.11, 3.12, 3.13 | 19 | 8 | 2 | 2 | — | 2 | 1 |
 | 1.1.0 | 3.11, 3.12, 3.13 | 18 | 8 | 2 | 2 | — | 2 | 1 |
 | 1.0.2 | 3.11, 3.12, 3.13 | 18 | 8 | 2 | 2 | — | 2 | 1 |

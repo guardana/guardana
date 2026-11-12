@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     # The collector's tests need a real PostgreSQL. They skip without one, so that
     # a contributor changing a rule does not have to run a database — and
