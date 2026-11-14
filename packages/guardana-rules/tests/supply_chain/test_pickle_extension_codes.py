@@ -23,6 +23,7 @@ import pytest
 from guardana.core.report import ShortfallKind
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain import pickle_opcode
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule
 
 _EXTENSION_CODES = {
@@ -44,9 +45,9 @@ def _stream(code: bytes) -> bytes:
     return b"\x80\x02" + code + b"."
 
 
-def _zip(members: dict[str, bytes]) -> bytes:
+def _zip(members: dict[str, bytes], compression: int = zipfile.ZIP_STORED) -> bytes:
     buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
+    with zipfile.ZipFile(buffer, "w", compression) as archive:
         for name, data in members.items():
             archive.writestr(name, data)
     return buffer.getvalue()
@@ -208,6 +209,15 @@ def test_tensor_bytes_after_a_complete_pickle_stay_data_when_they_hold_an_extens
     findings, ctx = _run(
         tmp_path, "checkpoint.tar", _tar({"pickle": pickle.dumps({}, protocol=2) + trailing})
     )
+
+    assert findings == []
+    assert _unread(ctx) == []
+
+
+def test_bytes_after_a_complete_pickle_that_run_short_of_operands_stay_data(
+    tmp_path: Path,
+) -> None:
+    findings, ctx = _run(tmp_path, "model.pkl", pickle.dumps({}, protocol=2) + b"\x93")
 
     assert findings == []
     assert _unread(ctx) == []
@@ -659,6 +669,78 @@ def test_a_sniffed_stream_that_never_calls_what_an_extension_code_named_stays_qu
     tmp_path: Path, stream: bytes
 ) -> None:
     findings, ctx = _run(tmp_path, "model.p", stream)
+
+    assert findings == []
+    assert _unread(ctx) == []
+
+
+@pytest.mark.parametrize("later", [{}, {"z.pkl": b"\x80\x02N."}], ids=["alone", "before-another"])
+def test_a_sniffed_member_that_outlasts_the_archive_bound_past_an_extension_code_is_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, later: dict[str, bytes]
+) -> None:
+    """Opcodes past the code that outlast the bound may hide what shows the code was real."""
+    monkeypatch.setattr(pickle_opcode, "_ARCHIVE_OPCODE_FLOOR", 2000)
+    member = b"\x82\x01" + b"N0" * 3000 + b"cos\nsystem\n."
+    archive = _zip({"weights.bin": member, **later}, zipfile.ZIP_DEFLATED)
+
+    findings, ctx = _run(tmp_path, "bundle.zip", archive)
+
+    assert findings == [
+        (
+            _UNSCANNED,
+            f"zip members hold more than {2000 + len(archive)} pickle opcodes, the bound for "
+            "an archive of this size; weights.bin and the members after it not scanned",
+        )
+    ]
+    assert _unread(ctx) == [str(tmp_path / "bundle.zip")]
+
+
+def test_a_sniffed_file_whose_import_lies_past_its_first_bytes_is_read_on_past_a_code(
+    tmp_path: Path,
+) -> None:
+    """The bytes read to sniff a file can end before the import that shows a pickle."""
+    filler = b"N0" * (pickle_opcode._BIN_PROBE_BYTES // 2)
+    content = b"\x82\x01" + filler + b"cos\nsystem\n."
+
+    findings, ctx = _run(tmp_path, "weights.bin", content)
+
+    critical = "Dangerous pickle opcode (arbitrary code on load)"
+    assert [title for title, _summary in findings] == [critical, _UNSCANNED]
+    assert _unread(ctx) == [str(tmp_path / "weights.bin")]
+
+
+_HIDDEN_PAST_A_CODE = {
+    "crossed-frame": b"\x82\x010\x95" + (2).to_bytes(8, "little") + b"cos\nsystem\n(Vid\ntR.",
+    "hidden-operands": b"\x82\x01N\x93.",
+}
+
+
+_READ_BY_CONTENT: dict[str, tuple[str, _Wrap]] = {
+    "bin": ("weights.bin", lambda stream: stream),
+    "dat": ("weights.dat", lambda stream: stream),
+    "no-suffix": ("weights", lambda stream: stream),
+    "zip-member": ("bundle.zip", lambda stream: _zip({"weights.bin": stream})),
+}
+
+
+@pytest.mark.parametrize("stream", _HIDDEN_PAST_A_CODE.values(), ids=_HIDDEN_PAST_A_CODE)
+@pytest.mark.parametrize(("name", "wrap"), _READ_BY_CONTENT.values(), ids=_READ_BY_CONTENT)
+def test_a_sniffed_stream_that_hides_what_follows_an_extension_code_is_unscanned(
+    tmp_path: Path, name: str, wrap: _Wrap, stream: bytes
+) -> None:
+    """A frame the stream crosses, or an import whose operands it hides, past the code."""
+    findings, ctx = _run(tmp_path, name, wrap(stream))
+
+    assert [title for title, _summary in findings] == [_UNSCANNED]
+    assert _unread(ctx) == [str(tmp_path / name)]
+
+
+@pytest.mark.parametrize(("name", "wrap"), _READ_BY_CONTENT.values(), ids=_READ_BY_CONTENT)
+def test_a_sniffed_stream_whose_import_after_an_extension_code_lacks_operands_stays_data(
+    tmp_path: Path, name: str, wrap: _Wrap
+) -> None:
+    """Random bytes end this way, and an unpickler refuses the stream there."""
+    findings, ctx = _run(tmp_path, name, wrap(b"\x82\x01\x93" + bytes(range(256))))
 
     assert findings == []
     assert _unread(ctx) == []
