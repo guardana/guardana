@@ -5,9 +5,13 @@ unpickled by `torch.load`; a plain archive is extracted by a person who then loa
 member by its name. Every archive here is built in code; nothing is unpickled.
 """
 
+import gzip
 import io
+import stat
+import struct
 import tarfile
 import zipfile
+import zlib
 from pathlib import Path
 
 import pytest
@@ -288,3 +292,183 @@ def test_a_tar_that_ends_where_its_last_member_does_is_read_whole(
     assert titles == []
     assert list(ctx.shortfalls()) == []
     assert str(tmp_path / "bundle.tar") in ctx.examined_paths()
+
+
+def _zip_over_a_tar(tar: bytes) -> bytes:
+    """A zip whose one stored entry, at byte 0, holds `tar`, after a first block that is both
+    the entry's local header and a tar header."""
+    name = b"readme.txt"
+    extra = tarfile.BLOCKSIZE - 30 - len(name)
+    crc = zlib.crc32(tar)
+    local = struct.pack(
+        "<4s5H3L2H", b"PK\x03\x04", 20, 0, 0, 0, 0x21, crc, len(tar), len(tar), len(name), extra
+    )
+    block = bytearray(tarfile.TarInfo("x").tobuf(tarfile.USTAR_FORMAT))
+    block[:44] = local + name + struct.pack("<HH", 0xCAFE, extra - 4)
+    block[148:156] = b" " * 8
+    block[148:156] = b"%06o\x00 " % sum(block)
+    central = (
+        struct.pack(
+            "<4s6H3L5H2L",
+            b"PK\x01\x02",
+            20,
+            20,
+            0,
+            0,
+            0,
+            0x21,
+            crc,
+            len(tar),
+            len(tar),
+            len(name),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+        + name
+    )
+    end = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 1, 1, len(central), len(block) + len(tar), 0)
+    return bytes(block) + tar + central + end
+
+
+@pytest.mark.parametrize("name", ["bundle.tar", "bundle.zip", "bundle", "bundle.dat"])
+def test_a_zip_whose_first_block_is_a_tar_header_is_read_as_a_tar_too(
+    tmp_path: Path, name: str
+) -> None:
+    """`tar` unpacks a tar from bytes that open as one, whatever zip they also hold."""
+    content = _zip_over_a_tar(_tar(("model.pkl", _SYSTEM)))
+    assert [info.filename for info in zipfile.ZipFile(io.BytesIO(content)).infolist()] == [
+        "readme.txt"
+    ]
+
+    _titles, details, ctx = _run(tmp_path, name, content)
+
+    assert f"os.system in {name}::model.pkl" in details
+    assert str(tmp_path / name) in ctx.examined_paths()
+
+
+def test_a_plain_zip_after_a_tar_is_read_as_the_tar_too(tmp_path: Path) -> None:
+    buffer = io.BytesIO(_tar(("model.pkl", _SYSTEM)))
+    with zipfile.ZipFile(buffer, "a") as archive:
+        archive.writestr("readme.txt", b"hello\n")
+
+    _titles, details, _ctx = _run(tmp_path, "bundle.zip", buffer.getvalue())
+
+    assert "os.system in bundle.zip::model.pkl" in details
+
+
+_CLEAN = b"\x80\x02K\x00."
+_THROUGH = "at or below the link member"
+
+
+def _summaries(tmp_path: Path, name: str, content: bytes) -> tuple[list[str], RuleContext]:
+    (tmp_path / name).write_bytes(content)
+    ctx = RuleContext()
+    findings = PickleOpcodeRule().run(ArtifactTarget(tmp_path), ctx)
+    return [f.evidence.summary for f in findings], ctx
+
+
+def _zip_with_links(members: dict[str, bytes], links: dict[str, str], extra: bytes = b"") -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, to in links.items():
+            link = zipfile.ZipInfo(name)
+            link.external_attr = (stat.S_IFLNK | 0o777) << 16
+            link.extra = extra
+            archive.writestr(link, to)
+        for name, data in members.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+def _unicode_path(stored: str, name: str) -> bytes:
+    """An Info-ZIP Unicode Path field giving the member stored as `stored` the name `name`."""
+    data = struct.pack("<BL", 1, zlib.crc32(stored.encode())) + name.encode()
+    return struct.pack("<HH", 0x7075, len(data)) + data
+
+
+def _stored_as(content: bytes, placeholder: bytes, raw: bytes) -> bytes:
+    """`content` with a member's name bytes `placeholder` replaced by `raw`, flags unchanged."""
+    assert content.count(placeholder) == 2
+    return content.replace(placeholder, raw)
+
+
+_OVER_A_LINK = _tar(
+    ("model.pkl", _CLEAN), _link("notes.txt", "model.pkl", tarfile.SYMTYPE), ("notes.txt", _SYSTEM)
+)
+_OVER_A_HARD_LINK = _tar(
+    ("model.pkl", _CLEAN), _link("notes.txt", "model.pkl", tarfile.LNKTYPE), ("notes.txt", _SYSTEM)
+)
+_BELOW_A_LINK = _tar(_link("weights", ".", tarfile.SYMTYPE), ("weights/a.txt", b"hi\n"))
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("bundle.tar", _OVER_A_LINK),
+        ("bundle.tar", _BELOW_A_LINK),
+        ("bundle.tar.gz", gzip.compress(_BELOW_A_LINK)),
+        ("bundle.tar", _OVER_A_HARD_LINK),
+        ("bundle.tar.gz", gzip.compress(_OVER_A_HARD_LINK)),
+        ("bundle.tar.gz", gzip.compress(_OVER_A_LINK)),
+        ("bundle.zip", _zip_with_links({"weights/a.txt": b"hi\n"}, {"weights": "."})),
+        ("bundle.zip", _zip_with_links({"weights/a.txt": b"hi\n"}, {"Weights": "."})),
+        (
+            "bundle.zip",
+            _zip_with_links({"weights/a.txt": b"hi\n"}, {"t": "."}, _unicode_path("t", "weights")),
+        ),
+        (
+            "bundle.zip",
+            _stored_as(_zip_with_links({"\u00e9/a.txt": b"hi\n"}, {"Q9": "."}), b"Q9", b"\xc3\xa9"),
+        ),
+    ],
+    ids=[
+        "tar-file-over-a-same-named-link",
+        "tar-file-below-a-directory-link",
+        "compressed-tar-file-below-a-directory-link",
+        "tar-file-over-a-hard-link",
+        "compressed-tar-file-over-a-hard-link",
+        "compressed-tar",
+        "zip",
+        "zip-name-in-another-case",
+        "zip-unicode-path",
+        "zip-name-bytes-read-as-utf8",
+    ],
+)
+def test_a_member_at_or_below_a_link_leaves_the_archive_unscanned(
+    tmp_path: Path, name: str, content: bytes
+) -> None:
+    """Unpacked, such a member is written where the link leads, which the listing does not show."""
+    summaries, ctx = _summaries(tmp_path, name, content)
+
+    assert [s for s in summaries if _THROUGH in s], summaries
+    assert str(tmp_path / name) in ctx.examined_paths()
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        (
+            "bundle.tar",
+            _tar(
+                ("v1/model.pkl", _CLEAN),
+                _link("latest", "v1", tarfile.SYMTYPE),
+                ("docs/a.txt", b"hi\n"),
+            ),
+        ),
+        (
+            "bundle.zip",
+            _zip_with_links({"v1/model.pkl": _CLEAN, "docs/a.txt": b"hi\n"}, {"latest": "v1"}),
+        ),
+    ],
+    ids=["tar", "zip"],
+)
+def test_links_beside_the_members_leave_an_archive_scanned(
+    tmp_path: Path, name: str, content: bytes
+) -> None:
+    summaries, _ctx = _summaries(tmp_path, name, content)
+
+    assert summaries == []

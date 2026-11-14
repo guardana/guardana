@@ -53,8 +53,13 @@ pickle, a zip bomb, a 40 GB "model", or a file designed to exploit a parser.
 
 **Stance:** scanning must never execute what it reads. Model-format readers are
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
-fails becomes an `errors` entry rather than an exception or a silent skip. Pickle
-is parsed at the opcode level, never unpickled. The repository cannot hide its own
+fails becomes an `errors` entry rather than an exception or a silent skip. Pickle is
+parsed at the opcode level, never unpickled. An archive listing does not establish
+which files an unpacking tool writes. When its checks find that unpacking tools read
+members, codecs or archive formats differently, `pickle_opcode` reports the file
+unread with a `LOW` "Unscanned model file" finding and an `unexamined_component`
+coverage shortfall naming it; the run is `indeterminate` (exit `2`) unless another
+finding fails its policy. The repository cannot hide its own
 model files: its `.guardanaignore` excludes ordinary files only, never a file a
 model loader reads (a model, an archive or compressed file, a `torch.package`'s
 `.data/extern_modules` record (matched in any case) and every `.py` file below the
