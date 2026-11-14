@@ -166,6 +166,18 @@ Use a format that is not a pickle, such as `safetensors`, or exclude the file wi
 `rules.paths_exclude`. Load untrusted pickles only with a loader that enforces its own
 allowlist, such as `torch.load(..., weights_only=True)`.
 
+### Some archives of unpacked `torch.package` packages are not scanned
+
+A zip or tar, compressed or not, holding a package root and a non-ASCII name not marked as
+UTF-8 is reported unread (exit `2`) unless another finding fails the run's policy. GNU
+`tar`, busybox `tar`, `git archive`, `bsdtar` with `--format ustar` or `--format gnutar`,
+Python's `tarfile` in USTAR or GNU format, Info-ZIP `zip` and macOS `ditto` write such
+archives. Default-format `bsdtar` tars, `bsdtar` zips, default PAX `tarfile` archives and
+`zipfile` archives mark these names as UTF-8 and keep their verdict. Archives without a
+package root or with only ASCII names are unaffected. Exclude affected archives with
+`rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an archive), or scan
+the directory they unpack to instead. [`guardana scan`](usage-scan.md) lists every bound.
+
 ### `monitor` is scheduled, not passive
 
 It re-runs checks on an interval. It does not observe production traffic, cannot

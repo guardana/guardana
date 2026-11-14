@@ -55,11 +55,16 @@ pickle, a zip bomb, a 40 GB "model", or a file designed to exploit a parser.
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
 fails becomes an `errors` entry rather than an exception or a silent skip. Pickle
 is parsed at the opcode level, never unpickled. The repository cannot hide its own
-model files: its `.guardanaignore` excludes ordinary files only, never a file a model
-loader reads (a model, an archive or compressed file, and configuration, chat templates and Keras
-metadata beside a model or tokenizer). The output names every applied pattern and
-counts model files inside directories every scan skips (`build`, `env`,
-`node_modules`, …). Only the profile's `rules.paths_exclude` excludes such a file.
+model files: its `.guardanaignore` excludes ordinary files only, never a file a
+model loader reads (a model, an archive or compressed file, a `torch.package`'s
+`.data/extern_modules` record (matched in any case) and every `.py` file below the
+directory holding it, and configuration, chat templates and Keras metadata beside a
+model or tokenizer). The output names every applied pattern and counts model files
+inside directories every scan skips (`build`, `env`, `node_modules`, …). Only the
+profile's `rules.paths_exclude` excludes such a file. A link to a directory is
+recorded as a source the scan cannot read even when `.guardanaignore` matches it
+(exit `2` under the default `fail_on_error`); `rules.paths_exclude` and names of
+directories every scan skips still suppress that record.
 
 **Residual risk:** a parser bug is still a parser bug. Since 0.22.0 every rule that
 opens a file is property-tested against generated input — arbitrary bytes behind

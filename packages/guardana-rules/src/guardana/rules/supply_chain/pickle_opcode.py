@@ -6,6 +6,7 @@ import os
 import pickletools
 import posixpath
 import re
+import stat
 import struct
 import tarfile
 import zipfile
@@ -74,6 +75,11 @@ from guardana.rules.supply_chain._tar import (
     holds_file_data,
     listing_refusal,
     stream_listing,
+)
+from guardana.rules.supply_chain._torch_package import (
+    ends_in_marker_directory,
+    holds_package,
+    shipped_sources,
 )
 from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
@@ -339,6 +345,9 @@ _EXTRA_HEADER = struct.Struct("<HH")
 _UNICODE_PATH_EXTRA = 0x7075
 _UNICODE_PATH_HEADER = struct.Struct("<BL")
 _UTF8_NAME_FLAG = 0x800
+_PAX_PATH_KEY, _PAX_CHARSET_KEY, _PAX_BINARY_CHARSET = "path", "hdrcharset", "BINARY"
+_TORCH_NAME_BYTES = 511
+"""How many bytes of a member name torch's zip reader lists, which its module names come from."""
 _EMPTY_ZIP_MAGIC = b"PK\x05\x06"
 """An end record first: `np.load` opens such a file as an `.npz` as it does `PK\x03\x04`."""
 _7Z_MAGIC = b"7z\xbc\xaf\x27\x1c"
@@ -472,6 +481,73 @@ def _is_allowed(module: str, qualname: str) -> bool:
 def _maybe_dangerous(module: str, qualname: str) -> Iterator[str]:
     if not _is_allowed(module, qualname):
         yield f"{module}.{qualname}"
+
+
+def _shipped_ref(record: str) -> str:
+    """Name Python source a `torch.package` archive ships, which a load from it may run."""
+    return f"{record} (shipped Python source a torch.package load may run)"
+
+
+def _shipped(
+    report: "_FileReport",
+    members: Iterable[str],
+    links: Iterable[str] = (),
+    coded: Iterable[str] = (),
+) -> bool:
+    """Keep each archive member that is Python source a `torch.package` in it ships.
+
+    `links` holds every name a reader may give a symbolic or hard link member, and `coded` every
+    member name stored in non-ASCII bytes the archive does not mark as UTF-8, which unpacking
+    tools decode by different code pages. A link named as the directory holding a package's
+    marker leaves the archive unscanned, since unpacked it may make a root no listed name
+    shows; so does any link or such name in an archive holding a package, since it may lead a
+    load to source the listing does not place below a root.
+    """
+    listed = list(members)
+    found = False
+    for member, record in shipped_sources(listed):
+        report.found([_shipped_ref(record)], member)
+        found = True
+    linked, decoded = list(links), list(coded)
+    marker_links = [link for link in linked if ends_in_marker_directory(link)]
+    if marker_links:
+        report.unscanned(
+            f"{report.container} member is a link named as the directory holding a "
+            f"torch.package's marker, which may make a package once unpacked "
+            f"({marker_links[0]}); not scanned"
+        )
+        found = True
+    elif linked and holds_package(listed):
+        report.unscanned(
+            f"{report.container} member is a link beside a torch.package that a load from the "
+            f"unpacked package may follow ({linked[0]}); not scanned"
+        )
+        found = True
+    if decoded and holds_package(listed):
+        report.unscanned(
+            f"{report.container} member is named in non-ASCII bytes the archive does not mark "
+            "as UTF-8, which unpacking tools decode by different code pages, beside a "
+            f"torch.package it may join once unpacked ({decoded[0]}); not scanned"
+        )
+        found = True
+    return found
+
+
+def _zip_name_coded(info: zipfile.ZipInfo) -> bool:
+    """Whether a zip member's stored name holds non-ASCII bytes without the UTF-8 flag."""
+    return not info.flag_bits & _UTF8_NAME_FLAG and not info.orig_filename.isascii()
+
+
+def _tar_name_coded(entry: tarfile.TarInfo) -> bool:
+    """Whether a tar member's name is non-ASCII and not a PAX `path` marked as UTF-8.
+
+    A header name, a GNU long name and a PAX `path` whose `hdrcharset` says binary are bytes
+    each reader decodes by a code page of its own.
+    """
+    return not entry.name.isascii() and (
+        _PAX_PATH_KEY not in entry.pax_headers
+        or entry.pax_headers.get(_PAX_CHARSET_KEY) == _PAX_BINARY_CHARSET
+    )
 
 
 _MODULE_ID = "module"
@@ -1573,9 +1649,30 @@ def _zip_names(info: zipfile.ZipInfo) -> tuple[str, ...]:
     return tuple(dict.fromkeys((info.orig_filename, info.filename, *_unicode_paths(info))))
 
 
+def _utf8_names(info: zipfile.ZipInfo) -> tuple[str, ...]:
+    """Return the names a member's stored bytes read as in UTF-8, whatever its flags say.
+
+    `unzip` and `bsdtar` write the bytes up to a NUL as they are, which a UTF-8 file system
+    reads as UTF-8; torch's zip reader lists no more than `_TORCH_NAME_BYTES` of them, then
+    finds a record by that name in any case. A reading that is not UTF-8 is left out.
+    """
+    whole = _raw_name(info).partition(b"\0")[0]
+    names: list[str] = []
+    for raw in (whole, whole[:_TORCH_NAME_BYTES]):
+        try:
+            names.append(raw.decode("utf-8"))
+        except UnicodeDecodeError:
+            continue
+    return tuple(dict.fromkeys(names))
+
+
+def _raw_name(info: zipfile.ZipInfo) -> bytes:
+    """Return a member's name as the bytes its entry stores."""
+    return info.orig_filename.encode("utf-8" if info.flag_bits & _UTF8_NAME_FLAG else "cp437")
+
+
 def _unicode_paths(info: zipfile.ZipInfo) -> Iterator[str]:
     extra = info.extra
-    raw_name = info.orig_filename.encode("utf-8" if info.flag_bits & _UTF8_NAME_FLAG else "cp437")
     while len(extra) >= _EXTRA_HEADER.size:
         kind, size = _EXTRA_HEADER.unpack_from(extra)
         data = extra[_EXTRA_HEADER.size : _EXTRA_HEADER.size + size]
@@ -1588,7 +1685,7 @@ def _unicode_paths(info: zipfile.ZipInfo) -> Iterator[str]:
         try:
             yield data[_UNICODE_PATH_HEADER.size :].decode("utf-8")
         except UnicodeDecodeError as error:
-            if version == 1 and name_crc == zlib.crc32(raw_name):
+            if version == 1 and name_crc == zlib.crc32(_raw_name(info)):
                 raise zipfile.BadZipFile("Info-ZIP Unicode Path is not UTF-8") from error
 
 
@@ -1758,8 +1855,11 @@ class PickleOpcodeRule(ArtifactRule):
     and an opcode budget shared by its members, a plain zip's members not named as models
     are peeked at up to a count and a byte bound, and one that declares more entries, a
     larger zip central directory or larger tar extended headers than its bounds is refused
-    before it is opened. Checks state applied by `BUILD` and torch's `_rebuild_from_type_v2`,
-    object-array item counts, and the dtype of an array `numpy.ndarray` lays over a buffer.
+    before it is opened. In a `torch.package`, a zip or a directory holding
+    `.data/extern_modules`, every `.py` record below it is named as source a load may run,
+    whether or not a pickle imports it. Checks state applied by `BUILD` and torch's
+    `_rebuild_from_type_v2`, object-array item counts, and the dtype of an array
+    `numpy.ndarray` lays over a buffer.
     Reports a state numpy applies unchecked but never writes, or one set on an allowlisted
     class, naming the call that applies it. State it cannot
     judge, including dtype layouts with fields or subarrays and sparse tensors, becomes an
@@ -1844,6 +1944,24 @@ class PickleOpcodeRule(ArtifactRule):
             yield from self._scan_compressed_name(path, ctx)
         for path in target.iter_files(_HEAD_READ_SUFFIXES):
             yield from self._scan_head_read(path, ctx)
+        yield from self._scan_unpacked_packages(target, ctx)
+
+    def _scan_unpacked_packages(self, target: FileReader, ctx: RuleContext) -> Iterator[Finding]:
+        """Name the Python source each unpacked `torch.package` directory ships.
+
+        `PackageImporter` opens a directory as it opens an archive. Only files without a
+        suffix and `.py` files are listed: the one names a package's root, the other its source.
+        """
+        listed = {
+            path.as_posix(): path
+            for suffixes in (("",), (".py",))
+            for path in target.iter_files(suffixes)
+        }
+        for name, record in shipped_sources(listed):
+            report = _FileReport(listed[name], ctx)
+            report.found([_shipped_ref(record)])
+            yield from self._report(report)
+            ctx.examined(report.path)
 
     def _scan_compressed_name(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         """Scan a file with a codec suffix by what the rest of its name says it compresses."""
@@ -2011,9 +2129,11 @@ class PickleOpcodeRule(ArtifactRule):
         followed, since the member it names may lie behind the point the stream has reached.
         """
         unread: list[str] = []
+        entries: list[tarfile.TarInfo] = []
         chosen = 0
         exhausted = False
         while not exhausted and (entry := archive.next()) is not None:
+            entries.append(entry)
             if not holds_file_data(entry):
                 continue
             if _unread_model(entry.name, plain=True):
@@ -2024,6 +2144,12 @@ class PickleOpcodeRule(ArtifactRule):
             if chosen <= _ARCHIVE_MAX_MEMBERS:
                 exhausted = self._scan_streamed_member(report, archive, entry, budget)
         self._report_unread_models(report, unread)
+        sources = _shipped(
+            report,
+            (entry.name for entry in entries),
+            (entry.name for entry in entries if entry.issym() or entry.islnk()),
+            (entry.name for entry in entries if _tar_name_coded(entry)),
+        )
         if exhausted:
             return True
         if archive.offset < end:
@@ -2035,7 +2161,7 @@ class PickleOpcodeRule(ArtifactRule):
                 f"tar holds {chosen} members named as models; members past the "
                 f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
             )
-        return bool(chosen or unread)
+        return bool(chosen or unread) or sources
 
     def _scan_streamed_member(
         self,
@@ -2347,6 +2473,17 @@ class PickleOpcodeRule(ArtifactRule):
                 if any(_unread_model(n, plain=not every_member) for n in _zip_names(info))
             ]
             self._report_unread_models(report, unread)
+            sources = _shipped(
+                report,
+                (name for info in members for name in (*_zip_names(info), *_utf8_names(info))),
+                (
+                    name
+                    for info in members
+                    if stat.S_ISLNK(info.external_attr >> 16)
+                    for name in (*_zip_names(info), *_utf8_names(info))
+                ),
+                (info.orig_filename for info in members if _zip_name_coded(info)),
+            )
             chosen, unpeeked = self._choose_zip_members(archive, members, every_member=every_member)
             if unpeeked:
                 report.unscanned(
@@ -2373,7 +2510,7 @@ class PickleOpcodeRule(ArtifactRule):
                     f"zip holds {len(chosen)} {named}; members past the first "
                     f"{_ARCHIVE_MAX_MEMBERS} not scanned"
                 )
-        return every_member or bool(chosen) or bool(unread) or bool(unpeeked)
+        return every_member or sources or bool(chosen) or bool(unread) or bool(unpeeked)
 
     def _choose_zip_members(
         self, archive: zipfile.ZipFile, members: list[zipfile.ZipInfo], *, every_member: bool
@@ -2470,6 +2607,12 @@ class PickleOpcodeRule(ArtifactRule):
             and _unread_model(entry.name, plain=report.tar_named and not torch_named)
         ]
         self._report_unread_models(report, unread)
+        sources = _shipped(
+            report,
+            (entry.name for entry in listing.members),
+            (entry.name for entry in listing.members if entry.issym() or entry.islnk()),
+            (entry.name for entry in listing.members if _tar_name_coded(entry)),
+        )
         chosen = [
             index
             for index, entry in enumerate(listing.members)
@@ -2484,7 +2627,7 @@ class PickleOpcodeRule(ArtifactRule):
                 f"tar holds {len(chosen)} members named as models; members past the "
                 f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
             )
-        return torch_named or bool(chosen or unread)
+        return torch_named or sources or bool(chosen or unread)
 
     def _scan_tar_member(self, report: _FileReport, reading: _TarReading, index: int) -> bool:
         """Scan one tar member and return whether the archive's opcode budget ran out in it.

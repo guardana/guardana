@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 from pathlib import Path
 
+import pytest
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile import default_profile
 from guardana.core.registry import Registry
@@ -130,6 +131,97 @@ def test_files_loaded_with_a_model_beside_them_are_kept(tmp_path: Path) -> None:
         "saved/keras_metadata.pb",
         "saved/saved_model.pb",
     ]
+
+
+def _write(root: Path, *names: str) -> None:
+    for name in names:
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text("x")
+
+
+def test_a_torch_package_keeps_its_marker_and_python_source(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "model/.data/extern_modules",
+        "model/evil.py",
+        "model/pkg/__init__.py",
+        "model/notes.txt",
+        "tools/helper.py",
+    )
+    (tmp_path / ".guardanaignore").write_text("*.py\n*extern_modules\n*.txt\n")
+
+    assert _kept(tmp_path) == [
+        "model/.data/extern_modules",
+        "model/evil.py",
+        "model/pkg/__init__.py",
+    ]
+
+
+def test_a_torch_package_in_another_case_or_an_ignored_directory_keeps_its_source(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "upper/.DATA/EXTERN_MODULES",
+        "upper/a.py",
+        "hidden/.data/extern_modules",
+        "hidden/b.py",
+    )
+    (tmp_path / ".guardanaignore").write_text("*.py\nhidden\n*/.DATA/*\n")
+
+    assert _kept(tmp_path) == [
+        "hidden/.data/extern_modules",
+        "hidden/b.py",
+        "upper/.DATA/EXTERN_MODULES",
+        "upper/a.py",
+    ]
+
+
+def test_the_ignore_file_still_excludes_source_no_torch_package_holds(tmp_path: Path) -> None:
+    _write(
+        tmp_path, "notes/extern_modules", "notes/c.py", "model/.data/extern_modules", "model/d.PY"
+    )
+    (tmp_path / ".guardanaignore").write_text("*extern_modules\n*.py\n*.PY\n")
+
+    scope = _run(ArtifactTarget(tmp_path)).scope
+
+    assert scope is not None
+    assert [Path(kept.path).relative_to(tmp_path).as_posix() for kept in scope.kept_models] == [
+        "model/.data/extern_modules"
+    ]
+    assert str(tmp_path / "notes" / "c.py") not in scope.files
+
+
+def test_an_ignored_source_link_out_of_a_torch_package_is_not_followed(tmp_path: Path) -> None:
+    root = tmp_path / "scan"
+    _write(root, "model/.data/extern_modules")
+    (tmp_path / "outside.py").write_text("x")
+    (root / "model" / "evil.py").symlink_to(tmp_path / "outside.py")
+    (root / ".guardanaignore").write_text("*.py\n")
+    target = ArtifactTarget(root)
+
+    assert root / "model" / "evil.py" not in list(target.iter_files())
+    assert [unread.path for unread in target.unread_sources()] == [root / "model" / "evil.py"]
+
+
+@pytest.mark.parametrize("patterns", ["model/.data\nmodel/mod\n", "model\n", "*\n"])
+def test_a_directory_link_the_ignore_file_matches_is_recorded_unread(
+    tmp_path: Path, patterns: str
+) -> None:
+    root = tmp_path / "scan"
+    _write(tmp_path, "outside/.data/extern_modules", "outside/mod/__init__.py")
+    (root / "model").mkdir(parents=True)
+    (root / "model" / ".data").symlink_to(tmp_path / "outside" / ".data")
+    (root / "model" / "mod").symlink_to(tmp_path / "outside" / "mod")
+    (root / ".guardanaignore").write_text(patterns)
+    target = ArtifactTarget(root)
+
+    listed = list(target.iter_files())
+    unread = target.unread_sources()
+
+    assert root / "model" / "mod" / "__init__.py" not in listed
+    assert [u.path for u in unread] == [root / "model" / ".data", root / "model" / "mod"]
+    assert all("a symlinked directory is not walked" in u.reason for u in unread)
 
 
 def test_a_tokenizer_keeps_its_named_chat_templates_without_weights(tmp_path: Path) -> None:
