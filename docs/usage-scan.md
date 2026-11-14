@@ -64,17 +64,22 @@ Three things keep a file out of a directory scan:
   under [model files no rule reads](#model-files-no-rule-reads), an unzipped Keras model's
   `config.json` and `metadata.json` included), an archive or compressed file (`.zip`,
   `.tar`, `.tgz`, `.tbz2`, `.tbz`, `.txz`, or a name ending in `.gz`, `.gzip`, `.z`, `.xz`,
-  `.bz2`, `.lzma` or `.lz4`) whatever it is named, and, in a directory
+  `.bz2`, `.lzma` or `.lz4`) whatever it is named, a `torch.package`'s
+  `.data/extern_modules` record (matched in any case) and every `.py` file below the
+  directory holding it, and, in a directory
   that holds a model or a tokenizer (`tokenizer_config.json` or `tokenizer.json`), every
   `*config.json`, `chat_template.json`, `chat_template*.jinja`, `chat_template*.j2` and
-  `keras_metadata.pb`, with the templates in its `additional_chat_templates/`. A link is
-  judged by its name alone. A directory it matches is still walked for such files. A file
-  it matches that a model loader reads is scanned anyway and named in the output: `Scope`
+  `keras_metadata.pb`, with the templates in its `additional_chat_templates/`. A symbolic
+  link to a file is judged by its name alone. An ordinary directory it matches is still
+  walked for such files. A symbolic link to a directory is not followed and is recorded as a
+  source the scan cannot read even when `.guardanaignore` matches it; only
+  `rules.paths_exclude` or a name of a directory every scan skips suppresses that record.
+  A file it matches that a model loader reads is scanned anyway and named in the output: `Scope`
   in the terminal (the first ten, then a count), `scope.kept_models` in the saved run with
   the pattern that matched it.
   Every pattern it applied is named there too, with the file it came from
-  (`scope.excludes[].file`). It still excludes a notebook, source code and a configuration
-  with no model or tokenizer beside it. To leave a model file
+  (`scope.excludes[].file`). It still excludes a notebook, source code other than a package's
+  `.py` files and a configuration with no model or tokenizer beside it. To leave a model file
   out, use `rules.paths_exclude`.
 - **Directories every scan skips**, wherever they occur: `.git`, `.venv`, `venv`, `env`,
   `__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `node_modules`, `.tox`,
@@ -103,8 +108,11 @@ does not exist. It also does not list or read a symlinked file whose target, aft
 link is followed, lies outside the scanned directory, because a link resolves on the
 machine that scans, not where the artifact ships. Each one it meets is recorded as a source
 it could not read, naming the link, so the run records an error (exit `2` under the default
-`fail_on_error`). Scan the link's target directly, or exclude the link. A link the excludes
-remove, or a directory link named like a directory every scan skips, is not reported. A
+`fail_on_error`). Scan the link's target directly, or exclude the link with
+`rules.paths_exclude`. A link the profile's `rules.paths_exclude` removes, or a directory
+link named like a directory every scan skips, is not reported. A file link is judged by its
+name alone: `.guardanaignore` excludes it unless it is named as a file a model loader reads.
+`.guardanaignore` cannot suppress a directory link's error. A
 symlinked file whose target lies inside the scanned directory is listed and read, the
 scanned directory itself may be reached through a symlink, and a single file named on the
 command line is read even when it is a symlink.
@@ -455,8 +463,34 @@ network fetches.
 callable the file imports, sorted and each once, after a digest of that set
 (`unpickling imports 2 non-allowlisted callable(s) (set 9a0cd5b778d9): builtins.eval,
 os.system`). Its detail names the archive member each was found in
-(`os.system in model.pt::archive/data.pkl`). The summary also names the call that applies a
-state no `numpy` or Python pickler writes: `numpy.dtype.__setstate__` for forged dtype
+(`os.system in model.pt::archive/data.pkl`). For Python source shipped in a `torch.package`,
+the finding names every record ending in lower-case `.py` below a directory holding
+`.data/extern_modules`, matched in any case, whether or not a load names its module. It gives
+the source's path below the innermost package root, as
+`pkg/__init__.py (shipped Python source a torch.package load may run)`. In a scanned directory
+holding an unpacked package, each `.py` file gets its own `CRITICAL` finding. A `.py` file
+inside a directory every scan skips is not read; archive members are unaffected. Name
+comparisons drop `.` and empty steps (from leading or doubled separators), resolve `..`, treat
+backslashes as separators and ignore case and Unicode normalization. Zip names are also read
+from the directory entry as its UTF-8 flag says, from its Info-ZIP Unicode Path, and from
+stored bytes as UTF-8 regardless of the flag, up to any NUL, both whole as `unzip` and `bsdtar`
+write them on UTF-8 file systems and cut to 511 bytes as `torch` lists them. A zip or tar,
+compressed or not, holding a package root and a symbolic link, or a symbolic link named `.data`
+in any case, is reported unread: a `LOW` "Unscanned model file" finding and an
+`unexamined_component` coverage shortfall name the archive; its summary names the first link.
+Tar hard links count too. Unix mode identifies zip links. Unpacked package loads may follow
+links beyond the root, and a link named `.data` may make a root. An archive holding a package
+root and a non-ASCII name not marked as UTF-8 is reported unread the same way; its summary
+names the first such member. In a tar, this covers header and GNU long names, and PAX `path`
+names with `hdrcharset` `BINARY`. Unpacking tools decode these names by different code pages,
+so source can land below the root. `torch`'s `PackageExporter` marks every name as UTF-8. The
+run is `indeterminate` (exit `2`) unless another finding fails the run's policy. GNU `tar`,
+busybox `tar`, `git archive`, `bsdtar` with `--format ustar` or `--format gnutar`, Python's
+`tarfile` in USTAR or GNU format, Info-ZIP `zip` and macOS `ditto` store non-ASCII names
+without marking them as UTF-8. `bsdtar` writing a tar in its default format or a zip, Python's
+`tarfile` in its default PAX format and Python's `zipfile` mark such names as UTF-8. The
+summary also names the call that applies a state no `numpy` or Python pickler writes:
+`numpy.dtype.__setstate__` for forged dtype
 flags, byte order, item size or alignment, or an eight-item datetime or timedelta dtype
 state without its unit; `numpy.ndarray.__setstate__` for an object array given fewer items
 than its shape has elements; and `<module>.<class>.__setstate__` for a `BUILD` applied to an

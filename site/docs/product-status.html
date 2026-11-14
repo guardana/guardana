@@ -375,6 +375,16 @@ forests saved with <code>pickle</code> hold such a dtype and retain their <code>
 Use a format that is not a pickle, such as <code>safetensors</code>, or exclude the file with
 <code>rules.paths_exclude</code>. Load untrusted pickles only with a loader that enforces its own
 allowlist, such as <code>torch.load(..., weights_only=True)</code>.</p>
+<h3 id="some-archives-of-unpacked-torchpackage-packages-are-not-scanned">Some archives of unpacked <code>torch.package</code> packages are not scanned</h3>
+<p>A zip or tar, compressed or not, holding a package root and a non-ASCII name not marked as
+UTF-8 is reported unread (exit <code>2</code>) unless another finding fails the run's policy. GNU
+<code>tar</code>, busybox <code>tar</code>, <code>git archive</code>, <code>bsdtar</code> with <code>--format ustar</code> or <code>--format gnutar</code>,
+Python's <code>tarfile</code> in USTAR or GNU format, Info-ZIP <code>zip</code> and macOS <code>ditto</code> write such
+archives. Default-format <code>bsdtar</code> tars, <code>bsdtar</code> zips, default PAX <code>tarfile</code> archives and
+<code>zipfile</code> archives mark these names as UTF-8 and keep their verdict. Archives without a
+package root or with only ASCII names are unaffected. Exclude affected archives with
+<code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an archive), or scan
+the directory they unpack to instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
 <h3 id="monitor-is-scheduled-not-passive"><code>monitor</code> is scheduled, not passive</h3>
 <p>It re-runs checks on an interval. It does not observe production traffic, cannot
 see what your real users are doing, and is not an inline control. Watching live

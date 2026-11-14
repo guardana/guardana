@@ -256,6 +256,7 @@ class ArtifactTarget(Target):
         # A directory the target's own ignore file excludes is still walked, keyed to
         # the pattern, because a model file beneath it is scanned whatever it says.
         hidden: dict[Path, str] = {}
+        sources: list[tuple[Path, str]] = []
         for dirpath, dirnames, filenames in os.walk(self._root, onerror=self._unlisted):
             directory = Path(dirpath)
             inherited = hidden.get(directory)
@@ -268,22 +269,42 @@ class ArtifactTarget(Target):
                 self._unread[path] = UnreadSource(
                     path,
                     f"{path}: a symlinked directory is not walked; scan its target "
-                    f"directly or exclude it",
+                    "directly or exclude it with rules.paths_exclude",
                 )
             dirnames[:] = [d for d in kept if d not in linked]
             siblings = frozenset(name.lower() for name in filenames)
             self._names[directory] = filenames
             for filename in filenames:
                 path = directory / filename
-                if not self._listed(path, inherited, siblings):
-                    continue
-                refused = _refused_link(path, real_root) if _is_link(path) else None
-                if refused is not None:
-                    self._unread[path] = UnreadSource(path, f"{path}: {refused}")
-                    continue
-                matches.append(path)
+                if self._listed(path, inherited, siblings, sources):
+                    self._admit(path, real_root, matches)
+        self._keep_package_sources(sources, real_root, matches)
         self._kept.sort(key=lambda kept: kept.path)
         yield from sorted(matches)
+
+    def _admit(self, path: Path, real_root: str, matches: list[Path]) -> None:
+        """List `path`, or record it unread when it is a link the scan does not follow."""
+        refused = _refused_link(path, real_root) if _is_link(path) else None
+        if refused is not None:
+            self._unread[path] = UnreadSource(path, f"{path}: {refused}")
+        else:
+            matches.append(path)
+
+    def _keep_package_sources(
+        self, sources: list[tuple[Path, str]], real_root: str, matches: list[Path]
+    ) -> None:
+        """List the ignored Python source below a `torch.package` root, which a load may run.
+
+        `sources` holds each Python source the target's ignore file excluded, with the
+        pattern; whether a package holds one is known only once every directory is listed.
+        """
+        from guardana.core.inventory import package_roots  # noqa: PLC0415
+
+        roots = package_roots(self._names) if sources else frozenset()
+        for path, pattern in sources:
+            if not roots.isdisjoint(path.parents):
+                self._kept.append(KeptModel(str(path), pattern))
+                self._admit(path, real_root, matches)
 
     def _descended(
         self, directory: Path, names: list[str], inherited: str | None, hidden: dict[Path, str]
@@ -301,20 +322,29 @@ class ArtifactTarget(Target):
                 continue
             pattern = inherited or self._matched(path, ExcludeSource.IGNORE_FILE)
             if pattern is not None:
-                if _is_link(path):
-                    continue
                 hidden[path] = pattern
             kept.append(name)
         return kept
 
-    def _listed(self, path: Path, inherited: str | None, siblings: frozenset[str]) -> bool:
+    def _listed(
+        self,
+        path: Path,
+        inherited: str | None,
+        siblings: frozenset[str],
+        sources: list[tuple[Path, str]],
+    ) -> bool:
         """Whether `path` stays in the listing; a file model loaders read stays even ignored.
 
         `inherited` is the ignore-file pattern that excluded a directory above `path`. A
         link is judged by its name, so nothing is opened before the link itself is checked.
+        Python source the ignore file excludes goes to `sources`, to be judged by the package
+        roots once the walk is done.
         """
         # Imported here because the inventory imports this package.
-        from guardana.core.inventory import read_by_model_loaders  # noqa: PLC0415
+        from guardana.core.inventory import (  # noqa: PLC0415
+            named_as_python_source,
+            read_by_model_loaders,
+        )
 
         if self._matched(path, ExcludeSource.PROFILE) is not None:
             return False
@@ -322,6 +352,8 @@ class ArtifactTarget(Target):
         if pattern is None:
             return True
         if not read_by_model_loaders(path, siblings, self._holds_model, by_name=_is_link(path)):
+            if named_as_python_source(path):
+                sources.append((path, pattern))
             return False
         self._kept.append(KeptModel(str(path), pattern))
         return True
