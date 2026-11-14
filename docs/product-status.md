@@ -178,6 +178,24 @@ package root or with only ASCII names are unaffected. Exclude affected archives 
 `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an archive), or scan
 the directory they unpack to instead. [`guardana scan`](usage-scan.md) lists every bound.
 
+### Sparse tars, some streamed zips and files named as archives have coverage shortfalls
+
+A PAX-format tar holding a sparse file and any link, or a tar whose model member is stored
+sparse, can make the run `indeterminate` (exit `2`) unless another finding fails its
+policy. So can a zip named `.zip`, without a suffix or named as a tar, written to a pipe
+with data descriptors and bzip2, LZMA or encrypted members. GNU `tar` and `bsdtar` write
+the sparse layout; Python's `zipfile` writes streamed bzip2 or LZMA members. Under archive
+names, affected files also include a web page saved as `.zip`, a compressed pickle or zip
+named as a compressed tar, and tars compressed with zstd, lzip, lz4, lzma, lzop or
+`compress`. A `.zip` with preceding bytes, such as a self-extracting zip, is also
+affected. Sparse members the rule reads are read as `tarfile` unpacks them. Apart from
+these, tars and zips of an ordinary project that Python's `tarfile` and `zipfile`,
+`bsdtar`, GNU `tar`, busybox, Info-ZIP `zip`, `jar`, macOS `ditto`, `np.savez` and `git
+archive` write keep their verdict under these checks; the `torch.package` name checks also
+apply. Exclude affected archives with `rules.paths_exclude` (the target's
+`.guardanaignore` cannot exclude an archive), or scan the directory they unpack to
+instead. [`guardana scan`](usage-scan.md) lists every bound.
+
 ### `monitor` is scheduled, not passive
 
 It re-runs checks on an interval. It does not observe production traffic, cannot

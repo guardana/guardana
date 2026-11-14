@@ -74,6 +74,7 @@ from guardana.rules.supply_chain._tar import (
     TarListingError,
     holds_file_data,
     listing_refusal,
+    stored_sparse,
     stream_listing,
 )
 from guardana.rules.supply_chain._torch_package import (
@@ -81,12 +82,22 @@ from guardana.rules.supply_chain._torch_package import (
     holds_package,
     shipped_sources,
 )
+from guardana.rules.supply_chain._unpacking import (
+    TAR_OUTRANKS_ALL,
+    TAR_OUTRANKS_ZIP,
+    UNPACKING_PROBE_BYTES,
+    archive_first,
+    codec_first,
+    member_through_link,
+    tar_bid,
+)
 from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
     ZIP_DIRECTORY_MAX_BYTES,
     ZIP_ERRORS,
     declared_directory_start,
     member_disagreement,
+    unpacking_disagreement,
 )
 from guardana.rules.supply_chain._zip import listing_refusal as zip_listing_refusal
 
@@ -112,7 +123,8 @@ _TAR_SUFFIX = ".tar"
 _CONTENT_SUFFIXES = (_BIN_SUFFIX, ".sav", ".p", ".model", _TAR_SUFFIX, _PLAIN_ZIP_SUFFIX)
 """Read by content: `pytorch_model.bin` is a torch zip and `word2vec.model` a pickle, while
 a file under one of these names that is neither a zip, a tar nor a pickle stream is some
-other file this rule has nothing to say about."""
+other file this rule has nothing to say about, unless it is a `.tar` or a `.zip`, which a
+`tar` command unpacks by its bytes whatever they are."""
 _TORCH_TAR_NAMES = (".pth.tar", ".pt.tar")
 """What `torch.save` is told to write as a tar: a model, whatever its first bytes are."""
 _DATA_SUFFIX = ".dat"
@@ -399,6 +411,8 @@ _TAR_MAGIC = b"ustar"
 _TAR_MAGIC_OFFSET = 257
 _MAGIC_SNIFF_BYTES = tarfile.BLOCKSIZE
 """The first block: enough for every magic, and the whole first header of a tar."""
+_BLANK_MAX_BYTES = 1024 * 1024
+"""The largest file of zeros counted as an empty archive; past it, reading it all costs too much."""
 
 _RULE_ID = "guardana.supply_chain.pickle_opcode"
 _UNSCANNED_TITLE = "Unscanned model file"
@@ -548,6 +562,24 @@ def _tar_name_coded(entry: tarfile.TarInfo) -> bool:
         _PAX_PATH_KEY not in entry.pax_headers
         or entry.pax_headers.get(_PAX_CHARSET_KEY) == _PAX_BINARY_CHARSET
     )
+
+
+def _through_link(report: "_FileReport", members: Iterable[tuple[Iterable[str], bool]]) -> bool:
+    """Report a member listed at or below a link member; see `member_through_link`.
+
+    `members` holds, for each archive member, every name a reader may give it and whether it
+    is a symbolic or hard link. Unpacked, such a member is written where the link leads, so
+    what the listing shows is not what lands there.
+    """
+    found = member_through_link(members)
+    if found is None:
+        return False
+    member, link = found
+    report.unscanned(
+        f"{report.container} member lies at or below the link member {link} ({member}), so "
+        "an unpacking tool may follow or replace the link; not scanned"
+    )
+    return True
 
 
 _MODULE_ID = "module"
@@ -1062,6 +1094,12 @@ def _is_zip(path: Path) -> bool:
         return False
 
 
+def _blank(path: Path) -> bool:
+    """Whether the file at `path` is empty or a few zero blocks, from which nothing unpacks."""
+    data = read_bytes_bounded(path, _BLANK_MAX_BYTES)
+    return data is not None and not data[1] and data[0].count(0) == len(data[0])
+
+
 def _maybe_a_file(path: Path) -> bool:
     """Whether `path` is a regular file, or an entry whose type could not be told."""
     try:
@@ -1517,6 +1555,13 @@ def _member_suffix(member: str) -> str:
     return base[base.rfind(".") :] if "." in base else ""
 
 
+def _sparse_reason(name: str) -> str:
+    return (
+        "tar member is stored sparse, which tar readers can unpack to different bytes "
+        f"({name}); scanned only as `tarfile` unpacks it"
+    )
+
+
 def _model_named(member: str) -> bool:
     """Whether an archive member is named as a model a loader would open from it.
 
@@ -1785,6 +1830,11 @@ class _FileReport:
         """Whether the file is a zip whose members a person extracts: a `.zip`, or unnamed."""
         return self.head_only or self.path.suffix.lower() == _PLAIN_ZIP_SUFFIX
 
+    @property
+    def unpacked(self) -> bool:
+        """Whether the file is named as an archive, which a person unpacks with a `tar` command."""
+        return not self.head_only and (self.tar_named or self.plain_zip)
+
     def found(self, refs: Iterable[str], member: str | None = None) -> None:
         """Keep the callables one stream imports."""
         self.imports.update((ref, member) for ref in refs)
@@ -2024,35 +2074,104 @@ class PickleOpcodeRule(ArtifactRule):
         # A `.bin` or `.model` is named as a model although it is read by content; a plain
         # `.zip` or `.tar` names no model, so a pointer under that name is left alone.
         named_as_model = not by_content or report.path.suffix.lower() in _SNIFFED_SUFFIXES
-        if named_as_model and not sniffed[1] and is_lfs_pointer(magic):
-            report.unscanned(LFS_POINTER_REASON)
-            return True
+        if not sniffed[1] and is_lfs_pointer(magic):
+            if named_as_model:
+                report.unscanned(LFS_POINTER_REASON)
+            return named_as_model
+        refused = report.unpacked and self._tar_reads_otherwise(report, magic)
         if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
-            return self._scan_zip(report)
+            # A `tar` command reads a file whose first block is a tar header as a tar, zip
+            # magic or not, so such a file is read both ways.
+            as_zip = self._scan_zip(report)
+            as_tar = _opens_as_tar(magic) and self._scan_tar(report)
+            return as_zip or as_tar or refused
         if report.plain_zip and _is_zip(path):
             # Whoever opens a plain `.zip` finds its members from the end record, wherever
             # the zip data starts, while `np.load` and `torch.load` go by the first bytes,
-            # which are not a zip's: both readings are reported.
+            # which are not a zip's, and a `tar` command reads a tar there: each reading is
+            # reported.
             as_zip = self._scan_zip(report)
             as_stream = self._read_unarchived(report, magic, by_content=True)
-            return as_zip or as_stream
+            as_tar = _opens_as_tar(magic) and self._scan_tar(report)
+            return as_zip or as_stream or as_tar or refused
+        return self._read_unzipped(report, magic, by_content=by_content, refused=refused)
+
+    def _read_unzipped(
+        self, report: _FileReport, magic: bytes, *, by_content: bool, refused: bool
+    ) -> bool:
+        """Read a file that is no zip as a tar, a compressed tar and a stream; see `_read`.
+
+        `refused` says the file was already reported as one a `tar` command reads otherwise.
+        """
+        path = report.path
         # `tar` decompresses a file by its first bytes and `tarfile` tries it as a plain tar
         # first; a gzip header can be crafted to pass for both, so both readings are made.
-        codec = tar_codec(magic) if report.tar_named else None
+        codec = tar_codec(magic) if report.unpacked else None
         as_compressed_tar = None if codec is None else self._scan_compressed_tar(report, codec)
-        if not (_opens_as_tar(magic) or (report.tar_named and _has_ustar_magic(magic))):
-            return (
-                self._read_unarchived(report, magic, by_content=by_content)
-                if as_compressed_tar is None
-                else as_compressed_tar
+        holds_no_tar = codec is not None and as_compressed_tar is None
+        if holds_no_tar:
+            report.unscanned(
+                f"{codec}-compressed file holds no tar this scanner reads, "
+                "which a tar command may still unpack; not scanned"
             )
+        if not (_opens_as_tar(magic) or (report.tar_named and _has_ustar_magic(magic))):
+            if as_compressed_tar is not None:
+                return as_compressed_tar
+            read = self._read_unarchived(report, magic, by_content=by_content)
+            if read or refused or holds_no_tar or not report.unpacked or _blank(path):
+                return read or refused or holds_no_tar
+            report.unscanned(
+                "file named as an archive is no zip, tar or pickle this scanner reads, "
+                "which a tar command may still unpack; not scanned"
+            )
+            return True
         # `torch.load` opens any file that is not a zip as a tar first, whatever it is
         # named, while `pickle.load` reads the same bytes as one stream: both are read.
         # A tar that held a model is a checkpoint, whose header no loader unpickles, so
         # its stream is read only if its bytes are a pickle.
         as_tar = self._scan_tar(report)
         as_stream = self._read_unarchived(report, magic, by_content=by_content or as_tar)
-        return bool(as_compressed_tar) or as_tar or as_stream
+        return bool(as_compressed_tar) or as_tar or as_stream or refused or holds_no_tar
+
+    def _tar_reads_otherwise(self, report: _FileReport, magic: bytes) -> bool:
+        """Refuse a file named as an archive that a `tar` command may unpack as something else.
+
+        A `tar` command goes by the file's bytes, not its name; see `_unpacking`. A zip found
+        by its end record may follow bytes that command reads as another archive. Return
+        whether the file was refused.
+        """
+        path = report.path
+        at_start = magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC))
+        if report.plain_zip and not at_start and _is_zip(path):
+            report.unscanned(
+                "zip data does not start at the file's first byte, and a tar command may "
+                "read the bytes before it as another archive; not scanned"
+            )
+            return True
+        probe = read_bytes_bounded(path, UNPACKING_PROBE_BYTES)
+        head = magic if probe is None else probe[0]
+        codec = codec_first(head)
+        if codec is not None:
+            if tar_codec(magic) is not None:
+                return False
+            report.unscanned(
+                f"file holds {codec} data that a tar command decodes before unpacking; not scanned"
+            )
+            return True
+        bid = tar_bid(magic)
+        # The stream reading reports a 7z archive under any name.
+        if bid >= TAR_OUTRANKS_ALL or magic.startswith(_7Z_MAGIC):
+            return False
+        found = archive_first(head)
+        if found is None and bid < TAR_OUTRANKS_ZIP and not at_start and _is_zip(path):
+            found = "zip"
+        if found is None:
+            return False
+        report.unscanned(
+            f"file holds {found} archive data, which a tar command may unpack in place of "
+            "what this scanner reads; not scanned"
+        )
+        return True
 
     def _read_head_compressed_tar(self, report: _FileReport, head: bytes, *, cut: bool) -> bool:
         """Scan a file whose `head` decompresses to a tar as one; `cut` says the file goes on.
@@ -2079,11 +2198,15 @@ class PickleOpcodeRule(ArtifactRule):
             with open_regular(report.path) as raw:
                 size = os.fstat(raw.fileno()).st_size
                 limit = max(_COMPRESSED_TAR_MIN_BYTES, _COMPRESSED_TAR_MAX_RATIO * size)
-                head = InflatingReader(raw, codec, limit=limit).read(_MAGIC_SNIFF_BYTES)
+                probe = InflatingReader(raw, codec, limit=limit).read(
+                    UNPACKING_PROBE_BYTES if report.unpacked else _MAGIC_SNIFF_BYTES
+                )
+                head = probe[:_MAGIC_SNIFF_BYTES]
                 if not (_opens_as_tar(head) or _has_ustar_magic(head)):
                     return None
                 report.container = "tar"
-                as_tar = self._scan_compressed_tar_members(report, raw, codec, limit)
+                refused = report.unpacked and self._decompressed_otherwise(report, codec, probe)
+                as_tar = self._scan_compressed_tar_members(report, raw, codec, limit) or refused
                 raw.seek(0)
                 magic = raw.read(_MAGIC_SNIFF_BYTES)
         except InflateError as error:
@@ -2103,6 +2226,28 @@ class PickleOpcodeRule(ArtifactRule):
         if report.head_only or not _may_be_a_pickle(head):
             return as_tar
         return bool(self._scan_compressed(report, magic, by_content=True)) or as_tar
+
+    @staticmethod
+    def _decompressed_otherwise(report: _FileReport, codec: str, probe: bytes) -> bool:
+        """Refuse a compressed tar whose decompressed `probe` a `tar` command reads otherwise.
+
+        Return whether it was refused.
+        """
+        inner = codec_first(probe)
+        if inner is not None:
+            report.unscanned(
+                f"{codec}-compressed tar holds {inner} data after decompression, which a tar "
+                "command decodes in turn; not scanned"
+            )
+            return True
+        found = None if tar_bid(probe) >= TAR_OUTRANKS_ALL else archive_first(probe)
+        if found is None:
+            return False
+        report.unscanned(
+            f"{codec}-compressed tar decompresses to {found} archive data, which a tar "
+            "command may unpack in place of the tar; not scanned"
+        )
+        return True
 
     def _scan_compressed_tar_members(
         self, report: _FileReport, raw: IO[bytes], codec: str, limit: int
@@ -2150,6 +2295,9 @@ class PickleOpcodeRule(ArtifactRule):
             (entry.name for entry in entries if entry.issym() or entry.islnk()),
             (entry.name for entry in entries if _tar_name_coded(entry)),
         )
+        through = _through_link(
+            report, (((entry.name,), entry.issym() or entry.islnk()) for entry in entries)
+        )
         if exhausted:
             return True
         if archive.offset < end:
@@ -2161,7 +2309,7 @@ class PickleOpcodeRule(ArtifactRule):
                 f"tar holds {chosen} members named as models; members past the "
                 f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
             )
-        return bool(chosen or unread) or sources
+        return bool(chosen or unread) or sources or through
 
     def _scan_streamed_member(
         self,
@@ -2177,6 +2325,8 @@ class PickleOpcodeRule(ArtifactRule):
                 f"tar member is a link a compressed tar is not read back for ({name}); not scanned"
             )
             return False
+        if stored_sparse(entry):
+            report.unscanned(_sparse_reason(name))
         raw: bytes | None = None
         try:
             handle = archive.extractfile(entry)
@@ -2204,7 +2354,8 @@ class PickleOpcodeRule(ArtifactRule):
         data, cut = head
         magic = data[:_MAGIC_SNIFF_BYTES]
         if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
-            return self._scan_zip(report)
+            as_zip = self._scan_zip(report)
+            return (_opens_as_tar(magic) and self._scan_tar(report)) or as_zip
         if magic.startswith(NPY_MAGIC):
             self._scan_npy(report)
             return True
@@ -2450,7 +2601,8 @@ class PickleOpcodeRule(ArtifactRule):
     def _scan_zip_members(self, report: _FileReport, handle: IO[bytes]) -> bool:
         """Scan the members of the zip open on `handle`, whose listing bounds were checked."""
         every_member = not report.plain_zip
-        budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + os.fstat(handle.fileno()).st_size)
+        size = os.fstat(handle.fileno()).st_size
+        budget = _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + size)
         with zipfile.ZipFile(handle) as archive:
             # `start_dir` is where `zipfile` found the central directory; it is
             # public on `ZipFile` in every supported Python, unlike the end record.
@@ -2484,6 +2636,18 @@ class PickleOpcodeRule(ArtifactRule):
                 ),
                 (info.orig_filename for info in members if _zip_name_coded(info)),
             )
+            through = _through_link(
+                report,
+                (
+                    (
+                        (*_zip_names(info), *_utf8_names(info)),
+                        stat.S_ISLNK(info.external_attr >> 16),
+                    )
+                    for info in members
+                ),
+            )
+            walked = report.plain_zip or report.tar_named
+            hidden = walked and self._unpacked_otherwise(report, handle, members, archive, size)
             chosen, unpeeked = self._choose_zip_members(archive, members, every_member=every_member)
             if unpeeked:
                 report.unscanned(
@@ -2510,7 +2674,41 @@ class PickleOpcodeRule(ArtifactRule):
                     f"zip holds {len(chosen)} {named}; members past the first "
                     f"{_ARCHIVE_MAX_MEMBERS} not scanned"
                 )
-        return every_member or sources or bool(chosen) or bool(unread) or bool(unpeeked)
+        return (
+            every_member
+            or sources
+            or through
+            or hidden
+            or bool(chosen)
+            or bool(unread)
+            or bool(unpeeked)
+        )
+
+    def _unpacked_otherwise(
+        self,
+        report: _FileReport,
+        handle: IO[bytes],
+        members: list[zipfile.ZipInfo],
+        archive: zipfile.ZipFile,
+        size: int,
+    ) -> bool:
+        """Report a zip a person's unpacking tool may unpack otherwise than it lists; say if so.
+
+        A tool reading the zip from a pipe walks its local headers, not its central directory.
+        """
+        disagreement = unpacking_disagreement(
+            handle,
+            members,
+            archive.start_dir,
+            inflate_limit=max(_COMPRESSED_TAR_MIN_BYTES, _COMPRESSED_TAR_MAX_RATIO * size),
+        )
+        if disagreement is None:
+            return False
+        report.unscanned(
+            f"zip {disagreement}, so a tool that unpacks it by walking it may unpack members "
+            "otherwise than listed; not scanned"
+        )
+        return True
 
     def _choose_zip_members(
         self, archive: zipfile.ZipFile, members: list[zipfile.ZipInfo], *, every_member: bool
@@ -2613,6 +2811,10 @@ class PickleOpcodeRule(ArtifactRule):
             (entry.name for entry in listing.members if entry.issym() or entry.islnk()),
             (entry.name for entry in listing.members if _tar_name_coded(entry)),
         )
+        through = _through_link(
+            report,
+            (((entry.name,), entry.issym() or entry.islnk()) for entry in listing.members),
+        )
         chosen = [
             index
             for index, entry in enumerate(listing.members)
@@ -2627,7 +2829,7 @@ class PickleOpcodeRule(ArtifactRule):
                 f"tar holds {len(chosen)} members named as models; members past the "
                 f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
             )
-        return torch_named or sources or bool(chosen or unread)
+        return torch_named or sources or through or bool(chosen or unread)
 
     def _scan_tar_member(self, report: _FileReport, reading: _TarReading, index: int) -> bool:
         """Scan one tar member and return whether the archive's opcode budget ran out in it.
@@ -2639,6 +2841,8 @@ class PickleOpcodeRule(ArtifactRule):
         name = reading.listing.members[index].name
         kind = _Member.SNIFFED if _member_suffix(name) in _SNIFFED_SUFFIXES else _Member.PICKLE
         target = reading.listing.resolve(index)
+        if target is not None and stored_sparse(target):
+            report.unscanned(_sparse_reason(name))
         raw: bytes | None = None
         if target is not None and holds_file_data(target):
             judged = (target.offset, kind, _legacy_layout(name))

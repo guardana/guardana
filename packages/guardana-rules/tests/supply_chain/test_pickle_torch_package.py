@@ -532,12 +532,6 @@ _SOURCE_BESIDE_A_DATA_LINK = {"top/store/extern_modules": b"", "top/pkg/__init__
         ),
         (
             "release.zip",
-            _zip({**_MARKER_ELSEWHERE, **_MARKED}, {"top/other": "x", **_MARKER_DIRECTORY_LINKED}),
-            _MAKING,
-            "top/.DATA",
-        ),
-        (
-            "release.zip",
             _zip(_SOURCE_BESIDE_A_DATA_LINK, {"top/.data": "store"}),
             _MAKING,
             "top/.data",
@@ -562,7 +556,6 @@ _SOURCE_BESIDE_A_DATA_LINK = {"top/store/extern_modules": b"", "top/pkg/__init__
         "gzip-tar-hard-link-data",
         "zip-data-link-cut-at-a-nul",
         "zip-data-link-unicode-path",
-        "zip-data-link-after-another",
         "zip-data-link-and-source-alone",
         "tar-data-link-and-source-alone",
     ],
@@ -580,6 +573,22 @@ def test_a_link_beside_or_making_a_package_leaves_the_archive_unscanned(
         summary.format(container=container, link=link)
     ]
     assert str(tmp_path / name) in ctx.examined_paths()
+
+
+def test_a_marker_below_a_link_named_as_its_directory_is_reported_both_ways(
+    tmp_path: Path,
+) -> None:
+    """Another link listed first does not hide the one named as the marker's directory."""
+    links = {"top/other": "x", **_MARKER_DIRECTORY_LINKED}
+    (tmp_path / "release.zip").write_bytes(_zip({**_MARKER_ELSEWHERE, **_MARKED}, links))
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.evidence.summary for f in findings] == [
+        _MAKING.format(container="zip", link="top/.DATA"),
+        f"zip member lies at or below the link member top/.DATA (top/{_MARKER}), so an "
+        "unpacking tool may follow or replace the link; not scanned",
+    ]
 
 
 @pytest.mark.parametrize(

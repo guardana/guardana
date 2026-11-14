@@ -5,6 +5,7 @@ any member can be read. Each archive here declares its size in a few crafted byt
 than holding it; nothing is unpickled.
 """
 
+import gzip
 import io
 import os
 import re
@@ -365,7 +366,9 @@ def test_extended_headers_in_front_of_one_member_count_together(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(_tar, "TAR_EXTENDED_HEADER_MAX_BYTES", 1024)
-    long_name = _header("././@LongLink", tarfile.GNUTYPE_LONGNAME, 768) + _padded(bytes(768))
+    long_name = _header("././@LongLink", tarfile.GNUTYPE_LONGNAME, 768) + _padded(
+        b"pickle".ljust(768, b"\x00")
+    )
     pax = _header("././@PaxHeader", tarfile.XHDTYPE, 768) + _padded(bytes(768))
     content = long_name + pax + _member("pickle", _SYSTEM) + _END
     calls = _tar_spy(monkeypatch)
@@ -381,11 +384,11 @@ def _fake_oversized_header() -> bytes:
     return _header("././@PaxHeader", tarfile.XHDTYPE, _HUGE)
 
 
-def test_a_pax_size_that_covers_a_header_shaped_block_is_followed_past_it(
+def test_a_pax_size_past_data_shaped_as_no_header_is_followed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The member's PAX size, not its header's, says where `tarfile` reads the next header."""
-    data = _fake_oversized_header()
+    data = b"\xff" * tarfile.BLOCKSIZE
     content = (
         _pax(tarfile.XHDTYPE, _record("size", str(len(data))))
         + _member("notes.txt", data, declared=0)
@@ -398,6 +401,24 @@ def test_a_pax_size_that_covers_a_header_shaped_block_is_followed_past_it(
 
     assert calls
     assert _critical(result)
+
+
+def test_a_pax_size_past_a_header_shaped_block_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """busybox keeps the header's own size, so it reads the member's first block as a header."""
+    data = _member("model.pkl", _SYSTEM)
+    content = (
+        _pax(tarfile.XHDTYPE, _record("size", str(len(data))))
+        + _member("notes.txt", data, declared=0)
+        + _END
+    )
+    calls = _tar_spy(monkeypatch)
+
+    result = _run(tmp_path, "model.pth.tar", content)
+
+    assert calls == []
+    _assert_refused_saying(result, tmp_path / "model.pth.tar", "read a header at byte 1536")
 
 
 def test_a_pax_size_that_uncovers_a_header_shaped_block_is_refused(
@@ -415,7 +436,7 @@ def test_a_pax_size_that_uncovers_a_header_shaped_block_is_refused(
     result = _run(tmp_path, "model.pth.tar", content)
 
     assert calls == []
-    _assert_refused(result, tmp_path / "model.pth.tar", _tar.TAR_EXTENDED_HEADER_MAX_BYTES)
+    _assert_refused_saying(result, tmp_path / "model.pth.tar", "smaller than its header's")
 
 
 def _checksummed(block: bytearray) -> bytes:
@@ -445,36 +466,50 @@ def _damaged(member: bytes) -> bytes:
     return bytes(block)
 
 
-def _sparse_old_gnu() -> bytes:
-    block = bytearray(_header("sparse.bin", tarfile.GNUTYPE_SPARSE, 0, tarfile.GNU_FORMAT))
-    block[482] = 1
-    return _checksummed(block) + bytes(tarfile.BLOCKSIZE)
+def _sparse_old_gnu(*, extended: bool = False, name: str = "disk.img", data: bytes = b"") -> bytes:
+    """An old GNU sparse member holding `data` as one region, with an extension block if
+    `extended`."""
+    block = bytearray(_header(name, tarfile.GNUTYPE_SPARSE, len(data), tarfile.GNU_FORMAT))
+    if data:
+        block[386:410] = b"%011o\x00%011o\x00" % (0, len(data))
+        block[483:495] = b"%011o\x00" % len(data)
+    block[482] = extended
+    return _checksummed(block) + bytes(tarfile.BLOCKSIZE * extended) + _padded(data)
 
 
 _SIBLING = _member("ck/data.pkl", _SYSTEM) + _END
 
 
-def _sparse_10(fields: list[int], *, data: int = 0, extra: bytes = b"") -> bytes:
+def _sparse_10(
+    fields: list[int],
+    data: bytes = b"",
+    *,
+    name: str = "ck/disk.img",
+    real_size: int = 20971520,
+    extra: bytes = b"",
+) -> bytes:
     """A sparse 1.0 member as bsdtar writes one: its map at the start of its data."""
     sparse_map = _padded(f"{len(fields) // 2}\n".encode() + b"".join(b"%d\n" % n for n in fields))
     records = (
         _record("GNU.sparse.major", "1"),
         _record("GNU.sparse.minor", "0"),
-        _record("GNU.sparse.name", "ck/weights.bin"),
-        _record("GNU.sparse.realsize", "20971520"),
+        _record("GNU.sparse.name", name),
+        _record("GNU.sparse.realsize", str(real_size)),
     )
-    header = _header("ck/GNUSparseFile.0/weights.bin", tarfile.REGTYPE, len(sparse_map) + data)
-    return _pax(tarfile.XHDTYPE, *records, extra) + header + sparse_map + _padded(bytes(data))
+    directory, _, base = name.rpartition("/")
+    stored_as = f"{directory}/GNUSparseFile.0/{base}" if directory else f"GNUSparseFile.0/{base}"
+    header = _header(stored_as, tarfile.REGTYPE, len(sparse_map) + len(data))
+    return _pax(tarfile.XHDTYPE, *records, extra) + header + sparse_map + _padded(data)
 
 
 @pytest.mark.parametrize(
     "content",
     [
         _sparse_10([0, 0, 20971520, 0]) + _SIBLING,
-        _sparse_10([0, 3], data=3) + _SIBLING,
+        _sparse_10([0, 3], b"abc") + _SIBLING,
         _sparse_old_gnu() + _SIBLING,
         _pax(tarfile.XHDTYPE, _record("GNU.sparse.map", "0,3"))
-        + _member("ck/weights.bin", b"abc")
+        + _member("ck/disk.img", b"abc")
         + _SIBLING,
         _pax(
             tarfile.XHDTYPE,
@@ -482,13 +517,10 @@ def _sparse_10(fields: list[int], *, data: int = 0, extra: bytes = b"") -> bytes
             _record("GNU.sparse.offset", "0"),
             _record("GNU.sparse.numbytes", "3"),
         )
-        + _member("ck/weights.bin", b"abc")
-        + _SIBLING,
-        _pax(tarfile.XGLTYPE, _record("GNU.sparse.map", "0,0"))
-        + _member("ck/weights.bin", b"")
+        + _member("ck/disk.img", b"abc")
         + _SIBLING,
     ],
-    ids=["bsdtar-1.0", "1.0-with-data", "gnu-type-s", "pax-0.1", "pax-0.0", "global-0.1"],
+    ids=["bsdtar-1.0", "1.0-with-data", "gnu-type-s", "pax-0.1", "pax-0.0"],
 )
 def test_a_sparse_member_is_followed_to_the_members_after_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes
@@ -502,8 +534,75 @@ def test_a_sparse_member_is_followed_to_the_members_after_it(
     assert _unscanned(result) == []
 
 
-def _long_name(size: int = 0) -> bytes:
-    return _header("././@LongLink", tarfile.GNUTYPE_LONGNAME, size) + _padded(bytes(size))
+_NONE = b"\x80\x02N."
+_SPARSE_LAYOUTS = ["gnu-type-s", "1.0", "pax-0.1", "pax-0.0", "real-size-alone"]
+
+
+def _stored_sparse(layout: str, name: str, data: bytes) -> bytes:
+    """`data` stored as one sparse region of the member `name`, laid out as `layout`."""
+    size = str(len(data))
+    if layout == "gnu-type-s":
+        return _sparse_old_gnu(name=name, data=data)
+    if layout == "1.0":
+        return _sparse_10([0, len(data)], data, name=name, real_size=len(data))
+    records = {
+        "pax-0.1": (_record("GNU.sparse.map", f"0,{size}"),),
+        "pax-0.0": (
+            _record("GNU.sparse.size", size),
+            _record("GNU.sparse.offset", "0"),
+            _record("GNU.sparse.numbytes", size),
+        ),
+        "real-size-alone": (_record("GNU.sparse.realsize", size),),
+    }[layout]
+    return _pax(tarfile.XHDTYPE, *records) + _member(name, data)
+
+
+def _as(archive: str, content: bytes) -> bytes:
+    return gzip.compress(content) if archive.endswith(".gz") else content
+
+
+@pytest.mark.parametrize("layout", _SPARSE_LAYOUTS)
+@pytest.mark.parametrize("archive", ["bundle.tar", "bundle.tar.gz"])
+def test_a_sparse_member_named_as_a_model_is_read_as_tarfile_unpacks_it_and_reported(
+    tmp_path: Path, archive: str, layout: str
+) -> None:
+    """Tar readers fill a sparse member's holes each their own way, or not at all."""
+    content = _stored_sparse(layout, "ck/weights.pkl", _SYSTEM) + _END
+
+    result = _run(tmp_path, archive, _as(archive, content))
+
+    assert _critical(result)
+    assert [s for s in _unscanned(result) if "stored sparse" in s and "ck/weights.pkl" in s]
+
+
+@pytest.mark.parametrize("layout", _SPARSE_LAYOUTS)
+@pytest.mark.parametrize("archive", ["bundle.tar", "bundle.tar.gz"])
+def test_a_clean_sparse_member_named_as_a_model_never_passes(
+    tmp_path: Path, archive: str, layout: str
+) -> None:
+    content = _stored_sparse(layout, "ck/weights.pkl", _NONE) + _END
+
+    result = _run(tmp_path, archive, _as(archive, content))
+
+    assert _critical(result) == []
+    assert [s for s in _unscanned(result) if "stored sparse" in s and "ck/weights.pkl" in s]
+    assert exit_code_for(gate_outcome(result, Policy())) == 2
+
+
+def test_a_link_to_a_sparse_member_is_reported_by_the_link_name(tmp_path: Path) -> None:
+    link = tarfile.TarInfo("ck/weights.pkl")
+    link.type = tarfile.LNKTYPE
+    link.linkname = "ck/disk.img"
+    content = _stored_sparse("pax-0.1", "ck/disk.img", _NONE) + link.tobuf() + _END
+
+    result = _run(tmp_path, "bundle.tar", content)
+
+    assert [s for s in _unscanned(result) if "stored sparse" in s and "ck/weights.pkl" in s]
+    assert exit_code_for(gate_outcome(result, Policy())) == 2
+
+
+def _long_name(name: bytes = b"ck/weights.bin", kind: bytes = tarfile.GNUTYPE_LONGNAME) -> bytes:
+    return _header("././@LongLink", kind, len(name)) + _padded(name)
 
 
 def _sized(*records: bytes) -> bytes:
@@ -523,11 +622,10 @@ def _sized(*records: bytes) -> bytes:
         + _padded(b"0\n")
         + _SIBLING,
         _sized() + _sparse_old_gnu() + _SIBLING,
-        _sized() + _long_name(4) + _member("ck/weights.bin", b"") + _SIBLING,
-        _sized() + _sized() + _member("ck/weights.bin", b"") + _SIBLING,
+        _sized() + _long_name() + _member("ck/weights.bin", b"") + _SIBLING,
         _sized(_record("GNU.sparse.realsize", "0")) + _member("ck/weights.bin", b"") + _SIBLING,
     ],
-    ids=["sparse-1.0-map", "gnu-type-s", "long-name-between", "two-sizes", "sparse-realsize"],
+    ids=["sparse-1.0-map", "gnu-type-s", "long-name-between", "sparse-realsize"],
 )
 def test_a_pax_size_tarfile_releases_place_differently_is_refused_unopened(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes
@@ -552,12 +650,6 @@ def test_a_pax_size_tarfile_releases_place_differently_is_refused_unopened(
             "more than 4 regions",
         ),
         (
-            _pax(tarfile.XGLTYPE, _record("GNU.sparse.map", ",".join(["0,1"] * 5)))
-            + _member("ck/weights.bin", b"")
-            + _SIBLING,
-            "more than 4 regions",
-        ),
-        (
             _pax(
                 tarfile.XHDTYPE,
                 _record("GNU.sparse.size", "0"),
@@ -567,15 +659,14 @@ def test_a_pax_size_tarfile_releases_place_differently_is_refused_unopened(
             + _SIBLING,
             "more than 4 regions",
         ),
-        (_sparse_old_gnu() + _SIBLING, "more than 4 regions"),
+        (_sparse_old_gnu() * 2 + _SIBLING, "more than 4 regions"),
         (_sparse_10([10**500] * 6) + _SIBLING, "oversized map"),
     ],
     ids=[
         "1.0-entries",
         "0.1-entries",
-        "global-entries",
         "0.0-entries",
-        "gnu-s-blocks",
+        "gnu-s-headers",
         "1.0-bytes",
     ],
 )
@@ -641,7 +732,7 @@ def test_an_error_tarfile_raises_while_listing_is_reported_unscanned(
 ) -> None:
     """`tarfile` raises IndexError on a sparse member cut inside its extension blocks."""
     monkeypatch.setattr(pickle_opcode, "listing_refusal", lambda *_args, **_kwargs: None)
-    content = _sparse_old_gnu()[: tarfile.BLOCKSIZE]
+    content = _sparse_old_gnu(extended=True)[: tarfile.BLOCKSIZE]
 
     result = _run(tmp_path, "model.pth.tar", content)
 
@@ -660,16 +751,13 @@ def test_an_error_tarfile_raises_while_listing_is_reported_unscanned(
         ),
         (
             _pax(tarfile.XHDTYPE, _record("size", "-512")) + _member("m", b"") + _END,
-            "negative size at byte 1024",
+            "PAX header at byte 0 whose size record",
         ),
         (
             _pax(tarfile.XHDTYPE, b"99 size=1\n") + _member("m", b"") + _END,
             "malformed PAX header at byte 0",
         ),
-        (
-            _header("././@LongLink", tarfile.GNUTYPE_LONGNAME, 0),
-            "damaged header at byte 512",
-        ),
+        (_long_name(), "damaged header at byte 1024"),
     ],
     ids=["damaged-checksum", "negative-pax-size", "pax-framing", "ends-in-extended"],
 )
@@ -702,7 +790,7 @@ def test_headers_past_the_bound_for_the_entries_are_refused(
     """Every header counts, the extended ones in front of each member included."""
     monkeypatch.setattr(pickle_opcode, "_ARCHIVE_MAX_ENTRIES", 2)
     bound = 2 * _tar.TAR_HEADERS_PER_ENTRY
-    member = _long_name() * 4 + _member("m", b"")
+    member = _pax(tarfile.XGLTYPE, _record("comment", "x")) * 3 + _long_name() + _member("m", b"")
     calls = _tar_spy(monkeypatch)
 
     result = _run(tmp_path, "model.pth.tar", member * 2 + _END)
@@ -739,6 +827,346 @@ def _formatted_tar(fmt: int, *, pax_headers: dict[str, str] | None = None) -> by
     ids=["ustar", "gnu", "pax", "pax-global"],
 )
 def test_a_tar_within_the_bounds_is_still_scanned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes
+) -> None:
+    calls = _tar_spy(monkeypatch)
+
+    result = _run(tmp_path, "bundle.tar", content)
+
+    assert calls
+    assert _critical(result)
+    assert _unscanned(result) == []
+
+
+def _edited(member: bytes, *fields: tuple[int, bytes]) -> bytes:
+    """`member` with each `(offset, bytes)` written into its header, the checksum redone."""
+    header = bytearray(member[: tarfile.BLOCKSIZE])
+    for at, value in fields:
+        header[at : at + len(value)] = value
+    return _checksummed(header) + member[tarfile.BLOCKSIZE :]
+
+
+def _prefixed(member: bytes, magic: bytes) -> bytes:
+    """`member` with its magic and version set to `magic` and its prefix field holding `zz`."""
+    return _edited(member, (257, magic), (345, b"zz"))
+
+
+_POSIX_MAGIC = b"ustar\x0000"
+_GNU_MAGIC = b"ustar  \x00"
+_PICKLE = _member("model.pkl", _SYSTEM)
+_LINK_TO_PICKLE = _header("link", tarfile.SYMTYPE, 0)
+
+
+def _hard_link(name: str, target: str) -> bytes:
+    info = tarfile.TarInfo(name)
+    info.type = tarfile.LNKTYPE
+    info.linkname = target
+    return info.tobuf(tarfile.USTAR_FORMAT)
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        (
+            _pax(tarfile.XGLTYPE, _record("path", "readme.txt")) + _PICKLE,
+            "global PAX header at byte 0",
+        ),
+        (
+            _pax(tarfile.XGLTYPE, _record("linkpath", "a.txt")) + _PICKLE,
+            "global PAX header at byte 0",
+        ),
+        (
+            _pax(tarfile.XGLTYPE, _record("GNU.sparse.name", "model.pkl")) + _PICKLE,
+            "global PAX header at byte 0",
+        ),
+        (_long_name(b"readme.txt") + _long_name(b"model.pkl") + _PICKLE, "more than one name"),
+        (
+            _pax(tarfile.XHDTYPE, _record("path", "readme.txt"))
+            + _pax(tarfile.XHDTYPE, _record("path", "model.pkl"))
+            + _PICKLE,
+            "more than one name",
+        ),
+        (_sized() + _sized() + _member("ck/weights.bin", b"") + _SIBLING, "more than one name"),
+        (
+            _long_name(b"readme.txt")
+            + _pax(tarfile.XHDTYPE, _record("path", "model.pkl"))
+            + _PICKLE,
+            "more than one name",
+        ),
+        (
+            _long_name(b"a.txt", tarfile.GNUTYPE_LONGLINK)
+            + _long_name(b"model.pkl", tarfile.GNUTYPE_LONGLINK)
+            + _LINK_TO_PICKLE
+            + _PICKLE,
+            "more than one name",
+        ),
+        (
+            _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "model.pkl"), _record("path", "a.txt"))
+            + _PICKLE,
+            "more than one name",
+        ),
+        (_pax(tarfile.XHDTYPE, _record("path", "")) + _PICKLE, "empty name"),
+        (_pax(tarfile.XHDTYPE, _record("linkpath", "")) + _LINK_TO_PICKLE + _PICKLE, "empty name"),
+        (_long_name(b"") + _PICKLE, "empty name"),
+        (_long_name(bytes(4)) + _PICKLE, "empty name"),
+        (_pax(tarfile.XHDTYPE, _record("path", "model.pkl\x00.txt")) + _PICKLE, "NUL byte"),
+        (
+            _long_name(b"a.txt", tarfile.GNUTYPE_LONGLINK)
+            + _pax(tarfile.XHDTYPE, _record("linkpath", "model.pkl"))
+            + _LINK_TO_PICKLE
+            + _PICKLE,
+            "more than one name",
+        ),
+        (_prefixed(_PICKLE, _GNU_MAGIC), "prefix field"),
+        (_prefixed(_PICKLE, bytes(8)), "prefix field"),
+        (_prefixed(_PICKLE, b"ustar\x00xx"), "prefix field"),
+        (
+            _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "readme.txt")) + _PICKLE,
+            "sparse name busybox does not read",
+        ),
+        (
+            _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "ck/readme.txt"))
+            + _member("ck/GNUSparseFile.0/model.pkl", _SYSTEM),
+            "sparse name busybox does not read",
+        ),
+        (
+            _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "ck/model.pkl"))
+            + _member("ck/GNUSparseFiles/model.pkl", _SYSTEM),
+            "sparse name busybox does not read",
+        ),
+        (
+            _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "model.pkl"))
+            + _member("ck/GNUSparseFile.0/model.pkl", _SYSTEM),
+            "sparse name busybox does not read",
+        ),
+        (
+            _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "ck/model.pkl"))
+            + _member("ck/GNUSparseFile./model.pkl", _SYSTEM),
+            "sparse name busybox does not read",
+        ),
+        (_sparse_10([0, 3], b"abc") + _LINK_TO_PICKLE, "a link at byte"),
+        (_LINK_TO_PICKLE + _sparse_10([0, 3], b"abc"), "a link at byte"),
+        (_sparse_10([0, 3], b"abc") + _hard_link("hard", "ck/disk.img"), "a link at byte"),
+    ],
+    ids=[
+        "global-path",
+        "global-link-path",
+        "global-sparse-name",
+        "two-long-names",
+        "two-pax-paths",
+        "two-pax-headers",
+        "long-name-and-pax-path",
+        "two-long-links",
+        "sparse-name-and-path",
+        "empty-pax-path",
+        "empty-pax-link-path",
+        "empty-long-name",
+        "long-name-of-nuls",
+        "pax-path-holding-a-nul",
+        "long-link-and-pax-link-path",
+        "prefix-under-gnu-magic",
+        "prefix-under-no-magic",
+        "prefix-under-another-version",
+        "sparse-name-busybox-does-not-read",
+        "sparse-directory-of-another-file",
+        "sparse-directory-misnamed",
+        "sparse-directory-elsewhere",
+        "sparse-directory-without-a-number",
+        "sparse-directory-then-link",
+        "link-then-sparse-directory",
+        "sparse-directory-then-hard-link",
+    ],
+)
+def test_a_header_tar_readers_name_differently_is_refused_unopened(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes, reason: str
+) -> None:
+    """`tarfile` and a `tar` command may give the member different names; neither is trusted."""
+    calls = _tar_spy(monkeypatch)
+
+    result = _run(tmp_path, "bundle.tar", content + _END)
+
+    assert calls == []
+    _assert_refused_saying(result, tmp_path / "bundle.tar", reason)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        _pax(tarfile.XHDTYPE, _record("path", "model.pkl"), _record("GNU.sparse.name", "model.pkl"))
+        + _PICKLE,
+        _long_name(b"model.pkl") + _pax(tarfile.XHDTYPE, _record("mtime", "0")) + _PICKLE,
+        _pax(tarfile.XGLTYPE, _record("comment", "release")) + _PICKLE,
+        _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "./model.pkl")) + _PICKLE,
+        _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "model.pkl"))
+        + _member("./GNUSparseFile.4242/model.pkl", _SYSTEM),
+        _pax(tarfile.XHDTYPE, _record("path", "model.pkl"), _record("GNU.sparse.name", "model.pkl"))
+        + _member("other.bin", _SYSTEM),
+        _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "ck/model.pkl"))
+        + _edited(_member("model.pkl", _SYSTEM), (345, b"ck")),
+        _pax(tarfile.XHDTYPE, _record("GNU.sparse.name", "ck/model.pkl"))
+        + _member("ck//model.pkl", _SYSTEM),
+        _pax(tarfile.XHDTYPE, _record("linkpath", "x/")) + _PICKLE,
+    ],
+    ids=[
+        "path-and-sparse-name-agree",
+        "long-name-and-unnamed-pax",
+        "global-comment",
+        "sparse-name-repeats-the-header-name",
+        "gnu-tar-sparse-directory",
+        "path-and-sparse-name-agree-over-another-header-name",
+        "sparse-name-repeats-the-prefixed-header-name",
+        "sparse-name-repeats-the-header-name-past-a-doubled-slash",
+        "pax-link-path-ending-in-a-slash-on-a-file",
+    ],
+)
+def test_headers_tar_readers_name_alike_are_scanned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes
+) -> None:
+    calls = _tar_spy(monkeypatch)
+
+    result = _run(tmp_path, "bundle.tar", content + _END)
+
+    assert calls
+    assert _critical(result)
+    assert _unscanned(result) == []
+
+
+_HIDDEN = _member("model.pkl", _SYSTEM)
+_FIRST = _member("readme0.txt", b"hello\n")
+
+
+def _sized_as(text: bytes) -> bytes:
+    """A member whose size field reads `text`, holding `_HIDDEN` for whoever reads 1024 bytes."""
+    return _edited(_header("readme.txt", tarfile.REGTYPE, 0), (124, text)) + _HIDDEN
+
+
+def _checksum_as(spell: bytes) -> bytes:
+    """A 1024-byte member holding `_HIDDEN`, its checksum spelled `spell` % the checksum."""
+    header = bytearray(_header("readme.txt", tarfile.REGTYPE, 2 * tarfile.BLOCKSIZE))
+    header[148:156] = b" " * 8
+    total = sum(header)
+    header[148:156] = spell % total if b"%" in spell else spell + total.to_bytes(7, "big")
+    return bytes(header) + _HIDDEN
+
+
+def _gnu_sparse_fields(member: bytes) -> bytes:
+    """`member` under the GNU magic with an old sparse entry, which only some readers apply."""
+    return _edited(member, (257, _GNU_MAGIC), (386, b"00000000001\x00"), (398, b"00000000001\x00"))
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        (_FIRST + _sized_as(b"+0000002000\x00"), "size or checksum field"),
+        (_FIRST + _sized_as(b"0_000002000\x00"), "size or checksum field"),
+        (_FIRST + _sized_as(b"0o000002000\x00"), "size or checksum field"),
+        (_FIRST + _sized_as(b"\n0000002000\x00"), "size or checksum field"),
+        (_FIRST + _sized_as(b"\x000000002000\x00"), "size or checksum field"),
+        (_FIRST + _sized_as(b"\t0000002000\x00"), "size or checksum field"),
+        (_FIRST + _sized_as(b"\x80\x00\x00\x00\x80" + bytes(7)), "size or checksum field"),
+        (_FIRST + _checksum_as(b"+%06o\x00"), "size or checksum field"),
+        (_FIRST + _checksum_as(b"\x80"), "size or checksum field"),
+        (_edited(_sparse_old_gnu(), (257, _POSIX_MAGIC)) + _SIBLING, "without the GNU magic"),
+        (_sparse_old_gnu(extended=True) + _SIBLING, "extension blocks"),
+        (_gnu_sparse_fields(_PICKLE) + _END, "GNU sparse fields"),
+        (_edited(_PICKLE, (257, _GNU_MAGIC), (386, b"\x01")) + _END, "GNU sparse fields"),
+        (_edited(_PICKLE, (257, _GNU_MAGIC), (483, b"00000000001\x00")) + _END, "GNU sparse"),
+        (_member("dir/", _HIDDEN), "as a directory"),
+        (_pax(tarfile.XHDTYPE, _record("path", "dir/")) + _member("x", _HIDDEN), "as a directory"),
+        (_long_name(b"dir/") + _member("x", _HIDDEN), "as a directory"),
+        (
+            _pax(tarfile.XHDTYPE, _record("path", "dir/"))
+            + _header("x", tarfile.AREGTYPE, len(_HIDDEN))
+            + _HIDDEN,
+            "as a directory",
+        ),
+        (
+            _header("x", tarfile.LNKTYPE, tarfile.BLOCKSIZE) + _member("model.pkl", b""),
+            "a size although",
+        ),
+        (
+            _pax(tarfile.XHDTYPE, _record("size", "1024")) + _header("l", tarfile.SYMTYPE, 0),
+            "a size although",
+        ),
+        (_header("d", tarfile.DIRTYPE, len(_HIDDEN)) + _HIDDEN, "a size although"),
+        (_pax(tarfile.XHDTYPE, _record("size", "+1024")) + _member("m", b""), "size record"),
+        (_pax(tarfile.XHDTYPE, _record("size", "1_024")) + _member("m", b""), "size record"),
+        (_pax(tarfile.XHDTYPE, _record("size", "")) + _member("m", b""), "size record"),
+        (_pax(tarfile.XGLTYPE, _record("size", "0")) + _PICKLE, "global PAX header at byte 0"),
+        (
+            _pax(tarfile.XGLTYPE, _record("GNU.sparse.map", "0,0")) + _PICKLE,
+            "global PAX header at byte 0",
+        ),
+        (
+            _pax(tarfile.XGLTYPE, _record("GNU.sparse.size", str(len(_SYSTEM)))) + _PICKLE,
+            "global PAX header at byte 0",
+        ),
+    ],
+    ids=[
+        "size-plus",
+        "size-underscore",
+        "size-0o",
+        "size-leading-newline",
+        "size-leading-nul",
+        "size-leading-tab",
+        "size-base256-of-63-bits",
+        "checksum-plus",
+        "checksum-base256",
+        "sparse-under-posix-magic",
+        "sparse-with-extension-blocks",
+        "gnu-sparse-entry-on-a-file",
+        "gnu-sparse-first-byte-on-a-file",
+        "gnu-real-size-on-a-file",
+        "file-named-as-a-directory",
+        "pax-path-named-as-a-directory",
+        "long-name-named-as-a-directory",
+        "old-file-with-a-pax-path-named-as-a-directory",
+        "hard-link-with-data",
+        "symlink-with-a-pax-size",
+        "directory-with-a-size",
+        "pax-size-plus",
+        "pax-size-underscore",
+        "pax-size-empty",
+        "global-size",
+        "global-sparse-map",
+        "global-sparse-size",
+    ],
+)
+def test_a_header_tar_readers_lay_out_differently_is_refused_unopened(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes, reason: str
+) -> None:
+    """A reader that reads another size, skip or layout unpacks members `tarfile` never lists."""
+    calls = _tar_spy(monkeypatch)
+
+    result = _run(tmp_path, "bundle.tar", content + _END)
+
+    assert calls == []
+    _assert_refused_saying(result, tmp_path / "bundle.tar", reason)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        _edited(_PICKLE, (124, (b"     %o " % len(_SYSTEM)).ljust(12, b"\x00"))) + _END,
+        _header("dir/", tarfile.AREGTYPE, 0) + _PICKLE + _END,
+        _member("dir/", b"") + _PICKLE + _END,
+        _header("l", tarfile.LNKTYPE, 0, tarfile.GNU_FORMAT) + _PICKLE + _END,
+        _edited(_member("empty.txt", b""), (124, bytes(12))) + _PICKLE + _END,
+        _pax(tarfile.XHDTYPE, _record("size", "200"))
+        + _member("notes.txt", bytes(200), declared=100)
+        + _PICKLE
+        + _END,
+    ],
+    ids=[
+        "size-padded-with-spaces",
+        "old-directory",
+        "empty-file-named-as-a-directory",
+        "gnu-hard-link",
+        "size-all-nul",
+        "pax-size-in-the-blocks-of-the-header-size",
+    ],
+)
+def test_headers_tar_readers_lay_out_alike_are_scanned(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes
 ) -> None:
     calls = _tar_spy(monkeypatch)
@@ -934,16 +1362,33 @@ def _with_base256_size(content: bytes, size: int) -> bytes:
     return bytes(header) + content[tarfile.BLOCKSIZE :]
 
 
-@pytest.mark.parametrize("size", [2**62, 2**80], ids=["past-the-end", "past-a-seek-offset"])
+@pytest.mark.parametrize(
+    ("size", "reason"),
+    [(2**62, "past its"), (2**80, "size or checksum field")],
+    ids=["past-the-end", "past-what-tar-readers-agree-on"],
+)
 def test_a_tar_member_sized_past_the_archive_is_refused_without_a_rule_error(
-    tmp_path: Path, size: int
+    tmp_path: Path, size: int, reason: str
 ) -> None:
     content = _with_base256_size(_formatted_tar(tarfile.USTAR_FORMAT), size)
 
     result = _run(tmp_path, "model.pth.tar", content)
 
     assert result.errors == ()
-    _assert_refused_saying(result, tmp_path / "model.pth.tar", "past its")
+    _assert_refused_saying(result, tmp_path / "model.pth.tar", reason)
+
+
+def test_a_base256_size_tar_readers_agree_on_is_scanned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GNU tar writes a size past 8 GiB in base-256, which every reader takes alike."""
+    member = _member("model.pkl", _SYSTEM)
+    calls = _tar_spy(monkeypatch)
+
+    result = _run(tmp_path, "bundle.tar", _with_base256_size(member, len(_SYSTEM)) + _END)
+
+    assert calls
+    assert _critical(result)
 
 
 def _with_far_zip64_locator(content: bytes) -> bytes:

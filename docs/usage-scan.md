@@ -275,7 +275,10 @@ more than 400,000 headers, a compressed tar's headers included; more than 8 exte
 front of one member; more than 1,000,000 global PAX records applied, counting the records
 in force once for every member and PAX header after them; sparse maps listing more than
 100,000 regions in all, or one stored in a member's data over 1 MiB; or a header the
-scanner cannot follow. A sparse member within those bounds is read like any other. An
+scanner cannot follow. When the rule reads a sparse member within those bounds, it reads it as
+`tarfile` unpacks it and also reports a `LOW` "Unscanned model file" finding and an
+`unexamined_component` coverage shortfall naming it: other tar readers can unpack different
+bytes. An
 archive that holds no model but exceeds the entry bound, such as an image dataset,
 is reported not scanned like any other refused archive. Exclude it from the scan
 with `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an archive), or
@@ -396,14 +399,44 @@ also read as a stream when its first bytes are not a zip's,
 and a file that starts with an end record is opened as a zip, as `np.load` does. In a
 legacy tar, the `storages` and `tensors` members are read as `torch.load` reads them, a
 pickle before each run of raw tensor bytes; a layout it cannot follow is a coverage
-shortfall. Any file `pickle_opcode` reads
-that does not start as a zip and whose first 512-byte block is a tar header (`ustar`, or
-the older v7 form without `ustar` magic) is read as a tar, whatever it is named, because
-`torch.load` opens a legacy `torch.save` file that way. The same file is also read as the
+shortfall. A file that starts as a zip and whose first 512-byte block is a tar header is also
+read as a tar, because the `tar` commands read it that way; findings from both readings are
+reported. Any file `pickle_opcode` reads that does not start as a zip and whose first 512-byte
+block is a tar header (`ustar`, or the older v7 form without `ustar` magic) is read as a tar,
+whatever it is named, because `torch.load` opens a legacy `torch.save` file that way. The same
+file is also read as the
 single pickle stream `pickle.load` would read from those bytes, and findings from both
 readings are reported; when the file is named `*.pth.tar` or `*.pt.tar`, or the tar holds a
-member named as a model, the stream counts only if its bytes are a pickle. Inside a tar, a member that several links name is read once for each
-way it is judged, not once per link. A model with no built-in rule is a coverage shortfall
+member named as a model, the stream counts only if its bytes are a pickle. Inside a tar, a
+member that several links name is read once for each way it is judged, not once per link. A
+tar, compressed or not, whose headers `tarfile` and the `tar` commands read as different names,
+sizes or layouts is a coverage shortfall. This covers size or checksum fields; missing GNU
+sparse magic, sparse extension blocks and sparse fields on other types; PAX sparse names
+`busybox` ignores, unless the header gives the same name or the name GNU tar and bsdtar write
+for a sparse file, one `GNUSparseFile.<n>` directory below the file's own; that directory
+alongside any link; global PAX names, sizes or layouts; PAX size parsing, sizes smaller than
+the header's or sizes readers ignore; data on types `tarfile` treats as empty or on
+directories; empty or NUL-containing names or link targets; prefixes; and multiple names or
+extended headers. A zip or tar listing a member at or below a symbolic or hard link's path is a
+coverage shortfall too: an unpacking tool follows or replaces the link. Names are compared as
+for `torch.package`, with every reading of zip names. A `.zip`, a file without a suffix or a
+zip named as a tar is also checked as a reader walking local headers reads it. Member
+boundaries include descriptors, with 8-byte sizes whenever the local header holds a ZIP64
+field. A local-header disagreement, overlapping members, data reaching the central directory,
+an unlisted local header, data ending differently at a descriptor or deflate stream, a decoding
+failure, or encryption or compression the scanner cannot decode to find an end is a coverage
+shortfall. So is exceeding the decompression bound (32 bytes for each byte of the file, and at
+least 64 MiB) or matching more than 100,000 data descriptor signatures while finding the ends.
+Zips named as models are read by their central directory. For `.zip`, `.tar`, `.tar.gz`,
+`.tgz`, `.tar.bz2`, `.tbz2`, `.tbz`, `.tar.xz` and `.txz`, in any case, another codec or
+archive format a `tar` command reads, zip data that does not start at the first byte, gzip,
+bzip2 or xz data holding no tar, or a compressed tar also indicating another codec or format
+after decompression is a coverage shortfall. So is a file holding nothing the rule reads,
+except empty files or at most 1 MiB of zeros. Git LFS pointers and 7z archives retain their
+handling. A gzip, bzip2 or xz tar named `.zip` is read as a compressed tar. These shortfalls
+produce a `LOW` "Unscanned model file" finding and an `unexamined_component` coverage shortfall
+naming the file. The summary names the header's byte offset or the member, or says what the
+file holds instead. A model with no built-in rule is a coverage shortfall
 too, so a scan holding one ends `indeterminate` (exit `2`) rather than clean. A rule left
 out by the profile reads nothing, so a profile that excludes
 `guardana.supply_chain.pickle_opcode` leaves every pickle unread. A third-party rule
