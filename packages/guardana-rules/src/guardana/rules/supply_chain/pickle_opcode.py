@@ -88,6 +88,8 @@ from guardana.rules.supply_chain._unpacking import (
     UNPACKING_PROBE_BYTES,
     archive_first,
     codec_first,
+    gnu_header_offset,
+    gnu_reads_as_tar,
     member_through_link,
     tar_bid,
 )
@@ -1625,6 +1627,13 @@ def _has_ustar_magic(data: bytes) -> bool:
     return data[_TAR_MAGIC_OFFSET : _TAR_MAGIC_OFFSET + len(_TAR_MAGIC)] == _TAR_MAGIC
 
 
+def _read_as_tar(report: "_FileReport", magic: bytes) -> bool:
+    """Whether `_read` reads the file as a tar from its first block, as `tarfile` lists it."""
+    if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
+        return _opens_as_tar(magic)
+    return _opens_as_tar(magic) or (report.tar_named and _has_ustar_magic(magic))
+
+
 def _opens_as_tar(head: bytes) -> bool:
     """Whether `tarfile` reads the first block of `head` as a tar header.
 
@@ -2083,7 +2092,7 @@ class PickleOpcodeRule(ArtifactRule):
             # A `tar` command reads a file whose first block is a tar header as a tar, zip
             # magic or not, so such a file is read both ways.
             as_zip = self._scan_zip(report)
-            as_tar = _opens_as_tar(magic) and self._scan_tar(report)
+            as_tar = _read_as_tar(report, magic) and self._scan_tar(report)
             return as_zip or as_tar or refused
         if report.plain_zip and _is_zip(path):
             # Whoever opens a plain `.zip` finds its members from the end record, wherever
@@ -2092,7 +2101,7 @@ class PickleOpcodeRule(ArtifactRule):
             # reported.
             as_zip = self._scan_zip(report)
             as_stream = self._read_unarchived(report, magic, by_content=True)
-            as_tar = _opens_as_tar(magic) and self._scan_tar(report)
+            as_tar = _read_as_tar(report, magic) and self._scan_tar(report)
             return as_zip or as_stream or as_tar or refused
         return self._read_unzipped(report, magic, by_content=by_content, refused=refused)
 
@@ -2114,7 +2123,7 @@ class PickleOpcodeRule(ArtifactRule):
                 f"{codec}-compressed file holds no tar this scanner reads, "
                 "which a tar command may still unpack; not scanned"
             )
-        if not (_opens_as_tar(magic) or (report.tar_named and _has_ustar_magic(magic))):
+        if not _read_as_tar(report, magic):
             if as_compressed_tar is not None:
                 return as_compressed_tar
             read = self._read_unarchived(report, magic, by_content=by_content)
@@ -2151,13 +2160,17 @@ class PickleOpcodeRule(ArtifactRule):
         probe = read_bytes_bounded(path, UNPACKING_PROBE_BYTES)
         head = magic if probe is None else probe[0]
         codec = codec_first(head)
-        if codec is not None:
-            if tar_codec(magic) is not None:
-                return False
-            report.unscanned(
-                f"file holds {codec} data that a tar command decodes before unpacking; not scanned"
-            )
+        read_plain = codec is None or gnu_reads_as_tar(head)
+        if read_plain and not _read_as_tar(report, magic) and self._gnu_tar_reads_a_header(report):
             return True
+        if codec is not None:
+            decodes_no_tar = tar_codec(magic) is None
+            if decodes_no_tar:
+                report.unscanned(
+                    f"file holds {codec} data that a tar command decodes before unpacking; "
+                    "not scanned"
+                )
+            return decodes_no_tar
         bid = tar_bid(magic)
         # The stream reading reports a 7z archive under any name.
         if bid >= TAR_OUTRANKS_ALL or magic.startswith(_7Z_MAGIC):
@@ -2170,6 +2183,27 @@ class PickleOpcodeRule(ArtifactRule):
         report.unscanned(
             f"file holds {found} archive data, which a tar command may unpack in place of "
             "what this scanner reads; not scanned"
+        )
+        return True
+
+    @staticmethod
+    def _gnu_tar_reads_a_header(report: _FileReport) -> bool:
+        """Refuse a file holding a block GNU tar reads as a tar header; return whether refused.
+
+        GNU tar skips the blocks it cannot read as headers and unpacks from the next one it
+        can, so a pickle, a zip or damaged bytes may hide a tar this scanner never lists.
+        """
+        try:
+            with open_regular(report.path) as source:
+                start = gnu_header_offset(source)
+        except OSError:
+            report.unscanned(_UNREADABLE)
+            return True
+        if start is None:
+            return False
+        report.unscanned(
+            f"GNU `tar` reads a header at byte {start} and unpacks data this scanner does not "
+            "read as a tar; not scanned"
         )
         return True
 

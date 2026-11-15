@@ -11,9 +11,11 @@ import bz2
 import gzip
 import io
 import lzma
+import struct
 import tarfile
 import tempfile
 import zipfile
+import zlib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -347,3 +349,135 @@ def test_a_tar_ordinary_tools_write_stays_clean(tmp_path: Path, content: bytes, 
 
 def test_a_file_without_a_suffix_is_left_to_its_head(tmp_path: Path) -> None:
     assert _scan(tmp_path, "bundle", b"\x28\xb5\x2f\xfd" + _INNER) == ([], [], False)
+
+
+def _gnu_tar_reads_at(start: int) -> str:
+    return (
+        f"GNU `tar` reads a header at byte {start} and unpacks data this scanner does not "
+        "read as a tar; not scanned"
+    )
+
+
+def _zip_hiding(content: bytes) -> tuple[bytes, int]:
+    """A stored zip whose second member's data puts `content` at a 512-aligned offset."""
+
+    def build(filler: int) -> tuple[bytes, int]:
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("archive/data.pkl", _CLEAN)
+            archive.writestr("archive/blob.bin", b"A" * filler + content)
+            info = archive.getinfo("archive/blob.bin")
+        return buffer.getvalue(), info.header_offset + 30 + len(info.filename) + len(info.extra)
+
+    _, data_at = build(0)
+    filler = -data_at % tarfile.BLOCKSIZE
+    return build(filler)[0], data_at + filler
+
+
+def _pickle_gnu_tar_reads_as_a_long_name() -> bytes:
+    """A pickle of one bytes object whose first block GNU tar alone reads as a long-name header.
+
+    The long name and a member importing `os.system` lie inside the bytes object, so the pickle
+    reads clean while GNU tar unpacks `model.pkl`.
+    """
+    stop = 3 * tarfile.BLOCKSIZE + 64
+    first = bytearray(tarfile.BLOCKSIZE)
+    first[:7] = b"\x80\x03B" + struct.pack("<I", stop - 7)
+    first[124:136] = b"%011o\x00" % len(b"model.pkl\x00")
+    first[156:157] = tarfile.GNUTYPE_LONGNAME
+    first[148:156] = b" " * 8
+    first[148:156] = b"\x00%06o " % sum(first)
+    member = _tar(("model.pkl", _SYSTEM), form=tarfile.USTAR_FORMAT)
+    data = bytearray(member[tarfile.BLOCKSIZE : 2 * tarfile.BLOCKSIZE])
+    data[64] = ord(".")
+    long_name = b"model.pkl\x00".ljust(tarfile.BLOCKSIZE, b"\x00")
+    header = member[: tarfile.BLOCKSIZE]
+    return bytes(first) + long_name + header + bytes(data) + bytes(2 * tarfile.BLOCKSIZE)
+
+
+_AFTER_A_PICKLE = _CLEAN.ljust(tarfile.BLOCKSIZE, b"\x00")
+
+
+def _gzip_gnu_tar_reads_plain(hidden: bytes) -> bytes:
+    """Gzip data of a clean tar whose first block GNU tar reads as a plain tar holding `hidden`.
+
+    The block's gzip header carries an extra field spanning `hidden`, which a gzip reader skips.
+    It is also a directory header with the ustar magic and a checksum only GNU tar reads, so
+    GNU tar reads the file as a plain tar and unpacks `hidden`.
+    """
+    extra = tarfile.BLOCKSIZE + len(hidden) - 12
+    first = bytearray(tarfile.BLOCKSIZE)
+    first[:12] = b"\x1f\x8b\x08\x04" + bytes(4) + b"\x00\xff" + struct.pack("<H", extra)
+    first[124:136] = b"%011o\x00" % 0
+    first[156:157] = tarfile.DIRTYPE
+    first[257:265] = b"ustar\x0000"
+    first[148:156] = b" " * 8
+    first[148:156] = b"\x00%06o " % sum(first)
+    clean = _tar(("model.pkl", _CLEAN), form=tarfile.USTAR_FORMAT)
+    deflate = zlib.compressobj(9, zlib.DEFLATED, -15)
+    data = deflate.compress(clean) + deflate.flush()
+    return bytes(first) + hidden + data + struct.pack("<II", zlib.crc32(clean), len(clean))
+
+
+@pytest.mark.parametrize("name", ["bundle.tar", "bundle.zip", "model.pth.tar"])
+def test_a_tar_behind_a_pickle_gnu_tar_skips_is_unscanned(tmp_path: Path, name: str) -> None:
+    critical, unscanned, examined = _scan(tmp_path, name, _AFTER_A_PICKLE + _INNER)
+
+    assert critical == []
+    assert unscanned == [_gnu_tar_reads_at(tarfile.BLOCKSIZE)]
+    assert examined
+
+
+@pytest.mark.parametrize("name", ["bundle.zip", "model.pth.tar", "bundle.tar"])
+def test_a_tar_inside_a_stored_zip_member_is_unscanned(tmp_path: Path, name: str) -> None:
+    content, start = _zip_hiding(_INNER)
+
+    critical, unscanned, examined = _scan(tmp_path, name, content)
+
+    assert critical == []
+    assert unscanned == [_gnu_tar_reads_at(start)]
+    assert examined
+
+
+def test_a_first_block_only_gnu_tar_reads_as_a_header_is_unscanned(tmp_path: Path) -> None:
+    content = _pickle_gnu_tar_reads_as_a_long_name()
+
+    critical, unscanned, examined = _scan(tmp_path, "bundle.tar", content)
+
+    assert critical == []
+    assert unscanned == [_gnu_tar_reads_at(0)]
+    assert examined
+
+
+@pytest.mark.parametrize(
+    ("name", "reason"),
+    [
+        ("bundle.zip", _gnu_tar_reads_at(0)),
+        ("bundle.tar", "tar has a damaged header at byte 0; not scanned"),
+        ("bundle.tar.gz", "tar has a damaged header at byte 0; not scanned"),
+    ],
+)
+def test_gzip_data_gnu_tar_reads_as_a_plain_tar_is_unscanned(
+    tmp_path: Path, name: str, reason: str
+) -> None:
+    hidden = _tar(("model.pkl", _SYSTEM), form=tarfile.USTAR_FORMAT)
+
+    critical, unscanned, examined = _scan(tmp_path, name, _gzip_gnu_tar_reads_plain(hidden))
+
+    assert critical == []
+    assert unscanned == [reason]
+    assert examined
+
+
+def test_a_block_of_zeros_ends_what_gnu_tar_reads(tmp_path: Path) -> None:
+    content = _AFTER_A_PICKLE + bytes(tarfile.BLOCKSIZE) + _INNER
+
+    assert _scan(tmp_path, "bundle.tar", content) == ([], [], True)
+
+
+@pytest.mark.parametrize("name", ["bundle.zip", "model.pth.tar"])
+def test_stored_numbers_gnu_tar_reads_no_header_from_stay_clean(tmp_path: Path, name: str) -> None:
+    weights = struct.pack("<65536f", *((i % 251) / 251 - 0.5 for i in range(65536)))
+    content = _zip({"archive/data.pkl": _CLEAN, "archive/data/0": weights})
+
+    assert _scan(tmp_path, name, content) == ([], [], True)

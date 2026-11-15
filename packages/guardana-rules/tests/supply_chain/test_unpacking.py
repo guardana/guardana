@@ -1,7 +1,8 @@
 """What a `tar` command takes a file for, and where a tool unpacking an archive writes a member.
 
 A `tar` command goes by a file's bytes: a codec's signature, another archive format's, or a tar
-header strong enough to outrank them. A tool unpacking an archive writes a member listed at or
+header strong enough to outrank them; GNU tar reads past blocks it cannot read as a header. A
+tool unpacking an archive writes a member listed at or
 below a link member where the link leads, or over it; names are compared past `.`, `..`, empty
 steps and backslashes, ignoring case and Unicode normalization.
 """
@@ -18,6 +19,10 @@ from guardana.rules.supply_chain._unpacking import (
     TAR_OUTRANKS_ZIP,
     archive_first,
     codec_first,
+    gnu_checksum,
+    gnu_header_offset,
+    gnu_reads_as_tar,
+    gnu_reads_header,
     member_through_link,
     tar_bid,
 )
@@ -357,3 +362,158 @@ def test_the_tar_bid_follows_the_header(head: bytes, bid: int) -> None:
 
 def test_a_v7_header_outranks_a_zip_and_an_end_block_does_not() -> None:
     assert tar_bid(_v7(_header())) >= TAR_OUTRANKS_ZIP > tar_bid(bytes(tarfile.BLOCKSIZE))
+
+
+@pytest.mark.parametrize(
+    ("field", "read"),
+    [
+        (b"012345\x00 ", 0o12345),
+        (b" 12345\x00 ", 0o12345),
+        (b"\t\n12345 ", 0o12345),
+        (b"12 34   ", 0o12),
+        (bytes(8), 0),
+        (b"\x00\x00123456", 0),
+        (b"\x00123456 ", 0o123456),
+        (b"\x00 123456", 0o123456),
+        (b" " * 8, None),
+        (b"\x00" + b" " * 7, None),
+        (b"12x45   ", None),
+        (b"+12345\x00 ", None),
+        (b"\x80" + bytes(7), None),
+    ],
+    ids=[
+        "as-tar-writes-it",
+        "after-a-space",
+        "after-other-blanks",
+        "up-to-a-blank",
+        "nuls",
+        "past-one-nul-only",
+        "past-a-leading-nul",
+        "past-a-leading-nul-and-blanks",
+        "blanks",
+        "a-nul-then-blanks",
+        "a-letter-after-digits",
+        "a-sign",
+        "base-256",
+    ],
+)
+def test_gnu_tar_reads_a_checksum_field_its_own_way(field: bytes, read: int | None) -> None:
+    assert gnu_checksum(field) == read
+
+
+def _gnu_only(header: bytes) -> bytes:
+    """`header` with a checksum GNU tar reads past a leading NUL and `tarfile` reads as 0."""
+    return _checksum_written(header, b"\x00%06o ")
+
+
+def test_a_checksum_past_a_leading_nul_is_read_by_gnu_tar_alone() -> None:
+    block = _gnu_only(_header())
+
+    with pytest.raises(tarfile.HeaderError):
+        tarfile.TarInfo.frombuf(block, "utf-8", "surrogateescape")
+    assert tar_bid(block) == 0
+    assert gnu_reads_header(block)
+
+
+@pytest.mark.parametrize(
+    ("block", "read"),
+    [
+        (_header(), True),
+        (_v7(_header()), True),
+        (_signed_checksum(_header()), True),
+        (_gnu_only(_header()), True),
+        (_gnu_only(_with(_header(), 124, b"\x80" + bytes(10) + b"\x03")), True),
+        (_with(_with(_header(), 124, b"12x" + bytes(9)), 156, b"1"), True),
+        (bytes(tarfile.BLOCKSIZE), False),
+        (_header()[:148] + b"0000001\x00" + _header()[156:], False),
+        (_with(_header(), 124, b"12x" + bytes(9)), False),
+        (_with(_header(), 124, b" " * 12), False),
+    ],
+    ids=[
+        "pax",
+        "v7",
+        "a-signed-checksum",
+        "a-checksum-past-a-leading-nul",
+        "a-base-256-size",
+        "a-hard-link-whose-size-goes-unread",
+        "a-block-of-zeros",
+        "a-checksum-that-does-not-match",
+        "a-size-gnu-tar-cannot-read",
+        "a-size-of-blanks",
+    ],
+)
+def test_gnu_tar_reads_a_header_by_its_checksum_and_size(block: bytes, read: bool) -> None:
+    assert gnu_reads_header(block) is read
+
+
+_GZIP_START = b"\x1f\x8b\x08\x04" + bytes(4) + b"\x00\xff\xa0\x0f"
+"""A gzip header whose extra field runs on for 4,000 bytes."""
+_GZIP_AND_USTAR = _with(_header(form=tarfile.USTAR_FORMAT), 0, _GZIP_START)
+
+
+@pytest.mark.parametrize(
+    ("head", "read"),
+    [
+        (_header(form=tarfile.USTAR_FORMAT), True),
+        (_header(form=tarfile.GNU_FORMAT), True),
+        (_with(_header(form=tarfile.USTAR_FORMAT), 263, b"XX"), True),
+        (_GZIP_AND_USTAR, True),
+        (_gnu_only(_GZIP_AND_USTAR), True),
+        (_GZIP_AND_USTAR[:148] + b"0000001\x00" + _GZIP_AND_USTAR[156:], False),
+        (_GZIP_START.ljust(tarfile.BLOCKSIZE, b"\x00"), False),
+        (_v7(_header()), False),
+        (_GZIP_AND_USTAR[: tarfile.BLOCKSIZE - 1], False),
+    ],
+    ids=[
+        "posix-magic",
+        "old-gnu-magic",
+        "a-version-gnu-tar-does-not-check",
+        "gzip-data-that-is-also-a-tar-header",
+        "the-same-with-a-checksum-only-gnu-tar-reads",
+        "a-checksum-that-does-not-match",
+        "gzip-data",
+        "a-v7-header-without-magic",
+        "less-than-a-block",
+    ],
+)
+def test_gnu_tar_reads_a_file_as_a_plain_tar_by_its_first_block(head: bytes, read: bool) -> None:
+    """GNU tar looks for a tar before it looks for compressed data."""
+    assert gnu_reads_as_tar(head) is read
+
+
+class _Trickle(io.BytesIO):
+    """A stream that hands back at most 700 bytes a read."""
+
+    def read(self, size: int | None = -1, /) -> bytes:
+        return super().read(700 if size is None or size < 0 else min(700, size))
+
+
+_JUNK = b"J" * tarfile.BLOCKSIZE
+
+
+@pytest.mark.parametrize(
+    ("content", "offset"),
+    [
+        (_header(), 0),
+        (3 * _JUNK + _header(), 3 * tarfile.BLOCKSIZE),
+        (_JUNK * 4096 + _header(), 4096 * tarfile.BLOCKSIZE),
+        (3 * _JUNK + bytes(tarfile.BLOCKSIZE) + _header(), None),
+        (3 * _JUNK + _header()[:300], None),
+        (_JUNK + b"J" * 100 + _header(), None),
+        (8 * _JUNK, None),
+        (b"", None),
+    ],
+    ids=[
+        "at-the-start",
+        "past-blocks-it-cannot-read",
+        "past-the-first-read",
+        "past-a-block-of-zeros",
+        "cut-short-by-the-end",
+        "off-a-block-boundary",
+        "none",
+        "empty",
+    ],
+)
+def test_gnu_tar_finds_the_first_header_it_reads(content: bytes, offset: int | None) -> None:
+    assert gnu_header_offset(io.BytesIO(content)) == offset
+    assert gnu_header_offset(_Trickle(content)) == offset
