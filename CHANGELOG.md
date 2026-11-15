@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-11-15 — the sixth patch release
+
 ### Fixed
 
 - **Check archives as GNU `tar` reads them.** `guardana.supply_chain.pickle_opcode` reports files named as archives unread when it finds a block GNU `tar` reads as a header before the first block of zeros, where the rule does not read a tar from the first block or compressed data also starts as a plain tar GNU `tar` accepts. The summary names the block's byte offset. Listed tars, compressed or not, are also reported unread when GNU `tar` and `tarfile` read a checksum field as different numbers. A `LOW` "Unscanned model file" finding and an `unexamined_component` coverage shortfall name the file. Previously, these files could scan clean while GNU `tar` wrote a `model.pkl` importing `os.system` that the rule never read. Honest files can also be reported unread. Seeded synthetic data laid from a 512-byte boundary produced 5 such blocks in 8 MiB of `int64` token ids below 50,257; 13 in 8 MiB of `int64` values below 256; 5 in 64 MiB of `int8` data with half its bytes zero; none in 64 MiB of random bytes or 16 MiB of `float32` values. GNU `tar` `1.35` read the sampled blocks as headers. Gate impact: may now be `indeterminate` (exit `2`) for these files unless another finding fails the run's policy. A file named as an archive that the rule does not read as a tar from its first block is read once more, up to its first block of zeros or the first block GNU `tar` reads as a header.
