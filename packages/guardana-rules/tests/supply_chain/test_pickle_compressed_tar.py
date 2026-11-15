@@ -210,11 +210,27 @@ def test_a_file_named_as_a_compressed_tar_that_is_a_plain_tar_is_read(tmp_path: 
 
 
 @pytest.mark.parametrize(
-    "content",
-    [gzip.compress(b"plain text, not a tar\n" * 40), b"not compressed at all\n"],
+    ("content", "reason"),
+    [
+        (gzip.compress(b"plain text, not a tar\n" * 40), "gzip-compressed file holds no tar"),
+        (b"not compressed at all\n", "is no zip, tar or pickle this scanner reads"),
+    ],
     ids=["compressed-text", "plain-text"],
 )
-def test_a_file_named_as_a_compressed_tar_that_holds_no_tar_stays_quiet(
+def test_a_file_named_as_a_compressed_tar_that_holds_no_tar_is_unscanned(
+    tmp_path: Path, content: bytes, reason: str
+) -> None:
+    """A `tar` command unpacks a file by its bytes, which may hold an archive not read here."""
+    result = _run(tmp_path, "notes.tar.gz", content)
+
+    assert not _critical(result)
+    assert len(_unscanned(result)) == 1
+    assert reason in _unscanned(result)[0]
+    assert _unread(result) == [str(tmp_path / "notes.tar.gz")]
+
+
+@pytest.mark.parametrize("content", [b"", bytes(10 * tarfile.BLOCKSIZE)], ids=["empty", "zeros"])
+def test_a_file_named_as_an_archive_that_is_empty_or_zeros_stays_quiet(
     tmp_path: Path, content: bytes
 ) -> None:
     result = _run(tmp_path, "notes.tar.gz", content)
@@ -290,13 +306,14 @@ def test_a_file_named_as_a_compressed_tar_that_holds_a_bare_pickle_is_read(
     assert _critical(result) == ["os.system in weights.tar.gz"]
 
 
-def test_a_file_named_as_a_compressed_tar_that_holds_a_clean_pickle_stays_quiet(
+def test_a_file_named_as_a_compressed_tar_that_holds_a_clean_pickle_is_unscanned(
     tmp_path: Path,
 ) -> None:
     result = _run(tmp_path, "weights.tar.gz", gzip.compress(_FLOATS))
 
-    assert not result.findings
-    assert not result.unverified
+    assert not _critical(result)
+    assert len(_unscanned(result)) == 1
+    assert "gzip-compressed file holds no tar" in _unscanned(result)[0]
 
 
 @pytest.mark.parametrize(

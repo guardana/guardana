@@ -64,17 +64,22 @@ Three things keep a file out of a directory scan:
   under [model files no rule reads](#model-files-no-rule-reads), an unzipped Keras model's
   `config.json` and `metadata.json` included), an archive or compressed file (`.zip`,
   `.tar`, `.tgz`, `.tbz2`, `.tbz`, `.txz`, or a name ending in `.gz`, `.gzip`, `.z`, `.xz`,
-  `.bz2`, `.lzma` or `.lz4`) whatever it is named, and, in a directory
+  `.bz2`, `.lzma` or `.lz4`) whatever it is named, a `torch.package`'s
+  `.data/extern_modules` record (matched in any case) and every `.py` file below the
+  directory holding it, and, in a directory
   that holds a model or a tokenizer (`tokenizer_config.json` or `tokenizer.json`), every
   `*config.json`, `chat_template.json`, `chat_template*.jinja`, `chat_template*.j2` and
-  `keras_metadata.pb`, with the templates in its `additional_chat_templates/`. A link is
-  judged by its name alone. A directory it matches is still walked for such files. A file
-  it matches that a model loader reads is scanned anyway and named in the output: `Scope`
+  `keras_metadata.pb`, with the templates in its `additional_chat_templates/`. A symbolic
+  link to a file is judged by its name alone. An ordinary directory it matches is still
+  walked for such files. A symbolic link to a directory is not followed and is recorded as a
+  source the scan cannot read even when `.guardanaignore` matches it; only
+  `rules.paths_exclude` or a name of a directory every scan skips suppresses that record.
+  A file it matches that a model loader reads is scanned anyway and named in the output: `Scope`
   in the terminal (the first ten, then a count), `scope.kept_models` in the saved run with
   the pattern that matched it.
   Every pattern it applied is named there too, with the file it came from
-  (`scope.excludes[].file`). It still excludes a notebook, source code and a configuration
-  with no model or tokenizer beside it. To leave a model file
+  (`scope.excludes[].file`). It still excludes a notebook, source code other than a package's
+  `.py` files and a configuration with no model or tokenizer beside it. To leave a model file
   out, use `rules.paths_exclude`.
 - **Directories every scan skips**, wherever they occur: `.git`, `.venv`, `venv`, `env`,
   `__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `node_modules`, `.tox`,
@@ -103,8 +108,11 @@ does not exist. It also does not list or read a symlinked file whose target, aft
 link is followed, lies outside the scanned directory, because a link resolves on the
 machine that scans, not where the artifact ships. Each one it meets is recorded as a source
 it could not read, naming the link, so the run records an error (exit `2` under the default
-`fail_on_error`). Scan the link's target directly, or exclude the link. A link the excludes
-remove, or a directory link named like a directory every scan skips, is not reported. A
+`fail_on_error`). Scan the link's target directly, or exclude the link with
+`rules.paths_exclude`. A link the profile's `rules.paths_exclude` removes, or a directory
+link named like a directory every scan skips, is not reported. A file link is judged by its
+name alone: `.guardanaignore` excludes it unless it is named as a file a model loader reads.
+`.guardanaignore` cannot suppress a directory link's error. A
 symlinked file whose target lies inside the scanned directory is listed and read, the
 scanned directory itself may be reached through a symlink, and a single file named on the
 command line is read even when it is a symlink.
@@ -151,7 +159,25 @@ named by its file: a pickle, archive or graph that does not parse, an archive me
 as a pickle (`data.pkl`, `*.pkl`, a legacy tar's `pickle`) that ends before its STOP, an
 NPY header whose `descr`, `shape` or `fortran_order` numpy would refuse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
-extension-registry code (`EXT1`, `EXT2`, `EXT4`), a model file that cannot be opened (a `.bin` included,
+extension-registry code (`EXT1`, `EXT2`, `EXT4`), a pickle holding a `numpy` dtype with
+fields or a subarray (including scikit-learn decision trees and random forests saved with
+`pickle`), a dtype state the scanner cannot read, an array whose state or items it cannot
+read (state given as a list, as an array, or as what a call returns, and items made by a
+call), state applied to what a call returns or to what a persistent id hands back when its kind
+is neither text nor what an import made (`torch` decodes a byte string, and a one-item
+text array equals its text) or it names a `torch.package` call, a call of what a call returns, a sparse tensor,
+a `torch._tensor._rebuild_from_type_v2` call whose arguments it cannot read, a
+`numpy.ndarray` call with unread arguments, an unread dtype, an offset other than 0 or
+strides over a buffer, or a buffer other than a byte string or `None`, a `_frombuffer` call
+over anything but a byte string or byte array (an out-of-band buffer included), a read-only
+view of an array, of what a call returned or of an object the scanner lost track of (an
+out-of-band buffer included), an allowlisted call
+that may keep views of an array (such as `list` or `collections.deque`, which iterate it)
+given an array, what a call returned or arguments it cannot read, state applied to an
+array that may already hold memory, which `numpy` frees while a view made any other way
+may still read it (the one state `numpy` writes for an empty array is read as clean), a
+model file
+that cannot be opened (a `.bin` included,
 since it may be a model), a safetensors file with a malformed header (including a tensor entry
 with a missing or mistyped `dtype`, `shape` or `data_offsets`, and tensors that do not
 describe the payload exactly), a GGUF file declaring an unsupported version, an ONNX
@@ -249,7 +275,10 @@ more than 400,000 headers, a compressed tar's headers included; more than 8 exte
 front of one member; more than 1,000,000 global PAX records applied, counting the records
 in force once for every member and PAX header after them; sparse maps listing more than
 100,000 regions in all, or one stored in a member's data over 1 MiB; or a header the
-scanner cannot follow. A sparse member within those bounds is read like any other. An
+scanner cannot follow. When the rule reads a sparse member within those bounds, it reads it as
+`tarfile` unpacks it and also reports a `LOW` "Unscanned model file" finding and an
+`unexamined_component` coverage shortfall naming it: other tar readers can unpack different
+bytes. An
 archive that holds no model but exceeds the entry bound, such as an image dataset,
 is reported not scanned like any other refused archive. Exclude it from the scan
 with `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an archive), or
@@ -370,14 +399,44 @@ also read as a stream when its first bytes are not a zip's,
 and a file that starts with an end record is opened as a zip, as `np.load` does. In a
 legacy tar, the `storages` and `tensors` members are read as `torch.load` reads them, a
 pickle before each run of raw tensor bytes; a layout it cannot follow is a coverage
-shortfall. Any file `pickle_opcode` reads
-that does not start as a zip and whose first 512-byte block is a tar header (`ustar`, or
-the older v7 form without `ustar` magic) is read as a tar, whatever it is named, because
-`torch.load` opens a legacy `torch.save` file that way. The same file is also read as the
+shortfall. A file that starts as a zip and whose first 512-byte block is a tar header is also
+read as a tar, because the `tar` commands read it that way; findings from both readings are
+reported. Any file `pickle_opcode` reads that does not start as a zip and whose first 512-byte
+block is a tar header (`ustar`, or the older v7 form without `ustar` magic) is read as a tar,
+whatever it is named, because `torch.load` opens a legacy `torch.save` file that way. The same
+file is also read as the
 single pickle stream `pickle.load` would read from those bytes, and findings from both
 readings are reported; when the file is named `*.pth.tar` or `*.pt.tar`, or the tar holds a
-member named as a model, the stream counts only if its bytes are a pickle. Inside a tar, a member that several links name is read once for each
-way it is judged, not once per link. A model with no built-in rule is a coverage shortfall
+member named as a model, the stream counts only if its bytes are a pickle. Inside a tar, a
+member that several links name is read once for each way it is judged, not once per link. A
+tar, compressed or not, whose headers `tarfile` and the `tar` commands read as different names,
+sizes or layouts is a coverage shortfall. This covers size or checksum fields; missing GNU
+sparse magic, sparse extension blocks and sparse fields on other types; PAX sparse names
+`busybox` ignores, unless the header gives the same name or the name GNU tar and bsdtar write
+for a sparse file, one `GNUSparseFile.<n>` directory below the file's own; that directory
+alongside any link; global PAX names, sizes or layouts; PAX size parsing, sizes smaller than
+the header's or sizes readers ignore; data on types `tarfile` treats as empty or on
+directories; empty or NUL-containing names or link targets; prefixes; and multiple names or
+extended headers. A zip or tar listing a member at or below a symbolic or hard link's path is a
+coverage shortfall too: an unpacking tool follows or replaces the link. Names are compared as
+for `torch.package`, with every reading of zip names. A `.zip`, a file without a suffix or a
+zip named as a tar is also checked as a reader walking local headers reads it. Member
+boundaries include descriptors, with 8-byte sizes whenever the local header holds a ZIP64
+field. A local-header disagreement, overlapping members, data reaching the central directory,
+an unlisted local header, data ending differently at a descriptor or deflate stream, a decoding
+failure, or encryption or compression the scanner cannot decode to find an end is a coverage
+shortfall. So is exceeding the decompression bound (32 bytes for each byte of the file, and at
+least 64 MiB) or matching more than 100,000 data descriptor signatures while finding the ends.
+Zips named as models are read by their central directory. For `.zip`, `.tar`, `.tar.gz`,
+`.tgz`, `.tar.bz2`, `.tbz2`, `.tbz`, `.tar.xz` and `.txz`, in any case, another codec or
+archive format a `tar` command reads, zip data that does not start at the first byte, gzip,
+bzip2 or xz data holding no tar, or a compressed tar also indicating another codec or format
+after decompression is a coverage shortfall. So is a file holding nothing the rule reads,
+except empty files or at most 1 MiB of zeros. Git LFS pointers and 7z archives retain their
+handling. A gzip, bzip2 or xz tar named `.zip` is read as a compressed tar. These shortfalls
+produce a `LOW` "Unscanned model file" finding and an `unexamined_component` coverage shortfall
+naming the file. The summary names the header's byte offset or the member, or says what the
+file holds instead. A model with no built-in rule is a coverage shortfall
 too, so a scan holding one ends `indeterminate` (exit `2`) rather than clean. A rule left
 out by the profile reads nothing, so a profile that excludes
 `guardana.supply_chain.pickle_opcode` leaves every pickle unread. A third-party rule
@@ -437,7 +496,44 @@ network fetches.
 callable the file imports, sorted and each once, after a digest of that set
 (`unpickling imports 2 non-allowlisted callable(s) (set 9a0cd5b778d9): builtins.eval,
 os.system`). Its detail names the archive member each was found in
-(`os.system in model.pt::archive/data.pkl`). A baseline fingerprint includes the
+(`os.system in model.pt::archive/data.pkl`). For Python source shipped in a `torch.package`,
+the finding names every record ending in lower-case `.py` below a directory holding
+`.data/extern_modules`, matched in any case, whether or not a load names its module. It gives
+the source's path below the innermost package root, as
+`pkg/__init__.py (shipped Python source a torch.package load may run)`. In a scanned directory
+holding an unpacked package, each `.py` file gets its own `CRITICAL` finding. A `.py` file
+inside a directory every scan skips is not read; archive members are unaffected. Name
+comparisons drop `.` and empty steps (from leading or doubled separators), resolve `..`, treat
+backslashes as separators and ignore case and Unicode normalization. Zip names are also read
+from the directory entry as its UTF-8 flag says, from its Info-ZIP Unicode Path, and from
+stored bytes as UTF-8 regardless of the flag, up to any NUL, both whole as `unzip` and `bsdtar`
+write them on UTF-8 file systems and cut to 511 bytes as `torch` lists them. A zip or tar,
+compressed or not, holding a package root and a symbolic link, or a symbolic link named `.data`
+in any case, is reported unread: a `LOW` "Unscanned model file" finding and an
+`unexamined_component` coverage shortfall name the archive; its summary names the first link.
+Tar hard links count too. Unix mode identifies zip links. Unpacked package loads may follow
+links beyond the root, and a link named `.data` may make a root. An archive holding a package
+root and a non-ASCII name not marked as UTF-8 is reported unread the same way; its summary
+names the first such member. In a tar, this covers header and GNU long names, and PAX `path`
+names with `hdrcharset` `BINARY`. Unpacking tools decode these names by different code pages,
+so source can land below the root. `torch`'s `PackageExporter` marks every name as UTF-8. The
+run is `indeterminate` (exit `2`) unless another finding fails the run's policy. GNU `tar`,
+busybox `tar`, `git archive`, `bsdtar` with `--format ustar` or `--format gnutar`, Python's
+`tarfile` in USTAR or GNU format, Info-ZIP `zip` and macOS `ditto` store non-ASCII names
+without marking them as UTF-8. `bsdtar` writing a tar in its default format or a zip, Python's
+`tarfile` in its default PAX format and Python's `zipfile` mark such names as UTF-8. The
+summary also names the call that applies a state no `numpy` or Python pickler writes:
+`numpy.dtype.__setstate__` for forged dtype
+flags, byte order, item size or alignment, or an eight-item datetime or timedelta dtype
+state without its unit; `numpy.ndarray.__setstate__` for an object array given fewer items
+than its shape has elements; and `<module>.<class>.__setstate__` for a `BUILD` applied to an
+allowlisted class itself, such as `collections.Counter.__setstate__`, including one a
+`torch` legacy persistent id carries (the item after `"module"`, or a tar-format id's
+first item). It names
+`numpy.ndarray.__new__` for an object dtype or a negative offset over a buffer. The dtype,
+object-array item-count and buffer checks also cover what `_rebuild_from_type_v2` calls and
+the state it applies, and the dtype and object-array checks the dtypes and arrays
+a persistent id carries. A baseline fingerprint includes the
 summary, so a file that imports a different callable is a new finding, even when the
 listing is long enough to be cut by the evidence bound. Callables found in the members
 read before a member that failed are still reported. A pickle that imports a callable
@@ -446,9 +542,13 @@ code, or that is cut by a read bound, is reported both ways: the finding for wha
 found, and the file as unread. An extension code counts where a loader reads the bytes
 as a pickle: from the first byte of a file or member named as one (`*.pkl`, `*.pt`,
 `data.pkl`, an object array); in the four pickles that follow a first pickle returning the
-legacy `torch.save` magic number; in a file or member named `.bin`, `.sav`, `.p` or
-`.model` when its stream goes on to a clean STOP, calls what the code named, or imports a
-callable after the code;
+legacy `torch.save` magic number; in a file or member named `.bin`, `.sav`, `.p`, `.model`
+or `.dat`, or a file with no suffix (a member with no suffix is not read this way), when its
+stream after the code reaches a clean `STOP`, calls what the code named, imports a callable
+not on the allowlist under a dotted name, or applies state the rule cannot prove safe in a
+stream that also imports a callable under a dotted name, allowlisted or not (if
+the stream after the code first reaches a size or opcode bound, crosses the end of a frame
+or hides an import's operands, the file or member is reported unread);
 and wherever a pickle opens with a `PROTO` opcode of any protocol. It stays data in a
 tensor storage beside a checkpoint's `data.pkl`, a numeric array, everything after those
 four pickles in a file whose first pickle returns the magic number, whatever the file is

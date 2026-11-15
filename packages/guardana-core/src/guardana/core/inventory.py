@@ -11,7 +11,7 @@ a scan should not pay for twice, and belongs to whoever needs the depth.
 """
 
 import os
-from collections.abc import Callable, Collection, Iterable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from pathlib import Path, PurePath
 
 from guardana.core.formats.hdf5 import (
@@ -152,6 +152,11 @@ _TEMPLATE_SUFFIXES = frozenset({".jinja", ".j2"})
 _TEMPLATE_DIRECTORY = "additional_chat_templates"
 _TOKENIZER_FILES = frozenset({"tokenizer_config.json", "tokenizer.json"})
 """A tokenizer is loaded on its own, chat templates and all, with no weights beside it."""
+_PACKAGE_DIRECTORY = ".data"
+_PACKAGE_MARKER = "extern_modules"
+"""`torch.package` loads a directory holding `.data/extern_modules`, found in any case, and runs
+the Python source below it when a load names its module."""
+_PACKAGE_SOURCE_SUFFIX = ".py"
 _NAMED_LIKE_MODEL_SUFFIXES = frozenset({".bin", ".model", ".sav"})
 """Suffixes the inventory lists only by their first bytes, counted by name where no file
 is opened: model weights carry them as often as anything else does."""
@@ -312,18 +317,46 @@ def read_by_model_loaders(
 ) -> bool:
     """Whether a model loader reads `path`, which the scanned target may then not exclude.
 
-    A model file, an archive or compressed file, and a file read with the model beside
-    it, when `holds_a_model` says that directory holds one. `siblings` are the lower-cased
-    names beside `path`; `by_name` judges by the name alone, opening nothing.
+    A model file, an archive or compressed file, a `torch.package` marker, and a file read
+    with the model beside it, when `holds_a_model` says that directory holds one. `siblings`
+    are the lower-cased names beside `path`; `by_name` judges by the name alone, opening
+    nothing. Python source below a package root is judged once the walk is done, by
+    `package_roots`.
     """
     name = path.name.lower()
-    if path.suffix.lower() in _ARCHIVE_SUFFIXES:
+    if path.suffix.lower() in _ARCHIVE_SUFFIXES or package_marker(path):
         return True
     model = named_like_model(name) if by_name else counts_as_model(path, siblings)
     if model:
         return True
     directory = loaded_with_model_in(path)
     return directory is not None and holds_a_model(directory)
+
+
+def package_marker(path: Path) -> bool:
+    """Whether `path` is the record that makes the directory above it a `torch.package`."""
+    return (
+        path.name.casefold() == _PACKAGE_MARKER
+        and path.parent.name.casefold() == _PACKAGE_DIRECTORY
+    )
+
+
+def named_as_python_source(path: Path) -> bool:
+    """Whether `path` is named as a module's source, which a `torch.package` load may run."""
+    return path.name.endswith(_PACKAGE_SOURCE_SUFFIX)
+
+
+def package_roots(listing: Mapping[Path, Iterable[str]]) -> frozenset[Path]:
+    """Return each directory `listing` shows holding a `torch.package` marker.
+
+    `listing` maps each listed directory to the names of the files in it.
+    """
+    return frozenset(
+        directory.parent
+        for directory, names in listing.items()
+        if directory.name.casefold() == _PACKAGE_DIRECTORY
+        and any(name.casefold() == _PACKAGE_MARKER for name in names)
+    )
 
 
 def counts_as_model(path: Path, siblings: Collection[str]) -> bool:

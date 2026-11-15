@@ -236,8 +236,75 @@ def listing_refusal(handle: IO[bytes], *, max_entries: int, max_directory_bytes:
 
 _LOCAL = struct.Struct("<4s5H3L2H")
 _LOCAL_SIGNATURE = b"PK\x03\x04"
+_DESCRIPTOR_SIGNATURE = b"PK\x07\x08"
+_DESCRIPTOR_CHECK_BYTES = 8
+"""A data descriptor's signature and CRC-32, which a streaming reader matches to end stored data."""
+_CRC_BYTES = 4
+_DESCRIPTOR_SIZES = struct.Struct("<LL")
+_ENCRYPTED_FLAG = 0x01
 _DATA_DESCRIPTOR_FLAG = 0x08
 _UTF8_NAME_FLAG = 0x800
+_EXTRA_HEADER = struct.Struct("<HH")
+_ZIP64_FIELD = 0x0001
+_ZIP64_SIZES = struct.Struct("<QQ")
+_UNICODE_PATH_FIELD = 0x7075
+_ATTRIBUTES_FIELD = 0x6C78
+_ATTRIBUTES_VERSION, _ATTRIBUTES_INTERNAL, _ATTRIBUTES_EXTERNAL = 0x01, 0x02, 0x04
+_MORE_BITS = 0x80
+
+
+@dataclass(frozen=True, slots=True)
+class _LocalHeader:
+    """A member's local header, which a reader that walks the file reads for its entry."""
+
+    version: int
+    flags: int
+    method: int
+    crc: int
+    packed: int
+    size: int
+    name: bytes
+    fields: dict[int, bytes]
+    repeats: bool
+    """Whether the extra-field block holds two fields of one kind."""
+
+    data_start: int
+
+
+def _fields(extra: bytes) -> tuple[dict[int, bytes], bool]:
+    """Return an extra-field block's fields by kind, and whether a kind repeats."""
+    fields: dict[int, bytes] = {}
+    repeats = False
+    while len(extra) >= _EXTRA_HEADER.size:
+        kind, size = _EXTRA_HEADER.unpack_from(extra)
+        repeats = repeats or kind in fields
+        fields[kind] = extra[_EXTRA_HEADER.size : _EXTRA_HEADER.size + size]
+        extra = extra[_EXTRA_HEADER.size + size :]
+    return fields, repeats
+
+
+def _local_header(handle: IO[bytes], info: zipfile.ZipInfo) -> _LocalHeader | None:
+    """Read the local header a member's directory entry points to; None when there is none."""
+    header = _read_at(handle, info.header_offset, _LOCAL.size)
+    if len(header) < _LOCAL.size or not header.startswith(_LOCAL_SIGNATURE):
+        return None
+    _sig, version, flags, method, _time, _date, crc, packed, size, name_length, extra_length = (
+        _LOCAL.unpack(header)
+    )
+    name_and_extra = _read_at(handle, info.header_offset + _LOCAL.size, name_length + extra_length)
+    fields, repeats = _fields(name_and_extra[name_length:])
+    return _LocalHeader(
+        version=version,
+        flags=flags,
+        method=method,
+        crc=crc,
+        packed=packed,
+        size=size,
+        name=name_and_extra[:name_length],
+        fields=fields,
+        repeats=repeats,
+        data_start=info.header_offset + _LOCAL.size + name_length + extra_length,
+    )
 
 
 def member_disagreement(handle: IO[bytes], info: zipfile.ZipInfo) -> str | None:
@@ -247,43 +314,301 @@ def member_disagreement(handle: IO[bytes], info: zipfile.ZipInfo) -> str | None:
     its size, and readers differ on which of the local header and the directory entry they
     trust, so each disagreement is named rather than read one way.
     """
+    return _disagreement(_local_header(handle, info), info)
+
+
+def _disagreement(  # noqa: PLR0911 — one return per disagreement named
+    local: _LocalHeader | None, info: zipfile.ZipInfo
+) -> str | None:
+    """Return how a member's local header and directory entry let readers read it differently."""
     if info.compress_type == zipfile.ZIP_STORED and info.compress_size != info.file_size:
         return "is stored with a compressed size that differs from its size"
-    header = _read_at(handle, info.header_offset, _LOCAL.size)
-    if len(header) < _LOCAL.size or not header.startswith(_LOCAL_SIGNATURE):
+    if local is None:
         return "has no local header where its directory entry points"
-    _sig, _version, flags, method, _time, _date, crc, packed, size, name_length, extra_length = (
-        _LOCAL.unpack(header)
-    )
-    name = _read_at(handle, info.header_offset + _LOCAL.size, name_length)
-    extra = _read_at(handle, info.header_offset + _LOCAL.size + name_length, extra_length)
     encoding = "utf-8" if info.flag_bits & _UTF8_NAME_FLAG else "cp437"
     if (
-        name != info.orig_filename.encode(encoding)
-        or flags != info.flag_bits
-        or method != info.compress_type
+        local.name != info.orig_filename.encode(encoding)
+        or local.flags != info.flag_bits
+        or local.method != info.compress_type
     ):
         return "has a local header whose name, flags or method differ from its directory entry"
-    if _repeats_a_field(info.extra) or _repeats_a_field(extra):
+    central, repeats = _fields(info.extra)
+    if local.repeats or repeats:
         return "repeats an extra field, whose copies zip readers choose between differently"
-    pairs = ((crc, info.CRC), (packed, info.compress_size), (size, info.file_size))
-    if not flags & _DATA_DESCRIPTOR_FLAG and any(
-        local not in (central, _UNSET32) for local, central in pairs
+    unicode_path = local.fields.get(_UNICODE_PATH_FIELD)
+    if unicode_path is not None and unicode_path != central.get(_UNICODE_PATH_FIELD):
+        return "has a local header whose Unicode path differs from its directory entry's"
+    if not _attributes_agree(local, info):
+        return "has a local header whose file attributes differ from its directory entry's"
+    pairs = (
+        (local.crc, info.CRC),
+        (local.packed, info.compress_size),
+        (local.size, info.file_size),
+    )
+    if not local.flags & _DATA_DESCRIPTOR_FLAG and any(
+        value not in (central_value, _UNSET32) for value, central_value in pairs
     ):
         return "has a local header whose sizes or checksum differ from its directory entry"
     return None
 
 
-_EXTRA_HEADER = struct.Struct("<HH")
+def _attributes_agree(local: _LocalHeader, info: zipfile.ZipInfo) -> bool:
+    """Whether a libarchive `xl` field in the local header gives the entry's file attributes.
 
-
-def _repeats_a_field(extra: bytes) -> bool:
-    """Whether an extra-field block holds two fields of one kind, such as two ZIP64 fields."""
-    kinds: set[int] = set()
-    while len(extra) >= _EXTRA_HEADER.size:
-        kind, size = _EXTRA_HEADER.unpack_from(extra)
-        if kind in kinds:
+    `bsdtar` takes a member's type and mode from that field, read as it is read here.
+    """
+    data = local.fields.get(_ATTRIBUTES_FIELD, b"")
+    if not data:
+        return True
+    bitmap, at = data[0], 1
+    while data[at - 1] & _MORE_BITS and at < len(data):
+        at += 1
+    system = local.version >> 8
+    if bitmap & _ATTRIBUTES_VERSION:
+        if len(data) < at + 2:
             return True
-        kinds.add(kind)
-        extra = extra[_EXTRA_HEADER.size + size :]
-    return False
+        system, at = data[at + 1], at + 2
+    if bitmap & _ATTRIBUTES_INTERNAL:
+        at += 2
+    if not bitmap & _ATTRIBUTES_EXTERNAL or len(data) < at + 4:
+        return True
+    external = int.from_bytes(data[at : at + 4], "little")
+    return (system, external) == (info.create_system, info.external_attr)
+
+
+def _streamed_sizes(local: _LocalHeader) -> tuple[int, int] | None:
+    """Return the sizes a streaming reader takes from a local header; None if readers differ.
+
+    The compressed size comes first. A size of 0xFFFFFFFF is read from the ZIP64 field:
+    libarchive reads only such sizes from it, the size first, while Java's reader reads both
+    when either is so marked.
+    """
+    marked = (local.packed == _UNSET32, local.size == _UNSET32)
+    if not any(marked):
+        return local.packed, local.size
+    wide = local.fields.get(_ZIP64_FIELD, b"")
+    if not all(marked) or len(wide) < _ZIP64_SIZES.size:
+        return None
+    size, packed = _ZIP64_SIZES.unpack_from(wide)
+    return packed, size
+
+
+class _OverBudgetError(Exception):
+    """The walk read past what it may spend on one archive's member data."""
+
+
+@dataclass(slots=True)
+class _WalkBudget:
+    """What the walk may still spend: bytes inflated, and data descriptor signatures matched."""
+
+    inflated: int
+    signatures: int
+
+    def inflate(self, count: int) -> None:
+        """Spend `count` inflated bytes."""
+        self.inflated -= count
+        if self.inflated < 0:
+            raise _OverBudgetError
+
+    def match(self) -> None:
+        """Spend one data descriptor signature."""
+        self.signatures -= 1
+        if self.signatures < 0:
+            raise _OverBudgetError
+
+
+def unpacking_disagreement(  # noqa: PLR0911 — one return per disagreement named
+    handle: IO[bytes], members: list[zipfile.ZipInfo], directory_start: int, *, inflate_limit: int
+) -> str | None:
+    """Return how a tool walking the zip could unpack what its directory lists otherwise, or not.
+
+    None when it cannot.
+
+    Such a tool, `bsdtar` reading a pipe among them, takes each member's name, type and
+    sizes from its local header; it ends data a data descriptor follows where the
+    descriptor's signature and CRC-32 match, compressed data where its stream ends, and
+    then looks ahead for the next local header signature. So every local header must agree
+    with its directory entry, every member's data must end where that entry says, and no
+    byte between the members may hold a local header signature. Inflating is bounded by
+    `inflate_limit` bytes.
+    """
+    budget = _WalkBudget(inflated=inflate_limit, signatures=ARCHIVE_MAX_ENTRIES)
+    position = reach = 0
+    try:
+        for info in sorted(members, key=lambda info: info.header_offset):
+            name = info.orig_filename
+            if info.header_offset < reach:
+                return f"member {name} overlaps the member before it"
+            hidden = _find(handle, _LOCAL_SIGNATURE, position, info.header_offset)
+            if hidden is not None:
+                return _unlisted(hidden)
+            local = _local_header(handle, info)
+            disagreement = _disagreement(local, info)
+            if local is None or disagreement is not None:
+                return f"member {name} {disagreement}"
+            disagreement = _streamed_disagreement(local, info)
+            if disagreement is not None:
+                return f"member {name} {disagreement}"
+            position = local.data_start + info.compress_size
+            ending = _end_disagreement(handle, info, local, budget)
+            if ending is not None:
+                return f"member {name} {ending}"
+            reach = position + _descriptor_reach(handle, local, position)
+            if reach > directory_start:
+                return f"member {name} runs into its central directory"
+    except _OverBudgetError:
+        return (
+            f"requires inflating more than {inflate_limit} bytes or matching more than "
+            f"{ARCHIVE_MAX_ENTRIES} data descriptor signatures to find where members end"
+        )
+    hidden = _find(handle, _LOCAL_SIGNATURE, position, directory_start)
+    return None if hidden is None else _unlisted(hidden)
+
+
+def _unlisted(at: int) -> str:
+    return f"holds a local header at byte {at} that its central directory does not list"
+
+
+def _descriptor_reach(handle: IO[bytes], local: _LocalHeader, data_end: int) -> int:
+    """Return how many bytes past a member's data a streaming reader may take as its descriptor.
+
+    A member without the data descriptor flag has none. `bsdtar` skipping a member takes
+    8-byte sizes whenever its local header holds a ZIP64 field, whatever the sizes, and a
+    deflated member's descriptor may lack its signature.
+    """
+    if not local.flags & _DATA_DESCRIPTOR_FLAG:
+        return 0
+    signed = _read_at(handle, data_end, len(_DESCRIPTOR_SIGNATURE)) == _DESCRIPTOR_SIGNATURE
+    size_bytes = _ZIP64_SIZES.size if _ZIP64_FIELD in local.fields else _DESCRIPTOR_SIZES.size
+    return (len(_DESCRIPTOR_SIGNATURE) if signed else 0) + _CRC_BYTES + size_bytes
+
+
+def _streamed_disagreement(local: _LocalHeader, info: zipfile.ZipInfo) -> str | None:
+    """Return how the sizes a streaming reader takes from a local header differ from the entry's.
+
+    With a data descriptor, a size of 0 defers to the descriptor.
+    """
+    sizes = _streamed_sizes(local)
+    if sizes is None:
+        return "has a local header whose ZIP64 sizes zip readers take differently"
+    declared = (info.compress_size, info.file_size)
+    if local.flags & _DATA_DESCRIPTOR_FLAG:
+        agree = all(size in (0, want) for size, want in zip(sizes, declared, strict=True))
+    else:
+        agree = sizes == declared
+    return None if agree else "has a local header whose sizes differ from its directory entry"
+
+
+def _end_disagreement(
+    handle: IO[bytes], info: zipfile.ZipInfo, local: _LocalHeader, budget: _WalkBudget
+) -> str | None:
+    """Return how a streaming reader could end a member's data elsewhere than its entry says."""
+    start, size = local.data_start, info.compress_size
+    described = info.flag_bits & _DATA_DESCRIPTOR_FLAG
+    if not described:
+        if info.compress_type == zipfile.ZIP_STORED:
+            return None
+        # A reader decoding the data ends it where its stream ends, then looks for the next
+        # local header from there; only a signature inside the data is found that way.
+        if _find(handle, _LOCAL_SIGNATURE, start, start + size) is None:
+            return None
+    if info.flag_bits & _ENCRYPTED_FLAG or info.compress_type not in (
+        zipfile.ZIP_STORED,
+        zipfile.ZIP_DEFLATED,
+    ):
+        return (
+            "is encrypted or uses compression other than stored or deflate, and finding its "
+            "data end requires decoding the scanner does not do"
+        )
+    if info.compress_type == zipfile.ZIP_STORED:
+        return _stored_end_disagreement(handle, start, size, budget)
+    return _deflate_end_disagreement(handle, start, size, budget)
+
+
+def _stored_end_disagreement(
+    handle: IO[bytes], start: int, size: int, budget: _WalkBudget
+) -> str | None:
+    """Return how a streaming reader ends described stored data elsewhere than `size` bytes on.
+
+    It ends the data at the first data descriptor signature whose next four bytes are the
+    CRC-32 of the data before it.
+    """
+    handle.seek(start)
+    limit = size + _DESCRIPTOR_CHECK_BYTES
+    window, base, read = b"", 0, 0
+    crc, crc_end, search = 0, 0, 0
+    while True:
+        chunk = handle.read(min(_CHUNK_BYTES, limit - read))
+        read += len(chunk)
+        window += chunk
+        while True:
+            found = window.find(_DESCRIPTOR_SIGNATURE, search - base)
+            if found < 0 or found + _DESCRIPTOR_CHECK_BYTES > len(window):
+                break
+            budget.match()
+            crc = zlib.crc32(memoryview(window)[crc_end - base : found], crc)
+            crc_end = base + found
+            if int.from_bytes(window[found + 4 : found + 8], "little") == crc:
+                if crc_end == size:
+                    return None
+                return (
+                    f"has stored data a streaming reader ends at byte {start + crc_end}, "
+                    "where a data descriptor's signature and CRC-32 match"
+                )
+            search = crc_end + 1
+        if not chunk:
+            return (
+                f"has stored data with no matching data descriptor at byte {start + size}, "
+                "where its directory entry says it ends, so a streaming reader reads on"
+            )
+        keep = max(len(window) - (_DESCRIPTOR_CHECK_BYTES - 1), crc_end - base)
+        crc = zlib.crc32(memoryview(window)[crc_end - base : keep], crc)
+        window, base, crc_end = window[keep:], base + keep, base + keep
+        search = max(search, base)
+
+
+def _deflate_end_disagreement(
+    handle: IO[bytes], start: int, size: int, budget: _WalkBudget
+) -> str | None:
+    """Return how a deflate stream, where a streaming reader ends it, ends off `size` bytes on."""
+    inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+    handle.seek(start)
+    remaining = size
+    try:
+        while remaining and not inflater.eof:
+            chunk = handle.read(min(_CHUNK_BYTES, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            while chunk and not inflater.eof:
+                budget.inflate(len(inflater.decompress(chunk, _CHUNK_BYTES)))
+                chunk = inflater.unconsumed_tail
+    except zlib.error:
+        return "has a deflate stream that does not decode"
+    if not inflater.eof:
+        return "has a deflate stream that does not end within the size its directory entry declares"
+    if inflater.unused_data or remaining:
+        return "has a deflate stream that ends before the size its directory entry declares"
+    return None
+
+
+def _find(handle: IO[bytes], needle: bytes, start: int, end: int) -> int | None:
+    """Return the first offset in [start, end) at which `needle` starts; None if it starts at none.
+
+    A match may run up to `len(needle) - 1` bytes past `end`.
+    """
+    keep = len(needle) - 1
+    limit = end + keep
+    handle.seek(start)
+    window, base = b"", start
+    while base < end:
+        chunk = handle.read(min(_CHUNK_BYTES, limit - base - len(window)))
+        window += chunk
+        found = window.find(needle)
+        if found >= 0:
+            return base + found
+        if not chunk:
+            return None
+        drop = max(len(window) - keep, 0)
+        window, base = window[drop:], base + drop
+    return None

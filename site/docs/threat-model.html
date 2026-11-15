@@ -242,13 +242,23 @@ valuable target in its own right.</li>
 pickle, a zip bomb, a 40 GB &quot;model&quot;, or a file designed to exploit a parser.</p>
 <p><strong>Stance:</strong> scanning must never execute what it reads. Model-format readers are
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
-fails becomes an <code>errors</code> entry rather than an exception or a silent skip. Pickle
-is parsed at the opcode level, never unpickled. The repository cannot hide its own
-model files: its <code>.guardanaignore</code> excludes ordinary files only, never a file a model
-loader reads (a model, an archive or compressed file, and configuration, chat templates and Keras
-metadata beside a model or tokenizer). The output names every applied pattern and
-counts model files inside directories every scan skips (<code>build</code>, <code>env</code>,
-<code>node_modules</code>, …). Only the profile's <code>rules.paths_exclude</code> excludes such a file.</p>
+fails becomes an <code>errors</code> entry rather than an exception or a silent skip. Pickle is
+parsed at the opcode level, never unpickled. An archive listing does not establish
+which files an unpacking tool writes. When its checks find that unpacking tools read
+members, codecs or archive formats differently, <code>pickle_opcode</code> reports the file
+unread with a <code>LOW</code> &quot;Unscanned model file&quot; finding and an <code>unexamined_component</code>
+coverage shortfall naming it; the run is <code>indeterminate</code> (exit <code>2</code>) unless another
+finding fails its policy. The repository cannot hide its own
+model files: its <code>.guardanaignore</code> excludes ordinary files only, never a file a
+model loader reads (a model, an archive or compressed file, a <code>torch.package</code>'s
+<code>.data/extern_modules</code> record (matched in any case) and every <code>.py</code> file below the
+directory holding it, and configuration, chat templates and Keras metadata beside a
+model or tokenizer). The output names every applied pattern and counts model files
+inside directories every scan skips (<code>build</code>, <code>env</code>, <code>node_modules</code>, …). Only the
+profile's <code>rules.paths_exclude</code> excludes such a file. A link to a directory is
+recorded as a source the scan cannot read even when <code>.guardanaignore</code> matches it
+(exit <code>2</code> under the default <code>fail_on_error</code>); <code>rules.paths_exclude</code> and names of
+directories every scan skips still suppress that record.</p>
 <p><strong>Residual risk:</strong> a parser bug is still a parser bug. Since 0.22.0 every rule that
 opens a file is property-tested against generated input — arbitrary bytes behind
 each format's magic number, declared lengths up to 2⁶³ pointed past the end of the
@@ -475,7 +485,7 @@ vulnerability reporting is enabled on the repository.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.2.2 · Apache-2.0 ·
+<span class="who">Guardana 1.2.3 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/threat-model.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>
