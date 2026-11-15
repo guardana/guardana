@@ -240,7 +240,7 @@ docs = [
     # framework, a theme system and (for Docusaurus) a Node toolchain to render
     # sixty files, and the half with actual value — the rule explorer — would
     # still be custom work.
-    "markdown-it-py>=3.0",
+    "markdown-it-py>=4.3.0",
 ]
 conformance = [
     # Test-only fixtures for the MCP and A2A conformance suite. Servers written by the
