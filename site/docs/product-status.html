@@ -380,8 +380,10 @@ allowlist, such as <code>torch.load(..., weights_only=True)</code>.</p>
 UTF-8 is reported unread (exit <code>2</code>) unless another finding fails the run's policy. GNU
 <code>tar</code>, busybox <code>tar</code>, <code>git archive</code>, <code>bsdtar</code> with <code>--format ustar</code> or <code>--format gnutar</code>,
 Python's <code>tarfile</code> in USTAR or GNU format, Info-ZIP <code>zip</code> and macOS <code>ditto</code> write such
-archives. Default-format <code>bsdtar</code> tars, <code>bsdtar</code> zips, default PAX <code>tarfile</code> archives and
-<code>zipfile</code> archives mark these names as UTF-8 and keep their verdict. Archives without a
+archives. Default-format <code>bsdtar</code> tars, <code>bsdtar</code> zips written in a UTF-8 locale, default
+PAX <code>tarfile</code> archives and <code>zipfile</code> archives mark these names as UTF-8 and keep their
+verdict. Windows <code>tar.exe</code> writes zip names as OEM code-page bytes without the UTF-8 flag;
+PowerShell <code>Compress-Archive</code> sets it. Archives without a
 package root or with only ASCII names are unaffected. Exclude affected archives with
 <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an archive), or scan
 the directory they unpack to instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>

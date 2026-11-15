@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Keep findings for names with lone surrogates.** `guardana.supply_chain.pickle_opcode` computes the digest in its summary so lone surrogates in a callable or source name pass through. Previously, strict UTF-8 encoding failed on these names, recording a check that could not run and losing every finding for the file. Sets without lone surrogates keep their digest, finding fingerprints, baselines and waivers. Human, JSON, SARIF and JUnit output already writes lone surrogates as `U+FFFD`. Gate impact: may now fail (exit `1`) where the run was `indeterminate` (exit `2`), or passed under `fail_on_error: false`.
 - **Leave directory entries out of package files.** `guardana.supply_chain.pickle_opcode` excludes zip entries ending in `/` and tar directory entries from shipped Python source and `.data/extern_modules` markers. In `1.2.3`, these entries counted as files and produced false `CRITICAL` findings. Records still count when an Info-ZIP Unicode Path gives a name without the trailing `/`, a zip name ends in `/.`, or a non-directory tar entry's name ends in `/`. Gate impact: may now pass (exit `0`) for these archives when nothing else in them is reported.
 
+### Documentation
+
+- **Correct the UTF-8 guidance for `bsdtar` zips.** `bsdtar` writing a zip marks non-ASCII names as UTF-8 in a UTF-8 locale. Windows `tar.exe` stored `café.pkl` as OEM code-page bytes without the zip UTF-8 flag; the tested `torch.package` zip was `indeterminate` (exit `2`) with `1.2.3`. Default-format `tar.exe` tars and PowerShell `Compress-Archive` zips marked the name as UTF-8. No behaviour changes.
+
 ### Security
 
 - **Check archives as GNU `tar` reads them.** This high-severity advisory covers `guardana-rules` `<= 1.2.3` and is patched in `1.2.4`. `guardana.supply_chain.pickle_opcode` could report files named as archives clean while GNU `tar` wrote a `model.pkl` importing `os.system` that the rule never read. These reading conflicts are now reported unread. ([GHSA-q6pc-3q7q-xwmx](https://github.com/guardana/guardana/security/advisories/GHSA-q6pc-3q7q-xwmx))

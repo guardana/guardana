@@ -172,8 +172,10 @@ A zip or tar, compressed or not, holding a package root and a non-ASCII name not
 UTF-8 is reported unread (exit `2`) unless another finding fails the run's policy. GNU
 `tar`, busybox `tar`, `git archive`, `bsdtar` with `--format ustar` or `--format gnutar`,
 Python's `tarfile` in USTAR or GNU format, Info-ZIP `zip` and macOS `ditto` write such
-archives. Default-format `bsdtar` tars, `bsdtar` zips, default PAX `tarfile` archives and
-`zipfile` archives mark these names as UTF-8 and keep their verdict. Archives without a
+archives. Default-format `bsdtar` tars, `bsdtar` zips written in a UTF-8 locale, default
+PAX `tarfile` archives and `zipfile` archives mark these names as UTF-8 and keep their
+verdict. Windows `tar.exe` writes zip names as OEM code-page bytes without the UTF-8 flag;
+PowerShell `Compress-Archive` sets it. Archives without a
 package root or with only ASCII names are unaffected. Exclude affected archives with
 `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an archive), or scan
 the directory they unpack to instead. [`guardana scan`](usage-scan.md) lists every bound.
