@@ -813,8 +813,10 @@ so source can land below the root. <code>torch</code>'s <code>PackageExporter</c
 run is <code>indeterminate</code> (exit <code>2</code>) unless another finding fails the run's policy. GNU <code>tar</code>,
 busybox <code>tar</code>, <code>git archive</code>, <code>bsdtar</code> with <code>--format ustar</code> or <code>--format gnutar</code>, Python's
 <code>tarfile</code> in USTAR or GNU format, Info-ZIP <code>zip</code> and macOS <code>ditto</code> store non-ASCII names
-without marking them as UTF-8. <code>bsdtar</code> writing a tar in its default format or a zip, Python's
-<code>tarfile</code> in its default PAX format and Python's <code>zipfile</code> mark such names as UTF-8. The
+without marking them as UTF-8. <code>bsdtar</code> writing a tar in its default format or a zip in a
+UTF-8 locale, Python's <code>tarfile</code> in its default PAX format and Python's <code>zipfile</code> mark such
+names as UTF-8. Windows <code>tar.exe</code> writing a zip stores such names as OEM code-page bytes
+without the UTF-8 flag. PowerShell <code>Compress-Archive</code> sets the flag. The
 summary also names the call that applies a state no <code>numpy</code> or Python pickler writes:
 <code>numpy.dtype.__setstate__</code> for forged dtype
 flags, byte order, item size or alignment, or an eight-item datetime or timedelta dtype
