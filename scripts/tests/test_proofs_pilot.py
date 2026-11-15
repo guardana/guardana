@@ -139,7 +139,9 @@ def test_the_findings_excerpt_names_each_rules_cases_and_the_first_findings() ->
 
 # Serving the pilot: a stand-in console script that behaves as `retrieval-pilot` does.
 
-_STAND_IN = """#!{python}
+_STAND_IN = """#!/bin/sh
+'''exec' "{python}" "$0" "$@"
+' '''
 import signal, sys, time
 args = sys.argv[1:]
 port = args[args.index("--port") + 1]
