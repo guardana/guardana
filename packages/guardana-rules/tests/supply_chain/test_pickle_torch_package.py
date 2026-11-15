@@ -400,6 +400,53 @@ _CODED_TAR = _tar({**_members(), "café/mod/__init__.py": _SOURCE}, tar_format=t
 _BINARY_TAR = _tar({**_members(), "x\udcff/mod/__init__.py": _SOURCE})
 
 
+def _pax_path_tar(path: bytes) -> bytes:
+    """A tar holding a package root and one source whose PAX `path` holds `path`, unmarked.
+
+    `tarfile` marks such a path as binary, so its blocks are put together here.
+    """
+    body = b" path=" + path + b"\n"
+    length = len(body) + 1
+    while len(str(length)) + len(body) != length:
+        length = len(str(length)) + len(body)
+    record = str(length).encode() + body
+
+    def member(name: str, data: bytes, kind: bytes = tarfile.REGTYPE) -> bytes:
+        info = tarfile.TarInfo(name)
+        info.size, info.type = len(data), kind
+        return info.tobuf(tarfile.USTAR_FORMAT) + data + bytes(-len(data) % tarfile.BLOCKSIZE)
+
+    return b"".join(
+        (
+            member(f"top/{_MARKER}", b""),
+            member("././@PaxHeader", record, tarfile.XHDTYPE),
+            member("top/placeholder.py", _SOURCE),
+            bytes(2 * tarfile.BLOCKSIZE),
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("content", "unscanned"),
+    [
+        (_tar({**_members(), "top/x\udcff.py": _SOURCE}, tar_format=tarfile.GNU_FORMAT), True),
+        (_pax_path_tar(b"top/x\xff.py"), False),
+    ],
+    ids=["header-name", "pax-path-without-a-charset"],
+)
+def test_a_source_named_in_bytes_that_are_not_utf8_is_still_reported(
+    tmp_path: Path, content: bytes, unscanned: bool
+) -> None:
+    (tmp_path / "release.tar").write_bytes(content)
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    critical = [f for f in findings if f.severity.name == "CRITICAL"]
+    assert len(critical) == 1, [f.evidence.summary for f in findings]
+    assert f"x\udcff.py {_RUNS}" in critical[0].evidence.summary
+    assert any(f.title == "Unscanned model file" for f in findings) is unscanned
+
+
 @pytest.mark.parametrize(
     ("name", "content", "listed"),
     [

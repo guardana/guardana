@@ -4,6 +4,7 @@ import io
 import os
 import pickle
 import re
+import tarfile
 import zipfile
 from dataclasses import replace
 from pathlib import Path
@@ -952,6 +953,52 @@ def test_the_callable_set_digest_is_stable_and_names_the_set(tmp_path: Path) -> 
     assert finding.evidence.summary == (
         f"unpickling imports 2 non-allowlisted callable(s) (set {digest}): builtins.exec, os.system"
     )
+
+
+_DECOY = b"\x8c\x05os\xed\xa0\x80\x8c\x06system\x93"
+"""A global whose module, decoded as CPython decodes it, holds a lone surrogate: `os\\ud800`."""
+_CALLS_THEN_DECOYS = b"\x80\x04cos\nsystem\n(S'x'\ntR0" + _DECOY + b"0N."
+
+
+def test_a_callable_named_with_a_lone_surrogate_keeps_the_finding(tmp_path: Path) -> None:
+    """The unpickler runs `os.system` before the decoy's import fails; both are named."""
+    (tmp_path / "model.pkl").write_bytes(_CALLS_THEN_DECOYS)
+
+    (finding,) = PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext())
+
+    listed = "os.system\nos\ud800.system".encode("utf-8", "surrogatepass")
+    digest = hashlib.sha256(listed).hexdigest()[:12]
+    assert finding.severity is Severity.CRITICAL
+    assert finding.evidence.summary == (
+        f"unpickling imports 2 non-allowlisted callable(s) (set {digest}): "
+        "os.system, os\ud800.system"
+    )
+
+
+@pytest.mark.parametrize("name", ["bundle.zip", "bundle.tar", "model.pt"])
+def test_an_archive_holding_a_decoy_named_callable_fails_a_run_that_tolerates_errors(
+    tmp_path: Path, name: str
+) -> None:
+    buffer = io.BytesIO()
+    if name.endswith(".tar"):
+        with tarfile.open(fileobj=buffer, mode="w") as archive:
+            info = tarfile.TarInfo("model.pkl")
+            info.size = len(_CALLS_THEN_DECOYS)
+            archive.addfile(info, io.BytesIO(_CALLS_THEN_DECOYS))
+        content = buffer.getvalue()
+    else:
+        content = _zip_with("archive/data.pkl", _CALLS_THEN_DECOYS)
+    (tmp_path / name).write_bytes(content)
+    policy = Policy(fail_on=FailOn(fail_on_error=False))
+
+    result = Runner(
+        registry=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)),
+        profile=Profile(name="t", policy=policy),
+    ).run(ArtifactTarget(tmp_path))
+
+    assert result.errors == ()
+    assert [f.severity for f in result.findings] == [Severity.CRITICAL]
+    assert gate_outcome(result, policy) is GateOutcome.FAIL
 
 
 def test_an_unreadable_bin_is_a_named_shortfall(tmp_path: Path) -> None:

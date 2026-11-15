@@ -3132,7 +3132,9 @@ class PickleOpcodeRule(ArtifactRule):
         if not report.imports:
             return None
         callables = sorted({ref for ref, _member in report.imports})
-        digest = hashlib.sha256("\n".join(callables).encode()).hexdigest()[:_SET_DIGEST_HEX]
+        # A pickle string and a tar name may hold lone surrogates, which strict UTF-8 refuses.
+        listed = "\n".join(callables).encode("utf-8", "surrogatepass")
+        digest = hashlib.sha256(listed).hexdigest()[:_SET_DIGEST_HEX]
         file = report.path.name
         where = sorted(
             f"{ref} in {file if member is None else f'{file}::{member}'}"
