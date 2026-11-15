@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-15 — the fifth patch release
+
 ### Changed
 
 - **Update transitive `opentelemetry-api` without changing package behaviour.** Only `opentelemetry-api` changes in `uv.lock` and the collector image's `deploy/docker/collector-requirements.txt`, regenerated from `uv.lock`: `1.45.1` becomes `1.45.2`, fixing GHSA-mf5v-w3w3-f6cg (CVE-2026-126360), quadratic-time `traceparent` parsing denial of service reported by `uv audit` against `1.45.1`. No Guardana package requires it directly; dependency floors remain unchanged. It is required by `fastapi`, which `guardana-server` runs on, by `mcp`, and by `google-api-core`, which `a2a-sdk` requires. Guardana code does not parse `traceparent`; FastAPI reads it through `opentelemetry-api` only with a configured OpenTelemetry tracer provider, which the collector does not configure. Dependabot pull requests #333 and #334 each changed one file, independently failing the image-requirements/lock consistency check. Gate impact: none.
