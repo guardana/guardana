@@ -3,7 +3,8 @@
 A `tar` command takes a file for a codec or an archive format by its bytes, whatever it is
 named. GNU tar and busybox decompress a file whose first bytes are a codec's signature unless
 they are a tar header with `ustar` magic; `bsdtar` decompresses whatever passes a codec's check,
-then reads the stream as the archive format whose check it passes best.
+then reads the stream as the archive format whose check it passes best. GNU tar reads any other
+file as a tar, block by block from the first, skipping each block it cannot read as a header.
 
 A tool resolves `.`, `..`, doubled and leading separators in a member's name, and a file system
 may ignore case and Unicode normalization; so names are compared as so resolved, with a
@@ -15,6 +16,7 @@ decides, so where its bytes land is not where the listing places them.
 import re
 import unicodedata
 from collections.abc import Iterable
+from typing import BinaryIO
 
 _LINK, _MEMBER = 0, 1
 
@@ -88,7 +90,9 @@ _TAR_MAGIC_BID = TAR_OUTRANKS_ALL - _TAR_CHECKSUM_BID - _TAR_TYPE_BID
 _TAR_MAGICS = (b"ustar\x0000", b"ustar  \x00")
 _TAR_MAGIC_SPAN = slice(257, 265)
 _TAR_CHECKSUM_SPAN = slice(148, 156)
+_TAR_SIZE_SPAN = slice(124, 136)
 _TAR_TYPE_AT = 156
+_TAR_HARD_LINK = ord("1")
 _TAR_NUMBER_SPANS = (
     slice(100, 108),
     slice(108, 116),
@@ -101,6 +105,16 @@ _TAR_NUMBER_SPANS = (
 """Mode, owner, group, size, time and device numbers, which `bsdtar` checks before it bids."""
 _OCTAL = b"01234567"
 _SIGNED_BYTE = 0x80
+_SIGNED_BYTES = bytes(range(_SIGNED_BYTE, 256))
+_ZERO_BLOCK = bytes(_TAR_BLOCK)
+_GNU_BLANKS = b" \t\n\v\f\r"
+_GNU_NUMBER_ENDS = b"\x00" + _GNU_BLANKS
+_GNU_OTHER_NUMBER_STARTS = b"\x00+-\x80\xff"
+"""What GNU tar reads a number from besides octal digits: nothing (zero), base 64 or base 256."""
+_GNU_CHECKSUM_STARTS = re.compile(rb"[\x00\t\n\v\f\r 0-7]")
+"""What a checksum field opens with when GNU tar reads a number from it; a block of zeros too."""
+_GNU_SCAN_BYTES = 1 << 20
+_GNU_TAR_MAGICS = (b"ustar\x00", b"ustar  \x00")
 
 
 def codec_first(head: bytes) -> str | None:
@@ -162,6 +176,86 @@ def _signed(head: bytes, signatures: tuple[tuple[bytes, str], ...]) -> str | Non
     return next((name for signature, name in signatures if head.startswith(signature)), None)
 
 
+def gnu_checksum(field: bytes) -> int | None:
+    """Read a tar header's checksum field as GNU tar does, or None where it reads no number.
+
+    GNU tar skips one leading NUL and then blanks, and reads octal digits up to a NUL, a blank
+    or the field's end; `tarfile` reads only what comes before the first NUL.
+    """
+    rest = (field[1:] if field[:1] == b"\x00" else field).lstrip(_GNU_BLANKS)
+    if not rest:
+        return None
+    digits = len(rest) - len(rest.lstrip(_OCTAL))
+    if digits < len(rest) and rest[digits] not in _GNU_NUMBER_ENDS:
+        return None
+    return int(rest[:digits], 8) if digits else 0
+
+
+def gnu_reads_header(block: bytes) -> bool:
+    """Whether GNU tar may read a 512-byte block as a tar header.
+
+    It reads one whose checksum matches and whose size it can read as a number, and does not
+    read the size of a hard link; a size it may read in base 64 or base 256 is taken as read.
+    """
+    declared = gnu_checksum(block[_TAR_CHECKSUM_SPAN])
+    if declared is None or declared not in _sums(block):
+        return False
+    return block[_TAR_TYPE_AT] == _TAR_HARD_LINK or _gnu_number_read(block[_TAR_SIZE_SPAN])
+
+
+def gnu_reads_as_tar(head: bytes) -> bool:
+    """Whether GNU tar reads a file starting with `head` as a plain tar, not as compressed data.
+
+    It looks for a tar before it looks for compression: a first block holding the POSIX or the
+    old GNU magic, without its version, and a checksum GNU tar accepts.
+    """
+    block = head[:_TAR_BLOCK]
+    if len(block) < _TAR_BLOCK or not block[_TAR_MAGIC_SPAN.start :].startswith(_GNU_TAR_MAGICS):
+        return False
+    declared = gnu_checksum(block[_TAR_CHECKSUM_SPAN])
+    return declared is not None and declared in _sums(block)
+
+
+def gnu_header_offset(source: BinaryIO) -> int | None:
+    """Return the offset of the first block GNU tar reads as a tar header, or None.
+
+    GNU tar skips each block it cannot read as a header until a block of zeros, which ends
+    the archive, or the end of the file; a block the end of the file cuts short is none.
+    """
+    offset, carried = 0, b""
+    while chunk := source.read(_GNU_SCAN_BYTES):
+        data = carried + chunk
+        whole = len(data) - len(data) % _TAR_BLOCK
+        firsts = data[_TAR_CHECKSUM_SPAN.start : whole : _TAR_BLOCK]
+        for match in _GNU_CHECKSUM_STARTS.finditer(firsts):
+            start = match.start() * _TAR_BLOCK
+            block = data[start : start + _TAR_BLOCK]
+            if block == _ZERO_BLOCK:
+                return None
+            if gnu_reads_header(block):
+                return offset + start
+        carried, offset = data[whole:], offset + whole
+    return None
+
+
+def _gnu_number_read(field: bytes) -> bool:
+    """Whether GNU tar may read a number from a header field; see `gnu_checksum`."""
+    rest = (field[1:] if field[:1] == b"\x00" else field).lstrip(_GNU_BLANKS)
+    if not rest:
+        return False
+    if rest[0] in _GNU_OTHER_NUMBER_STARTS:
+        return True
+    digits = len(rest) - len(rest.lstrip(_OCTAL))
+    return digits > 0 and (digits == len(rest) or rest[digits] in _GNU_NUMBER_ENDS)
+
+
+def _sums(block: bytes) -> tuple[int, int]:
+    """Return a header's unsigned and signed byte sums, its checksum field counted as spaces."""
+    summed = block[: _TAR_CHECKSUM_SPAN.start] + b" " * 8 + block[_TAR_CHECKSUM_SPAN.stop :]
+    unsigned = sum(summed)
+    return unsigned, unsigned - 256 * (len(summed) - len(summed.translate(None, _SIGNED_BYTES)))
+
+
 def _checksum_matches(block: bytes) -> bool:
     field = block[_TAR_CHECKSUM_SPAN]
     if field.translate(None, b" \x00" + _OCTAL):
@@ -169,10 +263,7 @@ def _checksum_matches(block: bytes) -> bool:
     digits = field.lstrip(b" ")
     run = len(digits) - len(digits.lstrip(_OCTAL))
     declared = int(digits[:run], 8) if run else 0
-    summed = block[: _TAR_CHECKSUM_SPAN.start] + b" " * 8 + block[_TAR_CHECKSUM_SPAN.stop :]
-    unsigned = sum(summed)
-    signed = unsigned - 256 * sum(byte >= _SIGNED_BYTE for byte in summed)
-    return declared in (unsigned, signed)
+    return declared in _sums(block)
 
 
 def _type_passes(flag: int) -> bool:

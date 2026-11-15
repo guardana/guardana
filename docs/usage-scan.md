@@ -433,7 +433,14 @@ archive format a `tar` command reads, zip data that does not start at the first 
 bzip2 or xz data holding no tar, or a compressed tar also indicating another codec or format
 after decompression is a coverage shortfall. So is a file holding nothing the rule reads,
 except empty files or at most 1 MiB of zeros. Git LFS pointers and 7z archives retain their
-handling. A gzip, bzip2 or xz tar named `.zip` is read as a compressed tar. These shortfalls
+handling. A gzip, bzip2 or xz tar named `.zip` is read as a compressed tar. For these archive
+names, a block GNU `tar` reads as a header before the first block of zeros is a coverage
+shortfall if the rule does not read a tar from the first block, or compressed data's first
+block is also a plain-tar header GNU `tar` accepts. A checksum field GNU `tar` reads as
+another number than `tarfile` is also a coverage shortfall in listed tars, compressed or not.
+The rule follows GNU `tar`'s default stopping at zeros; `--ignore-zeros` (`-i`) is not
+modelled. For other names, a tar found further into the file is not checked; unpack such a
+file into an empty directory with the tool you use and scan that directory. These shortfalls
 produce a `LOW` "Unscanned model file" finding and an `unexamined_component` coverage shortfall
 naming the file. The summary names the header's byte offset or the member, or says what the
 file holds instead. A model with no built-in rule is a coverage shortfall

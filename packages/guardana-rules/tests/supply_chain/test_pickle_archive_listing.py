@@ -1049,6 +1049,18 @@ def _checksum_as(spell: bytes) -> bytes:
     return bytes(header) + _HIDDEN
 
 
+def _checksum_read_as_zero(spell: bytes) -> bytes:
+    """A 1024-byte member holding `_HIDDEN` whose checksum field, spelled `spell`, `tarfile`
+    reads as 0, which matches once 0x80 bytes in the owner names bring the signed sum to 0."""
+    header = bytearray(_header("readme.txt", tarfile.REGTYPE, len(_HIDDEN)))
+    header[148:156] = b" " * 8
+    signed = sum(byte - 256 if byte >= 0x80 else byte for byte in header)
+    owner = b"\x80" * (signed // 128) + (bytes([256 - signed % 128]) if signed % 128 else b"")
+    header[265 : 265 + len(owner)] = owner
+    header[148:156] = spell
+    return bytes(header) + _HIDDEN
+
+
 def _gnu_sparse_fields(member: bytes) -> bytes:
     """`member` under the GNU magic with an old sparse entry, which only some readers apply."""
     return _edited(member, (257, _GNU_MAGIC), (386, b"00000000001\x00"), (398, b"00000000001\x00"))
@@ -1066,6 +1078,8 @@ def _gnu_sparse_fields(member: bytes) -> bytes:
         (_FIRST + _sized_as(b"\x80\x00\x00\x00\x80" + bytes(7)), "size or checksum field"),
         (_FIRST + _checksum_as(b"+%06o\x00"), "size or checksum field"),
         (_FIRST + _checksum_as(b"\x80"), "size or checksum field"),
+        (_checksum_read_as_zero(b"\x00777777 "), "size or checksum field"),
+        (_checksum_read_as_zero(b" " * 8), "size or checksum field"),
         (_edited(_sparse_old_gnu(), (257, _POSIX_MAGIC)) + _SIBLING, "without the GNU magic"),
         (_sparse_old_gnu(extended=True) + _SIBLING, "extension blocks"),
         (_gnu_sparse_fields(_PICKLE) + _END, "GNU sparse fields"),
@@ -1112,6 +1126,8 @@ def _gnu_sparse_fields(member: bytes) -> bytes:
         "size-base256-of-63-bits",
         "checksum-plus",
         "checksum-base256",
+        "checksum-gnu-tar-reads-past-a-leading-nul",
+        "checksum-gnu-tar-reads-no-number-from",
         "sparse-under-posix-magic",
         "sparse-with-extension-blocks",
         "gnu-sparse-entry-on-a-file",
@@ -1142,6 +1158,18 @@ def test_a_header_tar_readers_lay_out_differently_is_refused_unopened(
 
     assert calls == []
     _assert_refused_saying(result, tmp_path / "bundle.tar", reason)
+
+
+@pytest.mark.parametrize("name", ["bundle.tar.gz", "bundle.tar"])
+def test_a_compressed_header_gnu_tar_reads_another_checksum_from_is_refused(
+    tmp_path: Path, name: str
+) -> None:
+    """GNU tar decompresses first, then skips the header and reads its data as the next one."""
+    content = gzip.compress(_checksum_read_as_zero(b"\x00777777 ") + _END, mtime=0)
+
+    result = _run(tmp_path, name, content)
+
+    _assert_refused_saying(result, tmp_path / name, "size or checksum field")
 
 
 @pytest.mark.parametrize(

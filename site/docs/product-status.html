@@ -393,11 +393,17 @@ with data descriptors and bzip2, LZMA or encrypted members. GNU <code>tar</code>
 the sparse layout; Python's <code>zipfile</code> writes streamed bzip2 or LZMA members. Under archive
 names, affected files also include a web page saved as <code>.zip</code>, a compressed pickle or zip
 named as a compressed tar, and tars compressed with zstd, lzip, lz4, lzma, lzop or
-<code>compress</code>. A <code>.zip</code> with preceding bytes, such as a self-extracting zip, is also
+<code>compress</code>. Honest files named as archives that are not tars, such as a stored zip or a
+<code>torch</code> zip named <code>.pth.tar</code>, are also affected when their uncompressed data holds a block
+GNU <code>tar</code> reads as a header before any block of zeros. A <code>.zip</code> with preceding bytes, such
+as a self-extracting zip, is also
 affected. Sparse members the rule reads are read as <code>tarfile</code> unpacks them. Apart from
 these, tars and zips of an ordinary project that Python's <code>tarfile</code> and <code>zipfile</code>,
 <code>bsdtar</code>, GNU <code>tar</code>, busybox, Info-ZIP <code>zip</code>, <code>jar</code>, macOS <code>ditto</code>, <code>np.savez</code> and <code>git archive</code> write keep their verdict under these checks; the <code>torch.package</code> name checks also
-apply. Exclude affected archives with <code>rules.paths_exclude</code> (the target's
+apply. The checks for blocks GNU <code>tar</code> reads as headers apply only to files named as
+archives. For other names, including no suffix, <code>.dat</code> or <code>.bin</code>, a tar that a <code>tar</code>
+command finds further into the file is not checked. Exclude affected archives with
+<code>rules.paths_exclude</code> (the target's
 <code>.guardanaignore</code> cannot exclude an archive), or scan the directory they unpack to
 instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
 <h3 id="monitor-is-scheduled-not-passive"><code>monitor</code> is scheduled, not passive</h3>

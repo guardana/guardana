@@ -21,6 +21,8 @@ import tarfile
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from guardana.rules.supply_chain._unpacking import gnu_checksum
+
 TAR_MAX_HEADERS = 1_000_000
 """Headers read from one tar; each costs a 512-byte block, and a checkpoint holds a few."""
 TAR_EXTENDED_HEADER_MAX_BYTES = 1024 * 1024
@@ -266,18 +268,24 @@ def _header(block: bytes) -> _Header | None:
         named_as_directory=kind == tarfile.AREGTYPE and name.endswith(b"/"),
         slash_name=name.endswith(b"/"),
         disputed_prefix=block[_PREFIX_START] != 0 and magic != _POSIX_MAGIC,
-        disputed=_disputed(block, kind, magic),
+        disputed=_disputed(block, kind, magic, checksum),
     )
 
 
-def _disputed(block: bytes, kind: bytes, magic: bytes) -> str | None:
+def _disputed(block: bytes, kind: bytes, magic: bytes, checksum: int) -> str | None:
     """Why tar readers would read a header's size, checksum or layout differently, or None.
 
+    `checksum` is the field as `tarfile` reads it; GNU tar reads past a leading NUL, and
+    skips a block whose checksum it reads otherwise, unpacking from the next it can read.
     Only the GNU magic makes bsdtar read the old sparse fields, which it then reads for any
     type, while `tarfile` reads them for a sparse type alone; GNU tar and bsdtar walk a
     sparse member's extension blocks only under conditions `tarfile` does not check.
     """
-    if not (_agreed_number(block[_SIZE]) and _AGREED_CHECKSUM.fullmatch(block[_CHECKSUM])):
+    if not (
+        _agreed_number(block[_SIZE])
+        and _AGREED_CHECKSUM.fullmatch(block[_CHECKSUM])
+        and gnu_checksum(block[_CHECKSUM]) == checksum
+    ):
         return "whose size or checksum field tar readers read differently"
     sparse = kind == tarfile.GNUTYPE_SPARSE
     if sparse and magic != _GNU_MAGIC:
