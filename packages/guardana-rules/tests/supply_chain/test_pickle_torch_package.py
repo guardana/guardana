@@ -295,6 +295,122 @@ def test_python_source_no_package_runs_is_not_named(
     assert details == []
 
 
+def _with_directory(members: dict[str, bytes], directory: str, extra: bytes = b"") -> bytes:
+    """A zip of `members` and an entry for `directory`, as `ZipFile.mkdir` writes one."""
+    buffer = io.BytesIO(_zip(members))
+    with zipfile.ZipFile(buffer, "a") as archive:
+        entry = zipfile.ZipInfo(f"{directory}/")
+        entry.CRC = entry.compress_size = entry.file_size = 0
+        entry.external_attr = (stat.S_IFDIR | 0o755) << 16 | 0x10
+        entry.extra = extra
+        archive.mkdir(entry)
+    return buffer.getvalue()
+
+
+def _tar_with(members: dict[str, bytes], name: str, kind: bytes) -> bytes:
+    """A tar of `members` and an empty entry of type `kind` named `name`."""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w", format=tarfile.PAX_FORMAT) as archive:
+        for member, data in members.items():
+            info = tarfile.TarInfo(member)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+        entry = tarfile.TarInfo(name)
+        entry.type = kind
+        archive.addfile(entry)
+    return buffer.getvalue()
+
+
+_NO_SOURCE = {f"top/{_MARKER}": b"", "top/pkg/x.pkl": _DATA}
+_NO_MARKER = {"top/x.py": _SOURCE, "top/pkg/x.pkl": _DATA}
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("release.zip", _with_directory(_NO_SOURCE, "top/a.py")),
+        ("model.pt", _with_directory(_NO_SOURCE, "top/a.py")),
+        ("release.tar", _tar_with(_NO_SOURCE, "top/a.py", tarfile.DIRTYPE)),
+        ("release.tar.gz", gzip.compress(_tar_with(_NO_SOURCE, "top/a.py", tarfile.DIRTYPE))),
+        ("release.zip", _with_directory(_NO_MARKER, f"top/{_MARKER}")),
+        ("release.tar", _tar_with(_NO_MARKER, f"top/{_MARKER}", tarfile.DIRTYPE)),
+        (
+            "release.tar.gz",
+            gzip.compress(_tar_with(_NO_MARKER, f"top/{_MARKER}", tarfile.DIRTYPE)),
+        ),
+    ],
+    ids=[
+        "zip-directory-named-as-source",
+        "package-zip-directory-named-as-source",
+        "tar-directory-named-as-source",
+        "gzip-tar-directory-named-as-source",
+        "zip-directory-named-as-the-marker",
+        "tar-directory-named-as-the-marker",
+        "gzip-tar-directory-named-as-the-marker",
+    ],
+)
+def test_a_directory_entry_is_neither_source_nor_marker(
+    tmp_path: Path, name: str, content: bytes
+) -> None:
+    """Every unpacking tool makes such an entry a directory, which no load runs or opens."""
+    (tmp_path / name).write_bytes(content)
+
+    details, ctx = _details(tmp_path)
+
+    assert details == []
+    assert str(tmp_path / name) in ctx.examined_paths()
+
+
+_FILE_ENDING_IN_A_SEPARATOR = _tar_with(_NO_SOURCE, "top/a.py/", tarfile.REGTYPE)
+_MARKER_ENDING_IN_A_SEPARATOR = _tar_with(_NO_MARKER, f"top/{_MARKER}/", tarfile.REGTYPE)
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "detail"),
+    [
+        (
+            "release.zip",
+            _with_directory(_NO_SOURCE, "top/a.py", _unicode_path("top/a.py/", "top/a.py")),
+            "a.py {runs} in release.zip::top/a.py",
+        ),
+        (
+            "release.zip",
+            _zip({**_NO_SOURCE, "top/a.py/.": _SOURCE}),
+            "a.py {runs} in release.zip::top/a.py/.",
+        ),
+        ("release.tar", _FILE_ENDING_IN_A_SEPARATOR, "a.py {runs} in release.tar::top/a.py/"),
+        (
+            "release.tar.gz",
+            gzip.compress(_FILE_ENDING_IN_A_SEPARATOR),
+            "a.py {runs} in release.tar.gz::top/a.py/",
+        ),
+        ("release.tar", _MARKER_ENDING_IN_A_SEPARATOR, "x.py {runs} in release.tar::top/x.py"),
+        (
+            "release.tar.gz",
+            gzip.compress(_MARKER_ENDING_IN_A_SEPARATOR),
+            "x.py {runs} in release.tar.gz::top/x.py",
+        ),
+    ],
+    ids=[
+        "a-zip-directory-a-unicode-path-names-as-a-file",
+        "a-zip-file-name-ending-in-a-dot-step",
+        "a-tar-file-entry-named-as-a-directory",
+        "a-gzip-tar-file-entry-named-as-a-directory",
+        "a-tar-file-entry-named-as-the-marker-directory",
+        "a-gzip-tar-file-entry-named-as-the-marker-directory",
+    ],
+)
+def test_a_name_some_reader_unpacks_as_a_file_stays_source_or_marker(
+    tmp_path: Path, name: str, content: bytes, detail: str
+) -> None:
+    """`tarfile` writes a tar entry that is not a directory as a file, whatever its name ends in."""
+    (tmp_path / name).write_bytes(content)
+
+    details, _ctx = _details(tmp_path)
+
+    assert details == [detail.format(runs=_RUNS)]
+
+
 def test_an_unpacked_package_names_each_source_file(tmp_path: Path) -> None:
     _unpack(tmp_path, _members("pkg/__init__.py", "evil.py", root="model/"))
 

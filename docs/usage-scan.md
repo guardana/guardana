@@ -507,7 +507,11 @@ os.system`). Its detail names the archive member each was found in
 the finding names every record ending in lower-case `.py` below a directory holding
 `.data/extern_modules`, matched in any case, whether or not a load names its module. It gives
 the source's path below the innermost package root, as
-`pkg/__init__.py (shipped Python source a torch.package load may run)`. In a scanned directory
+`pkg/__init__.py (shipped Python source a torch.package load may run)`. Zip entries ending in
+`/`, regardless of attributes, and tar directory entries count as neither Python source nor
+`.data/extern_modules`. Records still count when an Info-ZIP Unicode Path gives a name without
+the trailing `/`, a zip name ends in `/.`, or a non-directory tar entry's name ends in `/`. In
+a scanned directory
 holding an unpacked package, each `.py` file gets its own `CRITICAL` finding. A `.py` file
 inside a directory every scan skips is not read; archive members are unaffected. Name
 comparisons drop `.` and empty steps (from leading or doubled separators), resolve `..`, treat
