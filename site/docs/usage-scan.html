@@ -789,7 +789,11 @@ callable the file imports, sorted and each once, after a digest of that set
 the finding names every record ending in lower-case <code>.py</code> below a directory holding
 <code>.data/extern_modules</code>, matched in any case, whether or not a load names its module. It gives
 the source's path below the innermost package root, as
-<code>pkg/__init__.py (shipped Python source a torch.package load may run)</code>. In a scanned directory
+<code>pkg/__init__.py (shipped Python source a torch.package load may run)</code>. Zip entries ending in
+<code>/</code>, regardless of attributes, and tar directory entries count as neither Python source nor
+<code>.data/extern_modules</code>. Records still count when an Info-ZIP Unicode Path gives a name without
+the trailing <code>/</code>, a zip name ends in <code>/.</code>, or a non-directory tar entry's name ends in <code>/</code>. In
+a scanned directory
 holding an unpacked package, each <code>.py</code> file gets its own <code>CRITICAL</code> finding. A <code>.py</code> file
 inside a directory every scan skips is not read; archive members are unaffected. Name
 comparisons drop <code>.</code> and empty steps (from leading or doubled separators), resolve <code>..</code>, treat

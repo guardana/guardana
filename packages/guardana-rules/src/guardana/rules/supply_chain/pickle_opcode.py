@@ -512,12 +512,15 @@ def _shipped(
 ) -> bool:
     """Keep each archive member that is Python source a `torch.package` in it ships.
 
-    `links` holds every name a reader may give a symbolic or hard link member, and `coded` every
-    member name stored in non-ASCII bytes the archive does not mark as UTF-8, which unpacking
-    tools decode by different code pages. A link named as the directory holding a package's
-    marker leaves the archive unscanned, since unpacked it may make a root no listed name
-    shows; so does any link or such name in an archive holding a package, since it may lead a
-    load to source the listing does not place below a root.
+    `members` holds every name a reader may give a member, directory entries left out: a zip
+    name ending in `/`, which every zip reader unpacks as a directory, and a tar entry of the
+    directory type. A tar entry of another type stays whatever its name ends in, since `tarfile`
+    writes it as a file. `links` holds every name a reader may give a symbolic or hard link
+    member, and `coded` every member name stored in non-ASCII bytes the archive does not mark
+    as UTF-8, which unpacking tools decode by different code pages. A link named as the
+    directory holding a package's marker leaves the archive unscanned, since unpacked it may
+    make a root no listed name shows; so does any link or such name in an archive holding a
+    package, since it may lead a load to source the listing does not place below a root.
     """
     listed = list(members)
     found = False
@@ -2325,7 +2328,7 @@ class PickleOpcodeRule(ArtifactRule):
         self._report_unread_models(report, unread)
         sources = _shipped(
             report,
-            (entry.name for entry in entries),
+            (entry.name for entry in entries if not entry.isdir()),
             (entry.name for entry in entries if entry.issym() or entry.islnk()),
             (entry.name for entry in entries if _tar_name_coded(entry)),
         )
@@ -2661,7 +2664,12 @@ class PickleOpcodeRule(ArtifactRule):
             self._report_unread_models(report, unread)
             sources = _shipped(
                 report,
-                (name for info in members for name in (*_zip_names(info), *_utf8_names(info))),
+                (
+                    name
+                    for info in members
+                    for name in (*_zip_names(info), *_utf8_names(info))
+                    if not name.endswith("/")
+                ),
                 (
                     name
                     for info in members
@@ -2841,7 +2849,7 @@ class PickleOpcodeRule(ArtifactRule):
         self._report_unread_models(report, unread)
         sources = _shipped(
             report,
-            (entry.name for entry in listing.members),
+            (entry.name for entry in listing.members if not entry.isdir()),
             (entry.name for entry in listing.members if entry.issym() or entry.islnk()),
             (entry.name for entry in listing.members if _tar_name_coded(entry)),
         )
