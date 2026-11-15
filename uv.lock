@@ -1,12 +1,12 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.15'",
     "python_full_version == '3.14.*'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version < '3.12' or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'linux')",
+    "(python_full_version < '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform == 'emscripten') or (python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'linux')",
 ]
 
 [manifest]
@@ -17,7 +17,6 @@ members = [
     "guardana-rules",
     "guardana-server",
 ]
-default-groups = ["conformance", "dev", "docs"]
 
 [manifest.dependency-groups]
 conformance = [
@@ -841,7 +840,7 @@ wheels = [
 
 [[package]]
 name = "guardana-cli"
-version = "1.2.2"
+version = "1.2.3"
 source = { editable = "packages/guardana-cli" }
 dependencies = [
     { name = "guardana-core" },
@@ -862,7 +861,7 @@ requires-dist = [
 
 [[package]]
 name = "guardana-core"
-version = "1.2.2"
+version = "1.2.3"
 source = { editable = "packages/guardana-core" }
 dependencies = [
     { name = "pyyaml" },
@@ -881,7 +880,7 @@ dev = [{ name = "types-pyyaml", specifier = ">=6.0.12.20261103" }]
 
 [[package]]
 name = "guardana-report"
-version = "1.2.2"
+version = "1.2.3"
 source = { editable = "packages/guardana-report" }
 dependencies = [
     { name = "guardana-core" },
@@ -892,7 +891,7 @@ requires-dist = [{ name = "guardana-core", editable = "packages/guardana-core" }
 
 [[package]]
 name = "guardana-rules"
-version = "1.2.2"
+version = "1.2.3"
 source = { editable = "packages/guardana-rules" }
 dependencies = [
     { name = "defusedxml" },
@@ -907,7 +906,7 @@ requires-dist = [
 
 [[package]]
 name = "guardana-server"
-version = "1.2.2"
+version = "1.2.3"
 source = { editable = "packages/guardana-server" }
 dependencies = [
     { name = "fastapi" },
