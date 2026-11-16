@@ -8,6 +8,7 @@ unpickled, and neither numpy nor torch is imported.
 """
 
 import bz2
+import collections
 import gzip
 import hashlib
 import io
@@ -1791,3 +1792,35 @@ def test_a_reason_a_pickle_repeats_is_held_once_however_often(
 
     assert findings == [_unproven(VIEW_UNREAD)]
     assert [machine.unproven for machine in machines] == [[VIEW_UNREAD]]
+
+
+@pytest.mark.parametrize("protocol", range(6))
+def test_defaultdict_type_none_exits_cleanly(tmp_path: Path, protocol: int) -> None:
+    content = pickle.dumps(collections.defaultdict(type(None)), protocol=protocol)
+    findings, unread = _scan(tmp_path, content)
+    assert findings == []
+    assert unread == []
+
+
+@pytest.mark.parametrize("factory", [int, list, dict])
+def test_defaultdict_standard_factories_retain_clean_exit(tmp_path: Path, factory: type) -> None:
+    content = pickle.dumps(collections.defaultdict(factory), protocol=3)
+    findings, unread = _scan(tmp_path, content)
+    assert findings == []
+    assert unread == []
+
+
+def test_defaultdict_type_non_none_remains_unverified(tmp_path: Path) -> None:
+    content = _pickle(
+        _call(_global("collections", "defaultdict"), _call(_global("builtins", "type"), 1))
+    )
+    findings, unread = _scan(tmp_path, content)
+    assert findings == [_unproven(VIEW_UNREAD)]
+    assert unread == [str(tmp_path / "model.pkl")]
+
+
+def test_numpy_dtype_call_views_memory_remains_unverified(tmp_path: Path) -> None:
+    content = b"\x80\x02cnumpy.dtypes\nFloat64DType\ncbuiltins\ntype\nK\x01\x85R\x85R."
+    findings, unread = _scan(tmp_path, content)
+    assert findings == [_unproven(VIEW_UNREAD)]
+    assert unread == [str(tmp_path / "model.pkl")]

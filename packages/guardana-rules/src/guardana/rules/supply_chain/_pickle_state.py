@@ -187,7 +187,17 @@ _KEEPS_NO_VIEW = frozenset(
         *(
             (module, name)
             for module in ("builtins", "__builtin__")
-            for name in ("bytes", "bytearray", "str", "int", "float", "bool", "complex", "type")
+            for name in (
+                "bytes",
+                "bytearray",
+                "str",
+                "int",
+                "float",
+                "bool",
+                "complex",
+                "type",
+                "NoneType",
+            )
         ),
         *((module, "object") for module in ("builtins", "__builtin__")),
         *((module, "scalar") for module in _MULTIARRAYS),
@@ -199,6 +209,9 @@ _KEEPS_NO_VIEW = frozenset(
 """Allowlisted callables that keep no view of an array given to them: each copies, converts or
 refuses it, or is judged by its own rule. `scalar` views an array only as a structured scalar,
 and a state that later frees that array's memory is judged where it is applied."""
+
+_TYPE_NAMES = frozenset({(module, "type") for module in ("builtins", "__builtin__")})
+_NONE_TYPE_NAMES = frozenset({(module, "NoneType") for module in ("builtins", "__builtin__")})
 
 _SPEC = re.compile(r"(?P<kind>[biufcOSUVMm])(?P<size>[0-9]{1,9})")
 """The type strings `numpy.dtype.__reduce__` writes: a kind and an item size."""
@@ -224,6 +237,19 @@ _ARRAY_STATE_LENGTHS = {5: (1, 4), 4: (0, 3)}
 """Where the shape and the data sit in each ndarray state numpy reads."""
 
 
+def _none_type_result(func: Global, name: tuple[str, str], args: object) -> Tracked | None:
+    if (
+        name in _TYPE_NAMES
+        and isinstance(args, Items)
+        and len(args.items) == 1
+        and args.items[0] == _NONE
+    ):
+        return Global(func.module, "NoneType", allowed=True)
+    if name in _NONE_TYPE_NAMES:
+        return _NONE
+    return None
+
+
 def call_result(
     func: object, args: object, notes: Notes, *, keywords: bool = False
 ) -> Tracked | None:
@@ -238,6 +264,9 @@ def call_result(
     if not isinstance(func, Global):
         return None
     name = (func.module, func.qualname)
+    none_type = _none_type_result(func, name, args)
+    if none_type is not None:
+        return none_type
     if func.allowed and name not in _KEEPS_NO_VIEW and _may_pass_an_array(args):
         # Iterating a 2-D array yields rows that view its memory, which a later state frees.
         notes.cannot_prove(VIEW_UNREAD)
