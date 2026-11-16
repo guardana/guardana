@@ -879,6 +879,24 @@ def _text(value: str) -> bytes:
     return b"X" + struct.pack("<I", len(encoded)) + encoded
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"\x80\x02K\x01K\x02.",
+        b"I1\nI2\n.",
+        b"\x80\x02(K\x01.",
+        b"\x80\x02K\x02.",  # control: a clean STOP with one object
+    ],
+)
+def test_a_standalone_pickle_ending_with_objects_beneath_stop_is_read_to_its_end(
+    tmp_path: Path, content: bytes
+) -> None:
+    findings, _ctx = _run(tmp_path, "model.pkl", content)
+
+    # Recorded decision: no import and no unscanned message, so the verdict is clean (exit 0).
+    assert findings == [], [f.evidence.summary for f in findings]
+
+
 def test_an_import_after_an_embedded_pickle_is_reported(tmp_path: Path) -> None:
     wrapper = b"cjoblib.numpy_pickle\nNumpyArrayWrapper\n)\x81}b"
     inner = b"\x80\x02]q\x00."
