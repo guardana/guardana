@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from guardana.core.formats import FormatError, Limits, read_safetensors_header
@@ -260,15 +261,20 @@ def test_a_header_within_every_limit_is_read(tmp_path: Path) -> None:
     assert read_safetensors_header(path, limits=limits).metadata == {"note": "x" * 16}
 
 
-@pytest.mark.parametrize(
-    "raw",
-    [
-        b'{"w": ' + b"[" * 100_000 + b"]" * 100_000 + b"}",
-        b'{"w": {"shape": [' + b"9" * 5_000 + b"]}}",
-    ],
-    ids=["nested past the recursion limit", "an integer past the digit limit"],
-)
-def test_json_the_parser_refuses_is_a_format_error(tmp_path: Path, raw: bytes) -> None:
+def test_rejects_an_integer_past_the_decoder_digit_limit(tmp_path: Path) -> None:
+    raw = b'{"w": {"shape": [' + b"9" * 5_000 + b"]}}"
     path = _write(tmp_path, len(raw).to_bytes(8, "little") + raw)
     with pytest.raises(FormatError, match="valid JSON"):
         read_safetensors_header(path)
+
+
+def test_a_decoder_recursion_error_is_reported_as_a_format_error(tmp_path: Path) -> None:
+    path = _write(tmp_path, build_safetensors())
+    # The nesting depth at which the decoder raises depends on the platform.
+    error = RecursionError()
+    with (
+        patch.object(json, "loads", side_effect=error),
+        pytest.raises(FormatError, match="valid JSON") as caught,
+    ):
+        read_safetensors_header(path)
+    assert caught.value.__cause__ is error

@@ -227,10 +227,11 @@ def test_an_mcp_error_status_names_the_server_without_its_query() -> None:
     with pytest.raises(HTTPError) as raised:
         transport.request("tools/list", {})
 
-    assert raised.value.code == 500
-    assert _MARKER not in str(raised.value)
-    assert _MARKER not in raised.value.filename
-    assert _PLACEHOLDER.search(raised.value.filename)
+    with raised.value as error:
+        assert error.code == 500
+        assert _MARKER not in str(error)
+        assert _MARKER not in error.filename
+        assert _PLACEHOLDER.search(error.filename)
 
 
 def _junk(url: str, **kwargs: object) -> RawReply:
