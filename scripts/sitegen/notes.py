@@ -277,10 +277,13 @@ class _Links:
             if relative in self.docs_anchors:
                 self._fragment(note, href, self.docs_anchors[relative], fragment)
                 return served_path("docs/" + relative.with_suffix(".html").as_posix()) + suffix
-        elif resolved.parent == notes and resolved.suffix == ".md":
-            if resolved.stem in self.note_anchors:
-                self._fragment(note, href, self.note_anchors[resolved.stem], fragment)
-                return served_path(f"notes/{resolved.stem}.html") + suffix
+        elif (
+            resolved.parent == notes
+            and resolved.suffix == ".md"
+            and resolved.stem in self.note_anchors
+        ):
+            self._fragment(note, href, self.note_anchors[resolved.stem], fragment)
+            return served_path(f"notes/{resolved.stem}.html") + suffix
         self._problem(
             note,
             href,

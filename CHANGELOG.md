@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Update collector, CLI image and development dependencies without changing package behaviour.** In `uv.lock` and the collector image's `deploy/docker/collector-requirements.txt`, regenerated from `uv.lock`, `fastapi` moves from `0.162.0` to `0.162.5` and `psycopg[binary]` from `3.3.8` to `3.3.9`. `guardana-server` now requires `fastapi>=0.162.5` and `psycopg[binary]>=3.3.9`. Transitive `markdown-it-py`, required by `rich`, moves from `4.2.0` to `4.3.0` in `uv.lock` and `deploy/docker/cli-requirements.txt`; no Guardana package declares it. The development `docs` group now requires `markdown-it-py>=4.3.0`. Development-only updates include `ruff` to `0.17.5`, `import-linter` to `2.16` (with `grimp` to `3.20`), `hypothesis` to `6.170.15` and `types-pyyaml` to `6.0.12.20261111`. Two nested conditions in `scripts/sitegen/notes.py` become one; the generated site is unchanged. No package is added to or removed from `uv.lock`. These updates came from Dependabot pull requests #352, #353, #355, #356, #357, #358 and #359. Gate impact: none.
+
 ## [1.2.4] - 2026-11-15 — the sixth patch release
 
 ### Fixed
