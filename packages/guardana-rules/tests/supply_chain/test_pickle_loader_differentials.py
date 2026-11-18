@@ -570,6 +570,99 @@ def test_members_decompressing_past_the_archive_bound_are_unscanned(
     assert list(ctx.shortfalls())
 
 
+def _protocol_0_pickle(size: int, *, beneath: bool) -> bytes:
+    """A pickle of exactly `size` bytes with no import, optionally leaving an object below STOP."""
+    tail = b"I1\n." if beneath else b"."
+    return b"S'" + b"a" * (size - len(b"S''\n") - len(tail)) + b"'\n" + tail
+
+
+@pytest.mark.parametrize("beneath", [False, True], ids=["clean-stop", "object-beneath"])
+@pytest.mark.parametrize("name", ["model.bin", "model.dat", "model", "model.dat.gz"])
+def test_a_pickle_ending_where_the_first_read_ends_is_read_on(
+    tmp_path: Path, name: str, *, beneath: bool
+) -> None:
+    content = _protocol_0_pickle(pickle_opcode._BIN_PROBE_BYTES, beneath=beneath) + _CALL
+    assert _second_load_reaches_find_class(content)
+    if name.endswith(".gz"):
+        content = gzip.compress(content)
+
+    findings, _ctx = _run(tmp_path, name, content)
+
+    _assert_flagged(findings)
+
+
+def test_a_file_that_is_one_read_long_holds_nothing_past_it(tmp_path: Path) -> None:
+    content = _protocol_0_pickle(pickle_opcode._BIN_PROBE_BYTES, beneath=False)
+
+    findings, ctx = _run(tmp_path, "model.bin", content)
+
+    assert findings == []
+    assert list(ctx.shortfalls()) == []
+
+
+@pytest.mark.parametrize("beneath", [False, True], ids=["clean-stop", "object-beneath"])
+def test_a_member_pickle_ending_at_the_member_bound_is_unscanned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, beneath: bool
+) -> None:
+    monkeypatch.setattr(pickle_opcode, "_MEMBER_MAX_BYTES", 64 * 1024)
+    member = _protocol_0_pickle(64 * 1024, beneath=beneath) + _CALL
+    content = _zip(("model.pkl", member))
+
+    findings, ctx = _run(tmp_path, "bundle.zip", content)
+
+    assert any("model.pkl" in summary for summary in _unscanned(findings)), findings
+    assert list(ctx.shortfalls())
+
+
+@pytest.mark.parametrize("compress", [False, True], ids=["raw", "gzip"])
+def test_a_file_pickle_ending_at_the_file_bound_is_unscanned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, compress: bool
+) -> None:
+    bound = 128 * 1024
+    monkeypatch.setattr(pickle_opcode, "_MAX_PICKLE_BYTES", bound)
+    monkeypatch.setattr(pickle_opcode, "_MEMBER_MAX_BYTES", bound)
+    content = _protocol_0_pickle(bound, beneath=False) + _CALL
+
+    findings, ctx = _run(tmp_path, "model.bin", gzip.compress(content) if compress else content)
+
+    assert _unscanned(findings), findings
+    assert list(ctx.shortfalls())
+
+
+def _padded_count(size: int) -> bytes:
+    """A pickle of exactly `size` bytes returning the count 1, padded with a string it drops."""
+    tail = b"0K\x01."
+    padding = size - len(_HEADER) - len(b"X") - 4 - len(tail)
+    return _HEADER + b"X" + struct.pack("<I", padding) + b"a" * padding + tail
+
+
+def _bytes_storage(size: int) -> bytes:
+    """A storages member of exactly `size` bytes: a count of one, then one byte storage."""
+    head = _count(1) + _STORAGE_ARGS.replace(b"FloatStorage", b"ByteStorage")
+    elements = size - len(head) - pickle_opcode._STORAGE_LENGTH_BYTES
+    return head + struct.pack("<q", elements) + bytes(elements)
+
+
+@pytest.mark.parametrize("cut_at", ["storages-count", "tensors-count", "storage-views"])
+def test_a_legacy_member_cut_where_torch_reads_on_is_unscanned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cut_at: str
+) -> None:
+    bound = 64 * 1024
+    monkeypatch.setattr(pickle_opcode, "_MEMBER_MAX_BYTES", bound)
+    after = _HEADER + _CALL
+    if cut_at == "tensors-count":
+        member, content = "tensors", _legacy(_HONEST_STORAGES, _padded_count(bound) + after)
+    elif cut_at == "storages-count":
+        member, content = "storages", _legacy(_padded_count(bound) + after, _HONEST_TENSORS)
+    else:
+        member, content = "storages", _legacy(_bytes_storage(bound) + after, _HONEST_TENSORS)
+
+    findings, ctx = _run(tmp_path, "model.pt", content)
+
+    assert any(f"({member})" in summary for summary in _unscanned(findings)), findings
+    assert list(ctx.shortfalls())
+
+
 @pytest.mark.parametrize("member", ["weights.pkl.gz", "model.joblib.xz", "state.pkl.z"])
 def test_a_member_named_as_a_compressed_pickle_is_read(tmp_path: Path, member: str) -> None:
     content = _zip((member, gzip.compress(_PAYLOAD)))

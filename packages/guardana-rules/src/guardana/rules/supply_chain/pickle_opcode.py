@@ -1013,7 +1013,8 @@ class ParseEnd(StrEnum):
     checkpoint is raw tensor data and is `NOT_PICKLE` within its first few bytes —
     reporting that would put a finding on every tensor in every honest model, and so
     is a stream an unpickler would refuse part-way, since nothing after that runs. A
-    stream that was still parsing when the buffer ended (`RAN_OUT`), or one the
+    stream that was still parsing when the buffer ended, or that ended exactly where a
+    buffer cut from a longer one does (`RAN_OUT`), or one the
     pickle machine could not model an operand for (`UNRESOLVABLE`), is a pickle this
     rule did not finish proving clean, and so is one cut off by the archive's opcode
     budget (`OVER_BUDGET`), one with a read that crosses the end of a frame
@@ -1146,7 +1147,11 @@ class _OpcodeScan:
 
 
 def _scan_opcodes(
-    data: bytes, budget: _OpcodeBudget | None = None, *, as_pickle: _AsPickle = _AsPickle.DATA
+    data: bytes,
+    budget: _OpcodeBudget | None = None,
+    *,
+    as_pickle: _AsPickle = _AsPickle.DATA,
+    cut: bool = False,
 ) -> _OpcodeScan:
     """Read `data` as one or more pickle opcode streams, keeping whatever they prove.
 
@@ -1172,12 +1177,15 @@ def _scan_opcodes(
     A state this rule cannot prove safe counts from a pickle a loader reads (the first of a
     stream named as one, and the four after the legacy magic number) and from one that opens
     with a PROTO opcode; elsewhere only beside an import with a real dotted name.
+
+    `cut` says the bytes go on past `data`, so a pickle that ends exactly where `data` does
+    ends `RAN_OUT`: what follows it was not read.
     """
     refs: list[str] = []
     unproven: list[str] = []
     stream = io.BytesIO(data)
     fork_budget = budget or _OpcodeBudget(_ARCHIVE_OPCODE_FLOOR + len(data))
-    starts = _Starts(len(data))
+    starts = _Starts(len(data), cut=cut)
     legacy = 0
     while starts.pending:
         start, after_complete, forked, ordinal = starts.pending.popleft()
@@ -1234,6 +1242,9 @@ class _Starts:
     """The offsets a byte stream is read from as a pickle, and the worst way one ended."""
 
     size: int
+    cut: bool = False
+    """Whether the stream goes on past `size`, beyond the bytes read."""
+
     pending: collections.deque[tuple[int, bool, bool, int | None]] = field(
         default_factory=lambda: collections.deque([(0, False, False, 0)])
     )
@@ -1248,8 +1259,16 @@ class _Starts:
     def add(
         self, offset: int, *, forked: bool, first: bool = False, ordinal: int | None = None
     ) -> None:
-        """Read from `offset` too, once, when bytes are left there; `first` reads it next."""
-        if offset >= self.size or offset in self.seen:
+        """Read from `offset` too, once, when bytes are left there; `first` reads it next.
+
+        At or past the end of a cut stream nothing is left to read, so the read ran out.
+        """
+        if offset >= self.size:
+            if self.cut:
+                # A loader reading the whole stream goes on from here into bytes never read.
+                self.ended(ParseEnd.RAN_OUT)
+            return
+        if offset in self.seen:
             return
         self.seen.add(offset)
         if first:
@@ -1473,6 +1492,8 @@ class _LegacyReader:
         """Read the member as torch does; raise `_WalkEnd` wherever that stops early."""
         total = self.pickle().count
         if self.at_end():
+            if storages or total != 0:
+                self.read_on()
             return
         if total is None:
             raise _WalkEnd(self.unfollowed())
@@ -1483,9 +1504,12 @@ class _LegacyReader:
             self.expect_more()
             self.skip(self.raw_bytes(shape, storages=storages))
             done += 1
-        if storages and not self.at_end():
-            # The storage views torch reads after the last storage.
-            self.pickle()
+        if storages:
+            if self.at_end():
+                self.read_on()
+            else:
+                # The storage views torch reads after the last storage.
+                self.pickle()
 
     def pickle(self) -> _Shape:
         """Read the next pickle and what it is; a pickle that does not end cleanly ends the walk."""
@@ -1503,6 +1527,14 @@ class _LegacyReader:
     def at_end(self) -> bool:
         """Tell whether every byte read has been consumed."""
         return self.stream.tell() >= len(self.data)
+
+    def read_on(self) -> None:
+        """End the walk as cut where torch reads on and the bytes were cut here.
+
+        At the member's real end torch stops on the short read, so nothing is left unread.
+        """
+        if self.cut:
+            raise _WalkEnd(_LegacyWalk(self.refs, cut=True))
 
     def expect_more(self) -> None:
         """End the walk when torch would read past the last byte here."""
@@ -1669,7 +1701,7 @@ def _may_hold_a_tar(head: bytes, *, cut: bool) -> bool:
 
 def _may_be_a_pickle(head: bytes) -> bool:
     """Whether bytes that go on past `head` may be a pickle stream; see `_bin_verdict`."""
-    scan = _scan_opcodes(head, as_pickle=_AsPickle.SNIFFED)
+    scan = _scan_opcodes(head, as_pickle=_AsPickle.SNIFFED, cut=True)
     return _bin_verdict(head, scan, cut=True) is not False
 
 
@@ -2421,7 +2453,7 @@ class PickleOpcodeRule(ArtifactRule):
                 )
                 return True
             stream, stream_cut = inflated.data, cut or inflated.cut
-        scan = _scan_opcodes(stream, as_pickle=_AsPickle.SNIFFED)
+        scan = _scan_opcodes(stream, as_pickle=_AsPickle.SNIFFED, cut=stream_cut)
         if _bin_verdict(stream, scan, cut=stream_cut) is False:
             return False
         if inflated is not None:
@@ -2486,7 +2518,9 @@ class PickleOpcodeRule(ArtifactRule):
         if not by_content and inflated.data.startswith(NPY_MAGIC):
             self._scan_npy_bytes(report, inflated.data, cut_summary=cut_summary)
             return True
-        scan = _scan_opcodes(inflated.data, as_pickle=_file_reading(by_content=by_content))
+        scan = _scan_opcodes(
+            inflated.data, as_pickle=_file_reading(by_content=by_content), cut=inflated.cut
+        )
         if by_content and _bin_verdict(inflated.data, scan, cut=inflated.cut) is False:
             return False
         self._report_stream(
@@ -2521,7 +2555,7 @@ class PickleOpcodeRule(ArtifactRule):
             if probe is None:
                 report.unscanned(_UNREADABLE)
                 return True
-            scan = _scan_opcodes(probe[0], as_pickle=_AsPickle.SNIFFED)
+            scan = _scan_opcodes(probe[0], as_pickle=_AsPickle.SNIFFED, cut=probe[1])
             verdict = _bin_verdict(probe[0], scan, cut=probe[1])
             if verdict is False:
                 return False
@@ -2530,7 +2564,7 @@ class PickleOpcodeRule(ArtifactRule):
             report.unscanned(_UNREADABLE)
             return True
         data, oversized = prefix
-        scan = _scan_opcodes(data, as_pickle=_file_reading(by_content=by_content))
+        scan = _scan_opcodes(data, as_pickle=_file_reading(by_content=by_content), cut=oversized)
         if by_content and _bin_verdict(data, scan, cut=oversized) is False:
             return False
         self._report_stream(
@@ -2603,7 +2637,7 @@ class PickleOpcodeRule(ArtifactRule):
         data, oversized = whole
         self._report_stream(
             report,
-            _scan_opcodes(data[header.data_offset :], as_pickle=_AsPickle.NAMED),
+            _scan_opcodes(data[header.data_offset :], as_pickle=_AsPickle.NAMED, cut=oversized),
             cut_summary=_oversized_summary(oversized),
             unparsed="array of Python objects whose data is not a pickle stream",
         )
@@ -2960,7 +2994,7 @@ class PickleOpcodeRule(ArtifactRule):
             report.unscanned(f"{report.container} member is a nested archive ({name}); not scanned")
             if kind is not _Member.PICKLE:
                 return False
-        scan = _scan_opcodes(member_data, budget, as_pickle=as_pickle)
+        scan = _scan_opcodes(member_data, budget, as_pickle=as_pickle, cut=cut)
         if scan.end is not ParseEnd.OVER_BUDGET and (
             (kind is _Member.STORAGE and not _holds_a_pickle(member_data, scan, cut=cut))
             or (kind is _Member.SNIFFED and _bin_verdict(member_data, scan, cut=cut) is False)
@@ -3093,7 +3127,7 @@ class PickleOpcodeRule(ArtifactRule):
             return True
         if not header.holds_objects:
             return False
-        scan = _scan_opcodes(data[header.data_offset :], budget, as_pickle=_AsPickle.NAMED)
+        scan = _scan_opcodes(data[header.data_offset :], budget, as_pickle=_AsPickle.NAMED, cut=cut)
         report.found(scan.refs, name)
         report.unproven(scan.unproven, name)
         if scan.end is ParseEnd.OVER_BUDGET:
