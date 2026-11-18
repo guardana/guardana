@@ -407,7 +407,7 @@ whatever it is named, because `torch.load` opens a legacy `torch.save` file that
 file is also read as the
 single pickle stream `pickle.load` would read from those bytes, and findings from both
 readings are reported; when the file is named `*.pth.tar` or `*.pt.tar`, or the tar holds a
-member named as a model, the stream counts only if its bytes are a pickle. Inside a tar, a
+member named as a model, the stream counts only if its bytes are a pickle. When nothing in the file follows a standalone pickle's `STOP` that leaves objects beneath its result, the pickle ends there, as `pickle.load` returns the top object. When bytes follow that `STOP`, they are read as before. Inside a tar, a
 member that several links name is read once for each way it is judged, not once per link. A
 tar, compressed or not, whose headers `tarfile` and the `tar` commands read as different names,
 sizes or layouts is a coverage shortfall. This covers size or checksum fields; missing GNU

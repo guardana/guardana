@@ -1412,7 +1412,8 @@ def _read_one(
         try:
             op, arg = next(ops)
         except StopIteration:
-            if not (embedded and (machine.stack or machine.marks)):
+            # Nothing after the STOP means no embedded pickle follows it, as `load_stop` ends there.
+            if stream.tell() >= size or not (embedded and (machine.stack or machine.marks)):
                 return _OneScan(frame_end=frame_end, embedded=stops)
             # The embedded pickle had its own memo, so what this one stored is unknown now.
             stops.append(stream.tell())
