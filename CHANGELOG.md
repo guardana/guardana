@@ -9,9 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Recognize `type(None)` in `collections.defaultdict` pickles.** `guardana.supply_chain.pickle_opcode` recognizes `type(None)` (`NoneType`), pickled as a call to `builtins.type` with `None`, as a safe, allowlisted callable that cannot hold or view arrays. Previously, `collections.defaultdict(type(None))` produced an unverified `LOW` finding ("pickle views memory this scanner cannot prove stays allocated; not proven safe to load") under protocols 0–5 because `type` was treated as an opaque derived value that could hold an array. Gate impact: `collections.defaultdict(type(None))` pickles now exit `0` cleanly.
+- **Recognize `type(None)` in pickles (#351).** `guardana.supply_chain.pickle_opcode` now recognizes `type(None)` as the array-free `NoneType` class and a call to it as `None`. Pickles encode it as `builtins.type` called with `None` (`__builtin__.type` at protocols 0 to 2). Previously, at protocols 0 to 5, the rule treated the result as an unknown object that could be an array. Passing it to an allowlisted callable triggered a `LOW` "Unscanned model file" finding and an `unexamined_component` coverage shortfall. Gate impact: pickles that pass it to an allowlisted callable, such as `collections.defaultdict(type(None))`, or call it now pass (exit `0`) when nothing else is reported. Setting state on it now triggers `CRITICAL` (exit `1`), as for any allowlisted class. Both cases were previously `indeterminate` (exit `2`). Other `type` arguments still yield unknown objects, so `collections.defaultdict(type(1))` exits `2`. The import allowlist still excludes `NoneType`. Imports of `builtins.NoneType` or `__builtin__.NoneType` still trigger `CRITICAL` (exit `1`).
 
 ## [1.3.0] - 2026-11-18 — the third minor release
+
+### Added
+
+- **Support Python 3.14 across all five packages (#328).** MCP tests now close the HTTP error responses they inspect because Python 3.14 warns when an open response is reclaimed. CI tests Python 3.14, and the CLI and collector images use the matching Python base. The minimum Python version remains 3.11.
+
+### Changed
+
+- **Update collector, CLI image and development dependencies without changing package behaviour.** In `uv.lock` and the collector image's `deploy/docker/collector-requirements.txt`, regenerated from `uv.lock`, `fastapi` moves from `0.162.0` to `0.162.5` and `psycopg[binary]` from `3.3.8` to `3.3.9`. `guardana-server` now requires `fastapi>=0.162.5` and `psycopg[binary]>=3.3.9`. Transitive `markdown-it-py`, required by `rich`, moves from `4.2.0` to `4.3.0` in `uv.lock` and `deploy/docker/cli-requirements.txt`; no Guardana package declares it. The development `docs` group now requires `markdown-it-py>=4.3.0`. Development-only updates include `ruff` to `0.17.5`, `import-linter` to `2.16` (with `grimp` to `3.20`), `hypothesis` to `6.170.15` and `types-pyyaml` to `6.0.12.20261111`. Two nested conditions in `scripts/sitegen/notes.py` become one; the generated site is unchanged. No package is added to or removed from `uv.lock`. These updates came from Dependabot pull requests #352, #353, #355, #356, #357, #358 and #359. Gate impact: none.
+
+### Fixed
+
+- **Treat pickles ending exactly at read bounds as unfinished.** `guardana.supply_chain.pickle_opcode` previously treated that point as the file or member end and read no further. Now it reads files further after the 64 KiB detection read for `.bin`, `.sav`, `.p`, `.model`, `.dat` and suffixless files, including after decompressing their heads. At larger bounds—64 MiB for such files decompressed or archive members, and 512 MiB for such files without decompression—it reports files or members unread past the bound. In legacy `torch.save` tar files, it also reports `storages` and `tensors` members unread when cut at 64 MiB exactly where `torch.load` would read on: after the count pickle or last storage. Pickles ending before the bound and files no longer than it are unaffected. Such files importing a non-allowlisted callable after 64 KiB may now fail (exit `1`). Files or members cut at the larger bounds or described tar points now receive a `LOW` "Unscanned model file" finding and `unexamined_component` coverage shortfall; runs may now be `indeterminate` (exit `2`) unless another finding fails the run's policy.
+- **Read a standalone pickle to its end when a `STOP` leaves objects beneath its result (#349).** `guardana.supply_chain.pickle_opcode` previously read past such a `STOP` as an embedded pickle, as `joblib`'s `NumpyArrayWrapper` requires, even when nothing followed it in the file. The read ran out of bytes, so `model.pkl` files such as `\x80\x02K\x01K\x02.` were reported as unscanned with a message suggesting a zip-based container. CPython's `pickle.loads` returns the top object for these bytes, so the rule now ends the pickle at that `STOP`. Embedded pickles followed by more bytes are read as before. Gate impact: these files may now pass (exit `0`) where they were `indeterminate` (exit `2`) when nothing else in them is reported.
+
+## [1.2.4] - 2026-11-15 — the sixth patch release
 
 ### Fixed
 
