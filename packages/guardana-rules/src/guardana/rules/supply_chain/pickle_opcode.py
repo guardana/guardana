@@ -316,6 +316,8 @@ _SAFE_BUILTINS = frozenset(
         "type",
     }
 )
+_RENAMED_BUILTINS = frozenset({("__builtin__", "long"), ("__builtin__", "unicode")})
+"""`int` and `str` under the names protocols 0 to 2 write; an unpickler maps them back."""
 _STACK_GLOBAL_ARGC = 2
 _STRING_OPS = frozenset(
     {
@@ -488,7 +490,7 @@ _BOOLS = {name: Literal(value) for name, value in _BOOL_OPS.items()}
 
 def _is_allowed(module: str, qualname: str) -> bool:
     if module in _BUILTIN_MODULES:
-        return qualname in _SAFE_BUILTINS
+        return qualname in _SAFE_BUILTINS or (module, qualname) in _RENAMED_BUILTINS
     if module == _NUMPY_DTYPE_MODULE:
         return qualname.endswith("DType") and qualname.isidentifier()
     return (module, qualname) in _SAFE_GLOBALS

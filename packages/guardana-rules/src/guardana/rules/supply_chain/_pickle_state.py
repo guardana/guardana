@@ -190,6 +190,7 @@ _KEEPS_NO_VIEW = frozenset(
             for name in ("bytes", "bytearray", "str", "int", "float", "bool", "complex", "type")
         ),
         *((module, "object") for module in ("builtins", "__builtin__")),
+        *(("__builtin__", name) for name in ("long", "unicode")),
         *((module, "scalar") for module in _MULTIARRAYS),
         _NUMPY_DTYPE,
         _NUMPY_NDARRAY,

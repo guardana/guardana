@@ -1045,6 +1045,7 @@ _KEEPS_NO_VIEW: dict[str, bytes] = {
         for name in ("bytes", "bytearray", "str", "int", "float", "bool", "complex", "type")
     },
     "object": _global("__builtin__", "object"),
+    **{name: _global("__builtin__", name) for name in ("long", "unicode")},
     "dtype": _global("numpy", "dtype"),
 }
 
