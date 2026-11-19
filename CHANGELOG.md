@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Recognize `type(None)` in pickles (#351).** `guardana.supply_chain.pickle_opcode` now recognizes `type(None)` as the array-free `NoneType` class and a call to it as `None`. Pickles encode it as `builtins.type` called with `None` (`__builtin__.type` at protocols 0 to 2). Previously, at protocols 0 to 5, the rule treated the result as an unknown object that could be an array. Passing it to an allowlisted callable triggered a `LOW` "Unscanned model file" finding and an `unexamined_component` coverage shortfall. Gate impact: pickles that pass it to an allowlisted callable, such as `collections.defaultdict(type(None))`, or call it now pass (exit `0`) when nothing else is reported. Setting state on it now triggers `CRITICAL` (exit `1`), as for any allowlisted class. Both cases were previously `indeterminate` (exit `2`). Other `type` arguments still yield unknown objects, so `collections.defaultdict(type(1))` exits `2`. The import allowlist still excludes `NoneType`. Imports of `builtins.NoneType` or `__builtin__.NoneType` still trigger `CRITICAL` (exit `1`).
+
 ## [1.3.0] - 2026-11-18 — the third minor release
 
 ### Added
