@@ -715,6 +715,37 @@ def test_a_dangerous_global_beside_rebuilt_bytes_still_fires(tmp_path: Path) -> 
     assert [f.evidence.summary for f in findings] == [_summary(_SYSTEM)]
 
 
+@pytest.mark.parametrize("protocol", [0, 1, 2])
+@pytest.mark.parametrize("factory", [int, str])
+def test_int_and_str_under_the_names_protocols_0_to_2_write_are_allowlisted(
+    tmp_path: Path, factory: type, protocol: int
+) -> None:
+    content = pickle.dumps(collections.defaultdict(factory), protocol=protocol)
+    (tmp_path / "model.pkl").write_bytes(content)
+
+    assert list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+@pytest.mark.parametrize(
+    ("module", "name"),
+    [
+        ("builtins", "long"),
+        ("builtins", "unicode"),
+        ("__builtin__", "basestring"),
+        ("__builtin__", "reduce"),
+        ("__builtin__", "xrange"),
+    ],
+)
+def test_no_other_python_2_builtin_name_is_allowlisted(
+    tmp_path: Path, module: str, name: str
+) -> None:
+    (tmp_path / "model.pkl").write_bytes(_global(module, name))
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.evidence.summary for f in findings] == [_summary(f"{module}.{name}")]
+
+
 def _summary(*callables: str) -> str:
     """The summary of a file importing exactly `callables`."""
     named = sorted(callables)
