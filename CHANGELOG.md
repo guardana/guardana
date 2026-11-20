@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-20 — the seventh patch release
+
 ### Fixed
 
 - **Recognize `type(None)` in pickles (#351).** `guardana.supply_chain.pickle_opcode` now recognizes `type(None)` as the array-free `NoneType` class and a call to it as `None`. Pickles encode it as `builtins.type` called with `None` (`__builtin__.type` at protocols 0 to 2). Previously, at protocols 0 to 5, the rule treated the result as an unknown object that could be an array. Passing it to an allowlisted callable triggered a `LOW` "Unscanned model file" finding and an `unexamined_component` coverage shortfall. Gate impact: pickles that pass it to an allowlisted callable, such as `collections.defaultdict(type(None))`, or call it now pass (exit `0`) when nothing else is reported. Setting state on it now triggers `CRITICAL` (exit `1`), as for any allowlisted class. Both cases were previously `indeterminate` (exit `2`). Other `type` arguments still yield unknown objects, so `collections.defaultdict(type(1))` exits `2`. The import allowlist still excludes `NoneType`. Imports of `builtins.NoneType` or `__builtin__.NoneType` still trigger `CRITICAL` (exit `1`).
 - **Accept Python 2 pickle names for `int` and `str` (#368).** The `guardana.supply_chain.pickle_opcode` rule now accepts `__builtin__.long` and `__builtin__.unicode` as `int` and `str`, respectively, and evaluates calls as calls to those classes. Previously, pickles using these names, which Python 3 writes for `int` and `str` at protocols 0 to 2, received a `CRITICAL` finding and failed (exit `1`). The allowlist still excludes `builtins.long`, `builtins.unicode`, and other Python 2 names remapped on load, including `__builtin__.reduce`, `__builtin__.xrange`, and `__builtin__.basestring`. Gate impact: these pickles now pass (exit `0`) when the scan reports nothing else.
+- **Stop concurrent runs promptly on Ctrl-C (#345).** Previously, with `--concurrency` above its default of 1, a Ctrl-C could leave `guardana probe` runs, including MCP and A2A runs, and `monitor` running: rules kept starting until the first rule thread had none left to take, and only then did the run stop. This could happen on any POSIX system, because the operating system may deliver SIGINT to any thread, and a signal delivered to a rule thread did not wake the main thread while it waited in an untimed join. The main thread now waits for rule threads in short timed intervals, so Ctrl-C ends the run at once whichever thread receives SIGINT. An interrupted run still exits `7`. Gate impact: none.
+
+### Documentation
+
+- **Add a generated Threat coverage page.** It groups the built-in rules by threat class and lists their IDs, titles, default severities, and commands for scans, probes, and trace analysis. The generator uses the installed rules and a class file and requires exactly one class per built-in rule. The README and FEATURES.md link to the page so readers can find checks by threat. The README and landing page ask readers to star the repository and point to `guardana probe` with `--fixtures` for tenant-boundary and planted-document checks, which `guardana grade` cannot run. The README clarifies that OWASP references carry editions and that ATLAS technique IDs and NIST attack-class identifiers are unversioned.
 
 ### Documentation
 

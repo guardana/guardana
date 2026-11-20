@@ -16,6 +16,8 @@ Guardana is an open-source AI security verification tool for security and platfo
 
 [Quickstart](#quickstart) · [Features](FEATURES.md) · [Rule catalog](docs/generated/rule-catalog.md) · [Docs](docs/index.md) · [Status & limits](docs/product-status.md) · [Current work](https://github.com/guardana/guardana/issues) · [Changelog](CHANGELOG.md) · [Get involved](#get-involved)
 
+⭐ [Star Guardana on GitHub](https://github.com/guardana/guardana) to help other teams find it.
+
 </div>
 
 ---
@@ -84,7 +86,7 @@ Every published distribution has signed, keyless build provenance verifiable wit
 
 ## What it checks
 
-The [generated rule summary](docs/generated/rule-summary.md) counts 58 built-in rules: 19 artifact rules and 39 runtime rules. The runtime rules span live endpoints, live MCP servers, live A2A agents, seeded applications, and recorded traces. A single endpoint does not exercise all 39. Rules map to both editions of the OWASP LLM Top 10, the OWASP Top 10 for Agentic Applications, the OWASP MCP Top 10, OWASP ML Top 10, MITRE ATLAS v5.6.0, and NIST AI 100-2e2025. References include their edition.
+The [generated rule summary](docs/generated/rule-summary.md) counts 58 built-in rules: 19 artifact rules and 39 runtime rules. The runtime rules span live endpoints, live MCP servers, live A2A agents, seeded applications, and recorded traces. A single endpoint does not exercise all 39. Rules map to OWASP Top 10 for LLM Applications 2025 and 2026, OWASP Top 10 for Agentic Applications 2026, OWASP MCP Top 10 2025, OWASP Machine Learning Security Top 10 2023, MITRE ATLAS (transcribed from release 5.6.0), and NIST AI 100-2 attack classes. References use edition tags for OWASP (for example, `LLM01:2025`) and unversioned ATLAS technique IDs and NIST attack-class identifiers, which retain their meaning across releases.
 
 | Family | Rules | Surface | What it covers |
 |---|---|---|---|
@@ -99,6 +101,8 @@ The [generated rule summary](docs/generated/rule-summary.md) counts 58 built-in 
 | `guardana.retrieval.*` | 1 | runtime | an instruction planted in a seeded document being followed |
 | `guardana.output.*` | 1 | runtime | secrets in model output |
 | `guardana.training.*` | 1 | build | training-data integrity |
+
+See which threats the rules check for in [threat coverage](docs/generated/threat-coverage.md) and which framework entries they map to in [taxonomy coverage](docs/generated/taxonomy-coverage.md).
 
 The 19 static rules need no model or network. The generated [rule catalog](docs/generated/rule-catalog.md) lists built-in rule ids, severities, surfaces, and framework mappings. `guardana rules` shows rules admitted in the current installation, including trusted third-party rules. See [`FEATURES.md`](FEATURES.md) for the capability overview and the [generated detection limits](docs/generated/detection-limits.md) for what each finding establishes.
 
@@ -222,7 +226,7 @@ flowchart LR
 | System | Point Guardana at | What it observes | What it cannot see |
 |---|---|---|---|
 | A dedicated model | Model files with `guardana scan PATH`; a staging endpoint with `guardana probe`. | File risks and replies to selected active checks. | What an application does after receiving a model reply. |
-| A multi-tenant retrieval application | Its endpoint with `--fixtures`; recorded answers with `guardana grade RECORDING`. | Tenant-boundary markers and poisoned-document instructions that reach replies. | Internal retrieval that never appears in a reply, or production traffic. |
+| A multi-tenant retrieval application | Its endpoint, using `guardana probe` with `--fixtures` and seeded test data for each tenant. | Replies that expose another tenant's seeded data or follow instructions planted in retrieved documents. | Internal retrieval that never appears in a reply, or production traffic. |
 | An agent with tools | Its endpoint, an MCP server or A2A agent; recorded traces with `guardana analyze-trace TRACE`. | Selected probe replies, protocol surfaces and recorded tool effects; tool doubles can supply test tools. | Calls and effects absent from the recorded trace, or production traffic. |
 
 ## Extend it for your application
@@ -288,7 +292,7 @@ Report suspected vulnerabilities privately through [`SECURITY.md`](SECURITY.md),
 - Try it in about ten minutes and tell us where you got stuck in a [first-run session](docs/studies/first-run-study.md).
 - Bring your team's LLM, RAG or MCP application as a [pilot](docs/studies/adopter-study.md). Start in [GitHub Discussions](https://github.com/guardana/guardana/discussions) or email contact@guardana.dev.
 - Write your own pack or check. See [docs/extending.md](docs/extending.md) and [examples/](examples/).
-- Star the repository or watch releases to follow new releases.
+- [Star the repository](https://github.com/guardana/guardana) to help other teams find Guardana, and watch releases to follow updates.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). New rules need a framework mapping and fixtures.
 

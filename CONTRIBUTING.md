@@ -344,4 +344,4 @@ Answer each with a sentence or an explicit "not applicable":
 - [ ] Tests, including a negative case
 - [ ] Documentation, per the five places above
 - [ ] `CHANGELOG.md` entry saying *why*
-- [ ] Generated docs refreshed (`uv run python scripts/generate_docs.py`)
+- [ ] Generated docs refreshed (`uv run python scripts/generate_docs.py`); a new built-in rule placed under one threat in `scripts/threat_classes.yaml`

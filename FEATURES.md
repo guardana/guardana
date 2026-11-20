@@ -6,8 +6,9 @@ live systems, and recorded executions with one policy and one evidence model.
 This page is an overview, not a second rule catalog. Exact, generated sources of
 truth are the [rule summary](docs/generated/rule-summary.md),
 [rule catalog](docs/generated/rule-catalog.md),
-[evaluator catalog](docs/generated/evaluator-catalog.md), and
-[taxonomy coverage](docs/generated/taxonomy-coverage.md).
+[evaluator catalog](docs/generated/evaluator-catalog.md),
+[taxonomy coverage](docs/generated/taxonomy-coverage.md), and
+[threat coverage](docs/generated/threat-coverage.md).
 
 For maturity and known gaps, read [Product status](docs/product-status.md).
 To join a pilot or contribute, read [Community](docs/community.md).

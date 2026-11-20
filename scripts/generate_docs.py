@@ -14,7 +14,9 @@ added between releases turns the suite red rather than waiting for someone to cu
 one. Prose links to these files instead of repeating them.
 
 The rule catalog also reads `scripts/severity_conditions.yaml`, which says when a
-finding carries a severity other than its rule's default.
+finding carries a severity other than its rule's default. The threat coverage page
+reads `scripts/threat_classes.yaml`, which places every built-in rule under the one
+threat it checks for.
 """
 
 import argparse
@@ -37,6 +39,7 @@ sys.path.insert(0, str(_REPO / "packages" / "guardana-core" / "src"))
 sys.path.insert(0, str(_REPO / "packages" / "guardana-rules" / "src"))
 
 from guardana.core import __version__  # noqa: E402
+from guardana.core.contract.assertion import AssertionKind  # noqa: E402
 from guardana.core.evaluator import CONFIG_WIRED  # noqa: E402
 from guardana.core.evaluator.base import Evaluator  # noqa: E402
 from guardana.core.manifest.model import MANIFEST_SCHEMA_VERSION  # noqa: E402
@@ -51,7 +54,7 @@ from guardana.core.rule.verify import FixtureVerdict, verify_rule  # noqa: E402
 from guardana.core.safety import Detection  # noqa: E402
 from guardana.core.severity import Severity  # noqa: E402
 from guardana.core.surface import Surface  # noqa: E402
-from guardana.core.target import TargetKind  # noqa: E402
+from guardana.core.target import Capability, TargetKind  # noqa: E402
 from guardana.rules import provide_evaluators, provide_rules  # noqa: E402
 
 import adopter_measure  # noqa: E402
@@ -84,6 +87,12 @@ _FRONTMATTER: dict[str, tuple[str, int, str]] = {
         "Taxonomy coverage",
         40,
         "Which entry of each public framework at least one built-in rule maps to.",
+    ),
+    "threat-coverage.md": (
+        "Threat coverage",
+        45,
+        "Guardana's built-in rules by threat class, with each rule's ID, title, default "
+        "severity, and command.",
     ),
     "detection-limits.md": (
         "Detection limits",
@@ -296,6 +305,179 @@ def _taxonomy(rules: list[Rule]) -> str:
     for framework in sorted(per_framework):
         entries = ", ".join(f"`{e}`" for e in sorted(per_framework[framework]))
         lines.append(f"| {framework} | {entries} |")
+    return "\n".join(lines) + "\n"
+
+
+THREAT_CLASSES = _REPO / "scripts" / "threat_classes.yaml"
+_CLASS_FIELDS = frozenset({"title", "summary", "rules"})
+_THREAT_INTRO = (
+    "This page lists Guardana's {total} built-in rules in {classes} threat classes, with each "
+    "rule's ID, title, default severity, and command. The `scripts/generate_docs.py` script builds"
+    " the page from the installed rules and a class file and stops if any built-in rule has zero "
+    "or multiple classes. Each rule checks for part of a threat, with [detection "
+    "limits](detection-limits.md) explaining what findings prove and [taxonomy "
+    "coverage](taxonomy-coverage.md) showing framework mappings."
+)
+_PREVENT_HEADING = "Prevent regressions"
+_PREVENT_INTRO = "Use these checks to catch regressions in scans, live probes, and recorded runs."
+_PREVENT: tuple[str, ...] = (
+    (
+        "`guardana scan` exits `1` when a finding meets `fail_on` (HIGH by default) and `2` when "
+        "required coverage is missing, blocking the merge in CI. Use the GitHub Action, a "
+        "pre-commit hook, or GitLab, Jenkins, and Azure templates. See "
+        "[integrations](../integrations.md)."
+    ),
+    (
+        "`guardana baseline` records accepted findings as waivers with a reason, approver, and "
+        "expiry. With `scan --baseline`, new findings still fail the gate, and findings with "
+        "expired waivers fail again if still present. See [baselines](../usage-baseline.md)."
+    ),
+    (
+        "`guardana diff accepted.json current.json` exits `1` if a finding appears, is proven, or "
+        "escalates at or above the `fail_on` bar, or, at any severity, a check can no longer reach "
+        "a verdict, a rule stops running, or a file leaves the scan. It exits `2` if the runs "
+        "cannot be compared. See [run comparisons](../usage-diff.md)."
+    ),
+    (
+        "`guardana monitor` (beta) reruns endpoint rules with a fresh canary each cycle and alerts"
+        " if the gate fails, more checks fail to run, or a cycle is worse than the first. See "
+        "[endpoint monitoring](../usage-monitor.md)."
+    ),
+    (
+        "`guardana probe --mcp URL --write-mcp-pin PIN` saves the approved tool manifest. A later "
+        "probe with `--mcp-pin PIN` reports changed tool declarations as CRITICAL. If the pin "
+        "cannot be compared, the run ends indeterminate (exit `2`). See [MCP "
+        "probes](../usage-probe.md)."
+    ),
+    (
+        "`guardana analyze-trace --contract FILE` checks recorded runs against {contract_count} "
+        "contract types ({contract_kinds}). The run ends indeterminate (exit `2`) if the trace "
+        "lacks evidence a contract needs. See [trace contracts](../usage-contracts.md)."
+    ),
+)
+_SCAN = "scan PATH"
+_ANALYZE_TRACE = "analyze-trace TRACE"
+_PROBE_OPTIONS: tuple[tuple[Capability, str], ...] = (
+    (Capability.REGISTRY_ENTRY, "probe --mcp URL --mcp-registry-entry FILE"),
+    (Capability.SEEDED_DATA, "probe --url URL --model MODEL --fixtures FILE"),
+    (Capability.INSPECT_A2A, "probe --a2a URL"),
+    (Capability.INSPECT_AUTHORIZATION, "probe --mcp URL"),
+    (Capability.LIST_TOOLS, "probe --mcp URL"),
+    (Capability.CHAT, "probe --url URL --model MODEL"),
+)
+"""The probe options that supply what an endpoint rule needs; the first match wins."""
+
+
+class ThreatClassesError(ValueError):
+    """The threat classes file, or a rule it places, says something the page cannot back."""
+
+
+@dataclass(frozen=True)
+class ThreatClass:
+    """One threat and the built-in rules that check for part of it."""
+
+    title: str
+    summary: str
+    rules: tuple[str, ...]
+
+
+def load_threat_classes(rules: list[Rule], path: Path = THREAT_CLASSES) -> list[ThreatClass]:
+    """Read the threat classes file, refusing anything but every built-in rule placed once.
+
+    Raises `ThreatClassesError` naming the file for a document of the wrong shape, a blank
+    or table-splitting text, a repeated title, an id that is not a built-in rule, a rule
+    placed more than once, or a built-in rule placed nowhere.
+    """
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(document, list) or not document:
+        raise ThreatClassesError(f"{path}: the top level must be a non-empty list of classes")
+    classes = [_threat_class(path, index, entry) for index, entry in enumerate(document, 1)]
+    titles = Counter(threat.title for threat in classes)
+    repeated = sorted(title for title, count in titles.items() if count > 1)
+    if repeated:
+        raise ThreatClassesError(f"{path}: titles used more than once: {', '.join(repeated)}")
+    placed = Counter(rule_id for threat in classes for rule_id in threat.rules)
+    known = {rule.meta.id for rule in rules}
+    unknown = sorted(set(placed) - known)
+    if unknown:
+        raise ThreatClassesError(f"{path}: not built-in rule ids: {', '.join(unknown)}")
+    twice = sorted(rule_id for rule_id, count in placed.items() if count > 1)
+    if twice:
+        raise ThreatClassesError(f"{path}: rules placed more than once: {', '.join(twice)}")
+    missing = sorted(known - set(placed))
+    if missing:
+        raise ThreatClassesError(
+            f"{path}: built-in rules in no class: {', '.join(missing)}; add each under one class"
+        )
+    return classes
+
+
+def _threat_class(path: Path, index: int, entry: object) -> ThreatClass:
+    where = f"{path}: class {index}"
+    if not isinstance(entry, dict) or set(entry) != _CLASS_FIELDS:
+        raise ThreatClassesError(f"{where}: must have exactly 'title', 'summary' and 'rules'")
+    texts = {name: entry[name] for name in ("title", "summary")}
+    for name, text in texts.items():
+        if not isinstance(text, str) or not text.strip():
+            raise ThreatClassesError(f"{where}: '{name}' must be a non-blank string")
+        if "|" in text:
+            raise ThreatClassesError(
+                f"{where}: '{name}' must not contain '|', which splits a table"
+            )
+    ids = entry["rules"]
+    if not isinstance(ids, list) or not ids or not all(isinstance(i, str) for i in ids):
+        raise ThreatClassesError(f"{where}: 'rules' must be a non-empty list of rule ids")
+    return ThreatClass(texts["title"].strip(), texts["summary"].strip(), tuple(ids))
+
+
+def runs_with(rule: Rule) -> str:
+    """Name the command that runs a built-in rule, refusing a rule no command can serve."""
+    kind = rule.meta.target_kind
+    if kind == TargetKind.ARTIFACT:
+        return _SCAN
+    if kind == TargetKind.TRACE:
+        return _ANALYZE_TRACE
+    needs = rule.meta.required_capabilities
+    if kind == TargetKind.ENDPOINT:
+        for capability, command in _PROBE_OPTIONS:
+            if capability in needs:
+                return command
+    raise ThreatClassesError(
+        f"{rule.meta.id}: no command is known to run a {kind} rule that needs "
+        f"{', '.join(sorted(str(capability) for capability in needs)) or 'nothing'}"
+    )
+
+
+def _threats(rules: list[Rule], classes_path: Path = THREAT_CLASSES) -> str:
+    by_id = {rule.meta.id: rule for rule in rules}
+    classes = load_threat_classes(rules, classes_path)
+    intro = _THREAT_INTRO.format(total=len(rules), classes=len(classes))
+    lines = [_HEADER, intro + "\n", "| Threat | Rules | Runs with |", "|---|---|---|"]
+    for threat in classes:
+        verbs = dict.fromkeys(runs_with(by_id[rule_id]).split()[0] for rule_id in threat.rules)
+        listed = ", ".join(f"`{verb}`" for verb in verbs)
+        lines.append(f"| {threat.title} | {len(threat.rules)} | {listed} |")
+    for threat in classes:
+        lines += [
+            f"\n## {threat.title}\n",
+            threat.summary + "\n",
+            "| Rule | Reports | Default severity | Runs with |",
+            "|---|---|---|---|",
+        ]
+        for rule_id in threat.rules:
+            meta = by_id[rule_id].meta
+            if "|" in meta.title:
+                raise ThreatClassesError(f"{rule_id}: its title contains '|', which splits a table")
+            lines.append(
+                f"| `{rule_id}` | {meta.title} | {meta.severity.name} "
+                f"| `{runs_with(by_id[rule_id])}` |"
+            )
+    kinds = ", ".join(f"`{kind}`" for kind in AssertionKind)
+    lines += [f"\n## {_PREVENT_HEADING}\n", _PREVENT_INTRO + "\n"]
+    lines += [
+        "- " + item.format(contract_count=len(AssertionKind), contract_kinds=kinds)
+        for item in _PREVENT
+    ]
     return "\n".join(lines) + "\n"
 
 
@@ -684,6 +866,7 @@ _FILES: dict[str, Callable[[list[Rule]], str]] = {
     "rule-catalog.md": _catalog,
     "evaluator-catalog.md": _evaluator_catalog,
     "taxonomy-coverage.md": _taxonomy,
+    "threat-coverage.md": _threats,
     "detection-limits.md": _detection_limits,
     "first-run.md": _first_run,
     "compatibility-matrix.md": _compatibility_matrix,
@@ -752,6 +935,7 @@ def main() -> int:
 
     _OUT.mkdir(parents=True, exist_ok=True)
     rules = _rules()
+    load_threat_classes(rules)
     stale: list[str] = []
     for name, render in _FILES.items():
         path = _OUT / name

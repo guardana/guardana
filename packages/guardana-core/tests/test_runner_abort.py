@@ -2,8 +2,8 @@
 
 A target that went away stops the run: no further rule starts, and the rules already
 in flight finish and record what happened to them. A Ctrl-C ends the process even
-while rules are in flight, which a non-daemon `ThreadPoolExecutor` would not allow,
-since CPython joins its workers at exit.
+while rules are in flight, whichever thread the signal reaches; a non-daemon
+`ThreadPoolExecutor` would not allow it, since CPython joins its workers at exit.
 """
 
 import signal
@@ -84,42 +84,59 @@ def test_no_further_rules_start_once_the_endpoint_is_known_to_be_down() -> None:
     assert len(_STARTED) <= 2
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="sends SIGINT")
-def test_ctrl_c_ends_the_process_without_waiting_for_in_flight_rules() -> None:
-    # Run in a subprocess: the failure mode is CPython joining non-daemon workers
-    # at interpreter exit, which nothing inside this process can observe.
-    script = textwrap.dedent(f"""
-        import time
-        from guardana.core.profile.model import Policy, Profile
-        from guardana.core.registry import Registry
-        from guardana.core.rule import Rule, RuleMeta
-        from guardana.core.runner import Runner
-        from guardana.core.severity import Severity
-        from guardana.core.target import Capability, EndpointTarget, TargetKind
-        from guardana.core.testing import ScriptedTransport
+# Four rules in flight at concurrency 4. Run in a subprocess: the failure mode is the
+# interpreter waiting for rule threads at exit, which nothing inside this process can observe.
+_CHILD = textwrap.dedent("""
+    import signal
+    import sys
+    import threading
+    import time
+    from guardana.core.profile.model import Policy, Profile
+    from guardana.core.registry import Registry
+    from guardana.core.rule import Rule, RuleMeta
+    from guardana.core.runner import Runner
+    from guardana.core.severity import Severity
+    from guardana.core.target import Capability, EndpointTarget, TargetKind
+    from guardana.core.testing import ScriptedTransport
 
-        def make(index):
-            class R(Rule):
-                meta = RuleMeta(
-                    id=f"t.r{{index}}", title="t", severity=Severity.LOW,
-                    target_kind=TargetKind.ENDPOINT, taxonomy=(),
-                    required_capabilities=frozenset({{Capability.CHAT}}),
-                )
-                def run(self, target, ctx):
-                    print("started", flush=True)
-                    time.sleep({_IN_FLIGHT_SECONDS})
-                    return ()
-            return R()
+    # A non-interactive shell starts a background job with SIGINT ignored, and a child
+    # inherits that; the Ctrl-C modelled here reaches a process with the default handler.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
 
-        registry = Registry()
-        for i in range(4):
-            registry.register_rule(make(i))
-        Runner(
-            registry=registry, profile=Profile(name="t", policy=Policy()), concurrency=4
-        ).run(EndpointTarget("http://x", "m", transport=ScriptedTransport("ok")))
-    """)
+    in_flight_seconds = float(sys.argv[1])
+    signal_from_rule = sys.argv[2] == "rule"
+    all_in_flight = threading.Barrier(4)
+
+    def make(index):
+        class R(Rule):
+            meta = RuleMeta(
+                id=f"t.r{index}", title="t", severity=Severity.LOW,
+                target_kind=TargetKind.ENDPOINT, taxonomy=(),
+                required_capabilities=frozenset({Capability.CHAT}),
+            )
+            def run(self, target, ctx):
+                print("started", flush=True)
+                all_in_flight.wait()
+                if signal_from_rule and index == 0:
+                    time.sleep(0.5)
+                    signal.pthread_kill(threading.get_ident(), signal.SIGINT)
+                time.sleep(in_flight_seconds)
+                return ()
+        return R()
+
+    registry = Registry()
+    for i in range(4):
+        registry.register_rule(make(i))
+    Runner(
+        registry=registry, profile=Profile(name="t", policy=Policy()), concurrency=4
+    ).run(EndpointTarget("http://x", "m", transport=ScriptedTransport("ok")))
+""")
+
+
+def _interrupted(signal_source: str) -> tuple[float, int | None]:
+    """Interrupt the child once every rule is in flight; return its exit time and status."""
     with subprocess.Popen(  # noqa: S603
-        [sys.executable, "-c", script],
+        [sys.executable, "-c", _CHILD, str(_IN_FLIGHT_SECONDS), signal_source],
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         text=True,
@@ -130,13 +147,32 @@ def test_ctrl_c_ends_the_process_without_waiting_for_in_flight_rules() -> None:
             started = [child.stdout.readline() for _ in range(4)]
             assert started == ["started\n"] * 4, "every rule must be in flight before Ctrl-C"
             interrupted = time.perf_counter()
-            child.send_signal(signal.SIGINT)
+            if signal_source == "process":
+                child.send_signal(signal.SIGINT)
             child.wait(timeout=_IN_FLIGHT_SECONDS)
             elapsed = time.perf_counter() - interrupted
         finally:
             child.kill()
+    return elapsed, child.returncode
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="sends SIGINT")
+def test_ctrl_c_ends_the_process_without_waiting_for_in_flight_rules() -> None:
+    elapsed, returncode = _interrupted("process")
 
     assert elapsed < _EXIT_BUDGET_SECONDS, (
         f"process took {elapsed:.2f}s to exit after Ctrl-C — it is waiting for in-flight rules"
     )
-    assert child.returncode != 0, "Ctrl-C must stop the run, not let it end as if it finished"
+    assert returncode != 0, "Ctrl-C must stop the run, not let it end as if it finished"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="sends SIGINT")
+def test_ctrl_c_that_reaches_a_rule_thread_still_ends_the_process() -> None:
+    # The kernel may hand a process-wide SIGINT to any thread; here it reaches a rule's own.
+    elapsed, returncode = _interrupted("rule")
+
+    assert elapsed < _EXIT_BUDGET_SECONDS, (
+        f"process took {elapsed:.2f}s to exit after Ctrl-C reached a rule thread — the "
+        f"runner's wait for its rules did not wake"
+    )
+    assert returncode != 0, "Ctrl-C must stop the run, not let it end as if it finished"
