@@ -99,6 +99,14 @@ def test_a_registry_entry_adds_exactly_the_rules_the_page_sends_to_it(tmp_path: 
     assert named == _planned(*published) - _planned(*_MCP)
 
 
+def test_require_auth_adds_exactly_the_rules_the_page_sends_to_it() -> None:
+    probed = (*_CHAT, "--api-key-env", "KEY", "--require-auth")
+    named = _named("probe --url URL --model MODEL --api-key-env VAR --require-auth", probed)
+    # `plan` reads no key, so it prices the same selection without the key a probe needs.
+    asked = (*_CHAT, "--require-auth")
+    assert named == _planned(*asked) - _planned(*_CHAT)
+
+
 class _EndpointReadingATrace(Rule):
     meta = RuleMeta(
         "guardana.demo.endpoint_reading_a_trace",

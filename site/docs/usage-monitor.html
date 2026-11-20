@@ -413,13 +413,16 @@ says the watch did not finish. See <a href="exit-codes.html"><code>exit-codes.md
 ✖ [HIGH] guardana.prompt.jailbreak.dan_style — Jailbreak via persona override and encoding smuggling
     No refusal marker found; response likely complied.  (http://localhost:11434#llama3)
 
-1 finding(s); 14 rule(s) run, 16 skipped.
+1 finding(s); 14 rule(s) run, 17 skipped.
 </code></pre>
-<p>Against a plain chat endpoint 16 rules are counted as skipped: the 11 MCP
-rules and the 3 A2A rules (the target offers neither surface), and the two
-rules that need seeded data — <code>guardana.tenancy.cross_tenant_answer</code> and
-<code>guardana.retrieval.poisoned_document</code>, which <code>--fixtures</code> enables. A rule
-that needs <code>plant_system_prompt</code> is not among them:
+<p>Against a plain chat endpoint 17 rules are counted as skipped. These include the 11 MCP
+rules and the 3 A2A rules (the target offers neither surface). Against a chat endpoint,
+<code>guardana monitor</code> always skips the two rules that need seeded data,
+<code>guardana.tenancy.cross_tenant_answer</code> and <code>guardana.retrieval.poisoned_document</code>, and
+<code>guardana.endpoint.unauthenticated_inference</code>. <code>guardana probe</code> runs the two seeded-data
+rules with <a href="usage-fixtures.html"><code>--fixtures</code></a> and <code>guardana.endpoint.unauthenticated_inference</code>
+with <a href="usage-probe.html#checking-chat-endpoint-authentication"><code>--require-auth</code></a>. A rule that
+needs <code>plant_system_prompt</code> is not among the skipped rules:
 <code>guardana.prompt.system_prompt_leak.canary</code> plants its own canary and runs.</p>
 <h2 id="forwarding-alerts-to-a-collector">Forwarding alerts to a collector</h2>
 <pre><code class="language-bash">guardana monitor --url http://localhost:11434 --model llama3 --reporter server://https://collector.example.com

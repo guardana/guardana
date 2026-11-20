@@ -125,11 +125,11 @@ A `guardana.yaml` or named preset (§5) selects rules with include/exclude globs
 `guardana rules` groups the catalogue by layer:
 
 - **Build-time (static, artifact)** — 19 rules cover pickle opcodes; unsafe deserialization sinks; `trust_remote_code`/`torch.hub.load`; config-`auto_map` and kernel-dispatch RCE; chat-template SSTI; ONNX graph risk; notebook payloads; Keras/TF/model-format code execution; advisory-backed malicious and hallucinated dependencies; insecure transport; hardcoded secrets; MCP tool poisoning; hidden-instruction rules-file backdoors; and training-data integrity.
-- **Runtime (dynamic, endpoint and trace)** — 39 rules, grouped by what they read:
+- **Runtime (dynamic, endpoint and trace)** — 40 rules, grouped by what they read:
 
 | Reads | Checks |
 |---|---|
-| a chat endpoint | direct and indirect (RAG) prompt injection, DAN-style and multi-turn jailbreaks, excessive tool-use agency, unbounded consumption and cost asymmetry, secrets in output, canary-proven system-prompt leakage |
+| a chat endpoint | direct and indirect (RAG) prompt injection, DAN-style and multi-turn jailbreaks, excessive tool-use agency, unbounded consumption and cost asymmetry, secrets in output, canary-proven system-prompt leakage, and whether the chat completions route returns a completion to a request without a credential (`--require-auth`) |
 | an agent's tools | tool-result injection, credential exfiltration through a tool argument, over-broad tool arguments, memory poisoning across a session, hidden context in a tool schema, a live MCP server's tool manifest |
 | a live MCP server | whether it authorizes a caller: unauthenticated answers, a usable authorization surface, foreign tokens, session ids, least-privilege scopes, discovery addresses, authorization-code mix-up, cacheable listings, anonymous task listings, and the registry entry it publishes |
 | a live A2A agent | a card a client can connect to safely, callers without a credential, one caller reading another's tasks |

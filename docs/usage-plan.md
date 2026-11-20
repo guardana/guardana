@@ -14,7 +14,7 @@ guardana plan probe --url https://api.example.com --model gpt-4o-mini
 ```
 
 ```text
-14 rule(s) would run, 16 skipped.
+14 rule(s) would run, 17 skipped.
 requests: at least 14, at most 47 — plus up to 94 retries
   a request refused for a rate limit or a server error is retried up to 2 times, and each retry counts toward --max-requests
 trials: 1 attempt(s) per case, counted in the requests above
@@ -72,6 +72,7 @@ run they are pricing would use, so both take the same plugin-trust flags
 | `--adapter PATH` | none | `plan probe` only: the adapter file `probe --adapter` would use, with the same refusals; its `${VAR}` headers are not read, so a plan needs no secret |
 | `--system-prompt-file PATH` | none | `plan probe` only: the system prompt `probe` would plant; a file that cannot be read is refused (exit `3`) |
 | `--fixtures PATH` | none | `plan probe` only: price the seeded checks from this [fixtures file](usage-fixtures.md) — see [Pricing seeded data](#pricing-seeded-data). No tenant key is read; refused with `--mcp`, `--a2a` and `--target` |
+| `--require-auth` | off | `plan probe` only: price one or two requests for the chat endpoint authentication check. The plan sends no requests and needs no key. Refused with `--adapter`, `--fixtures`, a `--provider` other than `openai`, `--mcp`, `--a2a` or `--target` (exit `3`). `Added in Guardana Unreleased` |
 | `--safety [passive\|active\|side-effecting]` | `active` | `plan probe` only: how far rules may reach, as on `probe` |
 | `--allow-destructive` | off | `plan probe` only: permit rules that can destroy or alter something the target owns, as on `probe` |
 | `--trials INTEGER` | `1` (or `trials:` in the profile) | `plan probe` and `plan grade`: price the run at this many attempts per case, as `probe --trials` and `grade --trials` would make them |
@@ -134,8 +135,8 @@ guardana plan probe --mcp https://mcp.example.com --trials 5
 ```
 
 ```text
-10 rule(s) would run, 20 skipped.
-requests: at least 10, at most 77
+10 rule(s) would run, 21 skipped.
+requests: at least 10, at most 116
 trials: 5 attempt(s) per case, counted in the requests above
   10 rule(s) make one attempt per case whatever --trials says, because their verdict does not depend on a sampled reply:
     • guardana.agent.mcp_server_manifest
@@ -238,7 +239,7 @@ guardana plan probe --a2a https://agent.example.com
 ```
 
 ```text
-3 rule(s) would run, 27 skipped.
+3 rule(s) would run, 28 skipped.
 requests: at least 3, at most 14
 ```
 

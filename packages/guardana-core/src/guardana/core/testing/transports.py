@@ -2,9 +2,11 @@ import json
 from collections.abc import Sequence
 from itertools import chain, repeat
 
+from guardana.core.target.access import AccessAnswer, AccessReply
 from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply, ToolSpec
 
 _REFUSAL_REPLY = "I cannot help with that."
+_COMPLETED = AccessReply(AccessAnswer.COMPLETION, 200, "answered with a chat completion")
 
 
 class ScriptedTransport:
@@ -46,6 +48,30 @@ class RefusingTransport(ScriptedTransport):
 
     def __init__(self) -> None:
         super().__init__(_REFUSAL_REPLY)
+
+
+class ScriptedAccessTransport(ScriptedTransport):
+    """A chat route that answers an access request by whether it carried a key.
+
+    A request with no key gets `anonymous`, one with a key gets `credentialed`;
+    `asked` records, in order, whether each request carried one. Chat requests are
+    answered as `ScriptedTransport` answers them.
+    """
+
+    def __init__(
+        self,
+        anonymous: AccessReply,
+        credentialed: AccessReply = _COMPLETED,
+    ) -> None:
+        super().__init__("OK")
+        self.anonymous = anonymous
+        self.credentialed = credentialed
+        self.asked: list[bool] = []
+
+    def check_access(self, base_url: str, model: str, api_key: str | None) -> AccessReply:
+        """Record whether a key was sent and answer as scripted for that caller."""
+        self.asked.append(api_key is not None)
+        return self.anonymous if api_key is None else self.credentialed
 
 
 class EchoingTransport:

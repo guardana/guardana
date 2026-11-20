@@ -11,6 +11,7 @@ somebody has to vendor is a conformance kit nobody runs.
 from typing import TYPE_CHECKING
 
 from guardana.core.target import Capability, EndpointTarget, Target, ToolCallingTransport
+from guardana.core.target.base import REQUESTED_CAPABILITIES
 from guardana.core.target.protocols import CAPABILITY_SURFACE, FileReader, unmet_surfaces
 
 if TYPE_CHECKING:
@@ -61,13 +62,17 @@ def assert_target_conforms(target: Target) -> None:
 
 
 def _fixed_at_construction(target: Target, capability: Capability) -> bool:
-    """Whether an endpoint's transport, not its class, decides that it cannot call tools.
+    """Whether how the target was built, not its class, decides that it lacks `capability`.
 
+    A requested capability is declared only when the run asks for the check that needs it,
+    so a target offering the surface without declaring it is the default, not a fail-open.
     `EndpointTarget` always has `offer_tools`, and declares `CALL_TOOLS` only when the
     transport it was built with speaks the function-calling API, the way it declares
     `PLANT_SYSTEM_PROMPT` only when built with a system prompt. A subclass that replaces
     `offer_tools` offers tools its own way, so it must declare the capability.
     """
+    if capability in REQUESTED_CAPABILITIES:
+        return True
     return (
         capability is Capability.CALL_TOOLS
         and isinstance(target, EndpointTarget)

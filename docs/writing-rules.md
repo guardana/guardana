@@ -354,7 +354,7 @@ a pack importing an internal name pins `guardana-core`.
 ## Path 2: Python plugin (when YAML can't express the logic)
 
 Use this for custom parsers, stateful probes, or any check against an **artifact** target.
-Of the 58 built-in rules, 19 are build-time (artifact-kind) Python plugins: pickle opcodes
+Of the 59 built-in rules, 19 are build-time (artifact-kind) Python plugins: pickle opcodes
 (including ZIP-archive recursion), model format, chat-template code-execution gadgets, risky
 ONNX graph constructs, Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency
 risk, remote-code (`trust_remote_code`/`torch.hub.load`) and its config form (`auto_map`), code
@@ -482,6 +482,11 @@ so `fail_on_error` keeps the run from passing. `guardana.retrieval.poisoned_docu
 both.
 A rule that requires `Capability.SEEDED_DATA` is demanded by every run given fixtures,
 whatever the profile selects, unless `not_applicable_to` says it has nothing to check there.
+A rule that requires `Capability.INFERENCE_ACCESS` is skipped as `not_applicable` if the
+target does not declare it or `not_applicable_to` says it has nothing to check there, and
+is otherwise demanded whatever the profile selects.
+A demanded rule that the profile excludes or `--safety` filters out leaves a
+`demanded_check` coverage shortfall, and the run ends `indeterminate` (exit `2`) unless a finding fails it.
 
 **Ask the target for parsed source — never parse it yourself.** A scan runs
 every rule over the same tree, so a rule that reads and parses a file for itself

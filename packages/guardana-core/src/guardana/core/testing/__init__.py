@@ -41,6 +41,17 @@ either being real:
         ToolCallReply(text=None, tool_calls=(ToolCall("send_email", '{"to": "x"}', "c2"),)),
     ])
 
+**A scripted access route** stands in for a chat route asked whether it answers a caller
+presenting no credential, so the check can be driven against a route that refuses and one
+that answers anybody:
+
+    from guardana.core.target import AccessAnswer, AccessReply
+    from guardana.core.testing import ScriptedAccessTransport
+
+    refuses = ScriptedAccessTransport(AccessReply(AccessAnswer.REFUSED, 401, "refused"))
+    target = EndpointTarget("http://x", "m", api_key="k", transport=refuses,
+                            inference_access_check=True)
+
 **A scripted MCP server** stands in for a live one, so a rule about how a server
 authorizes a caller can be driven against a server that does — and one that does
 not — without either being real:
@@ -112,6 +123,7 @@ from guardana.core.testing.transports import (
     FailingTransport,
     GullibleAgentTransport,
     RefusingTransport,
+    ScriptedAccessTransport,
     ScriptedAgentTransport,
     ScriptedTransport,
     ScriptExhaustedError,
@@ -128,6 +140,7 @@ __all__ = [
     "RefusingTransport",
     "ScriptExhaustedError",
     "ScriptedA2aAgent",
+    "ScriptedAccessTransport",
     "ScriptedAgentTransport",
     "ScriptedMcpServer",
     "ScriptedTransport",

@@ -75,6 +75,18 @@ A framework mapping says a rule is relevant to that entry, not that the entry is
 - `MCP06:2025`: Intent Flow Subversion
 - `MCP10:2025`: Context Injection & Over-Sharing
 
+## endpoint
+
+### Tested invariant
+
+- `guardana.endpoint.unauthenticated_inference`: Chat route returns a completion to a caller without a credential
+
+### Framework entries these rules are relevant to, not coverage of them
+
+- `AML.T0040`: AI Model Inference API Access
+- `LLM06:2026`: Unbounded Consumption
+- `LLM10:2025`: Unbounded Consumption
+
 ## mcp
 
 ### Tested invariant

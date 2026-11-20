@@ -44,6 +44,7 @@ from guardana.core.target import (
     wire_protocols_of,
 )
 from guardana.core.target._scoped import RuleScoped
+from guardana.core.target.base import REQUESTED_CAPABILITIES
 from guardana.core.target.endpoint import TargetChanged, close_http_error, secrets_sent_by
 from guardana.core.target.failure import (
     FailureRemedies,
@@ -891,6 +892,14 @@ def capability_refusal(
     if not missing:
         return None
     names = tuple(sorted(str(c) for c in missing))
+    if missing <= REQUESTED_CAPABILITIES:
+        return SkippedRule(
+            rule_id=rule.meta.id,
+            reason=SkipReason.NOT_APPLICABLE,
+            missing=(),
+            detail=f"the run did not ask {target_ref} for {', '.join(names)}, which "
+            f"{rule.meta.id} checks",
+        )
     return SkippedRule(
         rule_id=rule.meta.id,
         reason=SkipReason.MISSING_CAPABILITY,

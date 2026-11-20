@@ -28,6 +28,8 @@ from guardana.core.rule import NotApplicable, NotOffered, Rule, RuleContext, Rul
 from guardana.core.rule.trajectory_rule import TrajectoryRule
 from guardana.core.target import (
     MAX_LISTING_PAGES,
+    AccessAnswer,
+    AccessReply,
     Capability,
     EndpointTarget,
     SeededTarget,
@@ -171,6 +173,24 @@ class _AlwaysAnswers:
     ) -> ToolCallReply:
         return ToolCallReply(text=None, tool_calls=(ToolCall(tools[0].name, "{}", "c1"),))
 
+    def check_access(self, base_url: str, model: str, api_key: str | None) -> AccessReply:
+        """Refuse the request with no key and answer the keyed one: both legs are paid for."""
+        if api_key is None:
+            return AccessReply(AccessAnswer.REFUSED, 401, "refused with HTTP 401")
+        return AccessReply(AccessAnswer.COMPLETION, 200, "answered with a chat completion")
+
+
+def _talkative_target() -> EndpointTarget:
+    """A chat endpoint answering everything, asked for every check a chat probe can run."""
+    return EndpointTarget(
+        "http://x",
+        "m",
+        api_key="k",
+        system_prompt="s",
+        transport=_AlwaysAnswers(),
+        inference_access_check=True,
+    )
+
 
 def _endpoint_rules() -> list[Rule]:
     return [r for r in provide_rules() if r.meta.target_kind is TargetKind.ENDPOINT]
@@ -181,9 +201,15 @@ def _chat_rules() -> list[Rule]:
 
     `guardana.agent.mcp_server_manifest` needs `LIST_TOOLS` and is measured
     separately: running it against a chat endpoint measures a rule refusing to
-    run, not a rule spending anything.
+    run, not a rule spending anything. The access check belongs here: a chat probe
+    asked for it is the same run with its two requests added.
     """
-    chattable = {Capability.CHAT, Capability.PLANT_SYSTEM_PROMPT, Capability.CALL_TOOLS}
+    chattable = {
+        Capability.CHAT,
+        Capability.PLANT_SYSTEM_PROMPT,
+        Capability.CALL_TOOLS,
+        Capability.INFERENCE_ACCESS,
+    }
     return [r for r in _endpoint_rules() if not r.meta.required_capabilities - chattable]
 
 
@@ -193,7 +219,7 @@ def _requests_spent(rule: Rule) -> int:
     Measured through the same meter a budget is enforced against, so a meter that
     under-counts fails this gate too.
     """
-    target = EndpointTarget("http://x", "m", system_prompt="s", transport=_AlwaysAnswers())
+    target = _talkative_target()
     with suppress(RuleError):
         list(rule.run(target, _CTX))
     usage = target.usage()
@@ -655,7 +681,7 @@ def _counting_context(tally: Counter[str]) -> RuleContext:
 def _verdicts_graded(rule: Rule) -> Counter[str]:
     """Run one rule against a maximally talkative model and count the verdicts it graded."""
     tally: Counter[str] = Counter()
-    target = EndpointTarget("http://x", "m", system_prompt="s", transport=_AlwaysAnswers())
+    target = _talkative_target()
     with suppress(RuleError):
         list(rule.run(target, _counting_context(tally)))
     return tally

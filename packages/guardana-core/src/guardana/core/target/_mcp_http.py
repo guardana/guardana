@@ -467,12 +467,12 @@ def server_is_local(url: str, sender: Sender) -> bool:
     or when every connection `sender` made to it reached an inside address. A
     sender that records no connections, such as a test double, leaves only the URL.
     """
-    if _named_local(url):
+    if names_local_host(url):
         return True
     return isinstance(sender, HttpSender) and sender.reached_only_inside(url)
 
 
-def _named_local(url: str) -> bool:
+def names_local_host(url: str) -> bool:
     """Whether the URL itself names a local host: an inside IP literal or `localhost`."""
     host = urlsplit(url).hostname
     if not host:
@@ -579,7 +579,7 @@ class _Route:
     ) -> None:
         self._first = first
         self._discovery = discovery
-        self._named_local = _named_local(alongside if alongside is not None else first.full_url)
+        self._named_local = names_local_host(alongside if alongside is not None else first.full_url)
         self._reads_peer = alongside is None
         self._record = record
         self._peer: _Address | None = None

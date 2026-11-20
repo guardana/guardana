@@ -360,6 +360,7 @@ _ANALYZE_TRACE = "analyze-trace TRACE"
 _PROBE_OPTIONS: tuple[tuple[Capability, str], ...] = (
     (Capability.REGISTRY_ENTRY, "probe --mcp URL --mcp-registry-entry FILE"),
     (Capability.SEEDED_DATA, "probe --url URL --model MODEL --fixtures FILE"),
+    (Capability.INFERENCE_ACCESS, "probe --url URL --model MODEL --api-key-env VAR --require-auth"),
     (Capability.INSPECT_A2A, "probe --a2a URL"),
     (Capability.INSPECT_AUTHORIZATION, "probe --mcp URL"),
     (Capability.LIST_TOOLS, "probe --mcp URL"),

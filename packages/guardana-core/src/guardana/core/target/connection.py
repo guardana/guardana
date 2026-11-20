@@ -153,11 +153,13 @@ class ResolvedConnection:
         system_prompt: str | None = None,
         meter: UsageMeter | None = None,
         transport: ChatTransport | None = None,
+        inference_access_check: bool = False,
     ) -> EndpointTarget:
         """Build the endpoint this connection reaches; the one place its fields become one.
 
         `transport` stands in for a built-in provider's network transport, as a test seam
-        does; an adapter's own transport is never replaced by it.
+        does; an adapter's own transport is never replaced by it. `inference_access_check`
+        asks the endpoint to offer the check that its chat route refuses no credential.
         """
         return EndpointTarget(
             self.url,
@@ -167,6 +169,7 @@ class ResolvedConnection:
             provider=self.provider or DEFAULT_PROVIDER,
             transport=transport if self.transport is None else self.transport,
             meter=meter,
+            inference_access_check=inference_access_check,
         )
 
 
