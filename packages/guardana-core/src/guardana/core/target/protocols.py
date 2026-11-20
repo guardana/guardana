@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from guardana.core.target._a2a_view import A2aView
     from guardana.core.target._mcp_authorization import McpAuthorizationView
     from guardana.core.target._mcp_registry import RegistryEntry, ReportedServer
+    from guardana.core.target.access import AccessReply
     from guardana.core.target.endpoint import ChatMessage, ChatReply, ToolCallReply, ToolSpec
     from guardana.core.target.mcp import McpConversation, McpTool
     from guardana.core.trace import Trace
@@ -208,6 +209,32 @@ class SeededData(Protocol):
         raise NotImplementedError
 
 
+@runtime_checkable
+class InferenceAccessCheck(Protocol):
+    """The surface `Capability.INFERENCE_ACCESS` promises: one chat request, keyed or not.
+
+    The target sends and classifies; the rule decides what the answers mean together.
+    """
+
+    @property
+    def access_route(self) -> str:
+        """The chat completions address an access request goes to, as findings show it."""
+        raise NotImplementedError
+
+    @property
+    def access_route_is_local(self) -> bool:
+        """Whether the operator's URL names a loopback or private host, judged without a lookup."""
+        raise NotImplementedError
+
+    def check_access(self, *, credentials: bool) -> "AccessReply":
+        """Send one access request, with the configured credential or with none at all.
+
+        Raises `BudgetExhausted` when the run's budget refuses the request: a check the
+        run could not afford is not a route that answered.
+        """
+        raise NotImplementedError
+
+
 __all__ = [
     "CAPABILITY_SURFACE",
     "A2aInspector",
@@ -215,6 +242,7 @@ __all__ = [
     "ChatEndpoint",
     "ChatWithMetadata",
     "FileReader",
+    "InferenceAccessCheck",
     "RegistryEntryInspector",
     "SeededData",
     "SystemPromptPlanter",
@@ -235,6 +263,7 @@ CAPABILITY_SURFACE: Mapping[Capability, type] = {
     Capability.REGISTRY_ENTRY: RegistryEntryInspector,
     Capability.READ_TRACE: TraceReader,
     Capability.SEEDED_DATA: SeededData,
+    Capability.INFERENCE_ACCESS: InferenceAccessCheck,
 }
 """Which protocol each capability promises, for the capabilities that promise one.
 

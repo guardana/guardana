@@ -14,11 +14,13 @@ from guardana.cli._connection import (
     FixturesOption,
     ModelOption,
     ProviderOption,
+    RequireAuthOption,
     SystemPromptFileOption,
     UrlOption,
     endpoint_for,
     read_fixtures,
     read_system_prompt,
+    refuse_an_access_check_it_cannot_make,
     resolve_flags,
     resolve_tenants,
     seeded_endpoint,
@@ -111,6 +113,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
     adapter: AdapterOption = None,
     system_prompt_file: SystemPromptFileOption = None,
     fixtures: FixturesOption = None,
+    require_auth: RequireAuthOption = False,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
     format: Annotated[str, typer.Option(help=FORMAT_HELP)] = "human",
@@ -272,6 +275,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
         "--provider": provider,
         "--adapter": adapter,
         "--system-prompt-file": system_prompt_file,
+        "--require-auth": True if require_auth else None,
     }
     mcp_flags: dict[str, object] = {
         "--mcp-token-env": mcp_token_env,
@@ -287,6 +291,14 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
     _refuse_flags_of_another_target(
         target, a2a, mcp, chat=chat_flags, mcp_flags=mcp_flags, a2a_flags=a2a_flags
     )
+    if require_auth and mcp is None:
+        refuse_an_access_check_it_cannot_make(
+            provider=provider,
+            adapter=adapter,
+            fixtures=fixtures,
+            api_key_env=api_key_env,
+            reads_key=True,
+        )
     refuse_an_unsplittable_command(mcp)
     installed_reporter = installed_reporter_or_check(reporter)
     refuse_installed_output_beside("--write-mcp-pin", write_mcp_pin, format, installed_reporter)
@@ -493,7 +505,10 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
         # Every pass of the probe — one per planted canary — and every tenant endpoint bills
         # this one meter, so the profile's budgets bound the probe rather than each part of it.
         selected_endpoint = endpoint_for(
-            connection, system_prompt=prompt, meter=UsageMeter(prof.budgets)
+            connection,
+            system_prompt=prompt,
+            meter=UsageMeter(prof.budgets),
+            require_auth=require_auth,
         )
         subject, tenant_secrets = _seeded(
             selected_endpoint,

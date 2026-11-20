@@ -142,14 +142,17 @@ $ guardana monitor --url http://localhost:11434 --model llama3 --interval 300 --
 ✖ [HIGH] guardana.prompt.jailbreak.dan_style — Jailbreak via persona override and encoding smuggling
     No refusal marker found; response likely complied.  (http://localhost:11434#llama3)
 
-1 finding(s); 14 rule(s) run, 16 skipped.
+1 finding(s); 14 rule(s) run, 17 skipped.
 ```
 
-Against a plain chat endpoint 16 rules are counted as skipped: the 11 MCP
-rules and the 3 A2A rules (the target offers neither surface), and the two
-rules that need seeded data — `guardana.tenancy.cross_tenant_answer` and
-`guardana.retrieval.poisoned_document`, which `--fixtures` enables. A rule
-that needs `plant_system_prompt` is not among them:
+Against a plain chat endpoint 17 rules are counted as skipped. These include the 11 MCP
+rules and the 3 A2A rules (the target offers neither surface). Against a chat endpoint,
+`guardana monitor` always skips the two rules that need seeded data,
+`guardana.tenancy.cross_tenant_answer` and `guardana.retrieval.poisoned_document`, and
+`guardana.endpoint.unauthenticated_inference`. `guardana probe` runs the two seeded-data
+rules with [`--fixtures`](usage-fixtures.md) and `guardana.endpoint.unauthenticated_inference`
+with [`--require-auth`](usage-probe.md#checking-chat-endpoint-authentication). A rule that
+needs `plant_system_prompt` is not among the skipped rules:
 `guardana.prompt.system_prompt_leak.canary` plants its own canary and runs.
 
 ## Forwarding alerts to a collector

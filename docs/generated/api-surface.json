@@ -2093,6 +2093,19 @@
         "secondary_opts": []
       },
       {
+        "flag": true,
+        "has_default": true,
+        "hidden": false,
+        "kind": "option",
+        "multiple": false,
+        "name": "require_auth",
+        "opts": [
+          "--require-auth"
+        ],
+        "required": false,
+        "secondary_opts": []
+      },
+      {
         "flag": false,
         "has_default": false,
         "hidden": false,
@@ -2521,6 +2534,19 @@
         "name": "fixtures",
         "opts": [
           "--fixtures"
+        ],
+        "required": false,
+        "secondary_opts": []
+      },
+      {
+        "flag": true,
+        "has_default": true,
+        "hidden": false,
+        "kind": "option",
+        "multiple": false,
+        "name": "require_auth",
+        "opts": [
+          "--require-auth"
         ],
         "required": false,
         "secondary_opts": []
@@ -3976,6 +4002,10 @@
         {
           "name": "SEEDED_DATA",
           "value": "'seeded_data'"
+        },
+        {
+          "name": "INFERENCE_ACCESS",
+          "value": "'inference_access'"
         }
       ],
       "methods": {}
@@ -6910,7 +6940,7 @@
       "annotation": "Mapping[Capability, type]",
       "defined_in": "guardana.core.target.protocols",
       "kind": "constant",
-      "value": "{Capability.READ_FILES: FileReader, Capability.CHAT: ChatEndpoint, Capability.CALL_TOOLS: ToolOfferingEndpoint, Capability.LIST_TOOLS: ToolListing, Capability.INSPECT_AUTHORIZATION: AuthorizationInspector, Capability.INSPECT_A2A: A2aInspector, Capability.REGISTRY_ENTRY: RegistryEntryInspector, Capability.READ_TRACE: TraceReader, Capability.SEEDED_DATA: SeededData}"
+      "value": "{Capability.READ_FILES: FileReader, Capability.CHAT: ChatEndpoint, Capability.CALL_TOOLS: ToolOfferingEndpoint, Capability.LIST_TOOLS: ToolListing, Capability.INSPECT_AUTHORIZATION: AuthorizationInspector, Capability.INSPECT_A2A: A2aInspector, Capability.REGISTRY_ENTRY: RegistryEntryInspector, Capability.READ_TRACE: TraceReader, Capability.SEEDED_DATA: SeededData, Capability.INFERENCE_ACCESS: InferenceAccessCheck}"
     },
     "guardana.core.target.protocols.ChatEndpoint": {
       "bases": [
@@ -7058,6 +7088,71 @@
             }
           ],
           "returns": "'tuple[UnreadSource, ...]'"
+        }
+      }
+    },
+    "guardana.core.target.protocols.InferenceAccessCheck": {
+      "bases": [
+        "Protocol"
+      ],
+      "decorators": [
+        "runtime_checkable"
+      ],
+      "defined_in": "guardana.core.target.protocols",
+      "fields": [],
+      "kind": "protocol",
+      "methods": {
+        "access_route": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "str"
+        },
+        "access_route_is_local": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "bool"
+        },
+        "check_access": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "bool",
+              "has_default": false,
+              "kind": "keyword_only",
+              "name": "credentials"
+            }
+          ],
+          "returns": "'AccessReply'"
         }
       }
     },
@@ -9113,6 +9208,75 @@
             }
           ],
           "returns": "None"
+        }
+      }
+    },
+    "guardana.core.testing.ScriptedAccessTransport": {
+      "bases": [
+        "ScriptedTransport"
+      ],
+      "decorators": [],
+      "defined_in": "guardana.core.testing.transports",
+      "fields": [],
+      "kind": "class",
+      "methods": {
+        "__init__": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "AccessReply",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "anonymous"
+            },
+            {
+              "annotation": "AccessReply",
+              "has_default": true,
+              "kind": "positional_or_keyword",
+              "name": "credentialed"
+            }
+          ],
+          "returns": "None"
+        },
+        "check_access": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            },
+            {
+              "annotation": "str",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "base_url"
+            },
+            {
+              "annotation": "str",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "model"
+            },
+            {
+              "annotation": "str | None",
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "api_key"
+            }
+          ],
+          "returns": "AccessReply"
         }
       }
     },

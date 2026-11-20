@@ -206,7 +206,7 @@
 </nav>
 </details>
 <main id="main">
-<h1>Threat coverage</h1><p class="lede">Guardana's built-in rules by threat class, with each rule's ID, title, default severity, and command.</p><p>This page lists Guardana's 58 built-in rules in 16 threat classes, with each rule's ID, title, default severity, and command. The <code>scripts/generate_docs.py</code> script builds the page from the installed rules and a class file and stops if any built-in rule has zero or multiple classes. Each rule checks for part of a threat, with <a href="detection-limits.html">detection limits</a> explaining what findings prove and <a href="taxonomy-coverage.html">taxonomy coverage</a> showing framework mappings.</p>
+<h1>Threat coverage</h1><p class="lede">Guardana's built-in rules by threat class, with each rule's ID, title, default severity, and command.</p><p>This page lists Guardana's 59 built-in rules in 17 threat classes, with each rule's ID, title, default severity, and command. The <code>scripts/generate_docs.py</code> script builds the page from the installed rules and a class file and stops if any built-in rule has zero or multiple classes. Each rule checks for part of a threat, with <a href="detection-limits.html">detection limits</a> explaining what findings prove and <a href="taxonomy-coverage.html">taxonomy coverage</a> showing framework mappings.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -279,6 +279,11 @@
 <tr>
 <td>Unbounded output and costly requests</td>
 <td>2</td>
+<td><code>probe</code></td>
+</tr>
+<tr>
+<td>Unauthenticated chat inference</td>
+<td>1</td>
 <td><code>probe</code></td>
 </tr>
 <tr>
@@ -717,6 +722,26 @@
 <td>A cheap request that is expensive to answer (cost asymmetry)</td>
 <td>MEDIUM</td>
 <td><code>probe --url URL --model MODEL</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="unauthenticated-chat-inference">Unauthenticated chat inference</h2>
+<p>Guardana checks, on request, whether the named chat completions route returns a completion to a caller without a credential.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Reports</th>
+<th>Default severity</th>
+<th>Runs with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guardana.endpoint.unauthenticated_inference</code></td>
+<td>Chat route returns a completion to a caller without a credential</td>
+<td>CRITICAL</td>
+<td><code>probe --url URL --model MODEL --api-key-env VAR --require-auth</code></td>
 </tr>
 </tbody>
 </table></div>

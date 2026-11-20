@@ -20,6 +20,7 @@ from guardana.core.rule.yaml_rule import load_yaml_rules
 from guardana.rules.a2a import A2aAgentCardRule, A2aCallerIdentityRule, A2aTaskVisibilityRule
 from guardana.rules.agent.excessive_agency import ExcessiveAgencyRule
 from guardana.rules.agent.mcp_server_manifest import McpServerManifestRule
+from guardana.rules.endpoint import UnauthenticatedInferenceRule
 from guardana.rules.mcp import (
     McpAuthorizationDiscoveryRule,
     McpCacheScopeRule,
@@ -100,6 +101,7 @@ def provide_rules() -> list[Rule]:
         HiddenInstructionsRule(),
         DatasetIntegrityRule(),
         ExcessiveAgencyRule(),
+        UnauthenticatedInferenceRule(),
         McpServerManifestRule(),
         McpUnauthenticatedAccessRule(),
         McpAuthorizationDiscoveryRule(),

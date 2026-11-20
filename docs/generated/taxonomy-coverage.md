@@ -14,7 +14,7 @@ See [detection limits](detection-limits.md) for what each rule proves.
 
 | Framework | Entries covered |
 |---|---|
-| MITRE-ATLAS | `AML.T0011.002`, `AML.T0018`, `AML.T0034.002`, `AML.T0051`, `AML.T0053`, `AML.T0056`, `AML.T0057`, `AML.T0080`, `AML.T0080.000`, `AML.T0084.001`, `AML.T0086`, `AML.T0098`, `AML.T0101`, `AML.T0109`, `AML.T0110` |
+| MITRE-ATLAS | `AML.T0011.002`, `AML.T0018`, `AML.T0034.002`, `AML.T0040`, `AML.T0051`, `AML.T0053`, `AML.T0056`, `AML.T0057`, `AML.T0080`, `AML.T0080.000`, `AML.T0084.001`, `AML.T0086`, `AML.T0098`, `AML.T0101`, `AML.T0109`, `AML.T0110` |
 | NIST-AI-100-2 | `poisoning`, `supply-chain` |
 | OWASP-ASI-2026 | `ASI01`, `ASI02`, `ASI03`, `ASI04`, `ASI05`, `ASI06`, `ASI07`, `ASI09` |
 | OWASP-LLM-2025 | `LLM01`, `LLM02`, `LLM03`, `LLM04`, `LLM05`, `LLM06`, `LLM07`, `LLM08`, `LLM10` |

@@ -96,6 +96,7 @@ from guardana.core.target import (
     examined_by_rules_only,
 )
 from guardana.core.target.adapter import HttpAdapterTransport
+from guardana.core.target.base import REQUESTED_CAPABILITIES
 from guardana.core.target.endpoint import EndpointTarget, secrets_sent_by
 from guardana.core.target.failure import FailureRemedies, describe_failure
 from guardana.core.target.recorded import RecordedTarget
@@ -632,8 +633,13 @@ class Verifier:
             deployment=deployment,
             kept=None if keeper is None or planned is None else (keeper, planned),
             fixtures=fixtures,
-            demanded=self.demanded_rules | demanded_by_fixtures(registry, target, fixtures),
-            unchecked=unchecked_fixtures(registry, target, fixtures),
+            demanded=self.demanded_rules
+            | demanded_by_fixtures(registry, target, fixtures)
+            | demanded_by_request(registry, target),
+            unchecked=(
+                *unchecked_fixtures(registry, target, fixtures),
+                *unchecked_requests(registry, target),
+            ),
             withheld=withheld,
         )
 
@@ -996,6 +1002,23 @@ def demanded_by_fixtures(
     )
 
 
+def demanded_by_request(registry: Registry, target: Target) -> frozenset[str]:
+    """Return the rules a target demands by declaring a capability the operator asked for.
+
+    Every registered rule that needs one of the `REQUESTED_CAPABILITIES` `target` declares is
+    demanded, whatever the profile selects, unless it says it has nothing to check on
+    `target`: asking for a check and then excluding it must not end as a pass.
+    """
+    asked = REQUESTED_CAPABILITIES & target.capabilities()
+    if not asked:
+        return frozenset()
+    return frozenset(
+        rule.meta.id
+        for rule in registry.rules()
+        if asked & rule.meta.required_capabilities and applicability_refusal(rule, target) is None
+    )
+
+
 def _declares_seeded_data(target: Target) -> bool:
     """Whether `target` says it holds seeded data, whoever built it."""
     return Capability.SEEDED_DATA in target.capabilities()
@@ -1024,6 +1047,32 @@ def unchecked_fixtures(
                 "none of it was verified"
             ),
         ),
+    )
+
+
+def unchecked_requests(registry: Registry, target: Target) -> tuple[CoverageShortfall, ...]:
+    """Return a shortfall for each check the operator asked for that no registered rule makes.
+
+    A target declares a requested capability only because its check was asked for, so a
+    registry with no rule to make it must not let the run end as though the check passed.
+    """
+    demanded = demanded_by_request(registry, target)
+    served = {
+        capability
+        for rule in registry.rules()
+        if rule.meta.id in demanded
+        for capability in rule.meta.required_capabilities
+    }
+    return tuple(
+        CoverageShortfall(
+            kind=ShortfallKind.DEMANDED_CHECK,
+            name=str(capability),
+            detail=(
+                f"the run asked for the {capability} check and no registered rule makes it, "
+                "so it was not made"
+            ),
+        )
+        for capability in sorted((REQUESTED_CAPABILITIES & target.capabilities()) - served)
     )
 
 

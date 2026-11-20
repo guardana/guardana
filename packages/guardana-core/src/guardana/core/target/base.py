@@ -64,6 +64,8 @@ class Capability(StrEnum):
     READ_SIDE_EFFECTS = "read_side_effects"
     SEEDED_DATA = "seeded_data"
     """The target holds a fixtures file's seeded items and one endpoint per declared tenant."""
+    INFERENCE_ACCESS = "inference_access"
+    """The operator asked whether the chat route answers a request with no credential."""
 
 
 class WireProtocol(StrEnum):
@@ -87,12 +89,21 @@ WIRE_PROTOCOL_OF: Mapping[Capability, WireProtocol] = MappingProxyType(
         Capability.INSPECT_AUTHORIZATION: WireProtocol.MCP,
         Capability.REGISTRY_ENTRY: WireProtocol.MCP,
         Capability.INSPECT_A2A: WireProtocol.A2A,
+        Capability.INFERENCE_ACCESS: WireProtocol.CHAT,
     }
 )
 """The wire protocol each protocol-bound capability belongs to.
 
 A capability left out (file reads, trace dimensions, seeded data) names no protocol, so
 a rule requiring only those is never read as being about another protocol.
+"""
+
+REQUESTED_CAPABILITIES: frozenset[Capability] = frozenset({Capability.INFERENCE_ACCESS})
+"""Capabilities a target declares only when the operator asks for the check that needs them.
+
+A rule needing one that the target lacks was not asked for, so it is skipped as not
+applicable rather than as a coverage gap; a target that declares one demands every rule
+needing it.
 """
 
 

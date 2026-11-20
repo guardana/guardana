@@ -40,6 +40,16 @@ def test_every_built_in_provider_conforms(provider: str) -> None:
     assert_target_conforms(_ProductTarget("http://x", "m", provider=provider))
 
 
+def test_an_endpoint_conforms_whether_or_not_the_run_asked_for_the_access_check() -> None:
+    asked = EndpointTarget("http://x", "m", inference_access_check=True)
+    not_asked = EndpointTarget("http://x", "m")
+
+    assert_target_conforms(asked)
+    assert_target_conforms(not_asked)
+    assert Capability.INFERENCE_ACCESS in asked.capabilities()
+    assert Capability.INFERENCE_ACCESS not in not_asked.capabilities()
+
+
 def test_an_adapter_transport_conforms() -> None:
     assert_target_conforms(EndpointTarget("http://x/chat", "m", transport=_adapter()))
     assert_target_conforms(_ProductTarget("http://x/chat", "m", transport=_adapter()))

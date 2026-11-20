@@ -68,9 +68,16 @@ def test_every_route_builds_its_endpoint_through_the_one_builder(
         system_prompt: str | None = None,
         meter: UsageMeter | None = None,
         transport: ChatTransport | None = None,
+        inference_access_check: bool = False,
     ) -> EndpointTarget:
         built.append(self)
-        return original(self, system_prompt=system_prompt, meter=meter, transport=transport)
+        return original(
+            self,
+            system_prompt=system_prompt,
+            meter=meter,
+            transport=transport,
+            inference_access_check=inference_access_check,
+        )
 
     monkeypatch.setattr(ResolvedConnection, "endpoint", recording)
 

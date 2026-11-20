@@ -39,6 +39,7 @@
   <url><loc>https://guardana.dev/docs/rules/by/cost-zero</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-a2a</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-agent</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/by/family-endpoint</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-mcp</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-output</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-prompt</loc></url>
@@ -60,6 +61,7 @@
   <url><loc>https://guardana.dev/docs/rules/by/reference-AML.T0011.002</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-AML.T0018</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-AML.T0034.002</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/by/reference-AML.T0040</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-AML.T0051</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-AML.T0053</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-AML.T0056</loc></url>
@@ -125,6 +127,7 @@
   <url><loc>https://guardana.dev/docs/rules/guardana.agent.memory_poisoning</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.agent.tool_argument_scope</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.agent.tool_result_injection</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.endpoint.unauthenticated_inference</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.authorization_discovery</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.cache_scope</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.discovery_target</loc></url>

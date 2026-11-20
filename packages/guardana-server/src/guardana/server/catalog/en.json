@@ -41,6 +41,10 @@
       "name": "Agent obeys a tool result",
       "description": "The model was asked to summarise a document and a tool result told it to forward that document elsewhere. Acting on it is a confused deputy: every step is permitted, the run still ends somewhere nobody approved."
     },
+    "guardana.endpoint.unauthenticated_inference": {
+      "name": "Chat route returns a completion to a caller without a credential",
+      "description": "The named chat completions route returns a completion to a request without a credential, allowing callers who can reach it to run the model. The probe checks this only with --require-auth."
+    },
     "guardana.mcp.authorization_discovery": {
       "name": "MCP authorization surface unusable",
       "description": "A protected server publishes no Protected Resource Metadata, names no authorization server, claims a resource on another origin, points at an authorization server that does not advertise PKCE, or serves authorization-server metadata whose issuer is missing or is not the one it was fetched for — each of which stops a conforming client from authenticating at all."

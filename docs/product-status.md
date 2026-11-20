@@ -277,6 +277,15 @@ cue. It describes Guardana's transports, not the servers behind them: whether vL
 SGLang, llama.cpp and TGI agree on streaming, finish reasons or usage metadata is still a
 claim to check per deployment, not a guarantee.
 
+### An authentication verdict covers one route from one machine
+
+A pass of the `--require-auth` check does not show that the server refuses wrong or
+expired keys. It also does not show what a key is allowed to do. The verdict covers
+`POST <base-url>/v1/chat/completions` as reached from the machine running `guardana`,
+through its proxy if one is set. Other routes and access from other networks are outside
+the check.
+See [checking chat endpoint authentication](usage-probe.md#checking-chat-endpoint-authentication).
+
 ### A recipe records what you declare about the subject
 
 `subject.kind` says whether an application or a model harness answered, and Guardana

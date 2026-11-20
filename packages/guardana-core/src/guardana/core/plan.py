@@ -219,7 +219,9 @@ def build_plan(  # noqa: PLR0913 — what is run, against what, and how the run 
     )
     from guardana.core.verify import (  # noqa: PLC0415 — verify is downstream
         demanded_by_fixtures,
+        demanded_by_request,
         unchecked_fixtures,
+        unchecked_requests,
         unfinished_demands,
     )
 
@@ -263,7 +265,7 @@ def build_plan(  # noqa: PLR0913 — what is run, against what, and how the run 
         *reported_once(tuple(foreseen_errors), registry),
         *_unknown_evaluators(graded, registry),
     )
-    demanded = demanded_by_fixtures(registry, target, None)
+    demanded = demanded_by_fixtures(registry, target, None) | demanded_by_request(registry, target)
     foreseen = ScanResult(
         findings=(), rules_run=tuple(selected), rules_skipped=tuple(skipped), errors=errors
     )
@@ -287,6 +289,7 @@ def build_plan(  # noqa: PLR0913 — what is run, against what, and how the run 
             *incomplete_recording(target),
             *unfinished_demands(demanded, foreseen, profile.policy),
             *unchecked_fixtures(registry, target, None),
+            *unchecked_requests(registry, target),
         ),
     )
 

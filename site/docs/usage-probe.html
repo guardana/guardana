@@ -284,6 +284,11 @@ the run (exit <code>4</code>).</p>
 <td>A <a href="usage-fixtures.html"><code>guardana-fixtures.yaml</code></a>: ask every seeded item as its owner and as every other tenant, each through that tenant's own credentials, and every poisoned document as its owner — see <a href="#seeded-data-and-tenants">Seeded data and tenants</a>. A file or a tenant connection that cannot be used is refused before anything is sent (exit <code>3</code>); refused with <code>--mcp</code>, <code>--a2a</code> and <code>--target</code></td>
 </tr>
 <tr>
+<td><code>--require-auth</code></td>
+<td>off</td>
+<td>Check whether the OpenAI-compatible chat completions route refuses a request without a credential. Sends one or two requests. Refused before sending anything (exit <code>3</code>) if <code>--api-key-env</code> is missing or if used with <code>--adapter</code>, <code>--fixtures</code>, a <code>--provider</code> other than <code>openai</code>, <code>--mcp</code>, <code>--a2a</code> or <code>--target</code>. See <a href="#checking-chat-endpoint-authentication">Checking chat endpoint authentication</a>. <code>Added in Guardana Unreleased</code></td>
+</tr>
+<tr>
 <td><code>--profile PATH</code></td>
 <td>none (built-in default profile)</td>
 <td>Path to a <code>guardana.yaml</code> policy file</td>
@@ -429,6 +434,46 @@ marker. A target that says it speaks chat (<code>Target.speaks()</code>) has eve
 skipped as <code>not_applicable</code>, unless it declares a capability of that protocol too (an endpoint
 that also lists MCP tools runs the MCP manifest rule); one that does not say has any rule it
 cannot serve skipped for a missing capability. See <a href="extending.html#adding-a-target"><code>extending.md</code></a>.</p>
+<h2 id="checking-chat-endpoint-authentication">Checking chat endpoint authentication</h2>
+<p>Use <code>--require-auth</code> to check whether the OpenAI-compatible chat completions route refuses a
+request without a credential. The check is the rule
+<code>guardana.endpoint.unauthenticated_inference</code> and is off by default.</p>
+<pre><code class="language-bash">guardana probe --url &lt;base-url&gt; --model &lt;name&gt; --api-key-env &lt;env-var&gt; --require-auth
+</code></pre>
+<p>Guardana sends a short request to <code>POST &lt;base-url&gt;/v1/chat/completions</code> with the <code>--model</code>
+name, one user message (<code>Reply with the single word OK.</code>), and <code>&quot;stream&quot;: false</code>. The body
+omits a system prompt and tools.</p>
+<ol>
+<li>The first request carries no <code>Authorization</code> header, cookie or user part in the URL.</li>
+<li>Only after HTTP <code>401</code> or <code>403</code>, Guardana repeats the same request with the key from
+<code>--api-key-env</code> as <code>Authorization: Bearer &lt;key&gt;</code>. This is the control.</li>
+</ol>
+<p>Each request is sent once, without retries or redirect following.</p>
+<ul>
+<li><strong>Finding (critical, exit <code>1</code>).</strong> The first request gets HTTP <code>200</code> and a JSON body whose
+first choice holds a message. The run fails regardless of <code>fail_on</code>. On a loopback or private
+address, the finding says so and stays critical.</li>
+<li><strong>Pass.</strong> The first request gets HTTP <code>401</code> or <code>403</code> and the control gets a chat completion.
+The rest of the probe determines the run's exit code.</li>
+<li><strong>Inconclusive (exit <code>2</code>).</strong> Any other outcome, including a timeout, an unexpected status, a
+<code>200</code> reply that lacks a valid chat completion or exceeds 8 MiB, or a control that also gets
+<code>401</code> or <code>403</code>. An inconclusive verdict records a <code>demanded_check</code> coverage shortfall. An
+inconclusive or unfinished check ends the run <code>indeterminate</code> unless a finding fails it,
+whatever <code>fail_on</code> says. A profile that excludes the rule leaves the check unfinished, and so
+does <code>--safety passive</code>.</li>
+</ul>
+<p>The check costs one or two requests, and <code>guardana plan probe --require-auth</code> prices them
+without sending anything. Each counts toward <code>--max-requests</code> and the run's usage. If the
+budget has no room for the control, the run stops as a spent budget (exit <code>6</code>).</p>
+<p>Requests leave from the machine running <code>guardana</code> through its environment's proxy, if
+configured. Each verdict records one case with the route, each request's outcome, the number
+sent, and whether a proxy carried them. The record omits the reply body and key.</p>
+<p>A server that accepts any <code>Authorization</code> value can pass, so a pass leaves wrong or expired
+keys untested. A route that expects a different key header refuses the control, making the
+check inconclusive. The verdict covers only the named route as seen from the runner's network.
+Other routes of the same server, such as Ollama's native <code>/api/chat</code>, are not checked. Other
+probe rules can run concurrently and trigger HTTP <code>429</code>. Use <code>--concurrency 1</code> or a profile
+with only this rule to avoid rate limits caused by concurrent rules.</p>
 <h2 id="probing-an-mcp-server">Probing an MCP server</h2>
 <p><code>--mcp</code> points <code>probe</code> at a Model Context Protocol server rather than a chat
 endpoint. There is no model to talk to: the server speaks MCP, so every chat and A2A

@@ -5,6 +5,7 @@ either runs here against the same input or is not published.
 """
 
 import html
+import json
 import re
 from pathlib import Path
 
@@ -30,6 +31,10 @@ _SITE_PLAN = re.compile(
     r'<span class="s">guardana plan probe --url (\S+) --model (\S+)( --profile guardana\.yaml)?'
     r"</span>\n(.*?)\n\n",
     re.DOTALL,
+)
+_MONITOR_SKIPPED = re.compile(r"Against a plain chat endpoint (\d+) rules are counted as skipped")
+_MONITOR_TRANSCRIPT = re.compile(
+    r"^\d+ finding\(s\); \d+ rule\(s\) run, (\d+) skipped\.$", re.MULTILINE
 )
 _SITE_COMMENT = re.compile(r'<span class="c">\s*(.*?)</span>')
 _SITE_BUDGETS = re.compile(r'<span class="k">budgets</span>: (\{[^}]*\})')
@@ -62,6 +67,23 @@ def test_the_readme_sample_scan_is_what_the_scan_prints(monkeypatch: pytest.Monk
     assert result.exit_code == ExitCode.POLICY_FAILED
     missing = _not_printed(match.group(1).splitlines(), result.output)
     assert not missing, "README.md shows lines the scan does not print:\n  " + "\n  ".join(missing)
+
+
+def test_the_monitor_page_counts_the_rules_a_plain_chat_endpoint_skips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    page = (_REPO / "docs" / "usage-monitor.md").read_text(encoding="utf-8")
+    stated = [*_MONITOR_SKIPPED.findall(page), *_MONITOR_TRANSCRIPT.findall(page)]
+    assert len(stated) == 2, "docs/usage-monitor.md no longer states the skipped count twice"
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app, ["plan", "probe", "--url", "http://model.invalid", "--model", "m", "--format", "json"]
+    )
+
+    assert result.exit_code == ExitCode.OK, result.output
+    skipped = len(json.loads(_ANSI.sub("", result.output))["skipped"])
+    assert [int(count) for count in stated] == [skipped, skipped]
 
 
 def test_the_plan_page_estimate_is_what_plan_probe_prints(

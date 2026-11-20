@@ -265,7 +265,7 @@
 <p><code>guardana rules</code> groups the catalogue by layer:</p>
 <ul>
 <li><strong>Build-time (static, artifact)</strong> — 19 rules cover pickle opcodes; unsafe deserialization sinks; <code>trust_remote_code</code>/<code>torch.hub.load</code>; config-<code>auto_map</code> and kernel-dispatch RCE; chat-template SSTI; ONNX graph risk; notebook payloads; Keras/TF/model-format code execution; advisory-backed malicious and hallucinated dependencies; insecure transport; hardcoded secrets; MCP tool poisoning; hidden-instruction rules-file backdoors; and training-data integrity.</li>
-<li><strong>Runtime (dynamic, endpoint and trace)</strong> — 39 rules, grouped by what they read:</li>
+<li><strong>Runtime (dynamic, endpoint and trace)</strong> — 40 rules, grouped by what they read:</li>
 </ul>
 <div class="table-wrap"><table>
 <thead>
@@ -277,7 +277,7 @@
 <tbody>
 <tr>
 <td>a chat endpoint</td>
-<td>direct and indirect (RAG) prompt injection, DAN-style and multi-turn jailbreaks, excessive tool-use agency, unbounded consumption and cost asymmetry, secrets in output, canary-proven system-prompt leakage</td>
+<td>direct and indirect (RAG) prompt injection, DAN-style and multi-turn jailbreaks, excessive tool-use agency, unbounded consumption and cost asymmetry, secrets in output, canary-proven system-prompt leakage, and whether the chat completions route returns a completion to a request without a credential (<code>--require-auth</code>)</td>
 </tr>
 <tr>
 <td>an agent's tools</td>

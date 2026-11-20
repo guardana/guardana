@@ -7,6 +7,7 @@ without an evaluator; a verdict stamped by an evaluator is that evaluator's call
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.rules.agent.excessive_agency import ExcessiveAgencyRule
+from guardana.rules.endpoint import UnauthenticatedInferenceRule
 from guardana.rules.output.secrets import OutputSecretsRule
 from guardana.rules.seeded import CrossTenantAnswerRule, PoisonedDocumentRule
 
@@ -14,6 +15,7 @@ _SELF_GRADING_DETERMINISTIC = {
     OutputSecretsRule.meta.id,
     CrossTenantAnswerRule.meta.id,
     PoisonedDocumentRule.meta.id,
+    UnauthenticatedInferenceRule.meta.id,
 }
 
 
