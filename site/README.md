@@ -7,7 +7,8 @@ which Cloudflare reads for the security headers — applies to both.
 | File | What it is | Where it comes from |
 |---|---|---|
 | `index.html` | the landing page | hand-written; its counts, framework coverage grid, maturity labels and diagrams are written by `scripts/sync_site.py` |
-| `assets/home.css` | the landing page's own styles: layout, light and dark colours, and the animations, all in CSS. The theme switch is a checkbox read with `:has()`, so the page still runs no script | hand-written |
+| `assets/site.css` | what the landing page and every docs and notes page share: the light and dark colours, the header with its theme switch, buttons and the footer. The theme switch is a checkbox read with `:has()`, so no page runs a script | hand-written |
+| `assets/home.css` | the landing page's own sections and their animations, all in CSS | hand-written |
 | `docs/` | the documentation site: every page of `docs/`, plus a page per rule and per filter | **generated** by `scripts/build_site.py` — never edit it, the whole tree is deleted and rewritten |
 | `llms.txt` | the [llms.txt](https://llmstxt.org) documentation map, so a model asking what this project is gets the docs rather than this page's markup | **generated** by `scripts/generate_llms_txt.py` from `docs/index.md` — never edit it |
 | `og.png` | the 1200×630 card a link preview shows in Slack, X and LinkedIn | rendered from `scripts/og_card.html`, deliberately and by hand (see below) |
@@ -213,8 +214,11 @@ the SVG in `index.html`.
 ## The visual system, shared with Guardana Control
 
 `assets/brand/v1/` is the one source of the fonts, colours and mark of the
-Guardana sites. The landing page and every docs page link `tokens.css` before their
-own styles, which hold only what is theirs.
+Guardana sites. The landing page and every docs page link `tokens.css`, then
+`assets/site.css` (the colours, the header and the footer they share), then their own
+styles, which hold only what is theirs. The docs pages draw the landing page's header and
+footer from `scripts/sitegen/layout.py`; `scripts/tests/test_sitegen_layout.py` fails when
+the two footers link to different places.
 
 **v1 is frozen.** A site built from another repository — Guardana Control's, once it
 has one — is meant to vendor a copy of this directory and check it against

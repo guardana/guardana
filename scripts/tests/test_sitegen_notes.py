@@ -73,8 +73,8 @@ def test_a_note_carries_its_canonical_feed_link_and_served_urls(tmp_path: Path) 
     assert 'href="/docs/usage-scan#exit-codes"' in html
     assert 'href="/notes/second-note#details"' in html
     assert '<a href="https://dev.to/g/first">Also on dev.to</a>' in html
-    assert '<a class="mark" href="/">' in html
-    assert '<a href="/docs/">Docs</a>' in html
+    assert '<a class="logo" href="/">' in html
+    assert '<a href="/docs/" class="sm-keep">Docs</a>' in html
     assert '<a href="/notes/">Notes</a>' in html
     assert '<div class="table-wrap"><table>' in html
     assert ".md" not in "".join(re.findall(r'href="([^"]+)"', html))

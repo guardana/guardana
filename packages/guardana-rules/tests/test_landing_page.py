@@ -79,19 +79,13 @@ def test_the_page_only_shows_rules_that_exist() -> None:
     assert not unknown, f"site/index.html advertises rule(s) that do not ship: {sorted(unknown)}"
 
 
-def test_the_page_labels_the_collector_beta_rather_than_implying_it_is_finished() -> None:
-    """The page's one maturity claim, pinned because it is the one that ages.
+def test_the_page_labels_the_collector_rather_than_implying_it_is_finished() -> None:
+    """The collector's maturity is the claim that ages, so the page carries its label.
 
-    The collector gained tenancy, environments and run history across three
-    releases; it still has no finding lifecycle, audit log or retention. A landing
-    page that dropped the label would be claiming the second half too — and this
-    project's own history is a page advertising 25 rules through three releases
-    that took the number to 32.
+    `sync_site.py` copies the word from `docs/product-status.md`; without the label the
+    collector would read as finished as the engine beside it.
     """
-    page = _page()
-
-    assert "beta" in page
-    assert "optional in every direction" in page
+    assert 'data-maturity="Collector (guardana-server)"' in _page()
 
 
 def test_the_page_does_not_promise_a_hosted_collector() -> None:
