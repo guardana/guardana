@@ -1,0 +1,99 @@
+/* What the landing page and the documentation share: the colours and their light/dark
+   switch, the header, buttons and the footer. Fonts come from brand v1; the colours are
+   set under the v1 names too, so generated diagrams and severity labels follow the switch. */
+:root{
+  color-scheme:light;
+  --bg:#FFFFFF;--bg2:#F8F9FB;--surface:#FFFFFF;--ink:#0B0C10;--ink2:#454A57;--muted:#646B7A;--line:#E7E8ED;--line2:#D8DAE1;
+  --accent:#5B3DF5;--accent-ink:#4A2FE0;--accent-soft:#F1EEFF;--ok:#16794C;--no:#C22F23;--wait:#8F5F00;--hl:#FFF6DB;
+  --btn:#0B0C10;--btn-ink:#FFFFFF;--code-bg:#0B0C10;--code-ink:#ECEDF1;--code-mute:#8E95A4;--code-line:rgba(255,255,255,.1);
+  --dots:rgba(11,12,16,.08);--faint:#7B8291;--critical:#B42318;--high:#C2410C;--medium:#A16207;--low:#2F6BB3;
+  --shadow:0 0 0 1px rgba(11,12,16,.06),0 1px 2px rgba(11,12,16,.04),0 10px 28px -10px rgba(11,12,16,.1),0 36px 72px -32px rgba(11,12,16,.14);
+}
+@media (prefers-color-scheme:dark){:root{
+  color-scheme:dark;
+  --bg:#0A0B0F;--bg2:#0E1015;--surface:#121419;--ink:#ECEDF1;--ink2:#B4B8C3;--muted:#8D93A2;--line:#1E2129;--line2:#2D313B;
+  --accent:#A194FF;--accent-ink:#C0B7FF;--accent-soft:rgba(161,148,255,.13);--ok:#4ADE94;--no:#FF7B6E;--wait:#F0C454;--hl:#2A2410;
+  --btn:#ECEDF1;--btn-ink:#0A0B0F;--code-bg:#121419;--code-ink:#ECEDF1;--code-mute:#7F8595;--code-line:rgba(255,255,255,.08);
+  --dots:rgba(255,255,255,.09);--faint:#6C7486;--critical:#F97066;--high:#FB923C;--medium:#FACC15;--low:#7CB4F5;
+  --shadow:0 0 0 1px rgba(255,255,255,.08),0 24px 60px -24px rgba(0,0,0,.9)}}
+@media (prefers-color-scheme:light){html:has(#theme:checked){
+  color-scheme:dark;
+  --bg:#0A0B0F;--bg2:#0E1015;--surface:#121419;--ink:#ECEDF1;--ink2:#B4B8C3;--muted:#8D93A2;--line:#1E2129;--line2:#2D313B;
+  --accent:#A194FF;--accent-ink:#C0B7FF;--accent-soft:rgba(161,148,255,.13);--ok:#4ADE94;--no:#FF7B6E;--wait:#F0C454;--hl:#2A2410;
+  --btn:#ECEDF1;--btn-ink:#0A0B0F;--code-bg:#121419;--code-ink:#ECEDF1;--code-mute:#7F8595;--code-line:rgba(255,255,255,.08);
+  --dots:rgba(255,255,255,.09);--faint:#6C7486;--critical:#F97066;--high:#FB923C;--medium:#FACC15;--low:#7CB4F5;
+  --shadow:0 0 0 1px rgba(255,255,255,.08),0 24px 60px -24px rgba(0,0,0,.9)}}
+@media (prefers-color-scheme:dark){html:has(#theme:checked){
+  color-scheme:light;
+  --bg:#FFFFFF;--bg2:#F8F9FB;--surface:#FFFFFF;--ink:#0B0C10;--ink2:#454A57;--muted:#646B7A;--line:#E7E8ED;--line2:#D8DAE1;
+  --accent:#5B3DF5;--accent-ink:#4A2FE0;--accent-soft:#F1EEFF;--ok:#16794C;--no:#C22F23;--wait:#8F5F00;--hl:#FFF6DB;
+  --btn:#0B0C10;--btn-ink:#FFFFFF;--code-bg:#0B0C10;--code-ink:#ECEDF1;--code-mute:#8E95A4;--code-line:rgba(255,255,255,.1);
+  --dots:rgba(11,12,16,.08);--faint:#7B8291;--critical:#B42318;--high:#C2410C;--medium:#A16207;--low:#2F6BB3;
+  --shadow:0 0 0 1px rgba(11,12,16,.06),0 1px 2px rgba(11,12,16,.04),0 10px 28px -10px rgba(11,12,16,.1),0 36px 72px -32px rgba(11,12,16,.14)}}
+:root{--panel:var(--surface);--brand:var(--accent);--brand-ink:var(--accent-ink);--brand-soft:var(--accent-soft);
+  --ok-soft:color-mix(in srgb,var(--ok) 13%,var(--surface));--no-soft:color-mix(in srgb,var(--no) 11%,var(--surface));--wait-soft:color-mix(in srgb,var(--wait) 15%,var(--surface))}
+/* What only one scheme shows: the switch's icon and the footer badge. */
+.tgl .sun,.b-dk{display:none}
+@media (prefers-color-scheme:dark){.tgl .sun,.b-dk{display:block}.tgl .moon,.b-lt{display:none}}
+@media (prefers-color-scheme:light){html:has(#theme:checked) :is(.tgl .sun,.b-dk){display:block}html:has(#theme:checked) :is(.tgl .moon,.b-lt){display:none}}
+@media (prefers-color-scheme:dark){html:has(#theme:checked) :is(.tgl .sun,.b-dk){display:none}html:has(#theme:checked) :is(.tgl .moon,.b-lt){display:block}}
+
+/* layout */
+.w{max-width:1200px;margin:0 auto;padding:0 24px}
+@media(max-width:600px){.w{padding:0 20px}}
+
+/* header */
+.top{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top .w{display:flex;align-items:center;gap:18px;height:60px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:600;font-size:16px;letter-spacing:-.02em;text-decoration:none;white-space:nowrap;color:var(--ink)}
+.logo svg{width:21px;height:21px;color:var(--accent);flex:none}
+.logo b{color:var(--accent);font-weight:inherit}
+.vlink{text-decoration:none;flex:none;border-radius:999px;margin-left:-6px}
+.ver{display:inline-block;font:500 12px/1.6 var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 9px;white-space:nowrap}
+.vlink:hover .ver{border-color:var(--accent);color:var(--accent)}
+.links{display:flex;gap:22px;margin-left:14px;font-size:14px;color:var(--ink2)}
+.links a{text-decoration:none;white-space:nowrap}.links a:hover{color:var(--ink)}
+.right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.tgl{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;cursor:pointer;color:var(--ink2);border:1px solid var(--line)}
+.tgl:hover{color:var(--ink)}
+.tgl svg{width:16px;height:16px}
+#theme{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;margin:0}
+#theme:focus-visible+.tgl{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:1020px){.links a{display:none}.links .sm-keep{display:inline}}
+@media(max-width:460px){.vlink{display:none}.top .w{gap:12px}.links{margin-left:4px;gap:16px}
+  .xs-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
+@media(max-width:359px){.links a[href="/docs/"]{display:none}}
+:where(.top,.ft) a{color:inherit}
+
+/* Controls drawn smaller than a fingertip answer over 44 px. */
+.logo,.vlink,.links a,.tgl,.btn.sm{position:relative}
+.logo:after,.vlink:after,.links a:after,.tgl:after,.btn.sm:after{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:9px;font-weight:500;font-size:15px;text-decoration:none;white-space:nowrap;transition:transform .2s,box-shadow .2s,border-color .2s}
+.btn svg{width:16px;height:16px;flex:none}
+.btn.sm{height:36px;padding:0 13px;font-size:14px;border-radius:8px}
+.btn.p{background:var(--btn);color:var(--btn-ink)}
+.btn.s{border:1px solid var(--line2);color:var(--ink);background:var(--surface)}
+.btn:hover{transform:translateY(-1px)}
+.btn.s:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line2))}
+.btn .star{color:#E3A008}
+.btn:hover .star{animation:twinkle .9s ease-in-out}
+@keyframes twinkle{40%{transform:rotate(-14deg) scale(1.18)}70%{transform:rotate(8deg) scale(1.05)}}
+
+/* footer */
+.ft{border-top:1px solid var(--line)}
+.ft .w{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(4,minmax(0,1fr));gap:32px 36px;padding-top:52px;padding-bottom:60px;font-size:13.5px;color:var(--muted)}
+.ft h4{margin:0 0 4px;font-weight:500;color:var(--ink);font-size:14px}
+.ft a{text-decoration:none}.ft a:hover{color:var(--ink)}
+.ft li{display:flex;align-items:center;flex-wrap:wrap;min-height:40px}
+.ft ul a{display:inline-flex;align-items:center;min-height:40px;font-size:14px}
+.ft .fb p{margin-top:12px;max-width:34ch;font-size:14px}
+.ft .badge2{display:inline-block;margin-top:16px}
+.ft .badge2 img{vertical-align:top}
+.ft .tag2{font:500 11px var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-left:6px;white-space:nowrap}
+@media(max-width:900px){.ft .w{grid-template-columns:repeat(2,minmax(0,1fr))}.ft .fb{grid-column:1/-1}}
+.ft ul{list-style:none;margin:0;padding:0}
+.ft p{margin:0}
+
+@media (prefers-reduced-motion:reduce){.btn,.btn:hover .star{animation:none;transition:none}}

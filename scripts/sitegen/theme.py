@@ -1,24 +1,18 @@
-"""The one stylesheet the documentation site ships.
+"""The stylesheet of the documentation pages: the sidebar and the prose.
 
 Held here as a string rather than as a checked-in `.css` so `site/docs/` stays
 entirely generated — a hand-edited file in a generated tree is the one nobody
 regenerates, and the first thing to go stale.
 
-Fonts and the shared colour tokens come from `site/assets/brand/v1/tokens.css`, linked
-before this sheet and never from a third party: a security project's documentation must
-not tell anyone else who is reading it. No script either, so the narrow-screen menu is a
-`<details>` element.
+Fonts come from `site/assets/brand/v1/tokens.css`; the colours, their light/dark switch,
+the header and the footer from `site/assets/site.css`, which the landing page shares. Both
+are linked before this sheet and never from a third party: a security project's
+documentation must not tell anyone else who is reading it. No script either, so the
+narrow-screen menu is a `<details>` element.
 """
 
 CSS = """\
-:root{
-  --code:#F3F4F8; --code-line:#E4E6EE;
-  --edge:color-mix(in srgb, var(--ink) 14%, transparent);
-  --faint:#6B7280;
-}
-@media (prefers-color-scheme:dark){
-  :root{--code:#151923; --code-line:#262C3B; --faint:#8189A0}
-}
+:root{--edge:color-mix(in srgb, var(--ink) 14%, transparent)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%; scroll-padding-top:76px}
 /* Smooth only after the reader interacts: a fragment opened on load must jump, or the scroll
@@ -29,35 +23,16 @@ body{
   font-family:var(--sans); font-size:16.5px; line-height:1.68;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
-a{color:var(--brand); text-underline-offset:.18em; text-decoration-thickness:1px}
-a:hover{color:var(--brand-ink)}
+main a{color:var(--brand); text-underline-offset:.18em; text-decoration-thickness:1px}
+main a:hover{color:var(--brand-ink)}
 :focus-visible{outline:2px solid var(--brand); outline-offset:2px; border-radius:4px}
 .skip{position:absolute; left:12px; top:0; z-index:100; background:var(--bg);
   padding:8px 14px; border:1px solid var(--line); border-radius:8px;
   transform:translateY(-150%); transition:transform .15s}
 .skip:focus{transform:translateY(12px)}
 
-.top{
-  position:sticky; top:0; z-index:20; border-bottom:1px solid var(--line);
-  background:color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter:saturate(1.4) blur(10px); -webkit-backdrop-filter:saturate(1.4) blur(10px);
-}
-.top .bar{
-  max-width:1280px; margin:0 auto; padding:0 20px; height:60px;
-  display:flex; align-items:center; gap:18px;
-}
-.top .mark{
-  display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:-.02em;
-  font-size:17.5px; color:var(--ink); text-decoration:none;
-}
-.top .mark svg{width:22px; height:22px; flex:none}
-.top .mark b{color:var(--brand); font-weight:inherit}
-.top nav{margin-left:auto; display:flex; gap:4px; font-size:14.5px}
-.top nav a{color:var(--muted); text-decoration:none; padding:8px 10px; border-radius:8px}
-.top nav a:hover,.top nav a[aria-current]{color:var(--ink); background:var(--code)}
-
 .shell{
-  max-width:1280px; margin:0 auto; padding:0 20px;
+  --gutter:24px; max-width:1200px; margin:0 auto; padding:0 var(--gutter);
   display:grid; grid-template-columns:260px minmax(0,1fr); gap:48px;
 }
 .side{
@@ -76,8 +51,11 @@ a:hover{color:var(--brand-ink)}
   display:block; padding:5px 10px; border-radius:7px; color:var(--muted);
   text-decoration:none; line-height:1.4;
 }
-.side a:hover{background:var(--code); color:var(--ink)}
-.side a[aria-current]{background:var(--brand-soft); color:var(--brand-ink); font-weight:600}
+.side a:hover{background:var(--bg2); color:var(--ink)}
+.side a[aria-current]{
+  background:var(--brand-soft); color:var(--ink); font-weight:600;
+  box-shadow:inset 2px 0 0 var(--brand);
+}
 .side .tag{
   font-size:10px; text-transform:uppercase; letter-spacing:.07em;
   color:var(--faint); margin-left:6px; font-weight:500;
@@ -125,15 +103,15 @@ main img{max-width:100%; height:auto}
 main hr{border:0; border-top:1px solid var(--line); margin:34px 0}
 
 code{
-  font-family:var(--mono); font-size:.88em; background:var(--code);
-  padding:.12em .38em; border-radius:5px; border:1px solid var(--code-line);
+  font-family:var(--mono); font-size:.88em; background:var(--bg2);
+  padding:.12em .38em; border-radius:5px; border:1px solid var(--line);
 }
 pre{
-  --cover:var(--code);
+  --cover:var(--code-bg); --edge:rgba(255,255,255,.16); color:var(--code-ink);
   border:1px solid var(--code-line); border-radius:10px;
   padding:15px 17px; overflow-x:auto; line-height:1.55; margin:18px 0;
 }
-pre code{background:none; padding:0; border:0; font-size:13.5px}
+pre code{background:none; padding:0; border:0; font-size:13.5px; color:inherit}
 
 .table-wrap{
   --cover:var(--bg);
@@ -168,10 +146,10 @@ tr:last-child td{border-bottom:0}
 td:not(:first-child) code{overflow-wrap:anywhere}
 td:last-child:not(:first-child){min-width:14em}
 th{
-  font-weight:600; white-space:nowrap; color:var(--muted); background:var(--code);
+  font-weight:600; white-space:nowrap; color:var(--muted); background:var(--bg2);
   font-size:12px; text-transform:uppercase; letter-spacing:.06em;
 }
-tbody tr:hover{background:color-mix(in srgb, var(--code) 60%, transparent)}
+tbody tr:hover{background:var(--bg2)}
 
 .facets{
   display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));
@@ -211,13 +189,7 @@ tbody tr:hover{background:color-mix(in srgb, var(--code) 60%, transparent)}
 }
 a.pill:hover{border-color:var(--brand); color:var(--brand)}
 
-.foot{border-top:1px solid var(--line); padding:28px 0 64px; color:var(--muted); font-size:14px}
-.foot .bar{
-  max-width:1280px; margin:0 auto; padding:0 20px;
-  display:flex; gap:10px 20px; flex-wrap:wrap; align-items:center;
-}
-.foot a{color:var(--muted)}
-.foot .who{margin-right:auto}
+.pagefoot{margin:56px 0 0; padding-top:16px; border-top:1px solid var(--line); font-size:14px}
 
 @media (max-width:980px){
   .shell{display:block}
@@ -227,13 +199,13 @@ a.pill:hover{border-color:var(--brand); color:var(--brand)}
      An expanded .mnav is an overlay the reader opened, so it is not accounted for here. */
   html{scroll-padding-top:125px}
   .mnav{
-    display:block; position:sticky; top:60px; z-index:15; margin:0 -20px;
+    display:block; position:sticky; top:60px; z-index:15; margin:0 calc(-1 * var(--gutter));
     background:color-mix(in srgb, var(--bg) 92%, transparent);
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line);
   }
   .mnav summary{
-    list-style:none; cursor:pointer; padding:12px 20px; min-height:48px;
+    list-style:none; cursor:pointer; padding:12px var(--gutter); min-height:48px;
     display:flex; align-items:center; gap:10px; font-size:14.5px; color:var(--muted);
   }
   .mnav summary::-webkit-details-marker{display:none}
@@ -245,14 +217,15 @@ a.pill:hover{border-color:var(--brand); color:var(--brand)}
     transform:rotate(45deg); transition:transform .2s;
   }
   .mnav[open] summary::after{transform:rotate(-135deg)}
-  .mnav .inner{max-height:70vh; overflow-y:auto; padding:4px 20px 18px; font-size:15px}
+  .mnav .inner{max-height:70vh; overflow-y:auto; padding:4px var(--gutter) 18px; font-size:15px}
   .mnav .inner h2{font-size:11px; letter-spacing:.12em; text-transform:uppercase;
     color:var(--faint); margin:18px 0 6px; font-weight:600}
   .mnav .inner ul{list-style:none; margin:0; padding:0}
   .mnav .inner a{display:block; padding:9px 10px; border-radius:8px; color:var(--muted);
     text-decoration:none}
   .mnav .inner a[aria-current]{
-    background:var(--brand-soft); color:var(--brand-ink); font-weight:600
+    background:var(--brand-soft); color:var(--ink); font-weight:600;
+    box-shadow:inset 2px 0 0 var(--brand)
   }
   .mnav .inner .tag{font-size:10px; text-transform:uppercase; letter-spacing:.07em;
     color:var(--faint); margin-left:6px}
@@ -261,15 +234,10 @@ a.pill:hover{border-color:var(--brand); color:var(--brand)}
 }
 @media (max-width:520px){
   body{font-size:16px}
-  .top nav a{padding:8px 7px}
   main h1{font-size:27px}
   .lede{font-size:17px}
 }
-@media (max-width:400px){
-  .top .bar{gap:10px}
-  .top nav{gap:0; font-size:14px}
-  .top nav a{padding:8px 5px}
-}
+@media (max-width:600px){ .shell{--gutter:20px} }
 @media (prefers-reduced-motion:reduce){
   *{transition:none !important}
 }

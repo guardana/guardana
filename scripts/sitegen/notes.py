@@ -377,28 +377,24 @@ def _shell(*, path: str, title: str, description: str, body: str) -> str:
 <link rel="alternate" type="application/atom+xml" title="{_FEED_TITLE}" href="/notes/feed.xml">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="/assets/site.css">
 <link rel="stylesheet" href="/docs/docs.css">
 <style>{_STYLE}</style>
 </head>
 <body>
-<header class="top"><div class="bar">
-<a class="mark" href="/">{layout.MARK}<span class="w">guard<b>ana</b></span></a>
-<nav>
-<a href="/docs/">Docs</a>
-<a href="/notes/">Notes</a>
-</nav>
-</div></header>
+{layout.site_header(link=_from_root, version=None, notes=True)}
 <main class="notes">
 {body}
+<p class="pagefoot"><a href="/notes/feed.xml">Atom feed</a></p>
 </main>
-<footer class="foot"><div class="bar">
-<span class="who">Guardana · Apache-2.0</span>
-<a href="/notes/feed.xml">Atom feed</a>
-<a href="/llms.txt">llms.txt</a>
-</div></footer>
+{layout.site_footer(link=_from_root, notes=True)}
 </body>
 </html>
 """
+
+
+def _from_root(path: str) -> str:
+    return f"/{path}"
 
 
 def _feed(notes: list[Note]) -> str:

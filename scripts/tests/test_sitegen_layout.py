@@ -1,10 +1,14 @@
-"""Every generated docs page opens with a skip link targeting the main content."""
+"""The shell of a generated docs page: its skip link, and the landing page's header and footer."""
 
 from __future__ import annotations
 
 import re
+from html import unescape
+from pathlib import Path
 
 from sitegen import layout, theme
+
+_LANDING = Path(__file__).resolve().parents[2] / "site" / "index.html"
 
 _FOCUSABLE = re.compile(
     r"<(?:a\s[^>]*href=|button|input|select|textarea|summary)[^>]*>", re.IGNORECASE
@@ -55,3 +59,29 @@ def test_the_skip_link_is_moved_out_of_view_until_it_has_focus() -> None:
     assert hidden.get("top") == "0"
     assert _vertical_shift(".skip").startswith("-")
     assert not _vertical_shift(".skip:focus").startswith("-")
+
+
+def _footer_links(html: str) -> list[tuple[str, str]]:
+    """Each footer link's text, with its href when it leaves the site."""
+    footer = html[html.index('<footer class="ft">') : html.index("</footer>")]
+    return [
+        (unescape(re.sub(r"<[^>]+>", "", text)).strip(), href if href.startswith("https:") else "")
+        for href, text in re.findall(r'<a [^>]*?href="([^"]+)"[^>]*>(.*?)</a>', footer, re.DOTALL)
+    ]
+
+
+def test_a_docs_page_ends_with_the_landing_page_footer() -> None:
+    page = layout.page(
+        chrome=layout.Chrome((), "0.0.0", notes=True),
+        href="index.html",
+        title="T",
+        summary="s",
+        body="<p>Text.</p>",
+        edit_path=None,
+    )
+
+    assert _footer_links(page) == _footer_links(_LANDING.read_text(encoding="utf-8"))
+
+
+def test_a_docs_page_carries_the_theme_switch_the_shared_colours_read() -> None:
+    assert '<input type="checkbox" id="theme"' in _render()

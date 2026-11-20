@@ -38,6 +38,12 @@ _MONITOR_TRANSCRIPT = re.compile(
 )
 _SITE_COMMENT = re.compile(r'<span class="c">\s*(.*?)</span>')
 _SITE_BUDGETS = re.compile(r'<span class="k">budgets</span>: (\{[^}]*\})')
+_SITE_SCAN = re.compile(
+    r'<pre class="tx" data-command="guardana scan (\S+)"><code>(.*?)</code></pre>'
+    r".*?<b>exit (\d+)</b>",
+    re.DOTALL,
+)
+_TAG = re.compile(r"<[^>]+>")
 # The landing page writes `…` for a URL and model the reader supplies.
 _PLACEHOLDER_URL = "https://api.example.com/v1"
 _PLACEHOLDER_MODEL = "support-bot"
@@ -67,6 +73,28 @@ def test_the_readme_sample_scan_is_what_the_scan_prints(monkeypatch: pytest.Monk
     assert result.exit_code == ExitCode.POLICY_FAILED
     missing = _not_printed(match.group(1).splitlines(), result.output)
     assert not missing, "README.md shows lines the scan does not print:\n  " + "\n  ".join(missing)
+
+
+def test_every_landing_page_scan_is_what_the_scan_prints(monkeypatch: pytest.MonkeyPatch) -> None:
+    page = (_REPO / "site" / "index.html").read_text(encoding="utf-8")
+    scans = _SITE_SCAN.findall(page)
+    assert scans, "site/index.html no longer shows the sample scan and its exit code"
+    assert len(scans) == page.count('data-command="guardana scan '), (
+        "site/index.html shows a scan transcript, or an exit code, this test cannot read"
+    )
+    monkeypatch.chdir(_REPO)
+
+    for path, block, code in scans:
+        lines = [html.unescape(_TAG.sub("", line)) for line in block.splitlines()]
+        assert lines[0] == f"$ guardana scan {path}"
+
+        result = runner.invoke(app, ["scan", path])
+
+        assert result.exit_code == int(code) == ExitCode.POLICY_FAILED
+        missing = _not_printed(lines[1:], result.output)
+        assert not missing, "site/index.html shows lines the scan does not print:\n  " + (
+            "\n  ".join(missing)
+        )
 
 
 def test_the_monitor_page_counts_the_rules_a_plain_chat_endpoint_skips(
@@ -110,7 +138,10 @@ def test_every_landing_page_estimate_is_what_plan_probe_prints(
     budgets = _SITE_BUDGETS.search(page)
     estimates = _SITE_PLAN.findall(page)
     assert budgets is not None, "site/index.html no longer shows the budgets the estimate uses"
-    assert len(estimates) == 2, f"site/index.html shows {len(estimates)} `plan probe` estimates"
+    assert estimates, "site/index.html no longer shows a `plan probe` estimate"
+    assert len(estimates) == page.count('<span class="s">guardana plan probe '), (
+        "site/index.html shows a `plan probe` estimate this test cannot read"
+    )
     (tmp_path / "guardana.yaml").write_text(f"budgets: {budgets.group(1)}\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
