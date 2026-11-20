@@ -15,7 +15,7 @@ from guardana.core.target._mcp_http import (
     AddressRefusedError,
     DiscoveryScope,
     _inside,
-    _named_local,
+    names_local_host,
     refusal_for,
     send,
 )
@@ -62,7 +62,7 @@ def test_an_inside_ipv4_address_in_a_wrapper_is_inside(address: str) -> None:
     assert refusal is not None
     assert "inside the network" in refusal
     assert _inside(ipaddress.ip_address(address))
-    assert _named_local(f"http://[{address}]:9/mcp")
+    assert names_local_host(f"http://[{address}]:9/mcp")
 
 
 @pytest.mark.parametrize(
@@ -78,7 +78,7 @@ def test_an_embedding_that_cannot_be_read_is_refused_and_is_not_inside(
 
     assert refusal == f"{address} {_CANNOT_JUDGE}"
     assert not _inside(ipaddress.ip_address(address))
-    assert not _named_local(f"http://[{address}]:9/mcp")
+    assert not names_local_host(f"http://[{address}]:9/mcp")
 
 
 def test_the_unspecified_and_loopback_addresses_are_not_read_as_ipv4_compatible() -> None:

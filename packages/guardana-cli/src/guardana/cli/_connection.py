@@ -14,6 +14,7 @@ from guardana.cli._endpoint import seam_transport
 from guardana.core.fixtures import Fixtures, FixturesError, ResolvedTenant, load_fixtures
 from guardana.core.target import EndpointTarget, SeededTarget
 from guardana.core.target.connection import (
+    DEFAULT_PROVIDER,
     Connection,
     ConnectionConfigError,
     ResolvedConnection,
@@ -54,6 +55,14 @@ FixturesOption = Annotated[
 SystemPromptFileOption = Annotated[
     Path | None,
     typer.Option("--system-prompt-file", help="File containing a system prompt"),
+]
+RequireAuthOption = Annotated[
+    bool,
+    typer.Option(
+        "--require-auth",
+        help="Check if the chat route refuses requests without credentials. Up to two "
+        "requests. An inconclusive or unfinished check makes the run indeterminate.",
+    ),
 ]
 
 
@@ -96,13 +105,49 @@ def endpoint_for(
     *,
     system_prompt: str | None = None,
     meter: UsageMeter | None = None,
+    require_auth: bool = False,
 ) -> EndpointTarget:
     """Build the endpoint a resolved connection describes, through the CLI's transport seam.
 
     An adapter keeps its own transport, and its URL was already checked when it was loaded.
     """
     substitute = None if connection.transport is not None else seam_transport(connection.url)
-    return connection.endpoint(system_prompt=system_prompt, meter=meter, transport=substitute)
+    return connection.endpoint(
+        system_prompt=system_prompt,
+        meter=meter,
+        transport=substitute,
+        inference_access_check=require_auth,
+    )
+
+
+def refuse_an_access_check_it_cannot_make(
+    *,
+    provider: str | None,
+    adapter: Path | None,
+    fixtures: Path | None,
+    api_key_env: str | None,
+    reads_key: bool,
+) -> None:
+    """Refuse `--require-auth` beside a flag under which the check could not be sent or decided.
+
+    The check sends the OpenAI-compatible request itself, so an adapter's schema or another
+    provider's protocol would not be what was checked. A refusal of the request with no
+    credential means something only when the same request with the key is answered, so a
+    command that reads a key needs one.
+    """
+    beside = [flag for flag, value in (("--adapter", adapter), ("--fixtures", fixtures)) if value]
+    if provider is not None and provider != DEFAULT_PROVIDER:
+        beside.append(f"--provider {provider}")
+    if beside:
+        raise typer.BadParameter(
+            f"--require-auth cannot be combined with {', '.join(beside)}; the check sends "
+            f"its own OpenAI-compatible chat completions request"
+        )
+    if reads_key and api_key_env is None:
+        raise typer.BadParameter(
+            "--require-auth needs --api-key-env so it can repeat the request with a key if "
+            "the route refuses the request without a credential"
+        )
 
 
 def read_fixtures(path: Path | None) -> Fixtures | None:
@@ -156,11 +201,13 @@ __all__ = [
     "FixturesOption",
     "ModelOption",
     "ProviderOption",
+    "RequireAuthOption",
     "SystemPromptFileOption",
     "UrlOption",
     "endpoint_for",
     "read_fixtures",
     "read_system_prompt",
+    "refuse_an_access_check_it_cannot_make",
     "resolve_flags",
     "resolve_tenants",
     "seeded_endpoint",

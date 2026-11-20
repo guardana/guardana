@@ -666,6 +666,11 @@ only by a query apart; it does not hide a short or guessable value.</p>
 <td><code>seeded_data</code></td>
 <td><code>fixtures</code>, <code>ask_as</code></td>
 </tr>
+<tr>
+<td><code>InferenceAccessCheck</code></td>
+<td><code>inference_access</code></td>
+<td><code>access_route</code>, <code>access_route_is_local</code>, <code>check_access</code> (<code>Added in Guardana Unreleased</code>)</td>
+</tr>
 </tbody>
 </table></div>
 <p>Built-ins are <code>ArtifactTarget</code> (files: pickles, GGUF, ONNX, ML formats,
@@ -680,11 +685,14 @@ cannot satisfy them rather than crashing.</p>
 what it is: an agent that fronts MCP tools may implement only <code>chat</code> and <code>call_tools</code>.
 Override <code>Target.speaks()</code> to return the <code>WireProtocol</code> values your target speaks
 (<code>CHAT</code>, <code>MCP</code>, <code>A2A</code>, from <code>guardana.core.target</code>). A rule's protocol comes from the
-capabilities it requires (<code>wire_protocols_of</code>: <code>chat</code>, <code>call_tools</code> and
-<code>plant_system_prompt</code> are chat; <code>list_tools</code>, <code>inspect_authorization</code> and <code>registry_entry</code>
+capabilities it requires (<code>wire_protocols_of</code>: <code>chat</code>, <code>call_tools</code>,
+<code>plant_system_prompt</code> and <code>inference_access</code> are chat; <code>list_tools</code>, <code>inspect_authorization</code> and <code>registry_entry</code>
 are MCP; <code>inspect_a2a</code> is A2A). A rule whose protocols your target does not speak is
 skipped as <code>not_applicable</code>, which <code>fail_on_skipped</code> and <code>--preset release</code> do not count;
-a capability missing within a protocol it speaks stays a <code>missing_capability</code> gap. A
+a capability missing within a protocol it speaks stays a <code>missing_capability</code> gap, except
+for <code>inference_access</code>. A target declares it only when the operator requests the check with
+<code>guardana probe --require-auth</code> or, in Python, <code>EndpointTarget(..., inference_access_check=True)</code> (<code>Added in Guardana Unreleased</code>).
+If the target does not declare it, a rule that needs it is skipped as <code>not_applicable</code>. A
 protocol one of your target's declared capabilities belongs to is spoken whatever
 <code>speaks()</code> returns: a subclass of <code>EndpointTarget</code> that adds <code>list_tools</code> speaks MCP too,
 and the MCP rules run against it. The default, <code>None</code>, says nothing, and every rule the
@@ -883,6 +891,9 @@ acts on it (the positive fixture for prompt injection through tool
 output); pair with <code>RefusingTransport</code> for the negative.</li>
 <li><code>FailingTransport</code> — an unreachable endpoint: every call raises the
 given error.</li>
+<li><code>ScriptedAccessTransport</code> — a chat route with scripted replies for requests
+with and without a key; it records, in order, whether each request carried a
+key. <code>Added in Guardana Unreleased</code></li>
 <li><code>ScriptedAgentTransport</code> — plays a written agent run: one reply per round
 trip, one script per session, nothing repeated. What a declarative fixture's
 <code>turns:</code> builds, and what a Python fixture uses to script a run by hand.</li>

@@ -22,7 +22,7 @@ Guardana is an open-source AI security verification tool for security and platfo
 
 ---
 
-**58 built-in security checks; add checks for your application.** The count comes from the [generated rule summary](docs/generated/rule-summary.md). Built-in artifact checks need no network. `scan --reporter server://<url>` sends results to a collector; active checks contact the target you choose. Guardana needs no account and has no automatic telemetry or phone-home.
+**59 built-in security checks; add checks for your application.** The count comes from the [generated rule summary](docs/generated/rule-summary.md). Built-in artifact checks need no network. `scan --reporter server://<url>` sends results to a collector; active checks contact the target you choose. Guardana needs no account and has no automatic telemetry or phone-home.
 
 ## Quickstart
 
@@ -86,7 +86,7 @@ Every published distribution has signed, keyless build provenance verifiable wit
 
 ## What it checks
 
-The [generated rule summary](docs/generated/rule-summary.md) counts 58 built-in rules: 19 artifact rules and 39 runtime rules. The runtime rules span live endpoints, live MCP servers, live A2A agents, seeded applications, and recorded traces. A single endpoint does not exercise all 39. Rules map to OWASP Top 10 for LLM Applications 2025 and 2026, OWASP Top 10 for Agentic Applications 2026, OWASP MCP Top 10 2025, OWASP Machine Learning Security Top 10 2023, MITRE ATLAS (transcribed from release 5.6.0), and NIST AI 100-2 attack classes. References use edition tags for OWASP (for example, `LLM01:2025`) and unversioned ATLAS technique IDs and NIST attack-class identifiers, which retain their meaning across releases.
+The [generated rule summary](docs/generated/rule-summary.md) counts 59 built-in rules: 19 artifact rules and 40 runtime rules. The runtime rules span live endpoints, live MCP servers, live A2A agents, seeded applications, and recorded traces. A single endpoint does not exercise all 40. Rules map to OWASP Top 10 for LLM Applications 2025 and 2026, OWASP Top 10 for Agentic Applications 2026, OWASP MCP Top 10 2025, OWASP Machine Learning Security Top 10 2023, MITRE ATLAS (transcribed from release 5.6.0), and NIST AI 100-2 attack classes. References use edition tags for OWASP (for example, `LLM01:2025`) and unversioned ATLAS technique IDs and NIST attack-class identifiers, which retain their meaning across releases.
 
 | Family | Rules | Surface | What it covers |
 |---|---|---|---|
@@ -95,6 +95,7 @@ The [generated rule summary](docs/generated/rule-summary.md) counts 58 built-in 
 | `guardana.agent.*` | 7 | runtime | tool-result injection, credential exfiltration, broad arguments, excessive use, memory poisoning, tool schemas, and MCP server manifests |
 | `guardana.mcp.*` | 10 | runtime | authentication, discovery, audience, session, scope, issuer, cache handling, task listings, and registry entries |
 | `guardana.a2a.*` | 3 | runtime | agent cards, callers without a credential, and one caller's view of another's tasks |
+| `guardana.endpoint.*` | 1 | runtime | chat completions returned to requests without a credential ([`--require-auth`](docs/usage-probe.md#checking-chat-endpoint-authentication)) |
 | `guardana.trace.*` | 9 | runtime | recorded credential, identity, consent, policy, approval, retrieval, effect, and handoff boundaries |
 | `guardana.scenario.*` | 2 | runtime | multi-turn jailbreak and indirect-injection scenarios |
 | `guardana.tenancy.*` | 1 | runtime | another tenant's seeded data reaching a reply, asked through the application's own index |
@@ -231,7 +232,7 @@ flowchart LR
 
 ## Extend it for your application
 
-The 58 built-ins cover shared risks. Installed packages have six entry-point groups: **rules, evaluators, targets, taxonomies, renderers, and reporters**. Rules express checks in YAML or Python; evaluators grade replies (configuration supports `llm_judge` through an OpenAI-compatible endpoint and the optional `guard` classifier); targets connect through locator schemes; taxonomies add control sets; renderers add formats; reporters add destinations. See [`docs/writing-rules.md`](docs/writing-rules.md), [`docs/outputs.md`](docs/outputs.md), and [`docs/extending.md`](docs/extending.md).
+The 59 built-ins cover shared risks. Installed packages have six entry-point groups: **rules, evaluators, targets, taxonomies, renderers, and reporters**. Rules express checks in YAML or Python; evaluators grade replies (configuration supports `llm_judge` through an OpenAI-compatible endpoint and the optional `guard` classifier); targets connect through locator schemes; taxonomies add control sets; renderers add formats; reporters add destinations. See [`docs/writing-rules.md`](docs/writing-rules.md), [`docs/outputs.md`](docs/outputs.md), and [`docs/extending.md`](docs/extending.md).
 
 A profile (`guardana.yaml`) configures a run. A finding is a result format. A [security contract](docs/usage-contracts.md) declares policy for one application. None is an entry-point group.
 

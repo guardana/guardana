@@ -37,6 +37,7 @@ provides:
     - guardana.agent.memory_poisoning
     - guardana.agent.tool_argument_scope
     - guardana.agent.tool_result_injection
+    - guardana.endpoint.unauthenticated_inference
     - guardana.mcp.authorization_discovery
     - guardana.mcp.cache_scope
     - guardana.mcp.discovery_target

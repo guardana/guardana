@@ -18,6 +18,8 @@ entries:
     title: Manipulate AI Model
   - id: AML.T0034.002
     title: "Cost Harvesting: Agentic Resource Consumption"
+  - id: AML.T0040
+    title: AI Model Inference API Access
   - id: AML.T0051
     title: LLM Prompt Injection
   - id: AML.T0053

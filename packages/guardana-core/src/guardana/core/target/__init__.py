@@ -31,6 +31,7 @@ from guardana.core.target.a2a import (
     A2aSecurity,
     A2aView,
 )
+from guardana.core.target.access import AccessAnswer, AccessCheckingTransport, AccessReply
 from guardana.core.target.adapter import AdapterConfig, HttpAdapterTransport
 from guardana.core.target.artifact import ArtifactTarget
 from guardana.core.target.base import (
@@ -83,6 +84,7 @@ from guardana.core.target.protocols import (
     ChatEndpoint,
     ChatWithMetadata,
     FileReader,
+    InferenceAccessCheck,
     RegistryEntryInspector,
     SeededData,
     SystemPromptPlanter,
@@ -106,6 +108,9 @@ __all__ = [
     "A2aReply",
     "A2aSecurity",
     "A2aView",
+    "AccessAnswer",
+    "AccessCheckingTransport",
+    "AccessReply",
     "AdapterConfig",
     "Anonymous",
     "ArtifactTarget",
@@ -131,6 +136,7 @@ __all__ = [
     "FileReader",
     "ForeignToken",
     "HttpAdapterTransport",
+    "InferenceAccessCheck",
     "LegacyOffer",
     "LocatorError",
     "McpAuthorizationView",

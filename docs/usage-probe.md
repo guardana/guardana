@@ -47,6 +47,7 @@ guardana probe (--url <base-url> --model <name> | --target <scheme://locator> | 
 | `--adapter PATH` | none | Adapter file mapping a **guarded product endpoint**'s custom request/response schema — see [Probing a guarded endpoint](#probing-a-guarded-endpoint). Cannot be combined with `--provider` or `--api-key-env`: the adapter is the wire shape, and its `headers:` carry the credential |
 | `--system-prompt-file PATH` | none | File containing the system prompt already deployed in front of the model, so non-canary rules probe the real configuration. A file that cannot be read is refused (exit `3`) |
 | `--fixtures PATH` | none | A [`guardana-fixtures.yaml`](usage-fixtures.md): ask every seeded item as its owner and as every other tenant, each through that tenant's own credentials, and every poisoned document as its owner — see [Seeded data and tenants](#seeded-data-and-tenants). A file or a tenant connection that cannot be used is refused before anything is sent (exit `3`); refused with `--mcp`, `--a2a` and `--target` |
+| `--require-auth` | off | Check whether the OpenAI-compatible chat completions route refuses a request without a credential. Sends one or two requests. Refused before sending anything (exit `3`) if `--api-key-env` is missing or if used with `--adapter`, `--fixtures`, a `--provider` other than `openai`, `--mcp`, `--a2a` or `--target`. See [Checking chat endpoint authentication](#checking-chat-endpoint-authentication). `Added in Guardana Unreleased` |
 | `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file |
 | `--preset [ci\|pre-training\|monitor\|release]` | none | Named policy preset (mutually exclusive with `--profile`) — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--format TEXT` | `human` | Output format: `human`, `json`, `sarif`, `junit`, or an [installed format](outputs.md) |
@@ -84,6 +85,53 @@ marker. A target that says it speaks chat (`Target.speaks()`) has every MCP and 
 skipped as `not_applicable`, unless it declares a capability of that protocol too (an endpoint
 that also lists MCP tools runs the MCP manifest rule); one that does not say has any rule it
 cannot serve skipped for a missing capability. See [`extending.md`](extending.md#adding-a-target).
+
+## Checking chat endpoint authentication
+
+Use `--require-auth` to check whether the OpenAI-compatible chat completions route refuses a
+request without a credential. The check is the rule
+`guardana.endpoint.unauthenticated_inference` and is off by default.
+
+```bash
+guardana probe --url <base-url> --model <name> --api-key-env <env-var> --require-auth
+```
+
+Guardana sends a short request to `POST <base-url>/v1/chat/completions` with the `--model`
+name, one user message (`Reply with the single word OK.`), and `"stream": false`. The body
+omits a system prompt and tools.
+
+1. The first request carries no `Authorization` header, cookie or user part in the URL.
+2. Only after HTTP `401` or `403`, Guardana repeats the same request with the key from
+   `--api-key-env` as `Authorization: Bearer <key>`. This is the control.
+
+Each request is sent once, without retries or redirect following.
+
+- **Finding (critical, exit `1`).** The first request gets HTTP `200` and a JSON body whose
+  first choice holds a message. The run fails regardless of `fail_on`. On a loopback or private
+  address, the finding says so and stays critical.
+- **Pass.** The first request gets HTTP `401` or `403` and the control gets a chat completion.
+  The rest of the probe determines the run's exit code.
+- **Inconclusive (exit `2`).** Any other outcome, including a timeout, an unexpected status, a
+  `200` reply that lacks a valid chat completion or exceeds 8 MiB, or a control that also gets
+  `401` or `403`. An inconclusive verdict records a `demanded_check` coverage shortfall. An
+  inconclusive or unfinished check ends the run `indeterminate` unless a finding fails it,
+  whatever `fail_on` says. A profile that excludes the rule leaves the check unfinished, and so
+  does `--safety passive`.
+
+The check costs one or two requests, and `guardana plan probe --require-auth` prices them
+without sending anything. Each counts toward `--max-requests` and the run's usage. If the
+budget has no room for the control, the run stops as a spent budget (exit `6`).
+
+Requests leave from the machine running `guardana` through its environment's proxy, if
+configured. Each verdict records one case with the route, each request's outcome, the number
+sent, and whether a proxy carried them. The record omits the reply body and key.
+
+A server that accepts any `Authorization` value can pass, so a pass leaves wrong or expired
+keys untested. A route that expects a different key header refuses the control, making the
+check inconclusive. The verdict covers only the named route as seen from the runner's network.
+Other routes of the same server, such as Ollama's native `/api/chat`, are not checked. Other
+probe rules can run concurrently and trigger HTTP `429`. Use `--concurrency 1` or a profile
+with only this rule to avoid rate limits caused by concurrent rules.
 
 ## Probing an MCP server
 

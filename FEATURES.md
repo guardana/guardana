@@ -133,6 +133,8 @@ Active and trace-backed checks cover:
 - excessive tool use, over-broad arguments, credential exfiltration, and poisoned
   tool results;
 - memory poisoning across sessions;
+- whether a live chat completions route returns a completion to a request without
+  a credential (`--require-auth`);
 - live MCP manifests, authorization discovery (the metadata `issuer` included), audience
   and session handling, scope breadth, discovery targets, issuer identification, cache
   scope, tasks listed to a caller without a credential, and whether the server is the one
@@ -246,7 +248,7 @@ specification's reference verifier. Its webhook ignores `HTTP_PROXY` and `HTTPS_
 The shipped conformance helpers verify capability claims and fail closed on an
 incomplete implementation. [`docs/conformance-kit.md`](docs/conformance-kit.md) adds `guardana.testing.assert_renderer_conforms(spec)` and `assert_reporter_conforms(spec, delivered=…, rejected=…, unreachable=…)`. They raise `OutputContractError`; the reporter check blocks network calls during `prepare` and checks each locator against every sample run. `guardana.core.testing` adds `sample_verifications()`, `receiver()` and `files_target(files)`.
 
-All 58 built-in rules have finding, clean and inconclusive samples of their own. `guardana rule test 'guardana.*'` runs them and generates the summary count. A sample whose target cannot read a file is inconclusive. [`examples/reference_pack`](examples/reference_pack) is `guardana-reference-pack`, published on PyPI. Its wheel and sdist are also attached to each GitHub Release, and CI installs it in isolation. It includes YAML and Python rules, an evaluator, a conforming target, a taxonomy, `reference-summary`, `reference-file`, a schema-3 manifest and a committed lock.
+All 59 built-in rules have finding, clean and inconclusive samples of their own. `guardana rule test 'guardana.*'` runs them and generates the summary count. A sample whose target cannot read a file is inconclusive. [`examples/reference_pack`](examples/reference_pack) is `guardana-reference-pack`, published on PyPI. Its wheel and sdist are also attached to each GitHub Release, and CI installs it in isolation. It includes YAML and Python rules, an evaluator, a conforming target, a taxonomy, `reference-summary`, `reference-file`, a schema-3 manifest and a committed lock.
 
 The extension API is stable under [`docs/compatibility.md`](docs/compatibility.md). [Product status](docs/product-status.md) states the remaining limits and [Issues](https://github.com/guardana/guardana/issues) track work. `is_local_address` and flat-set support in `check_pack` and `check_packs` are removed; the latter now raises `TypeError`. `--no-plugins` remains deprecated until 2.0.
 

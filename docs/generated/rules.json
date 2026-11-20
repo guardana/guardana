@@ -550,6 +550,49 @@
       ]
     },
     {
+      "id": "guardana.endpoint.unauthenticated_inference",
+      "namespace": "guardana",
+      "family": "endpoint",
+      "title": "Chat route returns a completion to a caller without a credential",
+      "severity": "CRITICAL",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "chat",
+        "inference_access"
+      ],
+      "estimated_requests": 2,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "LLM10:2025",
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM10",
+          "title": "Unbounded Consumption",
+          "rank": 10
+        },
+        {
+          "reference": "LLM06:2026",
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM06",
+          "title": "Unbounded Consumption",
+          "rank": 6
+        },
+        {
+          "reference": "AML.T0040",
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0040",
+          "title": "AI Model Inference API Access",
+          "rank": null
+        }
+      ]
+    },
+    {
       "id": "guardana.mcp.authorization_discovery",
       "namespace": "guardana",
       "family": "mcp",

@@ -96,7 +96,7 @@
     <div><b>Offline scans</b>Scans stay offline unless <code>--reporter</code> names a destination.</div>
     <div><b>No account</b>Guardana collects no telemetry.</div>
     <div><b>One rule engine</b>The same engine runs on your laptop and in CI.</div>
-    <div><b>58 security checks</b>Built-in rules map to public frameworks.</div>
+    <div><b>59 security checks</b>Built-in rules map to public frameworks.</div>
   </div>
 </div></section>
 
@@ -251,7 +251,7 @@
     <div><p class="k">Coverage</p><h2>What the <span class="nw">built-in</span> rules check</h2></div>
     <p class="intro">Every built-in rule maps to a public framework. The grid shows how many built-in rules map to each OWASP entry.</p>
   </div>
-  <p class="tot"><b>58 rules · two surfaces</b></p>
+  <p class="tot"><b>59 rules · two surfaces</b></p>
   <div class="surfaces">
     <article class="card"><h3>Build-time checks</h3><p class="label"><b>19 rules · your laptop, CI, a training box</b></p><ul>
 <li><b>pickle_opcode</b> — Code that runs when a pickle-based model file loads.</li>
@@ -262,7 +262,7 @@
 <li><b>hidden_instructions</b> — Hidden instructions in files an agent reads.</li>
 <li><b>malicious_dependency</b> — Dependencies known to be malicious or compromised.</li>
 <li><b>dataset_integrity</b> — A dataset loading script, or a download with no fixed revision.</li></ul></article>
-    <article class="card"><h3>Runtime checks</h3><p class="label"><b>39 rules · served systems; recorded runs support checks only where exchanges were captured</b></p><ul>
+    <article class="card"><h3>Runtime checks</h3><p class="label"><b>40 rules · served systems; recorded runs support checks only where exchanges were captured</b></p><ul>
 <li><b>system_prompt_leak</b> — A reply exposes a token planted in the system prompt.</li>
 <li><b>prompt.injection.ignore_previous</b> — A model follows a prompt that overrides its instructions.</li>
 <li><b>scenario.gradual_jailbreak</b> — An attempt to bypass model rules escalates over several turns.</li>
@@ -276,7 +276,7 @@
 <li><b>tenancy.cross_tenant_answer</b> — A reply contains another tenant's seeded data.</li>
 <li><b>trace.unapproved_side_effect</b> — A consequential effect occurs without its required approval.</li></ul></article>
   </div>
-  <p class="inv"><b data-count="invariant">31</b> built-in rules are invariant rules. Every finding they report states a checked fact, while the other rules report leads for a person to confirm. The <a href="/docs/generated/detection-limits">detection limits page</a> lists which are which.</p>
+  <p class="inv"><b data-count="invariant">32</b> built-in rules are invariant rules. Every finding they report states a checked fact, while the other rules report leads for a person to confirm. The <a href="/docs/generated/detection-limits">detection limits page</a> lists which are which.</p>
   <p class="inv">See which threats the rules check for in <a href="/docs/generated/threat-coverage">threat coverage</a> and which framework entries they map to in <a href="/docs/generated/taxonomy-coverage">taxonomy coverage</a>.</p>
   <!-- coverage -->
 <div class="fws">
@@ -292,7 +292,7 @@
 <li><a href="/docs/rules/by/reference-LLM07-2025"><code>LLM07:2025</code><span>System Prompt Leakage</span><small>One rule</small></a></li>
 <li><a href="/docs/rules/by/reference-LLM08-2025"><code>LLM08:2025</code><span>Vector and Embedding Weaknesses</span><small>3 rules</small></a></li>
 <li><span class="x"><code>LLM09:2025</code><span>Misinformation</span><small>No built-in rule</small></span></li>
-<li><a href="/docs/rules/by/reference-LLM10-2025"><code>LLM10:2025</code><span>Unbounded Consumption</span><small>2 rules</small></a></li>
+<li><a href="/docs/rules/by/reference-LLM10-2025"><code>LLM10:2025</code><span>Unbounded Consumption</span><small>3 rules</small></a></li>
 </ol></article>
 <article class="fw"><h3><a href="/docs/rules/by/framework-OWASP-LLM-2026">OWASP Top 10 for Large Language Model Applications</a> <span class="ed">2026</span></h3>
 <p class="mapped"><b>9</b> of <b>10</b> entries mapped</p>
@@ -302,7 +302,7 @@
 <li><a href="/docs/rules/by/reference-LLM03-2026"><code>LLM03:2026</code><span>Excessive Agency</span><small>7 rules</small></a></li>
 <li><a href="/docs/rules/by/reference-LLM04-2026"><code>LLM04:2026</code><span>Supply Chain</span><small>14 rules</small></a></li>
 <li><a href="/docs/rules/by/reference-LLM05-2026"><code>LLM05:2026</code><span>Data and Model Poisoning</span><small>One rule</small></a></li>
-<li><a href="/docs/rules/by/reference-LLM06-2026"><code>LLM06:2026</code><span>Unbounded Consumption</span><small>2 rules</small></a></li>
+<li><a href="/docs/rules/by/reference-LLM06-2026"><code>LLM06:2026</code><span>Unbounded Consumption</span><small>3 rules</small></a></li>
 <li><span class="x"><code>LLM07:2026</code><span>Misinformation</span><small>No built-in rule</small></span></li>
 <li><a href="/docs/rules/by/reference-LLM08-2026"><code>LLM08:2026</code><span>Hidden Context Exposure</span><small>2 rules</small></a></li>
 <li><a href="/docs/rules/by/reference-LLM09-2026"><code>LLM09:2026</code><span>Vector and Embedding Weaknesses</span><small>4 rules</small></a></li>
@@ -338,7 +338,7 @@
 </ol></article>
 </div>
 <div class="also"><b>Other framework mappings</b><ul>
-<li><a href="/docs/rules/by/framework-MITRE-ATLAS">MITRE ATLAS</a> <span class="ed">5.6.0</span> <span>15 techniques</span></li>
+<li><a href="/docs/rules/by/framework-MITRE-ATLAS">MITRE ATLAS</a> <span class="ed">5.6.0</span> <span>16 techniques</span></li>
 <li><a href="/docs/rules/by/framework-NIST-AI-100-2">NIST AI 100-2 Adversarial Machine Learning</a> <span>2 attack classes</span></li>
 <li><a href="/docs/rules/by/framework-OWASP-ML-2023">OWASP Machine Learning Security Top 10</a> <span class="ed">2023</span> <span>2 entries</span></li>
 </ul></div>
@@ -415,7 +415,7 @@
 
 <span class="c"># Estimate requests, retries, and judge calls without sending a request.</span>
 <u>$ </u><span class="s">guardana plan probe --url … --model … --profile guardana.yaml</span>
-<span class="c">14 rule(s) would run, 16 skipped.</span>
+<span class="c">14 rule(s) would run, 17 skipped.</span>
 <span class="c">requests: at least 14, at most 47 — plus up to 94 retries</span>
 <span class="c">judge calls: none — no selected rule grades with a judge</span>
 <span class="c">budget: 60 request(s)</span>

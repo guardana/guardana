@@ -11,10 +11,18 @@ from time import sleep as _sleep
 from typing import IO, TYPE_CHECKING, Literal, Protocol, Self, TypeVar, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import (
+    HTTPRedirectHandler,
+    ProxyHandler,
+    Request,
+    build_opener,
+    getproxies,
+    proxy_bypass,
+)
 
 from guardana.core.budget import BudgetExhausted, Budgets
 from guardana.core.target._url import display_url
+from guardana.core.target.access import AccessAnswer, AccessCheckingTransport, AccessReply
 from guardana.core.target.base import Capability, Target, TargetKind, WireProtocol
 from guardana.core.target.decline import RequestDeclined
 from guardana.core.usage import TargetUsage, TokenUsage, UsageMeter
@@ -120,7 +128,9 @@ class _RefuseRedirects(HTTPRedirectHandler):
         return None
 
 
-_UNREDIRECTED = build_opener(_RefuseRedirects)
+_PROXIES: dict[str, str] = getproxies()
+"""The environment's proxies, read once when the opener is built, as urllib's default does."""
+_UNREDIRECTED = build_opener(ProxyHandler(_PROXIES), _RefuseRedirects)
 
 
 def open_unredirected(request: Request, *, timeout: float) -> HTTPResponse:
@@ -596,6 +606,116 @@ class UrllibTransport:
         )
         return replace(_extract_tool_reply(payload, ref=ref), usage=extract_token_usage(payload))
 
+    def check_access(self, base_url: str, model: str, api_key: str | None) -> AccessReply:
+        """POST one short chat completion request, once, and classify the reply.
+
+        Given no key, the request carries `Content-Type` and nothing else: urllib's opener
+        adds no cookie or authorization of its own, and the target refuses a user part.
+        """
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        body = json.dumps(
+            {
+                "model": model,
+                "messages": [{"role": "user", "content": ACCESS_CHECK_PROMPT}],
+                "stream": False,
+            }
+        ).encode("utf-8")
+        url = f"{base_url}/v1/chat/completions"
+        proxied = _carried_by_proxy(url)
+        # S310: the scheme is validated to be http/https in EndpointTarget.__init__.
+        request = Request(url, data=body, headers=headers, method="POST")  # noqa: S310
+        try:
+            with open_unredirected(request, timeout=self._timeout) as response:
+                status = response.status
+                raw: bytes = response.read(_MAX_RESPONSE_BYTES + 1)
+        except HTTPError as exc:
+            close_http_error(exc)
+            reply = _access_reply_for_status(exc.code)
+        except (OSError, HTTPException) as exc:
+            reply = AccessReply(AccessAnswer.UNDECIDED, None, _no_answer(exc, self._timeout))
+        else:
+            reply = _classify_access_reply(status, raw)
+        return replace(reply, via_proxy=proxied)
+
+
+ACCESS_CHECK_PROMPT = "Reply with the single word OK."
+"""The synthetic question both legs of an access check send; it asks for a one-word answer."""
+
+
+def _access_reply_for_status(code: int) -> AccessReply:
+    """Classify an error status; only 401 and 403 are a refusal of the caller."""
+    if code in (401, 403):
+        return AccessReply(AccessAnswer.REFUSED, code, f"refused with HTTP {code}")
+    if 300 <= code < 400:  # noqa: PLR2004 — the redirect status class
+        return AccessReply(
+            AccessAnswer.UNDECIDED, code, f"answered with a redirect (HTTP {code}), not followed"
+        )
+    if code == 429:  # noqa: PLR2004
+        return AccessReply(
+            AccessAnswer.UNDECIDED, code, "answered HTTP 429 (rate limited), not retried"
+        )
+    return AccessReply(AccessAnswer.UNDECIDED, code, f"answered HTTP {code}")
+
+
+def _carried_by_proxy(url: str) -> bool:
+    """Whether the shared opener sends a request for `url` through a proxy.
+
+    Read from the opener's own proxy handler; the bypass list is read when a request is
+    sent, as urllib does.
+    """
+    parts = urlsplit(url)
+    return parts.scheme in _PROXIES and not proxy_bypass(parts.netloc)
+
+
+def _no_answer(exc: OSError | HTTPException, timeout: float) -> str:
+    """Say why no status arrived, naming no host the caller did not configure."""
+    if isinstance(exc, TimeoutError) or (
+        isinstance(exc, URLError) and isinstance(exc.reason, TimeoutError)
+    ):
+        return f"did not answer within {timeout:g} seconds"
+    if isinstance(exc, URLError):
+        return f"could not be reached ({type(exc.reason).__name__})"
+    return f"could not complete the request ({type(exc).__name__})"
+
+
+def _classify_access_reply(status: int, raw: bytes) -> AccessReply:
+    """Classify a reply that arrived with a success status; only a chat completion counts."""
+    if status != 200:  # noqa: PLR2004 — a completion arrives with 200 and nothing else
+        return AccessReply(AccessAnswer.UNDECIDED, status, f"answered HTTP {status}")
+    if len(raw) > _MAX_RESPONSE_BYTES:
+        return AccessReply(
+            AccessAnswer.UNDECIDED,
+            status,
+            f"answered with a reply over {_MAX_RESPONSE_BYTES} bytes",
+        )
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return AccessReply(AccessAnswer.UNDECIDED, status, "answered with a reply that is not JSON")
+    if not _is_chat_completion(payload):
+        return AccessReply(
+            AccessAnswer.UNDECIDED, status, "answered with a reply that is not a chat completion"
+        )
+    return AccessReply(
+        AccessAnswer.COMPLETION,
+        status,
+        "answered with a chat completion",
+        usage=extract_token_usage(payload),
+    )
+
+
+def _is_chat_completion(payload: object) -> bool:
+    """Whether `payload` has the shape of a chat completion: a first choice with a message."""
+    if not isinstance(payload, dict):
+        return False
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return False
+    message = choices[0].get("message")
+    return isinstance(message, dict) and ("content" in message or "tool_calls" in message)
+
 
 def extract_token_usage(payload: object) -> TokenUsage | None:
     """Read the token counts an OpenAI-compatible reply carries, or None if it carries none.
@@ -741,6 +861,7 @@ class EndpointTarget(Target):
         transport: ChatTransport | None = None,
         budgets: Budgets | None = None,
         meter: UsageMeter | None = None,
+        inference_access_check: bool = False,
     ) -> None:
         scheme = urlsplit(base_url).scheme
         if scheme not in _ALLOWED_SCHEMES:
@@ -777,10 +898,13 @@ class EndpointTarget(Target):
             self.apply_budgets(budgets)
         self._keeper: ExchangeKeeper | None = None
         self._kept_rule: str | None = None
+        self._inference_access_check = inference_access_check
 
     def capabilities(self) -> set[Capability]:
-        """Declare CHAT, plus PLANT_SYSTEM_PROMPT and CALL_TOOLS when supported."""
+        """Declare CHAT, plus PLANT_SYSTEM_PROMPT, CALL_TOOLS and INFERENCE_ACCESS when so."""
         caps = {Capability.CHAT}
+        if self._inference_access_check:
+            caps.add(Capability.INFERENCE_ACCESS)
         if self._system_prompt is not None:
             caps.add(Capability.PLANT_SYSTEM_PROMPT)
         if isinstance(self._transport, ToolCallingTransport):
@@ -805,6 +929,18 @@ class EndpointTarget(Target):
     def model(self) -> str:
         """The model under test, by the name the endpoint knows it as."""
         return self._model
+
+    @property
+    def access_route(self) -> str:
+        """The chat completions address an access request goes to, as findings show it."""
+        return display_url(f"{self._base_url}/v1/chat/completions")
+
+    @property
+    def access_route_is_local(self) -> bool:
+        """Whether the operator's URL names a loopback or private host, judged without a lookup."""
+        from guardana.core.target._mcp_http import names_local_host  # noqa: PLC0415 — import cycle
+
+        return names_local_host(self._base_url)
 
     @property
     def provider(self) -> str | None:
@@ -991,6 +1127,42 @@ class EndpointTarget(Target):
         # An agent probe spends most of its budget here, not in `chat`. Counting
         # only one of the two paths would under-report the most expensive thing
         # Guardana does.
+        self._meter.record_reply(reply.usage)
+        return reply
+
+    def check_access(self, *, credentials: bool) -> AccessReply:
+        """Send one access request through the meter, with the configured key or with none.
+
+        Refused before sending, and so never a refusal by the route, when the run did not ask
+        for the check, the transport cannot send one, the address carries a user part, or a
+        credentialed request is asked for with no key configured.
+        """
+        if not self._inference_access_check:
+            return AccessReply(
+                AccessAnswer.UNDECIDED, None, "the run did not ask for an access check", sent=False
+            )
+        transport = self._transport
+        if not isinstance(transport, AccessCheckingTransport):
+            return AccessReply(
+                AccessAnswer.UNDECIDED,
+                None,
+                f"the {self._provider or 'configured'} transport cannot send an access check",
+                sent=False,
+            )
+        parts = urlsplit(self._base_url)
+        if parts.username is not None or parts.password is not None:
+            return AccessReply(
+                AccessAnswer.UNDECIDED,
+                None,
+                "the endpoint URL carries a user part; name the route without credentials",
+                sent=False,
+            )
+        if credentials and not self._api_key:
+            return AccessReply(
+                AccessAnswer.UNDECIDED, None, "no key is configured for the control", sent=False
+            )
+        key = self._api_key if credentials else None
+        reply = self._spend(lambda: transport.check_access(self._base_url, self._model, key))
         self._meter.record_reply(reply.usage)
         return reply
 

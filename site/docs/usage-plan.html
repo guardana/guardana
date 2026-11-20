@@ -215,7 +215,7 @@
 <h1><code>guardana plan</code> — what a run would cost, before it costs anything</h1><p class="lede"><code>guardana plan</code>: what a run would cost, before it costs anything</p><p><code>guardana plan</code> estimates request costs when you need to budget a probe or scan without sending a request.</p>
 <pre><code class="language-bash">guardana plan probe --url https://api.example.com --model gpt-4o-mini
 </code></pre>
-<pre><code class="language-text">14 rule(s) would run, 16 skipped.
+<pre><code class="language-text">14 rule(s) would run, 17 skipped.
 requests: at least 14, at most 47 — plus up to 94 retries
   a request refused for a rate limit or a server error is retried up to 2 times, and each retry counts toward --max-requests
 trials: 1 attempt(s) per case, counted in the requests above
@@ -335,6 +335,11 @@ run they are pricing would use, so both take the same plugin-trust flags
 <td><code>plan probe</code> only: price the seeded checks from this <a href="usage-fixtures.html">fixtures file</a> — see <a href="#pricing-seeded-data">Pricing seeded data</a>. No tenant key is read; refused with <code>--mcp</code>, <code>--a2a</code> and <code>--target</code></td>
 </tr>
 <tr>
+<td><code>--require-auth</code></td>
+<td>off</td>
+<td><code>plan probe</code> only: price one or two requests for the chat endpoint authentication check. The plan sends no requests and needs no key. Refused with <code>--adapter</code>, <code>--fixtures</code>, a <code>--provider</code> other than <code>openai</code>, <code>--mcp</code>, <code>--a2a</code> or <code>--target</code> (exit <code>3</code>). <code>Added in Guardana Unreleased</code></td>
+</tr>
+<tr>
 <td><code>--safety [passive|active|side-effecting]</code></td>
 <td><code>active</code></td>
 <td><code>plan probe</code> only: how far rules may reach, as on <code>probe</code></td>
@@ -412,8 +417,8 @@ way, the ceiling is a claim somebody checks, not a promise.</p>
 rules will not repeat, so the count is the run's, not an estimate of it:</p>
 <pre><code class="language-bash">guardana plan probe --mcp https://mcp.example.com --trials 5
 </code></pre>
-<pre><code class="language-text">10 rule(s) would run, 20 skipped.
-requests: at least 10, at most 77
+<pre><code class="language-text">10 rule(s) would run, 21 skipped.
+requests: at least 10, at most 116
 trials: 5 attempt(s) per case, counted in the requests above
   10 rule(s) make one attempt per case whatever --trials says, because their verdict does not depend on a sampled reply:
     • guardana.agent.mcp_server_manifest
@@ -490,7 +495,7 @@ stated out loud.</p>
 <h2 id="pricing-an-a2a-agent">Pricing an A2A agent</h2>
 <pre><code class="language-bash">guardana plan probe --a2a https://agent.example.com
 </code></pre>
-<pre><code class="language-text">3 rule(s) would run, 27 skipped.
+<pre><code class="language-text">3 rule(s) would run, 28 skipped.
 requests: at least 3, at most 14
 </code></pre>
 <p>The three A2A rules declare fourteen requests between them; a run shares the card and

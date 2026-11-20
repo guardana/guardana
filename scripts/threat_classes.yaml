@@ -96,6 +96,11 @@
     - guardana.prompt.unbounded_consumption
     - guardana.prompt.cost_asymmetry
 
+- title: "Unauthenticated chat inference"
+  summary: "Guardana checks, on request, whether the named chat completions route returns a completion to a caller without a credential."
+  rules:
+    - guardana.endpoint.unauthenticated_inference
+
 - title: "MCP access and registry weaknesses"
   summary: "Guardana checks for unauthenticated tool or task listings, unusable or unsafe discovery, issuer ambiguity, acceptance of foreign bearer tokens, weak sessions, broad scopes, publicly cacheable protected listings, and registry mismatches."
   rules:

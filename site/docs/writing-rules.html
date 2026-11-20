@@ -645,7 +645,7 @@ its YAML rule files with <code>Registry.load_yaml_rule_dirs(paths)</code>.</li>
 a pack importing an internal name pins <code>guardana-core</code>.</p>
 <h2 id="path-2-python-plugin-when-yaml-cant-express-the-logic">Path 2: Python plugin (when YAML can't express the logic)</h2>
 <p>Use this for custom parsers, stateful probes, or any check against an <strong>artifact</strong> target.
-Of the 58 built-in rules, 19 are build-time (artifact-kind) Python plugins: pickle opcodes
+Of the 59 built-in rules, 19 are build-time (artifact-kind) Python plugins: pickle opcodes
 (including ZIP-archive recursion), model format, chat-template code-execution gadgets, risky
 ONNX graph constructs, Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency
 risk, remote-code (<code>trust_remote_code</code>/<code>torch.hub.load</code>) and its config form (<code>auto_map</code>), code
@@ -759,7 +759,12 @@ else, such as <code>False</code> from <code>cond and &quot;reason&quot;</code>, 
 so <code>fail_on_error</code> keeps the run from passing. <code>guardana.retrieval.poisoned_document</code> does
 both.
 A rule that requires <code>Capability.SEEDED_DATA</code> is demanded by every run given fixtures,
-whatever the profile selects, unless <code>not_applicable_to</code> says it has nothing to check there.</p>
+whatever the profile selects, unless <code>not_applicable_to</code> says it has nothing to check there.
+A rule that requires <code>Capability.INFERENCE_ACCESS</code> is skipped as <code>not_applicable</code> if the
+target does not declare it or <code>not_applicable_to</code> says it has nothing to check there, and
+is otherwise demanded whatever the profile selects.
+A demanded rule that the profile excludes or <code>--safety</code> filters out leaves a
+<code>demanded_check</code> coverage shortfall, and the run ends <code>indeterminate</code> (exit <code>2</code>) unless a finding fails it.</p>
 <p><strong>Ask the target for parsed source — never parse it yourself.</strong> A scan runs
 every rule over the same tree, so a rule that reads and parses a file for itself
 multiplies the cost of the whole scan by the number of rules:</p>
