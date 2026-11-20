@@ -15,6 +15,7 @@ import re
 from html import unescape
 from pathlib import Path
 
+from guardana.core.safety import Detection
 from guardana.core.surface import Surface
 from guardana.rules import provide_rules
 
@@ -22,6 +23,7 @@ _TOTAL_RE = re.compile(r">(\d+) rules · two surfaces<")
 _BUILD_RE = re.compile(r">(\d+) rules · your laptop")
 _RUNTIME_LABEL = "served systems; recorded runs support checks only where exchanges were captured"
 _RUNTIME_RE = re.compile(rf">(\d+) rules · {re.escape(_RUNTIME_LABEL)}<")
+_INVARIANT_RE = re.compile(r'<b data-count="invariant">(\d+)</b>')
 
 
 def _page() -> str:
@@ -56,6 +58,13 @@ def test_the_page_states_the_real_split_between_the_two_surfaces() -> None:
 
     assert _stated(_BUILD_RE, page, "build-time rule") == build
     assert _stated(_RUNTIME_RE, page, "runtime rule") == runtime
+
+
+def test_the_page_states_the_real_number_of_invariant_rules() -> None:
+    rules = list(provide_rules())
+    invariant = sum(1 for r in rules if r.meta.detection is Detection.INVARIANT)
+
+    assert _stated(_INVARIANT_RE, _page(), "invariant rule") == invariant
 
 
 def test_the_page_only_shows_rules_that_exist() -> None:

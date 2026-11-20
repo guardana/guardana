@@ -6,7 +6,8 @@ which Cloudflare reads for the security headers — applies to both.
 
 | File | What it is | Where it comes from |
 |---|---|---|
-| `index.html` | the landing page | hand-written; its counts are rewritten by `scripts/sync_site.py` |
+| `index.html` | the landing page | hand-written; its counts, framework coverage grid, maturity labels and diagrams are written by `scripts/sync_site.py` |
+| `assets/home.css` | the landing page's own styles: layout, light and dark colours, and the animations, all in CSS. The theme switch is a checkbox read with `:has()`, so the page still runs no script | hand-written |
 | `docs/` | the documentation site: every page of `docs/`, plus a page per rule and per filter | **generated** by `scripts/build_site.py` — never edit it, the whole tree is deleted and rewritten |
 | `llms.txt` | the [llms.txt](https://llmstxt.org) documentation map, so a model asking what this project is gets the docs rather than this page's markup | **generated** by `scripts/generate_llms_txt.py` from `docs/index.md` — never edit it |
 | `og.png` | the 1200×630 card a link preview shows in Slack, X and LinkedIn | rendered from `scripts/og_card.html`, deliberately and by hand (see below) |
@@ -95,8 +96,13 @@ on purpose: a literal number in a sentence *explaining* how numbers stay current
 one more number to forget, and this one sat eight releases behind while the marker
 it described was rewritten every time.
 
-**Factual claims** — the rule total and the build/runtime split — come from the
-registry, not from memory:
+**Factual claims** — the rule total, the build/runtime split and the number of
+invariant rules — come from the registry, not from memory. So does the coverage grid
+between `<!-- coverage -->` and `<!-- /coverage -->`: every entry of the ranked OWASP
+lists with the number of built-in rules mapped to it, an entry no rule maps to
+included, drawn from the registry and the installed taxonomy catalogues. Every
+maturity label (`<span class="st" data-maturity="…">`) copies its word from the
+table in `docs/product-status.md`, so the page never states a maturity in prose:
 
 ```bash
 uv run python scripts/sync_site.py           # rewrite them from the registry
@@ -105,7 +111,7 @@ uv run python scripts/sync_site.py --check   # exit 1 if stale, change nothing
 
 `release.py` runs the first automatically, so a release cannot ship a page
 claiming last quarter's numbers. Between releases, `test_landing_page.py` pins the
-same three counts to the registry, so adding a rule without touching the page
+same four counts to the registry, so adding a rule without touching the page
 turns the suite red immediately rather than waiting for someone to cut a release.
 
 Both scripts fail loudly if a claim disappears from the page rather than skipping
@@ -140,14 +146,16 @@ one.
 
 ## What is still hand-maintained on the landing page
 
-The illustrative rule list, the terminal demo's finding lines, and the prose. A
-landing page may show six checks out of forty — it may not state a total that is
-not the total, which is the part that is pinned. `test_landing_page.py` refuses a
-rule *name* the project does not ship, so the list cannot advertise something that
-was renamed or removed, and it now also runs `guardana plan probe` and compares the
-transcript in the page against what the command actually prints — that transcript
-had drifted to numbers no build produced, which is this file's own warning happening
-one element over.
+The illustrative rule list, the terminal demos and the prose. A landing page may
+show a selection of the checks — it may not state a total that is not the total,
+which is the part that is pinned. `test_landing_page.py` refuses a rule *name* the
+project does not ship, so the list cannot advertise something that was renamed or
+removed, and it now also runs `guardana plan probe` and compares the transcript in
+the page against what the command actually prints — that transcript had drifted to
+numbers no build produced, which is this file's own warning happening one element
+over. `test_published_outputs.py` does the same for every `plan probe` estimate on
+the page and for the sample scan of `examples/vulnerable-model`, its exit code
+included; a line shown as `…` stands for lines left out.
 
 ## The documentation site
 
