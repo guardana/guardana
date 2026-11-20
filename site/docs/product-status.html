@@ -41,7 +41,7 @@
 <li><a href="usage-testing.html">In your test suite</a></li>
 <li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
@@ -60,15 +60,15 @@
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
-<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="usage-suites.html">Quality suites</a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
 <li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
-<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade</a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
@@ -133,7 +133,7 @@
 <li><a href="usage-testing.html">In your test suite</a></li>
 <li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
@@ -152,15 +152,15 @@
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
-<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="usage-suites.html">Quality suites</a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
 <li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
-<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade</a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
@@ -243,12 +243,12 @@ so this page is maintained as carefully as the code.</p>
 </tr>
 <tr>
 <td><code>guardana probe</code></td>
-<td><strong>beta</strong></td>
+<td><strong>stable</strong></td>
 <td>Works against OpenAI-compatible, Ollama, TGI, guarded endpoints, live MCP servers — on both their tool manifest and their authorization surface, and never by calling a tool — and A2A v1 agents, on their card and whom they answer, with reads only. Verdict quality depends on the evaluator you configure.</td>
 </tr>
 <tr>
 <td><code>guardana monitor</code></td>
-<td><strong>beta</strong></td>
+<td><strong>stable</strong></td>
 <td>Scheduled <strong>active</strong> verification. Not passive traffic inspection, not inline.</td>
 </tr>
 <tr>
@@ -263,7 +263,7 @@ so this page is maintained as carefully as the code.</p>
 </tr>
 <tr>
 <td><code>guardana grade</code></td>
-<td><strong>beta</strong></td>
+<td><strong>stable</strong></td>
 <td>Grades a recording — answers you supplied, or the exchanges <code>probe --keep-exchanges</code> kept — with your rules and no target request. MCP and A2A rules are <code>not_applicable</code> on a chat recording; canary and tool rules still skip for a missing capability, and a rule the recording does not answer is skipped as <code>not_recorded</code>.</td>
 </tr>
 <tr>
@@ -273,7 +273,7 @@ so this page is maintained as carefully as the code.</p>
 </tr>
 <tr>
 <td>Quality suites</td>
-<td><strong>beta</strong></td>
+<td><strong>stable</strong></td>
 <td>Gates pass rates on team-supplied versioned datasets, with repeated trials. Judge-graded suites and judge-error correction are <a href="#released-and-experimental">experimental</a>. No numeric aggregate gate or statistical comparison between suite runs.</td>
 </tr>
 <tr>
@@ -287,10 +287,11 @@ so this page is maintained as carefully as the code.</p>
 <code>Verifier.grade</code>, alongside <code>Verifier.scan</code> and <code>Verifier.run</code>. See the
 <a href="python-api.html#run-a-target">Python API</a> for all three entry points.</p>
 <h2 id="released-and-experimental">Released and experimental</h2>
-<p><strong>Released (beta):</strong> Quality suites use the deterministic assessors <code>exact_match</code>, <code>contains</code>, <code>regex</code>, <code>json_valid</code>, and <code>length</code>. They support versioned JSONL datasets (<code>name@version</code>), deterministic sampling (<code>sample: {size, seed}</code>), repeated trials per case, and a suite gate that passes, fails, or declines with <code>min_sample</code>. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.</p>
+<p><strong>Released (stable):</strong> Quality suites use the deterministic assessors <code>exact_match</code>, <code>contains</code>, <code>regex</code>, <code>json_valid</code>, and <code>length</code>. They support versioned JSONL datasets (<code>name@version</code>), deterministic sampling (<code>sample: {size, seed}</code>), repeated trials per case, and a suite gate that passes, fails, or declines with <code>min_sample</code>. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.</p>
 <p><strong>Experimental:</strong> Judge-graded suites use <code>answered</code> and <code>reference_judge</code>. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with <code>guardana calibrate --record</code>. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental behaviour and thresholds are outside the compatibility promise, but saved documents remain versioned and readers continue to support older versions under the persisted-document policy.</p>
-<p><strong>Released (beta):</strong> <a href="usage-recipe.html">repository recipes</a> that pin a team's checks and refuse a run whose pins moved, one set of connection settings across <code>probe</code>, <code>plan probe</code>, <code>target inspect</code>, <code>monitor</code> and every judge, and a tested <a href="providers.html">provider table</a>.</p>
-<p><strong>Released (beta):</strong> MCP checks proven against servers built on the <code>mcp</code> SDK in both revisions, and the A2A checks against agents built on <code>a2a-sdk</code>; a capability a server does not offer is recorded as skipped <code>not_offered</code>, a coverage gap.</p>
+<p><strong>Released (beta):</strong> <a href="usage-recipe.html">repository recipes</a> that pin a team's checks and refuse a run whose pins moved.</p>
+<p><strong>Released (stable):</strong> one set of connection settings across <code>probe</code>, <code>plan probe</code>, <code>target inspect</code>, <code>monitor</code> and every judge, and a tested <a href="providers.html">provider table</a>.</p>
+<p><strong>Released (stable):</strong> MCP checks proven against servers built on the <code>mcp</code> SDK in both revisions, and the A2A checks against agents built on <code>a2a-sdk</code>; a capability a server does not offer is recorded as skipped <code>not_offered</code>, a coverage gap.</p>
 <p><strong>Released (stable):</strong> an installed package adds a format for <code>--format</code> and a reporter for <code>--reporter</code> (<a href="outputs.html">installed outputs</a>), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit <code>8</code> when an installed output fails. <code>examples/output_pack</code> is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own <code>output_api</code>. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on <code>monitor</code>, <code>import-observations</code> and <code>recipe run</code>.</p>
 <p><strong>Not released:</strong> The five-user first-run study, the team regression loop and the live retrieval pilot remain open <a href="#adoption-measures">adoption measures</a>; the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.</p>
 <h2 id="stable-release-criteria">Stable-release criteria</h2>

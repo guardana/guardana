@@ -41,7 +41,7 @@
 <li><a href="usage-testing.html">In your test suite</a></li>
 <li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
@@ -60,15 +60,15 @@
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
-<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="usage-suites.html">Quality suites</a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
 <li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
-<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade</a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
@@ -133,7 +133,7 @@
 <li><a href="usage-testing.html">In your test suite</a></li>
 <li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+<li><a href="usage-probe.html">guardana probe</a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
@@ -152,15 +152,15 @@
 <li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-monitor.html">guardana monitor</a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
-<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="usage-suites.html">Quality suites</a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
 <li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
-<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade</a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
@@ -233,19 +233,19 @@
 <tr>
 <td>A chatbot or RAG application behind an HTTP endpoint</td>
 <td><code>guardana probe --url URL --model MODEL</code>, with <code>--fixtures</code> for seeded retrieval checks</td>
-<td>beta</td>
+<td>stable (<code>--fixtures</code> is beta)</td>
 <td><a href="recipe-real-application.html">Check a real application</a>, <a href="usage-fixtures.html">Fixtures</a></td>
 </tr>
 <tr>
 <td>An MCP server</td>
 <td><code>guardana probe --mcp URL</code>; reads its manifest and authorization metadata and never calls a tool</td>
-<td>beta</td>
+<td>stable</td>
 <td><a href="usage-probe.html">Probe</a></td>
 </tr>
 <tr>
 <td>Answers your application already gave, or exchanges a probe kept</td>
 <td><code>guardana grade RECORDING --rules rules/</code></td>
-<td>beta</td>
+<td>stable</td>
 <td><a href="recipe-recorded-answers.html">Grade recorded answers</a></td>
 </tr>
 <tr>
@@ -263,7 +263,7 @@
 <tr>
 <td>Scheduled re-verification of a live endpoint</td>
 <td><code>guardana monitor</code></td>
-<td>beta</td>
+<td>stable</td>
 <td><a href="usage-monitor.html">Monitor</a></td>
 </tr>
 </tbody>
@@ -324,14 +324,15 @@ def test_models_pass_the_policy() -&gt; None:
     assert_secure(&quot;models&quot;, profile=Path(&quot;guardana.yaml&quot;))
 </code></pre>
 <p>More: <a href="usage-testing.html">Testing</a>, <a href="python-api.html">Python API</a></p>
-<h2 id="7-probe-a-staging-deployment-within-limits-beta">7. Probe a staging deployment within limits (beta)</h2>
+<h2 id="7-probe-a-staging-deployment-within-limits">7. Probe a staging deployment within limits</h2>
 <p>Before any request, get authorization for the target, use synthetic data and isolate tools that have side effects. Set <code>budgets:</code> in the profile with <code>max_requests</code>, <code>max_duration</code> and <code>max_requests_per_minute</code>; a retry is a request, and each judge keeps its own meter under the same ceilings. <code>guardana plan probe</code> prices the run and sends nothing; it needs no key and has no <code>--api-key-env</code>. Inspect what the target supports before you probe it. Exit <code>6</code> means a budget stops the run: the result is incomplete, never a pass.</p>
 <pre><code class="language-bash">guardana plan probe --url URL --model MODEL --profile guardana.yaml
 guardana target inspect --url URL --model MODEL --api-key-env STAGING_API_KEY
 guardana probe --url URL --model MODEL --api-key-env STAGING_API_KEY --profile guardana.yaml --format json --output run.json
 </code></pre>
 <p>More: <a href="safe-testing.html">Safe testing</a>, <a href="usage-plan.html">Plan a run</a>, <a href="usage-target.html">Inspect a target</a>, <a href="usage-probe.html">Probe</a></p>
-<h2 id="8-test-what-is-specific-to-your-application-beta">8. Test what is specific to your application (beta)</h2>
+<h2 id="8-test-what-is-specific-to-your-application">8. Test what is specific to your application</h2>
+<p><code>guardana fixtures</code>, the synthetic data used by <code>--fixtures</code>, and <code>guardana analyze-trace</code> are beta.</p>
 <p>For a RAG application, declare synthetic documents in <code>guardana-fixtures.yaml</code>, render them to <code>seed/documents.jsonl</code> and ingest them with your own pipeline before probing with <code>--fixtures</code>. The probe checks tenant-boundary markers and poisoned-document instructions that reach replies. For an MCP server, probe its manifest and authorization metadata without calling a tool. For a recorded agent execution, inspect the trace before you analyze it. To grade answers your application already gives, use <code>guardana grade</code>, which sends nothing to the application.</p>
 <pre><code class="language-bash">guardana fixtures render guardana-fixtures.yaml --out seed/
 # Ingest seed/documents.jsonl with your own pipeline before probing.
@@ -351,7 +352,7 @@ guardana run inspect run.json
 guardana diff accepted-run.json run.json
 </code></pre>
 <p>More: <a href="usage-run.html">Inspect a run</a>, <a href="usage-diff.html">Compare runs</a>, <a href="reading-results.html">Read results</a></p>
-<h2 id="10-re-verify-on-a-schedule-beta">10. Re-verify on a schedule (beta)</h2>
+<h2 id="10-re-verify-on-a-schedule">10. Re-verify on a schedule</h2>
 <p>Use <code>guardana monitor</code> to run active checks every interval. It alerts when a cycle fails the gate, when more checks cannot run than in its first cycle, or when a cycle is worse than the first by the rules <code>guardana diff</code> applies. It does not inspect traffic passively. It writes no saved run per cycle and has no <code>--output</code> or <code>--format</code>; use <code>--reporter</code> to forward alerts to a collector. It does not select <code>--preset monitor</code> by itself, so pass the policy you want. Budgets apply to each cycle.</p>
 <pre><code class="language-bash">guardana monitor --url URL --model MODEL --profile guardana.yaml --interval 300 --max-cycles 3
 </code></pre>
