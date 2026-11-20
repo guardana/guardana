@@ -62,6 +62,9 @@ the library default is sequential and the CLI opts in (`probe`/`monitor` take
 `--concurrency`).
 """
 
+_JOIN_SECONDS = 0.1
+"""How long the main thread waits on a rule thread before it checks for a signal again."""
+
 
 def incomplete_recording(target: Target) -> tuple[CoverageShortfall, ...]:
     """Return the shortfall of grading a recording whose origin run was stopped.
@@ -531,7 +534,10 @@ class Runner:
         for thread in threads:
             thread.start()
         for thread in threads:
-            thread.join()
+            # Timed, because a SIGINT the kernel hands to a rule thread wakes no untimed
+            # wait here, and Ctrl-C would then wait for every rule in flight.
+            while thread.is_alive():
+                thread.join(_JOIN_SECONDS)
         return outcomes
 
     def _execute_one(self, rule: Rule, target: Target) -> _RuleOutcome:
