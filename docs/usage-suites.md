@@ -2,7 +2,7 @@
 title: "Quality suites"
 nav_order: 255
 summary: "quality suites: gate a deployed endpoint against a versioned golden dataset before release or in CI"
-status: beta
+status: stable
 ---
 
 # Quality suites

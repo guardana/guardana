@@ -14,12 +14,12 @@ You can add Guardana to an existing repository and pipeline in the order below. 
 | You have | Start with | Maturity | Guide |
 | --- | --- | --- | --- |
 | Model files, notebooks, training or loading code you ship | `guardana scan PATH` | stable | [Scan your own project](recipe-local-scan.md) |
-| A chatbot or RAG application behind an HTTP endpoint | `guardana probe --url URL --model MODEL`, with `--fixtures` for seeded retrieval checks | beta | [Check a real application](recipe-real-application.md), [Fixtures](usage-fixtures.md) |
-| An MCP server | `guardana probe --mcp URL`; reads its manifest and authorization metadata and never calls a tool | beta | [Probe](usage-probe.md) |
-| Answers your application already gave, or exchanges a probe kept | `guardana grade RECORDING --rules rules/` | beta | [Grade recorded answers](recipe-recorded-answers.md) |
+| A chatbot or RAG application behind an HTTP endpoint | `guardana probe --url URL --model MODEL`, with `--fixtures` for seeded retrieval checks | stable (`--fixtures` is beta) | [Check a real application](recipe-real-application.md), [Fixtures](usage-fixtures.md) |
+| An MCP server | `guardana probe --mcp URL`; reads its manifest and authorization metadata and never calls a tool | stable | [Probe](usage-probe.md) |
+| Answers your application already gave, or exchanges a probe kept | `guardana grade RECORDING --rules rules/` | stable | [Grade recorded answers](recipe-recorded-answers.md) |
 | A recorded agent execution in OpenTelemetry GenAI spans or Guardana's native trace | `guardana analyze-trace TRACE` | beta | [Analyze a trace](usage-analyze-trace.md) |
 | Evidence for a release decision | Save runs with `--format json --output run.json` and compare with `guardana diff` | stable | [Compare runs](usage-diff.md) |
-| Scheduled re-verification of a live endpoint | `guardana monitor` | beta | [Monitor](usage-monitor.md) |
+| Scheduled re-verification of a live endpoint | `guardana monitor` | stable | [Monitor](usage-monitor.md) |
 
 ## 1. Install
 
@@ -107,7 +107,7 @@ def test_models_pass_the_policy() -> None:
 
 More: [Testing](usage-testing.md), [Python API](python-api.md)
 
-## 7. Probe a staging deployment within limits (beta)
+## 7. Probe a staging deployment within limits
 
 Before any request, get authorization for the target, use synthetic data and isolate tools that have side effects. Set `budgets:` in the profile with `max_requests`, `max_duration` and `max_requests_per_minute`; a retry is a request, and each judge keeps its own meter under the same ceilings. `guardana plan probe` prices the run and sends nothing; it needs no key and has no `--api-key-env`. Inspect what the target supports before you probe it. Exit `6` means a budget stops the run: the result is incomplete, never a pass.
 
@@ -119,7 +119,9 @@ guardana probe --url URL --model MODEL --api-key-env STAGING_API_KEY --profile g
 
 More: [Safe testing](safe-testing.md), [Plan a run](usage-plan.md), [Inspect a target](usage-target.md), [Probe](usage-probe.md)
 
-## 8. Test what is specific to your application (beta)
+## 8. Test what is specific to your application
+
+`guardana fixtures`, the synthetic data used by `--fixtures`, and `guardana analyze-trace` are beta.
 
 For a RAG application, declare synthetic documents in `guardana-fixtures.yaml`, render them to `seed/documents.jsonl` and ingest them with your own pipeline before probing with `--fixtures`. The probe checks tenant-boundary markers and poisoned-document instructions that reach replies. For an MCP server, probe its manifest and authorization metadata without calling a tool. For a recorded agent execution, inspect the trace before you analyze it. To grade answers your application already gives, use `guardana grade`, which sends nothing to the application.
 
@@ -149,7 +151,7 @@ guardana diff accepted-run.json run.json
 
 More: [Inspect a run](usage-run.md), [Compare runs](usage-diff.md), [Read results](reading-results.md)
 
-## 10. Re-verify on a schedule (beta)
+## 10. Re-verify on a schedule
 
 Use `guardana monitor` to run active checks every interval. It alerts when a cycle fails the gate, when more checks cannot run than in its first cycle, or when a cycle is worse than the first by the rules `guardana diff` applies. It does not inspect traffic passively. It writes no saved run per cycle and has no `--output` or `--format`; use `--reporter` to forward alerts to a collector. It does not select `--preset monitor` by itself, so pass the policy you want. Budgets apply to each cycle.
 

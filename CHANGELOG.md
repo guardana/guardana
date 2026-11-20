@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - **guardana.dev has a new landing page.** It explains each command and component and labels maturity from the product status page. The generated framework grid includes entries with no mapped built-in rule. The page loads resources only from its own host, runs without JavaScript, and stops motion under `prefers-reduced-motion`. Every documentation and notes page shares the landing page's header, footer, colours and light/dark switch. The switch works without JavaScript, and each page opens in the reader's system theme.
+- **Mark `guardana probe`, `guardana grade`, `guardana monitor` and deterministic quality suites as stable.** The labels in the README, product status page, usage guides, adoption guide and guardana.dev show readers which checks are suitable for build gates. The stable suite label covers `exact_match`, `contains`, `regex`, `json_valid` and `length`. Only the labels change. The compatibility policy has covered every command, option, argument and exit code since 1.0.0. `guardana analyze-trace`, the collector (`guardana-server`), `guardana case`, repository recipes (`guardana recipe`), `guardana fixtures`, synthetic data for `probe --fixtures` and stateful tool doubles (`guardana.core.doubles`) stay beta. Judge-graded suites (`answered`, `reference_judge`) and judge-error correction stay experimental.
 
 ## [1.3.1] - 2026-11-20 — the seventh patch release
 

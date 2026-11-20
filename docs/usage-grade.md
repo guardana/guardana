@@ -2,7 +2,7 @@
 title: "guardana grade"
 nav_order: 85
 summary: "`guardana grade`: grade answers your application already gave — a file you wrote, or the exchanges a probe kept — with your rules, sending nothing to the target"
-status: beta
+status: stable
 ---
 
 # `guardana grade` — grade answers that were already given
