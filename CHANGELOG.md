@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Add the opt-in `--require-auth` check for chat endpoints (#373).** `guardana probe --require-auth` runs the rule `guardana.endpoint.unauthenticated_inference`, mapped to `LLM10:2025`, `LLM06:2026` and `AML.T0040`. It sends a short, non-streaming chat completions request without a credential. A completion triggers a critical finding. After HTTP `401` or `403`, it repeats the request with the bearer key from `--api-key-env`. A completion from that control gives a pass. Other outcomes are inconclusive. The check uses one or two requests, each counted against `--max-requests` and in run usage; `guardana plan probe --require-auth` prices them. Without the flag, the rule is skipped as `not_applicable` and the probe reports its usual results. For extension authors, `guardana.core.testing.ScriptedAccessTransport` scripts such a route. Gate impact: none without the flag; with it, a finding fails the run (exit `1`), and an inconclusive or unfinished check makes it `indeterminate` (exit `2`) unless a finding fails it, whatever `fail_on` says.
 
+### Documentation
+
+- **guardana.dev has a new landing page.** It explains each command and component and labels maturity from the product status page. The generated framework grid includes entries with no mapped built-in rule. The page loads resources only from its own host, runs without JavaScript, and stops motion under `prefers-reduced-motion`. Every documentation and notes page shares the landing page's header, footer, colours and light/dark switch. The switch works without JavaScript, and each page opens in the reader's system theme.
+
 ## [1.3.1] - 2026-11-20 — the seventh patch release
 
 ### Fixed
@@ -22,10 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - **Add a generated Threat coverage page.** It groups the built-in rules by threat class and lists their IDs, titles, default severities, and commands for scans, probes, and trace analysis. The generator uses the installed rules and a class file and requires exactly one class per built-in rule. The README and FEATURES.md link to the page so readers can find checks by threat. The README and landing page ask readers to star the repository and point to `guardana probe` with `--fixtures` for tenant-boundary and planted-document checks, which `guardana grade` cannot run. The README clarifies that OWASP references carry editions and that ATLAS technique IDs and NIST attack-class identifiers are unversioned.
-
-### Documentation
-
-- **guardana.dev has a new landing page.** It explains each command and component and labels maturity from the product status page. The generated framework grid includes entries with no mapped built-in rule. The page loads resources only from its own host, runs without JavaScript, and stops motion under `prefers-reduced-motion`. Every documentation and notes page shares the landing page's header, footer, colours and light/dark switch. The switch works without JavaScript, and each page opens in the reader's system theme.
 
 ## [1.3.0] - 2026-11-18 — the third minor release
 
