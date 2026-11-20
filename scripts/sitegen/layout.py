@@ -51,7 +51,7 @@ class Chrome:
 
 
 def site_header(*, link: Callable[[str], str], version: str | None, notes: bool) -> str:
-    """The landing page's header; `link` turns a path from the site root into an href."""
+    """Render the landing page's header; `link` turns a path from the site root into an href."""
     pill = (
         f'<a class="vlink" href="{_REPO}/releases"><span class="ver mono">v{escape(version)}'
         "</span></a>\n"
@@ -74,7 +74,7 @@ def site_header(*, link: Callable[[str], str], version: str | None, notes: bool)
 
 
 def site_footer(*, link: Callable[[str], str], notes: bool) -> str:
-    """The landing page's footer; `link` turns a path from the site root into an href."""
+    """Render the landing page's footer; `link` turns a path from the site root into an href."""
     notes_item = f'<li><a href="{link("notes/")}">Notes</a></li>' if notes else ""
     badge = link("assets/badges/devhunt-")
     return f"""<footer class="ft"><div class="w">
@@ -86,16 +86,20 @@ src="{badge}light.svg" alt="Featured on DevHunt" width="147" height="36"><img cl
 src="{badge}dark.svg" alt="Featured on DevHunt" width="147" height="36"></a>
 </div>
 <div><h4>Products</h4><ul><li><a href="{link("")}">Guardana</a></li><li><a \
-href="https://control.guardana.dev/">Guardana Control</a> <span class="tag2">alpha</span></li></ul></div>
+href="https://control.guardana.dev/">Guardana Control</a> \
+<span class="tag2">alpha</span></li></ul></div>
 <div><h4>Guardana</h4><ul><li><a href="{link("docs/")}">Documentation</a></li><li><a \
-href="{link("docs/rules/")}">Rule catalogue</a></li><li><a href="{_REPO}/releases">Releases</a></li>\
+href="{link("docs/rules/")}">Rule catalogue</a></li><li><a \
+href="{_REPO}/releases">Releases</a></li>\
 {notes_item}</ul></div>
 <div><h4>Get it</h4><ul><li><a href="https://pypi.org/project/guardana-cli/">PyPI</a></li><li><a \
-href="https://github.com/marketplace/actions/guardana-ai-security-scan">GitHub Action</a></li><li><a \
+href="https://github.com/marketplace/actions/guardana-ai-security-scan">GitHub Action</a>\
+</li><li><a \
 href="{_REPO}">Source</a></li></ul></div>
 <div><h4>More</h4><ul><li><a href="{link("llms.txt")}">llms.txt</a></li><li><a \
 href="{link("sitemap.xml")}">Sitemap</a></li><li><a \
-href="https://www.producthunt.com/products/guardana?launch=guardana" rel="noopener">Product Hunt</a>\
+href="https://www.producthunt.com/products/guardana?launch=guardana" rel="noopener">\
+Product Hunt</a>\
 </li></ul></div>
 </div></footer>"""
 
