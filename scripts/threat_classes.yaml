@@ -1,0 +1,127 @@
+# Every built-in rule under the one threat it checks for, in reading order.
+#
+# Read by scripts/generate_docs.py into docs/generated/threat-coverage.md. The
+# generator refuses an id that is not a built-in rule, a rule placed twice, and a
+# built-in rule placed nowhere, so a new rule is classified before the docs build.
+
+- title: "Unsafe model and dataset loading"
+  summary: "Guardana checks for dangerous pickle opcodes, Keras Lambda layers, SavedModel filesystem operators, risky model file and ONNX constructs, chat templates enabling code execution, and remote or custom code on load."
+  rules:
+    - guardana.supply_chain.pickle_opcode
+    - guardana.supply_chain.keras_lambda
+    - guardana.supply_chain.saved_model_ops
+    - guardana.supply_chain.model_format
+    - guardana.supply_chain.onnx_graph
+    - guardana.supply_chain.chat_template
+    - guardana.supply_chain.remote_code
+    - guardana.supply_chain.remote_code_config
+
+- title: "Unsafe code in projects"
+  summary: "Guardana checks for unsafe model or deserialization loader calls, dynamic code or shell execution sinks, and dangerous notebook cell payloads."
+  rules:
+    - guardana.supply_chain.dependency_risk
+    - guardana.supply_chain.code_execution
+    - guardana.supply_chain.notebook_payload
+
+- title: "Risky dependencies"
+  summary: "Guardana checks for known malicious dependencies, install-time payloads, and imports of unknown packages."
+  rules:
+    - guardana.supply_chain.malicious_dependency
+    - guardana.supply_chain.hallucinated_package
+
+- title: "Insecure downloads"
+  summary: "Guardana checks for insecure transport when fetching models or datasets."
+  rules:
+    - guardana.supply_chain.insecure_transport
+
+- title: "Model and dataset provenance gaps"
+  summary: "Guardana checks for unpinned model downloads, possible model license risks, dataset loader scripts, and unpinned training datasets."
+  rules:
+    - guardana.supply_chain.provenance
+    - guardana.training.dataset_integrity
+
+- title: "Hardcoded secrets"
+  summary: "Guardana checks for hardcoded secrets in repository files."
+  rules:
+    - guardana.supply_chain.hardcoded_secret
+
+- title: "Prompt injection and jailbreaks"
+  summary: "Guardana checks for instruction overrides, jailbreaks using persona overrides and encoded content, gradual multi-turn jailbreaks, and indirect prompt injection through retrieved documents."
+  rules:
+    - guardana.prompt.injection.ignore_previous
+    - guardana.prompt.jailbreak.dan_style
+    - guardana.scenario.gradual_jailbreak
+    - guardana.scenario.indirect_injection
+
+- title: "Agents steered by untrusted content"
+  summary: "Guardana checks for agents following instructions in tool results, poisoned memory steering later sessions, and applications following instructions planted in retrieved documents."
+  rules:
+    - guardana.agent.tool_result_injection
+    - guardana.agent.memory_poisoning
+    - guardana.retrieval.poisoned_document
+
+- title: "Hidden instructions and tool manifest changes"
+  summary: "Guardana checks for hidden instructions in files agents read, MCP tool descriptions, and live MCP tool manifests, as well as changes to live manifests."
+  rules:
+    - guardana.prompt.hidden_instructions
+    - guardana.prompt.mcp_tool_poisoning
+    - guardana.agent.mcp_server_manifest
+
+- title: "System prompt and tool schema leaks"
+  summary: "Guardana checks for system prompt leaks using a canary marker and disclosure of hidden tool schema context on request."
+  rules:
+    - guardana.prompt.system_prompt_leak.canary
+    - guardana.agent.hidden_context.tool_schema
+
+- title: "Secrets and cross-tenant data leaks"
+  summary: "Guardana checks for secrets in model output, another tenant's seeded data in replies, cross-tenant document retrieval, and credentials in recorded tool arguments."
+  rules:
+    - guardana.output.secrets
+    - guardana.tenancy.cross_tenant_answer
+    - guardana.trace.cross_tenant_retrieval
+    - guardana.trace.secret_in_tool_argument
+
+- title: "Agent actions beyond authorization"
+  summary: "Guardana checks for unsolicited destructive tool calls, overly broad tool arguments, planted secrets in tool arguments, actions taken despite denied or inconclusive policy decisions, and side effects without required approval."
+  rules:
+    - guardana.agent.excessive_tool_use
+    - guardana.agent.tool_argument_scope
+    - guardana.agent.credential_exfiltration
+    - guardana.trace.policy_decision_ignored
+    - guardana.trace.unapproved_side_effect
+
+- title: "Unbounded output and costly requests"
+  summary: "Guardana checks for unbounded output generation and cheap requests that are expensive to answer."
+  rules:
+    - guardana.prompt.unbounded_consumption
+    - guardana.prompt.cost_asymmetry
+
+- title: "MCP access and registry weaknesses"
+  summary: "Guardana checks for unauthenticated tool or task listings, unusable or unsafe discovery, issuer ambiguity, acceptance of foreign bearer tokens, weak sessions, broad scopes, publicly cacheable protected listings, and registry mismatches."
+  rules:
+    - guardana.mcp.unauthenticated_access
+    - guardana.mcp.authorization_discovery
+    - guardana.mcp.token_audience
+    - guardana.mcp.session_binding
+    - guardana.mcp.scope_breadth
+    - guardana.mcp.discovery_target
+    - guardana.mcp.issuer_identification
+    - guardana.mcp.cache_scope
+    - guardana.mcp.task_identity
+    - guardana.mcp.registry_entry
+
+- title: "A2A card and access weaknesses"
+  summary: "Guardana checks for incomplete agent cards or requirements callers cannot meet, responses to callers without credentials, and tasks shown to callers who do not own them."
+  rules:
+    - guardana.a2a.agent_card
+    - guardana.a2a.caller_identity
+    - guardana.a2a.task_visibility
+
+- title: "Delegation beyond granted authority"
+  summary: "Guardana checks for credentials crossing trust boundaries, tokens used outside their audience, sessions used as credentials for state changes, scopes without recorded consent, and authority beyond a handoff."
+  rules:
+    - guardana.trace.credential_passthrough
+    - guardana.trace.identity_disagreement
+    - guardana.trace.session_as_identity
+    - guardana.trace.consent_scope_exceeded
+    - guardana.trace.handoff_authority_expansion

@@ -125,6 +125,7 @@ coverage. Do not edit them by hand.
 - [`generated/rule-catalog.md`](generated/rule-catalog.md) — every built-in rule
 - [`generated/evaluator-catalog.md`](generated/evaluator-catalog.md) — every evaluator
 - [`generated/taxonomy-coverage.md`](generated/taxonomy-coverage.md) — framework coverage
+- [`generated/threat-coverage.md`](generated/threat-coverage.md) — built-in rules by threat class
 - [`generated/detection-limits.md`](generated/detection-limits.md) — what a finding states, per rule family
 - [`generated/first-run.md`](generated/first-run.md) — whether new users reach a first result in ten minutes, from the study sheet
 - [`generated/application-measures.md`](generated/application-measures.md) — coverage of the real application and the share of checks that reached a verdict, from consented team runs
