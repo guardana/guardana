@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- **guardana.dev has a new landing page.** It explains each command and component and labels maturity from the product status page. The generated framework grid includes entries with no mapped built-in rule. The page loads resources only from its own host, runs without JavaScript, and stops motion under `prefers-reduced-motion`.
+- **guardana.dev has a new landing page.** It explains each command and component and labels maturity from the product status page. The generated framework grid includes entries with no mapped built-in rule. The page loads resources only from its own host, runs without JavaScript, and stops motion under `prefers-reduced-motion`. Every documentation and notes page shares the landing page's header, footer, colours and light/dark switch. The switch works without JavaScript, and each page opens in the reader's system theme.
 
 ## [1.3.0] - 2026-11-18 — the third minor release
 

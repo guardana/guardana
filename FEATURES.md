@@ -275,6 +275,7 @@ Guardana never executes a tool offered to a model, and MCP authorization discove
 connects only to the address it checked. A collector or reporter named by `--reporter` is also a destination the run may reach. An A2A agent is sent reads only, on the origin
 the operator named, and its tokens never leave that origin. Active checks still send real
 requests and can cost money or trigger a model's surrounding application, so they
-are opt-in, budgeted, and documented for staging use. See
+are opt-in. Budget ceilings are unset by default. Set a budget before using a
+paid target, and prefer staging. See
 [Safe testing](docs/safe-testing.md), [Privacy](docs/privacy.md), and the
 [Threat model](docs/threat-model.md).

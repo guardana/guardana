@@ -46,6 +46,12 @@ lives in a console is one nobody can review, diff or restore. It declares a
    `guardana.dev.workers.dev`, because `workers_dev` is off in the config (see below).
    Until the domain resolves, check the deployment from the Cloudflare dashboard
    rather than by guessing a `workers.dev` address that will not answer.
+5. In **Settings** → **Build** → **Branch control**, set the production branch
+   to `main` and turn off **Builds for non-production branches**. Push a commit
+   to a non-production branch and confirm that GitHub shows no
+   **Workers Builds: guardana** check for that commit. If you enable branch
+   builds, set the version command to `npx wrangler versions upload` to upload
+   a version without deploying it.
 
 `_headers` is applied by Workers static assets exactly as it was by Pages —
 verified after the first deploy, and all five headers are live. Check it once at
@@ -54,9 +60,10 @@ verified is a policy nobody has.
 
 **This file is not published.** Wrangler uploads everything in the assets
 directory, so the first deploy served it at `/README.md`; `site/.assetsignore`
-keeps maintainer files out of the site, and a test keeps that true. The config
-also pins **one** public hostname — `workers_dev` and `preview_urls` are off, so
-the page lives at `guardana.dev` and nowhere else.
+keeps maintainer files out of the site, and a test keeps that true. The config turns off
+`workers_dev` and `preview_urls`, so `guardana.dev` is the only public hostname.
+With `preview_urls: false`, a branch build still publishes that branch's
+`site/` to `guardana.dev` if its version command is `npx wrangler deploy`.
 
 There is a one-off path (`npx wrangler deploy` from a laptop) but prefer the
 connected repo: a manual deploy is one more thing that can be forgotten, and the
