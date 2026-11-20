@@ -30,7 +30,8 @@ Procedure: the `add-a-rule` skill.
   four entry-point groups on purpose — a documented seam nothing exercises is a seam nobody has
   run.
 - After any change here: `uv run python scripts/generate_docs.py` (never edit
-  `docs/generated/`), `FEATURES.md` if the surface moved (a registry test refuses a built-in
+  `docs/generated/`; it refuses a built-in rule `scripts/threat_classes.yaml` places under
+  no threat), `FEATURES.md` if the surface moved (a registry test refuses a built-in
   missing from it), and `uv run guardana scan packages --profile scripts/dogfood.yaml` stays at
   zero findings.
 - Test the example in isolation: `uv run --isolated --no-cache --with … pytest

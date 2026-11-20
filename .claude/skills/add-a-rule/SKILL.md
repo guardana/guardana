@@ -71,8 +71,10 @@ file records nothing — "I looked and found nothing" is not a measurement.
 
 `CHANGELOG.md` (why, not only what), `FEATURES.md` if the capability surface
 moved, the relevant `docs/` page, and `uv run python scripts/generate_docs.py` —
-never edit `docs/generated/` by hand. The landing page states a rule count; a
-test pins it to the registry, so it will tell you.
+never edit `docs/generated/` by hand. The generator refuses a built-in rule that
+`scripts/threat_classes.yaml` places under no threat, so add the new id to one
+class. The landing page states a rule count; a test pins it to the registry, so
+it will tell you.
 
 ## Verify it the way the project verifies things
 

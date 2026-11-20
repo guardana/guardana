@@ -91,6 +91,7 @@ This file is generated from the documentation map; do not edit it by hand.
 - [generated/rule-catalog.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/rule-catalog.md): every built-in rule
 - [generated/evaluator-catalog.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/evaluator-catalog.md): every evaluator
 - [generated/taxonomy-coverage.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/taxonomy-coverage.md): framework coverage
+- [generated/threat-coverage.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/threat-coverage.md): built-in rules by threat class
 - [generated/detection-limits.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/detection-limits.md): what a finding states, per rule family
 - [generated/first-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/first-run.md): whether new users reach a first result in ten minutes, from the study sheet
 - [generated/application-measures.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/application-measures.md): coverage of the real application and the share of checks that reached a verdict, from consented team runs
