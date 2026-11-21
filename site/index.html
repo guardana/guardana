@@ -133,7 +133,7 @@
     <div class="txt">
       <p class="num">Probe <span class="st stable" data-maturity="guardana probe">stable</span></p>
       <h3>Test a live AI system</h3>
-      <p class="t"><code>guardana probe</code> sends real requests and grades each reply. Set a budget to limit the run. Use it in staging with a model endpoint, an agent, an MCP server, or an A2A agent.</p>
+      <p class="t"><code>guardana probe</code> sends real requests and grades each reply. Set a budget to limit the run. Use it in staging with a model endpoint, an agent, an MCP server, or an A2A agent. Use <code>--require-auth</code> to check whether an OpenAI-compatible chat endpoint refuses a request without a credential. This check is off by default and has <a href="/docs/product-status#an-authentication-verdict-covers-one-route-from-one-machine">documented limits</a>.</p>
       <a class="more" href="/docs/usage-probe">Probe guide <i>→</i></a>
     </div>
     <div class="pad">
@@ -273,6 +273,7 @@
 <li><b>mcp.unauthenticated_access</b> — An MCP server lists tools to a caller without a credential.</li>
 <li><b>mcp.token_audience</b> — An MCP server accepts a token it could not have issued.</li>
 <li><b>a2a.caller_identity</b> — An A2A agent answers a caller who presents no credential.</li>
+<li><b>endpoint.unauthenticated_inference</b> — A chat endpoint returns a completion for a request without a credential.</li>
 <li><b>tenancy.cross_tenant_answer</b> — A reply contains another tenant's seeded data.</li>
 <li><b>trace.unapproved_side_effect</b> — A consequential effect occurs without its required approval.</li></ul></article>
   </div>
