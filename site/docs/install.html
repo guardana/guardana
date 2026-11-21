@@ -15,7 +15,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="w">
 <a class="logo" href="../index.html"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span>guard<b>ana</b></span></a>
-<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.3.1</span></a>
+<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.4.0</span></a>
 <nav class="links" aria-label="Primary">
 <a href="../docs/index.html" class="sm-keep">Docs</a>
 <a href="../docs/rules/index.html" class="sm-keep">Rules</a>
@@ -236,8 +236,8 @@ uv run guardana scan examples/vulnerable-model   # exits 1: finds the planted is
 <p><code>uv sync</code> installs <code>guardana-core</code>, <code>guardana-rules</code>, <code>guardana-cli</code>, <code>guardana-report</code>, and <code>guardana-server</code> from the root <code>pyproject.toml</code>, plus <code>ruff</code>, <code>mypy</code>, and <code>pytest</code>. Run commands with <code>uv run guardana ...</code> inside the checkout. See <a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a> for contributor setup and test/lint gates.</p>
 <h2 id="run-it-as-a-container">Run it as a container</h2>
 <p>The CLI and collector images are available from GitHub Container Registry:</p>
-<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.3 scan /work
-docker run --rm ghcr.io/guardana/guardana-collector:1.3 --help
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.4 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:1.4 --help
 </code></pre>
 <p>Tags include the exact version, the moving minor used above, and <code>latest</code>. While a release candidate is out, <code>latest</code>, the moving minor and the Action's <code>vX.Y</code> tag stay on the last stable release, and the candidate's image carries only its exact version as a tag. Pin the moving minor in CI to receive fixes without changing the rule set, or pin a digest (<code>ghcr.io/guardana/guardana:&lt;version&gt;@sha256:&lt;digest&gt;</code>) to run exactly the image you reviewed. Both images run as a non-root user, support <code>linux/amd64</code> and <code>linux/arm64</code>, and include an SBOM and signed provenance attestation. See <a href="https://github.com/guardana/guardana/blob/main/deploy/docker/README.md"><code>deploy/docker/README.md</code></a> for mounts, exit codes, reports, and image builds.</p>
 <h2 id="the-optional-collector">The optional collector</h2>
