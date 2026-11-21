@@ -669,7 +669,7 @@ only by a query apart; it does not hide a short or guessable value.</p>
 <tr>
 <td><code>InferenceAccessCheck</code></td>
 <td><code>inference_access</code></td>
-<td><code>access_route</code>, <code>access_route_is_local</code>, <code>check_access</code> (<code>Added in Guardana Unreleased</code>)</td>
+<td><code>access_route</code>, <code>access_route_is_local</code>, <code>check_access</code> (<code>Added in Guardana 1.4.0</code>)</td>
 </tr>
 </tbody>
 </table></div>
@@ -691,7 +691,7 @@ are MCP; <code>inspect_a2a</code> is A2A). A rule whose protocols your target do
 skipped as <code>not_applicable</code>, which <code>fail_on_skipped</code> and <code>--preset release</code> do not count;
 a capability missing within a protocol it speaks stays a <code>missing_capability</code> gap, except
 for <code>inference_access</code>. A target declares it only when the operator requests the check with
-<code>guardana probe --require-auth</code> or, in Python, <code>EndpointTarget(..., inference_access_check=True)</code> (<code>Added in Guardana Unreleased</code>).
+<code>guardana probe --require-auth</code> or, in Python, <code>EndpointTarget(..., inference_access_check=True)</code> (<code>Added in Guardana 1.4.0</code>).
 If the target does not declare it, a rule that needs it is skipped as <code>not_applicable</code>. A
 protocol one of your target's declared capabilities belongs to is spoken whatever
 <code>speaks()</code> returns: a subclass of <code>EndpointTarget</code> that adds <code>list_tools</code> speaks MCP too,
@@ -893,7 +893,7 @@ output); pair with <code>RefusingTransport</code> for the negative.</li>
 given error.</li>
 <li><code>ScriptedAccessTransport</code> — a chat route with scripted replies for requests
 with and without a key; it records, in order, whether each request carried a
-key. <code>Added in Guardana Unreleased</code></li>
+key. <code>Added in Guardana 1.4.0</code></li>
 <li><code>ScriptedAgentTransport</code> — plays a written agent run: one reply per round
 trip, one script per session, nothing repeated. What a declarative fixture's
 <code>turns:</code> builds, and what a Python fixture uses to script a run by hand.</li>

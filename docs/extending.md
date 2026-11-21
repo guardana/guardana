@@ -449,7 +449,7 @@ only by a query apart; it does not hide a short or guessable value.
 | `RegistryEntryInspector` | `registry_entry` | `registry_entry`, `reported_server`, `server_url` |
 | `A2aInspector` | `inspect_a2a` | `a2a` |
 | `SeededData` | `seeded_data` | `fixtures`, `ask_as` |
-| `InferenceAccessCheck` | `inference_access` | `access_route`, `access_route_is_local`, `check_access` (`Added in Guardana Unreleased`) |
+| `InferenceAccessCheck` | `inference_access` | `access_route`, `access_route_is_local`, `check_access` (`Added in Guardana 1.4.0`) |
 
 Built-ins are `ArtifactTarget` (files: pickles, GGUF, ONNX, ML formats,
 requirements/lockfiles, manifests), `EndpointTarget`
@@ -470,7 +470,7 @@ are MCP; `inspect_a2a` is A2A). A rule whose protocols your target does not spea
 skipped as `not_applicable`, which `fail_on_skipped` and `--preset release` do not count;
 a capability missing within a protocol it speaks stays a `missing_capability` gap, except
 for `inference_access`. A target declares it only when the operator requests the check with
-`guardana probe --require-auth` or, in Python, `EndpointTarget(..., inference_access_check=True)` (`Added in Guardana Unreleased`).
+`guardana probe --require-auth` or, in Python, `EndpointTarget(..., inference_access_check=True)` (`Added in Guardana 1.4.0`).
 If the target does not declare it, a rule that needs it is skipped as `not_applicable`. A
 protocol one of your target's declared capabilities belongs to is spoken whatever
 `speaks()` returns: a subclass of `EndpointTarget` that adds `list_tools` speaks MCP too,
@@ -670,7 +670,7 @@ dynamic rule is graded end-to-end against a scripted model with no network:
   given error.
 - `ScriptedAccessTransport` — a chat route with scripted replies for requests
   with and without a key; it records, in order, whether each request carried a
-  key. `Added in Guardana Unreleased`
+  key. `Added in Guardana 1.4.0`
 - `ScriptedAgentTransport` — plays a written agent run: one reply per round
   trip, one script per session, nothing repeated. What a declarative fixture's
   `turns:` builds, and what a Python fixture uses to script a run by hand.
