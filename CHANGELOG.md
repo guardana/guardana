@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-21 — the fourth minor release
+
 ### Added
 
 - **Add the opt-in `--require-auth` check for chat endpoints (#373).** `guardana probe --require-auth` runs the rule `guardana.endpoint.unauthenticated_inference`, mapped to `LLM10:2025`, `LLM06:2026` and `AML.T0040`. It sends a short, non-streaming chat completions request without a credential. A completion triggers a critical finding. After HTTP `401` or `403`, it repeats the request with the bearer key from `--api-key-env`. A completion from that control gives a pass. Other outcomes are inconclusive. The check uses one or two requests, each counted against `--max-requests` and in run usage; `guardana plan probe --require-auth` prices them. Without the flag, the rule is skipped as `not_applicable` and the probe reports its usual results. For extension authors, `guardana.core.testing.ScriptedAccessTransport` scripts such a route. Gate impact: none without the flag; with it, a finding fails the run (exit `1`), and an inconclusive or unfinished check makes it `indeterminate` (exit `2`) unless a finding fails it, whatever `fail_on` says.

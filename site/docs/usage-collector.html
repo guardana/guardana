@@ -15,7 +15,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="w">
 <a class="logo" href="../index.html"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span>guard<b>ana</b></span></a>
-<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.3.1</span></a>
+<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.4.0</span></a>
 <nav class="links" aria-label="Primary">
 <a href="../docs/index.html" class="sm-keep">Docs</a>
 <a href="../docs/rules/index.html" class="sm-keep">Rules</a>
@@ -247,11 +247,11 @@ uvicorn 'guardana.server:create_app' --factory        # what serve does for you
 </code></pre>
 <p>Or as a container, where the same three commands are three <code>docker run</code>s:</p>
 <pre><code class="language-bash">docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:1.3 migrate
+  ghcr.io/guardana/guardana-collector:1.4 migrate
 docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:1.3 bootstrap --org acme --project web
+  ghcr.io/guardana/guardana-collector:1.4 bootstrap --org acme --project web
 docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:1.3
+  ghcr.io/guardana/guardana-collector:1.4
 </code></pre>
 <p>The image's default command is <code>serve --host 0.0.0.0 --port 8000</code>, and it does
 <strong>not</strong> migrate on start — see
