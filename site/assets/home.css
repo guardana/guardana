@@ -60,7 +60,7 @@ h1 .em{color:var(--accent)}
 .in small{font-size:13px;color:var(--muted)}
 .in code{grid-column:1/-1;margin-top:9px;justify-self:start;font-size:12.5px;color:var(--ink2);background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:2px 8px;white-space:nowrap}
 .eng{grid-column:3;margin:0 18px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
-.eng code{display:block;font-size:12.5px;font-weight:500;overflow-wrap:anywhere}
+.eng code{display:block;font-size:12.5px;font-weight:500;overflow-wrap:break-word}
 .eng small{display:block;margin-top:2px;font-size:12.5px;color:var(--muted)}
 .out{grid-column:5;border-radius:13px;padding:13px 15px;border:1px solid var(--line2);background:var(--surface);box-shadow:0 10px 22px -16px rgba(0,0,0,.25)}
 .out b{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
@@ -104,8 +104,13 @@ h1 .em{color:var(--accent)}
   .in,.eng,.out{grid-column:1;grid-row:auto;margin:0}
   .in{margin-top:12px}
   .eng{margin:8px 0 8px 22px;position:relative;border-style:dashed}
-  .eng:before{content:"";position:absolute;left:-12px;top:-9px;bottom:-9px;width:1px;background:var(--line2)}
-  .out{margin:0 0 6px 22px}
+  .eng:before,.out:before{content:"";position:absolute;left:-13px;width:1px;background:var(--line2)}
+  .eng:before{top:-9px;bottom:-9px}
+  .out:before{top:-1px;height:calc(50% + 1px)}
+  .eng:after,.out:after{content:"";position:absolute;left:-13px;top:50%;width:12px;height:1px;background:var(--line2)}
+  .out{margin:0 0 6px 22px;position:relative}
+  /* A pulse that scales the outcome would pull its connector away from the line above. */
+  .out{transform:none!important}
   .cap{flex-wrap:wrap}
 }
 
@@ -130,10 +135,11 @@ h2{text-wrap:balance;margin-top:12px;font-size:clamp(28px,3.7vw,46px);line-heigh
 .more:after{content:""}
 .more i{font-style:normal;display:inline-block;margin-left:6px;transition:transform .2s}
 .more:hover i{transform:translateX(3px)}
-.st{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
-.st:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--wait)}
+.st{font-size:13px;color:var(--muted);white-space:nowrap}
+.st:before{content:"";display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:var(--wait);vertical-align:middle}
 .st.stable:before{background:var(--ok)}
-:is(.fine,.intro) .st{font-size:inherit;color:var(--ink);font-weight:500;gap:6px}
+:is(.fine,.intro) .st{font-size:inherit;color:var(--ink);font-weight:500}
+:is(.fine,.intro) .st:before{margin-right:6px}
 .nw{white-space:nowrap}
 .ed{font:500 12px var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
 .more svg{width:16px;height:16px;margin-left:6px;vertical-align:-3px;transition:transform .2s}
@@ -153,9 +159,10 @@ h2{text-wrap:balance;margin-top:12px;font-size:clamp(28px,3.7vw,46px);line-heigh
 .pad>*{width:100%;max-width:470px}
 @media(max-width:560px){.pad{padding:18px 12px;border-radius:16px}}
 .ui{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:8px;font-size:14.5px}
-.uh{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
-.file{font:500 13px var(--mono);min-width:0;overflow-wrap:anywhere}
+.uh{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 12px;padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.file{font:500 13px var(--mono);min-width:0;overflow-wrap:break-word}
 .badge{font-size:12.5px;color:var(--muted);text-align:right}
+@media(max-width:560px){.badge{text-align:left}}
 .li{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 12px;border-radius:9px}
 .li+.li{margin-top:2px}
 .li>span:first-child{display:flex;align-items:center;gap:10px;min-width:0}
@@ -168,7 +175,7 @@ i.ok{color:var(--ok)}i.nope{color:var(--no)}i.hold{color:var(--wait)}i.mute{colo
 .tbar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--code-line);font:12.5px var(--mono);color:var(--code-mute)}
 .tbar i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.14)}
 .tbar span{margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tx{margin:0;padding:16px 16px 18px;font:12.5px/1.7 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--code-ink)}
+.tx{margin:0;padding:16px 16px 18px;font:12.5px/1.7 var(--mono);white-space:pre-wrap;overflow-wrap:break-word;color:var(--code-ink)}
 .tx code{font:inherit}
 .tx .pr{color:var(--code-mute);user-select:none}
 .tx .c{color:#FF8A80;font-weight:500}.tx .h{color:#FFB86B;font-weight:500}.tx .d{color:var(--code-mute)}
@@ -270,6 +277,7 @@ mark{background:var(--accent-soft);color:var(--accent-ink);border-radius:4px;pad
 @media(max-width:1020px){.parts{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:860px){.pk{grid-template-columns:1fr}}
 @media(max-width:620px){.parts{grid-template-columns:1fr 1fr}.pkl li{grid-template-columns:1fr}}
+@media(max-width:560px){.map .pad{margin:0 -20px;padding:18px 10px;border-radius:0;border-left:0;border-right:0}}
 
 /* coverage */
 .tot{margin-top:48px;font:500 13px var(--mono);color:var(--muted)}
@@ -378,6 +386,7 @@ mark{background:var(--accent-soft);color:var(--accent-ink);border-radius:4px;pad
 #q1:focus-visible~.tabs label[for=q1],#q2:focus-visible~.tabs label[for=q2],#q3:focus-visible~.tabs label[for=q3],#q4:focus-visible~.tabs label[for=q4],#q5:focus-visible~.tabs label[for=q5]{outline:2px solid var(--accent);outline-offset:-2px}
 #q1:checked~.p1,#q2:checked~.p2,#q3:checked~.p3,#q4:checked~.p4,#q5:checked~.p5{display:block}
 @media(max-width:860px){.pane pre{white-space:pre-wrap;overflow-wrap:anywhere}}
+@media(max-width:520px){.tabs{flex-wrap:wrap}.tabs label{height:42px}}
 .paths a{display:grid;grid-template-columns:1fr auto;gap:2px 16px;padding:19px 0;border-top:1px solid var(--line);text-decoration:none}
 .paths a:last-child{border-bottom:1px solid var(--line)}
 .paths b{font-weight:500;font-size:16.5px;letter-spacing:-.01em}
