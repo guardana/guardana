@@ -13,10 +13,8 @@
   schedule.
 
   **It states no rule count, and that is the point.** A number baked into a PNG is
-  a claim no test can read — the exact failure this repository has now had on the
-  landing page, in the README and in the GitHub repository description. What is
-  here instead is the four verbs and the licence, which do not move between
-  releases.
+  a claim no test can read. What is here instead is the landing page's headline,
+  which a test compares with the page, and the verbs and the licence.
 
   Fonts are the stack the page falls back to, not the webfont: a headless render
   has no network, and a card that silently rendered in Times because the font
@@ -43,9 +41,10 @@
   .mark{font-size:52px; line-height:1}
   .name{font-size:52px; font-weight:700; letter-spacing:-.02em}
   h1{
-    font-size:62px; font-weight:600; line-height:1.14; letter-spacing:-.022em;
-    max-width:19ch; margin-top:30px;
+    font-size:58px; font-weight:600; line-height:1.16; letter-spacing:-.022em;
+    margin-top:30px;
   }
+  h1 span, h1 em{display:block}
   h1 em{font-style:normal; color:#9F8DFF}
   .verbs{
     display:flex; gap:12px; font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
@@ -62,11 +61,11 @@
 <body>
   <div class="row"><span class="mark">🛡️</span><span class="name">Guardana</span></div>
 
-  <h1>Security gates for the AI you <em>run yourself</em>.</h1>
+  <h1><span>Check your AI systems.</span><em>See gaps. Unknown is never clean.</em></h1>
 
   <div class="foot">
     <div class="verbs">
-      <b>scan</b><span>·</span><b>probe</b><span>·</span><b>monitor</b><span>·</span><b>diff</b>
+      <b>scan</b><span>·</span><b>probe</b><span>·</span><b>grade</b><span>·</span><b>monitor</b><span>·</span><b>diff</b>
     </div>
     <div class="lic">
       open source, Apache-2.0<br>
