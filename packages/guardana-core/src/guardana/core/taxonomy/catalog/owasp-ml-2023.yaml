@@ -1,7 +1,7 @@
-# The entries Guardana's rules actually map to, transcribed as they were reviewed
-# when each mapping was added. A catalogue is allowed to be a subset of a published
-# document; what it may never do is invent an entry, so the gaps stay gaps rather
-# than being filled in from memory.
+# The entries a rule can name, transcribed as they were reviewed when each was
+# added. A catalogue is allowed to be a subset of a published document; what it may
+# never do is invent an entry, so the gaps stay gaps rather than being filled in
+# from memory.
 scheme: OWASP-ML
 edition: "2023"
 title: OWASP Machine Learning Security Top 10
