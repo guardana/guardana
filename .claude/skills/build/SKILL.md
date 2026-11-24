@@ -34,4 +34,4 @@ Work file: $ARGUMENTS (default: the only file in `.work/`, else ask which).
    test pass, and never let it make a check return clean to get green.
 
 Then `/review` → fix → gate → re-review only the fixes, at most three rounds (what is still open
-after that goes to the user, not into a fourth round). Then `/ship`.
+after that goes to the user, not into a fourth round). Then `/land`.

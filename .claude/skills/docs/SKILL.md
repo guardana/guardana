@@ -1,6 +1,6 @@
 ---
 name: docs
-description: Documentation work in this repo — the five places a user-visible change must answer, the page conventions the site build enforces, the tests that pin prose to the registry, and a simplification pass that makes a page shorter and truer without inventing a claim. Use for "update the docs", "the README is stale", "simplify this page", "add a usage page", or when /ship needs the five places answered.
+description: Documentation work in this repo — the five places a user-visible change must answer, the page conventions the site build enforces, the tests that pin prose to the registry, and a simplification pass that makes a page shorter and truer without inventing a claim. Use for "update the docs", "the README is stale", "simplify this page", "add a usage page", or when /land needs the five places answered.
 argument-hint: "[page or change to document | audit | simplify <page>]"
 ---
 # Documentation — shorter, truer, generated where it can be

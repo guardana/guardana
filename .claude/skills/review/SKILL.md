@@ -1,6 +1,6 @@
 ---
 name: review
-description: Pre-ship code review by a fresh-context Opus reviewer that checks the change against this project's hard rules — a false green, a channel rebuilt field by field, engine purity, schema versions, tenancy, the fixture pair, the five documentation places. Use after the gate is green and before /ship on every M or L change.
+description: Pre-ship code review by a fresh-context Opus reviewer that checks the change against this project's hard rules — a false green, a channel rebuilt field by field, engine purity, schema versions, tenancy, the fixture pair, the five documentation places. Use after the gate is green and before /land on every M or L change.
 argument-hint: "[git range, e.g. main~3..HEAD — default: uncommitted working tree]"
 context: fork
 agent: reviewer

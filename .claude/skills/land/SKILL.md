@@ -1,9 +1,9 @@
 ---
-name: ship
+name: land
 description: Commit and push a finished change the way this repo requires — explicit paths, one commit per logical change, no attribution, the five documentation places answered, the site checks before a push (a push to main deploys guardana.dev), CI watched after it, work file closed. Use when the gate is green and the review is settled.
 argument-hint: "[commit | push — default: both]"
 ---
-# Ship
+# Land
 
 Tree right now:
 
