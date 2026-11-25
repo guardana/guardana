@@ -387,3 +387,68 @@ def test_a_file_named_only_by_a_codec_that_cannot_be_decompressed_is_not_scanned
 
     assert any("cannot decompress" in summary for summary in _unscanned(result))
     assert _unread(result) == [str(tmp_path / "bundle.gz")]
+
+
+def _zstd(data: bytes) -> bytes:
+    """A zstd frame holding `data` as one raw block, which `zstd -d` and `tar` both decode.
+
+    The scanner never decompresses zstd, so a raw block shows the same bytes a compressed one
+    would; `data` must be 256 to 65,791 bytes, the two-byte content size this header holds.
+    """
+    header = b"\x28\xb5\x2f\xfd\x60" + (len(data) - 256).to_bytes(2, "little")
+    return header + (1 | len(data) << 3).to_bytes(3, "little") + data
+
+
+def _skippable(frame: bytes) -> bytes:
+    """`frame` behind a zstd skippable frame, which `zstd -d` and `tar` also recognise."""
+    return (0x184D2A5E).to_bytes(4, "little") + (4).to_bytes(4, "little") + bytes(4) + frame
+
+
+@pytest.mark.parametrize("wrap", [_zstd, lambda data: _skippable(_zstd(data))])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "model.tar.zst",
+        "model.tar.zstd",
+        "model.tzst",
+        "MODEL.TAR.ZST",
+        "bundle",
+        "weights.dat",
+        "clf.zst",
+        "model.pkl.zst",
+        "pytorch_model.bin.zstd",
+        "bundle.zip.zst",
+        "BUNDLE.ZIP.ZSTD",
+        "weights.tgz.zst",
+        "weights.tar.gz.zst",
+        "clf.gz.zst",
+        "model.package.zst",
+        "twice.zst.zst",
+    ],
+)
+def test_a_zstd_file_named_as_a_tar_a_model_or_nothing_is_not_scanned(
+    tmp_path: Path, name: str, wrap: Callable[[bytes], bytes]
+) -> None:
+    """zstd is never decompressed here, so a pickle `tar` would unpack from it is not cleared.
+
+    That holds above an archive or a codec too: `tar` reads `bundle.zip.zst` as the zip inside.
+    """
+    result = _run(tmp_path, name, wrap(_tar(("model.pkl", _SYSTEM))))
+
+    assert any("zstd" in summary for summary in _unscanned(result)), _unscanned(result)
+    assert _unread(result) == [str(tmp_path / name)]
+
+
+def test_a_zstd_file_named_as_data_stays_quiet(tmp_path: Path) -> None:
+    """Named as compressed data, not as a model or a tar, it is left alone as `data.jsonl` is."""
+    result = _run(tmp_path, "data.jsonl.zst", _zstd(b'{"text": "a"}\n' * 40))
+
+    assert not result.findings
+    assert not result.unverified
+    assert _unread(result) == []
+
+
+def test_a_gzip_tar_named_as_a_zstd_tar_is_read_by_its_bytes(tmp_path: Path) -> None:
+    result = _run(tmp_path, "model.tar.zst", gzip.compress(_tar(("model.pkl", _SYSTEM))))
+
+    assert _critical(result) == ["os.system in model.tar.zst::model.pkl"]

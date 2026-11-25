@@ -141,10 +141,15 @@ _ARCHIVE_SUFFIXES = frozenset(
         ".bz2",
         ".lzma",
         ".lz4",
+        ".zst",
+        ".zstd",
+        ".tzst",
+        ".package",
     }
 )
 """Archives and compressed files, which the artifact scan opens by their content whatever
-they are named, since a model ships in one as often as in a `model.tar.gz`."""
+they are named, since a model ships in one as often as in a `model.tar.gz`; a `.package` is
+the zip `torch.package` writes."""
 _LOADER_FILE_ENDING = "config.json"
 _LOADER_FILE_NAMES = frozenset({"keras_metadata.pb", "chat_template.json"})
 _TEMPLATE_STEM = "chat_template"
