@@ -954,7 +954,7 @@ def test_the_gate_starts_the_test_database_and_refuses_its_skip_before_any_check
         "-d",
         "--wait",
     ]
-    seen_by_pytest = environments[calls.index(["uv", "run", "pytest", "-q"])]
+    seen_by_pytest = environments[calls.index(["uv", "run", "pytest"])]
     assert seen_by_pytest["GUARDANA_REQUIRE_POSTGRES"] == "1"
     assert seen_by_pytest["GUARDANA_REQUIRE_PG_TOOLS"] == "1"
     assert seen_by_pytest["GUARDANA_TEST_DATABASE_URL"].endswith("@127.0.0.1:55439/guardana_test")

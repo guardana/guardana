@@ -20,6 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from guardana.core.inventory import read_by_model_loaders
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain import pickle_opcode
@@ -347,8 +348,13 @@ def test_a_tar_ordinary_tools_write_stays_clean(tmp_path: Path, content: bytes, 
     assert _scan(tmp_path, name, content)[:2] == ([], [])
 
 
-def test_a_file_without_a_suffix_is_left_to_its_head(tmp_path: Path) -> None:
-    assert _scan(tmp_path, "bundle", b"\x28\xb5\x2f\xfd" + _INNER) == ([], [], False)
+def test_a_file_without_a_suffix_holding_zstd_is_not_scanned(tmp_path: Path) -> None:
+    """`tar` decompresses zstd by its bytes, and this scanner never does, so nothing is cleared."""
+    critical, unscanned, examined = _scan(tmp_path, "bundle", b"\x28\xb5\x2f\xfd" + _INNER)
+
+    assert critical == []
+    assert [summary for summary in unscanned if "zstd" in summary] == unscanned != []
+    assert examined
 
 
 def _gnu_tar_reads_at(start: int) -> str:
@@ -481,3 +487,23 @@ def test_stored_numbers_gnu_tar_reads_no_header_from_stay_clean(tmp_path: Path, 
     content = _zip({"archive/data.pkl": _CLEAN, "archive/data/0": weights})
 
     assert _scan(tmp_path, name, content) == ([], [], True)
+
+
+def test_a_target_ignore_file_cannot_hide_a_name_this_rule_reads_by_name() -> None:
+    """Only the profile may exclude a file a loader reads, so every name read here is kept."""
+    endings = (
+        *pickle_opcode._SUFFIXES,
+        *pickle_opcode._COMPRESSED_MODEL_ENDINGS,
+        *pickle_opcode._COMPRESSED_TAR_ENDINGS,
+        *pickle_opcode._COMPRESSED_SUFFIXES,
+        *(set(pickle_opcode._CONTENT_SUFFIXES) - pickle_opcode._SNIFFED_SUFFIXES),
+        ".package",
+    )
+
+    hidden = [
+        ending
+        for ending in endings
+        if not read_by_model_loaders(Path(f"x{ending}"), (), lambda _: False, by_name=True)
+    ]
+
+    assert hidden == []
