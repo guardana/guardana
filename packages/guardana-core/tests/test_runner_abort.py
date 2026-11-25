@@ -106,6 +106,8 @@ _CHILD = textwrap.dedent("""
     in_flight_seconds = float(sys.argv[1])
     signal_from_rule = sys.argv[2] == "rule"
     all_in_flight = threading.Barrier(4)
+    # print writes the text and the newline separately; unbuffered, threads interleave them.
+    print_lock = threading.Lock()
 
     def make(index):
         class R(Rule):
@@ -115,7 +117,8 @@ _CHILD = textwrap.dedent("""
                 required_capabilities=frozenset({Capability.CHAT}),
             )
             def run(self, target, ctx):
-                print("started", flush=True)
+                with print_lock:
+                    print("started", flush=True)
                 all_in_flight.wait()
                 if signal_from_rule and index == 0:
                     time.sleep(0.5)
