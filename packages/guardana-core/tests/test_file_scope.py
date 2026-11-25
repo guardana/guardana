@@ -265,6 +265,26 @@ def test_an_archive_or_compressed_file_is_kept_whatever_it_is_named(tmp_path: Pa
     ]
 
 
+def test_a_file_a_loader_opens_by_content_is_kept_by_its_first_bytes(tmp_path: Path) -> None:
+    pickle = b"cos\nsystem\n(S'id'\ntR."
+    (tmp_path / "clf.sav").write_bytes(pickle)
+    (tmp_path / "bundle").write_bytes(b"PK\x03\x04" + bytes(26))
+    (tmp_path / "weights.dat").write_bytes(b"\x1f\x8b" + bytes(18))
+    (tmp_path / "notes.p").write_text("x = 1\n")
+    (tmp_path / "Dockerfile").write_text("FROM python:3.12\nRUN pip install x\n")
+    (tmp_path / "table.dat").write_bytes(bytes(range(256)) * 300)
+    (tmp_path / "data.model").write_bytes(b"(dp0\nVweights\np1\nF0.5\ns.")
+    (tmp_path / "blobs").mkdir()
+    (tmp_path / "blobs" / "part.txt").write_bytes(pickle)
+    (tmp_path / "x.p").symlink_to(tmp_path / "blobs" / "part.txt")
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.write_bytes(pickle)
+    (tmp_path / "far.p").symlink_to(outside)
+    (tmp_path / ".guardanaignore").write_text("*\n")
+
+    assert _kept(tmp_path) == ["bundle", "clf.sav", "weights.dat", "x.p"]
+
+
 def test_a_link_named_as_a_model_is_kept_and_its_destination_checked(tmp_path: Path) -> None:
     (tmp_path / "blobs").mkdir()
     (tmp_path / "blobs" / "part.txt").write_bytes(b"\x80\x02N.")
