@@ -51,9 +51,9 @@ Uncommitted changes that are not yours stay untouched and unstaged.
 
 | size | it is this when | lifecycle |
 |---|---|---|
-| **S** | ≤ 2 files, no schema / exit code / CLI flag / extension-contract change, the fix is obvious | do it → `/gate` → `/ship` |
-| **M** | one package, several files, or any change a saved run, a report or a finding could show | `/plan` → build it yourself (or one `coder`) → `/gate` → `/review` → `/ship` |
-| **L** | crosses packages, adds a command / target / evaluator / schema / migration, touches the collector envelope or the extension contract | `/plan` with lanes → `/build` (parallel `coder`s) → `/gate` → `/review` → `/ship` in ordered commits → close |
+| **S** | ≤ 2 files, no schema / exit code / CLI flag / extension-contract change, the fix is obvious | do it → `/gate` → `/land` |
+| **M** | one package, several files, or any change a saved run, a report or a finding could show | `/plan` → build it yourself (or one `coder`) → `/gate` → `/review` → `/land` |
+| **L** | crosses packages, adds a command / target / evaluator / schema / migration, touches the collector envelope or the extension contract | `/plan` with lanes → `/build` (parallel `coder`s) → `/gate` → `/review` → `/land` in ordered commits → close |
 
 When unsure between two sizes, take the smaller and escalate the moment a second package shows up.
 Specialised entries: new coverage is `add-a-rule` (a rule, evaluator or target — never the

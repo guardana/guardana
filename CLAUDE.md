@@ -104,7 +104,7 @@ tags · image tags and `deploy/` shapes · the trace format integrators write.
 ## How work runs here
 
 `/work` sizes the task (S/M/L) and routes it → `/plan` (one work file in `.work/`, which git
-ignores) → `/build` → `/gate` → `/review` → `/ship`; `/auto` runs the chain unattended;
+ignores) → `/build` → `/gate` → `/review` → `/land`; `/auto` runs the chain unattended;
 `/debug`, `/refactor`, `/docs` and `add-a-rule` (coverage — a rule, evaluator or target, never
 the engine) are the specialised entries; `false-green-audit` is the review nobody asked for.
 Local pieces: `stack`; the site in a browser: `site-check`.
