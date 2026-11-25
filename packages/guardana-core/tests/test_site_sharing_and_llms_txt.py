@@ -101,6 +101,26 @@ def test_the_share_image_states_no_count_that_could_go_stale() -> None:
     )
 
 
+def _headline(html: str) -> str:
+    match = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.DOTALL)
+    assert match is not None, "no <h1> to compare"
+    return " ".join(re.sub(r"<[^>]+>", " ", match.group(1)).split())
+
+
+def test_the_share_card_says_what_the_landing_headline_says() -> None:
+    """The card is pixels nobody re-reads, so its source and its alt text follow the page's h1."""
+    headline = _headline(_page())
+    card = (_repo() / "scripts" / "og_card.html").read_text(encoding="utf-8")
+
+    assert _headline(card) == headline, (
+        f"scripts/og_card.html says {_headline(card)!r} and the landing page says "
+        f"{headline!r}; update the card, re-render site/og.png and fix og:image:alt"
+    )
+    assert headline in _meta("og:image:alt"), (
+        f"og:image:alt does not contain the landing headline {headline!r}"
+    )
+
+
 def test_the_page_points_at_llms_txt_and_the_file_is_there() -> None:
     """A link element and a missing file is a 404 offered to every model that follows it."""
     page = _page()
