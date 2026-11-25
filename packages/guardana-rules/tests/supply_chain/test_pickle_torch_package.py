@@ -789,3 +789,92 @@ def test_a_link_in_an_archive_holding_no_package_is_not_reported(
     details, _ctx = _details(tmp_path)
 
     assert details == []
+
+
+_UNSCANNED = "Unscanned model file"
+_IMPORTS_SYSTEM = b"cos\nsystem\n(S'id'\ntR."
+_EXTERNS = b"collections\ntorch._utils\n"
+
+
+@pytest.mark.parametrize("name", ["model.package", "MODEL.PACKAGE", "model.pt"])
+def test_a_package_named_package_reports_the_source_it_ships(tmp_path: Path, name: str) -> None:
+    """`PackageImporter` opens a zip under any name; `.package` is read like `.pt`."""
+    (tmp_path / name).write_bytes(_zip(_members("pkg/__init__.py")))
+
+    details, ctx = _details(tmp_path)
+
+    assert details == [f"pkg/__init__.py {_RUNS} in {name}::top/pkg/__init__.py"]
+    assert str(tmp_path / name) in ctx.examined_paths()
+
+
+def test_a_package_under_a_name_the_rule_does_not_read_is_left_alone(tmp_path: Path) -> None:
+    """The documented limit: a zip is opened under the names this rule reads, not every name."""
+    (tmp_path / "model.txt").write_bytes(_zip(_members("pkg/__init__.py")))
+
+    details, ctx = _details(tmp_path)
+
+    assert details == []
+    assert str(tmp_path / "model.txt") not in ctx.examined_paths()
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("bundle.zip", _zip({"release/model.package": _zip(_members("pkg/__init__.py"))})),
+        ("bundle.tar", _tar({"release/model.package": _zip(_members("pkg/__init__.py"))})),
+    ],
+    ids=["zip", "tar"],
+)
+def test_a_package_inside_an_archive_is_not_cleared(
+    tmp_path: Path, name: str, content: bytes
+) -> None:
+    (tmp_path / name).write_bytes(content)
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.evidence.summary for f in findings if f.title == _UNSCANNED] == [
+        f"{name.rsplit('.', 1)[1]} member is a nested archive (release/model.package); not scanned"
+    ]
+
+
+def test_a_packages_extern_modules_are_read_as_module_names(tmp_path: Path) -> None:
+    """A protocol-0 GLOBAL starts with `c`, as `collections` does; the record is not a pickle."""
+    members = {"m/.data/extern_modules": _EXTERNS, "m/pkg/x.pkl": _DATA}
+    (tmp_path / "model.pt").write_bytes(_zip(members))
+
+    details, ctx = _details(tmp_path)
+
+    assert details == []
+    assert str(tmp_path / "model.pt") in ctx.examined_paths()
+
+
+def test_torchscript_source_is_not_read_as_a_pickle(tmp_path: Path) -> None:
+    members = {"m/data.pkl": _DATA, "m/code/model.py": b"class Model:\n    pass\n"}
+    (tmp_path / "model.pt").write_bytes(_zip(members))
+
+    details, _ctx = _details(tmp_path)
+
+    assert details == []
+
+
+@pytest.mark.parametrize("record", ["m/.data/extern_modules", "m/code/model.py"])
+def test_a_text_record_that_holds_a_pickle_is_still_read(tmp_path: Path, record: str) -> None:
+    """Only text is skipped: a record that starts as a pickle is read whatever it is named."""
+    (tmp_path / "model.pt").write_bytes(
+        _zip({"m/data.pkl": _DATA, record: b"\x80\x02" + _IMPORTS_SYSTEM})
+    )
+
+    details, _ctx = _details(tmp_path)
+
+    assert any(detail.startswith("os.system in model.pt::") for detail in details), details
+
+
+@pytest.mark.parametrize("record", ["m/.data/extern_modules", "m/code/model.py"])
+def test_a_text_record_holding_a_protocol_0_pickle_is_not_read(tmp_path: Path, record: str) -> None:
+    """A documented limit: without a `PROTO` opcode such a pickle starts as text does, and no
+    torch loader unpickles these records."""
+    (tmp_path / "model.pt").write_bytes(_zip({"m/data.pkl": _DATA, record: _IMPORTS_SYSTEM}))
+
+    details, _ctx = _details(tmp_path)
+
+    assert details == []

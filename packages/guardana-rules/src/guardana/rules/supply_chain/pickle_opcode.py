@@ -122,11 +122,20 @@ _SUFFIXES = (
 _BIN_SUFFIX = ".bin"
 _PLAIN_ZIP_SUFFIX = ".zip"
 _TAR_SUFFIX = ".tar"
-_CONTENT_SUFFIXES = (_BIN_SUFFIX, ".sav", ".p", ".model", _TAR_SUFFIX, _PLAIN_ZIP_SUFFIX)
-"""Read by content: `pytorch_model.bin` is a torch zip and `word2vec.model` a pickle, while
-a file under one of these names that is neither a zip, a tar nor a pickle stream is some
-other file this rule has nothing to say about, unless it is a `.tar` or a `.zip`, which a
-`tar` command unpacks by its bytes whatever they are."""
+_CONTENT_SUFFIXES = (
+    _BIN_SUFFIX,
+    ".sav",
+    ".p",
+    ".model",
+    ".package",
+    _TAR_SUFFIX,
+    _PLAIN_ZIP_SUFFIX,
+)
+"""Read by content: `pytorch_model.bin` is a torch zip, `model.package` a `torch.package` zip
+and `word2vec.model` a pickle, while a file under one of these names that is neither a zip, a
+tar nor a pickle stream is some other file this rule has nothing to say about, unless it is a
+`.tar` or a `.zip`, which a `tar` command unpacks by its bytes whatever they are."""
+_SOURCE_SUFFIX = ".py"
 _TORCH_TAR_NAMES = (".pth.tar", ".pt.tar")
 """What `torch.save` is told to write as a tar: a model, whatever its first bytes are."""
 _DATA_SUFFIX = ".dat"
@@ -148,8 +157,22 @@ _HEAD_READ_SUFFIXES = (_DATA_SUFFIX, "")
 """Names that say nothing of the format, which `pickle.load` and `torch.load` open all the
 same: such a file counts only when one bounded read of its first bytes shows a pickle, a
 compressed one, an array or an archive holding a model."""
-_COMPRESSED_TAR_ENDINGS = (".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tbz", ".tar.xz", ".txz")
+_COMPRESSED_TAR_ENDINGS = (
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tbz",
+    ".tar.xz",
+    ".txz",
+    ".tar.zst",
+    ".tar.zstd",
+    ".tzst",
+)
 """Names of a tar `tar` decompresses before it extracts the members a person then loads."""
+_ZSTD_SUFFIXES = (".zst", ".zstd")
+_ZSTD_UNREAD = "zstd-compressed file, which this scanner does not decompress; not scanned"
+"""Reported on every Python alike, so the verdict does not depend on which one runs the scan."""
 _COMPRESSED_SUFFIXES = tuple(
     dict.fromkeys(
         f".{end.rsplit('.', 1)[1]}"
@@ -162,6 +185,11 @@ _COMPRESSED_SUFFIXES = tuple(
 """Codec suffixes; a file named by one and nothing that says what it compresses
 (`clf.gz`, which `joblib.dump` writes compressed by that suffix) is read by its first
 bytes, like a file whose name says nothing of its format."""
+_ZSTD_INNER_SUFFIXES = frozenset(
+    {*_HEAD_READ_SUFFIXES, _PLAIN_ZIP_SUFFIX, _TAR_SUFFIX, *_COMPRESSED_SUFFIXES}
+)
+"""What a name before `.zst` may end in for the file to be read: nothing that says its format,
+an archive, or a codec."""
 _UNREAD_MODEL_SUFFIXES = frozenset(
     {
         ".gguf",
@@ -1622,6 +1650,26 @@ def _pickle_named(member: str) -> bool:
     return _model_named(member) and _member_suffix(member) not in _SNIFFED_SUFFIXES
 
 
+def _read_as_text(member: str) -> bool:
+    """Whether a zip member is a record its loaders read as text and never unpickle.
+
+    `PackageImporter` reads `.data/extern_modules` as module names and imports a `.py` record
+    as source, which `_shipped` reports inside a package root; TorchScript compiles `code/*.py`.
+    """
+    return member.endswith(_SOURCE_SUFFIX) or holds_package((member,))
+
+
+def _zstd_may_hold_a_model(name: str) -> bool:
+    """Whether a zstd-named file is named as a model, an archive, a codec, or nothing else.
+
+    zstd is not decompressed here, so the name is all there is: `clf.zst`, `model.pkl.zst` and
+    `bundle.zip.zst`, which `tar` reads as the zip inside, are read by their first bytes, while
+    `data.jsonl.zst` is left alone, as `data.jsonl` is.
+    """
+    inner = name[: name.rfind(".")]
+    return _member_suffix(inner) in _ZSTD_INNER_SUFFIXES or _model_named(inner)
+
+
 def _file_reading(*, by_content: bool) -> _AsPickle:
     """How a file's stream is read for an extension code; see `PickleOpcodeRule._scan`."""
     return _AsPickle.SNIFFED if by_content else _AsPickle.NAMED
@@ -1929,9 +1977,11 @@ class PickleOpcodeRule(ArtifactRule):
 
     Reads opcodes statically, each argument at least as leniently as CPython's unpickler
     reads it; never unpickles anything. Unzips
-    ZIP-based model archives (modern `torch.save`, NumPy `.npz`) and scans every member
-    regardless of extension, so a payload hidden under a non-`.pkl` name cannot
-    slip past; a zip whose readers would disagree on its members is not read. A plain
+    ZIP-based model archives (modern `torch.save`, a `.package`, NumPy `.npz`) and scans every
+    member regardless of extension, so a payload hidden under a non-`.pkl` name cannot
+    slip past; a `.py` or `.data/extern_modules` record, which loaders read as text, only
+    when it starts with an NPY header or a pickle `PROTO` opcode. A zip whose readers would
+    disagree on its members is not read. A plain
     `.zip`, and any file `tarfile` opens as a tar whatever it is named,
     as `torch.load` opens a legacy `torch.save` file, has the members a loader would
     unpickle read, by their names, without extracting anything to disk; a tar is also read
@@ -1939,7 +1989,9 @@ class PickleOpcodeRule(ArtifactRule):
     `storages` and `tensors` members as torch reads them, pickles between raw bytes. A
     compressed tar (`.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, or a `.tar` or a file named only
     by a codec whose bytes decompress to a tar) is decompressed in memory, up to a bound that
-    grows with its size, and its members are read as `tar` extracts them. A
+    grows with its size, and its members are read as `tar` extracts them. zstd is never
+    decompressed: a file named as a zstd tar, or read by its first bytes, that holds zstd
+    data is unverified on every Python. A
     NumPy array file is a pickle when its header declares a dtype that holds Python
     objects; its header is parsed as a literal, and a numeric array is not a pickle. A
     file or member joblib would decompress by its first bytes is decompressed first.
@@ -2070,7 +2122,7 @@ class PickleOpcodeRule(ArtifactRule):
             report = _FileReport(path, ctx, compressed_tar=True)
             if (yield from self._scan(report, by_content=True)):
                 ctx.examined(path)
-        else:
+        elif not name.endswith(_ZSTD_SUFFIXES) or _zstd_may_hold_a_model(name):
             yield from self._scan_head_read(path, ctx)
 
     def _scan_head_read(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
@@ -2431,9 +2483,14 @@ class PickleOpcodeRule(ArtifactRule):
         if magic.startswith(NPY_MAGIC):
             self._scan_npy(report)
             return True
+        # `tar` decompresses zstd by its bytes whatever the file is named, and so may a
+        # loader's caller; the other readings still run, since `tarfile` tries a plain tar first.
+        zstd = codec_first(magic) == "zstd"
+        if zstd:
+            report.unscanned(_ZSTD_UNREAD)
         as_tar = _opens_as_tar(magic) and self._scan_tar(report)
         as_tar = self._read_head_compressed_tar(report, data, cut=cut) or as_tar
-        return self._read_head_stream(report, data, cut=cut) or as_tar
+        return self._read_head_stream(report, data, cut=cut) or as_tar or zstd
 
     def _read_head_stream(self, report: _FileReport, head: bytes, *, cut: bool) -> bool:
         """Judge a file's `head` as a pickle stream, compressed or not, and read on if it is one.
@@ -2796,12 +2853,19 @@ class PickleOpcodeRule(ArtifactRule):
 
         A plain zip has its members named as models read, and the others peeked at for an
         NPY or pickle start; each peek reads a local header and a first block, so peeks are
-        bounded by count and by those bytes.
+        bounded by count and by those bytes. Any other zip has every member read except a
+        text record (`_read_as_text`) that does not start as an array or a pickle.
         """
         chosen: list[zipfile.ZipInfo] = []
         peeks = peeked_bytes = unpeeked = 0
         for info in members:
-            if every_member or any(_model_named(name) for name in _zip_names(info)):
+            names = _zip_names(info)
+            if every_member:
+                text = all(_read_as_text(name) for name in names)
+                if not text or _starts_as_array_or_pickle(archive, info):
+                    chosen.append(info)
+                continue
+            if any(_model_named(name) for name in names):
                 chosen.append(info)
                 continue
             cost = (

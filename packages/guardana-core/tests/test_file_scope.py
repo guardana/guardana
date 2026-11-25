@@ -234,16 +234,32 @@ def test_a_tokenizer_keeps_its_named_chat_templates_without_weights(tmp_path: Pa
 
 
 def test_an_archive_or_compressed_file_is_kept_whatever_it_is_named(tmp_path: Path) -> None:
-    for name in ("weights.tar.gz", "release.tgz", "bundle.zip", "data.tar", "clf.gz", "a.xz"):
+    names = (
+        "weights.tar.gz",
+        "release.tgz",
+        "bundle.zip",
+        "data.tar",
+        "clf.gz",
+        "a.xz",
+        "model.tar.zst",
+        "b.TZST",
+        "c.zstd",
+        "model.package",
+    )
+    for name in names:
         (tmp_path / name).write_bytes(b"x")
     (tmp_path / "notes.txt").write_text("x")
     (tmp_path / ".guardanaignore").write_text("*\n")
 
     assert _kept(tmp_path) == [
         "a.xz",
+        "b.TZST",
         "bundle.zip",
+        "c.zstd",
         "clf.gz",
         "data.tar",
+        "model.package",
+        "model.tar.zst",
         "release.tgz",
         "weights.tar.gz",
     ]

@@ -102,6 +102,11 @@ _HOSTILE_SUFFIXES = (
     ".tbz",
     ".tar.xz",
     ".txz",
+    ".package",
+    ".tar.zst",
+    ".tzst",
+    ".pkl.zst",
+    ".zip.zstd",
 )
 """Every extension a built-in artifact rule opens and reads the contents of.
 
@@ -132,6 +137,7 @@ _MAGICS = (
     b"BZh9",
     b"\xfd7zXZ\x00",
     b"\x5d\x00\x00\x80\x00",  # lzma
+    b"\x28\xb5\x2f\xfd",  # zstd
     b"ZF0x40               ",  # joblib's legacy zlib header
 )
 
