@@ -30,7 +30,10 @@ _CLEAN = b"\x80\x02K\x00."
 _TEXT = b"hello world\n" * 20
 _WALKED = "so a tool that unpacks it by walking it may unpack members otherwise than listed"
 _DESCRIBED = 0x08
+_PPMD = 98
+"""A compression method no supported Python's `zipfile` decodes."""
 _ZSTD = 93
+"""zstd, which `zipfile` decodes from Python 3.14 on."""
 _UNSET = 0xFFFFFFFF
 
 
@@ -345,11 +348,11 @@ _UNPACKED_OTHERWISE = [
         "is encrypted or uses compression other than",
     ),
     (
-        _walked_zip(_Member(b"readme.txt", _TEXT, method=_ZSTD, flags=_DESCRIBED)),
+        _walked_zip(_Member(b"readme.txt", _TEXT, method=_PPMD, flags=_DESCRIBED)),
         "is encrypted or uses compression other than",
     ),
     (
-        _walked_zip(_Member(b"readme.txt", _TEXT + _HIDDEN, method=_ZSTD)),
+        _walked_zip(_Member(b"readme.txt", _TEXT + _HIDDEN, method=_PPMD)),
         "is encrypted or uses compression other than",
     ),
     (
@@ -1021,3 +1024,26 @@ def test_a_harmful_pickle_in_a_piped_zip_is_found(tmp_path: Path, method: int) -
     assert [f.severity for f in findings] == [Severity.CRITICAL], findings
     assert "os.system" in findings[0].evidence.summary
     assert ctx.shortfalls() == ()
+
+
+def _zstd_frame(data: bytes) -> bytes:
+    """A zstd frame holding `data`, 256 to 65,791 bytes, as one raw block."""
+    header = b"\x28\xb5\x2f\xfd\x60" + (len(data) - 256).to_bytes(2, "little")
+    return header + (1 | len(data) << 3).to_bytes(3, "little") + data
+
+
+@pytest.mark.parametrize(
+    ("name", "member"),
+    [("bundle.zip", b"weights"), ("bundle.zip", b"model.pkl"), ("model.pt", b"archive/data.pkl")],
+)
+def test_a_zstd_member_is_not_scanned_on_any_python(
+    tmp_path: Path, name: str, member: bytes
+) -> None:
+    """Read on Python 3.14 and not before, it would make the verdict the runner's."""
+    content = _SYSTEM + bytes(256)
+    archive = _walked_zip(_Member(member, _zstd_frame(content), content=content, method=_ZSTD))
+
+    summaries, _ctx, _path = _summaries(tmp_path, name, archive)
+
+    assert any("is zstd-compressed" in summary for summary in summaries), summaries
+    assert not any("os.system" in summary for summary in summaries), summaries

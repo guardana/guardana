@@ -1,6 +1,8 @@
 import json
 import os
+import struct
 import zipfile
+import zlib
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -131,6 +133,33 @@ def test_an_unreadable_keras_archive_is_reported_as_unscanned(tmp_path: Path) ->
     findings = _findings(tmp_path)
     assert [severity for severity, _ in findings] == ["LOW"]
     assert "not scanned" in findings[0][1]
+    assert _unread(tmp_path) == [str(tmp_path / "model.keras")]
+
+
+def _zstd_member_zip(name: str, content: bytes) -> bytes:
+    """A zip whose one member is zstd-compressed (method 93); `content` is 256 to 65,791 bytes."""
+    header = b"\x28\xb5\x2f\xfd\x60" + (len(content) - 256).to_bytes(2, "little")
+    data = header + (1 | len(content) << 3).to_bytes(3, "little") + content
+    raw, crc, sizes = name.encode(), zlib.crc32(content), (len(data), len(content))
+    local = struct.pack("<4s5H3L2H", b"PK\x03\x04", 63, 0, 93, 0, 0x21, crc, *sizes, len(raw), 0)
+    zeros = (0,) * 6
+    central = struct.pack(
+        "<4s6H3L5H2L", b"PK\x01\x02", 63, 63, 0, 93, 0, 0x21, crc, *sizes, len(raw), *zeros
+    )
+    entries = local + raw + data
+    directory = central + raw
+    end = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 1, 1, len(directory), len(entries), 0)
+    return entries + directory + end
+
+
+def test_a_zstd_compressed_config_is_unscanned_on_every_python(tmp_path: Path) -> None:
+    """Read on Python 3.14 and not before, it would make the verdict the runner's."""
+    config = json.dumps({"class_name": "Sequential", "config": {"layers": []}}).ljust(300)
+    (tmp_path / "model.keras").write_bytes(_zstd_member_zip("config.json", config.encode()))
+
+    findings = _findings(tmp_path)
+
+    assert [severity for severity, _ in findings] == ["LOW"]
     assert _unread(tmp_path) == [str(tmp_path / "model.keras")]
 
 

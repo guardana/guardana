@@ -436,7 +436,10 @@ stream, a described member's stream decoding to other bytes than its entry decla
 stops at the declared size, a streaming reader writes every byte), a decoding failure, or encryption, another compression method or an LZMA stream without
 an end marker, which the scanner cannot decode to find an end, is a coverage shortfall. So is exceeding the decompression bound (32 bytes for each byte of the file, and at
 least 64 MiB) or matching more than 100,000 data descriptor signatures while finding the ends.
-Zips named as models are read by their central directory. For `.zip`, `.tar`, `.tar.gz`,
+Zips named as models are read by their central directory. A zip member compressed with zstd
+(method 93), which `zipfile` decodes from Python 3.14 on, is a coverage shortfall on every Python
+version, so the verdict does not depend on the one that runs the scan; this holds for the Keras
+rule's `config.json` too. For `.zip`, `.tar`, `.tar.gz`,
 `.tgz`, `.tar.bz2`, `.tbz2`, `.tbz`, `.tar.xz`, `.txz`, `.tar.zst`, `.tar.zstd` and `.tzst`, in
 any case, another codec or
 archive format a `tar` command reads, zip data that does not start at the first byte, gzip,

@@ -97,6 +97,7 @@ from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
     ZIP_DIRECTORY_MAX_BYTES,
     ZIP_ERRORS,
+    ZSTD_METHOD,
     declared_directory_start,
     member_disagreement,
     unpacking_disagreement,
@@ -1835,7 +1836,10 @@ def _starts_as_array_or_pickle(archive: zipfile.ZipFile, info: zipfile.ZipInfo) 
     `np.load` reads any key of a zip it opens as `.npz`, whatever the member is named. A
     damaged member counts, so the failure to read it is reported; an encrypted one or one
     in a method `zipfile` lacks does not, since no loader that uses it can read it either.
+    A zstd member counts unopened: `zipfile` decodes it on some Pythons and not others.
     """
+    if info.compress_type == ZSTD_METHOD:
+        return True
     try:
         with archive.open(info) as member:
             head = member.read(len(NPY_MAGIC))
@@ -3014,6 +3018,12 @@ class PickleOpcodeRule(ArtifactRule):
     ) -> bool:
         """Scan one member and return whether the archive's opcode budget ran out in it."""
         name = info.orig_filename
+        if info.compress_type == ZSTD_METHOD:
+            report.unscanned(
+                f"zip member {name} is zstd-compressed, which this scanner does not "
+                "decompress; not scanned"
+            )
+            return False
         try:
             with archive.open(info) as member:
                 raw = member.read(_MEMBER_MAX_BYTES + 1)  # +1 byte reveals a cut member

@@ -427,7 +427,9 @@ with no suffix, by a codec alone (<code>bundle.zst</code>), or as a model, an ar
 file followed by <code>.zst</code> or <code>.zstd</code> (<code>model.pkl.zst</code>, <code>bundle.zip.zst</code>, <code>weights.tgz.zst</code>).
 Any other <code>.zst</code> or <code>.zstd</code> file (<code>data.jsonl.zst</code>) is left alone, and so
 is one under a name the rule reads by content (<code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code>, <code>.package</code>),
-which no model loader decompresses. Decompress such a file with the tool you use and scan
+which no model loader decompresses. A zip member compressed with zstd (method 93), which
+Python's <code>zipfile</code> decodes from 3.14 on, is reported unread the same way on every Python.
+Decompress such a file with the tool you use and scan
 the result.</p>
 <h3 id="a-torchpackage-saved-under-another-name-is-not-opened">A <code>torch.package</code> saved under another name is not opened</h3>
 <p><code>PackageImporter</code> opens a package zip under any name. <code>pickle_opcode</code> opens one saved as

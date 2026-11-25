@@ -48,6 +48,10 @@ ZIP_ERRORS = (
 """What `zipfile` raises for a crafted archive or member: a damaged stream, a name that is
 not in its declared encoding, an encrypted or unsupported member."""
 
+ZSTD_METHOD = 93
+"""Zip's zstd method, which `zipfile` decodes from Python 3.14 on. No reader here opens such a
+member on any Python, so a verdict never depends on the one that runs the scan."""
+
 _END = struct.Struct("<4s4H2LH")
 _END_SIGNATURE = b"PK\x05\x06"
 _LOCATOR = struct.Struct("<4sLQL")

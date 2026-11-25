@@ -41,6 +41,7 @@ from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
     ZIP_DIRECTORY_MAX_BYTES,
     ZIP_ERRORS,
+    ZSTD_METHOD,
     listing_refusal,
 )
 from guardana.rules.supply_chain.saved_model_ops import SavedModelOpsRule, names_a_file_elsewhere
@@ -980,6 +981,8 @@ def _read_keras_config(handle: BinaryIO) -> object:
     try:
         with zipfile.ZipFile(handle) as archive:
             if "config.json" not in archive.namelist():
+                return _UNREADABLE
+            if archive.getinfo("config.json").compress_type == ZSTD_METHOD:
                 return _UNREADABLE
             with archive.open("config.json") as member:
                 raw = member.read(_MAX_CONFIG_BYTES + 1)

@@ -217,7 +217,9 @@ with no suffix, by a codec alone (`bundle.zst`), or as a model, an archive or a 
 file followed by `.zst` or `.zstd` (`model.pkl.zst`, `bundle.zip.zst`, `weights.tgz.zst`).
 Any other `.zst` or `.zstd` file (`data.jsonl.zst`) is left alone, and so
 is one under a name the rule reads by content (`.bin`, `.sav`, `.p`, `.model`, `.package`),
-which no model loader decompresses. Decompress such a file with the tool you use and scan
+which no model loader decompresses. A zip member compressed with zstd (method 93), which
+Python's `zipfile` decodes from 3.14 on, is reported unread the same way on every Python.
+Decompress such a file with the tool you use and scan
 the result.
 
 ### A `torch.package` saved under another name is not opened
