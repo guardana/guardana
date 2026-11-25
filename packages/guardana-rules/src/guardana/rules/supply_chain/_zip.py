@@ -641,21 +641,21 @@ class _Decoder(Protocol):
     @property
     def eof(self) -> bool:
         """Whether the stream's end has been reached."""
-        ...
+        raise NotImplementedError
 
     @property
     def needs_input(self) -> bool:
         """Whether decoding further needs more input."""
-        ...
+        raise NotImplementedError
 
     @property
     def unused_data(self) -> bytes:
         """The input found after the stream's end."""
-        ...
+        raise NotImplementedError
 
     def decompress(self, data: bytes, max_length: int = -1) -> bytes:
         """Decode `data` after what is buffered, returning at most `max_length` bytes."""
-        ...
+        raise NotImplementedError
 
 
 def _stream_ending(
