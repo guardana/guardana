@@ -25,7 +25,7 @@ def repo_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_a_python_file_inside_the_repo_is_returned(repo_file: Path) -> None:
-    payload = {"tool_input": {"file_path": str(repo_file)}}
+    payload: dict[str, object] = {"tool_input": {"file_path": str(repo_file)}}
     assert ruff_on_edit._edited_python_file(payload) == repo_file.resolve()
 
 
@@ -51,7 +51,7 @@ def test_a_missing_file_returns_none(repo_file: Path) -> None:
 def test_the_response_path_wins_over_the_input_path(repo_file: Path) -> None:
     other = repo_file.with_name("other.py")
     other.write_text("z = 3\n", encoding="utf-8")
-    payload = {
+    payload: dict[str, object] = {
         "tool_input": {"file_path": str(repo_file)},
         "tool_response": {"filePath": str(other)},
     }
@@ -59,19 +59,19 @@ def test_the_response_path_wins_over_the_input_path(repo_file: Path) -> None:
 
 
 def test_an_unusable_response_path_falls_back_to_the_input_path(repo_file: Path) -> None:
-    payload = {
+    payload: dict[str, object] = {
         "tool_input": {"file_path": str(repo_file)},
         "tool_response": {"filePath": str(repo_file.with_name("gone.py"))},
     }
     assert ruff_on_edit._edited_python_file(payload) == repo_file.resolve()
 
 
-def _record_ruff_calls(monkeypatch: pytest.MonkeyPatch) -> list[object]:
-    calls: list[object] = []
+def _record_ruff_calls(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    calls: list[list[str]] = []
 
-    def _run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        calls.append(args)
-        return subprocess.CompletedProcess([], 0)
+    def _run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(subprocess, "run", _run)
     return calls
@@ -103,4 +103,23 @@ def test_a_valid_payload_runs_check_then_format(
     payload = {"tool_input": {"file_path": str(repo_file)}}
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
     assert ruff_on_edit.main() == 0
-    assert len(calls) == 2
+    path = str(repo_file.resolve())
+    assert calls == [
+        ["uv", "run", "ruff", "check", "--fix", "--quiet", path],
+        ["uv", "run", "ruff", "format", "--quiet", path],
+    ]
+
+
+@pytest.mark.parametrize(
+    "error", [OSError("uv not found"), subprocess.TimeoutExpired(["uv"], 30)]
+)
+def test_a_failing_ruff_run_never_blocks_the_edit(
+    repo_file: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    def _run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise error
+
+    monkeypatch.setattr(subprocess, "run", _run)
+    payload = {"tool_input": {"file_path": str(repo_file)}}
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+    assert ruff_on_edit.main() == 0
