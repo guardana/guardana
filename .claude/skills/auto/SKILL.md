@@ -27,7 +27,7 @@ An idea with unmet start conditions is not a task, and an unmeasured criterion i
    long, the work file alone must let a fresh session continue.
 4. **Review loop, bounded.** `/review` → fix findings → gate → re-review ONLY the fixes. At most
    three rounds; what is still open after that goes into the report, not into a fourth round.
-5. **Commit, do not push** — `/ship` § 1 exactly (explicit paths, one commit per logical change,
+5. **Commit, do not push** — `/land` § 1 exactly (explicit paths, one commit per logical change,
    no attribution, the five documentation places, the work file closed). The push — a site
    deploy — stays with the user unless they said "and push" in the task; a tag never happens
    here. `Closes #N` only when every acceptance box is ticked with evidence, else `Refs #N`.
