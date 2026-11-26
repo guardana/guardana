@@ -305,7 +305,12 @@ and in CI. A format name (`tflite`) is not a path and stays as it is.
 | `.tflite`, `.mar`, `.nemo`, `.llamafile`, a `.bin` that starts like GGUF or GGML | no built-in rule |
 
 A `.bin`, `.sav`, `.p`, `.model` or `.dat`, or a file with no suffix, whose first bytes match
-none of those is not listed as a model. A `.dat`, a file with no suffix or a file named only by
+none of those is not listed as a model.
+For these suffixes and files with no suffix, a protocol 2 to 5 `PROTO` header is enough to list
+the file as a pickle model component. `pickle_opcode` counts the component as examined once it
+reads the file, even if every unpickler rejects the byte immediately after the header as an
+invalid opcode.
+A `.dat`, a file with no suffix or a file named only by
 a codec costs `pickle_opcode` one read of its first 64 KiB, and a file with no suffix the same one read for
 `keras_lambda`: a pickle, a compressed pickle, an NPY array or an archive holding a model is
 read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among

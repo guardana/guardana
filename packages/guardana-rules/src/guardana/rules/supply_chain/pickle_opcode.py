@@ -1956,6 +1956,18 @@ class _FileReport:
     compressed_tar: bool = False
     """Whether the file is named as a compressed tar, which a person extracts with `tar`."""
 
+    magic: bytes = b""
+    """The first bytes of the file, as the read that judged it saw them."""
+
+    @property
+    def headed(self) -> bool:
+        """Whether the file opens with the PROTO opcode of a pickle of protocol 2 to 5.
+
+        The inventory counts such a file as a pickle, and this rule judges it as one: a file
+        every unpickler refuses is examined and found to hold nothing a load runs.
+        """
+        return self.magic.startswith(_PICKLE_HEADERS)
+
     @property
     def numpy(self) -> bool:
         """Whether the file is named as a NumPy array file, which `np.load` reads."""
@@ -2133,8 +2145,10 @@ class PickleOpcodeRule(ArtifactRule):
             if path.name.lower().endswith(_TORCH_TAR_NAMES):
                 yield from self._scan(_FileReport(path, ctx))
                 ctx.examined(path)
-            elif (yield from self._scan(_FileReport(path, ctx), by_content=True)):
-                ctx.examined(path)
+            else:
+                report = _FileReport(path, ctx)
+                if (yield from self._scan(report, by_content=True)) or report.headed:
+                    ctx.examined(path)
         for path in target.iter_files(_COMPRESSED_SUFFIXES):
             yield from self._scan_compressed_name(path, ctx)
         for path in target.iter_files(_HEAD_READ_SUFFIXES):
@@ -2173,7 +2187,8 @@ class PickleOpcodeRule(ArtifactRule):
 
     def _scan_head_read(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         """Scan a file whose name says nothing of its format; count it when it held a model."""
-        if (yield from self._scan(_FileReport(path, ctx, head_only=True), by_content=True)):
+        report = _FileReport(path, ctx, head_only=True)
+        if (yield from self._scan(report, by_content=True)) or report.headed:
             ctx.examined(path)
 
     def _scan(
@@ -2215,7 +2230,7 @@ class PickleOpcodeRule(ArtifactRule):
             if maybe_a_model:
                 report.unscanned(_UNREADABLE)
             return maybe_a_model
-        magic = sniffed[0]
+        magic = report.magic = sniffed[0]
         # A `.bin` or `.model` is named as a model although it is read by content; a plain
         # `.zip` or `.tar` names no model, so a pointer under that name is left alone.
         named_as_model = not by_content or report.path.suffix.lower() in _SNIFFED_SUFFIXES
@@ -2538,7 +2553,7 @@ class PickleOpcodeRule(ArtifactRule):
         if head is None:
             return False
         data, cut = head
-        magic = data[:_MAGIC_SNIFF_BYTES]
+        magic = report.magic = data[:_MAGIC_SNIFF_BYTES]
         if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
             as_zip = self._scan_zip(report)
             return (_opens_as_tar(magic) and self._scan_tar(report)) or as_zip
