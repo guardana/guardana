@@ -439,7 +439,11 @@ least 64 MiB) or matching more than 100,000 data descriptor signatures while fin
 Zips named as models are read by their central directory. A zip member compressed with zstd
 (method 93), which `zipfile` decodes from Python 3.14 on, is a coverage shortfall on every Python
 version, so the verdict does not depend on the one that runs the scan; this holds for the Keras
-rule's `config.json` too. For `.zip`, `.tar`, `.tar.gz`,
+rule's `config.json` too.
+When central-directory entries of a zip share a local header, `pickle_opcode` reports them as
+unread without opening them and reads the other entries. This coverage shortfall does not depend
+on the Python version.
+For `.zip`, `.tar`, `.tar.gz`,
 `.tgz`, `.tar.bz2`, `.tbz2`, `.tbz`, `.tar.xz`, `.txz`, `.tar.zst`, `.tar.zstd` and `.tzst`, in
 any case, another codec or
 archive format a `tar` command reads, zip data that does not start at the first byte, gzip,
