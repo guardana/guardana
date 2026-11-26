@@ -13,7 +13,6 @@ and opinions belong in a rule a profile can exclude and a taxonomy can answer fo
 
 import base64
 import json
-import re
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
@@ -62,11 +61,6 @@ from guardana.core.target.endpoint import EndpointUnreachable, close_http_error
 from guardana.core.usage import UsageMeter
 
 _CLIENT = {"name": "guardana", "version": "0"}
-# The lookbehind lets a parameter start only at a word boundary, so a long run of word
-# characters with no `="..."` after it is scanned once, not re-scanned from every position;
-# the possessive quantifiers keep each attempt from backtracking. A probed server sets this
-# header, so its length is not ours to trust.
-_CHALLENGE_PARAM = re.compile(r'(?<!\w)(\w++)\s*+=\s*+"([^"]*+)"')
 _SESSION_SAMPLES = 3
 _HTTP_ERROR = 400
 _BAD_REQUEST = 400
@@ -1260,10 +1254,48 @@ def scopes_in(document: Mapping[str, object] | None) -> tuple[str, ...]:
 
 
 def challenge_parameters(challenge: str | None) -> dict[str, str]:
-    """Read the quoted parameters out of a `WWW-Authenticate` header."""
+    """Read the quoted parameters out of a `WWW-Authenticate` header.
+
+    A parameter is a word, `=` and a quoted value, with optional white space around the
+    `=`; a later one replaces an earlier one of the same name. One forward pass, since a
+    probed server writes this header.
+    """
+    params: dict[str, str] = {}
     if not challenge:
-        return {}
-    return {name.lower(): value for name, value in _CHALLENGE_PARAM.findall(challenge)}
+        return params
+    end = len(challenge)
+    at = 0
+    while at < end:
+        if not _word_character(challenge[at]):
+            at += 1
+            continue
+        name_end = at + 1
+        while name_end < end and _word_character(challenge[name_end]):
+            name_end += 1
+        quote = _skip_space(challenge, name_end)
+        if quote < end and challenge[quote] == "=":
+            quote = _skip_space(challenge, quote + 1)
+            if quote < end and challenge[quote] == '"':
+                close = challenge.find('"', quote + 1)
+                if close < 0:
+                    break
+                params[challenge[at:name_end].lower()] = challenge[quote + 1 : close]
+                at = close + 1
+                continue
+        at = name_end
+    return params
+
+
+def _word_character(character: str) -> bool:
+    """Whether `character` is a word character as `re` reads one: alphanumeric or `_`."""
+    return character.isalnum() or character == "_"
+
+
+def _skip_space(text: str, at: int) -> int:
+    """Return the first position from `at` that is not white space."""
+    while at < len(text) and text[at].isspace():
+        at += 1
+    return at
 
 
 def _issuers(resource: Document | None) -> tuple[str, ...]:
