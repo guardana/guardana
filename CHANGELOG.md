@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Update collector, development and workflow dependencies without changing package behaviour.** In `uv.lock` and the collector image's `deploy/docker/collector-requirements.txt`, regenerated from `uv.lock`, `fastapi` moves from `0.162.5` to `0.165.0` and `pydantic` from `2.14.3` to `2.14.4` (`pydantic-core` from `2.50.4` to `2.50.5`). `guardana-server` now requires `fastapi>=0.165.0` and `pydantic>=2.14.4`. Development-only updates are the test dependency `a2a-sdk[http-server]` to `1.3.1`, `import-linter` to `2.17` and `types-pyyaml` to `6.0.12.20261122`. Workflows and the composite action in `action.yml` use `astral-sh/setup-uv` `v10.4.0`, and the Scorecard workflow uses `ossf/scorecard-action` `v2.6.0`; the composite action's inputs are unchanged. No package is added to or removed from `uv.lock`. These updates came from Dependabot pull requests #367, #384, #385, #386, #388, #389 and #390. `typer` stays at `0.27.3`: `0.29` requires `pydantic`, which would add five packages to every `guardana-cli` install and to the CLI image, so #387 stays open. Gate impact: none.
 
+### Fixed
+
+- **Report zip entries that share a local header as unverified (#347).** A model zip with duplicate references to a local header could exit `0` without a finding and print `UserWarning: Overlapped entries: ... (possible zip bomb)` to stderr on CPython 3.12 and later. On 3.11, it exited `2` with an unread-member result. On 3.12, `-W error` kept the rule from running. The rule now reports the affected entries as unread without opening them on CPython 3.11 through 3.14. It reads the other entries, emits no overlap warning, and runs under `-W error`. The existing walk-check result for `bundle.zip` and the refusal of members whose sizes extend into the next local header still apply. Gate impact: A zip named as a model that exited `0` on CPython 3.12 or later because of this overlap now exits `2`.
+
 ## [1.4.1] - 2026-11-25 — the eighth patch release
 
 ### Fixed

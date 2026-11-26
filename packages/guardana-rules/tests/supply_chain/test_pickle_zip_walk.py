@@ -625,14 +625,51 @@ def test_a_zip_a_streaming_reader_unpacks_otherwise_is_unscanned(
     assert reason in refusals[0], refusals
 
 
-@pytest.mark.filterwarnings("ignore:Overlapped entries")
+_SHARED = "entries that point to a local header another entry points to"
+
+
 def test_two_entries_of_one_local_header_are_unscanned(tmp_path: Path) -> None:
     content = _walked_zip(_Member(b"notes.txt", _TEXT), _Member(b"notes.txt", _TEXT, offset=0))
 
     refusals = _walk_refusals(tmp_path, "bundle.zip", content)
+    summaries, _ctx, _path = _summaries(tmp_path, "bundle.zip", content)
 
     assert len(refusals) == 1, refusals
     assert "overlaps the member before it" in refusals[0], refusals
+    assert [summary for summary in summaries if _SHARED in summary], summaries
+
+
+@pytest.mark.parametrize("name", ["model.pt", "arrays.npz", "bundle.zip"])
+def test_entries_sharing_a_local_header_are_unscanned_on_every_python(
+    tmp_path: Path, name: str
+) -> None:
+    """Python 3.11's `zipfile` refuses such an entry and later ones read it with a warning."""
+    content = _walked_zip(
+        _Member(b"archive/data.pkl", _CLEAN),
+        _Member(b"archive/data.pkl", _CLEAN, offset=0),
+        _Member(b"archive/version", b"3\n"),
+    )
+
+    summaries, ctx, path = _summaries(tmp_path, name, content)
+
+    assert [summary for summary in summaries if _SHARED in summary], summaries
+    assert str(path) in ctx.examined_paths()
+
+
+@pytest.mark.parametrize("name", ["model.pt", "arrays.npz", "bundle.zip"])
+def test_a_member_whose_sizes_run_into_the_next_local_header_is_unscanned(
+    tmp_path: Path, name: str
+) -> None:
+    size = len(_SYSTEM) + 8
+    content = _walked_zip(
+        _Member(b"archive/data.pkl", _SYSTEM, declared=(size, size)),
+        _Member(b"archive/version", b"3\n"),
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, name, content)
+
+    assert [summary for summary in summaries if "data.pkl" in summary], summaries
+    assert not any("non-allowlisted" in summary for summary in summaries), summaries
 
 
 @pytest.mark.parametrize("name", ["bundle.zip", "bundle", "bundle.tar", "bundle.tar.gz"])

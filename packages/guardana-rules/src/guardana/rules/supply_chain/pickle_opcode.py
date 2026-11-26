@@ -1830,6 +1830,27 @@ def _unicode_paths(info: zipfile.ZipInfo) -> Iterator[str]:
                 raise zipfile.BadZipFile("Info-ZIP Unicode Path is not UTF-8") from error
 
 
+def _apart_from_shared_headers(
+    report: "_FileReport", members: list[zipfile.ZipInfo]
+) -> list[zipfile.ZipInfo]:
+    """Report the entries that point to a local header another entry points to; return the rest.
+
+    `zipfile` refuses to open such an entry on some Python versions and opens it with a warning
+    on others, so the entries are reported unread on every version and never opened.
+    """
+    at_offset = collections.Counter(info.header_offset for info in members)
+    shared = [info.orig_filename for info in members if at_offset[info.header_offset] > 1]
+    if not shared:
+        return members
+    listed = ", ".join(dict.fromkeys(shared[:_UNREAD_MODELS_LISTED]))
+    report.unscanned(
+        f"zip lists {len(shared)} entries that point to a local header another entry points to "
+        f"({listed}), which `zipfile` refuses on some Python versions and reads on others; "
+        "not scanned"
+    )
+    return [info for info in members if at_offset[info.header_offset] == 1]
+
+
 def _starts_as_array_or_pickle(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> bool:
     """Whether a member's first bytes are an NPY array or a PROTO opcode of any protocol.
 
@@ -2788,7 +2809,8 @@ class PickleOpcodeRule(ArtifactRule):
             )
             walked = report.plain_zip or report.tar_named
             hidden = walked and self._unpacked_otherwise(report, handle, members, archive, size)
-            chosen, unpeeked = self._choose_zip_members(archive, members, every_member=every_member)
+            apart = _apart_from_shared_headers(report, members)
+            chosen, unpeeked = self._choose_zip_members(archive, apart, every_member=every_member)
             if unpeeked:
                 report.unscanned(
                     f"zip holds {unpeeked} member(s) not named as models whose first bytes "
@@ -2819,6 +2841,7 @@ class PickleOpcodeRule(ArtifactRule):
             or sources
             or through
             or hidden
+            or len(apart) < len(members)
             or bool(chosen)
             or bool(unread)
             or bool(unpeeked)
