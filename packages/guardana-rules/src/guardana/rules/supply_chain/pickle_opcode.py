@@ -367,8 +367,9 @@ _IMPORTS_BY_ARG = frozenset({"GLOBAL", "INST"})
 # no file shows, so what it imports is unknown. It counts only in a stream read as a
 # pickle: three of every 256 random tensor bytes are extension opcodes.
 _EXTENSION_OPS = frozenset({"EXT1", "EXT2", "EXT4"})
-# The C unpickler reaches the list or dict under these items without honouring the
-# MARK fence, so the model does the same rather than stopping where it would not.
+# Both unpicklers refuse these when a MARK lies between the items and the list or dict
+# under them. The model reaches under the MARK and reads on, so it may name an import no
+# load reaches, never fewer.
 _UNFENCED_OPS = frozenset({"APPEND", "SETITEM"})
 _BOOKKEEPING_OPS = frozenset({"PROTO", "FRAME", "MEMOIZE", "PUT", "BINPUT", "LONG_BINPUT", "STOP"})
 _BINARY_INT_OPS = frozenset({"BININT", "BININT1", "BININT2", "LONG1", "LONG4"})
