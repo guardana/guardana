@@ -436,18 +436,36 @@ def test_an_allowlisted_inst_is_clean(tmp_path: Path) -> None:
     assert list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
 
 
-def test_an_append_to_a_list_under_a_mark_is_followed_as_the_c_unpickler_does(
-    tmp_path: Path,
-) -> None:
-    """The C unpickler's APPEND reaches under the MARK, so the MARK stays and fences
-    nothing the model could mistake for a refusal."""
-    stream = b"\x80\x02](Na" + _s("os") + _s("system") + b"\x93" + _REDUCE_ID
+@pytest.mark.parametrize(
+    "fill",
+    [b"](Na", b"](K\x01a", b"}(K\x01K\x02s"],
+    ids=["append-none", "append", "setitem"],
+)
+def test_an_import_past_a_fill_across_a_mark_is_still_named(tmp_path: Path, fill: bytes) -> None:
+    """Both unpicklers refuse APPEND or SETITEM across a MARK; the model reads on.
+
+    So it names an import a load would never reach, which is never fewer than a load runs.
+    """
+    stream = b"\x80\x02" + fill + _s("os") + _s("system") + b"\x93" + _REDUCE_ID
     (tmp_path / "model.pkl").write_bytes(stream)
 
     findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
 
     assert [f.severity.name for f in findings] == ["CRITICAL"]
     assert findings[0].evidence.summary.endswith(": os.system")
+
+
+@pytest.mark.parametrize("stream", [b"](K\x01a.", b"}(K\x01K\x02s."], ids=["append", "setitem"])
+def test_a_fill_across_a_mark_names_nothing_and_is_not_cleared(
+    tmp_path: Path, stream: bytes
+) -> None:
+    """Every unpickler refuses these bytes; nothing is imported, and nothing passes as clean."""
+    (tmp_path / "model.pkl").write_bytes(stream)
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert _scan_opcodes(stream).refs == []
+    assert [f.title for f in findings] == ["Unscanned model file"]
 
 
 @pytest.mark.parametrize(
