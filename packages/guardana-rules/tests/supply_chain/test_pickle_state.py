@@ -15,6 +15,7 @@ import io
 import lzma
 import pickle
 import pickletools
+import re
 import struct
 import tarfile
 import zipfile
@@ -27,6 +28,7 @@ from guardana.core.report import ShortfallKind
 from guardana.core.rule import RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain import pickle_opcode
 from guardana.rules.supply_chain._pickle_state import (
     ARRAY_UNREAD,
     DERIVED_CALL,
@@ -1773,6 +1775,62 @@ def test_states_applied_to_one_class_name_it_once_however_many_there_are(
     named = [ref for machine in machines for ref in machine.refs]
     assert len(named) >= 1_000
     assert len({id(ref) for ref in named}) == 1
+
+
+class _CountingPattern:
+    """A compiled pattern that counts the characters it is asked to match."""
+
+    def __init__(self, pattern: re.Pattern[str]) -> None:
+        self.pattern = pattern
+        self.read = 0
+
+    def fullmatch(self, text: str) -> re.Match[str] | None:
+        self.read += len(text)
+        return self.pattern.fullmatch(text)
+
+
+@pytest.mark.parametrize(
+    ("name", "header", "qualname"),
+    [("model.pkl", b"\x80\x04", "a" * 20_000), ("model.bin", b"", "a" * 20_000 + "-")],
+    ids=["a-named-pickle", "a-headerless-bin-naming-no-dotted-callable"],
+)
+def test_a_global_a_memo_repeats_is_judged_and_held_once_however_often(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, header: bytes, qualname: str
+) -> None:
+    """BINGET, BINGET, STACK_GLOBAL, POP names a long global again for six bytes."""
+    machines: list[_PickleMachine] = []
+    step = _PickleMachine.step
+
+    def recording(machine: _PickleMachine, op: pickletools.OpcodeInfo, arg: object) -> None:
+        if not any(seen is machine for seen in machines):
+            machines.append(machine)
+        step(machine, op, arg)
+
+    judged: list[int] = []
+    is_allowed = pickle_opcode._is_allowed
+
+    def counting(module: str, qualname: str) -> bool:
+        judged.append(len(module) + len(qualname))
+        return is_allowed(module, qualname)
+
+    identifier = _CountingPattern(pickle_opcode._IDENTIFIER)
+    monkeypatch.setattr(_PickleMachine, "step", recording)
+    monkeypatch.setattr(pickle_opcode, "_is_allowed", counting)
+    monkeypatch.setattr(pickle_opcode, "_IDENTIFIER", identifier)
+    repeats = 10_000
+    named = b"\x8c\x02os\x94X" + struct.pack("<I", len(qualname)) + qualname.encode()
+    content = header + named + b"\x94\x930" + b"h\x00h\x01\x930" * repeats + b"N."
+
+    findings, unread = _scan(tmp_path, content, name)
+
+    assert findings == ([_critical(f"os.{qualname}")] if header else [])
+    assert unread == []
+    once = len(qualname) + len("os.")
+    assert sum(judged) <= len(machines) * once
+    assert identifier.read <= 8 * once
+    kept = [ref for machine in machines for ref in machine.refs]
+    assert len(kept) > repeats
+    assert len({id(ref) for ref in kept}) <= len(machines)
 
 
 def test_a_reason_a_pickle_repeats_is_held_once_however_often(
