@@ -525,11 +525,6 @@ def _is_allowed(module: str, qualname: str) -> bool:
     return (module, qualname) in _SAFE_GLOBALS
 
 
-def _maybe_dangerous(module: str, qualname: str) -> Iterator[str]:
-    if not _is_allowed(module, qualname):
-        yield f"{module}.{qualname}"
-
-
 def _shipped_ref(record: str) -> str:
     """Name Python source a `torch.package` archive ships, which a load from it may run."""
     return f"{record} (shipped Python source a torch.package load may run)"
@@ -731,6 +726,11 @@ class _PickleMachine:
     returns_legacy_magic: bool = False
     """Whether the last STOP returned the legacy magic number, and nothing was left below it."""
 
+    named: dict[tuple[str, str], tuple[str | None, bool]] = field(default_factory=dict)
+    """Each global it imported: its reference when not allowlisted, and whether its name is a
+    real dotted one. A memo repeats a name for a few bytes, so a repeat costs a lookup, never
+    work or memory that grows with the name."""
+
     stack: list[_Value] = field(default_factory=list)
     marks: list[int] = field(default_factory=list)
     memo: dict[int, _Value] = field(default_factory=dict)
@@ -744,8 +744,8 @@ class _PickleMachine:
             self.stack.append(arg if isinstance(arg, str) else None)
         elif name == "STACK_GLOBAL":
             module, qualname = self._stack_global()
-            self._imports(module, qualname)
-            self.stack.append(Global(module, qualname, _is_allowed(module, qualname)))
+            allowed = self._imports(module, qualname)
+            self.stack.append(Global(module, qualname, allowed))
         elif not (self._step_tracked(name, arg) or self._step_marks_and_memo(name, arg)):
             if name in _IMPORTS_BY_ARG and isinstance(arg, str):
                 module, _, qualname = arg.partition(" ")
@@ -789,11 +789,23 @@ class _PickleMachine:
             return None
         return self.stack[-depth]
 
-    def _imports(self, module: str, qualname: str) -> None:
-        self.refs.extend(_maybe_dangerous(module, qualname))
-        self.imported = self.imported or bool(_IDENTIFIER.fullmatch(f"{module}.{qualname}"))
+    def _imports(self, module: str, qualname: str) -> bool:
+        """Keep an import of `module.qualname`; return whether it is allowlisted."""
+        known = self.named.get((module, qualname))
+        if known is None:
+            name = f"{module}.{qualname}"
+            known = (
+                None if _is_allowed(module, qualname) else name,
+                bool(_IDENTIFIER.fullmatch(name)),
+            )
+            self.named[module, qualname] = known
+        ref, dotted = known
+        if ref is not None:
+            self.refs.append(ref)
+        self.imported = self.imported or dotted
         if self.shape is not None:
             self.shape.named(module, qualname)
+        return ref is None
 
     def _step_marks_and_memo(self, name: str, arg: object) -> bool:
         """Apply an opcode whose declared stack effect is not its whole effect.
@@ -1096,6 +1108,15 @@ def _unproven_pickle(scan: "_OpcodeScan") -> bool:
     )
 
 
+def _names_a_dotted_callable(refs: Iterable[str]) -> bool:
+    """Whether any reference is an import with a real dotted name, each distinct one tested once.
+
+    A memo repeats a reference for a few bytes, so testing every copy would cost its length
+    for each repeat.
+    """
+    return any(_IDENTIFIER.fullmatch(ref) for ref in dict.fromkeys(refs))
+
+
 def _bin_verdict(head: bytes, scan: "_OpcodeScan", *, cut: bool) -> bool | None:
     """Whether a file of no known format is a pickle: True, False, or None to read on.
 
@@ -1109,7 +1130,7 @@ def _bin_verdict(head: bytes, scan: "_OpcodeScan", *, cut: bool) -> bool | None:
     """
     if head.startswith(_PICKLE_HEADERS):
         return scan.end is not ParseEnd.NOT_PICKLE or bool(scan.refs or scan.unproven)
-    if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs) or _unproven_pickle(scan):
+    if _names_a_dotted_callable(scan.refs) or _unproven_pickle(scan):
         return True
     if scan.end is ParseEnd.RAN_OUT and cut:
         return None
@@ -1409,8 +1430,8 @@ def _scan_one(
         one.end = ParseEnd.EXTENSION
         return one
     refs, unproven, stops = machine.kept
-    if (machine.imported and machine.unproven[unproven:]) or any(
-        _IDENTIFIER.fullmatch(ref) for ref in machine.refs[refs:]
+    if (machine.imported and machine.unproven[unproven:]) or _names_a_dotted_callable(
+        machine.refs[refs:]
     ):
         # An import with a real dotted name past the code, or a state it cannot prove safe in
         # a pickle that imports one, is no accident of random bytes, and an unpickler
@@ -1902,7 +1923,7 @@ def _holds_a_pickle(head: bytes, scan: _OpcodeScan, *, cut: bool) -> bool:
     Tensor values can parse as an import with hidden operands, but `torch.load` never
     unpickles a storage, so without a header that is not taken as evidence of a pickle.
     """
-    if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs):
+    if _names_a_dotted_callable(scan.refs):
         return True
     if not head.startswith(_PICKLE_HEADERS):
         return False
