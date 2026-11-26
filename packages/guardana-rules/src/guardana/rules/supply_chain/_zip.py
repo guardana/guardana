@@ -256,12 +256,8 @@ _UNICODE_PATH_FIELD = 0x7075
 _ATTRIBUTES_FIELD = 0x6C78
 _ATTRIBUTES_VERSION, _ATTRIBUTES_INTERNAL, _ATTRIBUTES_EXTERNAL = 0x01, 0x02, 0x04
 _MORE_BITS = 0x80
-_DECODED_METHODS = (
-    zipfile.ZIP_STORED,
-    zipfile.ZIP_DEFLATED,
-    zipfile.ZIP_BZIP2,
-    zipfile.ZIP_LZMA,
-)
+_COMPRESSED_METHODS = (zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA)
+_DECODED_METHODS = (zipfile.ZIP_STORED, *_COMPRESSED_METHODS)
 _LZMA_HEADER = struct.Struct("<2BH")
 """Zip's LZMA header: the encoder's major and minor version, then the size of the properties."""
 _LZMA_PROPERTIES = struct.Struct("<BL")
@@ -366,6 +362,26 @@ def _disagreement(  # noqa: PLR0911 — one return per disagreement named
     ):
         return "has a local header whose sizes or checksum differ from its directory entry"
     return None
+
+
+def decoded_disagreement(handle: IO[bytes], info: zipfile.ZipInfo) -> str | None:
+    """Return how a compressed member's stream decodes otherwise than its entry declares, or not.
+
+    A tool that extracts through the central directory, Info-ZIP `unzip` among them, decodes
+    the stream to its end and writes every byte, at most warning about the CRC-32, while
+    `zipfile` stops at the declared size; so the stream must decode to that size and CRC-32.
+    Decoding stops one chunk past the declared size.
+    """
+    if info.flag_bits & _ENCRYPTED_FLAG or info.compress_type not in _COMPRESSED_METHODS:
+        return None
+    local = _local_header(handle, info)
+    if local is None:
+        return "has no local header where its directory entry points"
+    budget = _WalkBudget(inflated=info.file_size, signatures=0)
+    try:
+        return _decoded_ending(handle, info, local.data_start, budget)
+    except _OverBudgetError:
+        return "has a stream that decodes to more bytes than its directory entry declares"
 
 
 def _attributes_agree(local: _LocalHeader, info: zipfile.ZipInfo) -> bool:
@@ -515,7 +531,7 @@ def _streamed_disagreement(local: _LocalHeader, info: zipfile.ZipInfo) -> str | 
     return None if agree else "has a local header whose sizes differ from its directory entry"
 
 
-def _end_disagreement(  # noqa: PLR0911 — one return per way of finding the end
+def _end_disagreement(
     handle: IO[bytes], info: zipfile.ZipInfo, local: _LocalHeader, budget: _WalkBudget
 ) -> str | None:
     """Return how a streaming reader could end a member's data elsewhere than its entry says."""
@@ -535,6 +551,14 @@ def _end_disagreement(  # noqa: PLR0911 — one return per way of finding the en
         )
     if info.compress_type == zipfile.ZIP_STORED:
         return _stored_end_disagreement(handle, start, size, budget)
+    return _decoded_ending(handle, info, start, budget)
+
+
+def _decoded_ending(
+    handle: IO[bytes], info: zipfile.ZipInfo, start: int, budget: _WalkBudget
+) -> str | None:
+    """Return how a deflate, bzip2 or LZMA member's stream differs from its entry, decoded."""
+    size = info.compress_size
     if info.compress_type == zipfile.ZIP_DEFLATED:
         return _deflate_end_disagreement(handle, info, start, budget)
     if info.compress_type == zipfile.ZIP_BZIP2:
