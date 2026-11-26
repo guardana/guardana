@@ -99,6 +99,7 @@ from guardana.rules.supply_chain._zip import (
     ZIP_ERRORS,
     ZSTD_METHOD,
     declared_directory_start,
+    decoded_disagreement,
     member_disagreement,
     unpacking_disagreement,
 )
@@ -2872,6 +2873,10 @@ class PickleOpcodeRule(ArtifactRule):
                 )
             for info in chosen[:_ARCHIVE_MAX_MEMBERS]:
                 disagreement = member_disagreement(handle, info)
+                if disagreement is None and info.file_size <= _MEMBER_MAX_BYTES:
+                    # A member read whole is decoded once more to its stream's end, which is
+                    # where an extracting tool stops writing it.
+                    disagreement = decoded_disagreement(handle, info)
                 if disagreement is not None:
                     report.unscanned(
                         f"zip member {disagreement} ({info.orig_filename}), so zip readers "

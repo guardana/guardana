@@ -1084,3 +1084,60 @@ def test_a_zstd_member_is_not_scanned_on_any_python(
 
     assert any("is zstd-compressed" in summary for summary in summaries), summaries
     assert not any("os.system" in summary for summary in summaries), summaries
+
+
+_OVERRUN = "has a stream that decodes to more bytes than its directory entry declares"
+
+
+@pytest.mark.parametrize("method", _PIPED_METHODS, ids=["deflate", "bzip2", "lzma"])
+@pytest.mark.parametrize("name", ["bundle.zip", "model.pt", "arrays.npz", "weights.bin"])
+def test_a_member_without_a_descriptor_decoding_past_its_size_is_not_read(
+    tmp_path: Path, method: int, name: str
+) -> None:
+    """An extracting tool writes the whole stream, while `zipfile` stops at the declared size."""
+    archive = _walked_zip(
+        _Member(b"model.pkl", _STREAMED[method](_CLEAN + _SYSTEM), content=_CLEAN, method=method)
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, name, archive)
+
+    assert [summary for summary in summaries if _OVERRUN in summary], summaries
+    assert not any("os.system" in summary for summary in summaries)
+
+
+@pytest.mark.parametrize("method", _PIPED_METHODS, ids=["deflate", "bzip2", "lzma"])
+def test_a_member_decoding_to_its_declared_size_is_read(tmp_path: Path, method: int) -> None:
+    archive = _walked_zip(
+        _Member(b"model.pkl", _STREAMED[method](_SYSTEM), content=_SYSTEM, method=method)
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, "model.pt", archive)
+
+    assert len(summaries) == 1
+    assert "os.system" in summaries[0]
+
+
+def test_decoding_a_member_stops_past_its_declared_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decoded: list[int] = []
+    add = _zip._Decoded.add
+
+    def counted(self: _zip._Decoded, data: bytes, budget: _zip._WalkBudget) -> None:
+        decoded.append(len(data))
+        add(self, data, budget)
+
+    monkeypatch.setattr(_zip._Decoded, "add", counted)
+    archive = _walked_zip(
+        _Member(
+            b"model.pkl",
+            _deflated(_CLEAN + bytes(32 * 1024 * 1024)),
+            content=_CLEAN,
+            method=zipfile.ZIP_DEFLATED,
+        )
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, "model.pt", archive)
+
+    assert [summary for summary in summaries if _OVERRUN in summary]
+    assert sum(decoded) <= len(_CLEAN) + _zip._CHUNK_BYTES
