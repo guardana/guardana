@@ -1379,3 +1379,16 @@ def test_a_plain_zip_member_whose_headers_disagree_is_unscanned(tmp_path: Path) 
 
     assert _unscanned(findings), findings
     assert list(ctx.shortfalls())
+
+
+@pytest.mark.parametrize("fill", [b"](K\x01a", b"}(K\x01K\x02s"], ids=["append", "setitem"])
+def test_an_import_past_a_fill_across_a_mark_is_named_though_no_unpickler_reaches_it(
+    tmp_path: Path, fill: bytes
+) -> None:
+    """Both unpicklers refuse APPEND or SETITEM across a MARK; the model reads on past it."""
+    stream = _HEADER + fill + _CALL
+
+    findings, _ctx = _run(tmp_path, "model.pkl", stream)
+
+    assert not _reaches_find_class(stream)
+    _assert_flagged(findings)
