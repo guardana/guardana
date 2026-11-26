@@ -452,3 +452,96 @@ def test_a_gzip_tar_named_as_a_zstd_tar_is_read_by_its_bytes(tmp_path: Path) -> 
     result = _run(tmp_path, "model.tar.zst", gzip.compress(_tar(("model.pkl", _SYSTEM))))
 
     assert _critical(result) == ["os.system in model.tar.zst::model.pkl"]
+
+
+def _link(name: str, target: str) -> tarfile.TarInfo:
+    link = tarfile.TarInfo(name)
+    link.type = tarfile.SYMTYPE
+    link.linkname = target
+    return link
+
+
+_COSTLY = ("big.pkl", gzip.compress(b"\x80\x02" + b"N0" * 30_000 + b"."))  # NONE, POP: all work
+_PACKAGE = (("m/.data/extern_modules", b""), ("m/pkg/__init__.py", b"x = 1\n"))
+_SHIPPED = "pkg/__init__.py (shipped Python source a torch.package load may run)"
+_LISTED_AFTER_THE_BOUND: dict[str, tuple[tuple[tarfile.TarInfo | tuple[str, bytes], ...], str]] = {
+    "shipped-source": (_PACKAGE, _SHIPPED),
+    "a-member-below-a-link": ((_link("lib", "/usr/lib"), ("lib/x.txt", b"x\n")), "link member lib"),
+    "an-unread-model": ((("w.onnx", b"onnx"),), "does not open inside an archive (w.onnx)"),
+}
+
+
+@pytest.mark.parametrize("ending", [".tar", ".tar.gz", ".tar.bz2", ".tar.xz"])
+@pytest.mark.parametrize("after", [True, False], ids=["after", "before"])
+@pytest.mark.parametrize("case", list(_LISTED_AFTER_THE_BOUND))
+def test_every_member_is_listed_once_the_opcode_bound_runs_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ending: str, *, after: bool, case: str
+) -> None:
+    """The checks over the whole listing see members the bound left unread, in any order."""
+    monkeypatch.setattr(pickle_opcode, "_ARCHIVE_OPCODE_FLOOR", 2000)
+    members, expected = _LISTED_AFTER_THE_BOUND[case]
+    archive = _tar(_COSTLY, *members) if after else _tar(*members, _COSTLY)
+    content = _COMPRESSORS[ending](archive) if ending in _COMPRESSORS else archive
+
+    result = _run(tmp_path, f"bundle{ending}", content)
+
+    reported = _critical(result) + _unscanned(result)
+    assert any(expected in line for line in reported), reported
+    assert any("pickle opcodes" in summary for summary in _unscanned(result)), _unscanned(result)
+    assert not [summary for summary in _unscanned(result) if "damaged header" in summary]
+    assert set(_unread(result)) == {str(tmp_path / f"bundle{ending}")}
+
+
+@pytest.mark.parametrize("ending", [".tar", ".tar.gz"])
+def test_a_package_alone_in_a_tar_is_critical_without_a_bound(tmp_path: Path, ending: str) -> None:
+    archive = _tar(*_PACKAGE)
+    content = gzip.compress(archive) if ending == ".tar.gz" else archive
+
+    result = _run(tmp_path, f"bundle{ending}", content)
+
+    assert any(_SHIPPED in detail for detail in _critical(result)), _critical(result)
+    assert not [s for s in _unscanned(result) if "pickle opcodes" in s]
+
+
+def test_a_model_member_listed_after_the_opcode_bound_is_not_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Past the bound a header is listed, never its member's data, so the cost stays bound."""
+    monkeypatch.setattr(pickle_opcode, "_ARCHIVE_OPCODE_FLOOR", 2000)
+    content = gzip.compress(_tar(_COSTLY, ("model.pkl", _SYSTEM)))
+
+    result = _run(tmp_path, "bundle.tar.gz", content)
+
+    assert _critical(result) == []
+    assert any("big.pkl and the members after it" in s for s in _unscanned(result))
+
+
+def test_a_header_tarfile_stops_at_past_the_opcode_bound_is_reported_beside_the_listing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pickle_opcode, "_ARCHIVE_OPCODE_FLOOR", 2000)
+    plain = _tar(*_PACKAGE, _COSTLY, ("decoy.txt", b""), ("model.pkl", _SYSTEM))
+    with tarfile.open(fileobj=io.BytesIO(plain)) as archive:
+        decoy = archive.getmember("decoy.txt").offset
+    content = gzip.compress(plain[:decoy] + _with_unreadable_mtime(plain[decoy:]))
+
+    result = _run(tmp_path, "bundle.tar.gz", content)
+
+    assert any(_SHIPPED in detail for detail in _critical(result)), _critical(result)
+    assert f"tar has a damaged header at byte {decoy}; not scanned" in _unscanned(result)
+    assert any("pickle opcodes" in summary for summary in _unscanned(result))
+
+
+class _RefusingArchive:
+    def next(self) -> tarfile.TarInfo | None:
+        raise tarfile.ReadError("bad checksum")
+
+
+def test_a_header_tarfile_refuses_ends_the_listing_only_past_the_opcode_bound() -> None:
+    refusing = _RefusingArchive()
+
+    listed = pickle_opcode.PickleOpcodeRule._next_listed(refusing, exhausted=True)  # type: ignore[arg-type]
+
+    assert listed is None
+    with pytest.raises(tarfile.ReadError):
+        pickle_opcode.PickleOpcodeRule._next_listed(refusing, exhausted=False)  # type: ignore[arg-type]

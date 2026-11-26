@@ -2421,12 +2421,14 @@ class PickleOpcodeRule(ArtifactRule):
 
         A member is read as its header is reached. A link is reported unscanned rather than
         followed, since the member it names may lie behind the point the stream has reached.
+        Once the opcode budget runs out, the remaining headers are still listed, unread, so
+        the checks over the whole listing see every member, as they do for a plain tar.
         """
         unread: list[str] = []
         entries: list[tarfile.TarInfo] = []
         chosen = 0
         exhausted = False
-        while not exhausted and (entry := archive.next()) is not None:
+        while (entry := self._next_listed(archive, exhausted=exhausted)) is not None:
             entries.append(entry)
             if not holds_file_data(entry):
                 continue
@@ -2435,7 +2437,7 @@ class PickleOpcodeRule(ArtifactRule):
             if not _model_named(entry.name):
                 continue
             chosen += 1
-            if chosen <= _ARCHIVE_MAX_MEMBERS:
+            if chosen <= _ARCHIVE_MAX_MEMBERS and not exhausted:
                 exhausted = self._scan_streamed_member(report, archive, entry, budget)
         self._report_unread_models(report, unread)
         sources = _shipped(
@@ -2447,18 +2449,32 @@ class PickleOpcodeRule(ArtifactRule):
         through = _through_link(
             report, (((entry.name,), entry.issym() or entry.islnk()) for entry in entries)
         )
-        if exhausted:
-            return True
         if archive.offset < end:
             # `tarfile` stops listing at a header it cannot parse, which `tar` warns about
             # and extracts past.
             report.unscanned(f"tar has a damaged header at byte {archive.offset}; not scanned")
+        if exhausted:
+            return True
         if chosen > _ARCHIVE_MAX_MEMBERS:
             report.unscanned(
                 f"tar holds {chosen} members named as models; members past the "
                 f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
             )
         return bool(chosen or unread) or sources or through
+
+    @staticmethod
+    def _next_listed(archive: tarfile.TarFile, *, exhausted: bool) -> tarfile.TarInfo | None:
+        """Return a streamed tar's next header, or None where its listing ends.
+
+        Past the opcode bound the file is already unscanned, so a header `tarfile` refuses
+        there ends the listing rather than discarding what the members before it show.
+        """
+        try:
+            return archive.next()
+        except tarfile.TarError:
+            if not exhausted:
+                raise
+            return None
 
     def _scan_streamed_member(
         self,

@@ -371,7 +371,10 @@ the members past either bound are a coverage shortfall that counts them. A membe
 so a pickle saved under such a name inside one is not found. A `.tar.gz`, `.tgz`, `.tar.bz2`,
 `.tbz2`, `.tbz`, `.tar.xz` or `.txz` is decompressed as `tar` decompresses it, as gzip, bz2 or
 xz by its first bytes and across streams written back to back, in memory and never to disk,
-and its members are read like those of a plain `.tar`, under the same bounds. At most 32 bytes
+and its members are read like those of a plain `.tar`, under the same bounds.
+If the pickle opcode bound is reached inside a member, the rule keeps listing the remaining
+headers for checks that use the full member list. It skips the remaining member data.
+At most 32 bytes
 are decompressed for each byte of the file, and at least 64 MiB; a compressed tar past that
 bound, damaged or cut before its end, or with a header `tarfile` stops listing at before the
 end of the archive, is a coverage shortfall, and so is a link named as a model inside one,
