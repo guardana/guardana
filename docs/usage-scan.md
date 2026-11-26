@@ -70,9 +70,12 @@ Three things keep a file out of a directory scan:
   directory holding it, and, in a directory
   that holds a model or a tokenizer (`tokenizer_config.json` or `tokenizer.json`), every
   `*config.json`, `chat_template.json`, `chat_template*.jinja`, `chat_template*.j2` and
-  `keras_metadata.pb`, with the templates in its `additional_chat_templates/`. A symbolic
-  link to a file is judged by its name alone. An ordinary directory it matches is still
-  walked for such files. A symbolic link to a directory is not followed and is recorded as a
+  `keras_metadata.pb`, with the templates in its `additional_chat_templates/`. Nor does it
+  exclude a file ending in `.bin`, `.sav`, `.p`, `.model` or `.dat`, or with no suffix, whose
+  first bytes show an archive, a compressed file, an NPY array or a pickle stream that
+  imports a callable: loaders open these files by content. A symbolic link to a file is judged by its
+  name, and also by the bytes of the file it leads to when that file is inside the scanned
+  directory. An ordinary directory it matches is still walked for such files. A symbolic link to a directory is not followed and is recorded as a
   source the scan cannot read even when `.guardanaignore` matches it; only
   `rules.paths_exclude` or a name of a directory every scan skips suppresses that record.
   A file it matches that a model loader reads is scanned anyway and named in the output: `Scope`

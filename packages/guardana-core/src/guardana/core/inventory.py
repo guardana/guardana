@@ -14,6 +14,7 @@ import os
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from pathlib import Path, PurePath
 
+from guardana.core.formats.content import FIRST_READ_BYTES, HEAD_MAX_BYTES, loader_reads
 from guardana.core.formats.hdf5 import (
     HDF5_HEAD_BYTES,
     find_hdf5_signature,
@@ -162,6 +163,9 @@ _PACKAGE_MARKER = "extern_modules"
 """`torch.package` loads a directory holding `.data/extern_modules`, found in any case, and runs
 the Python source below it when a load names its module."""
 _PACKAGE_SOURCE_SUFFIX = ".py"
+_CONTENT_READ_SUFFIXES = frozenset({".bin", ".sav", ".p", ".model", ".dat", ""})
+"""Names a pickle, a torch checkpoint, a joblib dump or an array is saved under as often as
+anything else, which their loaders open by content."""
 _NAMED_LIKE_MODEL_SUFFIXES = frozenset({".bin", ".model", ".sav"})
 """Suffixes the inventory lists only by their first bytes, counted by name where no file
 is opened: model weights carry them as often as anything else does."""
@@ -319,23 +323,45 @@ def read_by_model_loaders(
     holds_a_model: Callable[[Path], bool],
     *,
     by_name: bool = False,
+    opens: bool = True,
 ) -> bool:
     """Whether a model loader reads `path`, which the scanned target may then not exclude.
 
-    A model file, an archive or compressed file, a `torch.package` marker, and a file read
-    with the model beside it, when `holds_a_model` says that directory holds one. `siblings`
-    are the lower-cased names beside `path`; `by_name` judges by the name alone, opening
-    nothing. Python source below a package root is judged once the walk is done, by
-    `package_roots`.
+    A model file, an archive or compressed file, a `torch.package` marker, a file a loader
+    opens by content whose first bytes it reads, and a file read with the model beside it,
+    when `holds_a_model` says that directory holds one. `siblings` are the lower-cased names
+    beside `path`; `by_name` judges a model by the name alone, and `opens` says the scan reads
+    what `path` leads to, so its first bytes may be read. Python source below a package root
+    is judged once the walk is done, by `package_roots`.
     """
     name = path.name.lower()
-    if path.suffix.lower() in _ARCHIVE_SUFFIXES or package_marker(path):
+    suffix = path.suffix.lower()
+    if suffix in _ARCHIVE_SUFFIXES or package_marker(path):
         return True
     model = named_like_model(name) if by_name else counts_as_model(path, siblings)
-    if model:
+    if model or (opens and suffix in _CONTENT_READ_SUFFIXES and _loaded_by_content(path)):
         return True
     directory = loaded_with_model_in(path)
     return directory is not None and holds_a_model(directory)
+
+
+def _loaded_by_content(path: Path) -> bool:
+    """Whether a loader opening `path` by content reads it; True for a file it cannot read.
+
+    One short read, and a longer one only while the head reads as a pickle to its end.
+    """
+    if not _regular_file(path):
+        return False
+    try:
+        with path.open("rb") as handle:
+            head = handle.read(FIRST_READ_BYTES + 1)
+            found = loader_reads(head[:FIRST_READ_BYTES], cut=len(head) > FIRST_READ_BYTES)
+            if found is None:
+                head += handle.read(HEAD_MAX_BYTES + 1 - len(head))
+                found = loader_reads(head[:HEAD_MAX_BYTES], cut=len(head) > HEAD_MAX_BYTES)
+    except OSError:
+        return True
+    return found is not False
 
 
 def package_marker(path: Path) -> bool:

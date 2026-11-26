@@ -343,9 +343,12 @@ or <code>.zstd</code>) whatever it is named, a <code>torch.package</code>'s
 directory holding it, and, in a directory
 that holds a model or a tokenizer (<code>tokenizer_config.json</code> or <code>tokenizer.json</code>), every
 <code>*config.json</code>, <code>chat_template.json</code>, <code>chat_template*.jinja</code>, <code>chat_template*.j2</code> and
-<code>keras_metadata.pb</code>, with the templates in its <code>additional_chat_templates/</code>. A symbolic
-link to a file is judged by its name alone. An ordinary directory it matches is still
-walked for such files. A symbolic link to a directory is not followed and is recorded as a
+<code>keras_metadata.pb</code>, with the templates in its <code>additional_chat_templates/</code>. Nor does it
+exclude a file ending in <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or with no suffix, whose
+first bytes show an archive, a compressed file, an NPY array or a pickle stream that
+imports a callable: loaders open these files by content. A symbolic link to a file is judged by its
+name, and also by the bytes of the file it leads to when that file is inside the scanned
+directory. An ordinary directory it matches is still walked for such files. A symbolic link to a directory is not followed and is recorded as a
 source the scan cannot read even when <code>.guardanaignore</code> matches it; only
 <code>rules.paths_exclude</code> or a name of a directory every scan skips suppresses that record.
 A file it matches that a model loader reads is scanned anyway and named in the output: <code>Scope</code>
