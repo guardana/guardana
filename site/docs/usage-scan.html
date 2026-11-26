@@ -606,7 +606,12 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 </tbody>
 </table></div>
 <p>A <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or a file with no suffix, whose first bytes match
-none of those is not listed as a model. A <code>.dat</code>, a file with no suffix or a file named only by
+none of those is not listed as a model.
+For these suffixes and files with no suffix, a protocol 2 to 5 <code>PROTO</code> header is enough to list
+the file as a pickle model component. <code>pickle_opcode</code> counts the component as examined once it
+reads the file, even if every unpickler rejects the byte immediately after the header as an
+invalid opcode.
+A <code>.dat</code>, a file with no suffix or a file named only by
 a codec costs <code>pickle_opcode</code> one read of its first 64 KiB, and a file with no suffix the same one read for
 <code>keras_lambda</code>: a pickle, a compressed pickle, an NPY array or an archive holding a model is
 read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
