@@ -695,14 +695,12 @@ def _dtype_state(dtype: Dtype, state: object, notes: Notes) -> None:
 def _numbers(items: Sequence[object]) -> tuple[str, int, int, int] | None:
     """Return a dtype state's byte order, item size, alignment and flags, when all are read."""
     version, endian, *_layout, elsize, alignment, flags = items[:8]
-    known = [_known_int(item) for item in (elsize, alignment, flags)]
-    if not isinstance(endian, str) or _known_int(version) not in _STATE_VERSIONS:
+    size, align, bits = (_known_int(item) for item in (elsize, alignment, flags))
+    if size is None or align is None or bits is None or not isinstance(endian, str):
         return None
-    match known:
-        case [int(size), int(align), int(bits)]:
-            return endian, size, align, bits
-        case _:
-            return None
+    if _known_int(version) not in _STATE_VERSIONS:
+        return None
+    return endian, size, align, bits
 
 
 class _Laid(Enum):
