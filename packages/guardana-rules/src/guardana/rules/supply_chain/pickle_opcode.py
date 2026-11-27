@@ -52,6 +52,11 @@ from guardana.rules.supply_chain._npy import (
 )
 from guardana.rules.supply_chain._opcodes import SpelledInt, read_opcodes
 from guardana.rules.supply_chain._pickle_state import (
+    TORCH_STORAGES,
+    Array,
+    BlindWrites,
+    ByteText,
+    DictOf,
     Global,
     Items,
     ListOf,
@@ -63,6 +68,7 @@ from guardana.rules.supply_chain._pickle_state import (
     call_result,
     items_of,
     readonly_view,
+    returned,
 )
 from guardana.rules.supply_chain._reading import (
     LFS_POINTER_REASON,
@@ -219,29 +225,6 @@ _LEGACY_STORAGES = "storages"
 _LEGACY_TENSORS = "tensors"
 _LEGACY_TORCH_MEMBERS = frozenset({"pickle", _LEGACY_STORAGES, _LEGACY_TENSORS})
 """The members of a legacy `torch.save` tar that `torch.load` unpickles."""
-_TORCH_STORAGES = frozenset(
-    f"{kind}Storage"
-    for kind in (
-        "Bool",
-        "Byte",
-        "Char",
-        "Short",
-        "Int",
-        "Long",
-        "Half",
-        "Float",
-        "Double",
-        "BFloat16",
-        "ComplexFloat",
-        "ComplexDouble",
-        "QUInt8",
-        "QInt8",
-        "QInt32",
-        "QUInt4x2",
-        "QUInt2x4",
-        "Untyped",
-    )
-)
 _STORAGE_ELEMENT_BYTES = {
     "BoolStorage": 1,
     "ByteStorage": 1,
@@ -289,7 +272,7 @@ _TORCH_VALUES = frozenset(
 )
 _SAFE_GLOBALS: frozenset[tuple[str, str]] = frozenset(
     {
-        *(("torch", name) for name in _TORCH_STORAGES | _TORCH_VALUES),
+        *(("torch", name) for name in TORCH_STORAGES | _TORCH_VALUES),
         *(
             ("torch._utils", name)
             for name in (
@@ -361,6 +344,7 @@ _STRING_OPS = frozenset(
         "STRING",
     }
 )
+_BYTE_TEXT_OPS = frozenset({"SHORT_BINSTRING", "BINSTRING", "STRING"})
 # Memo stores: MEMOIZE takes the next free index; the others carry it as the arg.
 _MEMO_PUT_INDEXED = frozenset({"BINPUT", "LONG_BINPUT", "PUT"})
 _MEMO_GET = frozenset({"BINGET", "LONG_BINGET", "GET"})
@@ -504,6 +488,7 @@ _CALLABLE_DEPTH = {"REDUCE": 2, "NEWOBJ": 2, "NEWOBJ_EX": 3}
 _TUPLE_SIZES = {"EMPTY_TUPLE": 0, "TUPLE1": 1, "TUPLE2": 2, "TUPLE3": 3}
 _TUPLE_OPS = frozenset({*_TUPLE_SIZES, "TUPLE"})
 _LIST_OPS = frozenset({"EMPTY_LIST", "LIST", "APPEND", "APPENDS"})
+_DICT_OPS = frozenset({"EMPTY_DICT", "DICT"})
 # Each leaves the object it fills on the stack, or for READONLY_BUFFER a read-only view of it.
 _IN_PLACE_OPS = frozenset({"BUILD", "SETITEM", "SETITEMS", "ADDITEMS", "READONLY_BUFFER"})
 _SETITEM_DEPTH = 3
@@ -716,6 +701,12 @@ class _PickleMachine:
     setstates: dict[Global, str] = field(default_factory=dict)
     """The `__setstate__` of each class a state was applied to; see `Notes`."""
 
+    allocations: list[Array] = field(default_factory=list)
+    """The arrays allocated with unset items in the pickle being read; see `Notes`."""
+
+    blind: BlindWrites = field(default_factory=BlindWrites)
+    """The changes to dicts it could not follow; see `Notes`."""
+
     passed: bool = False
     """Whether it read on past an extension code."""
 
@@ -744,7 +735,9 @@ class _PickleMachine:
         if self.shape is not None:
             self.shape.note(name, arg)
         if name in _STRING_OPS:
-            self.stack.append(arg if isinstance(arg, str) else None)
+            text = arg if isinstance(arg, str) else None
+            byte_text = text is not None and name in _BYTE_TEXT_OPS
+            self.stack.append(ByteText(text) if byte_text else text)
         elif name == "STACK_GLOBAL":
             module, qualname = self._stack_global()
             allowed = self._imports(module, qualname)
@@ -779,6 +772,7 @@ class _PickleMachine:
         """Note what a STOP returns; refuse a call of what an extension code named."""
         if name == "STOP":
             self.returns_legacy_magic = not self.marks and self.stack == [_Tracked.LEGACY_MAGIC]
+            returned(self._notes())
         elif self._called(name) is _Tracked.EXTENSION:
             raise _ExtensionCodeError(f"{name} calls what an extension code named")
 
@@ -911,7 +905,7 @@ class _PickleMachine:
         return self.stack[self.marks[-1] :] if self.marks else None
 
     def _notes(self) -> Notes:
-        return Notes(self.refs, self.unproven, self.setstates)
+        return Notes(self.refs, self.unproven, self.setstates, self.allocations, self.blind)
 
     def _made(self, name: str, arg: object) -> _Value:  # noqa: PLR0911 — one return per opcode kind
         """Return what opcode `name` pushes, from its operands, when a state check needs it."""
@@ -923,6 +917,8 @@ class _PickleMachine:
             return self._tuple(name)
         if name in _LIST_OPS:
             return self._list(name)
+        if name in _DICT_OPS:
+            return self._dict(name)
         if name in _MAKING_CALLS:
             return self._call(name, arg)
         if name == "BINPERSID":
@@ -974,6 +970,15 @@ class _PickleMachine:
         target.count += added
         return target
 
+    def _dict(self, name: str) -> Tracked | None:
+        """Return a new dict, holding the pairs above the newest MARK for DICT."""
+        made = DictOf(born=self.blind.count)
+        if name == "DICT":
+            if not self.marks:
+                return None
+            made.put(self.stack, self.marks[-1], self._notes())
+        return made
+
     def _changed_in_place(self, name: str) -> Tracked | None:
         """Return the object an `_IN_PLACE_OPS` opcode leaves on the stack, as what it was.
 
@@ -991,10 +996,20 @@ class _PickleMachine:
         elif name == "SETITEM":
             # The dict under its key and value, reached past any MARK as for `_UNFENCED_OPS`.
             target = self.stack[-_SETITEM_DEPTH] if len(self.stack) >= _SETITEM_DEPTH else None
+            self._set_items(target, len(self.stack) - 2)
         else:
             mark = self.marks[-1] if self.marks else 0
             target = self.stack[mark - 1] if mark else None
+            if name == "SETITEMS":
+                self._set_items(target, mark)
         return target if isinstance(target, Tracked) else None
+
+    def _set_items(self, target: _Value, start: int) -> None:
+        """Put the pairs from `start` into `target`, or keep a change to an object it lost."""
+        if isinstance(target, DictOf):
+            target.put(self.stack, start, self._notes())
+        elif target is None or target is Made.DERIVED:
+            self._notes().write_blind()
 
     def _call(self, name: str, arg: object) -> Tracked | None:
         """Return what a call opcode makes, judging any state the call itself sets."""

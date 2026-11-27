@@ -16,6 +16,8 @@ from enum import Enum
 
 TUPLE_ITEMS_KEPT = 64
 """Items a tuple may hold and still be tracked: as many as a numpy array has dimensions."""
+ENTRIES_KEPT = 2 * TUPLE_ITEMS_KEPT
+"""Keys a dict may hold and still be tracked: the names of a dtype's fields and their titles."""
 NESTING_KEPT = 4
 """Tuples within tuples a tuple may hold and still be tracked, itself included. The deepest
 judged here, a `_rebuild_from_type_v2` call that gives a datetime dtype its state, nests four;
@@ -68,11 +70,119 @@ class ListOf:
     count: int = 0
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True, eq=False)
 class Dtype:
     """A dtype a call of `numpy.dtype` made, with the type string it named when that is literal."""
 
     spec: str | None
+    holds_objects: bool | None = None
+    """Whether its items hold object pointers, or None when this reading cannot tell: known
+    from its kind until a state lays out fields or a subarray in it."""
+
+    nested: bool = False
+    """Whether another dtype's layout holds it, so a state applied to it changes that layout."""
+
+    @property
+    def size(self) -> int | None:
+        """The bytes one item takes, from its type string.
+
+        numpy sizes every kind but the flexible ones itself, and a state that gives a flexible
+        dtype another size is judged where it is applied.
+        """
+        match = _SPEC.fullmatch(self.spec) if self.spec is not None else None
+        if match is None:
+            return None
+        size = int(match["size"])
+        return size * _UNICODE_UNIT if match["kind"] == _UNICODE_KIND else size
+
+
+class ByteText(str):
+    """Text a byte-string opcode pushed, which an unpickler decodes by its own encoding.
+
+    `torch.load` decodes it as UTF-8 and `encoding="bytes"` keeps the bytes, so the key or
+    name an unpickler holds may differ from this text.
+    """
+
+    __slots__ = ()
+
+
+@dataclass(slots=True)
+class BlindWrites:
+    """The changes to dicts a reading could not follow, against the dicts dtype states took."""
+
+    count: int = 0
+    """SETITEM and SETITEMS applied to an object this reading lost, which may be a tracked
+    dict reached by a route it does not follow, such as what a call or a persistent id hands
+    back."""
+
+    taken: bool = False
+    """Whether a dtype state took a dict, which such a change may reach."""
+
+
+@dataclass(slots=True, eq=False)
+class FieldsRead:
+    """What the entries of a dict lay out as dtype fields, read once while they stay unchanged.
+
+    A pickle may apply one wide layout any number of times, so each BUILD reads it in constant
+    time rather than once per entry.
+    """
+
+    proven: bool
+    """Whether every entry is `(dtype, offset[, title])` of a sized dtype that holds no object."""
+
+    start: int
+    """The lowest offset a sized entry starts at, or 0."""
+
+    end: int
+    """The furthest byte a sized entry reaches, or 0."""
+
+    parts: frozenset[int]
+    """The ids of the dtypes the entries name, which the entries keep alive."""
+
+    names: dict[int, tuple["Items", bool]] = field(default_factory=dict)
+    """For each names tuple judged against these entries, by id: the tuple and its verdict."""
+
+
+@dataclass(slots=True, eq=False)
+class DictOf:
+    """A dict an opcode made, with what each key holds while every key is tracked text."""
+
+    entries: dict[str, object] | None = field(default_factory=dict)
+    """None once it holds a key that is not text a unicode opcode pushed, or more than
+    `ENTRIES_KEPT` keys."""
+
+    born: int = 0
+    """How many blind writes came before it; one after it may have changed it unseen."""
+
+    taken: bool = False
+    """Whether a dtype state gave it to numpy, which keeps this dict itself as the fields."""
+
+    read: FieldsRead | None = None
+    """Its entries read as dtype fields, until they change."""
+
+    def put(self, stack: Sequence[object], start: int, notes: "Notes") -> None:
+        """Add the keys and values that alternate in `stack` from `start`, as SETITEM(S) does."""
+        self.change(notes)
+        self.read = None
+        for at in range(start, len(stack) - 1, 2):
+            if self.entries is None:
+                return
+            key = stack[at]
+            if type(key) is not str or (
+                key not in self.entries and len(self.entries) >= ENTRIES_KEPT
+            ):
+                self.entries = None
+            else:
+                self.entries[key] = stack[at + 1]
+
+    def change(self, notes: "Notes") -> None:
+        """Judge a change this reading may not see whole, such as a call given this dict.
+
+        Once numpy holds it, the reading stops following it: the fields are unproven anyway.
+        """
+        if self.taken:
+            notes.cannot_prove(FIELDS_CHANGED)
+            self.entries = None
 
 
 @dataclass(slots=True, eq=False)
@@ -82,6 +192,10 @@ class Array:
     holds_memory: bool
     """Whether it may hold memory a view could read: anything but an empty array no state has
     filled yet. numpy's `__setstate__` frees that memory even while a view still reads it."""
+
+    unset: bool = False
+    """Whether numpy allocated its items without setting them, as `numpy.empty` does, and no
+    state has set them since."""
 
 
 class Made(Enum):
@@ -99,7 +213,7 @@ class Made(Enum):
     back for an id this reading lost: one of its arguments, a class, or any object."""
 
 
-Tracked = Global | Literal | Items | ListOf | Dtype | Array | Made
+Tracked = Global | Literal | Items | ListOf | DictOf | Dtype | Array | Made
 
 
 @dataclass(slots=True)
@@ -114,6 +228,18 @@ class Notes:
 
     setstates: dict[Global, str] = field(default_factory=dict)
     """The `__setstate__` of each class a state was applied to, named once for the reading."""
+
+    allocations: list[Array] = field(default_factory=list)
+    """The arrays allocated with unset items since the pickle began, judged when it returns."""
+
+    blind: BlindWrites = field(default_factory=BlindWrites)
+    """The changes to dicts this reading could not follow."""
+
+    def write_blind(self) -> None:
+        """Keep a SETITEM or SETITEMS applied to an object this reading lost."""
+        self.blind.count += 1
+        if self.blind.taken:
+            self.cannot_prove(FIELDS_CHANGED)
 
     def flag(self, ref: str) -> None:
         """Keep a state numpy, torch or the unpickler applies unchecked, by its callable."""
@@ -133,7 +259,10 @@ class Notes:
             self.unproven.append(reason)
 
 
-DTYPE_LAYOUT = "rebuilds a numpy dtype with fields or a subarray, whose layout numpy does not check"
+DTYPE_LAYOUT = (
+    "rebuilds a numpy dtype with fields or a subarray in a layout this scanner cannot read"
+)
+FIELDS_CHANGED = "may change the fields of a numpy dtype after numpy took them"
 DTYPE_UNREAD = "rebuilds a numpy dtype from state this scanner cannot read"
 ARRAY_UNREAD = "rebuilds a numpy array whose items this scanner cannot count"
 DERIVED_STATE = "sets state on what a call returns"
@@ -142,6 +271,33 @@ SPARSE_TENSOR = "rebuilds a sparse tensor whose indices torch checks only with w
 REBUILD_UNREAD = "calls torch's _rebuild_from_type_v2 with arguments this scanner cannot read"
 NDARRAY_UNREAD = "calls numpy.ndarray with arguments this scanner cannot read"
 VIEW_UNREAD = "views memory this scanner cannot prove stays allocated"
+UNSET_MEMORY = "allocates an array or a storage whose contents nothing in the pickle sets"
+STORAGE_UNREAD = "calls a torch storage class with arguments this scanner cannot read"
+
+TORCH_STORAGES = frozenset(
+    f"{kind}Storage"
+    for kind in (
+        "Bool",
+        "Byte",
+        "Char",
+        "Short",
+        "Int",
+        "Long",
+        "Half",
+        "Float",
+        "Double",
+        "BFloat16",
+        "ComplexFloat",
+        "ComplexDouble",
+        "QUInt8",
+        "QInt8",
+        "QInt32",
+        "QUInt4x2",
+        "QUInt2x4",
+        "Untyped",
+    )
+)
+"""The storage classes `torch` exports, which a pickle names and may call."""
 
 _NUMPY_DTYPE = ("numpy", "dtype")
 _NUMPY_NDARRAY = ("numpy", "ndarray")
@@ -149,6 +305,7 @@ _NDARRAY_DTYPE_AT = 1
 _NDARRAY_BUFFER_AT = 2
 _NDARRAY_OFFSET_AT = 3
 _NDARRAY_STRIDES_AT = 4
+_RECONSTRUCT_DTYPE_AT = 2
 _NONE = Literal(None)
 _DEFAULT_KIND = "f"
 """The kind of the dtype numpy gives an array when none is named."""
@@ -179,6 +336,7 @@ _MADE_BY: dict[tuple[str, str], Made] = {
     ("_codecs", "encode"): Made.BYTES,
 }
 """What each allowlisted callable a later state depends on returns, arrays aside."""
+_TORCH = "torch"
 _REBUILD_FROM_TYPE = ("torch._tensor", "_rebuild_from_type_v2")
 _REBUILD_FROM_TYPE_ARGS = 4
 _SPARSE_REBUILD = ("torch._utils", "_rebuild_sparse_tensor")
@@ -201,6 +359,13 @@ _KEEPS_NO_VIEW = frozenset(
 refuses it, or is judged by its own rule. `scalar` views an array only as a structured scalar,
 and a state that later frees that array's memory is judged where it is applied."""
 
+_DICT_MAKERS = frozenset(
+    {
+        *(("collections", name) for name in ("OrderedDict", "defaultdict", "Counter")),
+        *((module, "dict") for module in ("builtins", "__builtin__")),
+    }
+)
+"""Allowlisted callables that return a new dict, never one given to them, with unread items."""
 _TYPE_NAMES = frozenset({(module, "type") for module in ("builtins", "__builtin__")})
 _NONE_TYPE_NAMES = frozenset({(module, "NoneType") for module in ("builtins", "__builtin__")})
 
@@ -217,6 +382,15 @@ _UNICODE_UNIT = 4
 _STATE_VERSIONS = frozenset({3, 4})
 """Versions whose flags numpy takes from the state; it recomputes them for older ones."""
 _STATE_LENGTHS = frozenset({8, 9})
+_VOID_KIND = "V"
+_ALIGNMENTS = frozenset({1, 2, 4, 8, 16})
+"""The alignments numpy gives a dtype: a power of two up to a long double's."""
+_LAYOUT = slice(2, 5)
+"""Where a dtype state holds its subarray, its names and its fields."""
+_FIELDS_AT = 2
+_FIELD_LENGTHS = frozenset({2, 3})
+_TITLE_AT = 2
+_SUBARRAY_LENGTH = 2
 _OBJECT_FLAGS = 0x3F
 """What numpy writes for an object dtype: refcounted, pickled as a list, a pointer, and so on."""
 _POINTER_FLAGS = 0x07
@@ -261,13 +435,37 @@ def call_result(
     if func.allowed and name not in _KEEPS_NO_VIEW and _may_pass_an_array(args):
         # Iterating a 2-D array yields rows that view its memory, which a later state frees.
         notes.cannot_prove(VIEW_UNREAD)
-    if name == _NUMPY_DTYPE or func.module == _NUMPY_DTYPE_CLASSES:
-        return Dtype(_spec(args) if name == _NUMPY_DTYPE else None)
+    _lose_dicts(args, notes)
+    made = _dict_or_dtype_made(func, args, notes)
+    if made is not None:
+        return made
     if name == _REBUILD_FROM_TYPE:
         return _rebuild_from_type(args, notes)
     if name == _SPARSE_REBUILD:
         notes.cannot_prove(SPARSE_TENSOR)
+    if func.module == _TORCH and func.qualname in TORCH_STORAGES:
+        _storage_call(args, keywords, notes)
     return _array_made(name, args, keywords, notes) or _MADE_BY.get(name)
+
+
+def _dict_or_dtype_made(func: Global, args: object, notes: Notes) -> DictOf | Dtype | None:
+    """Return the new dict or dtype a call of `func` makes, or None for any other call."""
+    name = (func.module, func.qualname)
+    if name in _DICT_MAKERS:
+        return DictOf(entries=None, born=notes.blind.count)
+    if name == _NUMPY_DTYPE or func.module == _NUMPY_DTYPE_CLASSES:
+        spec = _spec(args) if name == _NUMPY_DTYPE else None
+        match = _SPEC.fullmatch(spec) if spec is not None else None
+        return Dtype(spec, None if match is None else match["kind"] == _OBJECT_KIND)
+    return None
+
+
+def _lose_dicts(args: object, notes: Notes) -> None:
+    """Stop tracking each dict a call is given: it may change one, or hand it back unseen."""
+    for item in args.items if isinstance(args, Items) else ():
+        if isinstance(item, DictOf):
+            item.change(notes)
+            item.entries = None
 
 
 def _array_made(name: tuple[str, str], args: object, keywords: bool, notes: Notes) -> Array | None:
@@ -277,7 +475,57 @@ def _array_made(name: tuple[str, str], args: object, keywords: bool, notes: Note
     elif name in _FROMBUFFERS:
         _frombuffer_call(args, notes)
     shape_at = _SHAPE_AT.get(name)
-    return None if shape_at is None else Array(holds_memory=not _empty(_given(args, shape_at)))
+    if shape_at is None:
+        return None
+    array = Array(holds_memory=not _empty(_given(args, shape_at)))
+    if array.holds_memory and _allocates(name, args, keywords):
+        array.unset = True
+        notes.allocations.append(array)
+    return array
+
+
+def _allocates(name: tuple[str, str], args: object, keywords: bool) -> bool:
+    """Whether a call of the array maker `name` leaves the items of the array it makes unset.
+
+    `_reconstruct` and `numpy.ndarray` without a buffer allocate them as `numpy.empty` does,
+    except that numpy sets each object item to None; `_frombuffer` reads them from its buffer.
+    A `numpy.ndarray` call whose arguments are unread is judged by `_ndarray_call` alone.
+    """
+    if name == _NUMPY_NDARRAY:
+        if keywords or not isinstance(args, Items):
+            return False
+        given = args.items
+        dtype = given[_NDARRAY_DTYPE_AT] if len(given) > _NDARRAY_DTYPE_AT else _NONE
+        buffer = given[_NDARRAY_BUFFER_AT] if len(given) > _NDARRAY_BUFFER_AT else _NONE
+        return buffer == _NONE and _dtype_kind(dtype) != _OBJECT_KIND
+    if name in _FROMBUFFERS:
+        return False
+    return _dtype_kind(_given(args, _RECONSTRUCT_DTYPE_AT)) != _OBJECT_KIND
+
+
+def _storage_call(args: object, keywords: bool, notes: Notes) -> None:
+    """Judge a call of a torch storage class, which no pickle torch writes makes.
+
+    Given a size, torch allocates that many elements without setting them; given a sequence,
+    it copies the sequence.
+    """
+    if keywords or not isinstance(args, Items):
+        notes.cannot_prove(STORAGE_UNREAD)
+        return
+    if not args.items or isinstance(args.items[0], ListOf | Items):
+        return
+    size = _known_int(args.items[0])
+    if size is None:
+        notes.cannot_prove(STORAGE_UNREAD)
+    elif size > 0:
+        notes.cannot_prove(UNSET_MEMORY)
+
+
+def returned(notes: Notes) -> None:
+    """Judge, when a pickle returns, the arrays it allocated whose items no state has set."""
+    if any(array.unset for array in notes.allocations):
+        notes.cannot_prove(UNSET_MEMORY)
+    notes.allocations.clear()
 
 
 def build(target: object, state: object, notes: Notes) -> None:
@@ -286,13 +534,16 @@ def build(target: object, state: object, notes: Notes) -> None:
         if target.allowed:
             notes.flag_setstate(target)
     elif isinstance(target, Dtype):
-        _dtype_state(target.spec, state, notes)
+        if target.nested:
+            notes.cannot_prove(FIELDS_CHANGED)
+        _dtype_state(target, state, notes)
     elif isinstance(target, Array):
         if _applied(state):
             if target.holds_memory:
                 # numpy frees that memory even while a view of it, made by any route, reads it.
                 notes.cannot_prove(VIEW_UNREAD)
             target.holds_memory = True
+            target.unset = False
         _array_state(state, notes)
     elif target is Made.DERIVED:
         notes.cannot_prove(DERIVED_STATE)
@@ -410,34 +661,192 @@ def _known_int(value: object) -> int | None:
     return None
 
 
-def _dtype_state(spec: str | None, state: object, notes: Notes) -> None:
+def _dtype_state(dtype: Dtype, state: object, notes: Notes) -> None:
     """Judge a dtype state: version, byte order, subarray, names, fields, sizes, flags."""
     if not isinstance(state, Items):
         if _unseen(state):
             notes.cannot_prove(DTYPE_UNREAD)
+            dtype.holds_objects = None
         return  # numpy refuses a state that is not a tuple
-    match = _SPEC.fullmatch(spec) if spec is not None else None
+    match = _SPEC.fullmatch(dtype.spec) if dtype.spec is not None else None
     if match is None or len(state.items) not in _STATE_LENGTHS:
         notes.cannot_prove(DTYPE_UNREAD)
+        dtype.holds_objects = None
         return
     if match["kind"] in _DATETIME_KINDS and len(state.items) != _DATETIME_STATE_LENGTH:
         # numpy writes a datetime unit as the ninth item and crashes on a state without one.
         notes.flag("numpy.dtype.__setstate__")
         return
-    version, endian, subarray, names, fields, *numbers = state.items[:8]
-    elsize, alignment, flags = (_known_int(item) for item in numbers)
-    if any(item != Literal(None) for item in (subarray, names, fields)):
-        notes.cannot_prove(DTYPE_LAYOUT)
-    elif (
-        not isinstance(endian, str)
-        or _known_int(version) not in _STATE_VERSIONS
-        or elsize is None
-        or alignment is None
-        or flags is None
-    ):
+    layout = state.items[_LAYOUT]
+    numbers = _numbers(state.items)
+    if any(item != Literal(None) for item in layout):
+        fields = layout[_FIELDS_AT]
+        if isinstance(fields, DictOf):
+            fields.taken = notes.blind.taken = True
+            if fields.born < notes.blind.count:
+                fields.entries = None
+        dtype.holds_objects = _laid_out(dtype, match, layout, numbers, notes)
+    elif numbers is None:
         notes.cannot_prove(DTYPE_UNREAD)
-    elif not _canonical_dtype(match, endian, elsize, alignment, flags):
+    elif not _canonical_dtype(match, *numbers):
         notes.flag("numpy.dtype.__setstate__")
+
+
+def _numbers(items: Sequence[object]) -> tuple[str, int, int, int] | None:
+    """Return a dtype state's byte order, item size, alignment and flags, when all are read."""
+    version, endian, *_layout, elsize, alignment, flags = items[:8]
+    size, align, bits = (_known_int(item) for item in (elsize, alignment, flags))
+    if size is None or align is None or bits is None or not isinstance(endian, str):
+        return None
+    if _known_int(version) not in _STATE_VERSIONS:
+        return None
+    return endian, size, align, bits
+
+
+class _Laid(Enum):
+    """Where the fields or the subarray a dtype state lays out lie."""
+
+    WITHIN = "within"
+    """Each lies within the item, as numpy reads it, and holds no object."""
+
+    UNPROVEN = "unproven"
+    """One holds objects, or is a part this reading cannot read."""
+
+    OUTSIDE = "outside"
+    """One reaches outside the item, so reading it reads another item's memory or beyond."""
+
+
+def _laid_out(
+    dtype: Dtype,
+    spec: re.Match[str],
+    layout: Sequence[object],
+    numbers: tuple[str, int, int, int] | None,
+    notes: Notes,
+) -> bool | None:
+    """Judge a state that lays out fields or a subarray; return whether its items hold objects.
+
+    numpy applies the layout as given: an offset past the item, a field or a subarray wider
+    than it and object flags on bytes all reach the item's neighbours or read bytes as pointers.
+    """
+    if numbers is None:
+        notes.cannot_prove(DTYPE_UNREAD)
+        return None
+    _endian, elsize, alignment, flags = numbers
+    subarray, names, fields = layout
+    if spec["kind"] != _VOID_KIND:
+        notes.cannot_prove(DTYPE_LAYOUT)
+        return None
+    if subarray == _NONE:
+        laid = _fields_laid(dtype, names, fields, elsize)
+    elif names == _NONE and fields == _NONE:
+        laid = _subarray_laid(dtype, subarray, elsize)
+    else:
+        laid = _Laid.UNPROVEN
+    if -_SIGNED_FLAGS <= flags < 0:
+        flags += _SIGNED_FLAGS
+    if (
+        laid is _Laid.OUTSIDE
+        or elsize != int(spec["size"])
+        or not 0 <= flags <= _FLAG_BITS
+        or (laid is _Laid.WITHIN and flags & _POINTER_FLAGS)
+    ):
+        notes.flag("numpy.dtype.__setstate__")
+        return None
+    if laid is _Laid.UNPROVEN or alignment not in _ALIGNMENTS:
+        notes.cannot_prove(DTYPE_LAYOUT)
+        return None
+    return False
+
+
+def _fields_laid(whole: Dtype, names: object, fields: object, elsize: int) -> _Laid:
+    """Judge the fields a state lays out: names that each name an entry, entries within the item.
+
+    numpy writes a tuple of distinct names and a dict holding each name, and each title under
+    its own key, with `(dtype, offset)` or `(dtype, offset, title)`. numpy reads any entry by
+    its key, so one that reaches outside the item is judged whatever the names say.
+    """
+    if not (isinstance(names, Items) and isinstance(fields, DictOf) and fields.entries is not None):
+        return _Laid.UNPROVEN
+    if fields.read is None:
+        fields.read = _read_fields(fields.entries)
+    read = fields.read
+    if read.start < 0 or read.end > elsize:
+        return _Laid.OUTSIDE
+    if not read.proven or id(whole) in read.parts:
+        return _Laid.UNPROVEN
+    known = read.names.get(id(names))
+    if known is None:
+        known = read.names[id(names)] = (names, _named(names, fields.entries))
+    return _Laid.WITHIN if known[1] else _Laid.UNPROVEN
+
+
+def _read_fields(entries: dict[str, object]) -> FieldsRead:
+    """Read where the entries of a fields dict lie, and mark each dtype they name as nested.
+
+    A dtype that holds itself sends numpy into unbounded recursion; any other cycle runs
+    through a dtype given a state after another took it, which `build` judges.
+    """
+    proven, start, end, parts = True, 0, 0, set[int]()
+    for value in entries.values():
+        part = _field_part(value)
+        if part is None:
+            proven = False
+            continue
+        dtype, offset = part
+        dtype.nested = True
+        parts.add(id(dtype))
+        if dtype.size is None:
+            proven = False
+            continue
+        start, end = min(start, offset), max(end, offset + dtype.size)
+        proven = proven and dtype.holds_objects is False
+    return FieldsRead(proven, start, end, frozenset(parts))
+
+
+def _field_part(value: object) -> tuple[Dtype, int] | None:
+    """Return the dtype and offset of an entry numpy writes, else None."""
+    if not isinstance(value, Items) or len(value.items) not in _FIELD_LENGTHS:
+        return None
+    dtype, offset = value.items[0], _known_int(value.items[1])
+    if not isinstance(dtype, Dtype) or offset is None:
+        return None
+    if len(value.items) > _TITLE_AT and type(value.items[_TITLE_AT]) is not str:
+        return None
+    return dtype, offset
+
+
+def _named(names: Items, entries: dict[str, object]) -> bool:
+    """Whether `names` are distinct text keys of `entries`, and every other key is a title."""
+    named = {name for name in names.items if type(name) is str and name in entries}
+    if len(named) != len(names.items):
+        return False
+    titles = {
+        value.items[_TITLE_AT]
+        for value in (entries[name] for name in named)
+        if isinstance(value, Items) and len(value.items) > _TITLE_AT
+    }
+    return all(key in named or key in titles for key in entries)
+
+
+def _subarray_laid(whole: Dtype, subarray: object, elsize: int) -> _Laid:
+    """Judge a subarray `(base, shape)`: numpy reads that many base items as one item.
+
+    numpy writes an item exactly as wide as the subarray; a narrower one is not read past.
+    """
+    if not isinstance(subarray, Items) or len(subarray.items) != _SUBARRAY_LENGTH:
+        return _Laid.UNPROVEN
+    base, shape = subarray.items
+    dims = [_known_int(dim) for dim in (shape.items if isinstance(shape, Items) else (shape,))]
+    known = [dim for dim in dims if dim is not None and dim >= 0]
+    if not isinstance(base, Dtype) or len(known) != len(dims):
+        return _Laid.UNPROVEN
+    base.nested = True
+    if base.size is None or base is whole:
+        return _Laid.UNPROVEN
+    wide = base.size * math.prod(known)
+    if wide > elsize:
+        return _Laid.OUTSIDE
+    return _Laid.WITHIN if wide == elsize and base.holds_objects is False else _Laid.UNPROVEN
 
 
 def _canonical_dtype(

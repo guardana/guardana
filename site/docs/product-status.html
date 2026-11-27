@@ -376,14 +376,15 @@ when listing it would cost more than listing a model. An archive of more than 10
 is reported not scanned (exit <code>2</code>) even when it holds no model, such as an image dataset.
 Exclude it with <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an
 archive), or scan the model's directory instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
-<h3 id="pickled-dtype-layouts-out-of-band-arrays-and-sparse-tensors-are-unverified">Pickled dtype layouts, out-of-band arrays and sparse tensors are unverified</h3>
-<p>Pickles holding <code>numpy</code> dtype fields or subarrays, arrays over out-of-band buffers, or
-sparse tensors, are unverified even when <code>numpy</code> or <code>torch</code> writes them (<code>indeterminate</code>,
-exit <code>2</code>, unless another finding fails the run). scikit-learn decision trees and random
-forests saved with <code>pickle</code> hold such a dtype and retain their <code>CRITICAL</code> import finding.
-Use a format that is not a pickle, such as <code>safetensors</code>, or exclude the file with
-<code>rules.paths_exclude</code>. Load untrusted pickles only with a loader that enforces its own
-allowlist, such as <code>torch.load(..., weights_only=True)</code>.</p>
+<h3 id="some-pickled-numpy-dtypes-out-of-band-arrays-and-sparse-tensors-are-unverified">Some pickled <code>numpy</code> dtypes, out-of-band arrays and sparse tensors are unverified</h3>
+<p>Pickled <code>numpy</code> dtypes are unverified even when <code>numpy</code> writes them if they have fields or
+subarrays that hold objects, more than 64 fields, a non-text field title, or field names or
+dict keys stored as byte strings. Arrays over out-of-band buffers (pickle protocol 5) and
+sparse tensors are unverified even when <code>numpy</code> or <code>torch</code> writes them. These cases return
+<code>indeterminate</code> (exit <code>2</code>), unless another finding fails the run.</p>
+<p>Use a non-pickle format such as <code>safetensors</code>, or exclude the file with <code>rules.paths_exclude</code>.
+Load untrusted pickles only with a loader that enforces its own allowlist, such as
+<code>torch.load(..., weights_only=True)</code>.</p>
 <h3 id="some-archives-of-unpacked-torchpackage-packages-are-not-scanned">Some archives of unpacked <code>torch.package</code> packages are not scanned</h3>
 <p>A zip or tar, compressed or not, holding a package root and a non-ASCII name not marked as
 UTF-8 is reported unread (exit <code>2</code>) unless another finding fails the run's policy. GNU
