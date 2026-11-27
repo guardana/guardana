@@ -166,6 +166,23 @@ def test_a_failed_discovery_stays_an_open_question_a_run_can_refuse() -> None:
     ],
 )
 def test_a_legacy_server_refusing_discovery_stays_not_applicable(status: int, code: int) -> None:
+    target = _discovery_refused(status, code)
+
+    with pytest.raises(NotApplicable, match=f"MCP {LEGACY_VERSION}, which carries no cacheScope"):
+        list(RULE.run(target, RuleContext()))
+
+
+@pytest.mark.parametrize("status", [402, 409, 422, 451])
+def test_a_method_not_found_at_a_gateway_status_is_a_failed_discovery(status: int) -> None:
+    reported = list(RULE.run(_discovery_refused(status, -32601), RuleContext()))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status} carrying JSON-RPC error -32601" in summaries(reported)[0]
+
+
+def _discovery_refused(status: int, code: int) -> McpServerTarget:
+    """A gated legacy server answering `server/discover` with `code` at `status`."""
+
     class _Refuses(ScriptedMcpServer):
         def __call__(self, url: str, **kwargs: object) -> RawReply:
             if b"server/discover" not in cast("bytes", kwargs.get("body") or b""):
@@ -174,12 +191,7 @@ def test_a_legacy_server_refusing_discovery_stays_not_applicable(status: int, co
             return RawReply(status=status, headers={}, body=json.dumps(body).encode("utf-8"))
 
     server = _Refuses(ROUTABLE, tools=TOOLS, credential=CREDENTIAL, cache_scope="public")
-    target = McpServerTarget(
-        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
-    )
-
-    with pytest.raises(NotApplicable, match=f"MCP {LEGACY_VERSION}, which carries no cacheScope"):
-        list(RULE.run(target, RuleContext()))
+    return McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server)
 
 
 @pytest.mark.parametrize("status", [401, 403, 407])

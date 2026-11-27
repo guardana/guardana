@@ -274,7 +274,9 @@ def _json_rpc_error(status: int, code: int) -> RawReply:
     "reply",
     [
         pytest.param(_json_rpc_error(200, -32601), id="unknown-method"),
-        pytest.param(_json_rpc_error(404, -32601), id="unknown-method-at-any-status"),
+        pytest.param(_json_rpc_error(404, -32601), id="unknown-method-at-404"),
+        pytest.param(_json_rpc_error(405, -32601), id="unknown-method-at-405"),
+        pytest.param(_json_rpc_error(400, -32601), id="unknown-method-at-400"),
         pytest.param(_json_rpc_error(400, -32600), id="python-sdk-without-a-session"),
         pytest.param(_json_rpc_error(400, -32000), id="typescript-sdk-without-a-session"),
         pytest.param(
@@ -370,6 +372,15 @@ def test_a_discovery_that_failed_says_so_and_names_the_failure(reply: RawReply, 
     fallback = _discover_answered(reply)
 
     assert fallback == Fallback(said, failed=True)
+
+
+@pytest.mark.parametrize("status", [402, 409, 410, 418, 422, 451])
+def test_a_method_not_found_beside_a_status_a_server_lacking_it_never_gives_is_a_failure(
+    status: int,
+) -> None:
+    fallback = _discover_answered(_json_rpc_error(status, -32601))
+
+    assert fallback == Fallback(f"HTTP {status} carrying JSON-RPC error -32601", failed=True)
 
 
 @pytest.mark.parametrize("status", [401, 403, 407])

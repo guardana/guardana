@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Restrict which HTTP statuses count for missing MCP methods (#329).** JSON-RPC `-32601` counted as a missing method at every HTTP status except `401`, `403`, `407`, `408`, `425`, `429` and `5xx`. The same applied to `-32022` naming no older revision on legacy `initialize`. Discovery treated the server as handshake-era and skipped `cache_scope` as `not_applicable` when the server gated its tool listing. Legacy `initialize` treated the server as modern-only and skipped `session_binding` as `not_applicable`. `tasks/list` treated the method as unknown and skipped `task_identity` as `not_offered` on servers declaring no tasks. These errors count only with no HTTP status (stdio) or at HTTP `2xx`, `400`, `404` or `405`. `401` and `403` remain refusals. Outside those cases, `server/discover` fails and legacy `initialize` leaves the offer unknown. Both checks report `inconclusive` with the HTTP status and JSON-RPC error. For `tasks/list`, `task_identity` reports `inconclusive` with the status. When `tasks/list` returned an unknown-method error, `task_identity` counted unread task declarations as empty. It now reports `inconclusive` when it could not read a revision's task declarations, and counts only revisions the server is known not to serve as declaring no tasks. Gate impact: `guardana.mcp.session_binding` and `guardana.mcp.cache_scope` skipped `not_applicable` become `inconclusive`, which may now fail under `monitor`, under `release`, or with `fail_on_inconclusive: true`. `guardana.mcp.task_identity` skipped `not_offered` becomes `inconclusive`, which may now fail under `monitor` and may now pass where only `fail_on_skipped` is set.
+
 ## [1.4.2] - 2026-11-26 — the ninth patch release
 
 ### Changed

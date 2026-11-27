@@ -28,9 +28,9 @@ from guardana.core.target._mcp_client import (
     Opening,
     carries_tools,
     changed,
+    may_name_a_missing_method,
     no_json_rpc_error,
     opening_in,
-    says_nothing_of_the_method,
 )
 from guardana.core.target._mcp_http import (
     AddressRefusedError,
@@ -114,8 +114,8 @@ class TaskAnswer(StrEnum):
     REFUSED = "refused"
     """HTTP `401` or `403`, whatever error the body carries."""
     UNKNOWN_METHOD = "unknown_method"
-    """JSON-RPC `-32601` at any status but `401`, `403`, `407`, `408`, `425`, `429` and `5xx`,
-    or an HTTP `400` read whole with no JSON-RPC error in it."""
+    """JSON-RPC `-32601` at a `2xx`, `400`, `404` or `405`, or an HTTP `400` read whole with
+    no JSON-RPC error in it."""
     OTHER = "other"
     """Anything else; `Tasks.detail` names the status."""
 
@@ -753,7 +753,8 @@ class _Probe:
 
         Handshake-era declarations come from an anonymous handshake when one was answered,
         else from the conversation's opening, else from the legacy probe; modern ones from
-        `server/discover`. None when neither was read.
+        `server/discover`. None when an era the server may serve went unread: an era it
+        might declare tasks in is never read as declaring none.
         """
         legacy = next(
             (
@@ -773,19 +774,24 @@ class _Probe:
             offered = offer()
             if offered.wire is not None and offered.opening is not None:
                 legacy = offered.opening.capabilities
-        return _offer_in(legacy, self._negotiation().capabilities)
+        negotiation = self._negotiation()
+        if legacy is None and not offer().modern_only:
+            return None
+        if negotiation.capabilities is None and _modern_declarations_unread(negotiation):
+            return None
+        return _offer_in(legacy, negotiation.capabilities)
 
     def legacy_offer(self) -> LegacyOffer:  # noqa: PLR0911 — one return per answer class
         """Settle whether the server still answers `initialize`, asking when discovery did not say.
 
         One handshake over the `2025-11-25` wire, with the operator's credential when
         one is configured: a result naming that revision is a dual-era server; JSON-RPC
-        `-32601` or `-32022` at a status that does not settle the reply on its own, or a
+        `-32601` or `-32022` at a `2xx`, `400`, `404` or `405`, or a
         `400`, `404` or `405` read whole with no JSON-RPC error in it, is a modern-only
         one. A refusal (`401`, `403`) says who may ask, not which era answers, and any
-        other answer — a proxy's `407`, a timeout, a rate limit, a server error, another
-        JSON-RPC error — is a failure of this one request, whatever error code it carries;
-        both leave it unknown.
+        other answer — a proxy's `407`, a gateway's `402` or `451`, a timeout, a rate
+        limit, a server error, another JSON-RPC error — is a failure of this one request,
+        whatever error code it carries; both leave it unknown.
         """
         negotiation = self._negotiation()
         if negotiation.legacy_wire is not None:
@@ -813,9 +819,7 @@ class _Probe:
         older = _older_handshake(error)
         if older is not None:
             return older
-        refused_the_era = code in _NOT_THE_ERA_CODES and not says_nothing_of_the_method(
-            reply.status
-        )
+        refused_the_era = code in _NOT_THE_ERA_CODES and may_name_a_missing_method(reply.status)
         if refused_the_era or (
             reply.status in NOT_THE_ERA_STATUSES and no_json_rpc_error(reply, payload)
         ):
@@ -1132,15 +1136,15 @@ def _opening_of(reply: RawReply) -> Opening | None:
 def _task_listing(reply: RawReply) -> Tasks:
     """Class one reply to `tasks/list`; ids are read only from a result holding a list.
 
-    `-32601` names an unknown method only at a status that does not settle the reply on
-    its own, so a refusal stays a refusal whatever error its body carries.
+    `-32601` names an unknown method only at a `2xx`, `400`, `404` or `405`, so a refusal
+    stays a refusal whatever error its body carries.
     """
     payload = reply.json_object()
     error = error_member(payload)
     if (
         error is not None
         and error.get("code") == _METHOD_NOT_FOUND
-        and not says_nothing_of_the_method(reply.status)
+        and may_name_a_missing_method(reply.status)
     ):
         return Tasks(answer=TaskAnswer.UNKNOWN_METHOD, status=reply.status)
     if reply.status == _BAD_REQUEST and no_json_rpc_error(reply, payload):
@@ -1175,6 +1179,16 @@ def _task_listing(reply: RawReply) -> Tasks:
     if error is not None:
         detail = f"{detail} carrying JSON-RPC error {error.get('code')}"
     return Tasks(answer=TaskAnswer.OTHER, status=reply.status, detail=detail)
+
+
+def _modern_declarations_unread(negotiation: Negotiation) -> bool:
+    """Whether a negotiation holding no modern declarations may still have a server declaring some.
+
+    Only a `server/discover` answered as a server without the method shows there is no
+    modern era to declare anything in; a failed discovery, one refused with the versions it
+    names, or one that left the conversation on the handshake read nothing of it.
+    """
+    return negotiation.fallback is None or negotiation.fallback.failed
 
 
 def _offer_in(

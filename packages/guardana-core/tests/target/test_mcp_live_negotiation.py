@@ -342,6 +342,9 @@ class _AnswersTheLegacyProbe(ScriptedMcpServer):
     [
         pytest.param(200, -32601, id="200-method-not-found"),
         pytest.param(404, -32601, id="404-method-not-found"),
+        pytest.param(405, -32601, id="405-method-not-found"),
+        pytest.param(400, -32601, id="400-method-not-found"),
+        pytest.param(404, -32022, id="404-unsupported-version"),
         pytest.param(400, -32022, id="400-unsupported-version"),
         pytest.param(200, -32022, id="200-unsupported-version"),
         pytest.param(400, None, id="400-no-json-rpc"),
@@ -414,6 +417,28 @@ def test_a_legacy_probe_that_failed_leaves_the_era_unknown(
     assert offer.unsettled is not None
     assert said in offer.unsettled
     assert view.sessions.no_protocol_sessions is None
+
+
+@pytest.mark.parametrize("error", [-32601, -32022])
+@pytest.mark.parametrize("status", [402, 409, 410, 418, 422, 451])
+def test_a_legacy_probe_refused_at_a_gateway_status_leaves_the_era_unknown(
+    status: int, error: int
+) -> None:
+    server = _AnswersTheLegacyProbe(
+        ROUTABLE,
+        status=status,
+        error=error,
+        tools=TOOLS,
+        protocol_versions=[LATEST_VERSION, LEGACY_VERSION],
+        discovers=[LATEST_VERSION],
+    )
+
+    offer = _target(server).authorization().legacy_offer
+
+    assert not offer.modern_only
+    assert offer.wire is None
+    assert offer.unsettled is not None
+    assert f"HTTP {status} carrying JSON-RPC error {error}" in offer.unsettled
 
 
 @pytest.mark.parametrize("status", [401, 403])
