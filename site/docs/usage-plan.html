@@ -340,6 +340,11 @@ run they are pricing would use, so both take the same plugin-trust flags
 <td><code>plan probe</code> only: price one or two requests for the chat endpoint authentication check. The plan sends no requests and needs no key. Refused with <code>--adapter</code>, <code>--fixtures</code>, a <code>--provider</code> other than <code>openai</code>, <code>--mcp</code>, <code>--a2a</code> or <code>--target</code> (exit <code>3</code>). <code>Added in Guardana 1.4.0</code></td>
 </tr>
 <tr>
+<td><code>--require-key-check</code></td>
+<td>off</td>
+<td><code>plan probe</code> only. Price one to three requests for the chat endpoint authentication check. The plan sends no requests. Refused without <code>--require-auth</code> or with <code>--adapter</code>, <code>--fixtures</code>, a <code>--provider</code> other than <code>openai</code>, <code>--mcp</code>, <code>--a2a</code> or <code>--target</code> (exit <code>3</code>). <code>Added in Guardana Unreleased</code></td>
+</tr>
+<tr>
 <td><code>--safety [passive|active|side-effecting]</code></td>
 <td><code>active</code></td>
 <td><code>plan probe</code> only: how far rules may reach, as on <code>probe</code></td>

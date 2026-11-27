@@ -73,6 +73,7 @@ run they are pricing would use, so both take the same plugin-trust flags
 | `--system-prompt-file PATH` | none | `plan probe` only: the system prompt `probe` would plant; a file that cannot be read is refused (exit `3`) |
 | `--fixtures PATH` | none | `plan probe` only: price the seeded checks from this [fixtures file](usage-fixtures.md) — see [Pricing seeded data](#pricing-seeded-data). No tenant key is read; refused with `--mcp`, `--a2a` and `--target` |
 | `--require-auth` | off | `plan probe` only: price one or two requests for the chat endpoint authentication check. The plan sends no requests and needs no key. Refused with `--adapter`, `--fixtures`, a `--provider` other than `openai`, `--mcp`, `--a2a` or `--target` (exit `3`). `Added in Guardana 1.4.0` |
+| `--require-key-check` | off | `plan probe` only. Price one to three requests for the chat endpoint authentication check. The plan sends no requests. Refused without `--require-auth` or with `--adapter`, `--fixtures`, a `--provider` other than `openai`, `--mcp`, `--a2a` or `--target` (exit `3`). `Added in Guardana Unreleased` |
 | `--safety [passive\|active\|side-effecting]` | `active` | `plan probe` only: how far rules may reach, as on `probe` |
 | `--allow-destructive` | off | `plan probe` only: permit rules that can destroy or alter something the target owns, as on `probe` |
 | `--trials INTEGER` | `1` (or `trials:` in the profile) | `plan probe` and `plan grade`: price the run at this many attempts per case, as `probe --trials` and `grade --trials` would make them |

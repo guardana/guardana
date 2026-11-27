@@ -306,11 +306,19 @@ claim to check per deployment, not a guarantee.
 
 ### An authentication verdict covers one route from one machine
 
-A pass of the `--require-auth` check does not show that the server refuses wrong or
-expired keys. It also does not show what a key is allowed to do. The verdict covers
-`POST <base-url>/v1/chat/completions` as reached from the machine running `guardana`,
-through its proxy if one is set. Other routes and access from other networks are outside
-the check.
+A server that accepts any `Authorization` value can pass `--require-auth` alone.
+With `--require-key-check`, a pass means the route refused a request without a
+credential and a request with one generated key that cannot be valid, and returned a
+completion to the configured key. Expired or revoked keys, valid keys of other
+accounts, and what a key is allowed to do are outside the check. The generated key
+starts with the fixed prefix `guardana-invalid-key-` and need not match the
+configured key's format. A server that checks only format can refuse the generated
+key and still pass while serving any other key of the right format, so a pass leaves
+open whether the server checks that it issued the key.
+
+The verdict covers `POST <base-url>/v1/chat/completions` as reached from the machine
+running `guardana`, through its proxy if one is set. Other routes and access from other
+networks are outside the check.
 See [checking chat endpoint authentication](usage-probe.md#checking-chat-endpoint-authentication).
 
 ### A recipe records what you declare about the subject

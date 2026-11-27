@@ -235,6 +235,27 @@ class InferenceAccessCheck(Protocol):
         raise NotImplementedError
 
 
+@runtime_checkable
+class InvalidKeyCheck(Protocol):
+    """The access check's optional last request: the same request with a key that cannot be valid.
+
+    Separate from `InferenceAccessCheck` so a target implementing that surface alone keeps
+    satisfying it; such a target was never asked for this request.
+    """
+
+    @property
+    def invalid_key_check(self) -> bool:
+        """Whether the operator asked for the request with an invalid key."""
+        raise NotImplementedError
+
+    def check_invalid_key(self) -> "AccessReply":
+        """Send the access request once with a bearer value generated for it, never the key.
+
+        Raises `BudgetExhausted` when the run's budget refuses the request.
+        """
+        raise NotImplementedError
+
+
 __all__ = [
     "CAPABILITY_SURFACE",
     "A2aInspector",
@@ -243,6 +264,7 @@ __all__ = [
     "ChatWithMetadata",
     "FileReader",
     "InferenceAccessCheck",
+    "InvalidKeyCheck",
     "RegistryEntryInspector",
     "SeededData",
     "SystemPromptPlanter",

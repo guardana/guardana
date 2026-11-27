@@ -248,6 +248,161 @@ def test_a_redirect_is_not_followed_to_another_host() -> None:
     assert finding.verdict.outcome == "inconclusive"
 
 
+def _keyed(
+    anonymous: AccessReply = _REFUSED,
+    credentialed: AccessReply = _COMPLETION,
+    invalid: AccessReply | None = None,
+    **kwargs: object,
+) -> tuple[EndpointTarget, ScriptedAccessTransport]:
+    """A route asked for the request with an invalid key too; `invalid` None takes any key."""
+    transport = ScriptedAccessTransport(anonymous, credentialed, invalid_key=invalid)
+    options: dict[str, object] = {
+        "api_key": _KEY,
+        "inference_access_check": True,
+        "inference_key_check": True,
+    } | kwargs
+    target = EndpointTarget("https://models.example", "m", transport=transport, **options)  # type: ignore[arg-type]
+    return target, transport
+
+
+def test_a_route_serving_a_key_that_cannot_be_valid_is_a_critical_finding() -> None:
+    target, transport = _keyed()
+
+    (finding,), ctx = _run(target)
+
+    assert finding.severity is Severity.CRITICAL
+    assert finding.verdict is not None
+    assert finding.verdict.outcome == "fail"
+    assert "does not check the key" in finding.evidence.summary
+    assert "invalid key: answered with a chat completion" in finding.evidence.detail
+    assert "3 request(s) sent" in finding.evidence.detail
+    assert transport.asked == [False, True, True]
+    (recorded,) = ctx.recorded()
+    assert (recorded.status, recorded.passed) == (AssessmentStatus.MEASURED, False)
+
+
+@pytest.mark.parametrize("invalid", [_REFUSED, _FORBIDDEN])
+def test_a_route_refusing_a_key_that_cannot_be_valid_keeps_the_pass(invalid: AccessReply) -> None:
+    target, transport = _keyed(invalid=invalid)
+
+    findings, ctx = _run(target)
+
+    assert findings == []
+    (recorded,) = ctx.recorded()
+    assert (recorded.status, recorded.passed) == (AssessmentStatus.MEASURED, True)
+    assert f"invalid key: refused with HTTP {invalid.status}" in recorded.rationale
+    assert "3 request(s) sent" in recorded.rationale
+    assert transport.asked == [False, True, True]
+    assert ctx.shortfalls() == ()
+
+
+@pytest.mark.parametrize("anonymous", [_COMPLETION, _REFUSED])
+def test_a_case_decided_with_the_key_check_names_another_grader_than_one_without(
+    anonymous: AccessReply,
+) -> None:
+    keyed, _ = _keyed(anonymous)
+    unkeyed, _ = _route(anonymous)
+
+    _, with_check = _run(keyed)
+    _, without_check = _run(unkeyed)
+
+    (graded_with,), (graded_without,) = with_check.recorded(), without_check.recorded()
+    assert graded_without.assessor == RULE.meta.id
+    assert graded_with.assessor == f"{RULE.meta.id}+invalid-key"
+    assert graded_with.case_id == graded_without.case_id
+
+
+_BAD_REQUEST = AccessReply(AccessAnswer.UNDECIDED, 400, "answered HTTP 400")
+_REDIRECTED = AccessReply(
+    AccessAnswer.UNDECIDED, 302, "answered with a redirect (HTTP 302), not followed"
+)
+_NOT_ANSWERED = AccessReply(AccessAnswer.UNDECIDED, None, "did not answer within 30 seconds")
+
+
+@pytest.mark.parametrize(
+    "invalid", [_UNAVAILABLE, _RATE_LIMITED, _BAD_REQUEST, _REDIRECTED, _NOT_ANSWERED]
+)
+def test_any_other_answer_to_a_key_that_cannot_be_valid_is_undecided_never_a_pass(
+    invalid: AccessReply,
+) -> None:
+    target, _ = _keyed(invalid=invalid)
+
+    (finding,), ctx = _run(target)
+
+    assert finding.verdict is not None
+    assert finding.verdict.outcome == "inconclusive"
+    assert "request with an invalid key got no decisive answer" in finding.evidence.summary
+    (gap,) = ctx.shortfalls()
+    assert (gap.kind, gap.name) == (ShortfallKind.DEMANDED_CHECK, RULE.meta.id)
+    (recorded,) = ctx.recorded()
+    assert (recorded.status, recorded.passed) == (AssessmentStatus.INCONCLUSIVE, None)
+
+
+@pytest.mark.parametrize(("anonymous", "credentialed"), list(itertools.product(_ANSWERS, _ANSWERS)))
+def test_the_invalid_key_goes_last_and_only_after_the_configured_key_was_served(
+    anonymous: AccessReply, credentialed: AccessReply
+) -> None:
+    target, transport = _keyed(anonymous, credentialed, invalid=_REFUSED)
+
+    _run(target)
+
+    served = (
+        anonymous.answer is AccessAnswer.REFUSED and credentialed.answer is AccessAnswer.COMPLETION
+    )
+    refused = anonymous.answer is AccessAnswer.REFUSED
+    expected = [None, _KEY, "invalid"] if served else [None, _KEY] if refused else [None]
+    sent = ["invalid" if key not in (None, _KEY) else key for key in transport.keys]
+    assert sent == expected
+    assert len(sent) <= RULE.estimated_requests_for(target) <= RULE.estimated_requests
+    assert target.usage().requests == len(sent)
+
+
+def test_the_extra_request_never_carries_the_configured_key_nor_reaches_the_record() -> None:
+    target, transport = _keyed()
+
+    (finding,), ctx = _run(target)
+
+    invalid = transport.keys[2]
+    assert invalid is not None
+    assert invalid != _KEY
+    assert _KEY not in invalid
+    said = repr((finding, ctx.recorded(), ctx.shortfalls()))
+    assert invalid not in said
+    assert _KEY not in said
+
+
+def test_a_route_that_did_not_ask_for_the_invalid_key_prices_and_sends_two() -> None:
+    plain, plain_transport = _route(_REFUSED)
+    keyed, _ = _keyed(invalid=_REFUSED)
+
+    _run(plain)
+
+    assert RULE.estimated_requests_for(plain) == 2
+    assert RULE.estimated_requests_for(keyed) == 3
+    assert RULE.estimated_requests == 3
+    assert len(plain_transport.keys) == 2
+
+
+def test_a_budget_that_refuses_the_invalid_key_stops_the_rule_without_a_verdict() -> None:
+    target, transport = _keyed(invalid=_REFUSED, budgets=Budgets(max_requests=2))
+    ctx = RuleContext()
+
+    with pytest.raises(BudgetExhausted):
+        list(RULE.run(target, ctx))
+
+    assert len(transport.keys) == 2
+    assert ctx.recorded() == ()
+
+
+def test_a_run_that_asked_fails_on_a_route_taking_any_key_and_passes_a_checked_one() -> None:
+    any_key, _ = _keyed()
+    checked, _ = _keyed(invalid=_REFUSED)
+
+    assert _verify(any_key).gate is GateOutcome.FAIL
+    assert _verify(checked).gate is GateOutcome.PASS
+    assert _verify(_keyed(invalid=_UNAVAILABLE)[0]).gate is GateOutcome.INDETERMINATE
+
+
 def _verify(target: EndpointTarget, profile: Profile = _ONLY_THIS_RULE) -> Verification:
     return Verifier(trust=PluginTrust(mode=PluginMode.BUILTINS), profile=profile).run(target)
 

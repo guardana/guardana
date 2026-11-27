@@ -95,7 +95,7 @@ The [generated rule summary](docs/generated/rule-summary.md) counts 59 built-in 
 | `guardana.agent.*` | 7 | runtime | tool-result injection, credential exfiltration, broad arguments, excessive use, memory poisoning, tool schemas, and MCP server manifests |
 | `guardana.mcp.*` | 10 | runtime | authentication, discovery, audience, session, scope, issuer, cache handling, task listings, and registry entries |
 | `guardana.a2a.*` | 3 | runtime | agent cards, callers without a credential, and one caller's view of another's tasks |
-| `guardana.endpoint.*` | 1 | runtime | chat completions returned to requests without a credential ([`--require-auth`](docs/usage-probe.md#checking-chat-endpoint-authentication)) |
+| `guardana.endpoint.*` | 1 | runtime | chat completions returned to requests without a credential or, with `--require-key-check`, with a generated key that cannot be valid ([`--require-auth`](docs/usage-probe.md#checking-chat-endpoint-authentication)) |
 | `guardana.trace.*` | 9 | runtime | recorded credential, identity, consent, policy, approval, retrieval, effect, and handoff boundaries |
 | `guardana.scenario.*` | 2 | runtime | multi-turn jailbreak and indirect-injection scenarios |
 | `guardana.tenancy.*` | 1 | runtime | another tenant's seeded data reaching a reply, asked through the application's own index |

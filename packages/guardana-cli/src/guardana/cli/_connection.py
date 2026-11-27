@@ -64,6 +64,15 @@ RequireAuthOption = Annotated[
         "requests. An inconclusive or unfinished check makes the run indeterminate.",
     ),
 ]
+RequireKeyCheckOption = Annotated[
+    bool,
+    typer.Option(
+        "--require-key-check",
+        help="Check if the chat route refuses a generated invalid key. Requires --require-auth. "
+        "Up to three requests. An inconclusive or unfinished check makes the run "
+        "indeterminate unless a finding fails it.",
+    ),
+]
 
 
 def resolve_flags(  # noqa: PLR0913 — one argument per connection flag
@@ -106,6 +115,7 @@ def endpoint_for(
     system_prompt: str | None = None,
     meter: UsageMeter | None = None,
     require_auth: bool = False,
+    require_key_check: bool = False,
 ) -> EndpointTarget:
     """Build the endpoint a resolved connection describes, through the CLI's transport seam.
 
@@ -117,7 +127,19 @@ def endpoint_for(
         meter=meter,
         transport=substitute,
         inference_access_check=require_auth,
+        inference_key_check=require_key_check,
     )
+
+
+def refuse_a_key_check_without_the_access_check(
+    *, require_auth: bool, require_key_check: bool
+) -> None:
+    """Refuse `--require-key-check` alone: its request extends the `--require-auth` check."""
+    if require_key_check and not require_auth:
+        raise typer.BadParameter(
+            "--require-key-check needs --require-auth; it adds a request with a key that "
+            "cannot be valid to that check"
+        )
 
 
 def refuse_an_access_check_it_cannot_make(

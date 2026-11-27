@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import re
+import secrets
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -640,8 +641,20 @@ class UrllibTransport:
         return replace(reply, via_proxy=proxied)
 
 
+INVALID_KEY_PREFIX = "guardana-invalid-key-"
+"""How every generated invalid key starts, so a route's logs show what sent it."""
+
+
+def invalid_key(configured: str | None) -> str:
+    """Return a bearer value no server issued: random, and never the configured key."""
+    while True:
+        value = INVALID_KEY_PREFIX + secrets.token_urlsafe(32)
+        if value != configured:
+            return value
+
+
 ACCESS_CHECK_PROMPT = "Reply with the single word OK."
-"""The synthetic question both legs of an access check send; it asks for a one-word answer."""
+"""The synthetic question every request of an access check sends; it asks for a one-word answer."""
 
 
 def _access_reply_for_status(code: int) -> AccessReply:
@@ -862,7 +875,10 @@ class EndpointTarget(Target):
         budgets: Budgets | None = None,
         meter: UsageMeter | None = None,
         inference_access_check: bool = False,
+        inference_key_check: bool = False,
     ) -> None:
+        if inference_key_check and not inference_access_check:
+            raise ValueError("inference_key_check extends the access check; it needs it too")
         scheme = urlsplit(base_url).scheme
         if scheme not in _ALLOWED_SCHEMES:
             # Never repeated: in `user:pw@host:8000` the "scheme" is the user name.
@@ -899,6 +915,7 @@ class EndpointTarget(Target):
         self._keeper: ExchangeKeeper | None = None
         self._kept_rule: str | None = None
         self._inference_access_check = inference_access_check
+        self._inference_key_check = inference_key_check
 
     def capabilities(self) -> set[Capability]:
         """Declare CHAT, plus PLANT_SYSTEM_PROMPT, CALL_TOOLS and INFERENCE_ACCESS when so."""
@@ -1137,12 +1154,43 @@ class EndpointTarget(Target):
         for the check, the transport cannot send one, the address carries a user part, or a
         credentialed request is asked for with no key configured.
         """
+        refused = self._refuse_access_request()
+        if refused is not None:
+            return refused
+        if credentials and not self._api_key:
+            return AccessReply(
+                AccessAnswer.UNDECIDED, None, "no key is configured for the control", sent=False
+            )
+        return self._send_access(self._api_key if credentials else None)
+
+    @property
+    def invalid_key_check(self) -> bool:
+        """Whether the run asked for the access request with a key that cannot be valid."""
+        return self._inference_key_check
+
+    def check_invalid_key(self) -> AccessReply:
+        """Send the access request once with a bearer value generated for it, through the meter.
+
+        Refused before sending on the grounds `check_access` names, and when the run did not
+        ask for it. The value is new for every call, differs from the configured key and is
+        never kept, so neither it nor the key reaches anything the run writes.
+        """
+        if not self._inference_key_check:
+            return AccessReply(
+                AccessAnswer.UNDECIDED, None, "the run did not ask for an invalid key", sent=False
+            )
+        refused = self._refuse_access_request()
+        if refused is not None:
+            return refused
+        return self._send_access(invalid_key(self._api_key))
+
+    def _refuse_access_request(self) -> AccessReply | None:
+        """Say why no access request may be sent at all, or None when one may."""
         if not self._inference_access_check:
             return AccessReply(
                 AccessAnswer.UNDECIDED, None, "the run did not ask for an access check", sent=False
             )
-        transport = self._transport
-        if not isinstance(transport, AccessCheckingTransport):
+        if not isinstance(self._transport, AccessCheckingTransport):
             return AccessReply(
                 AccessAnswer.UNDECIDED,
                 None,
@@ -1157,11 +1205,13 @@ class EndpointTarget(Target):
                 "the endpoint URL carries a user part; name the route without credentials",
                 sent=False,
             )
-        if credentials and not self._api_key:
-            return AccessReply(
-                AccessAnswer.UNDECIDED, None, "no key is configured for the control", sent=False
-            )
-        key = self._api_key if credentials else None
+        return None
+
+    def _send_access(self, key: str | None) -> AccessReply:
+        """Send one access request carrying `key`, or no credential at all, and meter it."""
+        transport = self._transport
+        if not isinstance(transport, AccessCheckingTransport):
+            raise TypeError("an access request needs an AccessCheckingTransport")
         reply = self._spend(lambda: transport.check_access(self._base_url, self._model, key))
         self._meter.record_reply(reply.usage)
         return reply
