@@ -296,29 +296,38 @@ and in CI. A format name (`tflite`) is not a path and stays as it is.
 |---|---|
 | `.pkl`, `.pkl3`, `.pickle`, `.dill`, `.joblib`, `.pt`, `.pth`, `.th`, `.ckpt`, `.ptl`, `.pdparams`, `.mdl`, `.pth.tar`, `.pt.tar` | `guardana.supply_chain.pickle_opcode` |
 | `.npy`, and each `.npy` inside a `.npz`, or a `.bin`, `.sav`, `.p` or `.model` that starts with the NPY magic: an object array holds a pickle stream, a numeric one cannot | `guardana.supply_chain.pickle_opcode` |
-| `.bin` whose first bytes are a zip or a pickle stream (`pytorch_model.bin`); `.sav`, `.p` or `.model` whose first bytes are a pickle stream | `guardana.supply_chain.pickle_opcode` |
+| `.bin` whose first bytes are a zip or a pickle stream (`pytorch_model.bin`), and `.sav`, `.p` or `.model` whose first bytes are a pickle stream. The pickle stream must open with a protocol 2 to 5 `PROTO` header or have no `PROTO` header and import a callable with `GLOBAL` or `INST` within the first 64 KiB. | `guardana.supply_chain.pickle_opcode` |
 | a compressed pickle, checkpoint or array (`.pkl`, `.pickle` or `.joblib` followed by `.gz`, `.gzip`, `.z`, `.xz`, `.bz2` or `.lzma`; `.joblib.lz4`; `.pt.gz`; `.pth.gz`; `.ckpt.gz`; `.npy.gz`, read as an NPY array when it decompresses to one) | `guardana.supply_chain.pickle_opcode` |
-| a `.dat`, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a `.dat.gz` or `.dat` with another codec above, or a file named only by a codec (`clf.gz`, as `joblib.dump` writes it, or `.gzip`, `.z`, `.xz`, `.bz2`, `.lzma`, `.lz4`), read when it decompresses to a pickle | `guardana.supply_chain.pickle_opcode` |
+| a `.dat`, or a file with no suffix, whose first bytes are a pickle stream (listed as a model if it opens with a protocol 2 to 5 `PROTO` header or has no `PROTO` header and imports a callable with `GLOBAL` or `INST` within the first 64 KiB. Other pickles without `PROTO` are read without being listed); a `.dat.gz` or `.dat` with another codec above, or a file named only by a codec (`clf.gz`, as `joblib.dump` writes it, or `.gzip`, `.z`, `.xz`, `.bz2`, `.lzma`, `.lz4`), read when it decompresses to a pickle | `guardana.supply_chain.pickle_opcode` |
 | `.onnx` | `guardana.supply_chain.onnx_graph` |
 | `.keras`, `.h5`, `.hdf5`; a `.bin`, `.model`, `.hdf`, `.weights` or `.tf` that holds the HDF5 signature at its start or after a userblock; a file with no suffix that holds it in its first 64 KiB; a `config.json` beside `metadata.json`, `model.weights.h5` or `model.weights.npz` (an unzipped Keras model directory); a tf_keras SavedModel's `keras_metadata.pb` | `guardana.supply_chain.keras_lambda` |
 | `.gguf` | `guardana.supply_chain.chat_template` |
 | `.safetensors`, `.pmml` | `guardana.supply_chain.model_format` |
 | `saved_model.pb`, `saved_model.pbtxt` (the text form TensorFlow loads when there is no `.pb`; its `op` values are decoded as protobuf decodes them, and one that cannot be decoded is a shortfall) | `guardana.supply_chain.saved_model_ops` |
 | `model.tar.gz` (a SageMaker model), read for its members like any compressed tar (below); one holding no member named as a model is still a shortfall | `guardana.supply_chain.pickle_opcode` |
+| a plain `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tbz`, `.tar.xz` or `.txz` holding a file member named as a model (a model suffix from the table, `.bin`, `.sav`, `.p`, `.model`, `.package`, `.dat`, `.pkl.gz`, `saved_model.pb`, `pickle`, `storages` or `tensors`), or whose member listing cannot finish within the bounds below. The archive's bytes determine its format, `zip-archive` or `tar-archive`. | `guardana.supply_chain.pickle_opcode` |
 | `.tflite`, `.mar`, `.nemo`, `.llamafile`, a `.bin` that starts like GGUF or GGML | no built-in rule |
 
-A `.bin`, `.sav`, `.p`, `.model` or `.dat`, or a file with no suffix, whose first bytes match
-none of those is not listed as a model.
-For these suffixes and files with no suffix, a protocol 2 to 5 `PROTO` header is enough to list
-the file as a pickle model component. `pickle_opcode` counts the component as examined once it
-reads the file, even if every unpickler rejects the byte immediately after the header as an
-invalid opcode.
+A plain archive is listed by the last part of its file members' paths, ignoring case.
+Directories and `.h5` or `.hdf5` members are excluded. An archive counts as holding a model
+if listing cannot finish due to damage or truncation, over 100,000 declared zip entries,
+a global PAX header that names, sizes or lays out later tar members, a tar member given
+more than one name or PAX header, an extended header exceeding 1 MiB, over 1,000,000 header
+blocks, over 1,024 compressed streams, or compressed tar expansion past the larger of 64 MiB
+and 32 times its compressed size. A `.bin`, `.sav`, `.p`, `.model` or `.dat`, or
+a file with no suffix, is listed as a model only if its first bytes match a format above.
+A protocol 2 to 5 `PROTO` header is enough to list it as a pickle model component. For
+protocols 0 and 1 without `PROTO`, only streams that import a callable with `GLOBAL` or
+`INST` within the first 64 KiB are listed. `pickle_opcode` also reads streams without such
+imports. `pickle_opcode` counts the component as examined once it reads the file, even if
+every unpickler rejects the byte immediately after the header as an invalid opcode.
 A `.dat`, a file with no suffix or a file named only by
 a codec costs `pickle_opcode` one read of its first 64 KiB, and a file with no suffix the same one read for
 `keras_lambda`: a pickle, a compressed pickle, an NPY array or an archive holding a model is
 read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
 them, is left alone without a result. A zip or tar under such a name is read like a plain
-`.zip` or `.tar`. Zstandard (zstd) data is never decompressed, on any Python version: such a
+`.zip` or `.tar`. The inventory reads each plain archive once per scan without extracting members, using a zip's end records and central directory or a tar's headers and decompressing compressed tars up to the first member named as a model, the end or the bound. `pickle_opcode` reads the archive separately.
+Zstandard (zstd) data is never decompressed, on any Python version: such a
 file whose first bytes are a zstd frame or a zstd skippable frame is a coverage shortfall.
 Named only by a codec includes `bundle.zst`, `x.dat.zst` and a `.zst` or `.zstd` named as a
 model, an archive or another codec (`model.pkl.zst`, `bundle.zip.zst`, `weights.tgz.zst`, which

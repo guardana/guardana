@@ -8,7 +8,7 @@ import tarfile
 import zlib
 
 import pytest
-from guardana.core.formats.content import loader_reads
+from guardana.core.formats.content import loader_reads, raw_pickle_imports, starts_as_tar
 
 _SYSTEM = b"cos\nsystem\n(S'id'\ntR."
 
@@ -94,3 +94,46 @@ def test_a_head_that_is_still_a_pickle_where_it_ends_asks_for_more() -> None:
 
     assert loader_reads(head, cut=True) is None
     assert loader_reads(head, cut=False) is False
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        _SYSTEM,
+        b"ccollections\nOrderedDict\n)R.",
+        b"(icollections\nOrderedDict\n(dp0\nb.",
+        b"(lp0\nI1\nacos\nsystem\n(S'id'\ntR.",
+    ],
+)
+def test_a_pickle_with_no_header_naming_a_dotted_callable_counts(head: bytes) -> None:
+    assert raw_pickle_imports(head, cut=False) is True
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        b"(dp0\nVw\np1\nI1\ns.",
+        b"(lp0\nI1\naI2\na.",
+        b"cbuiltins\n\n.",
+        b"MIT License\n" * 20,
+        b"\x1f\x8b\x08\x00" + _SYSTEM,
+        b"PK\x03\x04" + _SYSTEM,
+        _tar(),
+    ],
+)
+def test_a_head_that_names_no_dotted_callable_or_is_no_raw_pickle_does_not_count(
+    head: bytes,
+) -> None:
+    assert raw_pickle_imports(head, cut=False) is False
+
+
+def test_a_raw_pickle_that_reads_on_past_its_head_asks_for_more() -> None:
+    head = b"(lp0\nI1\naI2\na"
+
+    assert raw_pickle_imports(head, cut=True) is None
+    assert raw_pickle_imports(head, cut=False) is False
+
+
+def test_a_tar_header_starts_a_tar_and_text_does_not() -> None:
+    assert starts_as_tar(_tar())
+    assert not starts_as_tar(b"MIT License\n" * 100)

@@ -13,8 +13,15 @@ a scan should not pay for twice, and belongs to whoever needs the depth.
 import os
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from pathlib import Path, PurePath
+from typing import BinaryIO
 
-from guardana.core.formats.content import FIRST_READ_BYTES, HEAD_MAX_BYTES, loader_reads
+from guardana.core.formats.archive_members import ArchiveKind, holding_kind
+from guardana.core.formats.content import (
+    FIRST_READ_BYTES,
+    HEAD_MAX_BYTES,
+    loader_reads,
+    raw_pickle_imports,
+)
 from guardana.core.formats.hdf5 import (
     HDF5_HEAD_BYTES,
     find_hdf5_signature,
@@ -103,7 +110,8 @@ _BIN_SIGNATURES: tuple[tuple[bytes, str], ...] = (
 `.bin` names model weights, firmware and test data alike, so it is a component only
 when its first bytes say which model container it is; one that says nothing is not
 listed."""
-_PICKLE_SIGNATURES = tuple(entry for entry in _BIN_SIGNATURES if entry[1] == "pickle")
+_PICKLE = "pickle"
+_PICKLE_SIGNATURES = tuple(entry for entry in _BIN_SIGNATURES if entry[1] == _PICKLE)
 _SNIFFED_SUFFIXES: dict[str, tuple[tuple[bytes, str], ...]] = {
     _BIN_SUFFIX: _BIN_SIGNATURES,
     ".sav": _PICKLE_SIGNATURES,
@@ -170,6 +178,25 @@ _NAMED_LIKE_MODEL_SUFFIXES = frozenset({".bin", ".model", ".sav"})
 """Suffixes the inventory lists only by their first bytes, counted by name where no file
 is opened: model weights carry them as often as anything else does."""
 _DATASET_SUFFIXES = frozenset({".parquet", ".jsonl", ".arrow"})
+_LISTED_ARCHIVE_ENDINGS = (
+    ".zip",
+    ".tar",
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tbz",
+    ".tar.xz",
+    ".txz",
+)
+"""Archives a person extracts before loading a member by its name, listed by what they hold."""
+_ARCHIVED_MODEL_SUFFIXES = frozenset({".bin", ".sav", ".p", ".model", ".package", ".dat"})
+"""Suffixes a member is loaded by once extracted, which a file on disk is listed by only when
+its first bytes say so: an archive is listed by its member names alone."""
+_ARCHIVED_TORCH_NAMES = frozenset({"pickle", "storages", "tensors"})
+"""The members of a checkpoint saved before `torch.save` wrote zips, kept as files of their own."""
+_ARCHIVED_DATASET_SUFFIXES = frozenset({".h5", ".hdf5"})
+"""HDF5 holds datasets as often as Keras models, so inside a plain archive it is not named."""
 _MANIFEST_PREFIX = "requirements"
 
 
@@ -208,17 +235,34 @@ def _sniffed_format(
         return None
     try:
         with path.open("rb") as handle:
-            head = handle.read(HDF5_HEAD_BYTES if head_only else 4)
+            head = handle.read((HDF5_HEAD_BYTES if head_only else FIRST_READ_BYTES) + 1)
             named = next((name for magic, name in signatures if head.startswith(magic)), None)
-            if named is not None or not hdf5:
+            if named is not None:
                 return named
+            if _PICKLE_SIGNATURES[0] in signatures and _raw_pickle(handle, head):
+                return _PICKLE
+            if not hdf5:
+                return None
             if head_only:
-                found = find_hdf5_signature_in_head(head)
+                found = find_hdf5_signature_in_head(head[:HDF5_HEAD_BYTES])
             else:
                 found = find_hdf5_signature(handle, os.fstat(handle.fileno()).st_size)
             return _KERAS_HDF5 if found is not None else None
     except OSError:
         return None
+
+
+def _raw_pickle(handle: BinaryIO, head: bytes) -> bool:
+    """Whether the file open on `handle`, whose first bytes are `head`, is a pickle with no header.
+
+    Such a pickle (protocol 0 or 1) counts only when it imports a callable, judged in the first
+    `HEAD_MAX_BYTES`, read further only while the bytes still read as a pickle to their end.
+    """
+    found = raw_pickle_imports(head[:FIRST_READ_BYTES], cut=len(head) > FIRST_READ_BYTES)
+    if found is None:
+        head += handle.read(HEAD_MAX_BYTES + 1 - len(head))
+        found = raw_pickle_imports(head[:HEAD_MAX_BYTES], cut=len(head) > HEAD_MAX_BYTES)
+    return found is True
 
 
 def _named_format(suffix: str, name: str) -> str | None:
@@ -270,6 +314,32 @@ def named_as_model(name: str) -> bool:
     """
     lowered = name.lower()
     return _named_format(PurePath(lowered).suffix, lowered) is not None
+
+
+def named_as_archived_model(member: str) -> bool:
+    """Whether a member of a plain archive is named as a model a person loads once it is extracted.
+
+    `member` is the path inside the archive; only its last part counts, in any case.
+    """
+    base = member.rsplit("/", 1)[-1].lower()
+    suffix = base[base.rfind(".") :] if "." in base else ""
+    if base in _ARCHIVED_TORCH_NAMES or suffix in _ARCHIVED_MODEL_SUFFIXES:
+        return True
+    return suffix not in _ARCHIVED_DATASET_SUFFIXES and _named_format(suffix, base) is not None
+
+
+def archive_holding_model(path: Path) -> ArchiveKind | None:
+    """Return what the plain archive at `path` is when it holds a member named as a model.
+
+    A `.zip`, a `.tar` or a compressed tar that no other name makes a model file, read for its
+    member names within bounds; one that cannot be listed to its end counts as holding one.
+    """
+    name = path.name.lower()
+    if not name.endswith(_LISTED_ARCHIVE_ENDINGS):
+        return None
+    if _named_format(PurePath(name).suffix, name) is not None or not _regular_file(path):
+        return None
+    return holding_kind(path, named_as_archived_model)
 
 
 def named_like_model(name: str) -> bool:
@@ -414,6 +484,9 @@ def _classify(
     model_format = _model_format(path, suffix, name) or _directory_format(path, listed)
     if model_format is not None:
         return ObservationKind.MODEL, {"format": model_format}
+    archive = archive_holding_model(path)
+    if archive is not None:
+        return ObservationKind.MODEL, {"format": f"{archive}-archive"}
     if name in _MANIFEST_NAMES or (name.startswith(_MANIFEST_PREFIX) and suffix == ".txt"):
         return ObservationKind.DEPENDENCY_MANIFEST, {}
     if suffix in _DATASET_SUFFIXES:
