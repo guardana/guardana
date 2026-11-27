@@ -12,10 +12,14 @@ import textwrap
 
 import pytest
 from guardana.core.budget import BudgetExhausted, Budgets
-from guardana.core.target import Capability, EndpointTarget
-from guardana.core.target.access import AccessAnswer, AccessCheckingTransport
-from guardana.core.target.endpoint import ACCESS_CHECK_PROMPT, UrllibTransport
-from guardana.core.testing import ScriptedTransport
+from guardana.core.target import Capability, EndpointTarget, InvalidKeyCheck
+from guardana.core.target.access import AccessAnswer, AccessCheckingTransport, AccessReply
+from guardana.core.target.endpoint import (
+    ACCESS_CHECK_PROMPT,
+    INVALID_KEY_PREFIX,
+    UrllibTransport,
+)
+from guardana.core.testing import ScriptedAccessTransport, ScriptedTransport
 from guardana.core.testing._fake_provider import (
     FakeProvider,
     Scripted,
@@ -29,6 +33,7 @@ from guardana.core.testing._fake_provider import (
 )
 
 _KEY = "sk-test-not-a-real-key"
+_REFUSED = AccessReply(AccessAnswer.REFUSED, 401, "refused with HTTP 401")
 _PROXY_VARIABLES = ("http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY")
 
 
@@ -168,6 +173,79 @@ def test_a_transport_that_cannot_send_an_access_check_is_never_asked_to() -> Non
 
     assert (reply.answer, reply.sent) == (AccessAnswer.UNDECIDED, False)
     assert transport.seen == []
+
+
+def _keyed(url: str, **kwargs: object) -> EndpointTarget:
+    return _asked(url, api_key=_KEY, inference_key_check=True, **kwargs)
+
+
+def test_the_invalid_key_request_carries_a_generated_bearer_value_and_never_the_key() -> None:
+    with FakeProvider(status_reply(401)) as provider:
+        reply = _keyed(provider.url).check_invalid_key()
+
+    assert reply.answer is AccessAnswer.REFUSED
+    (sent,) = provider.requests
+    bearer = sent.headers["authorization"].removeprefix("Bearer ")
+    assert bearer.startswith(INVALID_KEY_PREFIX)
+    assert len(bearer) > len(INVALID_KEY_PREFIX) + 40
+    assert _KEY not in repr(sent)
+    assert bearer not in repr(reply)
+
+
+def test_every_invalid_key_request_sends_a_new_value() -> None:
+    transport = ScriptedAccessTransport(_REFUSED)
+    target = EndpointTarget(
+        "http://127.0.0.1:9",
+        "m",
+        api_key=_KEY,
+        transport=transport,
+        inference_access_check=True,
+        inference_key_check=True,
+    )
+
+    target.check_invalid_key()
+    target.check_invalid_key()
+
+    first, second = transport.keys
+    assert first != second
+    assert _KEY not in transport.keys
+
+
+def test_the_invalid_key_request_is_sent_only_when_the_run_asked_for_it() -> None:
+    with FakeProvider(openai_reply("OK")) as provider:
+        target = _asked(provider.url, api_key=_KEY)
+        reply = target.check_invalid_key()
+
+    assert isinstance(target, InvalidKeyCheck)
+    assert not target.invalid_key_check
+    assert (reply.answer, reply.sent) == (AccessAnswer.UNDECIDED, False)
+    assert provider.requests == []
+    assert _keyed(provider.url).invalid_key_check
+
+
+def test_an_address_with_a_user_part_gets_no_invalid_key_request_either() -> None:
+    with FakeProvider(openai_reply("OK")) as provider:
+        host = provider.url.removeprefix("http://")
+        reply = _keyed(f"http://user:pw@{host}").check_invalid_key()
+
+    assert (reply.answer, reply.sent) == (AccessAnswer.UNDECIDED, False)
+    assert provider.requests == []
+
+
+def test_an_invalid_key_request_without_the_access_check_is_refused_at_construction() -> None:
+    with pytest.raises(ValueError, match="needs it too"):
+        EndpointTarget("http://127.0.0.1:9", "m", inference_key_check=True)
+
+
+def test_the_invalid_key_request_counts_against_the_run_budget() -> None:
+    with FakeProvider(status_reply(401), openai_reply("OK")) as provider:
+        target = _keyed(provider.url, budgets=Budgets(max_requests=2))
+        target.check_access(credentials=False)
+        target.check_access(credentials=True)
+        with pytest.raises(BudgetExhausted):
+            target.check_invalid_key()
+
+    assert len(provider.requests) == 2
 
 
 def test_each_request_counts_against_the_run_budget_and_its_usage() -> None:

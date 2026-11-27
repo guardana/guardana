@@ -21,11 +21,13 @@ from guardana.cli._connection import (
     ModelOption,
     ProviderOption,
     RequireAuthOption,
+    RequireKeyCheckOption,
     SystemPromptFileOption,
     UrlOption,
     endpoint_for,
     read_fixtures,
     read_system_prompt,
+    refuse_a_key_check_without_the_access_check,
     refuse_an_access_check_it_cannot_make,
     resolve_flags,
     resolve_tenants,
@@ -457,6 +459,7 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
     system_prompt_file: SystemPromptFileOption = None,
     fixtures: FixturesOption = None,
     require_auth: RequireAuthOption = False,
+    require_key_check: RequireKeyCheckOption = False,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
     format: Annotated[ReportFormat, typer.Option(help="human|json")] = ReportFormat.human,
@@ -578,6 +581,9 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
             "--fixtures asks the seeded items through --url, once per tenant; an MCP server "
             "or an A2A agent holds none"
         )
+    refuse_a_key_check_without_the_access_check(
+        require_auth=require_auth, require_key_check=require_key_check
+    )
     if require_auth:
         elsewhere = [f for f, v in (("--target", target), ("--mcp", mcp), ("--a2a", a2a)) if v]
         if elsewhere:
@@ -630,6 +636,7 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
             system_prompt_file=system_prompt_file,
             fixtures=seeded,
             require_auth=require_auth,
+            require_key_check=require_key_check,
         ),
     )
     try:
@@ -802,6 +809,7 @@ def _plan_probe_target(  # noqa: PLR0913 — one argument per connection flag
     system_prompt_file: Path | None,
     fixtures: Fixtures | None = None,
     require_auth: bool = False,
+    require_key_check: bool = False,
 ) -> Target:
     """Build the endpoint, MCP or A2A target without contacting it, seeded when given fixtures."""
     if a2a is not None:
@@ -813,7 +821,12 @@ def _plan_probe_target(  # noqa: PLR0913 — one argument per connection flag
         endpoint_url, model_name, provider=provider, adapter=adapter, sending=False
     )
     prompt = system_prompt_the_probe_will_send(system_prompt_file)
-    endpoint = endpoint_for(connection, system_prompt=prompt, require_auth=require_auth)
+    endpoint = endpoint_for(
+        connection,
+        system_prompt=prompt,
+        require_auth=require_auth,
+        require_key_check=require_key_check,
+    )
     if fixtures is None:
         return endpoint
     written = Connection(endpoint_url, model_name, provider=provider, adapter=adapter)

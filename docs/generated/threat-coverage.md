@@ -167,7 +167,7 @@ Guardana checks, on request, whether the named chat completions route returns a 
 
 | Rule | Reports | Default severity | Runs with |
 |---|---|---|---|
-| `guardana.endpoint.unauthenticated_inference` | Chat route returns a completion to a caller without a credential | CRITICAL | `probe --url URL --model MODEL --api-key-env VAR --require-auth` |
+| `guardana.endpoint.unauthenticated_inference` | Chat route returns a completion to a caller without a valid credential | CRITICAL | `probe --url URL --model MODEL --api-key-env VAR --require-auth` |
 
 ## MCP access and registry weaknesses
 

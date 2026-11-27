@@ -79,7 +79,7 @@ A framework mapping says a rule is relevant to that entry, not that the entry is
 
 ### Tested invariant
 
-- `guardana.endpoint.unauthenticated_inference`: Chat route returns a completion to a caller without a credential
+- `guardana.endpoint.unauthenticated_inference`: Chat route returns a completion to a caller without a valid credential
 
 ### Framework entries these rules are relevant to, not coverage of them
 

@@ -3,7 +3,13 @@ from collections.abc import Sequence
 from itertools import chain, repeat
 
 from guardana.core.target.access import AccessAnswer, AccessReply
-from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply, ToolSpec
+from guardana.core.target.endpoint import (
+    INVALID_KEY_PREFIX,
+    ChatMessage,
+    ToolCall,
+    ToolCallReply,
+    ToolSpec,
+)
 
 _REFUSAL_REPLY = "I cannot help with that."
 _COMPLETED = AccessReply(AccessAnswer.COMPLETION, 200, "answered with a chat completion")
@@ -51,10 +57,12 @@ class RefusingTransport(ScriptedTransport):
 
 
 class ScriptedAccessTransport(ScriptedTransport):
-    """A chat route that answers an access request by whether it carried a key.
+    """A chat route that answers an access request by the key it carried.
 
-    A request with no key gets `anonymous`, one with a key gets `credentialed`;
-    `asked` records, in order, whether each request carried one. Chat requests are
+    A request with no key gets `anonymous`, one with the generated invalid key gets
+    `invalid_key`, and one with any other key gets `credentialed`; left out, `invalid_key`
+    is `credentialed`, a route that answers any key alike. `asked` records, in order,
+    whether each request carried a key, and `keys` what it carried. Chat requests are
     answered as `ScriptedTransport` answers them.
     """
 
@@ -62,16 +70,25 @@ class ScriptedAccessTransport(ScriptedTransport):
         self,
         anonymous: AccessReply,
         credentialed: AccessReply = _COMPLETED,
+        *,
+        invalid_key: AccessReply | None = None,
     ) -> None:
         super().__init__("OK")
         self.anonymous = anonymous
         self.credentialed = credentialed
+        self.invalid_key = credentialed if invalid_key is None else invalid_key
         self.asked: list[bool] = []
+        self.keys: list[str | None] = []
 
     def check_access(self, base_url: str, model: str, api_key: str | None) -> AccessReply:
-        """Record whether a key was sent and answer as scripted for that caller."""
+        """Record the key that was sent and answer as scripted for that caller."""
         self.asked.append(api_key is not None)
-        return self.anonymous if api_key is None else self.credentialed
+        self.keys.append(api_key)
+        if api_key is None:
+            return self.anonymous
+        if api_key.startswith(INVALID_KEY_PREFIX):
+            return self.invalid_key
+        return self.credentialed
 
 
 class EchoingTransport:

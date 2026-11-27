@@ -2106,6 +2106,19 @@
         "secondary_opts": []
       },
       {
+        "flag": true,
+        "has_default": true,
+        "hidden": false,
+        "kind": "option",
+        "multiple": false,
+        "name": "require_key_check",
+        "opts": [
+          "--require-key-check"
+        ],
+        "required": false,
+        "secondary_opts": []
+      },
+      {
         "flag": false,
         "has_default": false,
         "hidden": false,
@@ -2547,6 +2560,19 @@
         "name": "require_auth",
         "opts": [
           "--require-auth"
+        ],
+        "required": false,
+        "secondary_opts": []
+      },
+      {
+        "flag": true,
+        "has_default": true,
+        "hidden": false,
+        "kind": "option",
+        "multiple": false,
+        "name": "require_key_check",
+        "opts": [
+          "--require-key-check"
         ],
         "required": false,
         "secondary_opts": []
@@ -7156,6 +7182,49 @@
         }
       }
     },
+    "guardana.core.target.protocols.InvalidKeyCheck": {
+      "bases": [
+        "Protocol"
+      ],
+      "decorators": [
+        "runtime_checkable"
+      ],
+      "defined_in": "guardana.core.target.protocols",
+      "fields": [],
+      "kind": "protocol",
+      "methods": {
+        "check_invalid_key": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "'AccessReply'"
+        },
+        "invalid_key_check": {
+          "async": false,
+          "decorators": [
+            "property"
+          ],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "bool"
+        }
+      }
+    },
     "guardana.core.target.protocols.RegistryEntryInspector": {
       "bases": [
         "Protocol"
@@ -9242,6 +9311,12 @@
               "has_default": true,
               "kind": "positional_or_keyword",
               "name": "credentialed"
+            },
+            {
+              "annotation": "AccessReply | None",
+              "has_default": true,
+              "kind": "keyword_only",
+              "name": "invalid_key"
             }
           ],
           "returns": "None"

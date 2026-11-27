@@ -5,6 +5,7 @@ the request with no credential first and bare, the keyed one only after a refusa
 nothing at all when the flags rule the check out.
 """
 
+import itertools
 import json
 import re
 from pathlib import Path
@@ -14,7 +15,12 @@ from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.report import load_report
 from guardana.core.report.shortfall import ShortfallKind
-from guardana.core.testing._fake_provider import FakeProvider, openai_reply, status_reply
+from guardana.core.testing._fake_provider import (
+    FakeProvider,
+    RecordedRequest,
+    openai_reply,
+    status_reply,
+)
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -209,3 +215,113 @@ def test_a_plan_that_asks_for_the_check_and_excludes_it_cannot_pass(setup: Path)
     assert code == ExitCode.INVALID_USAGE, output
     assert "coverage shortfall" in _plain(output)
     assert _RULE_ID in _plain(output)
+
+
+_BOTH = ("--api-key-env", "ACME_KEY", "--require-auth", "--require-key-check")
+
+
+def _bearer(sent: RecordedRequest) -> str:
+    return sent.headers["authorization"].removeprefix("Bearer ")
+
+
+def test_a_route_serving_a_key_that_cannot_be_valid_fails_the_run(setup: Path) -> None:
+    with FakeProvider(status_reply(401), openai_reply("OK"), openai_reply("OK")) as provider:
+        code, output = _probe(setup, provider.url, *_BOTH)
+
+    assert code == ExitCode.POLICY_FAILED, output
+    anonymous, control, invalid = provider.requests
+    assert "authorization" not in anonymous.headers
+    assert _bearer(control) == _KEY
+    assert _bearer(invalid) not in ("", _KEY)
+    assert _KEY not in _bearer(invalid)
+    saved = (setup / "run.json").read_text(encoding="utf-8")
+    assert _bearer(invalid) not in saved
+    assert _KEY not in saved
+    (finding,) = load_report(setup / "run.json").result.findings
+    assert (finding.rule_id, finding.severity.name) == (_RULE_ID, "CRITICAL")
+
+
+def test_a_route_refusing_a_key_that_cannot_be_valid_passes_after_three_requests(
+    setup: Path,
+) -> None:
+    with FakeProvider(status_reply(401), openai_reply("OK"), status_reply(401)) as provider:
+        code, output = _probe(setup, provider.url, *_BOTH)
+
+    assert code == ExitCode.OK, output
+    assert len(provider.requests) == 3
+    assert load_report(setup / "run.json").result.findings == ()
+
+
+def test_any_other_answer_to_a_key_that_cannot_be_valid_is_indeterminate(setup: Path) -> None:
+    with FakeProvider(status_reply(401), openai_reply("OK"), status_reply(503)) as provider:
+        code, output = _probe(setup, provider.url, *_BOTH)
+
+    assert code == ExitCode.INDETERMINATE, output
+    assert len(provider.requests) == 3
+
+
+def _keep(setup: Path, name: str) -> Path:
+    return (setup / "run.json").rename(setup / name)
+
+
+def test_runs_with_and_without_the_key_check_are_never_compared_as_one_check(
+    setup: Path,
+) -> None:
+    replies = (status_reply(401), openai_reply("OK"))
+    runs = []
+    for name, flags, expected in (
+        ("keyed.json", _BOTH, ExitCode.POLICY_FAILED),
+        ("unkeyed.json", _BOTH[:3], ExitCode.OK),
+        ("keyed-again.json", _BOTH, ExitCode.POLICY_FAILED),
+    ):
+        with FakeProvider(*replies, openai_reply("OK")) as provider:
+            assert _probe(setup, provider.url, *flags)[0] == expected
+        runs.append(_keep(setup, name))
+
+    for before, after in itertools.pairwise(runs):
+        result = runner.invoke(app, ["diff", str(before), str(after)])
+
+        output = _plain(result.output)
+        assert result.exit_code == ExitCode.INDETERMINATE, output
+        assert "RESOLVED" not in output
+        assert "APPEARED" not in output
+        assert "graded differently" in output
+        assert _RULE_ID in output
+
+
+def test_the_key_check_alone_is_refused_before_anything_is_sent(setup: Path) -> None:
+    with FakeProvider(openai_reply("OK")) as provider:
+        code, output = _probe(
+            setup, provider.url, "--api-key-env", "ACME_KEY", "--require-key-check"
+        )
+
+    assert code == ExitCode.INVALID_USAGE, output
+    assert "--require-key-check needs --require-auth" in _plain(output)
+    assert provider.requests == []
+
+
+def test_the_key_check_beside_another_target_is_refused(setup: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "probe",
+            "--mcp",
+            "http://127.0.0.1:9/mcp",
+            "--require-key-check",
+            "--profile",
+            str(setup / "guardana.yaml"),
+        ],
+    )
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert "--require-key-check" in _plain(result.output)
+
+
+def test_the_plan_prices_the_invalid_key_request_only_when_asked(setup: Path) -> None:
+    code, output = _plan(setup, "--require-auth", "--require-key-check")
+    alone_code, alone = _plan(setup, "--require-key-check")
+
+    assert code == ExitCode.OK, output
+    assert _planned(output)["requests"] == {"min": 1, "max": 3}
+    assert alone_code == ExitCode.INVALID_USAGE, alone
+    assert "--require-key-check needs --require-auth" in _plain(alone)

@@ -487,11 +487,18 @@ cue. It describes Guardana's transports, not the servers behind them: whether vL
 SGLang, llama.cpp and TGI agree on streaming, finish reasons or usage metadata is still a
 claim to check per deployment, not a guarantee.</p>
 <h3 id="an-authentication-verdict-covers-one-route-from-one-machine">An authentication verdict covers one route from one machine</h3>
-<p>A pass of the <code>--require-auth</code> check does not show that the server refuses wrong or
-expired keys. It also does not show what a key is allowed to do. The verdict covers
-<code>POST &lt;base-url&gt;/v1/chat/completions</code> as reached from the machine running <code>guardana</code>,
-through its proxy if one is set. Other routes and access from other networks are outside
-the check.
+<p>A server that accepts any <code>Authorization</code> value can pass <code>--require-auth</code> alone.
+With <code>--require-key-check</code>, a pass means the route refused a request without a
+credential and a request with one generated key that cannot be valid, and returned a
+completion to the configured key. Expired or revoked keys, valid keys of other
+accounts, and what a key is allowed to do are outside the check. The generated key
+starts with the fixed prefix <code>guardana-invalid-key-</code> and need not match the
+configured key's format. A server that checks only format can refuse the generated
+key and still pass while serving any other key of the right format, so a pass leaves
+open whether the server checks that it issued the key.</p>
+<p>The verdict covers <code>POST &lt;base-url&gt;/v1/chat/completions</code> as reached from the machine
+running <code>guardana</code>, through its proxy if one is set. Other routes and access from other
+networks are outside the check.
 See <a href="usage-probe.html#checking-chat-endpoint-authentication">checking chat endpoint authentication</a>.</p>
 <h3 id="a-recipe-records-what-you-declare-about-the-subject">A recipe records what you declare about the subject</h3>
 <p><code>subject.kind</code> says whether an application or a model harness answered, and Guardana
