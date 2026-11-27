@@ -17,6 +17,7 @@ from enum import Enum, StrEnum
 from pathlib import Path
 from typing import IO
 
+from guardana.core.formats.content import HEAD_MAX_BYTES, raw_pickle_imports
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
@@ -1139,6 +1140,15 @@ def _bin_verdict(head: bytes, scan: "_OpcodeScan", *, cut: bool) -> bool | None:
     return False
 
 
+def _listed_as_pickle(head: bytes, *, cut: bool) -> bool:
+    """Whether the inventory lists a file opening with `head` as a pickle with no PROTO opcode.
+
+    Judged on the bytes the inventory judges, the first `HEAD_MAX_BYTES`.
+    """
+    within = head[:HEAD_MAX_BYTES]
+    return raw_pickle_imports(within, cut=cut or len(head) > len(within)) is True
+
+
 def _oversized_summary(oversized: bool) -> str | None:
     if not oversized:
         return None
@@ -1961,6 +1971,13 @@ class _FileReport:
     magic: bytes = b""
     """The first bytes of the file, as the read that judged it saw them."""
 
+    listed: bool = False
+    """Whether the file's head is a pickle with no PROTO opcode that imports a callable.
+
+    The inventory lists such a file as a pickle, and this rule read it as one: one whose
+    opcodes it judges as data is examined and found to hold nothing a load runs.
+    """
+
     @property
     def headed(self) -> bool:
         """Whether the file opens with the PROTO opcode of a pickle of protocol 2 to 5.
@@ -1969,6 +1986,11 @@ class _FileReport:
         every unpickler refuses is examined and found to hold nothing a load runs.
         """
         return self.magic.startswith(_PICKLE_HEADERS)
+
+    @property
+    def counted(self) -> bool:
+        """Whether the inventory lists the file as a pickle, whatever this rule's reading said."""
+        return self.headed or self.listed
 
     @property
     def numpy(self) -> bool:
@@ -2149,7 +2171,7 @@ class PickleOpcodeRule(ArtifactRule):
                 ctx.examined(path)
             else:
                 report = _FileReport(path, ctx)
-                if (yield from self._scan(report, by_content=True)) or report.headed:
+                if (yield from self._scan(report, by_content=True)) or report.counted:
                     ctx.examined(path)
         for path in target.iter_files(_COMPRESSED_SUFFIXES):
             yield from self._scan_compressed_name(path, ctx)
@@ -2190,7 +2212,7 @@ class PickleOpcodeRule(ArtifactRule):
     def _scan_head_read(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         """Scan a file whose name says nothing of its format; count it when it held a model."""
         report = _FileReport(path, ctx, head_only=True)
-        if (yield from self._scan(report, by_content=True)) or report.headed:
+        if (yield from self._scan(report, by_content=True)) or report.counted:
             ctx.examined(path)
 
     def _scan(
@@ -2556,6 +2578,7 @@ class PickleOpcodeRule(ArtifactRule):
             return False
         data, cut = head
         magic = report.magic = data[:_MAGIC_SNIFF_BYTES]
+        report.listed = _listed_as_pickle(data, cut=cut)
         if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
             as_zip = self._scan_zip(report)
             return (_opens_as_tar(magic) and self._scan_tar(report)) or as_zip
@@ -2693,6 +2716,7 @@ class PickleOpcodeRule(ArtifactRule):
             if probe is None:
                 report.unscanned(_UNREADABLE)
                 return True
+            report.listed = _listed_as_pickle(probe[0], cut=probe[1])
             scan = _scan_opcodes(probe[0], as_pickle=_AsPickle.SNIFFED, cut=probe[1])
             verdict = _bin_verdict(probe[0], scan, cut=probe[1])
             if verdict is False:

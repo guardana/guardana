@@ -15,8 +15,11 @@ rule can defend.
 import ast
 import collections
 import gzip
+import io
 import os
 import sys
+import tarfile
+import zipfile
 from collections.abc import Iterator
 from pathlib import Path
 from types import FrameType
@@ -255,6 +258,48 @@ def test_a_file_whose_name_says_nothing_costs_each_reader_one_read(
     assert all(count <= 1 for count in opens.values()), (
         f"opens per file and reader: {dict(opens)} — a reader opens a file whose name says "
         f"nothing more than once to find out it is no model"
+    )
+
+
+def _tar(members: dict[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as archive:
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+def _zip(members: dict[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+def test_the_inventory_opens_an_honest_plain_archive_once(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A plain archive is listed by its member names, which costs one walk of its directory
+    # or headers; the rule asking whether the inventory lists it must not walk it again.
+    rows = b"a,b\n1,2\n" * 20_000
+    honest = {
+        "data.zip": _zip({"rows.csv": rows, "notes.txt": b"hello"}),
+        "notes.tar": _tar({"notes/a.txt": rows, "notes/b.md": b"# b"}),
+        "sdist.tar.gz": gzip.compress(_tar({"pkg-1.0/setup.py": b"", "pkg-1.0/a.py": rows})),
+    }
+    for name, content in honest.items():
+        (repo / name).write_bytes(content)
+    opens = _opens_by_reader(monkeypatch, set(honest))
+    result = _runner().run(ArtifactTarget(repo))
+    assert not [f for f in result.findings if f.rule_id == "guardana.supply_chain.pickle_opcode"]
+    assert {name for name, reader in opens if reader == "pickle_opcode"} == set(honest), (
+        "the rule did not read the archives, so the counts measure nothing"
+    )
+    assert {name: opens[name, "inventory"] for name in honest} == dict.fromkeys(honest, 1), (
+        f"opens per file and reader: {dict(opens)}"
     )
 
 

@@ -144,6 +144,34 @@ def loader_reads(head: bytes, *, cut: bool) -> bool | None:
         return None if data_cut else False
 
 
+def raw_pickle_imports(head: bytes, *, cut: bool) -> bool | None:
+    """Whether `head` starts an uncompressed pickle stream that names a callable it imports.
+
+    Only an import spelled on its own lines with a dotted name counts, as protocols 0 and 1
+    write one: an import whose name sits elsewhere is a byte random data spells often. False
+    for an archive, an NPY array or a compressed file; None when the bytes read as a pickle to
+    their end and the file goes on (`cut`).
+    """
+    if (
+        head.startswith(_SIGNATURES)
+        or _ZSTD_SKIPPABLE.match(head)
+        or _tar(head)
+        or _codec(head) is not None
+    ):
+        return False
+    try:
+        return _imports(head, named_only=True)
+    except _StreamEndError:
+        return False
+    except _RanOutError:
+        return None if cut else False
+
+
+def starts_as_tar(head: bytes) -> bool:
+    """Whether `tarfile` reads the first block of `head` as a header, or it carries the magic."""
+    return _tar(head)
+
+
 def _decompressed(head: bytes, *, cut: bool) -> tuple[bytes, bool] | None:
     """Decompress `head` as joblib would, within the bound.
 
@@ -191,11 +219,12 @@ def _tar(head: bytes) -> bool:
     return True
 
 
-def _imports(head: bytes) -> bool:
+def _imports(head: bytes, *, named_only: bool = False) -> bool:
     """Walk `head` as pickle streams, one after another, until one imports a callable.
 
     Arguments are skipped by their length and never checked, so the walk goes at least as far
-    as an unpickler does.
+    as an unpickler does. `named_only` counts only an import naming a dotted callable on its
+    own lines.
     """
     position = 0
     while position < len(head):
@@ -203,7 +232,7 @@ def _imports(head: bytes) -> bool:
         if op is None:
             raise _StreamEndError
         position += 1
-        if op.name in _IMPORTS:
+        if op.name in _IMPORTS and not named_only:
             return True
         if op.name in _IMPORT_LINES:
             module, name, position = _two_lines(head, position)
