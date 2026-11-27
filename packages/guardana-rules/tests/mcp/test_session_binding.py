@@ -9,10 +9,11 @@ from _offline import refuse_name_lookups
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile import default_profile
 from guardana.core.report import Finding
-from guardana.core.rule import RuleContext
+from guardana.core.rule import NotApplicable, RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import McpServerTarget
 from guardana.core.target._mcp_http import DiscoveryScope, RawReply, RedirectRefusedError
+from guardana.core.target._mcp_wire import LATEST_VERSION, LEGACY_VERSION
 from guardana.core.testing import ScriptedMcpServer
 from guardana.core.verify import Verifier
 from guardana.rules.mcp import McpSessionBindingRule
@@ -210,3 +211,33 @@ def test_an_empty_result_to_a_credential_less_listing_is_not_a_refusal() -> None
 
     assert outcomes(reported) == ["inconclusive"]
     assert "could not be read" in summaries(reported)[0]
+
+
+def _handshake_answered_unknown(status: int) -> _Answering:
+    """A server discovering only the modern revision whose `initialize` gets `-32601`."""
+    error = {"code": -32601, "message": "Method not found"}
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "error": error}).encode()
+
+    def unknown(method: str, presented: bool, before: int) -> RawReply | None:
+        return RawReply(status, {}, body) if method == "initialize" else None
+
+    server = guarded(protocol_versions=[LATEST_VERSION, LEGACY_VERSION], discovers=[LATEST_VERSION])
+    return _Answering(server, unknown)
+
+
+@pytest.mark.parametrize("status", [402, 409, 422, 451])
+def test_a_handshake_unknown_at_a_gateway_status_is_inconclusive_not_inapplicable(
+    status: int,
+) -> None:
+    reported = _through(_handshake_answered_unknown(status))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status} carrying JSON-RPC error -32601" in summaries(reported)[0]
+
+
+@pytest.mark.parametrize("status", [200, 400, 404, 405])
+def test_a_handshake_unknown_at_a_status_a_server_lacking_it_gives_has_no_sessions(
+    status: int,
+) -> None:
+    with pytest.raises(NotApplicable, match="issues no session id"):
+        _through(_handshake_answered_unknown(status))
