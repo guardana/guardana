@@ -158,15 +158,17 @@ is reported not scanned (exit `2`) even when it holds no model, such as an image
 Exclude it with `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an
 archive), or scan the model's directory instead. [`guardana scan`](usage-scan.md) lists every bound.
 
-### Pickled dtype layouts, out-of-band arrays and sparse tensors are unverified
+### Some pickled `numpy` dtypes, out-of-band arrays and sparse tensors are unverified
 
-Pickles holding `numpy` dtype fields or subarrays, arrays over out-of-band buffers, or
-sparse tensors, are unverified even when `numpy` or `torch` writes them (`indeterminate`,
-exit `2`, unless another finding fails the run). scikit-learn decision trees and random
-forests saved with `pickle` hold such a dtype and retain their `CRITICAL` import finding.
-Use a format that is not a pickle, such as `safetensors`, or exclude the file with
-`rules.paths_exclude`. Load untrusted pickles only with a loader that enforces its own
-allowlist, such as `torch.load(..., weights_only=True)`.
+Pickled `numpy` dtypes are unverified even when `numpy` writes them if they have fields or
+subarrays that hold objects, more than 64 fields, a non-text field title, or field names or
+dict keys stored as byte strings. Arrays over out-of-band buffers (pickle protocol 5) and
+sparse tensors are unverified even when `numpy` or `torch` writes them. These cases return
+`indeterminate` (exit `2`), unless another finding fails the run.
+
+Use a non-pickle format such as `safetensors`, or exclude the file with `rules.paths_exclude`.
+Load untrusted pickles only with a loader that enforces its own allowlist, such as
+`torch.load(..., weights_only=True)`.
 
 ### Some archives of unpacked `torch.package` packages are not scanned
 

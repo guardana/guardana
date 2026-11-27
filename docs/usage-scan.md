@@ -163,10 +163,11 @@ named by its file: a pickle, archive or graph that does not parse, an archive me
 as a pickle (`data.pkl`, `*.pkl`, a legacy tar's `pickle`) that ends before its STOP, an
 NPY header whose `descr`, `shape` or `fortran_order` numpy would refuse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
-extension-registry code (`EXT1`, `EXT2`, `EXT4`), a pickle holding a `numpy` dtype with
-fields or a subarray (including scikit-learn decision trees and random forests saved with
-`pickle`), a dtype state the scanner cannot read, an array whose state or items it cannot
-read (state given as a list, as an array, or as what a call returns, and items made by a
+extension-registry code (`EXT1`, `EXT2`, `EXT4`), a `numpy` dtype with fields or a
+subarray in a layout the scanner cannot read, a change that may reach a `numpy` dtype's fields
+after `numpy` took them, a dtype state the scanner cannot read, an array or storage allocation whose
+contents the pickle leaves unset, a call to a `torch` storage class with arguments the
+scanner cannot read, an array whose state or items it cannot read (state given as a list, as an array, or as what a call returns, and items made by a
 call), state applied to what a call returns or to what a persistent id hands back when its kind
 is neither text nor what an import made (`torch` decodes a byte string, and a one-item
 text array equals its text) or it names a `torch.package` call, a call of what a call returns, a sparse tensor,
@@ -581,9 +582,12 @@ UTF-8 locale, Python's `tarfile` in its default PAX format and Python's `zipfile
 names as UTF-8. Windows `tar.exe` writing a zip stores such names as OEM code-page bytes
 without the UTF-8 flag. PowerShell `Compress-Archive` sets the flag. The
 summary also names the call that applies a state no `numpy` or Python pickler writes:
-`numpy.dtype.__setstate__` for forged dtype
-flags, byte order, item size or alignment, or an eight-item datetime or timedelta dtype
-state without its unit; `numpy.ndarray.__setstate__` for an object array given fewer items
+`numpy.dtype.__setstate__` for forged dtype flags, byte order, item size or alignment,
+an eight-item datetime or timedelta dtype state without its unit, or a layout with a field
+or title at a negative offset or ending past the item size, a subarray wider than the item,
+an item size that disagrees with the `V<n>` type string, object flags when the fields or
+subarray hold no objects, or flags outside one byte;
+`numpy.ndarray.__setstate__` for an object array given fewer items
 than its shape has elements; and `<module>.<class>.__setstate__` for a `BUILD` applied to an
 allowlisted class itself, such as `collections.Counter.__setstate__`, including one a
 `torch` legacy persistent id carries (the item after `"module"`, or a tar-format id's
