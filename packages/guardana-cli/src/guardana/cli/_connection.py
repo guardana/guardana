@@ -224,6 +224,7 @@ __all__ = [
     "ModelOption",
     "ProviderOption",
     "RequireAuthOption",
+    "RequireKeyCheckOption",
     "SystemPromptFileOption",
     "UrlOption",
     "endpoint_for",
