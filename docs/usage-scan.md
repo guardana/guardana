@@ -170,7 +170,8 @@ contents the pickle leaves unset, a call to a `torch` storage class with argumen
 scanner cannot read, an array whose state or items it cannot read (state given as a list, as an array, or as what a call returns, and items made by a
 call), state applied to what a call returns or to what a persistent id hands back when its kind
 is neither text nor what an import made (`torch` decodes a byte string, and a one-item
-text array equals its text) or it names a `torch.package` call, a call of what a call returns, a sparse tensor,
+text array equals its text) or it names a `torch.package` call, a call of what a call returns, a read of an
+out-of-band buffer with `NEXT_BUFFER` (pickle protocol 5, whose bytes are not in the file), a sparse tensor,
 a `torch._tensor._rebuild_from_type_v2` call whose arguments it cannot read, a
 `numpy.ndarray` call with unread arguments, an unread dtype, an offset other than 0 or
 strides over a buffer, or a buffer other than a byte string or `None`, a `_frombuffer` call

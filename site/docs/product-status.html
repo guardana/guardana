@@ -376,12 +376,12 @@ when listing it would cost more than listing a model. An archive of more than 10
 is reported not scanned (exit <code>2</code>) even when it holds no model, such as an image dataset.
 Exclude it with <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an
 archive), or scan the model's directory instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
-<h3 id="some-pickled-numpy-dtypes-out-of-band-arrays-and-sparse-tensors-are-unverified">Some pickled <code>numpy</code> dtypes, out-of-band arrays and sparse tensors are unverified</h3>
+<h3 id="some-pickled-numpy-dtypes-out-of-band-buffers-and-sparse-tensors-are-unverified">Some pickled <code>numpy</code> dtypes, out-of-band buffers and sparse tensors are unverified</h3>
 <p>Pickled <code>numpy</code> dtypes are unverified even when <code>numpy</code> writes them if they have fields or
 subarrays that hold objects, more than 64 fields, a non-text field title, or field names or
-dict keys stored as byte strings. Arrays over out-of-band buffers (pickle protocol 5) and
-sparse tensors are unverified even when <code>numpy</code> or <code>torch</code> writes them. These cases return
-<code>indeterminate</code> (exit <code>2</code>), unless another finding fails the run.</p>
+dict keys stored as byte strings. Reads of out-of-band buffers (pickle protocol 5), arrays
+over them included, and sparse tensors are unverified even when <code>numpy</code> or <code>torch</code> writes
+them. These cases return <code>indeterminate</code> (exit <code>2</code>), unless another finding fails the run.</p>
 <p>Use a non-pickle format such as <code>safetensors</code>, or exclude the file with <code>rules.paths_exclude</code>.
 Load untrusted pickles only with a loader that enforces its own allowlist, such as
 <code>torch.load(..., weights_only=True)</code>.</p>

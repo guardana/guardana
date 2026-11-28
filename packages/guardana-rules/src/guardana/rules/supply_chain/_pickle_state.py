@@ -271,6 +271,7 @@ SPARSE_TENSOR = "rebuilds a sparse tensor whose indices torch checks only with w
 REBUILD_UNREAD = "calls torch's _rebuild_from_type_v2 with arguments this scanner cannot read"
 NDARRAY_UNREAD = "calls numpy.ndarray with arguments this scanner cannot read"
 VIEW_UNREAD = "views memory this scanner cannot prove stays allocated"
+OUT_OF_BAND = "reads a buffer passed outside the pickle, whose contents this scanner cannot see"
 UNSET_MEMORY = "allocates an array or a storage whose contents nothing in the pickle sets"
 STORAGE_UNREAD = "calls a torch storage class with arguments this scanner cannot read"
 
