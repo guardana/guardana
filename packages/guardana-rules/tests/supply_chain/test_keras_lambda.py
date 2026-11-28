@@ -92,8 +92,111 @@ def test_no_lambda_no_finding(tmp_path: Path) -> None:
 
 
 def test_h5_without_marker_is_clean(tmp_path: Path) -> None:
-    (tmp_path / "model.h5").write_bytes(b"\x89HDF\r\n" + b'{"class_name": "Dense"}' + b"\x00")
+    (tmp_path / "model.h5").write_bytes(b"\x89HDF\r\n\x1a\n" + b'{"class_name": "Dense"}' + b"\x00")
     assert _findings(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param(b"cos\nsystem\n(S'echo x'\ntR.", id="a pickle stream"),
+        pytest.param(b"\x89HDF\r\n" + b'{"class_name": "Dense"}', id="a cut signature"),
+        pytest.param(b"", id="an empty file"),
+    ],
+)
+@pytest.mark.parametrize("name", ["model.h5", "model.hdf5", "model.H5"])
+def test_an_hdf5_name_without_the_signature_is_not_cleared(
+    tmp_path: Path, name: str, content: bytes
+) -> None:
+    (tmp_path / name).write_bytes(content)
+
+    findings = _findings(tmp_path)
+
+    assert findings == [
+        ("LOW", f"Keras model not scanned for Lambda layers: {keras_lambda._NOT_HDF5}")
+    ]
+    assert _unread(tmp_path) == [str(tmp_path / name)]
+
+
+def test_a_lambda_in_an_hdf5_name_without_the_signature_is_still_found(tmp_path: Path) -> None:
+    (tmp_path / "model.h5").write_bytes(b'{"class_name": "Lambda", "config": {}}')
+
+    assert [severity for severity, _ in _findings(tmp_path)] == ["HIGH"]
+    assert _unread(tmp_path) == []
+
+
+_SIGNATURE = b"\x89HDF\r\n\x1a\n"
+_PROTO_PICKLE = b"\x80\x02cos\nsystem\nq\x00X\x06\x00\x00\x00echo xq\x01\x85q\x02Rq\x03."
+
+
+def _behind_a_userblock(head: bytes, size: int, body: bytes = b'{"class_name": "Dense"}') -> bytes:
+    return head + b"\x00" * (size - len(head)) + _SIGNATURE + body
+
+
+@pytest.mark.parametrize("size", [512, 1024])
+@pytest.mark.parametrize("name", ["model.h5", "model.hdf5"])
+def test_an_hdf5_file_behind_a_userblock_is_clean(tmp_path: Path, name: str, size: int) -> None:
+    (tmp_path / name).write_bytes(_behind_a_userblock(b"", size))
+
+    assert _findings(tmp_path) == []
+    assert _unread(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        pytest.param(_PROTO_PICKLE, id="protocol 2"),
+        pytest.param(b"\x80\x00N.", id="protocol 0 with a PROTO opcode"),
+    ],
+)
+@pytest.mark.parametrize(
+    "name", ["model.h5", "model.hdf5", "model.H5", "model.weights", "model.tf"]
+)
+def test_a_pickle_in_the_userblock_is_not_cleared(tmp_path: Path, name: str, head: bytes) -> None:
+    # The userblock is any bytes before the signature, and `pickle.load` runs the
+    # stream there and stops before it reaches the HDF5 data.
+    (tmp_path / name).write_bytes(_behind_a_userblock(head, 512))
+
+    findings = _findings(tmp_path)
+
+    assert findings == [
+        ("LOW", f"Keras model not scanned for Lambda layers: {keras_lambda._PICKLE_HEAD}")
+    ]
+    assert _unread(tmp_path) == [str(tmp_path / name)]
+
+
+@pytest.mark.parametrize("name", ["model.bin", "model.model", "model"])
+def test_a_pickle_in_the_userblock_is_left_to_the_rule_that_reads_it(
+    tmp_path: Path, name: str
+) -> None:
+    (tmp_path / name).write_bytes(_behind_a_userblock(_PROTO_PICKLE, 512))
+
+    assert _findings(tmp_path) == []
+    assert _unread(tmp_path) == []
+
+
+def test_a_lambda_behind_a_pickle_userblock_is_still_found(tmp_path: Path) -> None:
+    body = b'{"class_name": "Lambda", "config": {}}'
+    (tmp_path / "model.h5").write_bytes(_behind_a_userblock(_PROTO_PICKLE, 512, body))
+
+    assert [severity for severity, _ in _findings(tmp_path)] == ["HIGH"]
+    assert _unread(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    ("extra", "reason"),
+    [
+        pytest.param(0, keras_lambda._NOT_HDF5, id="read whole"),
+        pytest.param(1, keras_lambda._PARTLY_READ, id="one byte past the bound"),
+    ],
+)
+def test_the_signature_check_needs_the_whole_file(tmp_path: Path, extra: int, reason: str) -> None:
+    (tmp_path / "model.h5").write_bytes(b"\x00" * (keras_lambda._MAX_CONFIG_BYTES + extra))
+
+    findings = _findings(tmp_path)
+
+    assert [severity for severity, _ in findings] == ["LOW"]
+    assert reason in findings[0][1]
 
 
 def _verdicts(tmp_path: Path) -> list[object]:
@@ -105,7 +208,7 @@ def test_h5_lambda_is_a_firm_finding_not_a_lead(tmp_path: Path) -> None:
     # CVE-2025-9905: load_model silently ignores safe_mode for .h5, so a Lambda
     # in a legacy file *will* execute. The strict class marker is deterministic
     # evidence that one is declared — there is nothing probabilistic left to hedge.
-    blob = b"\x89HDF\r\n" + b'...{"class_name": "Lambda", "config": {}}...' + b"\x00\x00"
+    blob = b"\x89HDF\r\n\x1a\n" + b'...{"class_name": "Lambda", "config": {}}...' + b"\x00\x00"
     (tmp_path / "model.h5").write_bytes(blob)
     findings = _findings(tmp_path)
     assert [severity for severity, _ in findings] == ["HIGH"]
@@ -115,7 +218,7 @@ def test_h5_lambda_is_a_firm_finding_not_a_lead(tmp_path: Path) -> None:
 def test_a_layer_merely_named_lambda_is_not_a_lambda_layer(tmp_path: Path) -> None:
     # The old loose marker matched the bare word, so a Dense layer a user happened
     # to name "Lambda" was reported as arbitrary code execution.
-    blob = b"\x89HDF\r\n" + b'{"class_name": "Dense", "name": "Lambda"}' + b"\x00"
+    blob = b"\x89HDF\r\n\x1a\n" + b'{"class_name": "Dense", "name": "Lambda"}' + b"\x00"
     (tmp_path / "model.h5").write_bytes(blob)
     assert _findings(tmp_path) == []
 
@@ -176,7 +279,7 @@ def test_a_file_larger_than_the_scan_bound_is_not_cleared(tmp_path: Path) -> Non
     # The config attribute of a multi-GB HDF5 model may sit past the read bound.
     # Reporting "no Lambda" after reading a prefix would be clearing a file we
     # never finished looking at.
-    (tmp_path / "big.h5").write_bytes(b"\x89HDF\r\n" + b"\x00" * (16 * 1024 * 1024))
+    (tmp_path / "big.h5").write_bytes(b"\x89HDF\r\n\x1a\n" + b"\x00" * (16 * 1024 * 1024))
     findings = _findings(tmp_path)
     assert [severity for severity, _ in findings] == ["LOW"]
     assert "first" in findings[0][1]

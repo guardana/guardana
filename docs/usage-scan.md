@@ -338,7 +338,15 @@ start and after a userblock of 512, 1024, 2048 bytes and so on, up to the end of
 and in a file with no suffix up to the end of its first 64 KiB. The
 model config is read from the first 16 MiB, so a file whose signature or config lies past
 that, or a `.keras` whose `config.json` is longer, is reported as not scanned rather than
-clean, also when a Lambda layer was found in the part read. An HDF5 model saved with no
+clean, also when a Lambda layer was found in the part read. An `.h5` or `.hdf5` file that
+fits in the first 16 MiB and holds the signature at none of those positions is reported as not
+scanned, as an unreadable `.keras` archive is; a Lambda marker in it is a `high` finding, and
+a Git LFS pointer is reported with its LFS reason. A `.h5`, `.hdf5`, `.hdf`, `.weights` or
+`.tf` file whose first bytes are a pickle `PROTO` opcode (`0x80` followed by a protocol byte
+from `0` to `5`) is also reported as not scanned, with the reason "begins with a pickle stream,
+which a pickle loader reads whatever follows it", even when an HDF5 signature follows in a
+userblock: `pickle.load` stops at the end of the pickle stream without reaching the HDF5 data,
+and a Lambda marker in the file is still a `high` finding. An HDF5 model saved with no
 suffix behind a userblock that ends past its first 64 KiB is neither listed nor read. An
 HDF5 file holding a fractal heap stored compressed, where an attribute such as the model
 config is kept as bytes no search can read, is reported as not scanned. A `TFOpLambda` or
