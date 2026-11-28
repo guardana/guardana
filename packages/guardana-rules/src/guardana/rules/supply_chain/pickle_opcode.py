@@ -52,6 +52,7 @@ from guardana.rules.supply_chain._npy import (
 )
 from guardana.rules.supply_chain._opcodes import SpelledInt, read_opcodes
 from guardana.rules.supply_chain._pickle_state import (
+    OUT_OF_BAND,
     TORCH_STORAGES,
     Array,
     BlindWrites,
@@ -923,6 +924,10 @@ class _PickleMachine:
             return self._call(name, arg)
         if name == "BINPERSID":
             return _persisted(self.stack[-1] if self.stack else None)
+        if name == "NEXT_BUFFER":
+            # The loader's caller supplies the bytes, so nothing in the file vouches for them.
+            self._notes().cannot_prove(OUT_OF_BAND)
+            return None
         return self._changed_in_place(name) if name in _IN_PLACE_OPS else None
 
     def _literal(self, name: str, arg: object) -> Tracked | None:

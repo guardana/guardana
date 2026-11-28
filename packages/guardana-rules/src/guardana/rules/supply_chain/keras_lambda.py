@@ -407,6 +407,12 @@ def _tf_call(node: object) -> _TfCall:
 # Not None: a config whose JSON is `null` was read, and is no model either.
 _UNREADABLE = object()
 _PARTLY_READ = f"only the first {_MAX_CONFIG_BYTES} bytes were read"
+_NOT_HDF5 = "not an HDF5 file: the HDF5 signature is neither at its start nor after a userblock"
+_PICKLE_HEAD = "begins with a pickle stream, which a pickle loader reads whatever follows it"
+# `pickle_opcode` reads `.bin`, `.model` and files with no suffix by content, so a pickle
+# at the head of those is examined there; under these names nothing else reads it.
+_PICKLE_UNREAD_SUFFIXES = frozenset({".h5", ".hdf5", ".hdf", ".weights", ".tf"})
+_PICKLE_PROTO_HEADS = tuple(bytes((0x80, protocol)) for protocol in range(6))
 
 
 @dataclass(frozen=True, slots=True)
@@ -585,7 +591,7 @@ class KerasLambdaRule(ArtifactRule):
     )
 
     def fixtures(self) -> Iterable[RuleFixture]:
-        """Sample a `.keras` model with a Lambda layer, one without and one that is no archive."""
+        """Sample a `.keras` model with a Lambda layer, one without, and two unreadable models."""
         return materialise(
             (
                 _samples.sample(
@@ -615,6 +621,11 @@ class KerasLambdaRule(ArtifactRule):
                     "a .keras file that is not a readable archive",
                     FixtureOutcome.INCONCLUSIVE,
                     {"model.keras": b"not a zip archive"},
+                ),
+                _samples.sample(
+                    "an .h5 file that is not HDF5",
+                    FixtureOutcome.INCONCLUSIVE,
+                    {"model.h5": b"not an HDF5 file"},
                 ),
             )
         )
@@ -731,13 +742,21 @@ class KerasLambdaRule(ArtifactRule):
         """Search a file's first bytes for the class markers.
 
         An `hdf5` file holding a compressed heap, where an attribute is stored as bytes no
-        search can read, is reported unread beside whatever the search found.
+        search can read, is reported unread beside whatever the search found. An `hdf5` file
+        read whole without the HDF5 signature is no model the library opens, so a search
+        that found nothing in it is reported unread, never clean. Neither is one that begins
+        with a pickle `PROTO` opcode: its userblock is a stream `pickle.load` runs before it
+        ever reaches the HDF5 data.
         """
         prefix = read_bytes_bounded(path, _MAX_CONFIG_BYTES)
         if prefix is None:
             yield self._unscanned(path, "file could not be read", ctx)
             return
         data, truncated = prefix
+        if hdf5 and not truncated and find_hdf5_signature_in_head(data) is None:
+            fallback_reason = _NOT_HDF5
+        elif hdf5 and path.suffix.lower() in _PICKLE_UNREAD_SUFFIXES and _starts_as_pickle(data):
+            fallback_reason = _PICKLE_HEAD
         yield from self._judge_bytes(
             path,
             data,
@@ -920,6 +939,11 @@ def _directory_configs(target: FileReader) -> list[Path]:
         if path.name.lower() == _DIRECTORY_CONFIG
         and any((path.parent, sibling) in listed for sibling in _DIRECTORY_SIBLINGS)
     ]
+
+
+def _starts_as_pickle(data: bytes) -> bool:
+    """Whether `data` opens with a `PROTO` opcode `pickle.load` accepts."""
+    return data.startswith(_PICKLE_PROTO_HEADS)
 
 
 def _hdf5_in_head(path: Path) -> bool:

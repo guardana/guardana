@@ -39,6 +39,7 @@ from guardana.rules.supply_chain._pickle_state import (
     FIELDS_CHANGED,
     NDARRAY_UNREAD,
     NESTING_KEPT,
+    OUT_OF_BAND,
     REBUILD_UNREAD,
     SPARSE_TENSOR,
     STORAGE_UNREAD,
@@ -1257,11 +1258,38 @@ _VIEWS: dict[str, tuple[bytes, _Outcome]] = {
         _call(_global(_MULTIARRAY, "scalar"), _object_dtype(), _reconstructed()) + b"\x98",
         [_unproven(VIEW_UNREAD)],
     ),
-    "a-read-only-view-of-an-out-of-band-buffer": (b"\x97\x98", [_unproven(VIEW_UNREAD)]),
+    "a-read-only-view-of-an-out-of-band-buffer": (
+        b"\x97\x98",
+        [_unproven(OUT_OF_BAND), _unproven(VIEW_UNREAD)],
+    ),
 }
 """numpy's `__setstate__` frees an array's memory while a view of it still reads it; what a
 call returned, such as `scalar` given an object dtype, or a buffer the loader supplies may be
 such an array."""
+
+
+_OUT_OF_BAND_READS = {
+    "an-out-of-band-buffer-returned": b"\x97",
+    "an-allowlisted-copy-of-an-out-of-band-buffer": _global("builtins", "bytearray") + b"\x97\x85R",
+    "a-thousand-out-of-band-buffers-in-a-list": b"](" + b"\x97" * 1_000 + b"e",
+}
+"""Protocol 5 streams whose bytes the loader's caller passes in `buffers=`, never the file."""
+
+
+@pytest.mark.parametrize("made", _OUT_OF_BAND_READS.values(), ids=_OUT_OF_BAND_READS)
+def test_a_pickle_reading_an_out_of_band_buffer_is_unproven(tmp_path: Path, made: bytes) -> None:
+    findings, unread = _scan(tmp_path, b"\x80\x05" + made + b".")
+
+    assert findings == [_unproven(OUT_OF_BAND)]
+    assert unread == [str(tmp_path / "model.pkl")]
+
+
+def test_an_import_after_an_out_of_band_buffer_is_still_found(tmp_path: Path) -> None:
+    content = b"\x80\x05\x970" + _global("os", "system") + b"\x8c\x02id\x85R."
+
+    findings, _unread = _scan(tmp_path, content)
+
+    assert sorted(findings) == sorted([_critical("os.system"), _unproven(OUT_OF_BAND)])
 
 
 @pytest.mark.parametrize(("made", "outcome"), _VIEWS.values(), ids=_VIEWS)
@@ -1910,8 +1938,8 @@ def test_a_pickle_named_as_one_is_judged_without_a_header_or_an_import(tmp_path:
     """A loader unpickles a `.pkl` whatever its first bytes are."""
     findings, unread = _scan(tmp_path, b"\x97\x98.")
 
-    assert findings == [_unproven(VIEW_UNREAD)]
-    assert unread == [str(tmp_path / "model.pkl")]
+    assert findings == [_unproven(OUT_OF_BAND), _unproven(VIEW_UNREAD)]
+    assert unread == [str(tmp_path / "model.pkl")] * len(findings)
 
 
 def test_a_sniffed_file_with_a_protocol_header_is_judged_without_an_import(
@@ -1920,7 +1948,11 @@ def test_a_sniffed_file_with_a_protocol_header_is_judged_without_an_import(
     """A protocol 2 to 5 header says the stream is a pickle; the load takes the view first."""
     findings, unread = _scan(tmp_path, b"\x80\x05\x97\x98\x80\x3f", "weights.bin")
 
-    assert findings == [_unproven(VIEW_UNREAD), (Severity.LOW, _UNPARSED)]
+    assert findings == [
+        _unproven(OUT_OF_BAND),
+        _unproven(VIEW_UNREAD),
+        (Severity.LOW, _UNPARSED),
+    ]
     assert unread == [str(tmp_path / "weights.bin")] * len(findings)
 
 
@@ -2325,8 +2357,8 @@ def test_a_reason_a_pickle_repeats_is_held_once_however_often(
 
     findings, _unread = _scan(tmp_path, content)
 
-    assert findings == [_unproven(VIEW_UNREAD)]
-    assert [machine.unproven for machine in machines] == [[VIEW_UNREAD]]
+    assert findings == [_unproven(OUT_OF_BAND), _unproven(VIEW_UNREAD)]
+    assert [machine.unproven for machine in machines] == [[OUT_OF_BAND, VIEW_UNREAD]]
 
 
 @pytest.mark.parametrize("protocol", range(6))
