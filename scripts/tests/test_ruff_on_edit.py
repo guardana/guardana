@@ -110,9 +110,7 @@ def test_a_valid_payload_runs_check_then_format(
     ]
 
 
-@pytest.mark.parametrize(
-    "error", [OSError("uv not found"), subprocess.TimeoutExpired(["uv"], 30)]
-)
+@pytest.mark.parametrize("error", [OSError("uv not found"), subprocess.TimeoutExpired(["uv"], 30)])
 def test_a_failing_ruff_run_never_blocks_the_edit(
     repo_file: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
 ) -> None:
