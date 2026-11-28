@@ -15,7 +15,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="w">
 <a class="logo" href="../index.html"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span>guard<b>ana</b></span></a>
-<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.4.2</span></a>
+<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.5.0</span></a>
 <nav class="links" aria-label="Primary">
 <a href="../docs/index.html" class="sm-keep">Docs</a>
 <a href="../docs/rules/index.html" class="sm-keep">Rules</a>
@@ -271,7 +271,7 @@ jobs:
       security-events: write   # required to upload SARIF
     steps:
       - uses: actions/checkout@v7
-      - uses: guardana/guardana@v1.4   # moving tag; pins to the latest 1.4.x
+      - uses: guardana/guardana@v1.5   # moving tag; pins to the latest 1.5.x
         with:
           path: .
           # args: --preset ci --baseline guardana-baseline.yaml
@@ -334,12 +334,12 @@ user: the image's default user cannot write to a checkout it does not own:</p>
       - name: Scan and save this run
         # exit 1 is a finding the comparison will judge; 2 and above still stop the job
         run: &gt;
-          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work&quot; ghcr.io/guardana/guardana:1.4
+          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work&quot; ghcr.io/guardana/guardana:1.5
           scan /work --format json --output /work/current.json || test $? -eq 1
 
       - name: Compare against the last accepted run
         run: &gt;
-          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.4
+          docker run --rm --user &quot;$(id -u):$(id -g)&quot; -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.5
           diff /work/accepted.json /work/current.json --preset ci
 </code></pre>
 <p>Keep <code>accepted.json</code> in the repository (or in your CI's artifact store) and
@@ -351,7 +351,7 @@ these&quot; is not &quot;nothing got worse&quot;. See <a href="usage-diff.html">
 <p>The templates live in <a href="https://github.com/guardana/guardana/blob/main/deploy/ci/README.md"><code>deploy/ci/</code></a> and are meant to be
 copied. The shortest form, which is also what the Jenkins and Azure templates
 run:</p>
-<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.4 \
+<pre><code class="language-bash">docker run --rm -v &quot;$PWD:/work:ro&quot; ghcr.io/guardana/guardana:1.5 \
   scan /work --format junit &gt; guardana-junit.xml
 </code></pre>
 <p>The redirect is deliberate: the file is written by your shell, with your user's
@@ -361,7 +361,7 @@ the job's test report — GitLab, Jenkins and Azure all read JUnit natively — 
 let the exit code fail the build.</p>
 <p>GitLab can include the job rather than copy it:</p>
 <pre><code class="language-yaml">include:
-  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v1.4/deploy/ci/gitlab-ci.yml&quot;
+  - remote: &quot;https://raw.githubusercontent.com/guardana/guardana/v1.5/deploy/ci/gitlab-ci.yml&quot;
 
 guardana:
   variables:
