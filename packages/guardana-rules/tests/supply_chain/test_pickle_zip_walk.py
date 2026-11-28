@@ -7,7 +7,9 @@ such a tool would unpack otherwise than its central directory lists is unscanned
 archive here is built in code; nothing is unpickled.
 """
 
+import bz2
 import io
+import lzma
 import stat
 import struct
 import tempfile
@@ -18,6 +20,7 @@ from pathlib import Path
 
 import pytest
 from guardana.core.rule import RuleContext
+from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain import _zip, pickle_opcode
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule
@@ -27,6 +30,10 @@ _CLEAN = b"\x80\x02K\x00."
 _TEXT = b"hello world\n" * 20
 _WALKED = "so a tool that unpacks it by walking it may unpack members otherwise than listed"
 _DESCRIBED = 0x08
+_PPMD = 98
+"""A compression method no supported Python's `zipfile` decodes."""
+_ZSTD = 93
+"""zstd, which `zipfile` decodes from Python 3.14 on."""
 _UNSET = 0xFFFFFFFF
 
 
@@ -120,6 +127,26 @@ def _local_entry(name: bytes, data: bytes) -> bytes:
 def _deflated(data: bytes, level: int = 9) -> bytes:
     packer = zlib.compressobj(level, zlib.DEFLATED, -zlib.MAX_WBITS)
     return packer.compress(data) + packer.flush()
+
+
+def _bzipped(data: bytes) -> bytes:
+    return bz2.compress(data)
+
+
+_LZMA_FILTER = {"id": lzma.FILTER_LZMA1, "dict_size": 1 << 16, "lc": 3, "lp": 0, "pb": 2}
+_LZMA_PROPERTIES = struct.pack("<BL", (2 * 5 + 0) * 9 + 3, 1 << 16)
+
+
+def _lzma_zipped(data: bytes, *, header: bytes | None = None, cut: int = 0) -> bytes:
+    """Zip's LZMA format: a version, the properties' size and the properties, then raw LZMA1.
+
+    `cut` drops that many bytes from the end of the raw stream, its end marker among them.
+    """
+    packer = lzma.LZMACompressor(lzma.FORMAT_RAW, filters=[_LZMA_FILTER])
+    raw = packer.compress(data) + packer.flush()
+    if header is None:
+        header = struct.pack("<2BH", 9, 4, len(_LZMA_PROPERTIES)) + _LZMA_PROPERTIES
+    return header + raw[: len(raw) - cut]
 
 
 def _descriptor(data: bytes) -> bytes:
@@ -321,11 +348,17 @@ _UNPACKED_OTHERWISE = [
         "is encrypted or uses compression other than",
     ),
     (
-        _walked_zip(_Member(b"readme.txt", _TEXT, method=12, flags=_DESCRIBED)),
+        _walked_zip(_Member(b"readme.txt", _TEXT, method=_PPMD, flags=_DESCRIBED)),
         "is encrypted or uses compression other than",
     ),
     (
-        _walked_zip(_Member(b"readme.txt", _TEXT + _HIDDEN, method=12)),
+        _walked_zip(_Member(b"readme.txt", _TEXT + _HIDDEN, method=_PPMD)),
+        "is encrypted or uses compression other than",
+    ),
+    (
+        _walked_zip(
+            _Member(b"readme.txt", _bzipped(_TEXT) + _HIDDEN, content=_TEXT, method=12, flags=0x01)
+        ),
         "is encrypted or uses compression other than",
     ),
     (
@@ -391,6 +424,140 @@ _UNPACKED_OTHERWISE = [
         ),
         "member notes.txt overlaps the member before it",
     ),
+    (
+        _walked_zip(_Member(b"readme.txt", _TEXT, content=_TEXT, method=12, flags=_DESCRIBED)),
+        "bzip2 stream that does not decode",
+    ),
+    (
+        _walked_zip(_Member(b"readme.txt", _TEXT + _HIDDEN, content=_TEXT, method=12)),
+        "bzip2 stream that does not decode",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _bzipped(_TEXT) + _descriptor(_TEXT) + _HIDDEN,
+                content=_TEXT,
+                method=12,
+                flags=_DESCRIBED,
+            )
+        ),
+        "bzip2 stream that ends before the size its directory entry declares",
+    ),
+    (
+        _walked_zip(_Member(b"readme.txt", _bzipped(_TEXT) + _HIDDEN, content=_TEXT, method=12)),
+        "bzip2 stream that ends before the size its directory entry declares",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _bzipped(_TEXT) + bytes(8),
+                content=_TEXT,
+                method=12,
+                flags=_DESCRIBED,
+            )
+        ),
+        "bzip2 stream that ends before the size its directory entry declares",
+    ),
+    (
+        _walked_zip(
+            _Member(b"readme.txt", _bzipped(_TEXT)[:-4], content=_TEXT, method=12, flags=_DESCRIBED)
+        ),
+        "bzip2 stream that does not end within the size its directory entry declares",
+    ),
+    (
+        _walked_zip(_Member(b"readme.txt", _TEXT, content=_TEXT, method=14, flags=_DESCRIBED)),
+        "LZMA header that does not decode",
+    ),
+    (
+        _walked_zip(_Member(b"readme.txt", _TEXT + _HIDDEN, content=_TEXT, method=14)),
+        "LZMA header that does not decode",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _lzma_zipped(_TEXT)[:6],
+                content=_TEXT,
+                method=14,
+                flags=_DESCRIBED,
+            )
+        ),
+        "LZMA header that does not decode",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _lzma_zipped(
+                    _TEXT,
+                    header=struct.pack("<2BH", 9, 4, 7) + _LZMA_PROPERTIES + bytes(2),
+                ),
+                content=_TEXT,
+                method=14,
+                flags=_DESCRIBED,
+            )
+        ),
+        "LZMA header that does not decode",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _lzma_zipped(
+                    _TEXT,
+                    header=struct.pack("<2BHBL", 9, 4, 5, (4 * 5 + 4) * 9 + 8, 1 << 16),
+                ),
+                content=_TEXT,
+                method=14,
+                flags=_DESCRIBED,
+            )
+        ),
+        "LZMA header that does not decode",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _lzma_zipped(_TEXT) + _descriptor(_TEXT) + _HIDDEN,
+                content=_TEXT,
+                method=14,
+                flags=_DESCRIBED,
+            )
+        ),
+        "LZMA stream that ends before the size its directory entry declares",
+    ),
+    (
+        _walked_zip(
+            _Member(b"readme.txt", _lzma_zipped(_TEXT) + _HIDDEN, content=_TEXT, method=14)
+        ),
+        "LZMA stream that ends before the size its directory entry declares",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _lzma_zipped(_TEXT, cut=6),
+                content=_TEXT,
+                method=14,
+                flags=_DESCRIBED,
+            )
+        ),
+        "LZMA stream that does not end within the size its directory entry declares",
+    ),
+    (
+        _walked_zip(
+            _Member(
+                b"readme.txt",
+                _lzma_zipped(b"")[:9] + b"\xff" * 16,
+                content=_TEXT,
+                method=14,
+                flags=_DESCRIBED,
+            )
+        ),
+        "LZMA stream that does not decode",
+    ),
 ]
 
 
@@ -425,12 +592,28 @@ _UNPACKED_OTHERWISE = [
         "encrypted-and-described",
         "other-method-and-described",
         "other-method-holding-a-local-header",
+        "encrypted-bzip2-holding-a-local-header",
         "encrypted-deflate-holding-a-local-header",
         "zip64-field-and-a-short-descriptor-before-a-member",
         "zip64-field-and-a-short-descriptor-before-the-directory",
         "deflate-with-a-zip64-field-and-a-short-descriptor",
         "deflate-with-a-descriptor-cut-short",
         "deflate-with-a-signed-descriptor-cut-short",
+        "bzip2-that-does-not-decode",
+        "bzip2-that-does-not-decode-holding-a-local-header",
+        "described-bzip2-ending-early",
+        "bzip2-ending-early-before-a-local-header",
+        "described-bzip2-followed-by-extra-bytes",
+        "described-bzip2-ending-late",
+        "lzma-whose-header-does-not-decode",
+        "lzma-whose-header-does-not-decode-holding-a-local-header",
+        "lzma-header-cut-short",
+        "lzma-properties-of-seven-bytes",
+        "lzma-properties-out-of-range",
+        "described-lzma-ending-early",
+        "lzma-ending-early-before-a-local-header",
+        "described-lzma-without-its-end-marker",
+        "lzma-stream-that-does-not-decode",
     ],
 )
 def test_a_zip_a_streaming_reader_unpacks_otherwise_is_unscanned(
@@ -442,14 +625,51 @@ def test_a_zip_a_streaming_reader_unpacks_otherwise_is_unscanned(
     assert reason in refusals[0], refusals
 
 
-@pytest.mark.filterwarnings("ignore:Overlapped entries")
+_SHARED = "entries that point to a local header another entry points to"
+
+
 def test_two_entries_of_one_local_header_are_unscanned(tmp_path: Path) -> None:
     content = _walked_zip(_Member(b"notes.txt", _TEXT), _Member(b"notes.txt", _TEXT, offset=0))
 
     refusals = _walk_refusals(tmp_path, "bundle.zip", content)
+    summaries, _ctx, _path = _summaries(tmp_path, "bundle.zip", content)
 
     assert len(refusals) == 1, refusals
     assert "overlaps the member before it" in refusals[0], refusals
+    assert [summary for summary in summaries if _SHARED in summary], summaries
+
+
+@pytest.mark.parametrize("name", ["model.pt", "arrays.npz", "bundle.zip"])
+def test_entries_sharing_a_local_header_are_unscanned_on_every_python(
+    tmp_path: Path, name: str
+) -> None:
+    """Python 3.11's `zipfile` refuses such an entry and later ones read it with a warning."""
+    content = _walked_zip(
+        _Member(b"archive/data.pkl", _CLEAN),
+        _Member(b"archive/data.pkl", _CLEAN, offset=0),
+        _Member(b"archive/version", b"3\n"),
+    )
+
+    summaries, ctx, path = _summaries(tmp_path, name, content)
+
+    assert [summary for summary in summaries if _SHARED in summary], summaries
+    assert str(path) in ctx.examined_paths()
+
+
+@pytest.mark.parametrize("name", ["model.pt", "arrays.npz", "bundle.zip"])
+def test_a_member_whose_sizes_run_into_the_next_local_header_is_unscanned(
+    tmp_path: Path, name: str
+) -> None:
+    size = len(_SYSTEM) + 8
+    content = _walked_zip(
+        _Member(b"archive/data.pkl", _SYSTEM, declared=(size, size)),
+        _Member(b"archive/version", b"3\n"),
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, name, content)
+
+    assert [summary for summary in summaries if "data.pkl" in summary], summaries
+    assert not any("non-allowlisted" in summary for summary in summaries), summaries
 
 
 @pytest.mark.parametrize("name", ["bundle.zip", "bundle", "bundle.tar", "bundle.tar.gz"])
@@ -518,6 +738,10 @@ def _python_zip(method: int, *, piped: bool) -> bytes:
         _python_zip(zipfile.ZIP_STORED, piped=True),
         _python_zip(zipfile.ZIP_DEFLATED, piped=False),
         _python_zip(zipfile.ZIP_DEFLATED, piped=True),
+        _python_zip(zipfile.ZIP_BZIP2, piped=False),
+        _python_zip(zipfile.ZIP_BZIP2, piped=True),
+        _python_zip(zipfile.ZIP_LZMA, piped=False),
+        _python_zip(zipfile.ZIP_LZMA, piped=True),
         _walked_zip(
             _Member(
                 b"readme.txt",
@@ -615,6 +839,10 @@ def _python_zip(method: int, *, piped: bool) -> bytes:
         "python-stored-to-a-pipe",
         "python-deflated",
         "python-deflated-to-a-pipe",
+        "python-bzip2",
+        "python-bzip2-to-a-pipe",
+        "python-lzma",
+        "python-lzma-to-a-pipe",
         "zip64-sizes",
         "zip64-sizes-of-a-deflated-member",
         "zip64-field-beside-real-sizes",
@@ -647,13 +875,19 @@ def test_an_empty_zip_holding_a_local_entry_is_unscanned(tmp_path: Path) -> None
     assert _walk_refusals(tmp_path, "bundle.zip", _walked_zip(before=_HIDDEN))
 
 
+_PACKERS = {8: _deflated, 12: _bzipped, 14: _lzma_zipped}
+
+
+@pytest.mark.parametrize("method", list(_PACKERS), ids=["deflate", "bzip2", "lzma"])
 def test_inflating_past_the_bound_is_unscanned(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: int
 ) -> None:
     monkeypatch.setattr(pickle_opcode, "_COMPRESSED_TAR_MIN_BYTES", len(_TEXT) - 1)
     monkeypatch.setattr(pickle_opcode, "_COMPRESSED_TAR_MAX_RATIO", 0)
     content = _walked_zip(
-        _Member(b"readme.txt", _deflated(_TEXT), content=_TEXT, method=8, flags=_DESCRIBED)
+        _Member(
+            b"readme.txt", _PACKERS[method](_TEXT), content=_TEXT, method=method, flags=_DESCRIBED
+        )
     )
 
     refusals = _walk_refusals(tmp_path, "bundle.zip", content)
@@ -662,15 +896,18 @@ def test_inflating_past_the_bound_is_unscanned(
     assert f"inflating more than {len(_TEXT) - 1} bytes" in refusals[0]
 
 
+@pytest.mark.parametrize("method", list(_PACKERS), ids=["deflate", "bzip2", "lzma"])
 @pytest.mark.parametrize(("floor", "ratio"), [(len(_TEXT), 0), (1, len(_TEXT))])
 def test_inflating_up_to_the_bound_is_read(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, floor: int, ratio: int
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, floor: int, ratio: int, method: int
 ) -> None:
     """The bound is the larger of a floor and a multiple of the file's size."""
     monkeypatch.setattr(pickle_opcode, "_COMPRESSED_TAR_MIN_BYTES", floor)
     monkeypatch.setattr(pickle_opcode, "_COMPRESSED_TAR_MAX_RATIO", ratio)
     content = _walked_zip(
-        _Member(b"readme.txt", _deflated(_TEXT), content=_TEXT, method=8, flags=_DESCRIBED)
+        _Member(
+            b"readme.txt", _PACKERS[method](_TEXT), content=_TEXT, method=method, flags=_DESCRIBED
+        )
     )
 
     assert _walk_refusals(tmp_path, "bundle.zip", content) == []
@@ -727,9 +964,29 @@ def test_signatures_across_read_chunks_are_found(
             trailer=_HIDDEN[1:],
         )
     )
+    bzipped_early = _walked_zip(
+        _Member(
+            b"readme.txt",
+            _bzipped(_TEXT) + _descriptor(_TEXT) + _HIDDEN,
+            content=_TEXT,
+            method=12,
+            flags=_DESCRIBED,
+        )
+    )
+    lzma_early = _walked_zip(
+        _Member(
+            b"readme.txt",
+            _lzma_zipped(_TEXT) + _descriptor(_TEXT) + _HIDDEN,
+            content=_TEXT,
+            method=14,
+            flags=_DESCRIBED,
+        )
+    )
     clean = _walked_zip(
         _Member(b"readme.txt", _UNMATCHED + _TEXT, flags=_DESCRIBED),
         _Member(b"packed.txt", _deflated(_TEXT), content=_TEXT, method=8, flags=_DESCRIBED),
+        _Member(b"bzipped.txt", _bzipped(_TEXT), content=_TEXT, method=12, flags=_DESCRIBED),
+        _Member(b"lzma.txt", _lzma_zipped(_TEXT), content=_TEXT, method=14, flags=_DESCRIBED),
     )
 
     assert _walk_refusals(tmp_path, "early.zip", early)
@@ -737,4 +994,150 @@ def test_signatures_across_read_chunks_are_found(
     assert _walk_refusals(tmp_path, "inflated.zip", inflated)
     assert _walk_refusals(tmp_path, "early-at-eight.zip", early_at_eight)
     assert _walk_refusals(tmp_path, "straddling.zip", straddling)
+    assert _walk_refusals(tmp_path, "bzipped-early.zip", bzipped_early)
+    assert _walk_refusals(tmp_path, "lzma-early.zip", lzma_early)
     assert _walk_refusals(tmp_path, "clean.zip", clean) == []
+
+
+def _piped_model(method: int, pickle: bytes) -> bytes:
+    """A zip written to a pipe, so every member carries a data descriptor."""
+    pipe = _Pipe()
+    with zipfile.ZipFile(pipe, "w", method) as archive:
+        archive.writestr("readme.txt", _TEXT)
+        archive.writestr("model.pkl", pickle)
+    return pipe.written.getvalue()
+
+
+_PIPED_METHODS = [zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA]
+
+
+_STREAMED = {
+    zipfile.ZIP_DEFLATED: _deflated,
+    zipfile.ZIP_BZIP2: _bzipped,
+    zipfile.ZIP_LZMA: _lzma_zipped,
+}
+
+
+@pytest.mark.parametrize("method", _PIPED_METHODS, ids=["deflate", "bzip2", "lzma"])
+@pytest.mark.parametrize(
+    ("stream", "declared"),
+    [(_CLEAN + _SYSTEM, _CLEAN), (_CLEAN, b"\x80\x02K\x01.")],
+    ids=["longer", "other-crc"],
+)
+def test_a_stream_that_decodes_to_other_bytes_than_declared_is_not_read(
+    tmp_path: Path, method: int, stream: bytes, declared: bytes
+) -> None:
+    """`zipfile` stops at the declared size, while a streaming reader writes the whole stream."""
+    archive = _walked_zip(
+        _Member(
+            b"model.pkl",
+            _STREAMED[method](stream),
+            content=declared,
+            method=method,
+            flags=_DESCRIBED,
+        )
+    )
+
+    assert _walk_refusals(tmp_path, "bundle.zip", archive)
+
+
+@pytest.mark.parametrize("method", _PIPED_METHODS, ids=["deflate", "bzip2", "lzma"])
+def test_a_clean_pickle_in_a_piped_zip_is_read_and_clean(tmp_path: Path, method: int) -> None:
+    summaries, ctx, path = _summaries(tmp_path, "bundle.zip", _piped_model(method, _CLEAN))
+
+    assert summaries == []
+    assert ctx.shortfalls() == ()
+    assert str(path) in ctx.examined_paths()
+
+
+@pytest.mark.parametrize("method", _PIPED_METHODS, ids=["deflate", "bzip2", "lzma"])
+def test_a_harmful_pickle_in_a_piped_zip_is_found(tmp_path: Path, method: int) -> None:
+    path = Path(tempfile.mkdtemp(dir=tmp_path)) / "bundle.zip"
+    path.write_bytes(_piped_model(method, _SYSTEM))
+    ctx = RuleContext()
+
+    findings = list(PickleOpcodeRule().run(ArtifactTarget(path.parent), ctx))
+
+    assert [f.severity for f in findings] == [Severity.CRITICAL], findings
+    assert "os.system" in findings[0].evidence.summary
+    assert ctx.shortfalls() == ()
+
+
+def _zstd_frame(data: bytes) -> bytes:
+    """A zstd frame holding `data`, 256 to 65,791 bytes, as one raw block."""
+    header = b"\x28\xb5\x2f\xfd\x60" + (len(data) - 256).to_bytes(2, "little")
+    return header + (1 | len(data) << 3).to_bytes(3, "little") + data
+
+
+@pytest.mark.parametrize(
+    ("name", "member"),
+    [("bundle.zip", b"weights"), ("bundle.zip", b"model.pkl"), ("model.pt", b"archive/data.pkl")],
+)
+def test_a_zstd_member_is_not_scanned_on_any_python(
+    tmp_path: Path, name: str, member: bytes
+) -> None:
+    """Read on Python 3.14 and not before, it would make the verdict the runner's."""
+    content = _SYSTEM + bytes(256)
+    archive = _walked_zip(_Member(member, _zstd_frame(content), content=content, method=_ZSTD))
+
+    summaries, _ctx, _path = _summaries(tmp_path, name, archive)
+
+    assert any("is zstd-compressed" in summary for summary in summaries), summaries
+    assert not any("os.system" in summary for summary in summaries), summaries
+
+
+_OVERRUN = "has a stream that decodes to more bytes than its directory entry declares"
+
+
+@pytest.mark.parametrize("method", _PIPED_METHODS, ids=["deflate", "bzip2", "lzma"])
+@pytest.mark.parametrize("name", ["bundle.zip", "model.pt", "arrays.npz", "weights.bin"])
+def test_a_member_without_a_descriptor_decoding_past_its_size_is_not_read(
+    tmp_path: Path, method: int, name: str
+) -> None:
+    """An extracting tool writes the whole stream, while `zipfile` stops at the declared size."""
+    archive = _walked_zip(
+        _Member(b"model.pkl", _STREAMED[method](_CLEAN + _SYSTEM), content=_CLEAN, method=method)
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, name, archive)
+
+    assert [summary for summary in summaries if _OVERRUN in summary], summaries
+    assert not any("os.system" in summary for summary in summaries)
+
+
+@pytest.mark.parametrize("method", _PIPED_METHODS, ids=["deflate", "bzip2", "lzma"])
+def test_a_member_decoding_to_its_declared_size_is_read(tmp_path: Path, method: int) -> None:
+    archive = _walked_zip(
+        _Member(b"model.pkl", _STREAMED[method](_SYSTEM), content=_SYSTEM, method=method)
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, "model.pt", archive)
+
+    assert len(summaries) == 1
+    assert "os.system" in summaries[0]
+
+
+def test_decoding_a_member_stops_past_its_declared_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decoded: list[int] = []
+    add = _zip._Decoded.add
+
+    def counted(self: _zip._Decoded, data: bytes, budget: _zip._WalkBudget) -> None:
+        decoded.append(len(data))
+        add(self, data, budget)
+
+    monkeypatch.setattr(_zip._Decoded, "add", counted)
+    archive = _walked_zip(
+        _Member(
+            b"model.pkl",
+            _deflated(_CLEAN + bytes(32 * 1024 * 1024)),
+            content=_CLEAN,
+            method=zipfile.ZIP_DEFLATED,
+        )
+    )
+
+    summaries, _ctx, _path = _summaries(tmp_path, "model.pt", archive)
+
+    assert [summary for summary in summaries if _OVERRUN in summary]
+    assert sum(decoded) <= len(_CLEAN) + _zip._CHUNK_BYTES

@@ -158,15 +158,17 @@ is reported not scanned (exit `2`) even when it holds no model, such as an image
 Exclude it with `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an
 archive), or scan the model's directory instead. [`guardana scan`](usage-scan.md) lists every bound.
 
-### Pickled dtype layouts, out-of-band arrays and sparse tensors are unverified
+### Some pickled `numpy` dtypes, out-of-band arrays and sparse tensors are unverified
 
-Pickles holding `numpy` dtype fields or subarrays, arrays over out-of-band buffers, or
-sparse tensors, are unverified even when `numpy` or `torch` writes them (`indeterminate`,
-exit `2`, unless another finding fails the run). scikit-learn decision trees and random
-forests saved with `pickle` hold such a dtype and retain their `CRITICAL` import finding.
-Use a format that is not a pickle, such as `safetensors`, or exclude the file with
-`rules.paths_exclude`. Load untrusted pickles only with a loader that enforces its own
-allowlist, such as `torch.load(..., weights_only=True)`.
+Pickled `numpy` dtypes are unverified even when `numpy` writes them if they have fields or
+subarrays that hold objects, more than 64 fields, a non-text field title, or field names or
+dict keys stored as byte strings. Arrays over out-of-band buffers (pickle protocol 5) and
+sparse tensors are unverified even when `numpy` or `torch` writes them. These cases return
+`indeterminate` (exit `2`), unless another finding fails the run.
+
+Use a non-pickle format such as `safetensors`, or exclude the file with `rules.paths_exclude`.
+Load untrusted pickles only with a loader that enforces its own allowlist, such as
+`torch.load(..., weights_only=True)`.
 
 ### Some archives of unpacked `torch.package` packages are not scanned
 
@@ -187,8 +189,9 @@ the directory they unpack to instead. [`guardana scan`](usage-scan.md) lists eve
 A PAX-format tar holding a sparse file and any link, or a tar whose model member is stored
 sparse, can make the run `indeterminate` (exit `2`) unless another finding fails its
 policy. So can a zip named `.zip`, without a suffix or named as a tar, written to a pipe
-with data descriptors and bzip2, LZMA or encrypted members. GNU `tar` and `bsdtar` write
-the sparse layout; Python's `zipfile` writes streamed bzip2 or LZMA members. Under archive
+with data descriptors and encrypted members, members compressed by a method other than
+stored, deflate, bzip2 or LZMA, or LZMA members without an end marker. GNU `tar` and
+`bsdtar` write the sparse layout. Under archive
 names, affected files also include a web page saved as `.zip`, a compressed pickle or zip
 named as a compressed tar, and tars compressed with zstd, lzip, lz4, lzma, lzop or
 `compress`. Honest files named as archives that are not tars, such as a stored zip or a
@@ -205,6 +208,30 @@ command finds further into the file is not checked. Exclude affected archives wi
 `rules.paths_exclude` (the target's
 `.guardanaignore` cannot exclude an archive), or scan the directory they unpack to
 instead. [`guardana scan`](usage-scan.md) lists every bound.
+
+### Zstandard-compressed files are not decompressed
+
+`pickle_opcode` does not decompress zstd, on any Python version, so the verdict does not
+depend on the one that runs the scan. A file holding zstd data is reported unread (exit `2`,
+unless another finding fails the run's policy) when it is named as a tar compressed with
+zstd (`.tar.zst`, `.tar.zstd`, `.tzst`) or as an archive (`.zip`, `.tar`), as a `.dat`,
+with no suffix, by a codec alone (`bundle.zst`), or as a model, an archive or a compressed
+file followed by `.zst` or `.zstd` (`model.pkl.zst`, `bundle.zip.zst`, `weights.tgz.zst`).
+Any other `.zst` or `.zstd` file (`data.jsonl.zst`) is left alone, and so
+is one under a name the rule reads by content (`.bin`, `.sav`, `.p`, `.model`, `.package`),
+which no model loader decompresses. A zip member compressed with zstd (method 93), which
+Python's `zipfile` decodes from 3.14 on, is reported unread the same way on every Python.
+Decompress such a file with the tool you use and scan
+the result.
+
+### A `torch.package` saved under another name is not opened
+
+`PackageImporter` opens a package zip under any name. `pickle_opcode` opens one saved as
+`.package`, under a name it reads as a model or an archive (`model.pt`, `model.zip`), or
+with no suffix; saved under another name, such as `model.txt`, it is not opened, and the
+run can end clean. A `.package` inside another zip or tar is reported unread as a nested
+archive (exit `2`, unless another finding fails the run's policy). Save packages as
+`.package`, or scan the directory a package unpacks to.
 
 ### `monitor` is scheduled, not passive
 
@@ -281,11 +308,19 @@ claim to check per deployment, not a guarantee.
 
 ### An authentication verdict covers one route from one machine
 
-A pass of the `--require-auth` check does not show that the server refuses wrong or
-expired keys. It also does not show what a key is allowed to do. The verdict covers
-`POST <base-url>/v1/chat/completions` as reached from the machine running `guardana`,
-through its proxy if one is set. Other routes and access from other networks are outside
-the check.
+A server that accepts any `Authorization` value can pass `--require-auth` alone.
+With `--require-key-check`, a pass means the route refused a request without a
+credential and a request with one generated key that cannot be valid, and returned a
+completion to the configured key. Expired or revoked keys, valid keys of other
+accounts, and what a key is allowed to do are outside the check. The generated key
+starts with the fixed prefix `guardana-invalid-key-` and need not match the
+configured key's format. A server that checks only format can refuse the generated
+key and still pass while serving any other key of the right format, so a pass leaves
+open whether the server checks that it issued the key.
+
+The verdict covers `POST <base-url>/v1/chat/completions` as reached from the machine
+running `guardana`, through its proxy if one is set. Other routes and access from other
+networks are outside the check.
 See [checking chat endpoint authentication](usage-probe.md#checking-chat-endpoint-authentication).
 
 ### A recipe records what you declare about the subject

@@ -15,7 +15,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="w">
 <a class="logo" href="../index.html"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span>guard<b>ana</b></span></a>
-<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.4.0</span></a>
+<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.5.0</span></a>
 <nav class="links" aria-label="Primary">
 <a href="../docs/index.html" class="sm-keep">Docs</a>
 <a href="../docs/rules/index.html" class="sm-keep">Rules</a>
@@ -295,6 +295,11 @@ the run (exit <code>4</code>).</p>
 <td>Check whether the OpenAI-compatible chat completions route refuses a request without a credential. Sends one or two requests. Refused before sending anything (exit <code>3</code>) if <code>--api-key-env</code> is missing or if used with <code>--adapter</code>, <code>--fixtures</code>, a <code>--provider</code> other than <code>openai</code>, <code>--mcp</code>, <code>--a2a</code> or <code>--target</code>. See <a href="#checking-chat-endpoint-authentication">Checking chat endpoint authentication</a>. <code>Added in Guardana 1.4.0</code></td>
 </tr>
 <tr>
+<td><code>--require-key-check</code></td>
+<td>off</td>
+<td>Check whether the chat completions route refuses a generated key that cannot be valid. Sends one to three requests in total. Refused before sending anything (exit <code>3</code>) if <code>--require-auth</code> or <code>--api-key-env</code> is missing or if used with <code>--adapter</code>, <code>--fixtures</code>, a <code>--provider</code> other than <code>openai</code>, <code>--mcp</code>, <code>--a2a</code> or <code>--target</code>. See <a href="#checking-chat-endpoint-authentication">Checking chat endpoint authentication</a>. <code>Added in Guardana 1.5.0</code></td>
+</tr>
+<tr>
 <td><code>--profile PATH</code></td>
 <td>none (built-in default profile)</td>
 <td>Path to a <code>guardana.yaml</code> policy file</td>
@@ -443,9 +448,14 @@ cannot serve skipped for a missing capability. See <a href="extending.html#addin
 <h2 id="checking-chat-endpoint-authentication">Checking chat endpoint authentication</h2>
 <p>Use <code>--require-auth</code> to check whether the OpenAI-compatible chat completions route refuses a
 request without a credential. The check is the rule
-<code>guardana.endpoint.unauthenticated_inference</code> and is off by default.</p>
+<code>guardana.endpoint.unauthenticated_inference</code> and is off by default. Add
+<code>--require-key-check</code> to also check whether the route refuses a generated key that cannot be
+valid. <code>--require-key-check</code> is off by default.</p>
 <pre><code class="language-bash">guardana probe --url &lt;base-url&gt; --model &lt;name&gt; --api-key-env &lt;env-var&gt; --require-auth
+guardana probe --url &lt;base-url&gt; --model &lt;name&gt; --api-key-env &lt;env-var&gt; --require-auth --require-key-check
 </code></pre>
+<p>On its own, <code>--require-key-check</code> is refused before anything is sent (exit <code>3</code>) with the
+message <code>--require-key-check needs --require-auth; it adds a request with a key that cannot be valid to that check</code>.</p>
 <p>Guardana sends a short request to <code>POST &lt;base-url&gt;/v1/chat/completions</code> with the <code>--model</code>
 name, one user message (<code>Reply with the single word OK.</code>), and <code>&quot;stream&quot;: false</code>. The body
 omits a system prompt and tools.</p>
@@ -453,33 +463,58 @@ omits a system prompt and tools.</p>
 <li>The first request carries no <code>Authorization</code> header, cookie or user part in the URL.</li>
 <li>Only after HTTP <code>401</code> or <code>403</code>, Guardana repeats the same request with the key from
 <code>--api-key-env</code> as <code>Authorization: Bearer &lt;key&gt;</code>. This is the control.</li>
+<li>With <code>--require-key-check</code>, and only after the control gets a chat completion, Guardana
+sends the same request as <code>Authorization: Bearer &lt;value&gt;</code>. For this request, it generates
+a value starting with <code>guardana-invalid-key-</code> followed by 32 random bytes, URL-safe
+encoded. The generated value is distinct from the configured key, which this request
+never carries.</li>
 </ol>
 <p>Each request is sent once, without retries or redirect following.</p>
 <ul>
-<li><strong>Finding (critical, exit <code>1</code>).</strong> The first request gets HTTP <code>200</code> and a JSON body whose
-first choice holds a message. The run fails regardless of <code>fail_on</code>. On a loopback or private
-address, the finding says so and stays critical.</li>
+<li><strong>Finding (critical, exit <code>1</code>).</strong> The first or third request gets a chat completion, which
+is HTTP <code>200</code> with a JSON body whose first choice holds a message. The run fails regardless
+of <code>fail_on</code>. If the first request gets a completion on a loopback or private address, the
+finding says so and stays critical. If the third request gets a completion, the finding
+says the route serves any caller presenting a key without checking it.</li>
 <li><strong>Pass.</strong> The first request gets HTTP <code>401</code> or <code>403</code> and the control gets a chat completion.
-The rest of the probe determines the run's exit code.</li>
-<li><strong>Inconclusive (exit <code>2</code>).</strong> Any other outcome, including a timeout, an unexpected status, a
-<code>200</code> reply that lacks a valid chat completion or exceeds 8 MiB, or a control that also gets
-<code>401</code> or <code>403</code>. An inconclusive verdict records a <code>demanded_check</code> coverage shortfall. An
-inconclusive or unfinished check ends the run <code>indeterminate</code> unless a finding fails it,
-whatever <code>fail_on</code> says. A profile that excludes the rule leaves the check unfinished, and so
-does <code>--safety passive</code>.</li>
+With <code>--require-key-check</code>, the third request must also get HTTP <code>401</code> or <code>403</code>. The rest
+of the probe determines the run's exit code.</li>
+<li><strong>Inconclusive (exit <code>2</code>).</strong> Any other outcome, including a timeout, a redirect, an
+unexpected status such as <code>400</code>, <code>429</code> or <code>503</code>, a <code>200</code> reply that lacks a valid chat
+completion or exceeds 8 MiB, or a control that also gets <code>401</code> or <code>403</code>. An inconclusive
+verdict records a <code>demanded_check</code> coverage shortfall. An inconclusive or unfinished check
+ends the run <code>indeterminate</code> unless a finding fails it, whatever <code>fail_on</code> says. A profile
+that excludes the rule leaves the check unfinished, and so does <code>--safety passive</code>.</li>
 </ul>
-<p>The check costs one or two requests, and <code>guardana plan probe --require-auth</code> prices them
-without sending anything. Each counts toward <code>--max-requests</code> and the run's usage. If the
-budget has no room for the control, the run stops as a spent budget (exit <code>6</code>).</p>
+<p>The check costs one or two requests with <code>--require-auth</code> alone and one to three with
+<code>--require-key-check</code>. <code>guardana plan probe --require-auth</code> prices the check without sending
+anything. Add <code>--require-key-check</code> to the plan to price up to three requests. Each request
+counts toward <code>--max-requests</code> and the run's usage. If the budget has no room for the
+control or the third request when due, the run stops as a spent budget (exit <code>6</code>).</p>
 <p>Requests leave from the machine running <code>guardana</code> through its environment's proxy, if
 configured. Each verdict records one case with the route, each request's outcome, the number
-sent, and whether a proxy carried them. The record omits the reply body and key.</p>
-<p>A server that accepts any <code>Authorization</code> value can pass, so a pass leaves wrong or expired
-keys untested. A route that expects a different key header refuses the control, making the
-check inconclusive. The verdict covers only the named route as seen from the runner's network.
-Other routes of the same server, such as Ollama's native <code>/api/chat</code>, are not checked. Other
-probe rules can run concurrently and trigger HTTP <code>429</code>. Use <code>--concurrency 1</code> or a profile
-with only this rule to avoid rate limits caused by concurrent rules.</p>
+sent, and whether a proxy carried them. The third request is named <code>invalid key</code>. The record
+omits the reply body. The saved run, including the case, omits the configured key and the
+generated value.</p>
+<p>The recorded case uses the assessor
+<code>guardana.endpoint.unauthenticated_inference+invalid-key</code> with <code>--require-key-check</code> and
+<code>guardana.endpoint.unauthenticated_inference</code> without it. The case id is the same in both.
+Between runs with and without the flag, <code>guardana diff</code> skips this rule's findings and
+measured case in either order. It reports the comparison as incomplete, names the rule as
+graded differently, and exits <code>2</code>. To compare the check, run both with the flag or both
+without it.</p>
+<p>Without <code>--require-key-check</code>, a server that accepts any <code>Authorization</code> value can pass
+<code>--require-auth</code>. With the flag, a pass covers one generated key. Guardana generates the
+value independently of the configured key, with the fixed prefix <code>guardana-invalid-key-</code>. A
+server that checks only a key's format can refuse the generated value and still pass
+<code>--require-key-check</code> while serving any other value of the right format, so a pass leaves
+open whether the server checks that it issued the key. Expired or revoked keys, valid keys
+of other accounts, and what a key is allowed to do are outside the check. A route that
+expects a different key header refuses the control, making the check inconclusive. The
+verdict covers only the named route as seen from the runner's network. Other routes of the
+same server, such as Ollama's native <code>/api/chat</code>, are outside the check. Other probe rules
+can run concurrently and trigger HTTP <code>429</code>. Use <code>--concurrency 1</code> or a profile with only
+this rule to avoid rate limits caused by concurrent rules.</p>
 <h2 id="probing-an-mcp-server">Probing an MCP server</h2>
 <p><code>--mcp</code> points <code>probe</code> at a Model Context Protocol server rather than a chat
 endpoint. There is no model to talk to: the server speaks MCP, so every chat and A2A
@@ -533,38 +568,41 @@ another selected rule reaches a conclusion; a run in which no rule reached one e
 <code>indeterminate</code>.</li>
 <li><strong><code>guardana.mcp.cache_scope</code> does not apply on a <code>2025-11-25</code> conversation with a server
 that gates its tool listing behind a credential (skipped <code>not_applicable</code>).</strong> The skip's
-detail names the revision. When the server also lists a modern revision guardana does
-not speak, the result is inconclusive instead, naming that revision, because what it
-declares to modern clients was not read. The result is also inconclusive, naming the
-failure, when <code>server/discover</code> failed: a timeout, a refusal (<code>401</code>, <code>403</code>, <code>407</code>), a
-rate limit, a server error, a reply that is not JSON-RPC, a result whose
-<code>supportedVersions</code> names no revision, or another JSON-RPC error such as <code>-32603</code>. These
-are not such failures, but how a server without the method answers: JSON-RPC <code>-32601</code> at
-any status except <code>401</code>, <code>403</code>, <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> and a <code>5xx</code>, <code>-32600</code> or
-<code>-32602</code> at a <code>2xx</code> or <code>400</code>, <code>-32000</code> at a <code>400</code> (how the Python and TypeScript SDKs of
-the older revision turn away a request without a session), a <code>400</code>, <code>404</code> or <code>405</code> read
-whole with no JSON-RPC error, or a result without <code>supportedVersions</code>. A failing server
-that answers in one of those ways, such as a proxy's plain <code>404</code>, cannot be told apart
-and reads <code>not_applicable</code>. <code>not_applicable</code> is not a coverage gap, so it does not fail
-a run while another selected rule reaches a conclusion; a run in which no rule reached
-one ends <code>indeterminate</code>. <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code> and declare
-nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no finding there.</li>
-<li><strong>Whether a server still offers <code>2025-11-25</code> is asked, not read.</strong> Some servers list
-only the new revision in <code>server/discover</code> and still answer <code>initialize</code>. When discovery
-lists no older revision, the checks that need it send one <code>initialize</code> over the
-<code>2025-11-25</code> wire, with your token when you gave one. A result naming <code>2025-11-25</code> makes
-the server dual-era, graded over that revision; JSON-RPC <code>-32601</code> or a <code>-32022</code> that
-names no older revision makes it modern-only only at a status other than <code>401</code>, <code>403</code>,
-<code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> and a <code>5xx</code>. A <code>400</code>, <code>404</code> or <code>405</code> read whole whose body is
-plain text (including empty) or a JSON object without an <code>error</code> member makes it
-modern-only. A <code>-32022</code> naming an older handshake revision leaves its sessions
-unexamined, and <code>session_binding</code> reports <code>inconclusive</code> naming that revision. A <code>401</code>
-or <code>403</code> leaves it unknown, and <code>session_binding</code> reports <code>inconclusive</code> naming
-<code>--mcp-token-env</code>; so does any other answer — a <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> or a <code>5xx</code>
-whatever JSON-RPC error its body carries, a <code>400</code>, <code>404</code> or <code>405</code> whose body could not
-be read whole or parsed, a timeout, a rate limit, a server error, another JSON-RPC error
-— naming what came back, because one failed request does not show which revisions a
-server offers.</li>
+detail names the revision. When the server also lists a modern revision guardana does not
+speak, the result is inconclusive instead, naming that revision, because what it declares
+to modern clients was not read. The result is also inconclusive, naming the failure, when
+<code>server/discover</code> failed: a timeout, a refusal (<code>401</code>, <code>403</code>, <code>407</code>), a rate limit, a
+server error, a reply that is not JSON-RPC, a result whose <code>supportedVersions</code> names no
+revision, JSON-RPC <code>-32601</code> at any other status, such as <code>402</code> or <code>451</code> (reported as
+<code>HTTP &lt;status&gt; carrying JSON-RPC error -32601</code>), or another JSON-RPC error such as
+<code>-32603</code>. These are not such failures, but how a server without the method answers:
+JSON-RPC <code>-32601</code> with no HTTP status (stdio) or at a <code>2xx</code>, <code>400</code>, <code>404</code> or <code>405</code>,
+<code>-32600</code> or <code>-32602</code> at a <code>2xx</code> or <code>400</code>, <code>-32000</code> at a <code>400</code> (how the Python and
+TypeScript SDKs of the older revision turn away a request without a session), a <code>400</code>,
+<code>404</code> or <code>405</code> read whole with no JSON-RPC error, or a result without <code>supportedVersions</code>.
+A failing server that answers in one of those ways, such as a proxy's plain <code>404</code>, cannot
+be told apart and reads <code>not_applicable</code>. <code>not_applicable</code> is not a coverage gap, so it
+does not fail a run while another selected rule reaches a conclusion; a run in which no
+rule reached one ends <code>indeterminate</code>. <code>cacheScope</code> and <code>ttlMs</code> arrive with <code>2026-07-28</code>
+and declare nothing on the older revision, so even <code>cacheScope: &quot;public&quot;</code> produces no
+finding there.</li>
+<li><strong>Whether a server still offers <code>2025-11-25</code> is asked, not read.</strong> Some servers list only
+the new revision in <code>server/discover</code> and still answer <code>initialize</code>. When discovery lists
+no older revision, the checks that need it send one <code>initialize</code> over the <code>2025-11-25</code>
+wire, with your token when you gave one. A result naming <code>2025-11-25</code> makes the server
+dual-era, graded over that revision; JSON-RPC <code>-32601</code> or a <code>-32022</code> that names no older
+revision makes it modern-only only at an HTTP <code>2xx</code>, <code>400</code>, <code>404</code> or <code>405</code>. A <code>400</code>, <code>404</code>
+or <code>405</code> read whole whose body is plain text (including empty) or a JSON object without an
+<code>error</code> member makes it modern-only. A <code>-32022</code> naming an older handshake revision leaves
+its sessions unexamined, and <code>session_binding</code> reports <code>inconclusive</code> naming that
+revision. A <code>401</code> or <code>403</code> leaves it unknown, and <code>session_binding</code> reports <code>inconclusive</code>
+naming <code>--mcp-token-env</code>; so does any other answer — a <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> or a
+<code>5xx</code> whatever JSON-RPC error its body carries, a <code>400</code>, <code>404</code> or <code>405</code> whose body could
+not be read whole or parsed, a timeout, a rate limit, a server error, a <code>-32601</code>, or a
+<code>-32022</code> that names no older revision, at any other status such as <code>402</code> or <code>451</code>, or
+another JSON-RPC error — naming what came back, because one failed request does not show
+which revisions a server offers. For a <code>-32601</code> at an HTTP status such as <code>402</code> or <code>451</code>,
+the detail reads <code>HTTP &lt;status&gt; carrying JSON-RPC error -32601</code>.</li>
 <li><strong>No revision in common is an outcome, never a pass.</strong> The authorization checks
 report <code>inconclusive</code> naming both version lists, and the manifest checks
 report the same sentence as an error, so the run is indeterminate under the default
@@ -666,7 +704,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.task_identity</code></td>
-<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. Only the first page of the listing is read, so an empty one that names a further page is <code>inconclusive</code> too. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. A server that declares no tasks and answers <code>tasks/list</code> as an unknown method is skipped <code>not_offered</code>, a coverage gap; when what it declares could not be read at all, the check is <code>inconclusive</code> instead. A <code>tasks/list</code> answered <code>401</code> or <code>403</code> is refused whatever its body carries; JSON-RPC <code>-32601</code> at any status except <code>401</code>, <code>403</code>, <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> and a <code>5xx</code>, or an HTTP <code>400</code> read whole whose body is plain text (including empty) or a JSON object without an <code>error</code> member, counts as an unknown method. Any other answer, such as a <code>400</code> carrying another JSON-RPC error or whose body could not be read whole or parsed, <code>404</code>, <code>405</code>, a <code>5xx</code>, or <code>-32601</code> at <code>407</code>, <code>408</code>, <code>425</code>, <code>429</code> or a <code>5xx</code>, is <code>inconclusive</code></td>
+<td>One <code>tasks/list</code> sent without a credential lists no task, since a fresh anonymous session owns none; on a server that serves tools to anyone, listed task ids are not a counter, repeated or short. A refused listing is the conforming answer. An empty one on a gated server is confirmed with one listing as the operator: a task there shows the anonymous caller was kept from it; without <code>--mcp-token-env</code>, or with no task to show, the check is <code>inconclusive</code>. Only the first page of the listing is read, so an empty one that names a further page is <code>inconclusive</code> too. An operator's session refused with <code>401</code> or <code>403</code> is <code>inconclusive</code> too. When a server answers <code>tasks/list</code> as an unknown method, the check counts revisions the server is known not to serve as declaring no tasks, reports <code>inconclusive</code> if it could not read the task declarations for any other revision, and skips <code>not_offered</code> as a coverage gap if both revisions count as declaring no tasks. A <code>tasks/list</code> answered <code>401</code> or <code>403</code> is refused whatever its body carries; JSON-RPC <code>-32601</code> at an HTTP <code>2xx</code>, <code>400</code>, <code>404</code> or <code>405</code>, or an HTTP <code>400</code> read whole whose body is plain text (including empty) or a JSON object without an <code>error</code> member, counts as an unknown method. Any other answer, such as a <code>400</code> carrying another JSON-RPC error or whose body could not be read whole or parsed, a <code>404</code> or <code>405</code> without JSON-RPC <code>-32601</code>, a <code>5xx</code>, or <code>-32601</code> at any other status, such as <code>402</code>, <code>407</code>, <code>429</code>, <code>451</code> or a <code>5xx</code>, is <code>inconclusive</code>. When <code>-32601</code> gives this result, the check names the HTTP status.</td>
 </tr>
 </tbody>
 </table></div>

@@ -15,7 +15,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="w">
 <a class="logo" href="../index.html"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span>guard<b>ana</b></span></a>
-<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.4.0</span></a>
+<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.5.0</span></a>
 <nav class="links" aria-label="Primary">
 <a href="../docs/index.html" class="sm-keep">Docs</a>
 <a href="../docs/rules/index.html" class="sm-keep">Rules</a>
@@ -336,15 +336,19 @@ target, so whoever controls the target writes it. It excludes ordinary files, bu
 file a model loader reads: a file the scan observes as a model (every row of the table
 under <a href="#model-files-no-rule-reads">model files no rule reads</a>, an unzipped Keras model's
 <code>config.json</code> and <code>metadata.json</code> included), an archive or compressed file (<code>.zip</code>,
-<code>.tar</code>, <code>.tgz</code>, <code>.tbz2</code>, <code>.tbz</code>, <code>.txz</code>, or a name ending in <code>.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>,
-<code>.bz2</code>, <code>.lzma</code> or <code>.lz4</code>) whatever it is named, a <code>torch.package</code>'s
+<code>.tar</code>, <code>.tgz</code>, <code>.tbz2</code>, <code>.tbz</code>, <code>.txz</code>, <code>.tzst</code>, the <code>.package</code> zip <code>torch.package</code>
+writes, or a name ending in <code>.gz</code>, <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code>, <code>.lzma</code>, <code>.lz4</code>, <code>.zst</code>
+or <code>.zstd</code>) whatever it is named, a <code>torch.package</code>'s
 <code>.data/extern_modules</code> record (matched in any case) and every <code>.py</code> file below the
 directory holding it, and, in a directory
 that holds a model or a tokenizer (<code>tokenizer_config.json</code> or <code>tokenizer.json</code>), every
 <code>*config.json</code>, <code>chat_template.json</code>, <code>chat_template*.jinja</code>, <code>chat_template*.j2</code> and
-<code>keras_metadata.pb</code>, with the templates in its <code>additional_chat_templates/</code>. A symbolic
-link to a file is judged by its name alone. An ordinary directory it matches is still
-walked for such files. A symbolic link to a directory is not followed and is recorded as a
+<code>keras_metadata.pb</code>, with the templates in its <code>additional_chat_templates/</code>. Nor does it
+exclude a file ending in <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or with no suffix, whose
+first bytes show an archive, a compressed file, an NPY array or a pickle stream that
+imports a callable: loaders open these files by content. A symbolic link to a file is judged by its
+name, and also by the bytes of the file it leads to when that file is inside the scanned
+directory. An ordinary directory it matches is still walked for such files. A symbolic link to a directory is not followed and is recorded as a
 source the scan cannot read even when <code>.guardanaignore</code> matches it; only
 <code>rules.paths_exclude</code> or a name of a directory every scan skips suppresses that record.
 A file it matches that a model loader reads is scanned anyway and named in the output: <code>Scope</code>
@@ -422,10 +426,11 @@ named by its file: a pickle, archive or graph that does not parse, an archive me
 as a pickle (<code>data.pkl</code>, <code>*.pkl</code>, a legacy tar's <code>pickle</code>) that ends before its STOP, an
 NPY header whose <code>descr</code>, <code>shape</code> or <code>fortran_order</code> numpy would refuse, a pickle import whose
 name the scanner cannot resolve, a pickle of any protocol naming a callable by an
-extension-registry code (<code>EXT1</code>, <code>EXT2</code>, <code>EXT4</code>), a pickle holding a <code>numpy</code> dtype with
-fields or a subarray (including scikit-learn decision trees and random forests saved with
-<code>pickle</code>), a dtype state the scanner cannot read, an array whose state or items it cannot
-read (state given as a list, as an array, or as what a call returns, and items made by a
+extension-registry code (<code>EXT1</code>, <code>EXT2</code>, <code>EXT4</code>), a <code>numpy</code> dtype with fields or a
+subarray in a layout the scanner cannot read, a change that may reach a <code>numpy</code> dtype's fields
+after <code>numpy</code> took them, a dtype state the scanner cannot read, an array or storage allocation whose
+contents the pickle leaves unset, a call to a <code>torch</code> storage class with arguments the
+scanner cannot read, an array whose state or items it cannot read (state given as a list, as an array, or as what a call returns, and items made by a
 call), state applied to what a call returns or to what a persistent id hands back when its kind
 is neither text nor what an import made (<code>torch</code> decodes a byte string, and a one-item
 text array equals its text) or it names a <code>torch.package</code> call, a call of what a call returns, a sparse tensor,
@@ -563,7 +568,7 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
-<td><code>.bin</code> whose first bytes are a zip or a pickle stream (<code>pytorch_model.bin</code>); <code>.sav</code>, <code>.p</code> or <code>.model</code> whose first bytes are a pickle stream</td>
+<td><code>.bin</code> whose first bytes are a zip or a pickle stream (<code>pytorch_model.bin</code>), and <code>.sav</code>, <code>.p</code> or <code>.model</code> whose first bytes are a pickle stream. The pickle stream must open with a protocol 2 to 5 <code>PROTO</code> header or have no <code>PROTO</code> header and import a callable with <code>GLOBAL</code> or <code>INST</code> within the first 64 KiB.</td>
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
@@ -571,7 +576,7 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
-<td>a <code>.dat</code>, or a file with no suffix, whose first bytes are a pickle stream (listed as a model when they open with a protocol 2 to 5 header; an older pickle is read without being listed); a <code>.dat.gz</code> or <code>.dat</code> with another codec above, or a file named only by a codec (<code>clf.gz</code>, as <code>joblib.dump</code> writes it, or <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code>, <code>.lzma</code>, <code>.lz4</code>), read when it decompresses to a pickle</td>
+<td>a <code>.dat</code>, or a file with no suffix, whose first bytes are a pickle stream (listed as a model if it opens with a protocol 2 to 5 <code>PROTO</code> header or has no <code>PROTO</code> header and imports a callable with <code>GLOBAL</code> or <code>INST</code> within the first 64 KiB. Other pickles without <code>PROTO</code> are read without being listed); a <code>.dat.gz</code> or <code>.dat</code> with another codec above, or a file named only by a codec (<code>clf.gz</code>, as <code>joblib.dump</code> writes it, or <code>.gzip</code>, <code>.z</code>, <code>.xz</code>, <code>.bz2</code>, <code>.lzma</code>, <code>.lz4</code>), read when it decompresses to a pickle</td>
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
@@ -599,18 +604,40 @@ and in CI. A format name (<code>tflite</code>) is not a path and stays as it is.
 <td><code>guardana.supply_chain.pickle_opcode</code></td>
 </tr>
 <tr>
+<td>a plain <code>.zip</code>, <code>.tar</code>, <code>.tar.gz</code>, <code>.tgz</code>, <code>.tar.bz2</code>, <code>.tbz2</code>, <code>.tbz</code>, <code>.tar.xz</code> or <code>.txz</code> holding a file member named as a model (a model suffix from the table, <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code>, <code>.package</code>, <code>.dat</code>, <code>.pkl.gz</code>, <code>saved_model.pb</code>, <code>pickle</code>, <code>storages</code> or <code>tensors</code>), or whose member listing cannot finish within the bounds below. The archive's bytes determine its format, <code>zip-archive</code> or <code>tar-archive</code>.</td>
+<td><code>guardana.supply_chain.pickle_opcode</code></td>
+</tr>
+<tr>
 <td><code>.tflite</code>, <code>.mar</code>, <code>.nemo</code>, <code>.llamafile</code>, a <code>.bin</code> that starts like GGUF or GGML</td>
 <td>no built-in rule</td>
 </tr>
 </tbody>
 </table></div>
-<p>A <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or a file with no suffix, whose first bytes match
-none of those is not listed as a model. A <code>.dat</code>, a file with no suffix or a file named only by
+<p>A plain archive is listed by the last part of its file members' paths, ignoring case.
+Directories and <code>.h5</code> or <code>.hdf5</code> members are excluded. An archive counts as holding a model
+if listing cannot finish due to damage or truncation, over 100,000 declared zip entries,
+a global PAX header that names, sizes or lays out later tar members, a tar member given
+more than one name or PAX header, an extended header exceeding 1 MiB, over 1,000,000 header
+blocks, over 1,024 compressed streams, or compressed tar expansion past the larger of 64 MiB
+and 32 times its compressed size. A <code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code> or <code>.dat</code>, or
+a file with no suffix, is listed as a model only if its first bytes match a format above.
+A protocol 2 to 5 <code>PROTO</code> header is enough to list it as a pickle model component. For
+protocols 0 and 1 without <code>PROTO</code>, only streams that import a callable with <code>GLOBAL</code> or
+<code>INST</code> within the first 64 KiB are listed. <code>pickle_opcode</code> also reads streams without such
+imports. <code>pickle_opcode</code> counts the component as examined once it reads the file, even if
+every unpickler rejects the byte immediately after the header as an invalid opcode.
+A <code>.dat</code>, a file with no suffix or a file named only by
 a codec costs <code>pickle_opcode</code> one read of its first 64 KiB, and a file with no suffix the same one read for
 <code>keras_lambda</code>: a pickle, a compressed pickle, an NPY array or an archive holding a model is
 read on, and anything else, an unreadable file, a Git LFS pointer or a 7z archive among
 them, is left alone without a result. A zip or tar under such a name is read like a plain
-<code>.zip</code> or <code>.tar</code>. The HDF5 signature is looked for where the HDF5 library looks: at the
+<code>.zip</code> or <code>.tar</code>. The inventory reads each plain archive once per scan without extracting members, using a zip's end records and central directory or a tar's headers and decompressing compressed tars up to the first member named as a model, the end or the bound. <code>pickle_opcode</code> reads the archive separately.
+Zstandard (zstd) data is never decompressed, on any Python version: such a
+file whose first bytes are a zstd frame or a zstd skippable frame is a coverage shortfall.
+Named only by a codec includes <code>bundle.zst</code>, <code>x.dat.zst</code> and a <code>.zst</code> or <code>.zstd</code> named as a
+model, an archive or another codec (<code>model.pkl.zst</code>, <code>bundle.zip.zst</code>, <code>weights.tgz.zst</code>, which
+<code>tar</code> reads as the archive inside); any other <code>.zst</code> or <code>.zstd</code> (<code>data.jsonl.zst</code>) is left alone, as the
+name without the codec is. The HDF5 signature is looked for where the HDF5 library looks: at the
 start and after a userblock of 512, 1024, 2048 bytes and so on, up to the end of the file,
 and in a file with no suffix up to the end of its first 64 KiB. The
 model config is read from the first 16 MiB, so a file whose signature or config lies past
@@ -666,7 +693,10 @@ the members past either bound are a coverage shortfall that counts them. A membe
 so a pickle saved under such a name inside one is not found. A <code>.tar.gz</code>, <code>.tgz</code>, <code>.tar.bz2</code>,
 <code>.tbz2</code>, <code>.tbz</code>, <code>.tar.xz</code> or <code>.txz</code> is decompressed as <code>tar</code> decompresses it, as gzip, bz2 or
 xz by its first bytes and across streams written back to back, in memory and never to disk,
-and its members are read like those of a plain <code>.tar</code>, under the same bounds. At most 32 bytes
+and its members are read like those of a plain <code>.tar</code>, under the same bounds.
+If the pickle opcode bound is reached inside a member, the rule keeps listing the remaining
+headers for checks that use the full member list. It skips the remaining member data.
+At most 32 bytes
 are decompressed for each byte of the file, and at least 64 MiB; a compressed tar past that
 bound, damaged or cut before its end, or with a header <code>tarfile</code> stops listing at before the
 end of the archive, is a coverage shortfall, and so is a link named as a model inside one,
@@ -678,7 +708,9 @@ from the content, so a <code>.tar</code> whose bytes are gzip, bz2 or xz, a file
 suffix are read as a compressed tar when they decompress to one, found in the same first
 read that looks for a pickle. A compressed tar whose decompressed bytes start like a pickle
 is also read as the stream <code>joblib.load</code> would unpickle from them. A <code>.bin</code> whose bytes are a
-compressed tar is not read as one. A member named as
+compressed tar is not read as one. A <code>.tar.zst</code>, <code>.tar.zstd</code> or <code>.tzst</code> is read the same
+way by its bytes; one holding zstd data is a coverage shortfall, since zstd is not
+decompressed. A member named as
 a model that is itself an archive is a coverage shortfall, and one <code>pickle.load</code> would read is still read as a stream. A member named as a
 model it does not open inside an archive (<code>*.safetensors</code>, <code>*.gguf</code>, <code>*.onnx</code>, <code>*.keras</code>,
 a nested <code>model.tar.gz</code> and the rest of the last row above, and HDF5 files (<code>*.h5</code>, <code>*.hdf5</code>, <code>*.hdf</code>, <code>*.weights</code>, <code>*.tf</code>) and a Keras directory's
@@ -724,12 +756,21 @@ for <code>torch.package</code>, with every reading of zip names. A <code>.zip</c
 zip named as a tar is also checked as a reader walking local headers reads it. Member
 boundaries include descriptors, with 8-byte sizes whenever the local header holds a ZIP64
 field. A local-header disagreement, overlapping members, data reaching the central directory,
-an unlisted local header, data ending differently at a descriptor or deflate stream, a decoding
-failure, or encryption or compression the scanner cannot decode to find an end is a coverage
-shortfall. So is exceeding the decompression bound (32 bytes for each byte of the file, and at
+an unlisted local header, data ending differently at a descriptor or a deflate, bzip2 or LZMA
+stream, a described member's stream decoding to other bytes than its entry declares (<code>zipfile</code>
+stops at the declared size, a streaming reader writes every byte), a decoding failure, or encryption, another compression method or an LZMA stream without
+an end marker, which the scanner cannot decode to find an end, is a coverage shortfall. So is exceeding the decompression bound (32 bytes for each byte of the file, and at
 least 64 MiB) or matching more than 100,000 data descriptor signatures while finding the ends.
-Zips named as models are read by their central directory. For <code>.zip</code>, <code>.tar</code>, <code>.tar.gz</code>,
-<code>.tgz</code>, <code>.tar.bz2</code>, <code>.tbz2</code>, <code>.tbz</code>, <code>.tar.xz</code> and <code>.txz</code>, in any case, another codec or
+Zips named as models are read by their central directory. In any zip the rule reads, a deflate, bzip2 or LZMA member read whole is a coverage shortfall if its stream decodes to more or different bytes than its entry declares. <code>zipfile</code> stops at the declared size, while <code>unzip</code> and other unpacking tools write every decoded byte. A zip member compressed with zstd
+(method 93), which <code>zipfile</code> decodes from Python 3.14 on, is a coverage shortfall on every Python
+version, so the verdict does not depend on the one that runs the scan; this holds for the Keras
+rule's <code>config.json</code> too.
+When central-directory entries of a zip share a local header, <code>pickle_opcode</code> reports them as
+unread without opening them and reads the other entries. This coverage shortfall does not depend
+on the Python version.
+For <code>.zip</code>, <code>.tar</code>, <code>.tar.gz</code>,
+<code>.tgz</code>, <code>.tar.bz2</code>, <code>.tbz2</code>, <code>.tbz</code>, <code>.tar.xz</code>, <code>.txz</code>, <code>.tar.zst</code>, <code>.tar.zstd</code> and <code>.tzst</code>, in
+any case, another codec or
 archive format a <code>tar</code> command reads, zip data that does not start at the first byte, gzip,
 bzip2 or xz data holding no tar, or a compressed tar also indicating another codec or format
 after decompression is a coverage shortfall. So is a file holding nothing the rule reads,
@@ -797,7 +838,15 @@ callable the file imports, sorted and each once, after a digest of that set
 the finding names every record ending in lower-case <code>.py</code> below a directory holding
 <code>.data/extern_modules</code>, matched in any case, whether or not a load names its module. It gives
 the source's path below the innermost package root, as
-<code>pkg/__init__.py (shipped Python source a torch.package load may run)</code>. Zip entries ending in
+<code>pkg/__init__.py (shipped Python source a torch.package load may run)</code>. A package saved as
+<code>.package</code>, or under a name <code>pickle_opcode</code> reads as a model or an archive (<code>model.pt</code>,
+<code>model.zip</code>, no suffix), is opened; one saved under any other name (<code>model.txt</code>) is not, although
+<code>PackageImporter</code> opens it. A <code>.package</code> inside another zip or tar is a nested archive, a
+coverage shortfall. In a zip read as a model, a <code>.data/extern_modules</code> record and a record
+ending in <code>.py</code> are not read as pickle data: <code>PackageImporter</code> reads the one as module names and
+imports the other as source, and TorchScript compiles its <code>code/*.py</code>. Such a record that starts
+with an NPY header or a pickle <code>PROTO</code> opcode (protocol 2 or later) is still read; a protocol 0
+or 1 pickle there starts as text does and is not. Zip entries ending in
 <code>/</code>, regardless of attributes, and tar directory entries count as neither Python source nor
 <code>.data/extern_modules</code>. Records still count when an Info-ZIP Unicode Path gives a name without
 the trailing <code>/</code>, a zip name ends in <code>/.</code>, or a non-directory tar entry's name ends in <code>/</code>. In
@@ -826,9 +875,12 @@ UTF-8 locale, Python's <code>tarfile</code> in its default PAX format and Python
 names as UTF-8. Windows <code>tar.exe</code> writing a zip stores such names as OEM code-page bytes
 without the UTF-8 flag. PowerShell <code>Compress-Archive</code> sets the flag. The
 summary also names the call that applies a state no <code>numpy</code> or Python pickler writes:
-<code>numpy.dtype.__setstate__</code> for forged dtype
-flags, byte order, item size or alignment, or an eight-item datetime or timedelta dtype
-state without its unit; <code>numpy.ndarray.__setstate__</code> for an object array given fewer items
+<code>numpy.dtype.__setstate__</code> for forged dtype flags, byte order, item size or alignment,
+an eight-item datetime or timedelta dtype state without its unit, or a layout with a field
+or title at a negative offset or ending past the item size, a subarray wider than the item,
+an item size that disagrees with the <code>V&lt;n&gt;</code> type string, object flags when the fields or
+subarray hold no objects, or flags outside one byte;
+<code>numpy.ndarray.__setstate__</code> for an object array given fewer items
 than its shape has elements; and <code>&lt;module&gt;.&lt;class&gt;.__setstate__</code> for a <code>BUILD</code> applied to an
 allowlisted class itself, such as <code>collections.Counter.__setstate__</code>, including one a
 <code>torch</code> legacy persistent id carries (the item after <code>&quot;module&quot;</code>, or a tar-format id's

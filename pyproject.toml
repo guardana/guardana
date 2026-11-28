@@ -250,7 +250,7 @@ conformance = [
     # `packages/*/src` may import `mcp` or `a2a` (the import-linter contract below),
     # and the clean-install check and the isolated example suites never install it.
     "mcp==2.3.0",
-    "a2a-sdk[http-server]==1.3.0",
+    "a2a-sdk[http-server]==1.3.1",
     "uvicorn",
 ]
 dev = [
@@ -260,7 +260,7 @@ dev = [
     # releases, and an example-based test proves the case its author thought of —
     # which is never the length field that is one byte short of the file.
     "hypothesis>=6.170.15",
-    "import-linter>=2.16",
+    "import-linter>=2.17",
     # Test-only, and deliberately not a runtime dependency of any distribution:
     # `schemas/run-v2.schema.json` is a published contract, and a schema
     # nothing validates against is a promise rather than a gate. Guardana itself

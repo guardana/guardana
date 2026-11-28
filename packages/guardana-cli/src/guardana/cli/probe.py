@@ -15,11 +15,13 @@ from guardana.cli._connection import (
     ModelOption,
     ProviderOption,
     RequireAuthOption,
+    RequireKeyCheckOption,
     SystemPromptFileOption,
     UrlOption,
     endpoint_for,
     read_fixtures,
     read_system_prompt,
+    refuse_a_key_check_without_the_access_check,
     refuse_an_access_check_it_cannot_make,
     resolve_flags,
     resolve_tenants,
@@ -114,6 +116,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
     system_prompt_file: SystemPromptFileOption = None,
     fixtures: FixturesOption = None,
     require_auth: RequireAuthOption = False,
+    require_key_check: RequireKeyCheckOption = False,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
     format: Annotated[str, typer.Option(help=FORMAT_HELP)] = "human",
@@ -276,6 +279,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
         "--adapter": adapter,
         "--system-prompt-file": system_prompt_file,
         "--require-auth": True if require_auth else None,
+        "--require-key-check": True if require_key_check else None,
     }
     mcp_flags: dict[str, object] = {
         "--mcp-token-env": mcp_token_env,
@@ -290,6 +294,9 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
     }
     _refuse_flags_of_another_target(
         target, a2a, mcp, chat=chat_flags, mcp_flags=mcp_flags, a2a_flags=a2a_flags
+    )
+    refuse_a_key_check_without_the_access_check(
+        require_auth=require_auth, require_key_check=require_key_check
     )
     if require_auth and mcp is None:
         refuse_an_access_check_it_cannot_make(
@@ -509,6 +516,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
             system_prompt=prompt,
             meter=UsageMeter(prof.budgets),
             require_auth=require_auth,
+            require_key_check=require_key_check,
         )
         subject, tenant_secrets = _seeded(
             selected_endpoint,

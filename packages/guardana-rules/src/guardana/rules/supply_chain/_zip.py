@@ -14,13 +14,14 @@ Every function reads the open file it is given, so a caller that lists the archi
 same handle lists what was checked.
 """
 
+import bz2
 import lzma
 import os
 import struct
 import zipfile
 import zlib
 from dataclasses import dataclass
-from typing import IO
+from typing import IO, Protocol
 
 ARCHIVE_MAX_ENTRIES = 100_000
 """Entries one archive may list, read or not.
@@ -46,6 +47,10 @@ ZIP_ERRORS = (
 )
 """What `zipfile` raises for a crafted archive or member: a damaged stream, a name that is
 not in its declared encoding, an encrypted or unsupported member."""
+
+ZSTD_METHOD = 93
+"""Zip's zstd method, which `zipfile` decodes from Python 3.14 on. No reader here opens such a
+member on any Python, so a verdict never depends on the one that runs the scan."""
 
 _END = struct.Struct("<4s4H2LH")
 _END_SIGNATURE = b"PK\x05\x06"
@@ -251,6 +256,13 @@ _UNICODE_PATH_FIELD = 0x7075
 _ATTRIBUTES_FIELD = 0x6C78
 _ATTRIBUTES_VERSION, _ATTRIBUTES_INTERNAL, _ATTRIBUTES_EXTERNAL = 0x01, 0x02, 0x04
 _MORE_BITS = 0x80
+_COMPRESSED_METHODS = (zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA)
+_DECODED_METHODS = (zipfile.ZIP_STORED, *_COMPRESSED_METHODS)
+_LZMA_HEADER = struct.Struct("<2BH")
+"""Zip's LZMA header: the encoder's major and minor version, then the size of the properties."""
+_LZMA_PROPERTIES = struct.Struct("<BL")
+"""LZMA1 properties: lc, lp and pb packed into one byte, then the dictionary size."""
+_LZMA_MIN_DICTIONARY = 4096
 
 
 @dataclass(frozen=True, slots=True)
@@ -350,6 +362,26 @@ def _disagreement(  # noqa: PLR0911 — one return per disagreement named
     ):
         return "has a local header whose sizes or checksum differ from its directory entry"
     return None
+
+
+def decoded_disagreement(handle: IO[bytes], info: zipfile.ZipInfo) -> str | None:
+    """Return how a compressed member's stream decodes otherwise than its entry declares, or not.
+
+    A tool that extracts through the central directory, Info-ZIP `unzip` among them, decodes
+    the stream to its end and writes every byte, at most warning about the CRC-32, while
+    `zipfile` stops at the declared size; so the stream must decode to that size and CRC-32.
+    Decoding stops one chunk past the declared size.
+    """
+    if info.flag_bits & _ENCRYPTED_FLAG or info.compress_type not in _COMPRESSED_METHODS:
+        return None
+    local = _local_header(handle, info)
+    if local is None:
+        return "has no local header where its directory entry points"
+    budget = _WalkBudget(inflated=info.file_size, signatures=0)
+    try:
+        return _decoded_ending(handle, info, local.data_start, budget)
+    except _OverBudgetError:
+        return "has a stream that decodes to more bytes than its directory entry declares"
 
 
 def _attributes_agree(local: _LocalHeader, info: zipfile.ZipInfo) -> bool:
@@ -512,17 +544,28 @@ def _end_disagreement(
         # local header from there; only a signature inside the data is found that way.
         if _find(handle, _LOCAL_SIGNATURE, start, start + size) is None:
             return None
-    if info.flag_bits & _ENCRYPTED_FLAG or info.compress_type not in (
-        zipfile.ZIP_STORED,
-        zipfile.ZIP_DEFLATED,
-    ):
+    if info.flag_bits & _ENCRYPTED_FLAG or info.compress_type not in _DECODED_METHODS:
         return (
-            "is encrypted or uses compression other than stored or deflate, and finding its "
-            "data end requires decoding the scanner does not do"
+            "is encrypted or uses compression other than stored, deflate, bzip2 or LZMA, and "
+            "finding its data end requires decoding the scanner does not do"
         )
     if info.compress_type == zipfile.ZIP_STORED:
         return _stored_end_disagreement(handle, start, size, budget)
-    return _deflate_end_disagreement(handle, start, size, budget)
+    return _decoded_ending(handle, info, start, budget)
+
+
+def _decoded_ending(
+    handle: IO[bytes], info: zipfile.ZipInfo, start: int, budget: _WalkBudget
+) -> str | None:
+    """Return how a deflate, bzip2 or LZMA member's stream differs from its entry, decoded."""
+    size = info.compress_size
+    if info.compress_type == zipfile.ZIP_DEFLATED:
+        return _deflate_end_disagreement(handle, info, start, budget)
+    if info.compress_type == zipfile.ZIP_BZIP2:
+        span = range(start, start + size)
+        ending = _stream_ending(bz2.BZ2Decompressor(), handle, info, span, budget)
+        return None if ending is None else f"has a bzip2 stream that {ending}"
+    return _lzma_end_disagreement(handle, info, start, budget)
 
 
 def _stored_end_disagreement(
@@ -567,13 +610,36 @@ def _stored_end_disagreement(
         search = max(search, base)
 
 
+@dataclass(slots=True)
+class _Decoded:
+    """What a member's data has decoded to so far: its length and CRC-32."""
+
+    size: int = 0
+    crc: int = 0
+
+    def add(self, data: bytes, budget: _WalkBudget) -> None:
+        """Count `data`, spending its length from `budget`."""
+        budget.inflate(len(data))
+        self.size += len(data)
+        self.crc = zlib.crc32(data, self.crc)
+
+    def disagreement(self, info: zipfile.ZipInfo) -> str | None:
+        """Return how the decoded data differs from what the directory entry declares."""
+        if (self.size, self.crc) == (info.file_size, info.CRC):
+            return None
+        # A streaming reader writes every byte the stream decodes to, while `zipfile`
+        # stops at the declared size, so the two would see different contents.
+        return "decodes to other bytes than its directory entry declares"
+
+
 def _deflate_end_disagreement(
-    handle: IO[bytes], start: int, size: int, budget: _WalkBudget
+    handle: IO[bytes], info: zipfile.ZipInfo, start: int, budget: _WalkBudget
 ) -> str | None:
-    """Return how a deflate stream, where a streaming reader ends it, ends off `size` bytes on."""
+    """Return how a deflate stream, where a streaming reader ends it, differs from its entry."""
     inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+    decoded = _Decoded()
     handle.seek(start)
-    remaining = size
+    remaining = info.compress_size
     try:
         while remaining and not inflater.eof:
             chunk = handle.read(min(_CHUNK_BYTES, remaining))
@@ -581,7 +647,7 @@ def _deflate_end_disagreement(
                 break
             remaining -= len(chunk)
             while chunk and not inflater.eof:
-                budget.inflate(len(inflater.decompress(chunk, _CHUNK_BYTES)))
+                decoded.add(inflater.decompress(chunk, _CHUNK_BYTES), budget)
                 chunk = inflater.unconsumed_tail
     except zlib.error:
         return "has a deflate stream that does not decode"
@@ -589,7 +655,89 @@ def _deflate_end_disagreement(
         return "has a deflate stream that does not end within the size its directory entry declares"
     if inflater.unused_data or remaining:
         return "has a deflate stream that ends before the size its directory entry declares"
-    return None
+    content = decoded.disagreement(info)
+    return None if content is None else f"has a deflate stream that {content}"
+
+
+class _Decoder(Protocol):
+    """A bzip2 or LZMA decompressor, which buffers the input it has not decoded yet."""
+
+    @property
+    def eof(self) -> bool:
+        """Whether the stream's end has been reached."""
+        raise NotImplementedError
+
+    @property
+    def needs_input(self) -> bool:
+        """Whether decoding further needs more input."""
+        raise NotImplementedError
+
+    @property
+    def unused_data(self) -> bytes:
+        """The input found after the stream's end."""
+        raise NotImplementedError
+
+    def decompress(self, data: bytes, max_length: int = -1) -> bytes:
+        """Decode `data` after what is buffered, returning at most `max_length` bytes."""
+        raise NotImplementedError
+
+
+def _stream_ending(
+    decoder: _Decoder, handle: IO[bytes], info: zipfile.ZipInfo, span: range, budget: _WalkBudget
+) -> str | None:
+    """Return how a bzip2 or LZMA stream in the bytes `span` covers differs from its entry.
+
+    The stream ends where a streaming reader ends it.
+    """
+    decoded = _Decoded()
+    handle.seek(span.start)
+    remaining = len(span)
+    try:
+        while remaining and not decoder.eof:
+            chunk = handle.read(min(_CHUNK_BYTES, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            decoded.add(decoder.decompress(chunk, _CHUNK_BYTES), budget)
+            while not decoder.eof and not decoder.needs_input:
+                decoded.add(decoder.decompress(b"", _CHUNK_BYTES), budget)
+    except (OSError, lzma.LZMAError):
+        return "does not decode"
+    if not decoder.eof:
+        return "does not end within the size its directory entry declares"
+    if decoder.unused_data or remaining:
+        return "ends before the size its directory entry declares"
+    return decoded.disagreement(info)
+
+
+def _lzma_end_disagreement(
+    handle: IO[bytes], info: zipfile.ZipInfo, start: int, budget: _WalkBudget
+) -> str | None:
+    """Return how zip LZMA data, where a streaming reader ends it, differs from its entry.
+
+    The data is a header, the LZMA1 properties it gives the size of, then a raw LZMA1 stream.
+    A stream without an end marker never ends, so it never agrees.
+    """
+    size = info.compress_size
+    head_size = _LZMA_HEADER.size + _LZMA_PROPERTIES.size
+    head = _read_at(handle, start, min(head_size, size))
+    if len(head) < head_size:
+        return "has an LZMA header that does not decode"
+    _major, _minor, properties_size = _LZMA_HEADER.unpack_from(head)
+    if properties_size != _LZMA_PROPERTIES.size:
+        return "has an LZMA header that does not decode"
+    model, dictionary = _LZMA_PROPERTIES.unpack_from(head, _LZMA_HEADER.size)
+    # The decoder allocates its whole dictionary up front, and no distance in a stream the
+    # budget lets it decode can reach further back than the budget.
+    dictionary = min(dictionary, max(budget.inflated, _LZMA_MIN_DICTIONARY))
+    lc, lp, pb = model % 9, model // 9 % 5, model // 45
+    lzma1 = {"id": lzma.FILTER_LZMA1, "dict_size": dictionary, "lc": lc, "lp": lp, "pb": pb}
+    try:
+        decoder = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=[lzma1])
+    except (lzma.LZMAError, ValueError):
+        return "has an LZMA header that does not decode"
+    ending = _stream_ending(decoder, handle, info, range(start + head_size, start + size), budget)
+    return None if ending is None else f"has an LZMA stream that {ending}"
 
 
 def _find(handle: IO[bytes], needle: bytes, start: int, end: int) -> int | None:

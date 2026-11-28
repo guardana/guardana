@@ -30,6 +30,25 @@ def test_scan_exits_nonzero_on_critical_finding(tmp_path: Path) -> None:
     assert "pickle_opcode" in result.stdout
 
 
+_UNSET_ALLOCATIONS = {
+    "an-array": b"\x80\x02cnumpy.core.multiarray\n_reconstruct\n"
+    b"cnumpy\nndarray\nK\x10\x85C\x01b\x87R.",
+    "a-storage": b"\x80\x02ctorch\nByteStorage\nK\x10\x85R.",
+}
+
+
+@pytest.mark.parametrize("content", _UNSET_ALLOCATIONS.values(), ids=_UNSET_ALLOCATIONS)
+def test_scan_of_an_allocation_whose_contents_nothing_sets_is_indeterminate(
+    tmp_path: Path, content: bytes
+) -> None:
+    (tmp_path / "m.pkl").write_bytes(content)
+
+    result = runner.invoke(app, ["scan", str(tmp_path)])
+
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+    assert "whose contents nothing in the pickle sets" in " ".join(result.stdout.split())
+
+
 def test_scan_clean_tree_exits_zero(tmp_path: Path) -> None:
     (tmp_path / "ok.py").write_text("import os\n")
     result = runner.invoke(app, ["scan", str(tmp_path)])

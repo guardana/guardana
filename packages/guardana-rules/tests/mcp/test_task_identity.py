@@ -343,8 +343,8 @@ _METHOD_NOT_FOUND = json.dumps(
 ).encode()
 
 
-@pytest.mark.parametrize("status", [407, 408, 425, 429, 500, 503])
-def test_a_method_not_found_beside_a_failure_status_is_inconclusive_not_unoffered(
+@pytest.mark.parametrize("status", [402, 407, 408, 409, 410, 418, 422, 425, 429, 451, 500, 503])
+def test_a_method_not_found_beside_a_status_no_unknown_method_gets_is_inconclusive(
     status: int,
 ) -> None:
     target = _listing_answered(_open(), RawReply(status, {}, _METHOD_NOT_FOUND))
@@ -584,3 +584,104 @@ def test_the_rule_classifies_its_own_samples() -> None:
         FixtureOutcome.INCONCLUSIVE,
         FixtureOutcome.NOT_OFFERED,
     } <= outcomes_seen
+
+
+class _AnswersMethodsWith(ScriptedMcpServer):
+    """A server whose named methods get fixed replies, as a gateway in front of it might answer."""
+
+    def __init__(self, replies: Mapping[str, RawReply], **settings: object) -> None:
+        super().__init__(ROUTABLE, **settings)  # type: ignore[arg-type]
+        self.replies = replies
+
+    def __call__(self, url: str, **kwargs: object) -> RawReply:
+        raw = kwargs.get("body")
+        method = str(json.loads(raw).get("method")) if isinstance(raw, bytes) else ""
+        if method in self.replies:
+            return self.replies[method]
+        return super().__call__(url, **kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        pytest.param(RawReply(402, {}, _METHOD_NOT_FOUND), id="402-method-not-found"),
+        pytest.param(RawReply(502, {}, _METHOD_NOT_FOUND), id="502-method-not-found"),
+        pytest.param(RawReply(503, {}, b"busy"), id="503"),
+    ],
+)
+def test_an_unsettled_legacy_era_is_never_read_as_declaring_no_tasks(reply: RawReply) -> None:
+    unknown = RawReply(200, {}, _METHOD_NOT_FOUND)
+    server = _AnswersMethodsWith(
+        {"initialize": reply, "tasks/list": unknown},
+        tools=TOOLS,
+        protocol_versions=[_MODERN, _LEGACY],
+        discovers=[_MODERN],
+        task_declaration="listing",
+    )
+    target = _target(server)
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert target.authorization().legacy_offer.unsettled is not None
+    assert target.authorization().tasks.offer is None
+    assert outcomes(reported) == ["inconclusive"]
+    assert "never read" in summaries(reported)[0]
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        pytest.param(RawReply(402, {}, _METHOD_NOT_FOUND), id="402-method-not-found"),
+        pytest.param(RawReply(451, {}, _METHOD_NOT_FOUND), id="451-method-not-found"),
+        pytest.param(RawReply(503, {}, b""), id="503"),
+    ],
+)
+def test_a_failed_discovery_never_reads_the_modern_era_as_declaring_no_tasks(
+    reply: RawReply,
+) -> None:
+    server = _AnswersMethodsWith(
+        {"server/discover": reply},
+        tools=TOOLS,
+        protocol_versions=[_MODERN, _LEGACY],
+        task_declaration="extension",
+    )
+    target = _target(server)
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert target.authorization().tasks.offer is None
+    assert outcomes(reported) == ["inconclusive"]
+    assert "never read" in summaries(reported)[0]
+
+
+def test_a_discovery_refused_with_the_versions_it_names_reads_no_modern_declarations() -> None:
+    error = {"code": -32022, "message": "no", "data": {"supported": [_MODERN, _LEGACY]}}
+    refused = json.dumps({"jsonrpc": "2.0", "id": 1, "error": error}).encode()
+    server = _AnswersMethodsWith(
+        {
+            "server/discover": RawReply(400, {}, refused),
+            "tasks/list": RawReply(200, {}, _METHOD_NOT_FOUND),
+        },
+        tools=TOOLS,
+        protocol_versions=[_MODERN, _LEGACY],
+        task_declaration="extension",
+    )
+    target = _target(server)
+
+    reported = list(RULE.run(target, RuleContext()))
+
+    assert target.negotiation().capabilities is None
+    assert target.authorization().tasks.offer is None
+    assert outcomes(reported) == ["inconclusive"]
+    assert "never read" in summaries(reported)[0]
+
+
+def test_a_legacy_server_answering_discovery_as_lacking_it_still_declares_no_tasks() -> None:
+    server = _AnswersMethodsWith(
+        {"server/discover": RawReply(404, {}, _METHOD_NOT_FOUND)},
+        tools=TOOLS,
+        protocol_versions=[_LEGACY],
+    )
+
+    with pytest.raises(NotOffered):
+        list(RULE.run(_target(server), RuleContext()))

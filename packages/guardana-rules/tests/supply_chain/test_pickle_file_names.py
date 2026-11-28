@@ -18,11 +18,16 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from guardana.core.report import ShortfallKind
-from guardana.core.rule import RuleContext
+from guardana.core.gate import GateOutcome, gate_outcome
+from guardana.core.profile import Policy, Profile
+from guardana.core.registry import Registry
+from guardana.core.report import ScanResult, ShortfallKind
+from guardana.core.rule import Rule, RuleContext
+from guardana.core.runner import Runner
 from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain import pickle_opcode
 from guardana.rules.supply_chain._npy import NPY_MAGIC
+from guardana.rules.supply_chain.keras_lambda import KerasLambdaRule
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule
 
 _SYSTEM = b"\x80\x02cos\nsystem\nX\x02\x00\x00\x00id\x85R."
@@ -272,3 +277,71 @@ def test_data_named_only_by_its_codec_stays_quiet(
     findings, ctx = _scan(tmp_path)
     assert findings == []
     assert _unread(ctx) == []
+
+
+_REFUSED = b"\x80\x02\x00" + bytes(range(256)) * 16
+"""A protocol-2 PROTO opcode, then a byte no unpickler reads as an opcode."""
+_HEADED_NAMES = [
+    "weights.bin",
+    "weights.dat",
+    "weights.sav",
+    "weights.p",
+    "weights.model",
+    "weights",
+]
+
+
+def _run(root: Path, rule: Rule) -> ScanResult:
+    registry = Registry()
+    registry.register_rule(rule)
+    return Runner(registry=registry, profile=Profile(name="t", policy=Policy())).run(
+        ArtifactTarget(root)
+    )
+
+
+def _unread_by_any_rule(result: ScanResult) -> list[str]:
+    return [
+        gap.detail
+        for gap in result.coverage_shortfall
+        if gap.kind is ShortfallKind.UNEXAMINED_COMPONENT
+        and "no rule which ran reads" in gap.detail
+    ]
+
+
+@pytest.mark.parametrize("name", _HEADED_NAMES)
+def test_a_file_every_unpickler_refuses_past_its_header_is_examined_and_clean(
+    tmp_path: Path, name: str
+) -> None:
+    (tmp_path / name).write_bytes(_REFUSED)
+
+    result = _run(tmp_path, pickle_opcode.PickleOpcodeRule())
+
+    assert not result.findings
+    assert not result.unverified
+    assert not result.coverage_shortfall
+    assert gate_outcome(result, Policy()) is GateOutcome.PASS
+
+
+@pytest.mark.parametrize("name", _HEADED_NAMES)
+def test_the_same_file_is_unexamined_when_no_rule_that_reads_pickle_runs(
+    tmp_path: Path, name: str
+) -> None:
+    (tmp_path / name).write_bytes(_REFUSED)
+
+    result = _run(tmp_path, KerasLambdaRule())
+
+    (detail,) = _unread_by_any_rule(result)
+    assert detail.startswith(
+        f"1 pickle model component(s) that no rule which ran reads: {tmp_path / name} "
+    )
+    assert gate_outcome(result, Policy()) is GateOutcome.INDETERMINATE
+
+
+def test_a_complete_protocol_2_pickle_named_as_weights_stays_clean(tmp_path: Path) -> None:
+    (tmp_path / "weights.bin").write_bytes(_CLEAN)
+
+    result = _run(tmp_path, pickle_opcode.PickleOpcodeRule())
+
+    assert not result.findings
+    assert not result.coverage_shortfall
+    assert gate_outcome(result, Policy()) is GateOutcome.PASS

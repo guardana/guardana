@@ -6,6 +6,7 @@ instead of being dropped by one hand-written copy.
 """
 
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import guardana.cli._endpoint as endpoint_module
 import pytest
@@ -13,7 +14,7 @@ from guardana.cli._connection import endpoint_for
 from guardana.cli._evaluators import judge_endpoint
 from guardana.cli.main import app
 from guardana.core.evaluator.config import default_endpoint_builder
-from guardana.core.target import ChatMessage, ChatTransport, EndpointTarget
+from guardana.core.target import ChatMessage, EndpointTarget
 from guardana.core.target.connection import (
     DEFAULT_PROVIDER,
     Connection,
@@ -62,22 +63,9 @@ def test_every_route_builds_its_endpoint_through_the_one_builder(
     built: list[ResolvedConnection] = []
     original = ResolvedConnection.endpoint
 
-    def recording(
-        self: ResolvedConnection,
-        *,
-        system_prompt: str | None = None,
-        meter: UsageMeter | None = None,
-        transport: ChatTransport | None = None,
-        inference_access_check: bool = False,
-    ) -> EndpointTarget:
+    def recording(self: ResolvedConnection, **options: Any) -> EndpointTarget:  # noqa: ANN401
         built.append(self)
-        return original(
-            self,
-            system_prompt=system_prompt,
-            meter=meter,
-            transport=transport,
-            inference_access_check=inference_access_check,
-        )
+        return original(self, **options)
 
     monkeypatch.setattr(ResolvedConnection, "endpoint", recording)
 

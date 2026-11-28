@@ -192,7 +192,8 @@ def _gate() -> None:
         ["uv", "run", "ruff", "format", "--check", "."],
         ["uv", "run", "mypy", "--strict", "."],
         ["uv", "run", "lint-imports"],
-        ["uv", "run", "pytest", "-q"],
+        # addopts already holds -q; a second one makes pytest drop its pass-count line.
+        ["uv", "run", "pytest"],
         _DOGFOOD,
         # Last, because only a clean install sees an undeclared dependency the workspace hides.
         ["uv", "run", "--no-project", "python", "scripts/clean_install_check.py"],
@@ -301,7 +302,7 @@ def main(argv: list[str]) -> None:
         )
         return
 
-    _run(["uv", "run", "pytest", "-q"])  # re-gate after the bump touched pyprojects/lock
+    _run(["uv", "run", "pytest"])  # re-gate after the bump touched pyprojects/lock
     _run(_DOGFOOD)
     _stage_release(bumped)
     _run(["git", "commit", "-m", f"chore(release): {tag}"])

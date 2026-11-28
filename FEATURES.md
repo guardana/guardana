@@ -134,7 +134,8 @@ Active and trace-backed checks cover:
   tool results;
 - memory poisoning across sessions;
 - whether a live chat completions route returns a completion to a request without
-  a credential (`--require-auth`);
+  a credential (`--require-auth`) or, with `--require-key-check`, to a request with a
+  generated key that cannot be valid;
 - live MCP manifests, authorization discovery (the metadata `issuer` included), audience
   and session handling, scope breadth, discovery targets, issuer identification, cache
   scope, tasks listed to a caller without a credential, and whether the server is the one

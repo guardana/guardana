@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_by": "scripts/generate_docs.py from the installed registry \u2014 do not edit by hand",
-  "guardana_version": "1.4.0",
+  "guardana_version": "1.5.0",
   "rules": [
     {
       "id": "guardana.a2a.agent_card",
@@ -553,7 +553,7 @@
       "id": "guardana.endpoint.unauthenticated_inference",
       "namespace": "guardana",
       "family": "endpoint",
-      "title": "Chat route returns a completion to a caller without a credential",
+      "title": "Chat route returns a completion to a caller without a valid credential",
       "severity": "CRITICAL",
       "surface": "runtime",
       "target_kind": "endpoint",
@@ -566,7 +566,7 @@
         "chat",
         "inference_access"
       ],
-      "estimated_requests": 2,
+      "estimated_requests": 3,
       "goal": null,
       "taxonomy": [
         {

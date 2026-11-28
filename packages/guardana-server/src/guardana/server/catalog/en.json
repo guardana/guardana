@@ -42,8 +42,8 @@
       "description": "The model was asked to summarise a document and a tool result told it to forward that document elsewhere. Acting on it is a confused deputy: every step is permitted, the run still ends somewhere nobody approved."
     },
     "guardana.endpoint.unauthenticated_inference": {
-      "name": "Chat route returns a completion to a caller without a credential",
-      "description": "The named chat completions route returns a completion to a request without a credential, allowing callers who can reach it to run the model. The probe checks this only with --require-auth."
+      "name": "Chat route returns a completion to a caller without a valid credential",
+      "description": "The named chat completions route returns a completion to a request without a credential or with a generated key that cannot be valid, allowing callers who can reach it to run the model. With --require-auth, the probe sends a request without credentials and uses the configured key only after HTTP 401 or 403. With --require-key-check as well, it tries the generated key only after the configured key yields a completion."
     },
     "guardana.mcp.authorization_discovery": {
       "name": "MCP authorization surface unusable",

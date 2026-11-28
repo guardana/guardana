@@ -17,6 +17,7 @@ from enum import Enum, StrEnum
 from pathlib import Path
 from typing import IO
 
+from guardana.core.formats.content import HEAD_MAX_BYTES, raw_pickle_imports
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
 from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
@@ -51,6 +52,11 @@ from guardana.rules.supply_chain._npy import (
 )
 from guardana.rules.supply_chain._opcodes import SpelledInt, read_opcodes
 from guardana.rules.supply_chain._pickle_state import (
+    TORCH_STORAGES,
+    Array,
+    BlindWrites,
+    ByteText,
+    DictOf,
     Global,
     Items,
     ListOf,
@@ -62,6 +68,7 @@ from guardana.rules.supply_chain._pickle_state import (
     call_result,
     items_of,
     readonly_view,
+    returned,
 )
 from guardana.rules.supply_chain._reading import (
     LFS_POINTER_REASON,
@@ -97,7 +104,9 @@ from guardana.rules.supply_chain._zip import (
     ARCHIVE_MAX_ENTRIES,
     ZIP_DIRECTORY_MAX_BYTES,
     ZIP_ERRORS,
+    ZSTD_METHOD,
     declared_directory_start,
+    decoded_disagreement,
     member_disagreement,
     unpacking_disagreement,
 )
@@ -122,11 +131,20 @@ _SUFFIXES = (
 _BIN_SUFFIX = ".bin"
 _PLAIN_ZIP_SUFFIX = ".zip"
 _TAR_SUFFIX = ".tar"
-_CONTENT_SUFFIXES = (_BIN_SUFFIX, ".sav", ".p", ".model", _TAR_SUFFIX, _PLAIN_ZIP_SUFFIX)
-"""Read by content: `pytorch_model.bin` is a torch zip and `word2vec.model` a pickle, while
-a file under one of these names that is neither a zip, a tar nor a pickle stream is some
-other file this rule has nothing to say about, unless it is a `.tar` or a `.zip`, which a
-`tar` command unpacks by its bytes whatever they are."""
+_CONTENT_SUFFIXES = (
+    _BIN_SUFFIX,
+    ".sav",
+    ".p",
+    ".model",
+    ".package",
+    _TAR_SUFFIX,
+    _PLAIN_ZIP_SUFFIX,
+)
+"""Read by content: `pytorch_model.bin` is a torch zip, `model.package` a `torch.package` zip
+and `word2vec.model` a pickle, while a file under one of these names that is neither a zip, a
+tar nor a pickle stream is some other file this rule has nothing to say about, unless it is a
+`.tar` or a `.zip`, which a `tar` command unpacks by its bytes whatever they are."""
+_SOURCE_SUFFIX = ".py"
 _TORCH_TAR_NAMES = (".pth.tar", ".pt.tar")
 """What `torch.save` is told to write as a tar: a model, whatever its first bytes are."""
 _DATA_SUFFIX = ".dat"
@@ -148,8 +166,22 @@ _HEAD_READ_SUFFIXES = (_DATA_SUFFIX, "")
 """Names that say nothing of the format, which `pickle.load` and `torch.load` open all the
 same: such a file counts only when one bounded read of its first bytes shows a pickle, a
 compressed one, an array or an archive holding a model."""
-_COMPRESSED_TAR_ENDINGS = (".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tbz", ".tar.xz", ".txz")
+_COMPRESSED_TAR_ENDINGS = (
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tbz",
+    ".tar.xz",
+    ".txz",
+    ".tar.zst",
+    ".tar.zstd",
+    ".tzst",
+)
 """Names of a tar `tar` decompresses before it extracts the members a person then loads."""
+_ZSTD_SUFFIXES = (".zst", ".zstd")
+_ZSTD_UNREAD = "zstd-compressed file, which this scanner does not decompress; not scanned"
+"""Reported on every Python alike, so the verdict does not depend on which one runs the scan."""
 _COMPRESSED_SUFFIXES = tuple(
     dict.fromkeys(
         f".{end.rsplit('.', 1)[1]}"
@@ -162,6 +194,11 @@ _COMPRESSED_SUFFIXES = tuple(
 """Codec suffixes; a file named by one and nothing that says what it compresses
 (`clf.gz`, which `joblib.dump` writes compressed by that suffix) is read by its first
 bytes, like a file whose name says nothing of its format."""
+_ZSTD_INNER_SUFFIXES = frozenset(
+    {*_HEAD_READ_SUFFIXES, _PLAIN_ZIP_SUFFIX, _TAR_SUFFIX, *_COMPRESSED_SUFFIXES}
+)
+"""What a name before `.zst` may end in for the file to be read: nothing that says its format,
+an archive, or a codec."""
 _UNREAD_MODEL_SUFFIXES = frozenset(
     {
         ".gguf",
@@ -188,29 +225,6 @@ _LEGACY_STORAGES = "storages"
 _LEGACY_TENSORS = "tensors"
 _LEGACY_TORCH_MEMBERS = frozenset({"pickle", _LEGACY_STORAGES, _LEGACY_TENSORS})
 """The members of a legacy `torch.save` tar that `torch.load` unpickles."""
-_TORCH_STORAGES = frozenset(
-    f"{kind}Storage"
-    for kind in (
-        "Bool",
-        "Byte",
-        "Char",
-        "Short",
-        "Int",
-        "Long",
-        "Half",
-        "Float",
-        "Double",
-        "BFloat16",
-        "ComplexFloat",
-        "ComplexDouble",
-        "QUInt8",
-        "QInt8",
-        "QInt32",
-        "QUInt4x2",
-        "QUInt2x4",
-        "Untyped",
-    )
-)
 _STORAGE_ELEMENT_BYTES = {
     "BoolStorage": 1,
     "ByteStorage": 1,
@@ -258,7 +272,7 @@ _TORCH_VALUES = frozenset(
 )
 _SAFE_GLOBALS: frozenset[tuple[str, str]] = frozenset(
     {
-        *(("torch", name) for name in _TORCH_STORAGES | _TORCH_VALUES),
+        *(("torch", name) for name in TORCH_STORAGES | _TORCH_VALUES),
         *(
             ("torch._utils", name)
             for name in (
@@ -330,6 +344,7 @@ _STRING_OPS = frozenset(
         "STRING",
     }
 )
+_BYTE_TEXT_OPS = frozenset({"SHORT_BINSTRING", "BINSTRING", "STRING"})
 # Memo stores: MEMOIZE takes the next free index; the others carry it as the arg.
 _MEMO_PUT_INDEXED = frozenset({"BINPUT", "LONG_BINPUT", "PUT"})
 _MEMO_GET = frozenset({"BINGET", "LONG_BINGET", "GET"})
@@ -338,8 +353,9 @@ _IMPORTS_BY_ARG = frozenset({"GLOBAL", "INST"})
 # no file shows, so what it imports is unknown. It counts only in a stream read as a
 # pickle: three of every 256 random tensor bytes are extension opcodes.
 _EXTENSION_OPS = frozenset({"EXT1", "EXT2", "EXT4"})
-# The C unpickler reaches the list or dict under these items without honouring the
-# MARK fence, so the model does the same rather than stopping where it would not.
+# Both unpicklers refuse these when a MARK lies between the items and the list or dict
+# under them. The model reaches under the MARK and reads on, so it may name an import no
+# load reaches, never fewer.
 _UNFENCED_OPS = frozenset({"APPEND", "SETITEM"})
 _BOOKKEEPING_OPS = frozenset({"PROTO", "FRAME", "MEMOIZE", "PUT", "BINPUT", "LONG_BINPUT", "STOP"})
 _BINARY_INT_OPS = frozenset({"BININT", "BININT1", "BININT2", "LONG1", "LONG4"})
@@ -472,6 +488,7 @@ _CALLABLE_DEPTH = {"REDUCE": 2, "NEWOBJ": 2, "NEWOBJ_EX": 3}
 _TUPLE_SIZES = {"EMPTY_TUPLE": 0, "TUPLE1": 1, "TUPLE2": 2, "TUPLE3": 3}
 _TUPLE_OPS = frozenset({*_TUPLE_SIZES, "TUPLE"})
 _LIST_OPS = frozenset({"EMPTY_LIST", "LIST", "APPEND", "APPENDS"})
+_DICT_OPS = frozenset({"EMPTY_DICT", "DICT"})
 # Each leaves the object it fills on the stack, or for READONLY_BUFFER a read-only view of it.
 _IN_PLACE_OPS = frozenset({"BUILD", "SETITEM", "SETITEMS", "ADDITEMS", "READONLY_BUFFER"})
 _SETITEM_DEPTH = 3
@@ -494,11 +511,6 @@ def _is_allowed(module: str, qualname: str) -> bool:
     if module == _NUMPY_DTYPE_MODULE:
         return qualname.endswith("DType") and qualname.isidentifier()
     return (module, qualname) in _SAFE_GLOBALS
-
-
-def _maybe_dangerous(module: str, qualname: str) -> Iterator[str]:
-    if not _is_allowed(module, qualname):
-        yield f"{module}.{qualname}"
 
 
 def _shipped_ref(record: str) -> str:
@@ -689,6 +701,12 @@ class _PickleMachine:
     setstates: dict[Global, str] = field(default_factory=dict)
     """The `__setstate__` of each class a state was applied to; see `Notes`."""
 
+    allocations: list[Array] = field(default_factory=list)
+    """The arrays allocated with unset items in the pickle being read; see `Notes`."""
+
+    blind: BlindWrites = field(default_factory=BlindWrites)
+    """The changes to dicts it could not follow; see `Notes`."""
+
     passed: bool = False
     """Whether it read on past an extension code."""
 
@@ -702,6 +720,11 @@ class _PickleMachine:
     returns_legacy_magic: bool = False
     """Whether the last STOP returned the legacy magic number, and nothing was left below it."""
 
+    named: dict[tuple[str, str], tuple[str | None, bool]] = field(default_factory=dict)
+    """Each global it imported: its reference when not allowlisted, and whether its name is a
+    real dotted one. A memo repeats a name for a few bytes, so a repeat costs a lookup, never
+    work or memory that grows with the name."""
+
     stack: list[_Value] = field(default_factory=list)
     marks: list[int] = field(default_factory=list)
     memo: dict[int, _Value] = field(default_factory=dict)
@@ -712,11 +735,13 @@ class _PickleMachine:
         if self.shape is not None:
             self.shape.note(name, arg)
         if name in _STRING_OPS:
-            self.stack.append(arg if isinstance(arg, str) else None)
+            text = arg if isinstance(arg, str) else None
+            byte_text = text is not None and name in _BYTE_TEXT_OPS
+            self.stack.append(ByteText(text) if byte_text else text)
         elif name == "STACK_GLOBAL":
             module, qualname = self._stack_global()
-            self._imports(module, qualname)
-            self.stack.append(Global(module, qualname, _is_allowed(module, qualname)))
+            allowed = self._imports(module, qualname)
+            self.stack.append(Global(module, qualname, allowed))
         elif not (self._step_tracked(name, arg) or self._step_marks_and_memo(name, arg)):
             if name in _IMPORTS_BY_ARG and isinstance(arg, str):
                 module, _, qualname = arg.partition(" ")
@@ -747,6 +772,7 @@ class _PickleMachine:
         """Note what a STOP returns; refuse a call of what an extension code named."""
         if name == "STOP":
             self.returns_legacy_magic = not self.marks and self.stack == [_Tracked.LEGACY_MAGIC]
+            returned(self._notes())
         elif self._called(name) is _Tracked.EXTENSION:
             raise _ExtensionCodeError(f"{name} calls what an extension code named")
 
@@ -760,11 +786,23 @@ class _PickleMachine:
             return None
         return self.stack[-depth]
 
-    def _imports(self, module: str, qualname: str) -> None:
-        self.refs.extend(_maybe_dangerous(module, qualname))
-        self.imported = self.imported or bool(_IDENTIFIER.fullmatch(f"{module}.{qualname}"))
+    def _imports(self, module: str, qualname: str) -> bool:
+        """Keep an import of `module.qualname`; return whether it is allowlisted."""
+        known = self.named.get((module, qualname))
+        if known is None:
+            name = f"{module}.{qualname}"
+            known = (
+                None if _is_allowed(module, qualname) else name,
+                bool(_IDENTIFIER.fullmatch(name)),
+            )
+            self.named[module, qualname] = known
+        ref, dotted = known
+        if ref is not None:
+            self.refs.append(ref)
+        self.imported = self.imported or dotted
         if self.shape is not None:
             self.shape.named(module, qualname)
+        return ref is None
 
     def _step_marks_and_memo(self, name: str, arg: object) -> bool:
         """Apply an opcode whose declared stack effect is not its whole effect.
@@ -867,7 +905,7 @@ class _PickleMachine:
         return self.stack[self.marks[-1] :] if self.marks else None
 
     def _notes(self) -> Notes:
-        return Notes(self.refs, self.unproven, self.setstates)
+        return Notes(self.refs, self.unproven, self.setstates, self.allocations, self.blind)
 
     def _made(self, name: str, arg: object) -> _Value:  # noqa: PLR0911 — one return per opcode kind
         """Return what opcode `name` pushes, from its operands, when a state check needs it."""
@@ -879,6 +917,8 @@ class _PickleMachine:
             return self._tuple(name)
         if name in _LIST_OPS:
             return self._list(name)
+        if name in _DICT_OPS:
+            return self._dict(name)
         if name in _MAKING_CALLS:
             return self._call(name, arg)
         if name == "BINPERSID":
@@ -930,6 +970,15 @@ class _PickleMachine:
         target.count += added
         return target
 
+    def _dict(self, name: str) -> Tracked | None:
+        """Return a new dict, holding the pairs above the newest MARK for DICT."""
+        made = DictOf(born=self.blind.count)
+        if name == "DICT":
+            if not self.marks:
+                return None
+            made.put(self.stack, self.marks[-1], self._notes())
+        return made
+
     def _changed_in_place(self, name: str) -> Tracked | None:
         """Return the object an `_IN_PLACE_OPS` opcode leaves on the stack, as what it was.
 
@@ -947,10 +996,20 @@ class _PickleMachine:
         elif name == "SETITEM":
             # The dict under its key and value, reached past any MARK as for `_UNFENCED_OPS`.
             target = self.stack[-_SETITEM_DEPTH] if len(self.stack) >= _SETITEM_DEPTH else None
+            self._set_items(target, len(self.stack) - 2)
         else:
             mark = self.marks[-1] if self.marks else 0
             target = self.stack[mark - 1] if mark else None
+            if name == "SETITEMS":
+                self._set_items(target, mark)
         return target if isinstance(target, Tracked) else None
+
+    def _set_items(self, target: _Value, start: int) -> None:
+        """Put the pairs from `start` into `target`, or keep a change to an object it lost."""
+        if isinstance(target, DictOf):
+            target.put(self.stack, start, self._notes())
+        elif target is None or target is Made.DERIVED:
+            self._notes().write_blind()
 
     def _call(self, name: str, arg: object) -> Tracked | None:
         """Return what a call opcode makes, judging any state the call itself sets."""
@@ -1067,6 +1126,15 @@ def _unproven_pickle(scan: "_OpcodeScan") -> bool:
     )
 
 
+def _names_a_dotted_callable(refs: Iterable[str]) -> bool:
+    """Whether any reference is an import with a real dotted name, each distinct one tested once.
+
+    A memo repeats a reference for a few bytes, so testing every copy would cost its length
+    for each repeat.
+    """
+    return any(_IDENTIFIER.fullmatch(ref) for ref in dict.fromkeys(refs))
+
+
 def _bin_verdict(head: bytes, scan: "_OpcodeScan", *, cut: bool) -> bool | None:
     """Whether a file of no known format is a pickle: True, False, or None to read on.
 
@@ -1080,11 +1148,20 @@ def _bin_verdict(head: bytes, scan: "_OpcodeScan", *, cut: bool) -> bool | None:
     """
     if head.startswith(_PICKLE_HEADERS):
         return scan.end is not ParseEnd.NOT_PICKLE or bool(scan.refs or scan.unproven)
-    if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs) or _unproven_pickle(scan):
+    if _names_a_dotted_callable(scan.refs) or _unproven_pickle(scan):
         return True
     if scan.end is ParseEnd.RAN_OUT and cut:
         return None
     return False
+
+
+def _listed_as_pickle(head: bytes, *, cut: bool) -> bool:
+    """Whether the inventory lists a file opening with `head` as a pickle with no PROTO opcode.
+
+    Judged on the bytes the inventory judges, the first `HEAD_MAX_BYTES`.
+    """
+    within = head[:HEAD_MAX_BYTES]
+    return raw_pickle_imports(within, cut=cut or len(head) > len(within)) is True
 
 
 def _oversized_summary(oversized: bool) -> str | None:
@@ -1380,8 +1457,8 @@ def _scan_one(
         one.end = ParseEnd.EXTENSION
         return one
     refs, unproven, stops = machine.kept
-    if (machine.imported and machine.unproven[unproven:]) or any(
-        _IDENTIFIER.fullmatch(ref) for ref in machine.refs[refs:]
+    if (machine.imported and machine.unproven[unproven:]) or _names_a_dotted_callable(
+        machine.refs[refs:]
     ):
         # An import with a real dotted name past the code, or a state it cannot prove safe in
         # a pickle that imports one, is no accident of random bytes, and an unpickler
@@ -1622,6 +1699,26 @@ def _pickle_named(member: str) -> bool:
     return _model_named(member) and _member_suffix(member) not in _SNIFFED_SUFFIXES
 
 
+def _read_as_text(member: str) -> bool:
+    """Whether a zip member is a record its loaders read as text and never unpickle.
+
+    `PackageImporter` reads `.data/extern_modules` as module names and imports a `.py` record
+    as source, which `_shipped` reports inside a package root; TorchScript compiles `code/*.py`.
+    """
+    return member.endswith(_SOURCE_SUFFIX) or holds_package((member,))
+
+
+def _zstd_may_hold_a_model(name: str) -> bool:
+    """Whether a zstd-named file is named as a model, an archive, a codec, or nothing else.
+
+    zstd is not decompressed here, so the name is all there is: `clf.zst`, `model.pkl.zst` and
+    `bundle.zip.zst`, which `tar` reads as the zip inside, are read by their first bytes, while
+    `data.jsonl.zst` is left alone, as `data.jsonl` is.
+    """
+    inner = name[: name.rfind(".")]
+    return _member_suffix(inner) in _ZSTD_INNER_SUFFIXES or _model_named(inner)
+
+
 def _file_reading(*, by_content: bool) -> _AsPickle:
     """How a file's stream is read for an extension code; see `PickleOpcodeRule._scan`."""
     return _AsPickle.SNIFFED if by_content else _AsPickle.NAMED
@@ -1781,13 +1878,37 @@ def _unicode_paths(info: zipfile.ZipInfo) -> Iterator[str]:
                 raise zipfile.BadZipFile("Info-ZIP Unicode Path is not UTF-8") from error
 
 
+def _apart_from_shared_headers(
+    report: "_FileReport", members: list[zipfile.ZipInfo]
+) -> list[zipfile.ZipInfo]:
+    """Report the entries that point to a local header another entry points to; return the rest.
+
+    `zipfile` refuses to open such an entry on some Python versions and opens it with a warning
+    on others, so the entries are reported unread on every version and never opened.
+    """
+    at_offset = collections.Counter(info.header_offset for info in members)
+    shared = [info.orig_filename for info in members if at_offset[info.header_offset] > 1]
+    if not shared:
+        return members
+    listed = ", ".join(dict.fromkeys(shared[:_UNREAD_MODELS_LISTED]))
+    report.unscanned(
+        f"zip lists {len(shared)} entries that point to a local header another entry points to "
+        f"({listed}), which `zipfile` refuses on some Python versions and reads on others; "
+        "not scanned"
+    )
+    return [info for info in members if at_offset[info.header_offset] == 1]
+
+
 def _starts_as_array_or_pickle(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> bool:
     """Whether a member's first bytes are an NPY array or a PROTO opcode of any protocol.
 
     `np.load` reads any key of a zip it opens as `.npz`, whatever the member is named. A
     damaged member counts, so the failure to read it is reported; an encrypted one or one
     in a method `zipfile` lacks does not, since no loader that uses it can read it either.
+    A zstd member counts unopened: `zipfile` decodes it on some Pythons and not others.
     """
+    if info.compress_type == ZSTD_METHOD:
+        return True
     try:
         with archive.open(info) as member:
             head = member.read(len(NPY_MAGIC))
@@ -1829,7 +1950,7 @@ def _holds_a_pickle(head: bytes, scan: _OpcodeScan, *, cut: bool) -> bool:
     Tensor values can parse as an import with hidden operands, but `torch.load` never
     unpickles a storage, so without a header that is not taken as evidence of a pickle.
     """
-    if any(_IDENTIFIER.fullmatch(ref) for ref in scan.refs):
+    if _names_a_dotted_callable(scan.refs):
         return True
     if not head.startswith(_PICKLE_HEADERS):
         return False
@@ -1861,6 +1982,30 @@ class _FileReport:
 
     compressed_tar: bool = False
     """Whether the file is named as a compressed tar, which a person extracts with `tar`."""
+
+    magic: bytes = b""
+    """The first bytes of the file, as the read that judged it saw them."""
+
+    listed: bool = False
+    """Whether the file's head is a pickle with no PROTO opcode that imports a callable.
+
+    The inventory lists such a file as a pickle, and this rule read it as one: one whose
+    opcodes it judges as data is examined and found to hold nothing a load runs.
+    """
+
+    @property
+    def headed(self) -> bool:
+        """Whether the file opens with the PROTO opcode of a pickle of protocol 2 to 5.
+
+        The inventory counts such a file as a pickle, and this rule judges it as one: a file
+        every unpickler refuses is examined and found to hold nothing a load runs.
+        """
+        return self.magic.startswith(_PICKLE_HEADERS)
+
+    @property
+    def counted(self) -> bool:
+        """Whether the inventory lists the file as a pickle, whatever this rule's reading said."""
+        return self.headed or self.listed
 
     @property
     def numpy(self) -> bool:
@@ -1929,9 +2074,11 @@ class PickleOpcodeRule(ArtifactRule):
 
     Reads opcodes statically, each argument at least as leniently as CPython's unpickler
     reads it; never unpickles anything. Unzips
-    ZIP-based model archives (modern `torch.save`, NumPy `.npz`) and scans every member
-    regardless of extension, so a payload hidden under a non-`.pkl` name cannot
-    slip past; a zip whose readers would disagree on its members is not read. A plain
+    ZIP-based model archives (modern `torch.save`, a `.package`, NumPy `.npz`) and scans every
+    member regardless of extension, so a payload hidden under a non-`.pkl` name cannot
+    slip past; a `.py` or `.data/extern_modules` record, which loaders read as text, only
+    when it starts with an NPY header or a pickle `PROTO` opcode. A zip whose readers would
+    disagree on its members is not read. A plain
     `.zip`, and any file `tarfile` opens as a tar whatever it is named,
     as `torch.load` opens a legacy `torch.save` file, has the members a loader would
     unpickle read, by their names, without extracting anything to disk; a tar is also read
@@ -1939,7 +2086,9 @@ class PickleOpcodeRule(ArtifactRule):
     `storages` and `tensors` members as torch reads them, pickles between raw bytes. A
     compressed tar (`.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, or a `.tar` or a file named only
     by a codec whose bytes decompress to a tar) is decompressed in memory, up to a bound that
-    grows with its size, and its members are read as `tar` extracts them. A
+    grows with its size, and its members are read as `tar` extracts them. zstd is never
+    decompressed: a file named as a zstd tar, or read by its first bytes, that holds zstd
+    data is unverified on every Python. A
     NumPy array file is a pickle when its header declares a dtype that holds Python
     objects; its header is parsed as a literal, and a numeric array is not a pickle. A
     file or member joblib would decompress by its first bytes is decompressed first.
@@ -2035,8 +2184,10 @@ class PickleOpcodeRule(ArtifactRule):
             if path.name.lower().endswith(_TORCH_TAR_NAMES):
                 yield from self._scan(_FileReport(path, ctx))
                 ctx.examined(path)
-            elif (yield from self._scan(_FileReport(path, ctx), by_content=True)):
-                ctx.examined(path)
+            else:
+                report = _FileReport(path, ctx)
+                if (yield from self._scan(report, by_content=True)) or report.counted:
+                    ctx.examined(path)
         for path in target.iter_files(_COMPRESSED_SUFFIXES):
             yield from self._scan_compressed_name(path, ctx)
         for path in target.iter_files(_HEAD_READ_SUFFIXES):
@@ -2070,12 +2221,13 @@ class PickleOpcodeRule(ArtifactRule):
             report = _FileReport(path, ctx, compressed_tar=True)
             if (yield from self._scan(report, by_content=True)):
                 ctx.examined(path)
-        else:
+        elif not name.endswith(_ZSTD_SUFFIXES) or _zstd_may_hold_a_model(name):
             yield from self._scan_head_read(path, ctx)
 
     def _scan_head_read(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         """Scan a file whose name says nothing of its format; count it when it held a model."""
-        if (yield from self._scan(_FileReport(path, ctx, head_only=True), by_content=True)):
+        report = _FileReport(path, ctx, head_only=True)
+        if (yield from self._scan(report, by_content=True)) or report.counted:
             ctx.examined(path)
 
     def _scan(
@@ -2117,7 +2269,7 @@ class PickleOpcodeRule(ArtifactRule):
             if maybe_a_model:
                 report.unscanned(_UNREADABLE)
             return maybe_a_model
-        magic = sniffed[0]
+        magic = report.magic = sniffed[0]
         # A `.bin` or `.model` is named as a model although it is read by content; a plain
         # `.zip` or `.tar` names no model, so a pointer under that name is left alone.
         named_as_model = not by_content or report.path.suffix.lower() in _SNIFFED_SUFFIXES
@@ -2344,12 +2496,14 @@ class PickleOpcodeRule(ArtifactRule):
 
         A member is read as its header is reached. A link is reported unscanned rather than
         followed, since the member it names may lie behind the point the stream has reached.
+        Once the opcode budget runs out, the remaining headers are still listed, unread, so
+        the checks over the whole listing see every member, as they do for a plain tar.
         """
         unread: list[str] = []
         entries: list[tarfile.TarInfo] = []
         chosen = 0
         exhausted = False
-        while not exhausted and (entry := archive.next()) is not None:
+        while (entry := self._next_listed(archive, exhausted=exhausted)) is not None:
             entries.append(entry)
             if not holds_file_data(entry):
                 continue
@@ -2358,7 +2512,7 @@ class PickleOpcodeRule(ArtifactRule):
             if not _model_named(entry.name):
                 continue
             chosen += 1
-            if chosen <= _ARCHIVE_MAX_MEMBERS:
+            if chosen <= _ARCHIVE_MAX_MEMBERS and not exhausted:
                 exhausted = self._scan_streamed_member(report, archive, entry, budget)
         self._report_unread_models(report, unread)
         sources = _shipped(
@@ -2370,18 +2524,32 @@ class PickleOpcodeRule(ArtifactRule):
         through = _through_link(
             report, (((entry.name,), entry.issym() or entry.islnk()) for entry in entries)
         )
-        if exhausted:
-            return True
         if archive.offset < end:
             # `tarfile` stops listing at a header it cannot parse, which `tar` warns about
             # and extracts past.
             report.unscanned(f"tar has a damaged header at byte {archive.offset}; not scanned")
+        if exhausted:
+            return True
         if chosen > _ARCHIVE_MAX_MEMBERS:
             report.unscanned(
                 f"tar holds {chosen} members named as models; members past the "
                 f"first {_ARCHIVE_MAX_MEMBERS} not scanned"
             )
         return bool(chosen or unread) or sources or through
+
+    @staticmethod
+    def _next_listed(archive: tarfile.TarFile, *, exhausted: bool) -> tarfile.TarInfo | None:
+        """Return a streamed tar's next header, or None where its listing ends.
+
+        Past the opcode bound the file is already unscanned, so a header `tarfile` refuses
+        there ends the listing rather than discarding what the members before it show.
+        """
+        try:
+            return archive.next()
+        except tarfile.TarError:
+            if not exhausted:
+                raise
+            return None
 
     def _scan_streamed_member(
         self,
@@ -2424,16 +2592,22 @@ class PickleOpcodeRule(ArtifactRule):
         if head is None:
             return False
         data, cut = head
-        magic = data[:_MAGIC_SNIFF_BYTES]
+        magic = report.magic = data[:_MAGIC_SNIFF_BYTES]
+        report.listed = _listed_as_pickle(data, cut=cut)
         if magic.startswith((_ZIP_MAGIC, _EMPTY_ZIP_MAGIC)):
             as_zip = self._scan_zip(report)
             return (_opens_as_tar(magic) and self._scan_tar(report)) or as_zip
         if magic.startswith(NPY_MAGIC):
             self._scan_npy(report)
             return True
+        # `tar` decompresses zstd by its bytes whatever the file is named, and so may a
+        # loader's caller; the other readings still run, since `tarfile` tries a plain tar first.
+        zstd = codec_first(magic) == "zstd"
+        if zstd:
+            report.unscanned(_ZSTD_UNREAD)
         as_tar = _opens_as_tar(magic) and self._scan_tar(report)
         as_tar = self._read_head_compressed_tar(report, data, cut=cut) or as_tar
-        return self._read_head_stream(report, data, cut=cut) or as_tar
+        return self._read_head_stream(report, data, cut=cut) or as_tar or zstd
 
     def _read_head_stream(self, report: _FileReport, head: bytes, *, cut: bool) -> bool:
         """Judge a file's `head` as a pickle stream, compressed or not, and read on if it is one.
@@ -2557,6 +2731,7 @@ class PickleOpcodeRule(ArtifactRule):
             if probe is None:
                 report.unscanned(_UNREADABLE)
                 return True
+            report.listed = _listed_as_pickle(probe[0], cut=probe[1])
             scan = _scan_opcodes(probe[0], as_pickle=_AsPickle.SNIFFED, cut=probe[1])
             verdict = _bin_verdict(probe[0], scan, cut=probe[1])
             if verdict is False:
@@ -2727,7 +2902,8 @@ class PickleOpcodeRule(ArtifactRule):
             )
             walked = report.plain_zip or report.tar_named
             hidden = walked and self._unpacked_otherwise(report, handle, members, archive, size)
-            chosen, unpeeked = self._choose_zip_members(archive, members, every_member=every_member)
+            apart = _apart_from_shared_headers(report, members)
+            chosen, unpeeked = self._choose_zip_members(archive, apart, every_member=every_member)
             if unpeeked:
                 report.unscanned(
                     f"zip holds {unpeeked} member(s) not named as models whose first bytes "
@@ -2736,6 +2912,10 @@ class PickleOpcodeRule(ArtifactRule):
                 )
             for info in chosen[:_ARCHIVE_MAX_MEMBERS]:
                 disagreement = member_disagreement(handle, info)
+                if disagreement is None and info.file_size <= _MEMBER_MAX_BYTES:
+                    # A member read whole is decoded once more to its stream's end, which is
+                    # where an extracting tool stops writing it.
+                    disagreement = decoded_disagreement(handle, info)
                 if disagreement is not None:
                     report.unscanned(
                         f"zip member {disagreement} ({info.orig_filename}), so zip readers "
@@ -2758,6 +2938,7 @@ class PickleOpcodeRule(ArtifactRule):
             or sources
             or through
             or hidden
+            or len(apart) < len(members)
             or bool(chosen)
             or bool(unread)
             or bool(unpeeked)
@@ -2796,12 +2977,19 @@ class PickleOpcodeRule(ArtifactRule):
 
         A plain zip has its members named as models read, and the others peeked at for an
         NPY or pickle start; each peek reads a local header and a first block, so peeks are
-        bounded by count and by those bytes.
+        bounded by count and by those bytes. Any other zip has every member read except a
+        text record (`_read_as_text`) that does not start as an array or a pickle.
         """
         chosen: list[zipfile.ZipInfo] = []
         peeks = peeked_bytes = unpeeked = 0
         for info in members:
-            if every_member or any(_model_named(name) for name in _zip_names(info)):
+            names = _zip_names(info)
+            if every_member:
+                text = all(_read_as_text(name) for name in names)
+                if not text or _starts_as_array_or_pickle(archive, info):
+                    chosen.append(info)
+                continue
+            if any(_model_named(name) for name in names):
                 chosen.append(info)
                 continue
             cost = (
@@ -2950,6 +3138,12 @@ class PickleOpcodeRule(ArtifactRule):
     ) -> bool:
         """Scan one member and return whether the archive's opcode budget ran out in it."""
         name = info.orig_filename
+        if info.compress_type == ZSTD_METHOD:
+            report.unscanned(
+                f"zip member {name} is zstd-compressed, which this scanner does not "
+                "decompress; not scanned"
+            )
+            return False
         try:
             with archive.open(info) as member:
                 raw = member.read(_MEMBER_MAX_BYTES + 1)  # +1 byte reveals a cut member

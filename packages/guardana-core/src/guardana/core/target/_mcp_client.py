@@ -115,7 +115,6 @@ _CREDENTIAL_STATUSES = frozenset({401, 403, 407})
 """Statuses that answer who may ask, a proxy's `407` included, and never which revision answers."""
 
 _TARGET_STATUSES = frozenset({404, 408, 425, 429})
-_BUSY_STATUSES = frozenset({408, 425, 429})
 _NOT_FOUND = 404
 _BAD_REQUEST = 400
 _CLIENT_ERROR = 400
@@ -824,32 +823,26 @@ def _refuses_the_method(exc: McpProtocolError) -> bool:
     """Whether a JSON-RPC error is what a server of the handshake era answers `server/discover`.
 
     Handshake-era SDKs reach their method table only inside a session, so a request with
-    none is turned away as a `400` carrying `-32600` or `-32000` rather than `-32601`. A
-    `401`, `403` or `407` says who may ask, not which era answers, and a busy or server
-    status means the server failed whatever the error says. `-32000` is any server's own
-    code, so only a `400` makes it a rejection; a failing server sending just that cannot
-    be told apart.
+    none is turned away as a `400` carrying `-32600` or `-32000` rather than `-32601`.
+    `-32000` is any server's own code, so only a `400` makes it a rejection; a failing
+    server sending just that cannot be told apart.
     """
     status = exc.status
-    if says_nothing_of_the_method(status):
-        return False
     if exc.code == _METHOD_NOT_FOUND:
-        return True
+        return may_name_a_missing_method(status)
     if exc.code in _REQUEST_REJECTED:
         return status is None or status in _SUCCESS or status == _BAD_REQUEST
     return status == _BAD_REQUEST and exc.code == _NO_SESSION
 
 
-def says_nothing_of_the_method(status: int | None) -> bool:
-    """Whether an HTTP status settles a reply whatever JSON-RPC error its body carries.
+def may_name_a_missing_method(status: int | None) -> bool:
+    """Whether a JSON-RPC error beside this HTTP status can say that a method is missing.
 
-    A `401`, `403` or `407` says who may ask, and a busy or server status says the server
-    failed; neither says which methods the server implements, so a `-32601` beside one
-    is no evidence that a method is missing.
+    Only no status, a `2xx`, `400`, `404` or `405` is how a server answers a method it
+    lacks. Any other status says who may ask, that something failed, or that a gateway or
+    proxy answered, so a `-32601` beside one is no evidence that a method is missing.
     """
-    return status is not None and (
-        status in _CREDENTIAL_STATUSES or status in _BUSY_STATUSES or status >= _SERVER_ERROR
-    )
+    return status is None or status in _SUCCESS or status in NOT_THE_ERA_STATUSES
 
 
 def no_json_rpc_error(reply: RawReply, payload: Mapping[str, object] | None) -> bool:

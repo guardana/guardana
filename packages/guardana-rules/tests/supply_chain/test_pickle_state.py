@@ -15,6 +15,7 @@ import io
 import lzma
 import pickle
 import pickletools
+import re
 import struct
 import tarfile
 import zipfile
@@ -27,17 +28,22 @@ from guardana.core.report import ShortfallKind
 from guardana.core.rule import RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain import _pickle_state, pickle_opcode
 from guardana.rules.supply_chain._pickle_state import (
     ARRAY_UNREAD,
     DERIVED_CALL,
     DERIVED_STATE,
     DTYPE_LAYOUT,
     DTYPE_UNREAD,
+    ENTRIES_KEPT,
+    FIELDS_CHANGED,
     NDARRAY_UNREAD,
     NESTING_KEPT,
     REBUILD_UNREAD,
     SPARSE_TENSOR,
+    STORAGE_UNREAD,
     TUPLE_ITEMS_KEPT,
+    UNSET_MEMORY,
     VIEW_UNREAD,
 )
 from guardana.rules.supply_chain.pickle_opcode import PickleOpcodeRule, _PickleMachine
@@ -306,12 +312,14 @@ def test_a_number_dtype_keeps_its_own_item_size_whatever_the_state_says(
     assert unread == []
 
 
-_FIELDS = b"}" + _value("a") + _tuple(_float_dtype(), 0) + b"s"
-_STRUCTURED: _State = ("V8", (3, "|", None, _tuple("a"), _FIELDS, 8, 1, 16))
+_OBJECT_FIELD: _State = (
+    "V8",
+    (3, "|", None, _tuple("a"), b"}" + _value("a") + _tuple(_object_dtype(), 0) + b"s", 8, 1, 27),
+)
 _UNREAD_DTYPES: dict[str, tuple[_State, str]] = {
-    "fields": (_STRUCTURED, DTYPE_LAYOUT),
-    "subarray": (
-        ("V16", (3, "|", _tuple(_float_dtype(), _tuple(2)), None, None, 16, 8, 16)),
+    "an-object-field": (_OBJECT_FIELD, DTYPE_LAYOUT),
+    "a-subarray-of-objects": (
+        ("V16", (3, "|", _tuple(_object_dtype(), _tuple(2)), None, None, 16, 8, 63)),
         DTYPE_LAYOUT,
     ),
     "an-older-version": (("S3", (2, "|", None, None, None, 99, 1, 0)), DTYPE_UNREAD),
@@ -401,6 +409,301 @@ def test_a_dtype_state_a_call_returns_is_unproven(
 
     assert findings == outcome
     assert unread == [str(tmp_path / "model.pkl")] * len(outcome)
+
+
+def _fields(*entries: tuple[str, bytes], how: str = "setitems") -> bytes:
+    """A dict of `entries`, filled as protocols 1 to 5 fill one, by SETITEM, or made by DICT."""
+    pairs = b"".join(_value(key) + value for key, value in entries)
+    if how == "dict":
+        return b"(" + pairs + b"d"
+    if how == "setitem":
+        return b"}" + b"".join(_value(key) + value + b"s" for key, value in entries)
+    return b"}" + (b"(" + pairs + b"u" if entries else b"")
+
+
+def _structured(  # noqa: PLR0913 — one argument per part of the state numpy writes
+    size: int,
+    fields: dict[str, bytes],
+    *,
+    alignment: int = 1,
+    flags: int = 16,
+    how: str = "setitems",
+    names: tuple[str, ...] | None = None,
+) -> bytes:
+    """A structured dtype as numpy pickles one: `V<size>` given its names and fields by BUILD.
+
+    Every key of `fields` is a name unless `names` says otherwise, as for a title.
+    """
+    state = (
+        3,
+        "|",
+        None,
+        _tuple(*(fields if names is None else names)),
+        _fields(*fields.items(), how=how),
+        size,
+        alignment,
+        flags,
+    )
+    return _dtype(f"V{size}", state)
+
+
+def _subarray(size: int, base: bytes, shape: _Item, *, alignment: int = 1, flags: int = 0) -> bytes:
+    """A subarray dtype as numpy pickles one: `V<size>` given `(base, shape)` by BUILD."""
+    return _dtype(f"V{size}", (3, "|", _tuple(base, shape), None, None, size, alignment, flags))
+
+
+def _number(spec: str) -> bytes:
+    return _dtype(spec, (3, "<", None, None, None, -1, -1, 0))
+
+
+_I8, _F8, _U1, _F4 = _number("i8"), _float_dtype(), _number("u1"), _number("f4")
+_TREE_NODE = _structured(
+    64,
+    {
+        "left_child": _tuple(_I8, 0),
+        "right_child": _tuple(_I8, 8),
+        "feature": _tuple(_I8, 16),
+        "threshold": _tuple(_F8, 24),
+        "impurity": _tuple(_F8, 32),
+        "n_node_samples": _tuple(_I8, 40),
+        "weighted_n_node_samples": _tuple(_F8, 48),
+        "missing_go_to_left": _tuple(_U1, 56),
+    },
+)
+"""The node dtype of a scikit-learn decision tree, as numpy pickles it."""
+_POINT = _structured(8, {"x": _tuple(_F4, 0), "y": _tuple(_F4, 4)})
+_NUMPY_LAYOUTS: dict[str, bytes] = {
+    "a-tree-node": _TREE_NODE,
+    "packed": _structured(12, {"a": _tuple(_number("i4"), 0), "b": _tuple(_F8, 4)}),
+    "aligned": _structured(
+        32,
+        {"a": _tuple(_U1, 0), "b": _tuple(_number("c16"), 8), "c": _tuple(_number("f2"), 24)},
+        alignment=8,
+        flags=144,
+    ),
+    "titled": _structured(
+        2,
+        {"a": _tuple(_number("i2"), 0, "T"), "T": _tuple(_number("i2"), 0, "T")},
+        names=("a",),
+    ),
+    "nested": _structured(9, {"p": _tuple(_POINT, 0), "n": _tuple(_U1, 8)}),
+    "text-fields": _structured(
+        11,
+        {
+            "s": _tuple(_dtype("S3", (3, "|", None, None, None, 3, 1, 0)), 0),
+            "u": _tuple(_dtype("U2", (3, "<", None, None, None, 8, 4, 8)), 3),
+        },
+        flags=24,
+    ),
+    "a-subarray-field": _structured(
+        13, {"v": _tuple(_subarray(12, _F4, _tuple(3), alignment=4), 0), "i": _tuple(_U1, 12)}
+    ),
+    "no-fields": _structured(0, {}),
+    "a-subarray": _subarray(24, _F4, _tuple(2, 3), alignment=4),
+    "a-subarray-shaped-by-an-integer": _subarray(12, _F4, 3, alignment=4),
+    "a-subarray-of-a-structure": _subarray(
+        10,
+        _structured(5, {"x": _tuple(_U1, 0), "y": _tuple(_number("i4"), 1)}),
+        _tuple(2),
+        flags=16,
+    ),
+    "fields-set-one-by-one": _structured(
+        12, {"a": _tuple(_number("i4"), 0), "b": _tuple(_F8, 4)}, how="setitem"
+    ),
+    "fields-made-whole": _structured(
+        12, {"a": _tuple(_number("i4"), 0), "b": _tuple(_F8, 4)}, how="dict"
+    ),
+    "an-array-of-tree-nodes": _array(_TREE_NODE, (2,), b"C\x80" + bytes(128)),
+}
+"""What `numpy.dtype.__reduce__` returns for structured and subarray dtypes, as numpy 2 writes
+them; scikit-learn pickles a tree's nodes as an array of the first."""
+
+
+@pytest.mark.parametrize("made", _NUMPY_LAYOUTS.values(), ids=_NUMPY_LAYOUTS)
+def test_a_layout_numpy_writes_is_read_and_clean(tmp_path: Path, made: bytes) -> None:
+    findings, unread = _scan(tmp_path, _pickle(made))
+
+    assert findings == []
+    assert unread == []
+
+
+def _count_calls(monkeypatch: pytest.MonkeyPatch, name: str) -> list[tuple[object, ...]]:
+    """Record each call of the state module's function `name`."""
+    calls: list[tuple[object, ...]] = []
+    original = getattr(_pickle_state, name)
+
+    def counting(*args: object) -> object:
+        calls.append(args)
+        return original(*args)
+
+    monkeypatch.setattr(_pickle_state, name, counting)
+    return calls
+
+
+def test_a_wide_layout_applied_again_and_again_is_read_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    width, builds = 64, 1_000
+    reads, named = _count_calls(monkeypatch, "_read_fields"), _count_calls(monkeypatch, "_named")
+    entries: list[tuple[str, bytes]] = []
+    for at in range(width):
+        entries += [(f"n{at}", _tuple(_U1, at, f"t{at}")), (f"t{at}", _tuple(_U1, at, f"t{at}"))]
+    names = _tuple(*(f"n{at}" for at in range(width)))
+    dtype = _call(_global("numpy", "dtype"), f"V{width}", _FALSE, _TRUE)
+    content = _pickle(
+        names + b"q\x02" + _fields(*entries) + b"q\x03" + names + b"q\x04" + b"000",
+        _tuple(3, "|", None, b"h\x02", b"h\x03", width, 1, 16) + b"q\x05" + b"0",
+        # An equal names tuple of its own is judged on its own, once.
+        _tuple(3, "|", None, b"h\x04", b"h\x03", width, 1, 16) + b"q\x06" + b"0",
+        dtype + b"q\x01" + b"0",
+        b"h\x01h\x05b0h\x01h\x06b0" * (builds // 4),
+        (dtype + b"h\x05b0") * (builds // 2),
+        b"N",
+    )
+
+    findings, unread = _scan(tmp_path, content)
+
+    assert findings == []
+    assert unread == []
+    assert len(reads) == 1
+    assert len(named) == 2
+
+
+_FORGED_LAYOUTS: dict[str, bytes] = {
+    "an-offset-past-the-item": _structured(8, {"a": _tuple(_U1, 100)}),
+    "a-negative-offset": _structured(8, {"a": _tuple(_U1, -5)}),
+    "a-field-wider-than-the-item": _structured(8, {"a": _tuple(_I8, 4)}),
+    "a-title-past-the-item": _structured(
+        8, {"a": _tuple(_U1, 0, "T"), "T": _tuple(_U1, 9, "T")}, names=("a",)
+    ),
+    "a-nested-field-past-the-item": _structured(8, {"p": _tuple(_POINT, 1)}),
+    "a-subarray-wider-than-the-item": _subarray(8, _I8, _tuple(4)),
+    "an-item-size-other-than-the-type-string": _dtype(
+        "V8", (3, "|", None, _tuple("a"), _fields(("a", _tuple(_U1, 0))), 64, 1, 16)
+    ),
+    "object-flags-on-bytes": _structured(8, {"a": _tuple(_I8, 0)}, flags=27),
+    "flags-past-a-byte": _structured(8, {"a": _tuple(_I8, 0)}, flags=4096),
+    "a-field-added-before-the-state": _dtype(
+        "V8",
+        (
+            3,
+            "|",
+            None,
+            _tuple("a"),
+            _fields(("a", _tuple(_U1, 0))) + _value("b") + _tuple(_I8, 64) + b"s",
+            8,
+            1,
+            16,
+        ),
+    ),
+}
+"""Layouts numpy applies unchecked and never writes: each reads past the item or reads bytes
+as object pointers."""
+
+
+@pytest.mark.parametrize("made", _FORGED_LAYOUTS.values(), ids=_FORGED_LAYOUTS)
+def test_a_layout_that_reaches_outside_its_item_is_critical(tmp_path: Path, made: bytes) -> None:
+    findings, _unread = _scan(tmp_path, _pickle(made))
+
+    assert findings == [_critical(_DTYPE_STATE)]
+
+
+_DTYPE_CLASS = _call(_global("numpy.dtypes", "Float64DType"))
+_UNREAD_LAYOUTS: dict[str, bytes] = {
+    "an-object-field": _dtype(*_OBJECT_FIELD),
+    "a-structure-holding-an-object-field": _structured(8, {"o": _tuple(_dtype(*_OBJECT_FIELD), 0)}),
+    "a-field-of-a-dtype-class": _structured(8, {"a": _tuple(_DTYPE_CLASS, 0)}),
+    "a-field-of-an-unread-type-string": _structured(
+        8, {"a": _tuple(_call(_global("numpy", "dtype"), "<f8"), 0)}
+    ),
+    "a-name-missing-from-the-fields": _dtype(
+        "V8", (3, "|", None, _tuple("a", "b"), _fields(("a", _tuple(_U1, 0))), 8, 1, 16)
+    ),
+    "a-key-that-is-neither-a-name-nor-a-title": _dtype(
+        "V8",
+        (
+            3,
+            "|",
+            None,
+            _tuple("a"),
+            _fields(("a", _tuple(_U1, 0)), ("z", _tuple(_U1, 1))),
+            8,
+            1,
+            16,
+        ),
+    ),
+    "a-name-twice": _dtype(
+        "V8", (3, "|", None, _tuple("a", "a"), _fields(("a", _tuple(_U1, 0))), 8, 1, 16)
+    ),
+    "a-field-that-is-not-a-tuple": _structured(8, {"a": _value(0)}),
+    "an-offset-a-call-returns": _structured(
+        8, {"a": _tuple(_U1, _call(_global("builtins", "int"), "0"))}
+    ),
+    "a-title-that-is-not-text": _structured(8, {"a": _tuple(_U1, 0, 7)}),
+    "fields-a-call-made": _dtype(
+        "V8", (3, "|", None, _tuple("a"), _call(_global("builtins", "dict"), _list(0)), 8, 1, 16)
+    ),
+    "fields-given-to-a-call-first": _dtype(
+        "V8",
+        (
+            3,
+            "|",
+            None,
+            _tuple("a"),
+            _fields(("a", _tuple(_U1, 0)))
+            + b"q\x09"
+            + _call(_global("builtins", "type"), "x", _tuple(), b"h\x09")
+            + b"0",
+            8,
+            1,
+            16,
+        ),
+    ),
+    "a-subarray-narrower-than-the-item": _subarray(16, _I8, _tuple(1), alignment=8),
+    "a-subarray-of-an-unread-shape": _subarray(
+        16, _I8, _tuple(_call(_global("builtins", "int"), "2")), alignment=8
+    ),
+    "a-negative-subarray-dimension": _subarray(0, _I8, _tuple(-1), alignment=8),
+    "fields-and-a-subarray": _dtype(
+        "V8",
+        (3, "|", _tuple(_U1, _tuple(8)), _tuple("a"), _fields(("a", _tuple(_U1, 0))), 8, 1, 16),
+    ),
+    "fields-on-a-number": _dtype(
+        "i8", (3, "<", None, _tuple("a"), _fields(("a", _tuple(_U1, 0))), -1, -1, 16)
+    ),
+    "an-alignment-numpy-never-gives": _structured(8, {"a": _tuple(_U1, 0)}, alignment=3),
+    "more-keys-than-are-tracked": _structured(
+        ENTRIES_KEPT + 1, {f"f{index}": _tuple(_U1, index) for index in range(ENTRIES_KEPT + 1)}
+    ),
+}
+"""Layouts this scanner does not read whole: object fields, parts it lost track of, and states
+numpy never writes but may apply."""
+
+
+@pytest.mark.parametrize("made", _UNREAD_LAYOUTS.values(), ids=_UNREAD_LAYOUTS)
+def test_a_layout_this_scanner_cannot_read_is_unproven(tmp_path: Path, made: bytes) -> None:
+    findings, unread = _scan(tmp_path, _pickle(made))
+
+    assert findings == [_unproven(DTYPE_LAYOUT)]
+    assert unread == [str(tmp_path / "model.pkl")]
+
+
+_TAKEN = _fields(("a", _tuple(_U1, 0))) + b"q\x09"
+"""A fields dict kept in memo slot 9, to change after a dtype state takes it."""
+_TAKEN_BY_A_DTYPE = _dtype("V8", (3, "|", None, _tuple("a"), _TAKEN, 8, 1, 16)) + b"0"
+_CHANGED_FIELDS: dict[str, bytes] = {
+    "by-setitem": _TAKEN_BY_A_DTYPE + b"h\x09" + _value("b") + _tuple(_I8, 64) + b"s",
+    "by-setitems": _TAKEN_BY_A_DTYPE + b"h\x09(" + _value("b") + _tuple(_I8, 64) + b"u",
+    "by-a-call": _TAKEN_BY_A_DTYPE + _call(_global("builtins", "type"), "x", _tuple(), b"h\x09"),
+}
+
+
+@pytest.mark.parametrize("made", _CHANGED_FIELDS.values(), ids=_CHANGED_FIELDS)
+def test_fields_changed_after_a_dtype_took_them_are_unproven(tmp_path: Path, made: bytes) -> None:
+    findings, unread = _scan(tmp_path, _pickle(made + b"0N"))
+
+    assert findings == [_unproven(FIELDS_CHANGED)]
+    assert unread == [str(tmp_path / "model.pkl")]
 
 
 _MAKERS = {
@@ -1156,7 +1459,7 @@ _STATES_ON_ARRAYS: dict[str, tuple[bytes, _Outcome]] = {
         [],
     ),
     "a-state-a-call-made": (
-        _build(_FLOATS_OVER_BYTES, _call(_global("collections", "OrderedDict"))),
+        _build(_FLOATS_OVER_BYTES, _call(_global("collections", "deque"))),
         [_unproven(VIEW_UNREAD), _unproven(ARRAY_UNREAD)],
     ),
     "a-list-as-state": (
@@ -1184,7 +1487,7 @@ def test_a_state_applied_to_an_array_that_may_hold_memory_is_unproven(
 
 
 def test_an_unproven_state_says_why_the_pickle_was_not_cleared(tmp_path: Path) -> None:
-    (tmp_path / "model.pkl").write_bytes(_pickle(_dtype(*_STRUCTURED)))
+    (tmp_path / "model.pkl").write_bytes(_pickle(_dtype(*_OBJECT_FIELD)))
 
     findings = list(PickleOpcodeRule().run(ArtifactTarget(tmp_path), RuleContext()))
 
@@ -1202,6 +1505,181 @@ def test_a_sparse_tensor_is_unproven_once_however_often_it_is_rebuilt(tmp_path: 
 
     assert findings == [_unproven(SPARSE_TENSOR)]
     assert unread == [str(tmp_path / "model.pkl")]
+
+
+_FAR = _tuple(_F8, 1 << 40)
+"""A field whose offset reaches far past any item."""
+_D = _fields(("a", _tuple(_F8, 0))) + b"q\x09"
+"""A fields dict kept in memo slot 9."""
+_TAKES_D = _build(
+    _call(_global("numpy", "dtype"), "V8", _FALSE, _TRUE),
+    _tuple(3, "|", None, _tuple("a"), _D, 8, 1, 16),
+)
+_SCALAR = _global(_MULTIARRAY, "scalar")
+_UNTRACKED_ARGS = _call(_global("builtins", "tuple"), b"]" + b"(" + _object_dtype() + b"h\x09e")
+"""`(object dtype, D)` built by a call, so the reading holds the tuple as lost."""
+_ALIASES: dict[str, tuple[bytes, _Outcome]] = {
+    "changed-through-what-scalar-returns": (
+        _TAKES_D + b"0" + _SCALAR + _UNTRACKED_ARGS + b"R" + _value("a") + _FAR + b"s0N",
+        [_unproven(FIELDS_CHANGED)],
+    ),
+    "changed-through-a-persistent-id": (
+        _TAKES_D + b"0" + b"(h\x09Nt" + b"Q" + _value("a") + _FAR + b"s0N",
+        [_unproven(FIELDS_CHANGED)],
+    ),
+    "changed-unseen-before-a-dtype-took-it": (
+        _D
+        + b"0"
+        + _SCALAR
+        + _UNTRACKED_ARGS
+        + b"R"
+        + _value("a")
+        + _FAR
+        + b"s0"
+        + _build(
+            _call(_global("numpy", "dtype"), "V8", _FALSE, _TRUE),
+            _tuple(3, "|", None, _tuple("a"), b"h\x09", 8, 1, 16),
+        ),
+        [_unproven(DTYPE_LAYOUT)],
+    ),
+    "a-key-a-byte-string-names": (
+        _dtype("V8", (3, "|", None, _tuple("a"), b"}U\x01a" + _tuple(_U1, 0) + b"s", 8, 1, 16)),
+        [_unproven(DTYPE_LAYOUT)],
+    ),
+    "a-name-a-byte-string-gives": (
+        _dtype("V8", (3, "|", None, b"(U\x01at", _fields(("a", _tuple(_U1, 0))), 8, 1, 16)),
+        [_unproven(DTYPE_LAYOUT)],
+    ),
+    "a-dtype-holding-itself": (
+        _build(
+            _call(_global("numpy", "dtype"), "V8", _FALSE, _TRUE) + b"q\x08",
+            _tuple(
+                3, "|", None, _tuple("a"), b"}" + _value("a") + _tuple(b"h\x08", 0) + b"s", 8, 1, 16
+            ),
+        ),
+        [_unproven(DTYPE_LAYOUT)],
+    ),
+    "a-dtype-that-is-its-own-subarray": (
+        _build(
+            _call(_global("numpy", "dtype"), "V8", _FALSE, _TRUE) + b"q\x08",
+            _tuple(3, "|", _tuple(b"h\x08", _tuple(1)), None, None, 8, 1, 0),
+        ),
+        [_unproven(DTYPE_LAYOUT)],
+    ),
+    "changed-through-an-object-the-reading-lost": (
+        _TAKES_D
+        + b"0"
+        + _call(_global("builtins", "type"), "x", _tuple(), b"}")
+        + b"("
+        + _value("a")
+        + _FAR
+        + b"u0N",
+        [_unproven(FIELDS_CHANGED)],
+    ),
+    "a-field-dtype-given-a-state-after-another-took-it": (
+        _call(_global("numpy", "dtype"), "V8", _FALSE, _TRUE)
+        + b"q\x08"
+        + b"0"
+        + _structured(8, {"q": _tuple(b"h\x08", 0)})
+        + b"0"
+        + _build(
+            b"h\x08", _tuple(3, "|", None, _tuple("a"), _fields(("a", _tuple(_U1, 0))), 8, 1, 16)
+        ),
+        [_unproven(FIELDS_CHANGED)],
+    ),
+}
+"""Routes by which the fields numpy reads differ from those this reading holds: a dict
+changed through an object the reading lost, a key or name an unpickler decodes by its own
+encoding, and a dtype that holds itself, which numpy recurses into without end."""
+
+
+@pytest.mark.parametrize(("made", "outcome"), _ALIASES.values(), ids=_ALIASES)
+def test_fields_numpy_may_read_otherwise_are_unproven(
+    tmp_path: Path, made: bytes, outcome: _Outcome
+) -> None:
+    findings, unread = _scan(tmp_path, _pickle(made))
+
+    assert findings == outcome
+    assert unread == [str(tmp_path / "model.pkl")]
+
+
+def _reconstruct(shape: bytes, module: str = _MULTIARRAY) -> bytes:
+    """`_reconstruct(ndarray, shape, b'b')`, with no BUILD after it."""
+    return _call(_global(module, "_reconstruct"), _NDARRAY, shape, b"C\x01b")
+
+
+def _storage(kind: str, *args: _Item) -> bytes:
+    return _call(_global("torch", kind), *args)
+
+
+def test_a_dict_a_dict_maker_returns_is_new_so_filling_it_changes_no_fields(
+    tmp_path: Path,
+) -> None:
+    filled = {
+        maker: _call(_global(module, maker)) + b"(" + _value("a") + _FAR + b"u0"
+        for module, maker in (
+            ("collections", "OrderedDict"),
+            ("collections", "defaultdict"),
+            ("collections", "Counter"),
+            ("builtins", "dict"),
+        )
+    }
+
+    for made in filled.values():
+        findings, unread = _scan(tmp_path, _pickle(_TAKES_D + b"0" + made + b"N"))
+
+        assert findings == []
+        assert unread == []
+
+
+_UNSET: dict[str, tuple[bytes, _Outcome]] = {
+    "reconstructed-with-a-shape": (_reconstruct(_tuple(16)), [_unproven(UNSET_MEMORY)]),
+    "reconstructed-by-the-older-module": (
+        _reconstruct(_tuple(16), "numpy.core.multiarray"),
+        [_unproven(UNSET_MEMORY)],
+    ),
+    "reconstructed-with-a-shape-a-call-returns": (
+        _reconstruct(_call(_global("builtins", "tuple"), b"]")),
+        [_unproven(UNSET_MEMORY)],
+    ),
+    "ndarray-without-a-buffer": (_ndarray(_tuple(16), "u1"), [_unproven(UNSET_MEMORY)]),
+    "ndarray-over-none": (_ndarray(_tuple(16), "u1", None), [_unproven(UNSET_MEMORY)]),
+    "ndarray-of-the-default-dtype": (_ndarray(_tuple(2)), [_unproven(UNSET_MEMORY)]),
+    "a-byte-storage": (_storage("ByteStorage", 16), [_unproven(UNSET_MEMORY)]),
+    "an-untyped-storage": (_storage("UntypedStorage", 16), [_unproven(UNSET_MEMORY)]),
+    "a-storage-of-a-size-a-call-returns": (
+        _storage("FloatStorage", _call(_global("builtins", "int"), "16")),
+        [_unproven(STORAGE_UNREAD)],
+    ),
+    "a-storage-with-keyword-arguments": (
+        _global("torch", "ByteStorage") + _tuple(16) + b"}\x92",
+        [_unproven(STORAGE_UNREAD)],
+    ),
+    "set-by-a-later-state": (
+        _reconstruct(_tuple(1)) + b"q\x01" + b"0" + _build(b"h\x01", _FOUR_FLOATS),
+        [_unproven(VIEW_UNREAD)],
+    ),
+    "the-empty-array-numpy-writes": (_reconstructed(), []),
+    "ndarray-of-objects": (_ndarray(_tuple(16), "O"), []),
+    "ndarray-over-bytes": (_ndarray(_tuple(1), "f8", _BUFFER), []),
+    "ndarray-of-no-elements": (_ndarray(_tuple(0), "u1"), []),
+    "an-empty-storage": (_storage("ByteStorage"), []),
+    "a-storage-of-no-elements": (_storage("ByteStorage", 0), []),
+    "a-storage-copied-from-a-list": (_storage("ByteStorage", _list(3)), []),
+}
+"""numpy and torch allocate an array or a storage of a given size without setting its items,
+as `numpy.empty` does, so the loaded model holds whatever that memory held before; numpy sets
+object items to None. A later state that sets the items leaves only what it frees to judge."""
+
+
+@pytest.mark.parametrize(("made", "outcome"), _UNSET.values(), ids=_UNSET)
+def test_an_allocation_whose_contents_nothing_sets_is_unproven(
+    tmp_path: Path, made: bytes, outcome: _Outcome
+) -> None:
+    findings, unread = _scan(tmp_path, _pickle(made))
+
+    assert findings == outcome
+    assert unread == [str(tmp_path / "model.pkl")] * len(outcome)
 
 
 @pytest.mark.parametrize(
@@ -1559,7 +2037,7 @@ def _tar(members: dict[str, bytes]) -> bytes:
 
 
 _FORGED = _pickle(_array(_object_dtype(flags=0), (1,), _list(1)))
-_LAYOUT = _pickle(_dtype(*_STRUCTURED))
+_LAYOUT = _pickle(_dtype(*_OBJECT_FIELD))
 _SPARSE = _pickle(_call(_global("torch._utils", "_rebuild_sparse_tensor"), 0, _tuple()))
 
 
@@ -1773,6 +2251,62 @@ def test_states_applied_to_one_class_name_it_once_however_many_there_are(
     named = [ref for machine in machines for ref in machine.refs]
     assert len(named) >= 1_000
     assert len({id(ref) for ref in named}) == 1
+
+
+class _CountingPattern:
+    """A compiled pattern that counts the characters it is asked to match."""
+
+    def __init__(self, pattern: re.Pattern[str]) -> None:
+        self.pattern = pattern
+        self.read = 0
+
+    def fullmatch(self, text: str) -> re.Match[str] | None:
+        self.read += len(text)
+        return self.pattern.fullmatch(text)
+
+
+@pytest.mark.parametrize(
+    ("name", "header", "qualname"),
+    [("model.pkl", b"\x80\x04", "a" * 20_000), ("model.bin", b"", "a" * 20_000 + "-")],
+    ids=["a-named-pickle", "a-headerless-bin-naming-no-dotted-callable"],
+)
+def test_a_global_a_memo_repeats_is_judged_and_held_once_however_often(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, header: bytes, qualname: str
+) -> None:
+    """BINGET, BINGET, STACK_GLOBAL, POP names a long global again for six bytes."""
+    machines: list[_PickleMachine] = []
+    step = _PickleMachine.step
+
+    def recording(machine: _PickleMachine, op: pickletools.OpcodeInfo, arg: object) -> None:
+        if not any(seen is machine for seen in machines):
+            machines.append(machine)
+        step(machine, op, arg)
+
+    judged: list[int] = []
+    is_allowed = pickle_opcode._is_allowed
+
+    def counting(module: str, qualname: str) -> bool:
+        judged.append(len(module) + len(qualname))
+        return is_allowed(module, qualname)
+
+    identifier = _CountingPattern(pickle_opcode._IDENTIFIER)
+    monkeypatch.setattr(_PickleMachine, "step", recording)
+    monkeypatch.setattr(pickle_opcode, "_is_allowed", counting)
+    monkeypatch.setattr(pickle_opcode, "_IDENTIFIER", identifier)
+    repeats = 10_000
+    named = b"\x8c\x02os\x94X" + struct.pack("<I", len(qualname)) + qualname.encode()
+    content = header + named + b"\x94\x930" + b"h\x00h\x01\x930" * repeats + b"N."
+
+    findings, unread = _scan(tmp_path, content, name)
+
+    assert findings == ([_critical(f"os.{qualname}")] if header else [])
+    assert unread == []
+    once = len(qualname) + len("os.")
+    assert sum(judged) <= len(machines) * once
+    assert identifier.read <= 8 * once
+    kept = [ref for machine in machines for ref in machine.refs]
+    assert len(kept) > repeats
+    assert len({id(ref) for ref in kept}) <= len(machines)
 
 
 def test_a_reason_a_pickle_repeats_is_held_once_however_often(

@@ -1,6 +1,6 @@
 [project]
 name = "guardana-server"
-version = "1.4.0"
+version = "1.5.0"
 description = "Guardana collector: minimal FastAPI server that ingests and lists findings."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,7 +38,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Typing :: Typed",
 ]
-dependencies = ["fastapi>=0.162.5", "pydantic>=2.14.3", "psycopg[binary]>=3.3.9"]
+dependencies = ["fastapi>=0.165.0", "pydantic>=2.14.4", "psycopg[binary]>=3.3.9"]
 
 # The ASGI server is an extra, not a dependency: FastAPI builds the application,
 # and which server runs it is the deployment's decision — a site already running

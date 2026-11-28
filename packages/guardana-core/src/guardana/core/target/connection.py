@@ -154,12 +154,14 @@ class ResolvedConnection:
         meter: UsageMeter | None = None,
         transport: ChatTransport | None = None,
         inference_access_check: bool = False,
+        inference_key_check: bool = False,
     ) -> EndpointTarget:
         """Build the endpoint this connection reaches; the one place its fields become one.
 
         `transport` stands in for a built-in provider's network transport, as a test seam
         does; an adapter's own transport is never replaced by it. `inference_access_check`
-        asks the endpoint to offer the check that its chat route refuses no credential.
+        asks the endpoint to offer the check that its chat route refuses no credential;
+        `inference_key_check` adds the request with a key that cannot be valid.
         """
         return EndpointTarget(
             self.url,
@@ -170,6 +172,7 @@ class ResolvedConnection:
             transport=transport if self.transport is None else self.transport,
             meter=meter,
             inference_access_check=inference_access_check,
+            inference_key_check=inference_key_check,
         )
 
 

@@ -276,7 +276,7 @@ class ArtifactTarget(Target):
             self._names[directory] = filenames
             for filename in filenames:
                 path = directory / filename
-                if self._listed(path, inherited, siblings, sources):
+                if self._listed(path, inherited, siblings, sources, real_root):
                     self._admit(path, real_root, matches)
         self._keep_package_sources(sources, real_root, matches)
         self._kept.sort(key=lambda kept: kept.path)
@@ -332,13 +332,14 @@ class ArtifactTarget(Target):
         inherited: str | None,
         siblings: frozenset[str],
         sources: list[tuple[Path, str]],
+        real_root: str,
     ) -> bool:
         """Whether `path` stays in the listing; a file model loaders read stays even ignored.
 
         `inherited` is the ignore-file pattern that excluded a directory above `path`. A
-        link is judged by its name, so nothing is opened before the link itself is checked.
-        Python source the ignore file excludes goes to `sources`, to be judged by the package
-        roots once the walk is done.
+        link is judged as a model by its name, and its first bytes are read only once it is
+        known to lead to a file inside `real_root`. Python source the ignore file excludes goes
+        to `sources`, to be judged by the package roots once the walk is done.
         """
         # Imported here because the inventory imports this package.
         from guardana.core.inventory import (  # noqa: PLC0415
@@ -351,7 +352,9 @@ class ArtifactTarget(Target):
         pattern = inherited or self._matched(path, ExcludeSource.IGNORE_FILE)
         if pattern is None:
             return True
-        if not read_by_model_loaders(path, siblings, self._holds_model, by_name=_is_link(path)):
+        link = _is_link(path)
+        opens = not link or _refused_link(path, real_root) is None
+        if not read_by_model_loaders(path, siblings, self._holds_model, by_name=link, opens=opens):
             if named_as_python_source(path):
                 sources.append((path, pattern))
             return False

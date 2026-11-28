@@ -15,7 +15,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="w">
 <a class="logo" href="../index.html"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span>guard<b>ana</b></span></a>
-<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.4.0</span></a>
+<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.5.0</span></a>
 <nav class="links" aria-label="Primary">
 <a href="../docs/index.html" class="sm-keep">Docs</a>
 <a href="../docs/rules/index.html" class="sm-keep">Rules</a>
@@ -671,6 +671,11 @@ only by a query apart; it does not hide a short or guessable value.</p>
 <td><code>inference_access</code></td>
 <td><code>access_route</code>, <code>access_route_is_local</code>, <code>check_access</code> (<code>Added in Guardana 1.4.0</code>)</td>
 </tr>
+<tr>
+<td><code>InvalidKeyCheck</code></td>
+<td>none</td>
+<td><code>invalid_key_check</code>, <code>check_invalid_key</code> (<code>Added in Guardana 1.5.0</code>)</td>
+</tr>
 </tbody>
 </table></div>
 <p>Built-ins are <code>ArtifactTarget</code> (files: pickles, GGUF, ONNX, ML formats,
@@ -692,6 +697,7 @@ skipped as <code>not_applicable</code>, which <code>fail_on_skipped</code> and <
 a capability missing within a protocol it speaks stays a <code>missing_capability</code> gap, except
 for <code>inference_access</code>. A target declares it only when the operator requests the check with
 <code>guardana probe --require-auth</code> or, in Python, <code>EndpointTarget(..., inference_access_check=True)</code> (<code>Added in Guardana 1.4.0</code>).
+In Python, ask for the third request with <code>EndpointTarget(..., inference_access_check=True, inference_key_check=True)</code> (<code>Added in Guardana 1.5.0</code>).
 If the target does not declare it, a rule that needs it is skipped as <code>not_applicable</code>. A
 protocol one of your target's declared capabilities belongs to is spoken whatever
 <code>speaks()</code> returns: a subclass of <code>EndpointTarget</code> that adds <code>list_tools</code> speaks MCP too,
@@ -892,8 +898,11 @@ output); pair with <code>RefusingTransport</code> for the negative.</li>
 <li><code>FailingTransport</code> — an unreachable endpoint: every call raises the
 given error.</li>
 <li><code>ScriptedAccessTransport</code> — a chat route with scripted replies for requests
-with and without a key; it records, in order, whether each request carried a
-key. <code>Added in Guardana 1.4.0</code></li>
+with and without a key. <code>asked</code> records, in order, whether each request
+carried a key. <code>Added in Guardana 1.4.0</code> <code>invalid_key=</code> sets the reply for the
+generated key that cannot be valid and defaults to the <code>credentialed</code> reply.
+<code>Added in Guardana 1.5.0</code> <code>keys</code> records each request's key in order,
+with <code>None</code> for requests without a key. <code>Added in Guardana 1.5.0</code></li>
 <li><code>ScriptedAgentTransport</code> — plays a written agent run: one reply per round
 trip, one script per session, nothing repeated. What a declarative fixture's
 <code>turns:</code> builds, and what a Python fixture uses to script a run by hand.</li>

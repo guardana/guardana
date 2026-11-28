@@ -15,7 +15,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="w">
 <a class="logo" href="../index.html"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span>guard<b>ana</b></span></a>
-<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.4.0</span></a>
+<a class="vlink" href="https://github.com/guardana/guardana/releases"><span class="ver mono">v1.5.0</span></a>
 <nav class="links" aria-label="Primary">
 <a href="../docs/index.html" class="sm-keep">Docs</a>
 <a href="../docs/rules/index.html" class="sm-keep">Rules</a>
@@ -376,14 +376,15 @@ when listing it would cost more than listing a model. An archive of more than 10
 is reported not scanned (exit <code>2</code>) even when it holds no model, such as an image dataset.
 Exclude it with <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an
 archive), or scan the model's directory instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
-<h3 id="pickled-dtype-layouts-out-of-band-arrays-and-sparse-tensors-are-unverified">Pickled dtype layouts, out-of-band arrays and sparse tensors are unverified</h3>
-<p>Pickles holding <code>numpy</code> dtype fields or subarrays, arrays over out-of-band buffers, or
-sparse tensors, are unverified even when <code>numpy</code> or <code>torch</code> writes them (<code>indeterminate</code>,
-exit <code>2</code>, unless another finding fails the run). scikit-learn decision trees and random
-forests saved with <code>pickle</code> hold such a dtype and retain their <code>CRITICAL</code> import finding.
-Use a format that is not a pickle, such as <code>safetensors</code>, or exclude the file with
-<code>rules.paths_exclude</code>. Load untrusted pickles only with a loader that enforces its own
-allowlist, such as <code>torch.load(..., weights_only=True)</code>.</p>
+<h3 id="some-pickled-numpy-dtypes-out-of-band-arrays-and-sparse-tensors-are-unverified">Some pickled <code>numpy</code> dtypes, out-of-band arrays and sparse tensors are unverified</h3>
+<p>Pickled <code>numpy</code> dtypes are unverified even when <code>numpy</code> writes them if they have fields or
+subarrays that hold objects, more than 64 fields, a non-text field title, or field names or
+dict keys stored as byte strings. Arrays over out-of-band buffers (pickle protocol 5) and
+sparse tensors are unverified even when <code>numpy</code> or <code>torch</code> writes them. These cases return
+<code>indeterminate</code> (exit <code>2</code>), unless another finding fails the run.</p>
+<p>Use a non-pickle format such as <code>safetensors</code>, or exclude the file with <code>rules.paths_exclude</code>.
+Load untrusted pickles only with a loader that enforces its own allowlist, such as
+<code>torch.load(..., weights_only=True)</code>.</p>
 <h3 id="some-archives-of-unpacked-torchpackage-packages-are-not-scanned">Some archives of unpacked <code>torch.package</code> packages are not scanned</h3>
 <p>A zip or tar, compressed or not, holding a package root and a non-ASCII name not marked as
 UTF-8 is reported unread (exit <code>2</code>) unless another finding fails the run's policy. GNU
@@ -400,8 +401,9 @@ the directory they unpack to instead. <a href="usage-scan.html"><code>guardana s
 <p>A PAX-format tar holding a sparse file and any link, or a tar whose model member is stored
 sparse, can make the run <code>indeterminate</code> (exit <code>2</code>) unless another finding fails its
 policy. So can a zip named <code>.zip</code>, without a suffix or named as a tar, written to a pipe
-with data descriptors and bzip2, LZMA or encrypted members. GNU <code>tar</code> and <code>bsdtar</code> write
-the sparse layout; Python's <code>zipfile</code> writes streamed bzip2 or LZMA members. Under archive
+with data descriptors and encrypted members, members compressed by a method other than
+stored, deflate, bzip2 or LZMA, or LZMA members without an end marker. GNU <code>tar</code> and
+<code>bsdtar</code> write the sparse layout. Under archive
 names, affected files also include a web page saved as <code>.zip</code>, a compressed pickle or zip
 named as a compressed tar, and tars compressed with zstd, lzip, lz4, lzma, lzop or
 <code>compress</code>. Honest files named as archives that are not tars, such as a stored zip or a
@@ -417,6 +419,26 @@ command finds further into the file is not checked. Exclude affected archives wi
 <code>rules.paths_exclude</code> (the target's
 <code>.guardanaignore</code> cannot exclude an archive), or scan the directory they unpack to
 instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
+<h3 id="zstandard-compressed-files-are-not-decompressed">Zstandard-compressed files are not decompressed</h3>
+<p><code>pickle_opcode</code> does not decompress zstd, on any Python version, so the verdict does not
+depend on the one that runs the scan. A file holding zstd data is reported unread (exit <code>2</code>,
+unless another finding fails the run's policy) when it is named as a tar compressed with
+zstd (<code>.tar.zst</code>, <code>.tar.zstd</code>, <code>.tzst</code>) or as an archive (<code>.zip</code>, <code>.tar</code>), as a <code>.dat</code>,
+with no suffix, by a codec alone (<code>bundle.zst</code>), or as a model, an archive or a compressed
+file followed by <code>.zst</code> or <code>.zstd</code> (<code>model.pkl.zst</code>, <code>bundle.zip.zst</code>, <code>weights.tgz.zst</code>).
+Any other <code>.zst</code> or <code>.zstd</code> file (<code>data.jsonl.zst</code>) is left alone, and so
+is one under a name the rule reads by content (<code>.bin</code>, <code>.sav</code>, <code>.p</code>, <code>.model</code>, <code>.package</code>),
+which no model loader decompresses. A zip member compressed with zstd (method 93), which
+Python's <code>zipfile</code> decodes from 3.14 on, is reported unread the same way on every Python.
+Decompress such a file with the tool you use and scan
+the result.</p>
+<h3 id="a-torchpackage-saved-under-another-name-is-not-opened">A <code>torch.package</code> saved under another name is not opened</h3>
+<p><code>PackageImporter</code> opens a package zip under any name. <code>pickle_opcode</code> opens one saved as
+<code>.package</code>, under a name it reads as a model or an archive (<code>model.pt</code>, <code>model.zip</code>), or
+with no suffix; saved under another name, such as <code>model.txt</code>, it is not opened, and the
+run can end clean. A <code>.package</code> inside another zip or tar is reported unread as a nested
+archive (exit <code>2</code>, unless another finding fails the run's policy). Save packages as
+<code>.package</code>, or scan the directory a package unpacks to.</p>
 <h3 id="monitor-is-scheduled-not-passive"><code>monitor</code> is scheduled, not passive</h3>
 <p>It re-runs checks on an interval. It does not observe production traffic, cannot
 see what your real users are doing, and is not an inline control. Watching live
@@ -466,11 +488,18 @@ cue. It describes Guardana's transports, not the servers behind them: whether vL
 SGLang, llama.cpp and TGI agree on streaming, finish reasons or usage metadata is still a
 claim to check per deployment, not a guarantee.</p>
 <h3 id="an-authentication-verdict-covers-one-route-from-one-machine">An authentication verdict covers one route from one machine</h3>
-<p>A pass of the <code>--require-auth</code> check does not show that the server refuses wrong or
-expired keys. It also does not show what a key is allowed to do. The verdict covers
-<code>POST &lt;base-url&gt;/v1/chat/completions</code> as reached from the machine running <code>guardana</code>,
-through its proxy if one is set. Other routes and access from other networks are outside
-the check.
+<p>A server that accepts any <code>Authorization</code> value can pass <code>--require-auth</code> alone.
+With <code>--require-key-check</code>, a pass means the route refused a request without a
+credential and a request with one generated key that cannot be valid, and returned a
+completion to the configured key. Expired or revoked keys, valid keys of other
+accounts, and what a key is allowed to do are outside the check. The generated key
+starts with the fixed prefix <code>guardana-invalid-key-</code> and need not match the
+configured key's format. A server that checks only format can refuse the generated
+key and still pass while serving any other key of the right format, so a pass leaves
+open whether the server checks that it issued the key.</p>
+<p>The verdict covers <code>POST &lt;base-url&gt;/v1/chat/completions</code> as reached from the machine
+running <code>guardana</code>, through its proxy if one is set. Other routes and access from other
+networks are outside the check.
 See <a href="usage-probe.html#checking-chat-endpoint-authentication">checking chat endpoint authentication</a>.</p>
 <h3 id="a-recipe-records-what-you-declare-about-the-subject">A recipe records what you declare about the subject</h3>
 <p><code>subject.kind</code> says whether an application or a model harness answered, and Guardana

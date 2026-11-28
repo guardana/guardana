@@ -292,3 +292,13 @@ def test_a_data_file_under_a_name_that_says_nothing_is_not_a_model(tmp_path: Pat
     (tmp_path / "data.dat").write_bytes(b"\x89HDF\r\n\x1a\n" + bytes(16))
 
     assert _model_formats(tmp_path) == {}
+
+
+def test_a_pickle_with_no_header_is_a_model_when_it_imports_a_callable(tmp_path: Path) -> None:
+    system = b"cos\nsystem\n(S'id'\ntR."
+    (tmp_path / "model.sav").write_bytes(system)
+    (tmp_path / "model").write_bytes(b"(dp0\nVw\np1\nI1\ns.")
+    (tmp_path / "late.dat").write_bytes(b"(V" + b"a" * 1000 + b"\np0\n0" + system)
+    (tmp_path / "past.dat").write_bytes(b"(V" + b"a" * 70_000 + b"\np0\n0" + system)
+
+    assert _model_formats(tmp_path) == {"model.sav": "pickle", "late.dat": "pickle"}
